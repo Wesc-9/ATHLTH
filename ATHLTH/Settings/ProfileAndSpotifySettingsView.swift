@@ -8,6 +8,10 @@ struct ATHLTHEditProfileView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var gear: ProfileGearStore
 
+    // Allows the same header picker and upload/cropping flow to be
+    // reused from the profile hero instead of creating a second editor.
+    var onEditHeader: (() -> Void)? = nil
+
     @State private var displayName = ""
     @State private var username = ""
     @State private var bio = ""
@@ -30,8 +34,12 @@ struct ATHLTHEditProfileView: View {
             )
 
             ScrollView {
-                LazyVStack(spacing: 22) {
+                LazyVStack(spacing: 18) {
                     profileIdentityCard
+
+                    if let onEditHeader {
+                        profileHeaderEditingCard(onEditHeader: onEditHeader)
+                    }
 
                     VStack(spacing: 12) {
                         ATHLTHSectionHeader(title: "Public profile")
@@ -91,7 +99,12 @@ struct ATHLTHEditProfileView: View {
             }
             .scrollIndicators(.hidden)
         }
-        .navigationTitle("Edit Profile")
+        .navigationTitle(
+            ATHLTHLocalization.choose(
+                english: "Edit profile",
+                norwegian: "Rediger profil"
+            )
+        )
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
@@ -314,6 +327,108 @@ struct ATHLTHEditProfileView: View {
                 .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)
+        }
+    }
+
+
+    private func profileHeaderEditingCard(
+        onEditHeader: @escaping () -> Void
+    ) -> some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 34, height: 34)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: RoundedRectangle(cornerRadius: 11)
+                        )
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Profile header",
+                                norwegian: "Profilheader"
+                            )
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Select a built-in image or upload your own.",
+                                norwegian: "Velg standardbilde eller last opp ditt eget."
+                            )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+
+                GeometryReader { viewport in
+                    ZStack {
+                        if let headerURL = session.profile.headerImageURL {
+                            ATHLTHStorageImage(
+                                url: headerURL,
+                                maxPixelSize: 900
+                            ) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image.resizable().scaledToFill()
+                                default:
+                                    Image(
+                                        session.profile.headerArtworkName
+                                            ?? "ProfileHero"
+                                    )
+                                    .resizable().scaledToFill()
+                                }
+                            }
+                        } else {
+                            Image(
+                                session.profile.headerArtworkName
+                                    ?? "ProfileHero"
+                            )
+                            .resizable().scaledToFill()
+                        }
+                    }
+                    .frame(
+                        width: viewport.size.width,
+                        height: viewport.size.height
+                    )
+                    .clipped()
+                    .clipShape(
+                        RoundedRectangle(cornerRadius: 17, style: .continuous)
+                    )
+                }
+                .frame(height: 116)
+
+                Button(action: onEditHeader) {
+                    HStack {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Change profile header",
+                                norwegian: "Endre profilheader"
+                            ),
+                            systemImage: "photo.badge.arrow.down"
+                        )
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .padding(.horizontal, 14)
+                    .frame(height: 44)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: RoundedRectangle(cornerRadius: 14)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 
