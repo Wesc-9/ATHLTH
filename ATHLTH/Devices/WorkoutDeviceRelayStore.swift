@@ -256,6 +256,8 @@ final class WorkoutDeviceRelayStore:
     private let client: SupabaseClient
     private var listenerTask:
         Task<Void, Never>?
+    private var listeningUserID: UUID?
+    private var listenerGeneration: UUID?
 
     init(
         client:
@@ -370,78 +372,83 @@ final class WorkoutDeviceRelayStore:
             (WorkoutDeviceRelayCommand)
                 async throws -> Void
     ) {
-        guard
-            ATHLTHDeviceRole
-                .isIPhone,
-            currentUserID != nil
+        guard ATHLTHDeviceRole.isIPhone,
+              let userID = currentUserID
         else {
             stopListening()
             return
         }
 
-        guard listenerTask == nil
-        else {
-            return
+        if listenerTask != nil {
+            if listeningUserID == userID {
+                return
+            }
+            // A different account has signed in without a full restart.
+            // The previous channel must not consume the new account's work.
+            stopListening()
         }
 
-        listenerTask =
-            Task {
-                @MainActor [weak self] in
-                guard let self
-                else {
-                    return
-                }
+        let generation = UUID()
+        listeningUserID = userID
+        listenerGeneration = generation
+        listenerTask = Task { @MainActor [weak self] in
+            guard let self else { return }
 
-                await self.drainPending(
-                    process: process
+            defer {
+                // A stopped listener must never clear the handle of a newer
+                // listener that started during an account transition.
+                if self.listenerGeneration == generation {
+                    self.listenerTask = nil
+                    self.listeningUserID = nil
+                    self.listenerGeneration = nil
+                }
+            }
+
+            await self.drainPending(process: process)
+            guard !Task.isCancelled,
+                  self.currentUserID == userID
+            else { return }
+
+            // When a realtime stream finishes because of a network drop,
+            // re-subscribe while the same account remains active. Re-drain
+            // after subscribing to recover inserts missed during the gap.
+            while !Task.isCancelled && self.currentUserID == userID {
+                let channel = await self.client.channel(
+                    "workout-device-relay-\(userID.uuidString.lowercased())"
                 )
 
-                guard let userID =
-                        self
-                            .currentUserID
-                else {
-                    return
-                }
-
-                let channel =
-                    await self.client
-                        .channel(
-                            "workout-device-relay-\(userID.uuidString.lowercased())"
-                        )
-
-                let changes =
-                    await channel
-                        .postgresChange(
-                            InsertAction.self,
-                            schema: "public",
-                            table:
-                                "workout_device_commands"
-                        )
+                let changes = await channel.postgresChange(
+                    InsertAction.self,
+                    schema: "public",
+                    table: "workout_device_commands"
+                )
 
                 await channel.subscribe()
+                await self.drainPending(process: process)
 
                 for await _ in changes {
-                    guard
-                        !Task.isCancelled
-                    else {
-                        break
-                    }
+                    guard !Task.isCancelled,
+                          self.currentUserID == userID
+                    else { break }
 
-                    await self
-                        .drainPending(
-                            process:
-                                process
-                        )
+                    await self.drainPending(process: process)
                 }
 
-                await channel
-                    .unsubscribe()
+                await channel.unsubscribe()
+                guard !Task.isCancelled,
+                      self.currentUserID == userID
+                else { break }
+
+                try? await Task.sleep(for: .seconds(3))
             }
+        }
     }
 
     func stopListening() {
         listenerTask?.cancel()
         listenerTask = nil
+        listeningUserID = nil
+        listenerGeneration = nil
     }
 
     func refreshPending(
