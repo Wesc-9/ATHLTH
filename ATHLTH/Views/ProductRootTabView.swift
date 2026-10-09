@@ -5264,9 +5264,18 @@ struct ATHLTHTrainView: View {
                     premiumTrainBrandHeader
                     premiumTrainTabs
 
-                    if selectedSection == 1 {
+                    switch selectedSection {
+                    case 1:
                         ATHLTHTrainPlanPremiumView()
-                    } else {
+                    case 2:
+                        ATHLTHTrainLibraryPremiumView {
+                            selectedSection = 1
+                        }
+                    case 3:
+                        ATHLTHTrainProgressPremiumView {
+                            selectedSection = 1
+                        }
+                    default:
                         unfinishedWorkoutRecoveryCards
                         premiumTodayScreen
                     }
@@ -5754,12 +5763,12 @@ struct ATHLTHTrainView: View {
 
             premiumTrainTab(
                 ATHLTHLocalization.choose(
-                    english: "Exercises",
-                    norwegian: "Øvelser"
+                    english: "Library",
+                    norwegian: "Bibliotek"
                 ),
-                selected: false
+                selected: selectedSection == 2
             ) {
-                showingTrainExerciseLibrary = true
+                selectedSection = 2
             }
 
             premiumTrainTab(
@@ -5767,13 +5776,9 @@ struct ATHLTHTrainView: View {
                     english: "Progress",
                     norwegian: "Fremgang"
                 ),
-                selected: false
+                selected: selectedSection == 3
             ) {
-                if session.activePlan != nil {
-                    showingTrainPlanProgress = true
-                } else {
-                    selectedSection = 1
-                }
+                selectedSection = 3
             }
         }
         .padding(4)
