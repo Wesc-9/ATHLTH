@@ -95,6 +95,44 @@ final class AuditRegressionTests: XCTestCase {
     }
 
     @MainActor
+    func testAccountDeletionRemovesCoachTranscriptAndCachedInsight() throws {
+        try withDefaults { defaults in
+            let owner = UUID()
+            let cacheKey = "athlth.recoveryAIInsight.\(owner.uuidString).nb"
+            defaults.set(Data("Sensitive insight".utf8), forKey: cacheKey)
+            let conversation = RecoveryCoachConversationState(
+                messages: [
+                    RecoveryCoachMessage(
+                        role: .user,
+                        text: "Private fitness question"
+                    )
+                ],
+                quickQuestions: [],
+                contextSignature: nil
+            )
+            RecoveryCoachConversationPersistence.save(
+                conversation,
+                userID: owner
+            )
+            defer {
+                RecoveryCoachConversationPersistence.delete(userID: owner)
+            }
+
+            let session = AppSessionStore(defaults: defaults)
+            session.applyBackendBootstrap(bootstrap(owner))
+            XCTAssertNotNil(
+                RecoveryCoachConversationPersistence.load(userID: owner)
+            )
+
+            session.clearAfterAccountDeletion()
+            XCTAssertNil(
+                RecoveryCoachConversationPersistence.load(userID: owner)
+            )
+            XCTAssertNil(defaults.data(forKey: cacheKey))
+        }
+    }
+
+    @MainActor
     func testCoachLocalConversationCanBeDeletedWithoutAffectingOtherAccounts() {
         let first = UUID()
         let second = UUID()
