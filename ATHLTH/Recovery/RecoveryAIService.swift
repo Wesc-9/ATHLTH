@@ -508,8 +508,17 @@ final class RecoveryAIService {
 
     func generate(
         _ context: RecoveryAIContext,
+        authorizedUserID: UUID,
         bypassCache: Bool = false
     ) async throws -> RecoveryAIInsight {
+        // View state alone cannot authorize a third-party upload.
+        guard client.auth.currentUser?.id == authorizedUserID,
+              RecoveryInsightAIConsentPreferences.isAuthorized(
+                userID: authorizedUserID
+              ) else {
+            throw RecoveryInsightAIConsentError.notAuthorized
+        }
+
         let signature =
             try Self.cacheSignature(
                 for: context
@@ -558,10 +567,19 @@ final class RecoveryAIService {
                                 ? "nb"
                                 : "en",
                         history: nil,
-                        shareHealthData: nil
+                        shareHealthData: true
                     )
                 )
             )
+
+        // Consent may have been withdrawn during the network request.
+        // Never cache or present a revoked health-based insight.
+        guard client.auth.currentUser?.id == authorizedUserID,
+              RecoveryInsightAIConsentPreferences.isAuthorized(
+                userID: authorizedUserID
+              ) else {
+            throw RecoveryInsightAIConsentError.notAuthorized
+        }
 
         if let data = try? JSONEncoder().encode(
             RecoveryAIInsightCacheEntry(
