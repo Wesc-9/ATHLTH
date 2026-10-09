@@ -451,7 +451,7 @@ final class RecoveryAIService {
 
         let insight: RecoveryAIInsight =
             try await client.functions.invoke(
-                "recovery-sense",
+                "recovery-sense-v2",
                 options: FunctionInvokeOptions(
                     body: RecoveryAIRequest(
                         mode: "insight",
@@ -565,7 +565,7 @@ final class RecoveryAIService {
 
         let response: RecoveryAIAnswer =
             try await client.functions.invoke(
-                "recovery-sense",
+                "recovery-sense-v2",
                 options: FunctionInvokeOptions(
                     body: RecoveryAIRequest(
                         mode: "ask",
