@@ -94,6 +94,42 @@ final class AuditRegressionTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testCoachLocalConversationCanBeDeletedWithoutAffectingOtherAccounts() {
+        let first = UUID()
+        let second = UUID()
+        defer {
+            RecoveryCoachConversationPersistence.delete(userID: first)
+            RecoveryCoachConversationPersistence.delete(userID: second)
+        }
+
+        let saved = RecoveryCoachConversationState(
+            messages: [
+                RecoveryCoachMessage(
+                    role: .user,
+                    text: "Example private health question"
+                )
+            ],
+            quickQuestions: ["What's next?"],
+            contextSignature: nil
+        )
+
+        RecoveryCoachConversationPersistence.save(saved, userID: first)
+        XCTAssertEqual(
+            RecoveryCoachConversationPersistence.load(userID: first)?
+                .messages.first?.text,
+            "Example private health question"
+        )
+        XCTAssertNil(
+            RecoveryCoachConversationPersistence.load(userID: second)
+        )
+
+        RecoveryCoachConversationPersistence.delete(userID: first)
+        XCTAssertNil(
+            RecoveryCoachConversationPersistence.load(userID: first)
+        )
+    }
+
     private func withDefaults(_ body: (UserDefaults) throws -> Void) rethrows {
         let name = "ATHLTHTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
