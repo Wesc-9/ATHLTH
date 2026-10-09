@@ -11,6 +11,7 @@ struct ATHLTHTrainGoalHubView: View {
     let planID: UUID
     @State private var showingNewGoal = false
     @State private var showingLinkPicker = false
+    @State private var showingTrends = false
 
     private let ink = Color(red: 0.18, green: 0.18, blue: 0.17)
     private let muted = Color(red: 0.46, green: 0.45, blue: 0.43)
@@ -32,6 +33,29 @@ struct ATHLTHTrainGoalHubView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     introduction
                     if let plan {
+                        Button {
+                            showingTrends = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "chart.xyaxis.line")
+                                    .foregroundStyle(accent)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(tr("See exercise progress charts",
+                                            "Se grafer for treningsutvikling"))
+                                        .font(.subheadline.weight(.semibold))
+                                    Text(tr("Recorded load, volume and working sets",
+                                            "Registrert belastning, volum og arbeidssett"))
+                                        .font(.caption)
+                                        .foregroundStyle(muted)
+                                }
+                                Spacer()
+                                Image(systemName: "arrow.right")
+                            }
+                            .foregroundStyle(ink)
+                            .padding(15)
+                            .goalSurface(line: line)
+                        }
+                        .buttonStyle(.plain)
                         if linkedGoals.isEmpty {
                             noLinkedGoals
                         } else {
@@ -63,6 +87,9 @@ struct ATHLTHTrainGoalHubView: View {
             }
             .sheet(isPresented: $showingLinkPicker) {
                 ATHLTHTrainGoalLinkView(planID: planID)
+            }
+            .sheet(isPresented: $showingTrends) {
+                ATHLTHTrainTrendsView(planID: planID)
             }
         }
         .preferredColorScheme(.light)
