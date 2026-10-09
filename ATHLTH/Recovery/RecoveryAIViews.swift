@@ -478,7 +478,15 @@ struct RecoveryAIInsightCard: View {
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+        // All four signal tiles share one fixed size. The training load
+        // subtitle must never make its card taller or wider than the others.
+        .frame(
+            minWidth: 0,
+            maxWidth: .infinity,
+            minHeight: 86,
+            maxHeight: 86,
+            alignment: .topLeading
+        )
         .background(
             tint.opacity(0.055),
             in: RoundedRectangle(
