@@ -1635,7 +1635,8 @@ final class AppSessionStore: ObservableObject {
             updatedAt: Date(),
             startDate: proposedStart,
             endDate: proposedEnd,
-            builderProfile: source.builderProfile
+            builderProfile: source.builderProfile,
+            trainingBlocks: source.trainingBlocks
         )
 
         guard addTrainingPlan(duplicate) else {
@@ -3387,7 +3388,8 @@ final class AppSessionStore: ObservableObject {
             createdAt: Date(),
             updatedAt: Date(),
             startDate: nil,
-            builderProfile: source.builderProfile
+            builderProfile: source.builderProfile,
+            trainingBlocks: source.trainingBlocks
         )
 
         planTemplates.insert(template, at: 0)
@@ -3441,7 +3443,8 @@ final class AppSessionStore: ObservableObject {
             updatedAt: Date(),
             startDate: resolvedStartDate,
             endDate: resolvedEndDate,
-            builderProfile: template.builderProfile
+            builderProfile: template.builderProfile,
+            trainingBlocks: template.trainingBlocks
         )
 
         guard addTrainingPlan(plan) else {
@@ -3764,7 +3767,8 @@ final class AppSessionStore: ObservableObject {
             createdAt: Date(),
             updatedAt: Date(),
             startDate: nil,
-            builderProfile: source.builderProfile
+            builderProfile: source.builderProfile,
+            trainingBlocks: source.trainingBlocks
         )
         copy.sharedSourceOwnerID =
             source.sharedSourceOwnerID ?? sourceOwnerID ?? source.ownerID
