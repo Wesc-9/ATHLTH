@@ -7,14 +7,19 @@ begin;
 do $$
 declare
   exposed_count integer;
+  exposed_signatures text;
   total_count integer;
 begin
   select
     count(*) filter (
       where has_function_privilege('anon', p.oid, 'EXECUTE')
     ),
-    count(*)
-  into exposed_count, total_count
+    count(*),
+    string_agg(
+      format('%I.%I(%s)', n.nspname, p.proname, pg_get_function_identity_arguments(p.oid)),
+      ', '
+    ) filter (where has_function_privilege('anon', p.oid, 'EXECUTE'))
+  into exposed_count, total_count, exposed_signatures
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public'
@@ -25,8 +30,8 @@ begin
   end if;
 
   if exposed_count <> 0 then
-    raise exception '% SECURITY DEFINER functions became executable by anon',
-      exposed_count;
+    raise exception '% SECURITY DEFINER functions executable by anon: %',
+      exposed_count, exposed_signatures;
   end if;
 
   -- These tables are intentionally service-role-only.
