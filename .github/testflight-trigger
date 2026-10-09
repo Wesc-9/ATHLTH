@@ -80,3 +80,4 @@ ATHLTH 1.6.8 build 73 TestFlight upload 2026-10-08
 ATHLTH 1.6.8 build 73 TestFlight retry after Clubs archive fix 2026-10-08
 ATHLTH 1.6.8 build 73 TestFlight retry 2 after Clubs workaround removal 2026-10-08
 ATHLTH 1.6.8 build 74 TestFlight upload after Swift 6 APNs compile fix and native muscle map improvements 2026-10-08
+ATHLTH 1.6.9 build 75 TestFlight upload after four green CI checks for d96ea1b724a6194fefb44ac8acce6b3b4dfcf97e (2026-10-09)
