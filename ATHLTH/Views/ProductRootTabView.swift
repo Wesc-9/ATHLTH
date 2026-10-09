@@ -7122,11 +7122,12 @@ struct ATHLTHTrainView: View {
         planID: UUID,
         isHealthCompleted: Bool
     ) {
-        if isHealthCompleted ||
-            session.isPlanSessionManuallyCompleted(
-                planID: planID,
-                sessionID: workout.id
-            ) {
+        if session.isPlanSessionCompleted(
+            planID: planID,
+            sessionID: workout.id,
+            healthWorkouts: health.workouts,
+            strengthHistory: strengthWorkout.workoutHistory
+        ) {
             selectedPlanWorkout =
                 PlannedWorkoutSelection(
                     planID: planID,
@@ -8492,11 +8493,10 @@ struct ATHLTHTrainView: View {
                     planID: plan.id,
                     workout: workout,
                     isHealthCompleted:
-                        completed &&
-                        session.linkedHealthWorkoutID(
+                        healthCompletedTodaySessionIDs(
                             planID: plan.id,
-                            sessionID: workout.id
-                        ) != nil
+                            sessions: [workout]
+                        ).contains(workout.id)
                 )
         } label: {
             HStack(spacing: 10) {
@@ -10569,6 +10569,10 @@ struct ATHLTHTrainView: View {
         // Never infer that today's unrelated run completed a scheduled one.
         Set(
             sessions.filter {
+                !session.isPlanSessionManuallyCompleted(
+                    planID: planID,
+                    sessionID: $0.id
+                ) &&
                 session.linkedHealthWorkoutID(
                     planID: planID,
                     sessionID: $0.id
@@ -10577,7 +10581,7 @@ struct ATHLTHTrainView: View {
                     planID: planID,
                     sessionID: $0.id,
                     healthWorkouts: health.workouts,
-                    strengthHistory: strengthWorkout.workoutHistory
+                    strengthHistory: []
                 )
             }.map(\.id)
         )
