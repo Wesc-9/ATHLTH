@@ -5245,6 +5245,7 @@ struct ATHLTHTrainView: View {
     @State private var showingTrainPlanWorkspace = false
     @State private var showingTrainAllPlans = false
     @State private var showingTrainProgramCreation = false
+    @State private var showingTrainPlanProgress = false
     @State private var showingTrainExerciseLibrary = false
     @State private var selectedTrainPlanWeekIndex: Int?
 
@@ -5258,78 +5259,29 @@ struct ATHLTHTrainView: View {
 
     var body: some View {
         NavigationStack {
-            ATHLTHExclusiveHomeHeroLayout(
-                accent: Color.green.opacity(0.42),
-                showsTopSheen: false,
-                pullDownFadeBridge: true
-            ) {
-                ZStack(alignment: .topTrailing) {
-                    ATHLTHExclusiveHomeHero(
-                        imageName: "TrainHero",
-                        title: "Train",
-                        subtitle: "Build a stronger, healthier you."
-                    )
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    premiumTrainBrandHeader
+                    premiumTrainTabs
 
-                    ATHLTHTrainSectionSwitcher(
-                        titles: [
-                            ATHLTHLocalization.choose(
-                                english: "Today",
-                                norwegian: "I dag"
-                            ),
-                            ATHLTHLocalization.choose(
-                                english: "Plan",
-                                norwegian: "Plan"
-                            )
-                        ],
-                        selection: $selectedSection
-                    )
-                    .frame(
-                        maxWidth: .infinity,
-                        alignment: .leading
-                    )
-                    .padding(.top, 64)
-                    .padding(.leading, 16)
-                    .padding(.trailing, 68)
-
-                    Button {
-                        showingLibrary = true
-                    } label: {
-                        Image(systemName: "square.grid.2x2.fill")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 36, height: 36)
-                            .background(
-                                Color.black.opacity(0.20),
-                                in: Circle()
-                            )
-                            .overlay {
-                                Circle()
-                                    .stroke(
-                                        Color.white.opacity(0.30),
-                                        lineWidth: 0.8
-                                    )
-                            }
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Training Library")
-                    .padding(.top, 64)
-                    .padding(.trailing, 16)
-                }
-            } content: {
-                VStack(spacing: 15) {
-                    switch selectedSection {
-                    case 1:
+                    if selectedSection == 1 {
                         planContent
-                    default:
-                        todayContent
+                    } else {
+                        unfinishedWorkoutRecoveryCards
+                        premiumTodayScreen
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-                .padding(.bottom, 30)
-                .frame(maxWidth: 900)
+                .padding(.horizontal, 17)
+                .padding(.top, 18)
+                .padding(.bottom, 36)
+                .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
             }
+            .scrollIndicators(.hidden)
+            .background(
+                Color(red: 0.983, green: 0.976, blue: 0.964)
+                    .ignoresSafeArea()
+            )
             .navigationDestination(
                 isPresented: $showingLibrary
             ) {
@@ -5376,7 +5328,15 @@ struct ATHLTHTrainView: View {
                 AllTrainingPlansView()
             }
             .sheet(isPresented: $showingTrainProgramCreation) {
-                TrainingPlanCreationView()
+                ATHLTHTrainingPlanBuilderFlow(
+                    startsAtSourceChoice: false,
+                    initialAdvanced: false
+                )
+            }
+            .sheet(isPresented: $showingTrainPlanProgress) {
+                if let plan = session.activePlan {
+                    TrainingPlanProgressDetailView(planID: plan.id)
+                }
             }
             .sheet(item: $selectedPlanWorkout) { selection in
                 PlannedWorkoutDetailView(
@@ -5736,6 +5696,180 @@ struct ATHLTHTrainView: View {
                 )
             }
         }
+    }
+
+
+    // The reference-led Today design is isolated from the workout engine.
+    // The existing recording flows and plan workspace remain unchanged.
+    private var premiumTrainBrandHeader: some View {
+        HStack {
+            Text("A T H L T H")
+                .font(.system(size: 16, weight: .medium, design: .serif))
+                .foregroundStyle(Color(red: 0.18, green: 0.18, blue: 0.17))
+                .accessibilityLabel("ATHLTH")
+            Spacer()
+            Button {
+                showingLibrary = true
+            } label: {
+                Image(systemName: "square.grid.2x2")
+                    .font(.system(size: 17, weight: .regular))
+                    .foregroundStyle(Color(red: 0.25, green: 0.24, blue: 0.22))
+                    .frame(width: 37, height: 37)
+                    .background(
+                        Color.white.opacity(0.78),
+                        in: Circle()
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                ATHLTHLocalization.choose(
+                    english: "Training library",
+                    norwegian: "Treningsbibliotek"
+                )
+            )
+        }
+    }
+
+    private var premiumTrainTabs: some View {
+        HStack(spacing: 3) {
+            premiumTrainTab(
+                ATHLTHLocalization.choose(
+                    english: "Today",
+                    norwegian: "I dag"
+                ),
+                selected: selectedSection == 0
+            ) {
+                selectedSection = 0
+            }
+
+            premiumTrainTab(
+                ATHLTHLocalization.choose(
+                    english: "Plan",
+                    norwegian: "Plan"
+                ),
+                selected: selectedSection == 1
+            ) {
+                selectedSection = 1
+            }
+
+            premiumTrainTab(
+                ATHLTHLocalization.choose(
+                    english: "Exercises",
+                    norwegian: "Øvelser"
+                ),
+                selected: false
+            ) {
+                showingTrainExerciseLibrary = true
+            }
+
+            premiumTrainTab(
+                ATHLTHLocalization.choose(
+                    english: "Progress",
+                    norwegian: "Fremgang"
+                ),
+                selected: false
+            ) {
+                if session.activePlan != nil {
+                    showingTrainPlanProgress = true
+                } else {
+                    selectedSection = 1
+                }
+            }
+        }
+        .padding(4)
+        .background(
+            Color(red: 0.931, green: 0.919, blue: 0.903),
+            in: RoundedRectangle(cornerRadius: 13)
+        )
+    }
+
+    private func premiumTrainTab(
+        _ title: String,
+        selected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 11.5, weight: selected ? .semibold : .medium))
+                .foregroundStyle(
+                    selected
+                        ? Color.white
+                        : Color(red: 0.43, green: 0.41, blue: 0.39)
+                )
+                .frame(maxWidth: .infinity)
+                .frame(height: 36)
+                .background {
+                    if selected {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color(red: 0.17, green: 0.17, blue: 0.17))
+                    }
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    @ViewBuilder
+    private var premiumTodayScreen: some View {
+        let active = session.activePlan
+        let sessions = active.map { todaySessions(in: $0) } ?? []
+        let healthIDs: Set<UUID> = active.map {
+            healthCompletedTodaySessionIDs(
+                planID: $0.id,
+                sessions: sessions
+            )
+        } ?? []
+        let completedIDs: Set<UUID> = active.map {
+            completedTodaySessionIDs(
+                planID: $0.id,
+                sessions: sessions
+            )
+        } ?? []
+        let next = active.flatMap {
+            trainUpcomingWorkouts(in: $0, limit: 1).first
+        }
+        let progress = active.map {
+            session.trainingPlanProgress(
+                $0,
+                healthWorkouts: health.workouts,
+                strengthHistory: strengthWorkout.workoutHistory
+            ).completionFraction
+        } ?? 0
+
+        ATHLTHTrainTodayPremiumView(
+            plan: active,
+            sessions: sessions,
+            completedIDs: completedIDs,
+            healthCompletedIDs: healthIDs,
+            nextWorkoutTitle: next?.workout.title,
+            nextWorkoutDate: next?.date,
+            completionFraction: progress,
+            planPosition: active.map {
+                trainTodayPlanPositionText($0)
+            } ?? "",
+            onOpenPlan: { selectedSection = 1 },
+            onCreatePlan: { showingTrainProgramCreation = true },
+            onOpenLibrary: { showingLibrary = true },
+            onStartWorkout: { workout, healthCompleted in
+                guard let active else { return }
+                openTodayPrimaryWorkout(
+                    workout,
+                    planID: active.id,
+                    isHealthCompleted: healthCompleted
+                )
+            },
+            onWorkoutDetails: { workout, healthCompleted in
+                guard let active else { return }
+                selectedPlanWorkout = PlannedWorkoutSelection(
+                    planID: active.id,
+                    workout: workout,
+                    isHealthCompleted: healthCompleted
+                )
+            },
+            onQuickTrain: { kind in handleQuickStart(kind) },
+            onGhostRace: { showingGhostHub = true }
+        )
     }
 
     @ViewBuilder
