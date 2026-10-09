@@ -10994,6 +10994,22 @@ struct ATHLTHRecoveryView: View {
                                     isLoadingRecoveryAI
                             )
 
+                            Button {
+                                showingInsightAIConsentSheet = true
+                            } label: {
+                                Label(
+                                    insightText(
+                                        "AI privacy choices",
+                                        "AI-personvernvalg"
+                                    ),
+                                    systemImage: "lock.shield"
+                                )
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                            }
+                            .buttonStyle(.plain)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+
                             // Coach is now a dedicated next step instead of
                             // one of several utility buttons inside the score
                             // card. This keeps the primary insight cleaner and
@@ -11023,7 +11039,7 @@ struct ATHLTHRecoveryView: View {
                             if session.hasPaidAccess {
                                 ATHLTHCard {
                                     Label(
-                                        insightText("ATHLTH Coach health insights are off", "ATHLTH Coach-helseinnsikt er av"),
+                                        insightText("AI health insights are off", "AI-helseinnsikt er av"),
                                         systemImage: "lock.shield.fill"
                                     )
                                     .font(.headline)
@@ -11039,6 +11055,22 @@ struct ATHLTHRecoveryView: View {
                                         vertical: true
                                     )
                                     .padding(.top, 5)
+
+                                    Button {
+                                        showingInsightAIConsentSheet = true
+                                    } label: {
+                                        Label(
+                                            insightText(
+                                                "Choose AI insights",
+                                                "Velg AI-innsikt"
+                                            ),
+                                            systemImage: "lock.shield"
+                                        )
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .padding(.top, 8)
                                 }
                             }
                         }
