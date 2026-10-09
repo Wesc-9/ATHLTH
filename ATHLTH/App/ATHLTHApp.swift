@@ -173,12 +173,11 @@ struct ATHLTHApp: App {
     var body: some Scene {
         WindowGroup {
             if !appSession.signedIn &&
-                !appSession.previewModeEnabled &&
-                UIDevice.current.userInterfaceIdiom != .pad {
-                // Render sign-in before constructing the full workout,
-                // social and background-services environment tree.
-                // Compact iPhone simulators can otherwise remain on an
-                // empty first frame even while the process is alive.
+                !appSession.previewModeEnabled {
+                // Render signed-out onboarding directly on iPhone and iPad.
+                // Constructing the full AppRootView for signed-out iPads
+                // could leave an empty first frame while the process
+                // remained alive. Compatibility previews stay separate.
                 OnboardingFlowView()
                     .environmentObject(appSession)
                     .environmentObject(health)
