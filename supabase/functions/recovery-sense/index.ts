@@ -39,6 +39,8 @@ type RecoveryRequest = {
   question?: string | null;
   language?: "en" | "nb";
   history?: RecoveryChatTurn[];
+  // Explicitly set true only after the user confirms sending health data.
+  shareHealthData?: boolean;
 };
 
 const json = (body: Record<string, unknown>, status = 200) =>
@@ -435,7 +437,13 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Invalid request body." }, 400);
   }
 
-  const context = sanitizeContext(body.context);
+  // Privacy enforcement at the edge, not only in the iOS interface.
+  // An ordinary chat request never forwards raw health metrics to Groq.
+  const canShareHealth = body.mode !== "ask" ||
+    body.shareHealthData === true;
+  const context = sanitizeContext(
+    canShareHealth ? body.context : undefined,
+  );
   const responseLanguage =
     body.language === "nb" ? "Norwegian Bokmål" : "English";
   const languageInstruction =
@@ -447,7 +455,11 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Ask a recovery question first." }, 400);
     }
 
-    const history = sanitizeHistory(body.history);
+    // Earlier replies may contain health context. Include them only when
+    // the user explicitly approves this particular health-aware request.
+    const history = body.shareHealthData === true
+      ? sanitizeHistory(body.history)
+      : [];
 
     const response = await fetch("https://api.groq.com/openai/v1/responses", {
       method: "POST",
@@ -465,6 +477,7 @@ Deno.serve(async (req: Request) => {
 You are continuing an ATHLTH Coach conversation.
 - Use the supplied conversation history to understand follow-up questions and references such as "that", "tomorrow", or "what about strength?".
 - Answer the latest question directly in 2-5 short sentences.
+- If no recovery metrics were shared, say you do not have access to personal health data for this question. Never infer or invent such metrics.
 - Make the relationship to the supplied recovery data clear when relevant.
 - Do not repeat information from earlier answers unless it helps answer the latest question.
 - Return exactly three short follow-up questions that are useful next steps based on today's recovery context and the conversation so far.
