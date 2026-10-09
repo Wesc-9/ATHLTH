@@ -1314,6 +1314,34 @@ enum TrainingPlanBlockPurpose: String, Codable, Hashable, CaseIterable, Identifi
     }
 }
 
+/// An athlete-approved prescription adjustment within a specific training block.
+/// Applied workout IDs prevent the same operation from compounding unintentionally.
+enum TrainingBlockProgressionKind: String, Codable, Hashable, CaseIterable, Identifiable {
+    case weight
+    case repetitions
+    case recovery
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .weight:
+            return ATHLTHLocalization.choose(english: "Increase load", norwegian: "Øk belastning")
+        case .repetitions:
+            return ATHLTHLocalization.choose(english: "Increase reps", norwegian: "Øk repetisjoner")
+        case .recovery:
+            return ATHLTHLocalization.choose(english: "Recovery week", norwegian: "Lettere belastning")
+        }
+    }
+}
+
+struct TrainingBlockProgressionRule: Codable, Hashable {
+    var kind: TrainingBlockProgressionKind
+    var weightIncrementKilograms: Double = 2.5
+    var repetitionIncrement: Int = 1
+    var recoveryVolumeFactor: Double = 0.6
+    var recoveryWeightFactor: Double = 0.9
+}
+
 struct TrainingPlanBlock: Identifiable, Codable, Hashable {
     let id: UUID
     var title: String
@@ -1322,6 +1350,9 @@ struct TrainingPlanBlock: Identifiable, Codable, Hashable {
     var startWeek: Int
     var endWeek: Int
     var goal: String
+    // Optional metadata keeps existing blocks and plans readable.
+    var progressionRule: TrainingBlockProgressionRule? = nil
+    var progressedSessionIDs: [UUID]? = nil
 
     var weekCount: Int { max(0, endWeek - startWeek + 1) }
 
