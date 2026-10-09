@@ -478,10 +478,50 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
 
             guard !Task.isCancelled else { return }
 
+            // Participation is automatic for the current (or next) challenge.
+            // Enrolment happens once per user; no opt-in button is required.
+            var resolvedParticipants = loadedParticipants
+            var autoEnrollmentError: String?
+            let visibleChallenge = loadedChallenges
+                .filter { $0.isActive }
+                .sorted { $0.startsAt < $1.startsAt }
+                .first
+                ?? loadedChallenges
+                    .filter { $0.isUpcoming }
+                    .sorted { $0.startsAt < $1.startsAt }
+                    .first
+
+            if let userID = client.auth.currentUser?.id,
+               let visibleChallenge,
+               !resolvedParticipants.contains(where: {
+                   $0.challengeID == visibleChallenge.id &&
+                   $0.userID == userID
+               }) {
+                do {
+                    let enrolled: OfficialWeeklyChallengeParticipant = try await client
+                        .from("official_weekly_challenge_participants")
+                        .upsert(
+                            OfficialWeeklyChallengeParticipantWrite(
+                                challengeID: visibleChallenge.id,
+                                userID: userID,
+                                joinedAt: Date()
+                            )
+                        )
+                        .select()
+                        .single()
+                        .execute()
+                        .value
+                    resolvedParticipants.append(enrolled)
+                } catch {
+                    autoEnrollmentError = error.localizedDescription
+                }
+            }
+
+            guard !Task.isCancelled else { return }
             challenges = loadedChallenges
-            participants = loadedParticipants
+            participants = resolvedParticipants
             lastRefreshAt = Date()
-            errorMessage = nil
+            errorMessage = autoEnrollmentError
         } catch is CancellationError {
             return
         } catch {
@@ -654,6 +694,13 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
         if didUpdate {
             await refresh(force: true)
         }
+    }
+
+    func ensureParticipation(
+        for challenge: OfficialWeeklyChallenge
+    ) async {
+        guard !isJoined(challenge.id) else { return }
+        await join(challenge)
     }
 
     func join(_ challenge: OfficialWeeklyChallenge) async {
@@ -1797,54 +1844,16 @@ struct OfficialWeeklyChallengeCard: View {
 
                     Spacer(minLength: 8)
 
-                    if !joined {
-                        HStack(spacing: 9) {
-                            NavigationLink {
-                                OfficialWeeklyChallengeDetailView(
-                                    challengeID: challenge.id
-                                )
-                            } label: {
-                                Text("Details")
-                                    .font(.subheadline.weight(.bold))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 14)
-                                    .frame(height: 42)
-                                    .background(
-                                        Color.black.opacity(0.42),
-                                        in: Capsule()
-                                    )
-                                    .overlay {
-                                        Capsule()
-                                            .stroke(
-                                                Color.white.opacity(0.32),
-                                                lineWidth: 0.8
-                                            )
-                                    }
-                            }
-                            .buttonStyle(.plain)
-
-                            Button {
-                                Task {
-                                    await store.join(challenge)
-                                    await store.syncCompletionState(
-                                        workouts: health.workouts
-                                    )
-                                }
-                            } label: {
-                                HStack(spacing: 7) {
-                                    Text("Join Challenge")
-                                    Image(systemName: "arrow.right")
-                                }
-                                .font(.subheadline.weight(.bold))
-                                .foregroundStyle(ATHLTHTheme.primaryText)
-                                .padding(.horizontal, 17)
-                                .frame(height: 42)
-                                .background(.white, in: Capsule())
-                            }
-                            .buttonStyle(.plain)
-                        }
+                    NavigationLink {
+                        OfficialWeeklyChallengeDetailView(challengeID: challenge.id)
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .font(.headline.weight(.bold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .frame(width: 42, height: 42)
+                            .background(.white.opacity(0.88), in: Circle())
                     }
-                }
+                    .buttonStyle(.plain)
             }
             .padding(16)
 
@@ -1896,7 +1905,7 @@ struct OfficialWeeklyChallengeCard: View {
             )
         }
         .task(id: health.workouts.map(\.id)) {
-            guard joined else { return }
+            await store.ensureParticipation(for: challenge)
             await store.syncCompletionState(
                 workouts: health.workouts
             )
@@ -2039,7 +2048,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                 .navigationTitle("Weekly Challenge")
                 .navigationBarTitleDisplayMode(.inline)
                     .task(id: health.workouts.map(\.id)) {
-                        guard store.isJoined(challenge.id) else { return }
+                        await store.ensureParticipation(for: challenge)
                         await store.syncCompletionState(
                             workouts: health.workouts
                         )
@@ -2166,9 +2175,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                 HStack(alignment: .top, spacing: 16) {
                     VStack(alignment: .leading, spacing: 5) {
                         Text(
-                            store.isJoined(challenge.id)
-                                ? "YOUR WEEKLY TARGET"
-                                : "RECOMMENDED TARGET"
+                            "YOUR WEEKLY TARGET"
                         )
                         .font(.caption.weight(.bold))
                         .tracking(1.5)
@@ -2191,13 +2198,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                             .minimumScaleFactor(0.78)
 
                         Text(
-                            store.isJoined(challenge.id)
-                                ? progressStatusDescription(
-                                    for: challenge
-                                )
-                                : challengeFocusDescription(
-                                    for: challenge
-                                )
+                            progressStatusDescription(for: challenge)
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -2208,16 +2209,11 @@ struct OfficialWeeklyChallengeDetailView: View {
 
                         HStack(spacing: 7) {
                             Image(
-                                systemName:
-                                    store.isJoined(challenge.id)
-                                        ? "checkmark.circle.fill"
-                                        : "sparkles"
+                                systemName: "checkmark.circle.fill"
                             )
 
                             Text(
-                                store.isJoined(challenge.id)
-                                    ? progressStatus(for: challenge)
-                                    : challengeFocusTitle(for: challenge)
+                                progressStatus(for: challenge)
                             )
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.76)
@@ -2328,7 +2324,6 @@ struct OfficialWeeklyChallengeDetailView: View {
                     )
                 }
 
-                if store.isJoined(challenge.id) {
                     Button {
                         withAnimation(
                             .easeInOut(
@@ -2460,56 +2455,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                         }
                     }
                     .buttonStyle(.plain)
-                } else {
-                    Button {
-                        Task {
-                            await store.join(
-                                challenge
-                            )
-                            await store
-                                .syncCompletionState(
-                                    workouts:
-                                        health
-                                            .workouts
-                                )
-                        }
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(
-                                systemName: "plus"
-                            )
 
-                            Text("Join Challenge")
-
-                            Spacer()
-
-                            Image(
-                                systemName:
-                                    "arrow.right"
-                            )
-                        }
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                        .padding(
-                            .horizontal,
-                            18
-                        )
-                        .frame(
-                            maxWidth: .infinity
-                        )
-                        .frame(height: 56)
-                        .background(
-                            ATHLTHTheme.accentDeep,
-                            in:
-                                RoundedRectangle(
-                                    cornerRadius: 18,
-                                    style:
-                                        .continuous
-                                )
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
 
                 HStack(spacing: 10) {
                     Button {
@@ -2585,39 +2531,23 @@ struct OfficialWeeklyChallengeDetailView: View {
                     .buttonStyle(.plain)
                 }
 
-                if store.isJoined(challenge.id) {
-                    HStack {
-                        if store.isCompleted(challenge.id) {
-                            Label(
-                                "Challenge completed",
-                                systemImage: "checkmark.seal.fill"
-                            )
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.green)
-                        } else {
-                            Label(
-                                progressStatus(
-                                    for: challenge
-                                ),
-                                systemImage: "bolt.heart.fill"
-                            )
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(
-                                ATHLTHTheme.accentDeep
-                            )
-                        }
-
-                        Spacer()
-
-                        Button(role: .destructive) {
-                            Task {
-                                await store.leave(challenge)
-                            }
-                        } label: {
-                            Text("Leave")
-                                .font(.caption.weight(.semibold))
-                        }
+                HStack {
+                    if store.isCompleted(challenge.id) {
+                        Label(
+                            "Challenge completed",
+                            systemImage: "checkmark.seal.fill"
+                        )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.green)
+                    } else {
+                        Label(
+                            progressStatus(for: challenge),
+                            systemImage: "bolt.heart.fill"
+                        )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
                     }
+                    Spacer()
                 }
             }
             .padding(20)
@@ -2773,9 +2703,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                         .font(.title3.bold())
 
                     Text(
-                        store.isJoined(challenge.id)
-                            ? progressStatusDescription(for: challenge)
-                            : "Join to track your progress automatically."
+                        progressStatusDescription(for: challenge)
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -3251,12 +3179,6 @@ struct OfficialWeeklyChallengeDetailView: View {
     private func primaryProgressText(
         for challenge: OfficialWeeklyChallenge
     ) -> String {
-        guard store.isJoined(challenge.id) else {
-            return challenge.kind.targetText(
-                challenge.targetValue
-            )
-        }
-
         return resolvedProgressText(for: challenge)
     }
 
@@ -3443,10 +3365,6 @@ struct OfficialWeeklyChallengeDetailView: View {
     private func rankText(
         for challenge: OfficialWeeklyChallenge
     ) -> String {
-        guard store.isJoined(challenge.id) else {
-            return "—"
-        }
-
         guard let rank = store.rank(for: challenge.id) else {
             return "—"
         }
