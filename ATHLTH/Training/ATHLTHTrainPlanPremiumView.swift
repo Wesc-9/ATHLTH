@@ -51,6 +51,12 @@ struct ATHLTHTrainPlanPremiumView: View {
     }
 
     var body: some View {
+        editingSheets
+    }
+
+    // Small view fragments prevent SwiftUI's result-builder type checker
+    // from having to solve the entire planner and all of its sheets at once.
+    private var planContent: some View {
         VStack(alignment: .leading, spacing: 18) {
             header
             if let plan {
@@ -73,6 +79,10 @@ struct ATHLTHTrainPlanPremiumView: View {
         .onChange(of: highlightedPlanID) { _, next in
             focusedPlanID = next
         }
+    }
+
+    private var programSheets: some View {
+        planContent
         .sheet(isPresented: $showingCreation) {
             ATHLTHTrainProgramComposerView { planID in
                 focusedPlanID = planID
@@ -93,6 +103,10 @@ struct ATHLTHTrainPlanPremiumView: View {
                 TrainingPlanProgressDetailView(planID: plan.id)
             }
         }
+    }
+
+    private var insightsSheets: some View {
+        programSheets
         .sheet(isPresented: $showingGoals) {
             if let plan {
                 ATHLTHTrainGoalHubView(planID: plan.id)
@@ -108,6 +122,10 @@ struct ATHLTHTrainPlanPremiumView: View {
                 ATHLTHTrainRecoveryAdviceView(planID: plan.id)
             }
         }
+    }
+
+    private var editingSheets: some View {
+        insightsSheets
         .sheet(isPresented: $showingEditor) {
             if let plan {
                 ATHLTHTrainWeekBuilderView(
@@ -120,13 +138,10 @@ struct ATHLTHTrainPlanPremiumView: View {
             PlanMetadataEditorView(plan: item)
         }
         .sheet(item: $openingWorkout) { workout in
-            if let plan,
-               let day = plan.weeks.flatMap(\.days).first(where: {
-                   $0.sessions.contains(where: { $0.id == workout.id })
-               }) {
+            if let plan, let dayID = workoutDayID(workout, plan: plan) {
                 ATHLTHTrainWorkoutBuilderView(
                     planID: plan.id,
-                    dayID: day.id,
+                    dayID: dayID,
                     existingWorkout: workout
                 )
             }
@@ -147,6 +162,15 @@ struct ATHLTHTrainPlanPremiumView: View {
                 )
             }
         }
+    }
+
+    private func workoutDayID(_ workout: PlannedSession, plan: TrainingPlan) -> UUID? {
+        for week in plan.weeks {
+            for day in week.days where day.sessions.contains(where: { $0.id == workout.id }) {
+                return day.id
+            }
+        }
+        return nil
     }
 
     private var planChooser: some View {
