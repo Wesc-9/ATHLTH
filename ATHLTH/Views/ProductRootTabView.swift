@@ -5265,7 +5265,7 @@ struct ATHLTHTrainView: View {
                     premiumTrainTabs
 
                     if selectedSection == 1 {
-                        planContent
+                        ATHLTHTrainPlanPremiumView()
                     } else {
                         unfinishedWorkoutRecoveryCards
                         premiumTodayScreen
