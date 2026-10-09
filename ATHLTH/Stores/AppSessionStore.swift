@@ -547,6 +547,13 @@ final class AppSessionStore: ObservableObject {
             // Remove both separately from the regular training-data cleanup.
             RecoveryCoachConversationPersistence.delete(userID: deletedID)
             RecoveryCoachConsentPreferences.revoke(userID: deletedID)
+            RecoveryInsightAIConsentPreferences.removeForDeletedAccount(
+                userID: deletedID,
+                defaults: defaults
+            )
+            RecoveryInsightAIConsentPreferences.removeForDeletedAccount(
+                userID: deletedID
+            )
             for language in ["nb", "en"] {
                 let key = "athlth.recoveryAIInsight.\(deletedID.uuidString).\(language)"
                 defaults.removeObject(forKey: key)
