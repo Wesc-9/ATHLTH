@@ -5,6 +5,8 @@ import SwiftUI
 struct ATHLTHTrainWeekBuilderView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var strength: StrengthWorkoutStore
     @AppStorage("athlth.planWorkspace.advancedMode") private var advanced = false
 
     let planID: UUID
@@ -127,6 +129,12 @@ struct ATHLTHTrainWeekBuilderView: View {
                         "Fjerne \(request.title) fra planen? Registrert treningshistorikk blir ikke slettet."
                     )),
                     primaryButton: .destructive(Text(tr("Remove", "Fjern"))) {
+                        guard !session.isPlanSessionCompleted(
+                            planID: planID,
+                            sessionID: request.workoutID,
+                            healthWorkouts: health.workouts,
+                            strengthHistory: strength.workoutHistory
+                        ) else { return }
                         session.removeSession(
                             request.workoutID,
                             fromDay: request.dayID,
@@ -308,6 +316,7 @@ struct ATHLTHTrainWeekBuilderView: View {
                                 Label(tr("Move to a day", "Flytt til en dag"),
                                       systemImage: "calendar.badge.clock")
                             }
+                            .disabled(isCompleted(workout.id))
                             Button(role: .destructive) {
                                 removeRequest = .init(
                                     dayID: day.id,
@@ -317,6 +326,7 @@ struct ATHLTHTrainWeekBuilderView: View {
                             } label: {
                                 Label(tr("Remove", "Fjern"), systemImage: "trash")
                             }
+                            .disabled(isCompleted(workout.id))
                         } label: {
                             Image(systemName: "ellipsis")
                                 .foregroundStyle(ink)
@@ -419,6 +429,15 @@ struct ATHLTHTrainWeekBuilderView: View {
                 .foregroundStyle(muted)
             }
         }
+    }
+
+    private func isCompleted(_ workoutID: UUID) -> Bool {
+        session.isPlanSessionCompleted(
+            planID: planID,
+            sessionID: workoutID,
+            healthWorkouts: health.workouts,
+            strengthHistory: strength.workoutHistory
+        )
     }
 
     private func dayDate(_ index: Int) -> Date {
