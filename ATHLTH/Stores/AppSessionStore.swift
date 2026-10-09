@@ -2818,6 +2818,29 @@ final class AppSessionStore: ObservableObject {
         )
     }
 
+    /// Changes only the planning label and phase; completed workouts,
+    /// individual sets, and future prescriptions are not recalculated.
+    @discardableResult
+    func configureTrainingWeek(
+        planID: UUID,
+        weekID: UUID,
+        title: String,
+        phase: TrainingWeekStrengthPhase?
+    ) -> Bool {
+        guard var plan = trainingPlan(withID: planID),
+              let index = plan.weeks.firstIndex(where: { $0.id == weekID })
+        else { return false }
+
+        let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty, clean.count <= 80 else { return false }
+        plan.weeks[index].title = clean
+        plan.weeks[index].strengthPhase = phase
+        plan.version += 1
+        plan.updatedAt = Date()
+        replaceTrainingPlan(plan)
+        return true
+    }
+
     /// Fill only empty, future days using a selected week as the template.
     /// Original sessions and completion IDs are never replaced.
     @discardableResult
