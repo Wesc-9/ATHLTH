@@ -1315,6 +1315,211 @@ struct RecoveryCoachView: View {
         }
     }
 
+
+    // First-use opt-in for third-party AI; health sharing is a separate,
+    // default-off choice, and must still be confirmed for each message.
+    private var coachConsentSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 19) {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.system(size: 31, weight: .medium))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 65, height: 65)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: RoundedRectangle(cornerRadius: 21)
+                        )
+
+                    Text(recoveryAIText(
+                        "Before you chat with Coach",
+                        "Før du chatter med Coach"
+                    ))
+                    .font(.system(size: 27, weight: .bold, design: .rounded))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                    Text(recoveryAIText(
+                        "ATHLTH Coach uses the external AI provider Groq. Each message you send is processed by Groq to create an answer. Do not include information you do not want to share.",
+                        "ATHLTH Coach bruker den eksterne AI-leverandøren Groq. Hver melding du sender, behandles av Groq for å lage et svar. Ikke skriv informasjon du ikke ønsker å dele."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label(
+                            recoveryAIText(
+                                "AI chat (required to use Coach)",
+                                "AI-chat (nødvendig for å bruke Coach)"
+                            ),
+                            systemImage: "bubble.left.and.text.bubble.right"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        Text(recoveryAIText(
+                            "Choose 'Allow AI chat' below to allow your messages to be sent to Groq. You can decline without affecting other ATHLTH features.",
+                            "Velg «Tillat AI-chat» nedenfor for å tillate at meldingene sendes til Groq. Du kan avslå uten at andre ATHLTH-funksjoner påvirkes."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                        Divider()
+
+                        Toggle(isOn: $draftHealthPermission) {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(recoveryAIText(
+                                    "Allow optional health-data sharing",
+                                    "Tillat frivillig deling av helsedata"
+                                ))
+                                .font(.subheadline.weight(.semibold))
+
+                                Text(recoveryAIText(
+                                    "Sleep, HRV, resting heart rate, workout load, muscle recovery and check-in values. Off by default.",
+                                    "Søvn, HRV, hvilepuls, treningsbelastning, muskelrestitusjon og innsjekk. Av som standard."
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        .tint(ATHLTHTheme.accentDeep)
+
+                        Text(recoveryAIText(
+                            "This does not send health metrics automatically. Select 'Share health data' in the chat and confirm every individual transfer.",
+                            "Dette sender ikke helsemålinger automatisk. Velg «Del helsedata» i chatten og bekreft hver enkelt sending."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(17)
+                    .background(
+                        Color.white.opacity(0.94),
+                        in: RoundedRectangle(cornerRadius: 21)
+                    )
+
+                    NavigationLink {
+                        LegalDocumentView(kind: .privacy)
+                    } label: {
+                        Label(
+                            recoveryAIText(
+                                "Read the privacy policy",
+                                "Les personvernerklæringen"
+                            ),
+                            systemImage: "doc.text"
+                        )
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+
+                    Button {
+                        saveCoachConsent()
+                    } label: {
+                        Text(recoveryAIText(
+                            aiConsentApproved
+                                ? "Save privacy choices"
+                                : "Allow AI chat and continue",
+                            aiConsentApproved
+                                ? "Lagre personvernvalg"
+                                : "Tillat AI-chat og fortsett"
+                        ))
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 51)
+                        .background(
+                            ATHLTHTheme.accentDeep,
+                            in: RoundedRectangle(cornerRadius: 17)
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    if aiConsentApproved {
+                        Button(role: .destructive) {
+                            revokeCoachConsent()
+                        } label: {
+                            Text(recoveryAIText(
+                                "Withdraw AI permission",
+                                "Trekk tilbake AI-tillatelsen"
+                            ))
+                            .font(.subheadline.weight(.medium))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 7)
+                        }
+                    } else {
+                        Button {
+                            showingCoachConsentSheet = false
+                            dismiss()
+                        } label: {
+                            Text(recoveryAIText("Not now", "Ikke nå"))
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 7)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(22)
+                .frame(maxWidth: 560)
+                .frame(maxWidth: .infinity)
+            }
+            .background(ATHLTHTheme.canvas)
+            .navigationTitle(
+                recoveryAIText("Privacy choices", "Personvernvalg")
+            )
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .interactiveDismissDisabled(!aiConsentApproved)
+    }
+
+    @MainActor
+    private func loadCoachConsent() {
+        let saved = RecoveryCoachConsentPreferences.load(
+            userID: session.profile.userID
+        )
+        aiConsentApproved = saved != nil
+        healthConsentApproved = saved?.healthSharingAllowed ?? false
+        draftHealthPermission = healthConsentApproved
+        if !aiConsentApproved {
+            showingCoachConsentSheet = true
+        }
+    }
+
+    @MainActor
+    private func saveCoachConsent() {
+        let saved = RecoveryCoachConsentPreferences.approve(
+            userID: session.profile.userID,
+            healthSharingAllowed: draftHealthPermission
+        )
+        aiConsentApproved = true
+        healthConsentApproved = saved.healthSharingAllowed
+        if !healthConsentApproved {
+            shareHealthForNextQuestion = false
+            pendingHealthQuestion = nil
+        } else if pendingShareAfterConsent {
+            // Transfer still requires confirmation when the message is sent.
+            shareHealthForNextQuestion = true
+        }
+        pendingShareAfterConsent = false
+        showingCoachConsentSheet = false
+    }
+
+    @MainActor
+    private func revokeCoachConsent() {
+        RecoveryCoachConsentPreferences.revoke(
+            userID: session.profile.userID
+        )
+        aiConsentApproved = false
+        healthConsentApproved = false
+        shareHealthForNextQuestion = false
+        pendingHealthQuestion = nil
+        pendingShareAfterConsent = false
+        showingCoachConsentSheet = false
+        dismiss()
+    }
+
     private var coachConversationHero:
         some View {
         RecoveryCoachLegacyConversationHero(
