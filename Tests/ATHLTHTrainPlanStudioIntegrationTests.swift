@@ -202,4 +202,136 @@ final class ATHLTHTrainPlanStudioIntegrationTests: XCTestCase {
         XCTAssertEqual(finished.totalSessions, 2)
         XCTAssertEqual(finished.completedSessions, 1)
     }
+    @MainActor
+    func testCopyingFromPlanStudioCreatesIndependentSetIDs() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Copy safety", summary: "",
+            weekCount: 2,
+            startDate: Calendar.current.startOfDay(for: Date())
+        ))
+        let sourceDay = plan.weeks[0].days[0]
+        let targetDay = plan.weeks[1].days[0]
+        var source = workout()
+        var curl = PlannedExercise(
+            id: UUID(), exerciseID: nil,
+            embeddedExercise: ExerciseSnapshot(
+                name: "Bicepscurl", instructions: [],
+                primaryMuscles: ["biceps"],
+                secondaryMuscles: [], equipment: ["Manualer"],
+                imageURL: nil
+            ), sets: 2, reps: 10,
+            targetWeightKilograms: 12, targetRPE: nil,
+            restSeconds: 60, notes: nil
+        )
+        curl.setTargets = [
+            PlannedExerciseSetTarget(reps: 10, weightKilograms: 12),
+            PlannedExerciseSetTarget(reps: 8, weightKilograms: 14)
+        ]
+        source.exercises = [curl]
+        store.addSession(source, toDay: sourceDay.id, inPlan: plan.id)
+        let version = try XCTUnwrap(store.trainingPlan(withID: plan.id)).version
+        XCTAssertTrue(store.copyPlanStudioWorkout(
+            planID: plan.id, sourceWorkoutID: source.id,
+            targetDayID: targetDay.id, expectedVersion: version
+        ))
+
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let original = try XCTUnwrap(saved.weeks[0].days[0].sessions.first)
+        let copied = try XCTUnwrap(saved.weeks[1].days[0].sessions.first)
+        XCTAssertNotEqual(original.id, copied.id)
+        XCTAssertNotEqual(original.exercises[0].id, copied.exercises[0].id)
+        XCTAssertEqual(original.exercises[0].setTargets?.map(\.weightKilograms),
+                       copied.exercises[0].setTargets?.map(\.weightKilograms))
+        XCTAssertNotEqual(original.exercises[0].setTargets?.map(\.id),
+                          copied.exercises[0].setTargets?.map(\.id))
+        XCTAssertFalse(store.copyPlanStudioWorkout(
+            planID: plan.id, sourceWorkoutID: source.id,
+            targetDayID: targetDay.id, expectedVersion: version
+        ))
+    }
+
+    @MainActor
+    func testMovingPlannedWorkoutCannotMoveCompletedOrStaleSession() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let today = Calendar.current.startOfDay(for: Date())
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Safe move", summary: "",
+            weekCount: 1, startDate: today
+        ))
+        let sourceDay = plan.weeks[0].days[0]
+        let original = workout()
+        store.addSession(original, toDay: sourceDay.id, inPlan: plan.id)
+        let version = try XCTUnwrap(store.trainingPlan(withID: plan.id)).version
+        let tomorrow = try XCTUnwrap(Calendar.current.date(
+            byAdding: .day, value: 1, to: today
+        ))
+
+        store.setPlanSessionManuallyCompleted(
+            planID: plan.id, sessionID: original.id, completed: true
+        )
+        XCTAssertFalse(store.movePlanStudioWorkout(
+            planID: plan.id, workoutID: original.id, targetDate: tomorrow,
+            expectedVersion: version, healthWorkouts: [], strengthHistory: []
+        ))
+        store.setPlanSessionManuallyCompleted(
+            planID: plan.id, sessionID: original.id, completed: false
+        )
+        XCTAssertTrue(store.movePlanStudioWorkout(
+            planID: plan.id, workoutID: original.id, targetDate: tomorrow,
+            expectedVersion: version, healthWorkouts: [], strengthHistory: []
+        ))
+        XCTAssertFalse(store.movePlanStudioWorkout(
+            planID: plan.id, workoutID: original.id, targetDate: today,
+            expectedVersion: version, healthWorkouts: [], strengthHistory: []
+        ))
+
+        let moved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertTrue(moved.weeks[0].days[0].sessions.isEmpty)
+        XCTAssertEqual(moved.weeks[0].days[1].sessions.map(\.id), [original.id])
+    }
+
+    @MainActor
+    func testRemovePlanStudioWorkoutProtectsCompletedAndStaleEditors() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Safe removal", summary: "",
+            weekCount: 1,
+            startDate: Calendar.current.startOfDay(for: Date())
+        ))
+        let dayID = plan.weeks[0].days[0].id
+        let original = workout()
+        store.addSession(original, toDay: dayID, inPlan: plan.id)
+        let version = try XCTUnwrap(store.trainingPlan(withID: plan.id)).version
+
+        store.setPlanSessionManuallyCompleted(
+            planID: plan.id, sessionID: original.id, completed: true
+        )
+        XCTAssertFalse(store.removePlanStudioWorkout(
+            planID: plan.id, workoutID: original.id,
+            dayID: dayID, expectedVersion: version,
+            healthWorkouts: [], strengthHistory: []
+        ))
+        store.setPlanSessionManuallyCompleted(
+            planID: plan.id, sessionID: original.id, completed: false
+        )
+        store.addSession(workout(name: "New session"), toDay: dayID, inPlan: plan.id)
+        XCTAssertFalse(store.removePlanStudioWorkout(
+            planID: plan.id, workoutID: original.id,
+            dayID: dayID, expectedVersion: version,
+            healthWorkouts: [], strengthHistory: []
+        ))
+        let latest = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertTrue(store.removePlanStudioWorkout(
+            planID: plan.id, workoutID: original.id, dayID: dayID,
+            expectedVersion: latest.version,
+            healthWorkouts: [], strengthHistory: []
+        ))
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertEqual(saved.weeks[0].days[0].sessions.count, 1)
+    }
+
 }
