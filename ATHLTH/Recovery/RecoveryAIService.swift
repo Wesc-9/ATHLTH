@@ -282,13 +282,26 @@ enum RecoveryCoachConversationPersistence {
                     withIntermediateDirectories:
                         true
                 )
+            // Conversations may include health information voluntarily
+            // entered by the user. Protect them while the device is locked
+            // and keep this device-only cache out of system backups.
             try data.write(
                 to: url,
-                options: .atomic
+                options: [.atomic, .completeFileProtection]
+            )
+            var protectedURL = url
+            try protectedURL.setResourceValue(
+                true,
+                forKey: .isExcludedFromBackupKey
             )
         } catch {
             return
         }
+    }
+
+    static func delete(userID: UUID) {
+        let url = conversationURL(userID: userID)
+        try? FileManager.default.removeItem(at: url)
     }
 
     private static func conversationURL(
