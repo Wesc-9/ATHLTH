@@ -92,29 +92,24 @@ struct ATHLTHTrainPlanPremiumView: View {
         }
         .sheet(isPresented: $showingEditor) {
             if let plan {
-                NavigationStack {
-                    ScrollView {
-                        AdvancedPlannerView(
-                            planID: plan.id,
-                            showsEmptyState: false
-                        )
-                        .padding(16)
-                    }
-                    .background(paper.ignoresSafeArea())
-                    .navigationTitle(tr("Plan editor", "Rediger treningsplan"))
-                    .navigationBarTitleDisplayMode(.inline)
-                }
+                ATHLTHTrainWeekBuilderView(
+                    planID: plan.id,
+                    initialWeekIndex: selectedWeekIndex ?? currentWeekIndex(plan)
+                )
             }
         }
         .sheet(item: $editingPlan) { item in
             PlanMetadataEditorView(plan: item)
         }
         .sheet(item: $openingWorkout) { workout in
-            if let plan {
-                PlannedWorkoutDetailView(
+            if let plan,
+               let day = plan.weeks.flatMap(\.days).first(where: {
+                   $0.sessions.contains(where: { $0.id == workout.id })
+               }) {
+                ATHLTHTrainWorkoutBuilderView(
                     planID: plan.id,
-                    workout: workout,
-                    isHealthCompleted: false
+                    dayID: day.id,
+                    existingWorkout: workout
                 )
             }
         }
@@ -128,7 +123,7 @@ struct ATHLTHTrainPlanPremiumView: View {
             }
         )) {
             if let plan, let dayID = editingDayID {
-                SessionEditorView(
+                ATHLTHTrainWorkoutBuilderView(
                     planID: plan.id,
                     dayID: dayID
                 )
