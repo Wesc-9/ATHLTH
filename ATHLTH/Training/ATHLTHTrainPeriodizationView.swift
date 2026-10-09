@@ -23,6 +23,7 @@ struct ATHLTHTrainPeriodizationView: View {
     @State private var resultMessage = ""
     @State private var showingNewBlock = false
     @State private var editingBlock: TrainingPlanBlock?
+    @State private var progressionBlock: TrainingPlanBlock?
 
     private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
     private let muted = Color(red: 0.47, green: 0.45, blue: 0.43)
@@ -134,6 +135,12 @@ struct ATHLTHTrainPeriodizationView: View {
                         existingBlock: block
                     )
                 }
+            }
+            .sheet(item: $progressionBlock) { block in
+                ATHLTHTrainBlockProgressionView(
+                    planID: planID,
+                    blockID: block.id
+                )
             }
             .onAppear(perform: refreshEditor)
             .onChange(of: chosenWeekIndex) { _, _ in refreshEditor() }
@@ -305,6 +312,7 @@ struct ATHLTHTrainPeriodizationView: View {
                 .periodSurface(border: border)
             } else {
                 ForEach(blocks) { block in
+                    VStack(spacing: 7) {
                     Button {
                         editingBlock = block
                     } label: {
@@ -342,12 +350,38 @@ struct ATHLTHTrainPeriodizationView: View {
                         .periodSurface(border: border)
                     }
                     .buttonStyle(.plain)
+                    if advanced {
+                        Button {
+                            progressionBlock = block
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "arrow.up.forward")
+                                    .foregroundStyle(bronze)
+                                Text(tr("Adjust this block's workouts",
+                                        "Juster progresjon i blokken"))
+                                    .font(.caption.weight(.semibold))
+                                Spacer()
+                                if block.progressionRule != nil {
+                                    Image(systemName: "checkmark.circle")
+                                        .foregroundStyle(bronze)
+                                }
+                                Image(systemName: "chevron.right")
+                                    .font(.caption2)
+                            }
+                            .foregroundStyle(ink)
+                            .padding(.horizontal, 14)
+                            .frame(height: 40)
+                            .background(paleGold, in: RoundedRectangle(cornerRadius: 10))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    }
                 }
             }
 
             Text(tr(
-                "Blocks are planning labels. Your actual workouts and completion history remain unchanged.",
-                "Blokkene beskriver planen. Økter og treningshistorikk endres ikke."
+                "Workouts are adjusted only when you review and approve a proposal. Training history is always preserved.",
+                "Økter justeres bare når du kontrollerer og godkjenner et forslag. Treningshistorikken beholdes."
             ))
             .font(.caption)
             .foregroundStyle(muted)
