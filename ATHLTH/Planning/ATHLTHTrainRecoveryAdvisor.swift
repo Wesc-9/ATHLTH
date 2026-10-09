@@ -149,6 +149,7 @@ enum ATHLTHTrainRecoveryAdvisor {
         guard proposed.exercises != original.exercises else { return nil }
         // The original remains available for an exact one-tap reversal.
         proposed.recoveryOriginalExercises = original.exercises
+        proposed.recoveryAdjustedExercises = proposed.exercises
         proposed.recoveryAdjustedAt = Date()
         return proposed
     }
