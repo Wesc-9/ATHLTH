@@ -14896,25 +14896,29 @@ struct ATHLTHProfileView: View {
                         spacing: 14
                     ) {
                         ZStack(alignment: .bottomTrailing) {
-                            Button {
-                                showingProfilePhotoPicker =
-                                    true
+                            NavigationLink {
+                                ATHLTHEditProfileView(
+                                    onEditHeader: {
+                                        showingHeaderPicker = true
+                                    }
+                                )
                             } label: {
                                 profileAvatar
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel(
                                 ATHLTHLocalization.choose(
-                                    english:
-                                        "Change profile photo",
-                                    norwegian:
-                                        "Bytt profilbilde"
+                                    english: "Edit profile",
+                                    norwegian: "Rediger profil"
                                 )
                             )
 
-                            Button {
-                                showingProfilePhotoPicker =
-                                    true
+                            NavigationLink {
+                                ATHLTHEditProfileView(
+                                    onEditHeader: {
+                                        showingHeaderPicker = true
+                                    }
+                                )
                             } label: {
                                 Group {
                                     if updatingProfilePhoto {
@@ -14971,15 +14975,10 @@ struct ATHLTHProfileView: View {
                                 )
                             }
                             .buttonStyle(.plain)
-                            .disabled(
-                                updatingProfilePhoto
-                            )
                             .accessibilityLabel(
                                 ATHLTHLocalization.choose(
-                                    english:
-                                        "Change profile photo",
-                                    norwegian:
-                                        "Bytt profilbilde"
+                                    english: "Edit profile, photo and header",
+                                    norwegian: "Rediger profil, profilbilde og profilheader"
                                 )
                             )
                             .offset(
@@ -15008,18 +15007,7 @@ struct ATHLTHProfileView: View {
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.70)
 
-                                if trophyStore
-                                    .unlockedCount > 0 {
-                                    Image(
-                                        systemName:
-                                            "checkmark.seal.fill"
-                                    )
-                                    .font(.system(size: 16))
-                                    .foregroundStyle(
-                                        ATHLTHTheme
-                                            .premiumGold
-                                    )
-                                }
+
                             }
 
                             if !session.profile
@@ -15092,66 +15080,6 @@ struct ATHLTHProfileView: View {
             alignment: .topTrailing
         ) {
             HStack(spacing: 10) {
-                Button {
-                    showingHeaderPicker =
-                        true
-                } label: {
-                    Group {
-                        if updatingProfileHeader {
-                            ProgressView()
-                                .controlSize(
-                                    .small
-                                )
-                                .tint(.white)
-                        } else {
-                            Image(
-                                systemName:
-                                    "photo.on.rectangle.angled"
-                            )
-                            .font(
-                                .system(
-                                    size: 16,
-                                    weight:
-                                        .semibold
-                                )
-                            )
-                        }
-                    }
-                    .foregroundStyle(.white)
-                    .frame(
-                        width: 42,
-                        height: 42
-                    )
-                    .background(
-                        Color.black.opacity(
-                            0.30
-                        ),
-                        in: Circle()
-                    )
-                    .overlay {
-                        Circle()
-                            .stroke(
-                                Color.white.opacity(
-                                    0.30
-                                ),
-                                lineWidth:
-                                    0.8
-                            )
-                    }
-                }
-                .buttonStyle(.plain)
-                .disabled(
-                    updatingProfileHeader
-                )
-                .accessibilityLabel(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Change profile header",
-                        norwegian:
-                            "Bytt profilheader"
-                    )
-                )
-
                 NavigationLink {
                     ATHLTHSettingsView()
                 } label: {
