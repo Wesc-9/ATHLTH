@@ -18,6 +18,7 @@ struct ATHLTHTrainBlockProgressionView: View {
     @State private var confirming = false
     @State private var pendingRule: TrainingBlockProgressionRule?
     @State private var pendingVersion = 0
+    @State private var pendingWorkoutIDs: Set<UUID> = []
     @State private var resultMessage: String?
 
     private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
@@ -96,6 +97,7 @@ struct ATHLTHTrainBlockProgressionView: View {
                     guard let plan, proposal?.hasChanges == true else { return }
                     pendingRule = rule
                     pendingVersion = plan.version
+                    pendingWorkoutIDs = Set(proposal?.changes.map(\.workoutID) ?? [])
                     confirming = true
                 } label: {
                     HStack {
@@ -144,6 +146,7 @@ struct ATHLTHTrainBlockProgressionView: View {
                 }
                 Button(tr("Cancel", "Avbryt"), role: .cancel) {
                     pendingRule = nil
+                    pendingWorkoutIDs = []
                 }
             } message: {
                 Text(tr(
@@ -367,11 +370,13 @@ struct ATHLTHTrainBlockProgressionView: View {
             planID: planID,
             blockID: blockID,
             expectedVersion: pendingVersion,
+            expectedWorkoutIDs: pendingWorkoutIDs,
             rule: pendingRule,
             healthWorkouts: health.workouts,
             strengthHistory: strength.workoutHistory
         )
         self.pendingRule = nil
+        pendingWorkoutIDs = []
         if let saved {
             resultMessage = tr(
                 "Updated \(saved.changedWorkouts) workouts and \(saved.changedExercises) exercises. Your completed history is unchanged.",
