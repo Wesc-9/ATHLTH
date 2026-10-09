@@ -3,6 +3,67 @@ import SwiftUI
 import UIKit
 import UserNotifications
 
+
+private enum ATHLTHSettingsCategory: String, CaseIterable, Identifiable {
+    case health
+    case training
+    case account
+    case app
+    case membership
+    case privacy
+    case developer
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .health: return ATHLTHLocalization.choose(english: "Health & connections", norwegian: "Helse og tilkoblinger")
+        case .training: return ATHLTHLocalization.choose(english: "Training & alerts", norwegian: "Trening og varsler")
+        case .account: return ATHLTHLocalization.choose(english: "Profile & account", norwegian: "Profil og konto")
+        case .app: return ATHLTHLocalization.choose(english: "App & language", norwegian: "App og språk")
+        case .membership: return ATHLTHLocalization.choose(english: "Membership", norwegian: "Medlemskap")
+        case .privacy: return ATHLTHLocalization.choose(english: "Privacy & help", norwegian: "Personvern og hjelp")
+        case .developer: return ATHLTHLocalization.choose(english: "Developer tools", norwegian: "Utviklerverktøy")
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .health: return ATHLTHLocalization.choose(english: "Apple Health, Watch and services", norwegian: "Apple Health, Watch og tjenester")
+        case .training: return ATHLTHLocalization.choose(english: "Workouts, guidance and notifications", norwegian: "Økter, veiledning og varslinger")
+        case .account: return ATHLTHLocalization.choose(english: "Health profile, sign-in and security", norwegian: "Helseprofil, innlogging og sikkerhet")
+        case .app: return ATHLTHLocalization.choose(english: "Language, units, time and widgets", norwegian: "Språk, enheter, tid og widgeter")
+        case .membership: return ATHLTHLocalization.choose(english: "ATHLTH+, purchases and billing", norwegian: "ATHLTH+, kjøp og betaling")
+        case .privacy: return ATHLTHLocalization.choose(english: "Terms, privacy policy and information", norwegian: "Vilkår, personvern og informasjon")
+        case .developer: return ATHLTHLocalization.choose(english: "Diagnostics, AI usage and testing", norwegian: "Diagnostikk, AI-bruk og testing")
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .health: return "heart.text.square"
+        case .training: return "figure.run"
+        case .account: return "person.crop.circle"
+        case .app: return "slider.horizontal.3"
+        case .membership: return "crown"
+        case .privacy: return "lock.shield"
+        case .developer: return "wrench.and.screwdriver"
+        }
+    }
+
+    var terms: String {
+        switch self {
+        case .health: return "health helse apple health watch klokke sync synkronisering import calendar kalender spotify garmin home assistant tilkobling connections"
+        case .training: return "training trening workout styrke løping løp guidance veiledning audio coach ghost notifications varsler alarm achievements trophies medalje"
+        case .account: return "profile profil account konto health helseprofil sign-in login innlogging password passord security sikkerhet data privacy"
+        case .app: return "app språk language engelsk norsk måleenheter measurements units tid time format widget widgets lock screen siri"
+        case .membership: return "medlemskap premium athlth plus abonnement billing betal kjøp purchase restore subscription trial"
+        case .privacy: return "privacy personvern rettigheter vilkår terms policy exercise data repdb om app legal hjelpe"
+        case .developer: return "utvikler developer support diagnostics diagnostikk debug usage ai lab control center"
+        }
+    }
+}
+
 struct ATHLTHSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
@@ -20,24 +81,334 @@ struct ATHLTHSettingsView: View {
 
     @State private var showingMembership = false
     @State private var healthRequestInProgress = false
+    @State private var settingsSearchText = ""
 
     var body: some View {
         ZStack {
             settingsBackground
 
             ScrollView {
-                VStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 20) {
                     header
-                        .padding(.bottom, 24)
 
+                    settingsSearchField
+
+                    if settingsSearchText.isEmpty {
+                        quickAccessSection
+                    }
+
+                    VStack(alignment: .leading, spacing: 11) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "ALL SETTINGS",
+                                norwegian: "ALLE INNSTILLINGER"
+                            )
+                        )
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .tracking(1.5)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .padding(.leading, 5)
+
+                        if filteredSettingsCategories.isEmpty {
+                            ContentUnavailableView.search(text: settingsSearchText)
+                                .frame(maxWidth: .infinity)
+                        } else {
+                            PremiumSettingsCard {
+                                ForEach(filteredSettingsCategories) { category in
+                                    NavigationLink {
+                                        settingsDetailPage(for: category)
+                                    } label: {
+                                        settingsCategoryRow(category)
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    if category != filteredSettingsCategories.last {
+                                        SettingsDivider()
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    HStack {
+                        Spacer()
+                        Text("ATHLTH \(appVersion)")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                        Spacer()
+                    }
+                    .padding(.top, 4)
+                    .padding(.bottom, 22)
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 12)
+                .frame(maxWidth: 700)
+                .frame(maxWidth: .infinity)
+            }
+            .scrollDismissesKeyboard(.interactively)
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        .sheet(isPresented: $showingMembership) {
+            SubscriptionOfferView {
+                showingMembership = false
+            }
+        }
+        .task {
+            await notifications.refreshAuthorizationStatus()
+            _ = await health.restoreAuthorizationStateFromSystem()
+
+            if health.hasRequestedAuthorization,
+               health.lastSuccessfulRefreshAt == nil,
+               !health.isRefreshing {
+                health.resumeUserInitiatedHealthSync()
+                await health.configureBackgroundSync(
+                    allowed: settings.backgroundHealthSyncEnabled
+                )
+                await health.refreshAll()
+            }
+        }
+    }
+
+    private var filteredSettingsCategories: [ATHLTHSettingsCategory] {
+        let query = settingsSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return ATHLTHSettingsCategory.allCases.filter { category in
+            guard category != .developer || canShowDeveloperSettings else { return false }
+            return query.isEmpty
+                || category.title.localizedStandardContains(query)
+                || category.detail.localizedStandardContains(query)
+                || category.terms.localizedStandardContains(query)
+        }
+    }
+
+    private var canShowDeveloperSettings: Bool {
+        #if DEBUG
+        return session.currentRole.canAccessControlCenter || session.previewModeEnabled
+        #else
+        return session.currentRole.canAccessControlCenter
+        #endif
+    }
+
+    private var settingsSearchField: some View {
+        HStack(spacing: 11) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            TextField(
+                ATHLTHLocalization.choose(
+                    english: "Search settings, devices, notifications…",
+                    norwegian: "Søk etter innstillinger, enheter, varsler…"
+                ),
+                text: $settingsSearchText
+            )
+            .font(.subheadline)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+
+            if !settingsSearchText.isEmpty {
+                Button {
+                    settingsSearchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(english: "Clear search", norwegian: "Tøm søk")
+                )
+            }
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 51)
+        .background(Color.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 18))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(ATHLTHTheme.border.opacity(0.8), lineWidth: 0.8)
+        }
+    }
+
+    private var quickAccessSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(
+                ATHLTHLocalization.choose(
+                    english: "QUICK ACCESS",
+                    norwegian: "HURTIGVALG"
+                )
+            )
+            .font(.system(size: 11, weight: .bold, design: .rounded))
+            .tracking(1.5)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+            .padding(.leading, 5)
+
+            HStack(spacing: 10) {
+                NavigationLink {
+                    ATHLTHNotificationSettingsView()
+                } label: {
+                    quickAccessItem(
+                        icon: "bell.badge",
+                        title: ATHLTHLocalization.choose(english: "Alerts", norwegian: "Varsler")
+                    )
+                }
+
+                NavigationLink {
+                    PersonalHealthProfileView()
+                } label: {
+                    quickAccessItem(
+                        icon: "heart.text.square",
+                        title: ATHLTHLocalization.choose(english: "Health profile", norwegian: "Helseprofil")
+                    )
+                }
+
+                NavigationLink {
+                    ATHLTHAccountSecurityView()
+                } label: {
+                    quickAccessItem(
+                        icon: "person.crop.circle",
+                        title: ATHLTHLocalization.choose(english: "Account", norwegian: "Konto")
+                    )
+                }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func quickAccessItem(icon: String, title: String) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(height: 28)
+
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 92)
+        .background(
+            Color.white.opacity(0.92),
+            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(ATHLTHTheme.border.opacity(0.82), lineWidth: 0.8)
+        }
+    }
+
+    private func settingsCategoryRow(
+        _ category: ATHLTHSettingsCategory
+    ) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: category.icon)
+                .font(.system(size: 19, weight: .medium))
+                .foregroundStyle(
+                    category == .membership
+                        ? ATHLTHTheme.premiumGold
+                        : ATHLTHTheme.accentDeep
+                )
+                .frame(width: 44, height: 44)
+                .background(
+                    category == .membership
+                        ? ATHLTHTheme.premiumGoldSoft
+                        : ATHLTHTheme.accentSoft,
+                    in: RoundedRectangle(cornerRadius: 14)
+                )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(category.title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                Text(category.detail)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 8)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.68))
+        }
+        .padding(.horizontal, 15)
+        .padding(.vertical, 14)
+        .contentShape(Rectangle())
+    }
+
+    private func settingsDetailPage(
+        for category: ATHLTHSettingsCategory
+    ) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(category.title)
+                        .font(.system(size: 29, weight: .bold, design: .rounded))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                    Text(category.detail)
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                .padding(.horizontal, 3)
+                .padding(.bottom, 18)
+
+                settingsContents(for: category)
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 22)
+            .padding(.bottom, 32)
+            .frame(maxWidth: 700)
+            .frame(maxWidth: .infinity)
+        }
+        .background(settingsBackground)
+        .navigationTitle(category.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
+    }
+
+    @ViewBuilder
+    private func settingsContents(for category: ATHLTHSettingsCategory) -> some View {
+        switch category {
+        case .health:
+            healthSettingsSection
+            connectionsSettingsSection
+        case .training:
+            trainingSettingsSection
+            settingsSection("Tools") {
+                PremiumSettingsCard {
                     NavigationLink {
                         AthleteToolsView()
                     } label: {
-                        Label("Athlete Tools", systemImage: "figure.run.circle")
-                            .font(.headline).padding(.bottom, 20)
+                        PremiumSettingsRow(
+                            icon: "figure.run.circle",
+                            title: "Athlete Tools",
+                            subtitle: ATHLTHLocalization.choose(
+                                english: "Additional tools for your training",
+                                norwegian: "Flere verktøy til treningen din"
+                            )
+                        ) {
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
                     }
+                    .buttonStyle(.plain)
+                }
+            }
+        case .account:
+            profileSettingsSection
+            accountSettingsSection
+        case .app:
+            appSettingsSection
+        case .membership:
+            membershipSettingsSection
+        case .privacy:
+            aboutSettingsSection
+        case .developer:
+            developerSettingsSections
+        }
+    }
 
-                    settingsSection("App") {
+    private var appSettingsSection: some View {
+settingsSection("App") {
                         PremiumSettingsCard {
                             Menu {
                             ForEach(MeasurementPreference.allCases) { preference in
@@ -255,8 +626,10 @@ struct ATHLTHSettingsView: View {
                             .buttonStyle(.plain)
                         }
                     }
+    }
 
-                    settingsSection("Profile") {
+    private var profileSettingsSection: some View {
+settingsSection("Profile") {
                         PremiumSettingsCard {
                             NavigationLink {
                                 PersonalHealthProfileView()
@@ -273,8 +646,10 @@ struct ATHLTHSettingsView: View {
                             .buttonStyle(.plain)
                         }
                     }
+    }
 
-                    settingsSection("Health & Sync") {
+    private var healthSettingsSection: some View {
+settingsSection("Health & Sync") {
                         PremiumSettingsCard {
                             PremiumSettingsRow(
                                 icon: "heart",
@@ -375,8 +750,10 @@ struct ATHLTHSettingsView: View {
                             .disabled(healthRequestInProgress)
                         }
                     }
+    }
 
-                    settingsSection("Connections") {
+    private var connectionsSettingsSection: some View {
+settingsSection("Connections") {
                         PremiumSettingsCard {
                             Button {
                                 handleAppleHealthTap()
@@ -556,8 +933,10 @@ struct ATHLTHSettingsView: View {
                             .buttonStyle(.plain)
                         }
                     }
+    }
 
-                    settingsSection("Preferences") {
+    private var trainingSettingsSection: some View {
+settingsSection("Preferences") {
                         PremiumSettingsCard {
                             NavigationLink {
                                 ATHLTHTrainingSettingsView()
@@ -666,8 +1045,10 @@ struct ATHLTHSettingsView: View {
                             .buttonStyle(.plain)
                         }
                     }
+    }
 
-                    settingsSection("Membership") {
+    private var membershipSettingsSection: some View {
+settingsSection("Membership") {
                         PremiumSettingsCard {
                             Button {
                                 showingMembership = true
@@ -793,8 +1174,10 @@ struct ATHLTHSettingsView: View {
                             }
                         }
                     }
+    }
 
-                    settingsSection("Account") {
+    private var accountSettingsSection: some View {
+settingsSection("Account") {
                         PremiumSettingsCard {
                             NavigationLink {
                                 ATHLTHAccountSecurityView()
@@ -817,8 +1200,10 @@ struct ATHLTHSettingsView: View {
                             .buttonStyle(.plain)
                         }
                     }
+    }
 
-                    settingsSection("About") {
+    private var aboutSettingsSection: some View {
+settingsSection("About") {
                         PremiumSettingsCard {
                             Link(destination: URL(string: "https://repdb.co")!) {
                                 PremiumSettingsRow(
@@ -865,8 +1250,11 @@ struct ATHLTHSettingsView: View {
                             .buttonStyle(.plain)
                         }
                     }
+    }
 
-                    if session.currentRole.canAccessControlCenter {
+    @ViewBuilder
+    private var developerSettingsSections: some View {
+if session.currentRole.canAccessControlCenter {
                         settingsSection("Support") {
                             PremiumSettingsCard {
                                 NavigationLink {
@@ -952,39 +1340,6 @@ struct ATHLTHSettingsView: View {
                         }
                     }
                     #endif
-
-                    Text("ATHLTH \(appVersion) · Progress lives here.")
-                        .font(.caption2.weight(.medium))
-                        .tracking(1.2)
-                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                        .padding(.top, 6)
-                        .padding(.bottom, 34)
-                }
-                .padding(.horizontal, 18)
-                .frame(maxWidth: 760)
-                .frame(maxWidth: .infinity)
-            }
-        }
-        .toolbar(.hidden, for: .navigationBar)
-        .sheet(isPresented: $showingMembership) {
-            SubscriptionOfferView {
-                showingMembership = false
-            }
-        }
-        .task {
-            await notifications.refreshAuthorizationStatus()
-            _ = await health.restoreAuthorizationStateFromSystem()
-
-            if health.hasRequestedAuthorization,
-               health.lastSuccessfulRefreshAt == nil,
-               !health.isRefreshing {
-                health.resumeUserInitiatedHealthSync()
-                await health.configureBackgroundSync(
-                    allowed: settings.backgroundHealthSyncEnabled
-                )
-                await health.refreshAll()
-            }
-        }
     }
 
     private var settingsBackground: some View {
