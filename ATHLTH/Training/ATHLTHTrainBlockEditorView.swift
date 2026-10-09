@@ -285,7 +285,9 @@ struct ATHLTHTrainBlockEditorView: View {
             purpose: purpose,
             startWeek: startWeek,
             endWeek: endWeek,
-            goal: goal
+            goal: goal,
+            progressionRule: existingBlock?.progressionRule,
+            progressedSessionIDs: existingBlock?.progressedSessionIDs
         )
         if session.saveTrainingPlanBlock(planID: planID, block: block) {
             dismiss()
