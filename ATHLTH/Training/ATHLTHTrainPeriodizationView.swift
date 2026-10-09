@@ -263,7 +263,7 @@ struct ATHLTHTrainPeriodizationView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(tr("TRAINING BLOCKS", "TRENINGSSBLOKKER"))
+                    Text(tr("TRAINING BLOCKS", "TRENINGSBLOKKER"))
                         .font(.system(size: 10, weight: .semibold))
                         .tracking(1.5)
                         .foregroundStyle(bronze)
