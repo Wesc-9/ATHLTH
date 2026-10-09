@@ -3352,7 +3352,23 @@ final class AppSessionStore: ObservableObject {
             result.targetDurationSeconds = old.targetDurationSeconds
             result.loadKind = old.loadKind
             result.targetResistanceLevel = old.targetResistanceLevel
-            result.setTargets = old.setTargets
+            // New planned sets must not share identities with the source.
+            result.setTargets = old.setTargets?.map { target in
+                PlannedExerciseSetTarget(
+                    id: UUID(),
+                    reps: target.reps,
+                    durationSeconds: target.durationSeconds,
+                    weightKilograms: target.weightKilograms,
+                    resistanceLevel: target.resistanceLevel,
+                    restSeconds: target.restSeconds,
+                    targetRPE: target.targetRPE,
+                    targetRIR: target.targetRIR,
+                    isWarmUp: target.isWarmUp,
+                    setType: target.setType,
+                    tempo: target.tempo,
+                    notes: target.notes
+                )
+            }
             return result
         }
         var copy = PlannedSession(
