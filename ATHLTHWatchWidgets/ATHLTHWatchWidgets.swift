@@ -4,13 +4,14 @@ import WidgetKit
 // Different Watch-face choices, not just alternate artwork for Quick Run.
 // Keep the original Quick Run kind to preserve existing Watch-face placements.
 private enum ATHLTHWatchShortcut: String {
-    case run, strength, walk, today, routes
+    case run, strength, walk, ghost, today, routes
 
     var kind: String {
         switch self {
         case .run: return "ATHLTHQuickRunWatchWidget"
         case .strength: return "ATHLTHQuickStrengthWatchWidget"
         case .walk: return "ATHLTHQuickWalkWatchWidget"
+        case .ghost: return "ATHLTHGhostRaceWatchWidget"
         case .today: return "ATHLTHTodayWorkoutWatchWidget"
         case .routes: return "ATHLTHRoutesWatchWidget"
         }
@@ -21,6 +22,7 @@ private enum ATHLTHWatchShortcut: String {
         case .run: return "Løping"
         case .strength: return "Styrke"
         case .walk: return "Gåtur"
+        case .ghost: return "Ghost Race"
         case .today: return "Dagens økt"
         case .routes: return "Ruter"
         }
@@ -33,6 +35,7 @@ private enum ATHLTHWatchShortcut: String {
         case .run: return "Start løpetur"
         case .strength: return "Start styrkeøkt"
         case .walk: return "Start gåtur"
+        case .ghost: return "Konkurrer med Ghost"
         case .today: return "Dagens trening"
         case .routes: return "Velg en rute"
         }
@@ -43,6 +46,7 @@ private enum ATHLTHWatchShortcut: String {
         case .run: return "Start løping direkte fra urskiven."
         case .strength: return "Start styrketrening direkte fra urskiven."
         case .walk: return "Start en gåtur direkte fra urskiven."
+        case .ghost: return "Åpne Ghost Race på klokken. Start bare en Ghost-økt som er klargjort fra iPhone."
         case .today: return "Start dagens planlagte treningsøkt når den er tilgjengelig."
         case .routes: return "Åpne lagrede ATHLTH-ruter på klokken."
         }
@@ -53,6 +57,7 @@ private enum ATHLTHWatchShortcut: String {
         case .run: return "figure.run"
         case .strength: return "dumbbell.fill"
         case .walk: return "figure.walk"
+        case .ghost: return "scope"
         case .today: return "calendar.badge.clock"
         case .routes: return "map.fill"
         }
@@ -63,6 +68,7 @@ private enum ATHLTHWatchShortcut: String {
         case .run: return URL(string: "athlth-watch://quick-run")
         case .strength: return URL(string: "athlth-watch://quick-strength")
         case .walk: return URL(string: "athlth-watch://quick-walk")
+        case .ghost: return URL(string: "athlth-watch://ghost-race")
         case .today: return URL(string: "athlth-watch://today")
         case .routes: return URL(string: "athlth-watch://routes")
         }
@@ -170,6 +176,7 @@ struct ATHLTHWatchWidgetsBundle: WidgetBundle {
         ATHLTHWatchShortcutWidget(shortcut: .run)
         ATHLTHWatchShortcutWidget(shortcut: .strength)
         ATHLTHWatchShortcutWidget(shortcut: .walk)
+        ATHLTHWatchShortcutWidget(shortcut: .ghost)
         ATHLTHWatchShortcutWidget(shortcut: .today)
         ATHLTHWatchShortcutWidget(shortcut: .routes)
     }
