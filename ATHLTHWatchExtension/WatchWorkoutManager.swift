@@ -46,6 +46,25 @@ private struct WatchLocationSample: Sendable {
     }
 }
 
+// WatchConnectivity may complete via a reply, an error, or a timeout.
+ // Resolve exactly once so a late callback cannot trap a checked continuation.
+private final class WatchStartGuardContinuation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Bool?, Never>?
+
+    init(_ continuation: CheckedContinuation<Bool?, Never>) {
+        self.continuation = continuation
+    }
+
+    func complete(_ answer: Bool?) {
+        lock.lock()
+        let pending = continuation
+        continuation = nil
+        lock.unlock()
+        pending?.resume(returning: answer)
+    }
+}
+
 private struct WatchPersistedWorkoutState: Codable {
     var kind: WatchWorkoutKind
     var startedAt: Date?
@@ -2414,32 +2433,37 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     .timeIntervalSince1970
         ]
 
-        let allowed: Bool? =
-            await withCheckedContinuation {
-                continuation in
+        let allowed: Bool? = await withCheckedContinuation {
+            (continuation: CheckedContinuation<Bool?, Never>) in
+            let completion = WatchStartGuardContinuation(continuation)
 
-                session.sendMessage(
-                    payload,
-                    replyHandler: {
-                        reply in
-                        continuation.resume(
-                            returning:
-                                reply[
-                                    WatchTransferMetadataKey
-                                        .workoutAllowed
-                                ] as? Bool
-                        )
-                    },
-                    errorHandler: {
-                        _ in
-                        continuation.resume(
-                            returning: nil
-                        )
-                    }
-                )
+            session.sendMessage(
+                payload,
+                replyHandler: { reply in
+                    completion.complete(
+                        reply[
+                            WatchTransferMetadataKey.workoutAllowed
+                        ] as? Bool
+                    )
+                },
+                errorHandler: { _ in
+                    completion.complete(nil)
+                }
+            )
+
+            // If the iPhone stops replying, standalone Watch recording
+            // must still be possible without indefinitely hanging START.
+            Task {
+                try? await Task.sleep(for: .seconds(3))
+                completion.complete(nil)
             }
+        }
 
-        guard allowed != false else {
+        // Also check after the wait, as an iPhone session could have
+        // become active while the connectivity request was pending.
+        guard allowed != false,
+              companionWorkoutActivity?.isActive != true
+        else {
             errorMessage =
                 ATHLTHLocalization.choose(
                     english:
@@ -3177,22 +3201,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             startedAt = startDate
             persistWorkoutRecoveryState()
 
-            do {
-                try await session.startMirroringToCompanionDevice()
-                mirroringActive = true
-                mirroringRetryPending = false
-                await sendLiveSnapshot(
-                    stateOverride: .preparing,
-                    force: true
-                )
-            } catch {
-                // HealthKit can reject the first mirror request while the
-                // session is still preparing. The workout itself must still
-                // start; retry once after the session reaches .running.
-                mirroringActive = false
-                mirroringRetryPending = true
-            }
-
+            // Start the HealthKit session and collection before enabling
+            // mirroring. Mirroring a session that is not yet active can
+            // fail or leave the Watch launch in a bad lifecycle state.
             session.startActivity(with: startDate)
 
             try await withCheckedThrowingContinuation {
@@ -3209,6 +3220,20 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                         )
                     }
                 }
+            }
+
+            do {
+                try await session.startMirroringToCompanionDevice()
+                mirroringActive = true
+                mirroringRetryPending = false
+                await sendLiveSnapshot(
+                    stateOverride: .preparing,
+                    force: true
+                )
+            } catch {
+                // Keep the workout running even when iPhone mirroring fails.
+                mirroringActive = false
+                mirroringRetryPending = true
             }
 
             locationManager.requestWhenInUseAuthorization()
