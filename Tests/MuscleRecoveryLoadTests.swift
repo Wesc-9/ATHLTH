@@ -65,7 +65,7 @@ final class MuscleRecoveryMinuteWeightingTests: XCTestCase {
 
     @MainActor
     func testTwentyCoreEssentialsHaveOriginalNorwegianInstructions() {
-        let ids = ExerciseLibraryStore.featuredCoreExerciseIDs
+        let ids = ExerciseLibraryStore.originalCoreSlugs
         XCTAssertEqual(ids.count, 20)
         XCTAssertEqual(Set(ids).count, 20)
         for id in ids {
