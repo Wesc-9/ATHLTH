@@ -16321,10 +16321,10 @@ struct ATHLTHProfileView: View {
     private func gearTile(
         _ item: ProfileGearItem
     ) -> some View {
-        HStack(spacing: 7) {
+        HStack(spacing: 6) {
             ZStack {
                 RoundedRectangle(
-                    cornerRadius: 11,
+                    cornerRadius: 10,
                     style: .continuous
                 )
                 .fill(
@@ -16351,7 +16351,7 @@ struct ATHLTHProfileView: View {
                             ProfileGearCategoryIcon(
                                 category:
                                     item.category,
-                                size: 20
+                                size: 19
                             )
                         }
                     }
@@ -16359,13 +16359,13 @@ struct ATHLTHProfileView: View {
                     ProfileGearCategoryIcon(
                         category:
                             item.category,
-                        size: 20
+                        size: 19
                     )
                 }
             }
             .frame(
-                width: 38,
-                height: 38
+                width: 32,
+                height: 36
             )
 
             VStack(
@@ -16375,22 +16375,24 @@ struct ATHLTHProfileView: View {
                 Text(item.name)
                     .font(
                         .system(
-                            size: 9.5,
-                            weight: .bold
+                            size: 10,
+                            weight: .semibold
                         )
                     )
                     .foregroundStyle(
                         ATHLTHTheme.primaryText
                     )
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.70)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.90)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .layoutPriority(1)
 
                 Text(
                     item.category.shortTitle
                 )
                 .font(
                     .system(
-                        size: 8,
+                        size: 8.5,
                         weight: .medium
                     )
                 )
@@ -16398,14 +16400,16 @@ struct ATHLTHProfileView: View {
                     ATHLTHTheme.mutedText
                 )
                 .lineLimit(1)
+                .minimumScaleFactor(0.92)
             }
 
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 8)
         .frame(
             maxWidth: .infinity,
-            minHeight: 56,
+            minHeight: 70,
             alignment: .leading
         )
         .background(
@@ -16425,6 +16429,8 @@ struct ATHLTHProfileView: View {
                 lineWidth: 0.7
             )
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(item.name), \(item.category.shortTitle)")
     }
 
     private func mediaTile(
