@@ -3,6 +3,56 @@ import XCTest
 
 final class ChallengeEventCreationRegressionTests:
     XCTestCase {
+    func testChallengeEndReminderIsNorwegianWithUsefulSubtitle() {
+        let title = ATHLTHChallengeReminderText.title(
+            for: .ending, norwegian: true
+        )
+        XCTAssertEqual(title, "Utfordringen avsluttes i morgen!")
+
+        let message = ATHLTHChallengeReminderText.message(
+            for: .ending, challengeTitle: "Løp 5 km",
+            norwegian: true
+        )
+        XCTAssertTrue(message.contains("Løp 5 km"))
+        XCTAssertTrue(message.contains("24 timer"))
+        XCTAssertTrue(message.contains("fremdriften"))
+    }
+
+    func testOneWordOkIsNeverEntireReminderBody() {
+        let message = ATHLTHChallengeReminderText.message(
+            for: .ending, challengeTitle: " Ok ",
+            norwegian: true
+        )
+        XCTAssertFalse(message.lowercased() == "ok")
+        XCTAssertTrue(message.contains("24 timer"))
+        XCTAssertFalse(message.contains("«Ok»"))
+    }
+
+    func testChallengeRemindersHaveProperEnglishCopy() {
+        XCTAssertEqual(
+            ATHLTHChallengeReminderText.title(for: .ending, norwegian: false),
+            "Challenge ends tomorrow!"
+        )
+        let message = ATHLTHChallengeReminderText.message(
+            for: .ending, challengeTitle: "5K",
+            norwegian: false
+        )
+        XCTAssertTrue(message.contains("5K"))
+        XCTAssertTrue(message.contains("24 hours"))
+    }
+
+    func testMeetupReminderMentionsMeetingPointInNorwegian() {
+        XCTAssertEqual(
+            ATHLTHChallengeReminderText.title(for: .meetup, norwegian: true),
+            "Fellestreningen starter om én time"
+        )
+        let message = ATHLTHChallengeReminderText.message(
+            for: .meetup, challengeTitle: "Ok",
+            meetupPlace: "Torget", norwegian: true
+        )
+        XCTAssertTrue(message.contains("Torget"))
+    }
+
     func testBlankChallengeNameUsesAutomaticTitle() {
         let resolved =
             ChallengeCreationPolicy
