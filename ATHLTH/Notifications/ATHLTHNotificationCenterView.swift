@@ -1518,7 +1518,7 @@ struct ATHLTHNotificationCenterView: View {
         if isChallengeItem(item) {
             return ATHLTHLocalization.choose(
                 english: "CHALLENGE",
-                norwegian: "CHALLENGE"
+                norwegian: "UTFORDRING"
             )
         }
 
@@ -1547,7 +1547,10 @@ struct ATHLTHNotificationCenterView: View {
         case .system:
             return "ATHLTH"
         case .challenge:
-            return "CHALLENGE"
+            return ATHLTHLocalization.choose(
+                english: "CHALLENGE",
+                norwegian: "UTFORDRING"
+            )
         case .workoutCompleted:
             return ATHLTHLocalization.choose(
                 english: "ACTIVITY",
