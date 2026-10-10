@@ -10885,6 +10885,7 @@ struct ATHLTHRecoveryView: View {
     @State private var showingInsightAIConsentSheet = false
     @State private var showingSorenessLog = false
     @State private var showingRecoveryInfo = false
+    @State private var showingMoreInsightMetrics = false
     @State private var showingRecoveryCoach = false
     @State private var selectedRecoveryTool: RecoveryTool?
     @State private var recoveryDerivedSnapshot =
@@ -10969,98 +10970,20 @@ struct ATHLTHRecoveryView: View {
                         )
                 )
             } content: {
-                LazyVStack(spacing: 16) {
+                LazyVStack(spacing: 14) {
                     if shouldShowWearableRecoveryContent {
-                        if session.hasPaidAccess &&
-                            insightAISharingAllowed {
-                            RecoveryAIInsightCard(
-                                insight:
-                                    recoveryAIInsight ??
-                                    fallbackRecoveryAIInsight,
-                                context: recoveryAIContext,
-                                isLoading:
-                                    isLoadingRecoveryAI
-                            )
+                        // Readiness is the primary Insight, regardless of
+                        // the user's AI subscription or health-sharing consent.
+                        // Home already shows raw health metrics: put their
+                        // comparison and meaning first here instead.
+                        recoveryScoreCard
 
-                            Button {
-                                showingInsightAIConsentSheet = true
-                            } label: {
-                                Label(
-                                    insightText(
-                                        "AI privacy choices",
-                                        "AI-personvernvalg"
-                                    ),
-                                    systemImage: "lock.shield"
-                                )
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(ATHLTHTheme.accentDeep)
-                            }
-                            .buttonStyle(.plain)
-                            .frame(maxWidth: .infinity, alignment: .trailing)
+                        // Help users decide what to do with their actual plan
+                        // before presenting deeper analytics.
+                        plannedWorkoutInsightCard
 
-                            // Coach is now a dedicated next step instead of
-                            // one of several utility buttons inside the score
-                            // card. This keeps the primary insight cleaner and
-                            // makes conversational follow-up easier to find.
-                            RecoveryCoachEntryCard {
-                                showingRecoveryCoach = true
-                            }
-                        } else {
-                            recoveryScoreCard
-                            todaysSignalsCard
-
-                            // Chat access must not depend on persistent AI
-                            // health permission. Coach asks for explicit
-                            // sharing approval in the conversation itself.
-                            if session.hasPaidAccess {
-                                RecoveryCoachEntryCard {
-                                    showingRecoveryCoach = true
-                                }
-                            }
-
-                            RecoveryReadinessBreakdownCard(
-                                recovery: health.recovery,
-                                sleep: health.sleep,
-                                heart: health.heart
-                            )
-
-                            if session.hasPaidAccess {
-                                ATHLTHCard {
-                                    Label(
-                                        insightText("AI health insights are off", "AI-helseinnsikt er av"),
-                                        systemImage: "lock.shield.fill"
-                                    )
-                                    .font(.headline)
-                                    .foregroundStyle(ATHLTHTheme.accentDeep)
-
-                                    Text(
-                                        insightText("Health-based automatic AI insights are off. You can still chat with Coach and explicitly approve sending health data for a single question.", "Automatiske AI-innsikter basert på helsedata er av. Du kan fortsatt chatte med Coach og godkjenne deling av helsedata for ett spørsmål om gangen.")
-                                    )
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .fixedSize(
-                                        horizontal: false,
-                                        vertical: true
-                                    )
-                                    .padding(.top, 5)
-
-                                    Button {
-                                        showingInsightAIConsentSheet = true
-                                    } label: {
-                                        Label(
-                                            insightText(
-                                                "Choose AI insights",
-                                                "Velg AI-innsikt"
-                                            ),
-                                            systemImage: "lock.shield"
-                                        )
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .padding(.top, 8)
-                                }
-                            }
+                        if recoveryTodaySessions.isEmpty {
+                            todaysGuidanceCard
                         }
 
                         MuscleRecoveryCard(
@@ -11073,47 +10996,73 @@ struct ATHLTHRecoveryView: View {
                             showingSorenessLog = true
                         }
 
-                        plannedWorkoutInsightCard
-                        whatChangedCard
-                        loadBalanceCard
-
-                        RecoveryTrendsCard(
-                            snapshot: recoverySnapshot,
-                            sleep: health.sleep
-                        )
-
-                        recoveryPatternsCard
-
-                        if session.hasPaidAccess &&
-                            insightAISharingAllowed {
-                            RecoverySuggestedTodayCard(
-                                suggestion:
-                                    (recoveryAIInsight ??
-                                        fallbackRecoveryAIInsight)
-                                        .suggestion
-                            ) {
-                                onSelectTab(1)
-                            }
-                        } else {
-                            todaysGuidanceCard
-                        }
-
                         RecoveryDailyCheckInCard(
                             store: sorenessStore
                         ) {
                             showingSorenessLog = true
                         }
 
-                        RecoveryToolsCard { tool in
-                            selectedRecoveryTool = tool
+                        // Trends and recent changes are Insight-specific:
+                        // unlike the Home status tiles, they explain how
+                        // the user's baseline is changing over time.
+                        whatChangedCard
+                        RecoveryTrendsCard(
+                            snapshot: recoverySnapshot,
+                            sleep: health.sleep
+                        )
+
+                        if session.hasPaidAccess {
+                            // Coach remains usable without granting automatic
+                            // health-sharing consent. The chat requests its
+                            // own explicit per-question permission.
+                            RecoveryCoachEntryCard {
+                                showingRecoveryCoach = true
+                            }
                         }
 
-                        if health.sleep.totalAsleep > 0 {
-                            RecoveryLastNightCard(
-                                sleep: health.sleep
+                        insightMoreAnalysisToggle
+
+                        if showingMoreInsightMetrics {
+                            // Keep the original detailed tools available,
+                            // but avoid duplicating Home on first impression.
+                            if session.hasPaidAccess &&
+                                insightAISharingAllowed {
+                                RecoveryAIInsightCard(
+                                    insight:
+                                        recoveryAIInsight ??
+                                        fallbackRecoveryAIInsight,
+                                    context: recoveryAIContext,
+                                    isLoading: isLoadingRecoveryAI
+                                )
+                            }
+
+                            RecoveryReadinessBreakdownCard(
+                                recovery: health.recovery,
+                                sleep: health.sleep,
+                                heart: health.heart
                             )
+
+                            todaysSignalsCard
+                            loadBalanceCard
+                            recoveryPatternsCard
+
+                            if health.sleep.totalAsleep > 0 {
+                                RecoveryLastNightCard(
+                                    sleep: health.sleep
+                                )
+                            }
+
+                            RecoveryToolsCard { tool in
+                                selectedRecoveryTool = tool
+                            }
+
+                            if session.hasPaidAccess {
+                                insightAIPrivacySettingsButton
+                            }
                         }
                     } else {
+                        // Don't fabricate readiness when HealthKit or a
+                        // usable personal baseline is unavailable.
                         recoveryUnavailableCard
 
                         MuscleRecoveryCard(
@@ -11136,6 +11085,12 @@ struct ATHLTHRecoveryView: View {
 
                         RecoveryToolsCard { tool in
                             selectedRecoveryTool = tool
+                        }
+
+                        if session.hasPaidAccess {
+                            RecoveryCoachEntryCard {
+                                showingRecoveryCoach = true
+                            }
                         }
                     }
                 }
@@ -11385,7 +11340,182 @@ struct ATHLTHRecoveryView: View {
                 }
                 .padding(.top, 10)
             }
+
+            if health.recovery.score != nil {
+                insightReadinessSignalSummary
+            }
         }
+    }
+
+    // These are local, deterministic baseline comparisons, not an
+    // AI-generated breakdown of the score's exact weighted contribution.
+    // In particular, a lower resting heart rate can be favorable.
+    private var insightReadinessSignalSummary: some View {
+        let factors = fallbackRecoveryAIInsight.factors.filter {
+            $0.impact == "positive" || $0.impact == "negative"
+        }
+
+        return VStack(alignment: .leading, spacing: 12) {
+            Divider()
+                .padding(.vertical, 2)
+
+            Text(
+                insightText(
+                    "What's different from your normal?",
+                    "Hva skiller seg fra din normal?"
+                )
+            )
+            .font(.subheadline.weight(.bold))
+            .foregroundStyle(ATHLTHTheme.primaryText)
+
+            if factors.isEmpty {
+                Text(
+                    insightText(
+                        "No clear differences from your personal baseline, or not enough comparable readings yet.",
+                        "Ingen tydelige avvik fra din personlige normal, eller for få sammenlignbare målinger ennå."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            } else {
+                ForEach(factors) { factor in
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(
+                            systemName: factor.impact == "positive"
+                                ? "checkmark.circle.fill"
+                                : "exclamationmark.circle.fill"
+                        )
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(
+                            factor.impact == "positive"
+                                ? Color.green
+                                : Color.orange
+                        )
+                        .frame(width: 22, height: 22)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 6) {
+                                Text(factor.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                                Text(
+                                    factor.impact == "positive"
+                                        ? insightText("Favorable", "Gunstig")
+                                        : insightText("Worth noting", "Følg med")
+                                )
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(
+                                    factor.impact == "positive"
+                                        ? Color.green
+                                        : Color.orange
+                                )
+                            }
+
+                            Text(factor.detail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+
+            Text(
+                insightText(
+                    "Comparisons are indicators, not exact point contributions to the readiness score.",
+                    "Sammenligningene er signaler, ikke en eksakt fordeling av poengene i dagsformverdien."
+                )
+            )
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.top, 14)
+    }
+
+    private var insightMoreAnalysisToggle: some View {
+        Button {
+            showingMoreInsightMetrics.toggle()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "chart.xyaxis.line")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 42, height: 42)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: RoundedRectangle(cornerRadius: 13)
+                    )
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(
+                        insightText(
+                            "Detailed analysis",
+                            "Dypere analyse"
+                        )
+                    )
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                    Text(
+                        insightText(
+                            "Health measurements, load and recovery tools",
+                            "Helsemålinger, belastning og restitusjonsverktøy"
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 8)
+
+                Image(
+                    systemName: showingMoreInsightMetrics
+                        ? "chevron.up"
+                        : "chevron.down"
+                )
+                .font(.caption.weight(.bold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+            }
+            .padding(16)
+            .background(
+                Color.white.opacity(0.90),
+                in: RoundedRectangle(cornerRadius: 20)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.primary.opacity(0.07), lineWidth: 0.8)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityValue(
+            showingMoreInsightMetrics
+                ? insightText("Expanded", "Utvidet")
+                : insightText("Collapsed", "Lukket")
+        )
+    }
+
+    private var insightAIPrivacySettingsButton: some View {
+        Button {
+            showingInsightAIConsentSheet = true
+        } label: {
+            Label(
+                insightAISharingAllowed
+                    ? insightText("AI privacy choices", "AI-personvernvalg")
+                    : insightText("AI health insights are off – review choices", "AI-helseinnsikt er av – se valg"),
+                systemImage: "lock.shield"
+            )
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(ATHLTHTheme.accentDeep)
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 4)
     }
 
     private var recoveryScoreCopy: some View {
