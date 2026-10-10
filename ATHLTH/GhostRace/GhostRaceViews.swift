@@ -15,8 +15,48 @@ private enum GhostRaceHubMode:
     var title: String {
         switch self {
         case .live: return "Live"
-        case .past: return "Past runs"
-        case .target: return "Target"
+        case .past: return "Replay"
+        case .target: return ATHLTHLocalization.choose(english: "Target", norwegian: "Mål")
+        }
+    }
+
+    var headline: String {
+        switch self {
+        case .live:
+            return ATHLTHLocalization.choose(
+                english: "Run against someone now.",
+                norwegian: "Løp mot noen nå."
+            )
+        case .past:
+            return ATHLTHLocalization.choose(
+                english: "Run a previous workout.",
+                norwegian: "Løp en tidligere økt."
+            )
+        case .target:
+            return ATHLTHLocalization.choose(
+                english: "Set a goal. Chase it.",
+                norwegian: "Sett et mål og jag det."
+            )
+        }
+    }
+
+    var introduction: String {
+        switch self {
+        case .live:
+            return ATHLTHLocalization.choose(
+                english: "Race live against visible runners or invite a friend.",
+                norwegian: "Konkurrer live mot andre løpere eller inviter en venn."
+            )
+        case .past:
+            return ATHLTHLocalization.choose(
+                english: "Select a GPS run and challenge your previous performance.",
+                norwegian: "Velg en GPS-økt og utfordre din tidligere tid."
+            )
+        case .target:
+            return ATHLTHLocalization.choose(
+                english: "Choose a route and set your finish time or pace per km.",
+                norwegian: "Velg en rute og sett ønsket sluttid eller tempo per km."
+            )
         }
     }
 
@@ -43,6 +83,18 @@ private enum GhostRaceHubMode:
     }
 }
 
+private enum GhostReplaySort: String, CaseIterable, Identifiable {
+    case newest, fastest, longest
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .newest: return ATHLTHLocalization.choose(english: "Newest", norwegian: "Nyeste")
+        case .fastest: return ATHLTHLocalization.choose(english: "Fastest", norwegian: "Raskest")
+        case .longest: return ATHLTHLocalization.choose(english: "Longest", norwegian: "Lengst")
+        }
+    }
+}
+
 struct GhostRaceHubView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var session: AppSessionStore
@@ -61,6 +113,8 @@ struct GhostRaceHubView: View {
     @State private var liveStartingSessionID: UUID?
     @State private var selectedMode:
         GhostRaceHubMode = .live
+    @State private var replaySearch = ""
+    @State private var replaySort: GhostReplaySort = .newest
     @State private var errorMessage: String?
     @State private var captureDevice:
         WorkoutCaptureDevice = .iPhone
@@ -83,11 +137,13 @@ struct GhostRaceHubView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 18) {
-                hero
-                workoutDeviceCard
+            LazyVStack(spacing: 14) {
                 modeOverview
+                hero
                 modeContent
+                if selectedMode != .target {
+                    workoutDeviceCard
+                }
                 audioCoachCard
             }
             .padding()
@@ -150,58 +206,77 @@ struct GhostRaceHubView: View {
     }
 
     private var hero: some View {
-        ATHLTHCard {
-            VStack(alignment: .leading, spacing: 15) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text("GHOST RACE")
-                            .font(.caption2.weight(.bold))
-                            .tracking(2)
-                            .foregroundStyle(ATHLTHTheme.vitality)
-
-                        Text("One race. Three ways to chase.")
-                            .font(.system(
-                                size: 30,
-                                weight: .bold,
-                                design: .rounded
-                            ))
-                            .foregroundStyle(ATHLTHTheme.primaryText)
-                    }
-
-                    Spacer()
-
-                    Image(systemName: "figure.run.circle.fill")
-                        .font(.system(size: 44))
-                        .foregroundStyle(ATHLTHTheme.vitality)
-                }
-
-                Text(
-                    "Race someone live, chase one of your own previous runs, or create a target ghost for the exact finish time you want."
-                )
-                .font(.subheadline)
-                .foregroundStyle(ATHLTHTheme.mutedText)
-                .fixedSize(horizontal: false, vertical: true)
-
-                HStack(spacing: 8) {
-                    statusChip(
-                        title: "Live",
-                        icon:
-                            "dot.radiowaves.left.and.right"
-                    )
-                    statusChip(
-                        title: "Replay",
-                        icon:
-                            "clock.arrow.circlepath"
-                    )
-                    statusChip(
-                        title: "Target",
-                        icon:
-                            "timer.circle.fill"
+        ZStack(alignment: .leading) {
+            Image(selectedMode == .live ? "TrainHero" : "GoalMountain")
+                .resizable()
+                .scaledToFill()
+                .frame(height: 194)
+                .frame(maxWidth: .infinity)
+                .clipped()
+                .overlay {
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.98),
+                            Color.white.opacity(0.92),
+                            Color.white.opacity(0.24)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
                     )
                 }
 
+            VStack(alignment: .leading, spacing: 9) {
+                Text("GHOST RACE")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(2.0)
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                Text(selectedMode.headline)
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .tracking(-0.6)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(3)
+                    .frame(maxWidth: 255, alignment: .leading)
+
+                Text(selectedMode.introduction)
+                    .font(.system(size: 12))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 268, alignment: .leading)
+
+                if selectedMode == .live {
+                    let count = realtime.visibleLiveSessions.filter {
+                        $0.activity == "running" &&
+                        $0.ownerID != realtime.currentUserID
+                    }.count
+                    Label(
+                        ATHLTHLocalization.format(
+                            english: "%d runners visible now",
+                            norwegian: "%d løpere synlige nå",
+                            count
+                        ),
+                        systemImage: "circle.fill"
+                    )
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Color.white.opacity(0.94), in: Capsule()
+                    )
+                }
             }
+            .padding(19)
         }
+        .frame(height: 194)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 23))
+        .clipShape(RoundedRectangle(cornerRadius: 23))
+        .overlay {
+            RoundedRectangle(cornerRadius: 23)
+                .stroke(Color.white.opacity(0.86), lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private var workoutDeviceCard: some View {
@@ -231,7 +306,7 @@ struct GhostRaceHubView: View {
     }
 
     private var modeOverview: some View {
-        HStack(spacing: 9) {
+        HStack(spacing: 5) {
             ForEach(
                 GhostRaceHubMode.allCases
             ) { mode in
@@ -1499,50 +1574,23 @@ struct GhostRaceHubView: View {
         _ mode: GhostRaceHubMode,
         selected: Bool
     ) -> some View {
-        VStack(spacing: 7) {
-            Image(
-                systemName: mode.icon
-            )
-            .font(.headline)
-
+        HStack(spacing: 7) {
+            Image(systemName: mode.icon)
+                .font(.system(size: 14, weight: .semibold))
             Text(mode.title)
-                .font(
-                    .caption
-                        .weight(.semibold)
-                )
-
-            Text(mode.subtitle)
-                .font(.caption2)
+                .font(.system(size: 12, weight: .semibold))
                 .lineLimit(1)
-                .minimumScaleFactor(0.82)
         }
-        .foregroundStyle(
-            selected
-                ? Color.white
-                : ATHLTHTheme.primaryText
-        )
+        .foregroundStyle(selected ? Color.white : ATHLTHTheme.primaryText)
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
+        .frame(height: 43)
         .background(
-            selected
-                ? ATHLTHTheme.vitality
-                : ATHLTHTheme.card,
-            in: RoundedRectangle(
-                cornerRadius: 17,
-                style: .continuous
-            )
+            selected ? ATHLTHTheme.accentDeep : Color.white.opacity(0.85),
+            in: RoundedRectangle(cornerRadius: 13, style: .continuous)
         )
         .overlay {
-            RoundedRectangle(
-                cornerRadius: 17,
-                style: .continuous
-            )
-            .stroke(
-                selected
-                    ? Color.clear
-                    : ATHLTHTheme.border,
-                lineWidth: 0.8
-            )
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .stroke(selected ? Color.clear : ATHLTHTheme.border, lineWidth: 0.7)
         }
     }
 
