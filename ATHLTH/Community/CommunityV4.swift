@@ -257,7 +257,7 @@ struct ATHLTHCommunityV4View: View {
                 .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
             }
-            .onScrollGeometryChange(for: Bool.self) { geometry in
+            .onScrollGeometryChange(for: Bool.self) { @Sendable geometry in
                 geometry.contentOffset.y + geometry.contentInsets.top < -55
             } action: { _, pulledDown in
                 if pulledDown && !showingPeopleSearch {
