@@ -460,8 +460,14 @@ settingsSection("App") {
                             } label: {
                                 PremiumSettingsRow(
                                     icon: "clock",
-                                    title: "Time format",
-                                    subtitle: "Used for times throughout ATHLTH"
+                                    title: ATHLTHLocalization.choose(
+                                        english: "Time format",
+                                        norwegian: "Tidsformat"
+                                    ),
+                                    subtitle: ATHLTHLocalization.choose(
+                                        english: "Used for times throughout ATHLTH",
+                                        norwegian: "Brukes for klokkeslett i hele ATHLTH"
+                                    )
                                 ) {
                                     HStack(spacing: 8) {
                                         Text(settings.timeFormatPreference.title)
