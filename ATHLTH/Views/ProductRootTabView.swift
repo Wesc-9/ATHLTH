@@ -67,11 +67,12 @@ struct ATHLTHMinimizedWorkoutReturnPill: View {
                 }
             }
             .padding(.horizontal, 22)
-            .frame(minHeight: 58)
-            .background(
-                .regularMaterial,
-                in: Capsule()
-            )
+            .frame(minHeight: 52)
+            .background {
+                Capsule()
+                    .fill(.regularMaterial)
+                    .opacity(0.93)
+            }
             .overlay {
                 Capsule()
                     .stroke(
