@@ -1014,6 +1014,7 @@ struct RecoveryCoachView: View {
     @State private var aiConsentApproved = false
     @State private var healthConsentApproved = false
     @State private var draftHealthPermission = false
+    @State private var draftAutomaticHealthPermission = false
     @State private var showingCoachConsentSheet = false
     @State private var pendingShareAfterConsent = false
     @State private var showingMuscleFeedbackSheet = false
@@ -1344,6 +1345,46 @@ struct RecoveryCoachView: View {
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
                         .fixedSize(horizontal: false, vertical: true)
+
+                        Divider()
+
+                        Toggle(isOn: $draftAutomaticHealthPermission) {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(recoveryAIText(
+                                    "Personal Coach · automatic health access",
+                                    "Personlig Coach · automatisk helsetilgang"
+                                ))
+                                .font(.subheadline.weight(.semibold))
+
+                                Text(recoveryAIText(
+                                    "A separate, ongoing opt-in for questions sent to Groq. Never enabled by earlier permissions. You can withdraw at any time.",
+                                    "Eget, vedvarende samtykke for spørsmål sendt til Groq. Aktiveres aldri av tidligere tillatelser. Kan trekkes tilbake når som helst."
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        .tint(ATHLTHTheme.accentDeep)
+                        .disabled(
+                            !RecoveryCoachHealthSharingPreferences
+                                .automaticTransferApprovedForRelease ||
+                            !draftHealthPermission
+                        )
+
+                        if !RecoveryCoachHealthSharingPreferences
+                            .automaticTransferApprovedForRelease {
+                            Label(
+                                recoveryAIText(
+                                    "Not available yet. Automatic sharing remains blocked until the provider agreement, international transfers, retention and risk assessment have been verified.",
+                                    "Ikke tilgjengelig ennå. Automatisk deling er sperret til databehandleravtale, overføring, lagring og risikovurdering er verifisert."
+                                ),
+                                systemImage: "lock.shield"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                     .padding(17)
                     .background(
@@ -1434,6 +1475,10 @@ struct RecoveryCoachView: View {
         aiConsentApproved = saved != nil
         healthConsentApproved = saved?.healthSharingAllowed ?? false
         draftHealthPermission = healthConsentApproved
+        draftAutomaticHealthPermission =
+            RecoveryCoachHealthSharingPreferences.canAutomaticallyShare(
+                userID: session.profile.userID
+            )
         if !aiConsentApproved {
             showingCoachConsentSheet = true
         }
@@ -1447,6 +1492,23 @@ struct RecoveryCoachView: View {
         )
         aiConsentApproved = true
         healthConsentApproved = saved.healthSharingAllowed
+
+        // Save a distinct, versioned health-sharing choice. When the
+        // compliance gate is closed, requested automatic access can only
+        // become per-question access, never ongoing permission.
+        let requestedMode: RecoveryCoachHealthSharingMode =
+            !healthConsentApproved ? .off :
+            draftAutomaticHealthPermission ? .automatic :
+            .confirmEveryQuestion
+        RecoveryCoachHealthSharingPreferences.save(
+            userID: session.profile.userID,
+            requestedMode: requestedMode
+        )
+        draftAutomaticHealthPermission =
+            RecoveryCoachHealthSharingPreferences.canAutomaticallyShare(
+                userID: session.profile.userID
+            )
+
         if !healthConsentApproved {
             shareHealthForNextQuestion = false
             pendingHealthQuestion = nil
@@ -1465,6 +1527,8 @@ struct RecoveryCoachView: View {
         )
         aiConsentApproved = false
         healthConsentApproved = false
+        draftHealthPermission = false
+        draftAutomaticHealthPermission = false
         shareHealthForNextQuestion = false
         pendingHealthQuestion = nil
         pendingShareAfterConsent = false
@@ -2234,10 +2298,12 @@ struct RecoveryCoachView: View {
                 if !aiConsentApproved {
                     pendingShareAfterConsent = false
                     draftHealthPermission = false
+                    draftAutomaticHealthPermission = false
                     showingCoachConsentSheet = true
                 } else if !healthConsentApproved {
                     pendingShareAfterConsent = true
                     draftHealthPermission = false
+                    draftAutomaticHealthPermission = false
                     showingCoachConsentSheet = true
                 } else {
                     shareHealthForNextQuestion.toggle()
@@ -2682,7 +2748,16 @@ struct RecoveryCoachView: View {
             return
         }
 
-        if shareHealthForNextQuestion {
+        if RecoveryCoachHealthSharingPreferences.canAutomaticallyShare(
+            userID: session.profile.userID
+        ) {
+            // Still blocked by the release-level compliance gate. Should
+            // this ever be enabled, the user must have explicitly opted in
+            // through the separate v2 privacy choice.
+            Task {
+                await ask(clean, shareHealthData: true)
+            }
+        } else if shareHealthForNextQuestion {
             pendingHealthQuestion = clean
             showingHealthShareConfirmation = true
         } else {
@@ -2710,7 +2785,12 @@ struct RecoveryCoachView: View {
               let currentConsent = RecoveryCoachConsentPreferences.load(
                   userID: session.profile.userID
               ),
-              !shareHealthData || currentConsent.healthSharingAllowed
+              !shareHealthData || (
+                  currentConsent.healthSharingAllowed &&
+                  RecoveryCoachHealthSharingPreferences.effectiveMode(
+                      userID: session.profile.userID
+                  ) != .off
+              )
         else {
             return
         }
