@@ -1,6 +1,85 @@
 import Foundation
 import UserNotifications
 
+/// Copy for scheduled challenge alerts. Text is resolved when iOS queues the
+/// request, so the app re-schedules pending challenges if language changes.
+enum ATHLTHChallengeReminderText {
+    enum Reminder {
+        case starting
+        case meetup
+        case ending
+    }
+
+    static func title(
+        for reminder: Reminder,
+        norwegian: Bool = ATHLTHLocalization.isNorwegian
+    ) -> String {
+        switch reminder {
+        case .starting:
+            return norwegian
+                ? "Utfordringen starter om én time"
+                : "Challenge starts in one hour"
+        case .meetup:
+            return norwegian
+                ? "Fellestreningen starter om én time"
+                : "Meet & Train starts in one hour"
+        case .ending:
+            return norwegian
+                ? "Utfordringen avsluttes i morgen!"
+                : "Challenge ends tomorrow!"
+        }
+    }
+
+    static func message(
+        for reminder: Reminder,
+        challengeTitle: String,
+        meetupPlace: String? = nil,
+        norwegian: Bool = ATHLTHLocalization.isNorwegian
+    ) -> String {
+        let trimmed = challengeTitle.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        // Short placeholder-like titles such as "Ok" should never be the
+        // entire notification body. Preserve meaningful user-chosen names.
+        let name = trimmed.lowercased() == "ok" || trimmed.isEmpty
+            ? nil
+            : String(trimmed.prefix(60)) + (trimmed.count > 60 ? "…" : "")
+
+        switch reminder {
+        case .starting:
+            if let name {
+                return norwegian
+                    ? "«\(name)» starter snart. Sjekk detaljene og gjør deg klar."
+                    : "«\(name)» starts soon. Check the details and get ready."
+            }
+            return norwegian
+                ? "Start om én time. Åpne utfordringen for å se detaljene."
+                : "Starts in one hour. Open the challenge to see the details."
+        case .meetup:
+            let place = meetupPlace?.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ) ?? ""
+            if !place.isEmpty {
+                return norwegian
+                    ? "Oppmøte: \(place). Se detaljene før start."
+                    : "Meeting point: \(place). Check the details before starting."
+            }
+            return norwegian
+                ? "Sjekk møtested og detaljer før fellestreningen."
+                : "Check the meeting point and details before training."
+        case .ending:
+            if let name {
+                return norwegian
+                    ? "«\(name)»: 24 timer igjen. Sjekk fremdriften før fristen."
+                    : "«\(name)»: 24 hours left. Check your progress before the deadline."
+            }
+            return norwegian
+                ? "Du har 24 timer igjen. Sjekk fremdriften din før utfordringen avsluttes."
+                : "24 hours left. Check your progress before the challenge ends."
+        }
+    }
+}
+
 @MainActor
 final class ATHLTHNotificationStore: ObservableObject {
     @Published private(set) var items: [ATHLTHNotificationItem] = []
@@ -302,7 +381,7 @@ final class ATHLTHNotificationStore: ObservableObject {
                         kind: .challenge,
                         title: ATHLTHLocalization.choose(
                             english: "New challenge result",
-                            norwegian: "Nytt challenge-resultat"
+                            norwegian: "Nytt resultat i utfordringen"
                         ),
                         message: ATHLTHLocalization.format(
                             english: "%@ posted %@ in %@.",
@@ -327,7 +406,7 @@ final class ATHLTHNotificationStore: ObservableObject {
                         kind: .challenge,
                         title: ATHLTHLocalization.choose(
                             english: "Challenge completed",
-                            norwegian: "Challenge fullført"
+                            norwegian: "Utfordring fullført"
                         ),
                         message: ATHLTHLocalization.format(
                             english: "%@ has finished. View the final leaderboard.",
@@ -567,11 +646,11 @@ final class ATHLTHNotificationStore: ObservableObject {
         let startReminder = challenge.rules.startsAt.addingTimeInterval(-3_600)
         if startReminder > now {
             let content = UNMutableNotificationContent()
-            content.title = ATHLTHLocalization.choose(
-                english: "Challenge starts in 1 hour",
-                norwegian: "Challenge starter om 1 time"
+            content.title = ATHLTHChallengeReminderText.title(for: .starting)
+            content.body = ATHLTHChallengeReminderText.message(
+                for: .starting,
+                challengeTitle: challenge.title
             )
-            content.body = challenge.title
             content.sound = .default
             content.userInfo = [
                 "athlthChallengeID": challenge.id.uuidString
@@ -596,11 +675,12 @@ final class ATHLTHNotificationStore: ObservableObject {
 
             if meetupReminder > now {
                 let content = UNMutableNotificationContent()
-                content.title = ATHLTHLocalization.choose(
-                    english: "Meet & Train in 1 hour",
-                    norwegian: "Meet & Train om 1 time"
+                content.title = ATHLTHChallengeReminderText.title(for: .meetup)
+                content.body = ATHLTHChallengeReminderText.message(
+                    for: .meetup,
+                    challengeTitle: challenge.title,
+                    meetupPlace: meetup.placeName
                 )
-                content.body = "\(challenge.title) · \(meetup.placeName)"
                 content.sound = .default
                 content.userInfo = [
                     "athlthChallengeID": challenge.id.uuidString
@@ -626,11 +706,11 @@ final class ATHLTHNotificationStore: ObservableObject {
 
             if endReminder > now {
                 let content = UNMutableNotificationContent()
-                content.title = ATHLTHLocalization.choose(
-                    english: "Challenge ends tomorrow",
-                    norwegian: "Challenge avsluttes i morgen"
+                content.title = ATHLTHChallengeReminderText.title(for: .ending)
+                content.body = ATHLTHChallengeReminderText.message(
+                    for: .ending,
+                    challengeTitle: challenge.title
                 )
-                content.body = challenge.title
                 content.sound = .default
                 content.userInfo = [
                     "athlthChallengeID": challenge.id.uuidString
