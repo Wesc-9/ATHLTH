@@ -79,6 +79,25 @@ final class HomeWeeklyProgressCalendarTests: XCTestCase {
         ))
     }
 
+    func testCompletedWorkoutTypesUseNorwegianLabels() {
+        XCTAssertEqual(
+            HomeCompletedWorkoutPresentation.title(for: .running, norwegian: true),
+            "Løping"
+        )
+        XCTAssertEqual(
+            HomeCompletedWorkoutPresentation.title(for: .strength, norwegian: true),
+            "Styrke"
+        )
+        XCTAssertEqual(
+            HomeCompletedWorkoutPresentation.title(for: .coreTraining, norwegian: true),
+            "Kjernetrening"
+        )
+        XCTAssertEqual(
+            HomeCompletedWorkoutPresentation.title(for: .running, norwegian: false),
+            "Running"
+        )
+    }
+
     func testStandaloneShortcutAllowsOnlyTodayAndFutureDays() {
         let now = calendar.date(from: DateComponents(
             year: 2026, month: 10, day: 10, hour: 23, minute: 59
