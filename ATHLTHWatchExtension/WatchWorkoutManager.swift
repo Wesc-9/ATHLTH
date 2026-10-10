@@ -63,6 +63,23 @@ private final class WatchStartGuardContinuation: @unchecked Sendable {
         lock.unlock()
         pending?.resume(returning: answer)
     }
+
+    // These closures are created outside MainActor isolation. WCSession
+    // invokes them on a utility queue; closures created in an actor-isolated
+    // method can trap with _dispatch_assert_queue_fail in Swift 6.
+    nonisolated func makeReplyHandler() -> ([String: Any]) -> Void {
+        { [self] reply in
+            complete(
+                reply[WatchTransferMetadataKey.workoutAllowed] as? Bool
+            )
+        }
+    }
+
+    nonisolated func makeErrorHandler() -> (Error) -> Void {
+        { [self] _ in
+            complete(nil)
+        }
+    }
 }
 
 private struct WatchPersistedWorkoutState: Codable {
@@ -2439,16 +2456,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
             session.sendMessage(
                 payload,
-                replyHandler: { reply in
-                    completion.complete(
-                        reply[
-                            WatchTransferMetadataKey.workoutAllowed
-                        ] as? Bool
-                    )
-                },
-                errorHandler: { _ in
-                    completion.complete(nil)
-                }
+                replyHandler: completion.makeReplyHandler(),
+                errorHandler: completion.makeErrorHandler()
             )
 
             // If the iPhone stops replying, standalone Watch recording
