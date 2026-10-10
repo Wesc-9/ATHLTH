@@ -1409,7 +1409,7 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                         Color.black
                     }
                 }
-                .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                .onScrollGeometryChange(for: CGFloat.self) { @Sendable geometry in
                     max(0, geometry.contentOffset.y)
                 } action: { _, newOffset in
                     guard scrollFadeTransition else { return }
