@@ -165,6 +165,80 @@ final class ATHLTHTrainTrendEngineTests: XCTestCase {
         XCTAssertEqual(result.points.first?.volumeKilograms, 140)
     }
 
+    func testGeneralTrendsIncludeQuickTrainAndPlanLinkedSessions() {
+        let quick = logged(
+            linked: nil,
+            sets: [completedSet(weight: 45, reps: 6)],
+            exerciseName: "Knebøy"
+        )
+        let planned = logged(
+            linked: sessionID,
+            sets: [completedSet(weight: 60, reps: 5)],
+            exerciseName: "Knebøy"
+        )
+
+        let general = ATHLTHTrainTrendEngine.makeGeneral(
+            strengthHistory: [quick, planned]
+        )
+        let planSpecific = ATHLTHTrainTrendEngine.make(
+            plan: plan(),
+            strengthHistory: [quick, planned]
+        )
+
+        XCTAssertEqual(general.linkedWorkoutCount, 2)
+        XCTAssertEqual(general.points(for: "kneboy").count, 1)
+        XCTAssertEqual(
+            general.points(for: "kneboy").first?.peakWeightKilograms,
+            60
+        )
+        XCTAssertEqual(planSpecific.linkedWorkoutCount, 1)
+        XCTAssertTrue(planSpecific.points(for: "kneboy").isEmpty)
+    }
+
+    func testGeneralTrendsExcludeWarmupsUnfinishedAndDuplicateWorkouts() {
+        let warmup = completedSet(weight: 75, reps: 5, warmup: true)
+        let valid = completedSet(weight: 50, reps: 8)
+        var unfinishedSet = completedSet(weight: 200, reps: 1)
+        unfinishedSet.completedAt = nil
+
+        let done = logged(
+            linked: nil,
+            sets: [warmup, valid, unfinishedSet],
+            exerciseName: "Benkpress"
+        )
+        let incomplete = logged(
+            linked: nil,
+            sets: [completedSet(weight: 300)],
+            complete: false,
+            exerciseName: "Benkpress"
+        )
+
+        let result = ATHLTHTrainTrendEngine.makeGeneral(
+            strengthHistory: [done, done, incomplete]
+        )
+
+        XCTAssertEqual(result.linkedWorkoutCount, 1)
+        XCTAssertEqual(result.points.first?.completedWorkingSets, 1)
+        XCTAssertEqual(result.points.first?.peakWeightKilograms, 50)
+        XCTAssertEqual(result.points.first?.volumeKilograms, 400)
+    }
+
+    func testGeneralTrendsDoNotInventWeightForBodyweightExercise() {
+        let result = ATHLTHTrainTrendEngine.makeGeneral(
+            strengthHistory: [
+                logged(
+                    linked: nil,
+                    sets: [completedSet(weight: nil)],
+                    exerciseName: "Armheving"
+                )
+            ]
+        )
+
+        XCTAssertEqual(result.linkedWorkoutCount, 1)
+        XCTAssertNil(result.points.first?.peakWeightKilograms)
+        XCTAssertEqual(result.points.first?.completedWorkingSets, 1)
+    }
+
     func testLegacyRenamedExerciseResolvesToPlanNameByID() {
         let result = ATHLTHTrainTrendEngine.make(
             plan: plan(), strengthHistory: [
