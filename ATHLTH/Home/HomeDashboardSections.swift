@@ -3994,6 +3994,8 @@ struct HomeWeeklyProgressStrip:
 
 private struct HomeWeeklyProgressDaySheet:
     View {
+    @EnvironmentObject private var strength: StrengthWorkoutStore
+
     let selection:
         HomeWeeklyProgressDaySelection
 
@@ -4128,8 +4130,17 @@ private struct HomeWeeklyProgressDaySheet:
                         ForEach(
                             selection.actual
                         ) { workout in
-                            actualRow(
-                                workout
+                            NavigationLink {
+                                completedWorkoutDestination(workout)
+                            } label: {
+                                actualRow(workout)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityHint(
+                                ATHLTHLocalization.choose(
+                                    english: "Open all workout details",
+                                    norwegian: "Åpne alle detaljer fra treningsøkten"
+                                )
                             )
                         }
                     }
@@ -4396,6 +4407,38 @@ private struct HomeWeeklyProgressDaySheet:
         )
     }
 
+    @ViewBuilder
+    private func completedWorkoutDestination(
+        _ summary: WorkoutSummary
+    ) -> some View {
+        // Both the workout created in ATHLTH and its HealthKit record may
+        // carry the same HealthKit UUID. Prefer the ATHLTH strength log
+        // so sets, exercises, weights and personal records are available.
+        let strengthLog = strength.workoutHistory.first {
+            $0.id == summary.id ||
+            $0.healthMetrics.healthKitWorkoutUUID == summary.id
+        }
+        let workout = strengthLog.map {
+            SocialPublishableWorkout(strengthWorkout: $0)
+        } ?? SocialPublishableWorkout(summary: summary)
+
+        switch workout.activity {
+        case .strength:
+            HomeActivityStrengthDetailView(
+                workout: workout,
+                strengthWorkout: strengthLog
+            )
+        case .running, .walking, .hiking:
+            HomeActivityRunDetailView(
+                workout: workout,
+                initialDetail: nil,
+                initialAIInsight: nil
+            )
+        default:
+            WorkoutHistoryDetailView(workout: workout)
+        }
+    }
+
     private func actualRow(
         _ workout: WorkoutSummary
     ) -> some View {
@@ -4433,15 +4476,21 @@ private struct HomeWeeklyProgressDaySheet:
 
                 Spacer(minLength: 5)
 
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(ATHLTHTheme.vitality)
-                    .accessibilityLabel(
-                        ATHLTHLocalization.choose(
-                            english: "Completed",
-                            norwegian: "Fullført"
-                        )
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(ATHLTHTheme.vitality)
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english: "Completed. Open details",
+                        norwegian: "Fullført. Åpne detaljer"
                     )
+                )
             }
 
             LazyVGrid(
