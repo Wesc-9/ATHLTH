@@ -4432,10 +4432,17 @@ private struct HomeWeeklyProgressDaySheet:
 
         switch workout.activity {
         case .strength:
-            HomeActivityStrengthDetailView(
-                workout: workout,
-                strengthWorkout: strengthLog
-            )
+            if let strengthLog {
+                HomeActivityStrengthDetailView(
+                    workout: workout,
+                    strengthWorkout: strengthLog
+                )
+            } else {
+                // HealthKit-only strength sessions have no ATHLTH sets or
+                // exercise log. Show their actual HealthKit metrics instead
+                // of displaying empty set counts in the strength editor.
+                WorkoutHistoryDetailView(workout: workout)
+            }
         case .running, .walking, .hiking:
             HomeActivityRunDetailView(
                 workout: workout,
