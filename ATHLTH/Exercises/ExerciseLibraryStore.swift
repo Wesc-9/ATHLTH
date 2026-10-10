@@ -124,7 +124,7 @@ final class ExerciseLibraryStore: ObservableObject {
         case "chest":
             norwegian = "Bryst"
         case "core":
-            norwegian = "Kjerne"
+            norwegian = "Mage og kjerne"
         case "forearms", "lower arms":
             norwegian = "Underarmer"
         case "full body":
@@ -626,11 +626,11 @@ final class ExerciseLibraryStore: ObservableObject {
 
                 let currentSignature =
                     athlthCatalogExercises.map {
-                        "\($0.id.uuidString)|\($0.name)"
+                        "\($0.id.uuidString)|\($0.name)|\($0.exercise.primaryMuscles.joined(separator: ","))|\($0.exercise.secondaryMuscles.joined(separator: ","))"
                     }
                 let refreshedSignature =
                     refreshed.map {
-                        "\($0.id.uuidString)|\($0.name)"
+                        "\($0.id.uuidString)|\($0.name)|\($0.exercise.primaryMuscles.joined(separator: ","))|\($0.exercise.secondaryMuscles.joined(separator: ","))"
                     }
 
                 if currentSignature !=
