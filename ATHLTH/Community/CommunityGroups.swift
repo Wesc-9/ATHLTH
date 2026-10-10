@@ -4406,11 +4406,13 @@ final class CommunityGroupStore: ObservableObject {
         advancedOptions:
             CommunityGroupChallengeAdvancedOptions =
                 CommunityGroupChallengeAdvancedOptions(),
-        cohostIDs: [UUID] = []
+        cohostIDs: [UUID] = [],
+        featureAsWeekly: Bool = false
     ) async -> Bool {
         guard currentUserID != nil,
               let group = group(for: groupID),
               canCreateGroupContent(group),
+              (!featureAsWeekly || canPublishUpdates(group)),
               targetValue > 0,
               endsAt > startsAt
         else {
@@ -4479,6 +4481,19 @@ final class CommunityGroupStore: ObservableObject {
 
             errorMessage = nil
             await loadGroupContent(groupID)
+
+            // Reuse the dedicated featured weekly slot already on the Club.
+            // Contributors can propose a weekly goal; an owner/admin must
+            // choose to feature it in Club settings.
+            if featureAsWeekly && canManage(group) {
+                let featured = await setFeaturedChallenge(
+                    challengeID, in: group
+                )
+                if !featured {
+                    return false
+                }
+            }
+
             mergeGroupActivityIntoCommunityFeed(
                 groupID
             )
@@ -19782,6 +19797,23 @@ struct CommunityGroupChallengeCreateView: View {
         CommunityGroupStore
 
     let group: CommunityGroupRecord
+    let isWeeklyChallenge: Bool
+
+    init(group: CommunityGroupRecord, isWeeklyChallenge: Bool = false) {
+        self.group = group
+        self.isWeeklyChallenge = isWeeklyChallenge
+        if isWeeklyChallenge {
+            _goalPreset = State(initialValue: .mostCompletions)
+            _metric = State(initialValue: .workouts)
+            _target = State(initialValue: "5")
+            _title = State(
+                initialValue: ATHLTHLocalization.choose(
+                    english: "Weekly workout goal",
+                    norwegian: "Ukens treningsmål"
+                )
+            )
+        }
+    }
 
     @State private var title = ""
     @State private var summary = ""
@@ -19831,7 +19863,7 @@ struct CommunityGroupChallengeCreateView: View {
     var body: some View {
         NavigationStack {
             Form {
-                if groups.canManage(group) {
+                if groups.canManage(group) && !isWeeklyChallenge {
                     Section {
                         Button {
                             showingTemplatePicker = true
@@ -19974,26 +20006,40 @@ struct CommunityGroupChallengeCreateView: View {
                     .lineLimit(2...5)
                 }
 
-                CommunityGroupActivityEditor(
-                    draft: $activityDraft
-                )
-                .onChange(
-                    of: activityDraft.activityType
-                ) { _, type in
-                    if type == "strength" {
-                        goalPreset = .strengthVolume
-                        target = "5000"
-                    } else if [
-                        CommunityGroupChallengeGoalPreset
-                            .strengthVolume,
-                        .heaviestWeight,
-                        .strengthReps
-                    ].contains(goalPreset) {
-                        goalPreset = .mostDistance
-                        target = "100"
+                if !isWeeklyChallenge {
+                    CommunityGroupActivityEditor(
+                        draft: $activityDraft
+                    )
+                    .onChange(
+                        of: activityDraft.activityType
+                    ) { _, type in
+                        if type == "strength" {
+                            goalPreset = .strengthVolume
+                            target = "5000"
+                        } else if [
+                            CommunityGroupChallengeGoalPreset
+                                .strengthVolume,
+                            .heaviestWeight,
+                            .strengthReps
+                        ].contains(goalPreset) {
+                            goalPreset = .mostDistance
+                            target = "100"
+                        }
+    
+                        applyGoalPreset(goalPreset)
                     }
-
-                    applyGoalPreset(goalPreset)
+                } else {
+                    Section {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Simple Club-wide goals: total workouts, distance or training minutes. Route challenges are created with New challenge.",
+                                norwegian: "Enkle mål for hele klubben: antall økter, distanse eller treningsminutter. Ruteutfordringer opprettes via Ny challenge."
+                            ),
+                            systemImage: "trophy.fill"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
                 }
 
                 Section("Goal") {
@@ -20266,21 +20312,23 @@ struct CommunityGroupChallengeCreateView: View {
                     )
                 }
 
-                CommunityGroupChallengeAdvancedEditor(
-                    group: group,
-                    options: $challengeOptions,
-                    cohostIDs:
-                        $challengeCohostIDs,
-                    routeSelected:
-                        activityDraft.mode ==
-                            .route &&
-                        (
-                            activityDraft
-                                .selectedRoute != nil ||
-                            activityDraft
-                                .selectedRouteSnapshot != nil
-                        )
-                )
+                if !isWeeklyChallenge {
+                    CommunityGroupChallengeAdvancedEditor(
+                        group: group,
+                        options: $challengeOptions,
+                        cohostIDs:
+                            $challengeCohostIDs,
+                        routeSelected:
+                            activityDraft.mode ==
+                                .route &&
+                            (
+                                activityDraft
+                                    .selectedRoute != nil ||
+                                activityDraft
+                                    .selectedRouteSnapshot != nil
+                            )
+                    )
+                }
 
                 Section {
                     Label(
@@ -20291,7 +20339,17 @@ struct CommunityGroupChallengeCreateView: View {
                     .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("Group Challenge")
+            .navigationTitle(
+                isWeeklyChallenge
+                    ? ATHLTHLocalization.choose(
+                        english: "Weekly Club challenge",
+                        norwegian: "Ukens challenge"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "New Club challenge",
+                        norwegian: "Ny challenge"
+                    )
+            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(
@@ -20527,8 +20585,8 @@ struct CommunityGroupChallengeCreateView: View {
             return
         }
 
-        let configuration =
-            activityDraft.configuration
+        let configuration: CommunityGroupActivityConfiguration? =
+            isWeeklyChallenge ? nil : activityDraft.configuration
 
         Task {
             saving = true
@@ -20551,7 +20609,8 @@ struct CommunityGroupChallengeCreateView: View {
                 advancedOptions:
                     challengeOptions,
                 cohostIDs:
-                    Array(challengeCohostIDs)
+                    Array(challengeCohostIDs),
+                featureAsWeekly: isWeeklyChallenge
             )
 
             saving = false
@@ -20568,6 +20627,15 @@ struct CommunityGroupChallengeCreateView: View {
 
     private var suggestedGoalPresets:
         [CommunityGroupChallengeGoalPreset] {
+        if isWeeklyChallenge {
+            return [
+                .mostCompletions,
+                .mostDistance,
+                .mostActiveMinutes,
+                .completeTarget
+            ]
+        }
+
         switch activityDraft.activityType {
         case "strength":
             return [
@@ -20590,6 +20658,10 @@ struct CommunityGroupChallengeCreateView: View {
     }
 
     private var goalNeedsTarget: Bool {
+        if isWeeklyChallenge && goalPreset == .mostCompletions {
+            return true
+        }
+
         switch goalPreset {
         case .mostDistance,
              .mostActiveMinutes,
@@ -20636,10 +20708,20 @@ struct CommunityGroupChallengeCreateView: View {
             CommunityGroupChallengeGoalPreset
     ) {
         metric = preset.metric
-        challengeOptions.scoringMode =
-            preset.scoringMode
+        challengeOptions.scoringMode = preset.scoringMode
 
-        if !goalNeedsTarget {
+        if isWeeklyChallenge {
+            switch preset {
+            case .mostCompletions, .completeTarget:
+                target = "5"
+            case .mostDistance:
+                target = "25"
+            case .mostActiveMinutes:
+                target = "150"
+            default:
+                target = "5"
+            }
+        } else if !goalNeedsTarget {
             target = "1"
         } else if targetValue == nil ||
                     (targetValue ?? 0) <= 0 {
