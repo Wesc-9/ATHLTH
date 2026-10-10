@@ -2,8 +2,9 @@
 """Cheap SwiftUI image-layout regression check (not a visual-device test).
 
 The screenshots from Strength details and ATHLTH Coach demonstrated that an
-unbounded aspect-fill image can expand an entire vertical ScrollView sideways.
-Guard the repaired surfaces and report similar constructs across the app.
+unbounded aspect-fill image can expand a vertical ScrollView sideways.
+Coach now uses an image-free compact header; guard its responsive chat layout
+and the remaining artwork surfaces instead.
 Legitimate GeometryReader-based or bounded-fill images are deliberately allowed.
 """
 from __future__ import annotations
@@ -17,9 +18,10 @@ APP = ROOT / "ATHLTH"
 # Required source-level invariants for the two real-world iPhone regressions.
 # These checks intentionally avoid matching asset names or changing artwork.
 REQUIRED = {
+    # Coach now uses a compact, image-free header. The old 164 pt
+    # aspect-fill photo guard is intentionally obsolete.
     "ATHLTH/Recovery/RecoveryAIViews.swift": (
-        r"GeometryReader\s*\{\s*viewport\s+in",
-        r"\.frame\(width:\s*viewport\.size\.width,\s*height:\s*164\)",
+        r"private struct RecoveryCoachCompactHeader",
         r"\.containerRelativeFrame\(\.horizontal\)",
     ),
     "ATHLTH/Social/HomeActivityStrengthDetailView.swift": (
