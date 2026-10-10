@@ -7413,22 +7413,15 @@ struct CommunityGroupDetailView: View {
 
             referenceClubPostsSection
 
-            if let challenge =
-                featuredClubChallenge ??
-                nextGroupChallenge {
-                referenceClubChallengeCard(
-                    challenge
-                )
+            // Weekly Club challenge is an editorial feature, not the
+            // same as the member-created route/activity challenges below.
+            if let challenge = featuredClubChallenge {
+                referenceClubChallengeCard(challenge)
+            } else {
+                referenceEmptyChallengeCard
             }
 
             referenceComingUpSection
-
-            if featuredClubChallenge == nil,
-               nextGroupChallenge == nil,
-               nextGroupEvent == nil,
-               referenceSecondaryChallenge == nil {
-                referenceEmptyChallengeCard
-            }
 
             clubLeaderboardCard
         }
@@ -7561,7 +7554,10 @@ struct CommunityGroupDetailView: View {
                 )
             }
 
-            HStack(spacing: 8) {
+            LazyVGrid(
+                columns: [GridItem(.flexible()), GridItem(.flexible())],
+                spacing: 8
+            ) {
                 if groups.canManage(
                     currentGroup
                 ) {
@@ -7594,22 +7590,16 @@ struct CommunityGroupDetailView: View {
                     .buttonStyle(.plain)
                 } else {
                     Button {
-                        selectTab(.chat)
+                        selectTab(.members)
                     } label: {
                         referenceActionTile(
-                            title: "Chat",
-                            detail:
-                                ATHLTHLocalization
-                                    .choose(
-                                        english:
-                                            "Talk together",
-                                        norwegian:
-                                            "Snakk sammen"
-                                    ),
-                            icon:
-                                "bubble.left.and.bubble.right.fill",
-                            tint:
-                                clubForest
+                            title: ATHLTHLocalization.choose(
+                                english: "Members",
+                                norwegian: "Medlemmer"
+                            ),
+                            detail: memberCountText,
+                            icon: "person.2.fill",
+                            tint: clubForest
                         )
                     }
                     .buttonStyle(.plain)
@@ -7663,8 +7653,6 @@ struct CommunityGroupDetailView: View {
                 }
                 .buttonStyle(.plain)
 
-                referenceChallengeAction
-
                 Button {
                     if groups
                         .canCreateGroupContent(
@@ -7709,6 +7697,8 @@ struct CommunityGroupDetailView: View {
                     )
                 }
                 .buttonStyle(.plain)
+
+                referenceChallengeAction
             }
         }
         .padding(13)
@@ -7739,88 +7729,35 @@ struct CommunityGroupDetailView: View {
         )
     }
 
-    @ViewBuilder
-    private var referenceChallengeAction:
-        some View {
-        if let challenge =
-            featuredClubChallenge ??
-            nextGroupChallenge {
-            NavigationLink {
-                CommunityGroupChallengeDetailView(
-                    group: currentGroup,
-                    challenge: challenge
-                )
-            } label: {
-                referenceActionTile(
-                    title:
-                        ATHLTHLocalization
-                            .choose(
-                                english:
-                                    "Club challenge",
-                                norwegian:
-                                    "Ukens challenge"
-                            ),
-                    detail:
-                        ATHLTHLocalization
-                            .choose(
-                                english:
-                                    "Join in",
-                                norwegian:
-                                    "Bli med"
-                            ),
-                    icon: "trophy.fill",
-                    tint:
-                        clubEmerald
-                )
+    // Regular challenges: routes, activity goals and personal competitions.
+    // The week's curated challenge has its own featured card on Overview.
+    private var referenceChallengeAction: some View {
+        Button {
+            if groups.canCreateGroupContent(currentGroup) {
+                showingCreateChallenge = true
+            } else {
+                selectTab(.challenges)
             }
-            .buttonStyle(.plain)
-        } else {
-            Button {
-                if groups
-                    .canCreateGroupContent(
-                        currentGroup
-                    ) {
-                    showingCreateChallenge =
-                        true
-                } else {
-                    selectTab(.challenges)
-                }
-            } label: {
-                referenceActionTile(
-                    title:
-                        ATHLTHLocalization
-                            .choose(
-                                english:
-                                    "Club challenge",
-                                norwegian:
-                                    "Ukens challenge"
-                            ),
-                    detail:
-                        groups
-                            .canCreateGroupContent(
-                                currentGroup
-                            )
-                            ? ATHLTHLocalization
-                                .choose(
-                                    english:
-                                        "Create",
-                                    norwegian:
-                                        "Opprett"
-                                )
-                            : ATHLTHLocalization
-                                .choose(
-                                    english:
-                                        "View",
-                                    norwegian:
-                                        "Se challenges"
-                                ),
-                    icon: "trophy.fill",
-                    tint:
-                        clubEmerald
-                )
-            }
-            .buttonStyle(.plain)
+        } label: {
+            referenceActionTile(
+                title: ATHLTHLocalization.choose(
+                    english: "New challenge",
+                    norwegian: "Ny challenge"
+                ),
+                detail: groups.canCreateGroupContent(currentGroup)
+                    ? ATHLTHLocalization.choose(
+                        english: "Routes & goals",
+                        norwegian: "Ruter og mål"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "See challenges",
+                        norwegian: "Se challenges"
+                    ),
+                icon: "flag.checkered",
+                tint: clubEmerald
+            )
         }
+        .buttonStyle(.plain)
     }
 
     private func referenceActionTile(
@@ -7974,13 +7911,13 @@ struct CommunityGroupDetailView: View {
     private var referenceEmptyChallengeCard:
         some View {
         let canCreate =
-            groups.canCreateGroupContent(
+            groups.canPublishUpdates(
                 currentGroup
             )
 
         return Button {
             if canCreate {
-                showingCreateChallenge = true
+                showingCreateWeeklyChallenge = true
             } else {
                 selectTab(.challenges)
             }
@@ -8028,9 +7965,9 @@ struct CommunityGroupDetailView: View {
                     Text(
                         ATHLTHLocalization.choose(
                             english:
-                                "CLUB CHALLENGE",
+                                "WEEKLY CHALLENGE",
                             norwegian:
-                                "CLUB CHALLENGE"
+                                "WEEKLY CHALLENGE"
                         )
                     )
                     .font(
@@ -8050,9 +7987,9 @@ struct CommunityGroupDetailView: View {
                             ? ATHLTHLocalization
                                 .choose(
                                     english:
-                                        "No challenge selected yet",
+                                        "No weekly challenge selected",
                                     norwegian:
-                                        "Ingen challenge valgt ennå"
+                                        "Ingen ukesutfordring valgt"
                                 )
                             : ATHLTHLocalization
                                 .choose(
@@ -8078,9 +8015,9 @@ struct CommunityGroupDetailView: View {
                             ? ATHLTHLocalization
                                 .choose(
                                     english:
-                                        "Create the Club's next challenge. Owner and Admin can feature it when it is ready.",
+                                        "Set a shared weekly goal such as workouts, distance or active minutes. Admins choose what is featured.",
                                     norwegian:
-                                        "Opprett klubbens neste challenge. Owner og Admin kan fremheve den når den er klar."
+                                        "Sett et felles ukesmål for økter, distanse eller minutter. Admin velger hva som fremheves."
                                 )
                             : ATHLTHLocalization
                                 .choose(
@@ -8103,9 +8040,9 @@ struct CommunityGroupDetailView: View {
                                 ? ATHLTHLocalization
                                     .choose(
                                         english:
-                                            "Create challenge",
+                                            "Create weekly challenge",
                                         norwegian:
-                                            "Opprett challenge"
+                                            "Opprett ukesutfordring"
                                     )
                                 : ATHLTHLocalization
                                     .choose(
@@ -10294,6 +10231,7 @@ struct CommunityGroupDetailView: View {
 
         return groups.challenges(in: group.id)
             .filter {
+                $0.id != currentGroup.featuredChallengeID &&
                 $0.endsAt >= now &&
                 $0.status != "draft" &&
                 $0.status != "cancelled"
@@ -11479,10 +11417,13 @@ struct CommunityGroupDetailView: View {
         groups.challenges(in: group.id).filter {
             challenge in
 
-            challenge.status != "draft" ||
-            groups.canManage(currentGroup) ||
-            challenge.creatorID ==
-                session.profile.userID
+            // Weekly featured challenge lives in its own Overview section.
+            challenge.id != currentGroup.featuredChallengeID &&
+            (
+                challenge.status != "draft" ||
+                groups.canManage(currentGroup) ||
+                challenge.creatorID == session.profile.userID
+            )
         }
     }
 
