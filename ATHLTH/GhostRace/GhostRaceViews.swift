@@ -1134,7 +1134,7 @@ struct GhostRaceHubView: View {
                         ))
                     )
                     NavigationLink {
-                        RouteLibraryListView()
+                        RouteLibraryListView(source: .database)
                     } label: {
                         Label(
                             ATHLTHLocalization.choose(
