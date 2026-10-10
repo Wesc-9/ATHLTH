@@ -10040,7 +10040,16 @@ struct ATHLTHTrainView: View {
             } else {
                 showingStrengthQuickStart = true
             }
-        case .mobility, .recovery, .custom:
+        case .custom:
+            if customQuickStartAvailable {
+                showingCustomQuickStart = true
+            } else {
+                watchTransferError = ATHLTHLocalization.choose(
+                    english: "Connect Apple Watch and finish the active workout before choosing another training type.",
+                    norwegian: "Koble til Apple Watch og avslutt en aktiv økt før du velger en annen treningsform."
+                )
+            }
+        case .mobility, .recovery:
             break
         }
     }
