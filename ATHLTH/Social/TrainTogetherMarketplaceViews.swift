@@ -22,6 +22,31 @@ struct TrainTogetherMarketplaceView:
         TrainTogetherTimeFilter = .upcoming
     @State private var modeFilter:
         TrainTogetherModeFilter = .all
+    @State private var showingMap = false
+    @State private var joinRequestPost: TrainTogetherPost?
+
+    private var plannedKinds: Set<WorkoutKind> {
+        var planned = session.standalonePlannedSessions
+        if let plan = session.activePlan {
+            planned += plan.weeks.flatMap { $0.days }
+                .flatMap { $0.sessions }
+        }
+        let now = Date()
+        return Set(
+            planned.filter {
+                guard let start = $0.scheduledStart else { return false }
+                return start >= now && start < now.addingTimeInterval(14 * 86400)
+            }.map(\.kind)
+        )
+    }
+
+    private func matchScore(_ post: TrainTogetherPost) -> Int {
+        var score = 0
+        if plannedKinds.contains(postKind(post)) { score += 3 }
+        if social.isFollowing(post.creatorID) { score += 2 }
+        if post.spotsLeft > 0 { score += 1 }
+        return score
+    }
 
     var body: some View {
         ScrollView {
@@ -82,51 +107,40 @@ struct TrainTogetherMarketplaceView:
                         )
                 )
 
-                if marketplace.isLoading &&
-                    visiblePosts.isEmpty {
-                    VStack(spacing: 12) {
-                        ProgressView()
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Finding workouts…",
-                                norwegian:
-                                    "Finner økter…"
-                            )
+                if marketplace.isLoading && visiblePosts.isEmpty {
+                    ProgressView(
+                        ATHLTHLocalization.choose(
+                            english: "Finding workouts…",
+                            norwegian: "Finner økter…"
                         )
-                        .font(.caption)
-                        .foregroundStyle(
-                            .secondary
-                        )
-                    }
-                    .frame(
-                        maxWidth: .infinity
                     )
-                    .padding(
-                        .vertical,
-                        36
-                    )
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 34)
                 } else if visiblePosts.isEmpty {
                     emptyState
+                } else if showingMap && modeFilter != .sameWorkout {
+                    TrainTogetherAreaMapView(
+                        posts: visiblePosts.filter {
+                            $0.resolvedParticipationMode == .physical
+                        }
+                    )
+                    .environmentObject(marketplace)
                 } else {
-                    LazyVStack(spacing: 12) {
-                        ForEach(
-                            visiblePosts
-                        ) { post in
-                            NavigationLink {
-                                TrainTogetherPostDetailView(
-                                    postID:
-                                        post.id
-                                )
-                                .environmentObject(
-                                    marketplace
-                                )
-                            } label: {
-                                postCard(post)
+                    LazyVStack(spacing: 10) {
+                        ForEach(visiblePosts) { post in
+                            VStack(spacing: 6) {
+                                NavigationLink {
+                                    TrainTogetherPostDetailView(postID: post.id)
+                                        .environmentObject(marketplace)
+                                } label: {
+                                    postCard(post)
+                                }
+                                .buttonStyle(.plain)
+
+                                if post.spotsLeft > 0 {
+                                    quickJoinAction(post)
+                                }
                             }
-                            .buttonStyle(
-                                .plain
-                            )
                         }
                     }
                 }
@@ -181,6 +195,10 @@ struct TrainTogetherMarketplaceView:
                         "Område, økt eller utøver"
                 )
         )
+        .sheet(item: $joinRequestPost) { post in
+            TrainTogetherJoinRequestSheet(post: post)
+                .environmentObject(marketplace)
+        }
         .sheet(
             isPresented:
                 $showingCreate
@@ -240,132 +258,59 @@ struct TrainTogetherMarketplaceView:
         }
     }
 
-    private var hero:
-        some View {
-        ATHLTHCard {
-            VStack(
-                alignment: .leading,
-                spacing: 14
-            ) {
-                HStack {
-                    VStack(
-                        alignment: .leading,
-                        spacing: 5
-                    ) {
-                        Text(
-                            "TRAIN TOGETHER"
-                        )
-                        .font(
-                            .system(
-                                size: 10,
-                                weight: .bold
-                            )
-                        )
-                        .tracking(2.5)
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .vitality
-                        )
-
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Post a workout. Find your people.",
-                                norwegian:
-                                    "Legg ut en økt. Finn noen å trene med."
-                            )
-                        )
-                        .font(
-                            .title2
-                                .weight(.bold)
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .primaryText
-                        )
-                    }
-
-                    Spacer()
-
-                    Image(
-                        systemName:
-                            "person.2.wave.2.fill"
-                    )
-                    .font(
-                        .system(
-                            size: 26,
-                            weight:
-                                .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .vitality
-                    )
-                    .frame(
-                        width: 58,
-                        height: 58
-                    )
-                    .background(
-                        ATHLTHTheme
-                            .vitalitySoft,
-                        in: RoundedRectangle(
-                            cornerRadius: 18,
-                            style:
-                                .continuous
-                        )
-                    )
-                }
+    private var hero: some View {
+        HStack(alignment: .center, spacing: 14) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("TRAIN TOGETHER")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.8)
+                    .foregroundStyle(ATHLTHTheme.vitality)
 
                 Text(
                     ATHLTHLocalization.choose(
-                        english:
-                            "Create a real workout you want company for. Choose in-person or remote, then approve requests or open the workout for instant joining.",
-                        norwegian:
-                            "Opprett en konkret treningsøkt du ønsker selskap på. Velg fysisk eller på avstand, og godkjenn forespørsler eller åpne økten for direkte påmelding."
+                        english: "Find people to train with",
+                        norwegian: "Finn noen å trene med"
                     )
                 )
-                .font(.subheadline)
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .mutedText
-                )
-                .fixedSize(
-                    horizontal: false,
-                    vertical: true
-                )
+                .font(.title3.weight(.bold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
 
-                Button {
-                    showingCreate = true
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Create workout",
-                            norwegian:
-                                "Opprett økt"
-                        ),
-                        systemImage:
-                            "plus.circle.fill"
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Meet nearby or do the same workout remotely.",
+                        norwegian: "Møt opp fysisk eller tren samme økt på avstand."
                     )
-                    .font(
-                        .headline
-                    )
-                    .frame(
-                        maxWidth:
-                            .infinity
-                    )
-                }
-                .buttonStyle(
-                    .borderedProminent
                 )
-                .tint(
-                    ATHLTHTheme
-                        .vitality
-                )
-                .controlSize(.large)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
+
+            Spacer(minLength: 0)
+
+            Button {
+                showingCreate = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 48, height: 48)
+                    .background(ATHLTHTheme.vitality, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                ATHLTHLocalization.choose(
+                    english: "Create workout",
+                    norwegian: "Opprett økt"
+                )
+            )
         }
+        .padding(17)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Color.white.opacity(0.94),
+            in: RoundedRectangle(cornerRadius: 23, style: .continuous)
+        )
     }
 
     private var filterBar: some View {
@@ -455,6 +400,38 @@ struct TrainTogetherMarketplaceView:
                             selectedKind = kind
                         }
                     }
+                }
+            }
+
+            if modeFilter != .sameWorkout {
+                HStack {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "View",
+                            norwegian: "Visning"
+                        )
+                    )
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+
+                    Spacer()
+
+                    Picker("", selection: $showingMap) {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "List", norwegian: "Liste"
+                            ),
+                            systemImage: "list.bullet"
+                        ).tag(false)
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Map", norwegian: "Kart"
+                            ),
+                            systemImage: "map"
+                        ).tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 150)
                 }
             }
 
@@ -727,6 +704,23 @@ struct TrainTogetherMarketplaceView:
                     )
                 }
 
+                if matchScore(post) >= 3 {
+                    Label(
+                        plannedKinds.contains(postKind(post))
+                            ? ATHLTHLocalization.choose(
+                                english: "Matches your planned sport",
+                                norwegian: "Passer treningsplanen din"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "You follow the organizer",
+                                norwegian: "Du følger arrangøren"
+                            ),
+                        systemImage: "sparkles"
+                    )
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.vitality)
+                }
+
                 HStack(spacing: 8) {
                     infoPill(
                         post.broadArea,
@@ -749,6 +743,16 @@ struct TrainTogetherMarketplaceView:
                             icon: "clock"
                         )
                     }
+                }
+
+                if let km = post.distanceKilometers,
+                   km > 0 {
+                    Label(
+                        String(format: "%.1f km", km),
+                        systemImage: "figure.run"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 HStack(spacing: 8) {
@@ -846,6 +850,59 @@ struct TrainTogetherMarketplaceView:
         )
     }
 
+    private func quickJoinAction(_ post: TrainTogetherPost) -> some View {
+        let request = marketplace.request(
+            for: post.id,
+            userID: session.profile.userID
+        )
+        return HStack(spacing: 9) {
+            if let request, request.state == .pending || request.state == .accepted {
+                Label(
+                    request.state == .accepted
+                        ? ATHLTHLocalization.choose(
+                            english: "You're joining", norwegian: "Du er med"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Request sent", norwegian: "Forespørsel sendt"
+                        ),
+                    systemImage: request.state == .accepted
+                        ? "checkmark.circle.fill" : "clock"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.vitality)
+            } else {
+                Button {
+                    if post.resolvedJoinPolicy == .open {
+                        Task {
+                            guard await marketplace.joinOpen(postID: post.id) else { return }
+                            await social.refresh()
+                        }
+                    } else {
+                        joinRequestPost = post
+                    }
+                } label: {
+                    Label(
+                        post.resolvedJoinPolicy == .open
+                            ? ATHLTHLocalization.choose(
+                                english: "Join workout", norwegian: "Bli med"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Ask to join", norwegian: "Be om å bli med"
+                            ),
+                        systemImage: "person.badge.plus"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.vitality)
+                .controlSize(.regular)
+                .disabled(marketplace.isWorking)
+            }
+        }
+        .padding(.horizontal, 4)
+    }
+
     private var visiblePosts:
         [TrainTogetherPost] {
         marketplace.posts
@@ -909,6 +966,13 @@ struct TrainTogetherMarketplaceView:
                     post.creatorDisplayName
                         .lowercased()
                         .contains(query)
+            }
+            .sorted { lhs, rhs in
+                let a = matchScore(lhs)
+                let b = matchScore(rhs)
+                return a == b
+                    ? lhs.scheduledStart < rhs.scheduledStart
+                    : a > b
             }
     }
 
