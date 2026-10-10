@@ -2136,66 +2136,116 @@ struct GhostRaceLivePanel: View {
         _ result: GhostRaceResult
     ) -> some View {
         ATHLTHCard {
-            VStack(alignment: .leading, spacing: 9) {
+            VStack(alignment: .leading, spacing: 13) {
                 Label(
                     resultTitle(result),
-                    systemImage:
-                        result.beatGhost == true
-                            ? "trophy.fill"
-                            : "flag.checkered"
+                    systemImage: result.beatGhost == true
+                        ? "trophy.fill" : "flag.checkered"
                 )
-                .font(.headline)
+                .font(.title3.weight(.bold))
                 .foregroundStyle(
                     result.beatGhost == true
-                        ? ATHLTHTheme.vitality
+                        ? ATHLTHTheme.accentDeep
                         : ATHLTHTheme.primaryText
                 )
 
-                Text(
-                    resultSubtitle(result)
-                )
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                Text(resultSubtitle(result))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 8) {
+                    resultStat(
+                        label: ATHLTHLocalization.choose(
+                            english: "Your time", norwegian: "Din tid"
+                        ),
+                        value: clock(result.elapsedTime),
+                        icon: "stopwatch"
+                    )
+                    resultStat(
+                        label: ATHLTHLocalization.choose(
+                            english: "Ghost time", norwegian: "Ghost-tid"
+                        ),
+                        value: clock(result.referenceDuration),
+                        icon: "figure.run"
+                    )
+                }
+
+                if result.completedRoute,
+                   let delta = result.signedTimeSeconds {
+                    HStack(spacing: 8) {
+                        Image(systemName: delta >= 0
+                            ? "arrow.up.right.circle.fill"
+                            : "arrow.down.right.circle.fill")
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Finish difference",
+                                norwegian: "Forskjell ved målgang"
+                            ))
+                            .font(.caption)
+                            Text(signedTimeText(delta))
+                                .font(.title2.weight(.bold))
+                                .monospacedDigit()
+                        }
+                        Spacer()
+                    }
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .padding(12)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: RoundedRectangle(cornerRadius: 14)
+                    )
+                }
 
                 if result.maximumLeadMeters > 0 ||
                     result.maximumDeficitMeters > 0 ||
                     result.leadChangeCount > 0 {
                     Divider()
-
                     HStack(spacing: 10) {
                         resultMetric(
-                            title:
-                                ATHLTHLocalization.choose(
-                                    english: "Best lead",
-                                    norwegian: "Største ledelse"
-                                ),
-                            value:
-                                "\(Int(result.maximumLeadMeters.rounded())) m"
+                            title: ATHLTHLocalization.choose(
+                                english: "Best lead", norwegian: "Største ledelse"
+                            ),
+                            value: "\(Int(result.maximumLeadMeters.rounded())) m"
                         )
-
                         resultMetric(
-                            title:
-                                ATHLTHLocalization.choose(
-                                    english: "Largest gap",
-                                    norwegian: "Største etterslep"
-                                ),
-                            value:
-                                "\(Int(result.maximumDeficitMeters.rounded())) m"
+                            title: ATHLTHLocalization.choose(
+                                english: "Largest gap", norwegian: "Største etterslep"
+                            ),
+                            value: "\(Int(result.maximumDeficitMeters.rounded())) m"
                         )
-
                         resultMetric(
-                            title:
-                                ATHLTHLocalization.choose(
-                                    english: "Lead changes",
-                                    norwegian: "Lederskifter"
-                                ),
-                            value:
-                                "\(result.leadChangeCount)"
+                            title: ATHLTHLocalization.choose(
+                                english: "Lead changes", norwegian: "Lederskifter"
+                            ),
+                            value: "\(result.leadChangeCount)"
                         )
                     }
                 }
             }
         }
+    }
+
+    private func resultStat(
+        label: String,
+        value: String,
+        icon: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Label(label, systemImage: icon)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.title3.weight(.bold))
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHTheme.primaryText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(
+            ATHLTHTheme.surfaceStone,
+            in: RoundedRectangle(cornerRadius: 14)
+        )
     }
 
     private func resultMetric(
@@ -2353,40 +2403,48 @@ struct GhostRaceLivePanel: View {
             )
     }
 
-    private func resultTitle(
-        _ result: GhostRaceResult
-    ) -> String {
+    private func resultTitle(_ result: GhostRaceResult) -> String {
         guard result.completedRoute,
-              let beat = result.beatGhost
-        else {
-            return "Ghost Race finished"
+              let beat = result.beatGhost else {
+            return ATHLTHLocalization.choose(
+                english: "Ghost Race finished",
+                norwegian: "Ghost Race fullført"
+            )
         }
-
         return beat
-            ? "You beat your ghost"
-            : "Ghost wins this one"
+            ? ATHLTHLocalization.choose(
+                english: "You beat your ghost!",
+                norwegian: "Du slo Ghosten!"
+            )
+            : ATHLTHLocalization.choose(
+                english: "Ghost wins this time",
+                norwegian: "Ghosten vant denne gangen"
+            )
     }
 
-    private func resultSubtitle(
-        _ result: GhostRaceResult
-    ) -> String {
+    private func resultSubtitle(_ result: GhostRaceResult) -> String {
         guard result.completedRoute,
-              let delta =
-                result.signedTimeSeconds
-        else {
-            return "ATHLTH could not confirm enough of the route to compare the finish time reliably."
+              let delta = result.signedTimeSeconds else {
+            return ATHLTHLocalization.choose(
+                english: "The route could not be matched precisely enough for a reliable finish comparison.",
+                norwegian: "Ruten kunne ikke sammenlignes nøyaktig nok til å fastslå tidsforskjellen."
+            )
         }
-
-        let amount =
-            clock(abs(delta))
-
         if abs(delta) < 1 {
-            return "You matched your previous time."
+            return ATHLTHLocalization.choose(
+                english: "You matched the Ghost's time.",
+                norwegian: "Du løp på samme tid som Ghosten."
+            )
         }
-
         return delta > 0
-            ? "You reached the finish \(amount) faster than the reference run."
-            : "The reference run reached the finish \(amount) faster."
+            ? ATHLTHLocalization.choose(
+                english: "You reached the finish ahead of the Ghost.",
+                norwegian: "Du kom i mål før Ghosten."
+            )
+            : ATHLTHLocalization.choose(
+                english: "The Ghost reached the finish before you.",
+                norwegian: "Ghosten kom i mål før deg."
+            )
     }
 
     private func clock(
