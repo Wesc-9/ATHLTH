@@ -40,13 +40,24 @@ enum ATHLTHTrainTrendEngine {
         var reps = 0
     }
 
-    static func make(
-        plan: TrainingPlan,
+    static func makeGeneral(
         strengthHistory: [StrengthWorkoutLog],
         calendar: Calendar = .current
     ) -> Snapshot {
-        let workouts = plan.weeks.flatMap(\.days).flatMap(\.sessions)
-        let linkedSessionIDs = Set(workouts.map(\.id))
+        make(
+            plan: nil,
+            strengthHistory: strengthHistory,
+            calendar: calendar
+        )
+    }
+
+    static func make(
+        plan: TrainingPlan?,
+        strengthHistory: [StrengthWorkoutLog],
+        calendar: Calendar = .current
+    ) -> Snapshot {
+        let workouts = plan?.weeks.flatMap(\.days).flatMap(\.sessions) ?? []
+        let linkedSessionIDs = plan.map { _ in Set(workouts.map(\.id)) }
         let plannedExerciseNames = Dictionary(
             workouts.flatMap(\.exercises).map {
                 ($0.id, $0.embeddedExercise.displayName)
@@ -69,10 +80,12 @@ enum ATHLTHTrainTrendEngine {
         var lastDate: Date?
 
         for workout in strengthHistory where workout.isFinished {
-            guard let plannedID = workout.plannedSessionID,
-                  linkedSessionIDs.contains(plannedID) else {
-                ignored += 1
-                continue
+            if let linkedSessionIDs {
+                guard let plannedID = workout.plannedSessionID,
+                      linkedSessionIDs.contains(plannedID) else {
+                    ignored += 1
+                    continue
+                }
             }
             // A recorded workout ID is unique; repeated copies in a history
             // import must not double the volume or session count.
@@ -114,7 +127,7 @@ enum ATHLTHTrainTrendEngine {
                     } else {
                         loads = set.completedWeightKilograms.map { [$0] } ?? []
                     }
-                    for weight in loads where weight.isFinite && weight >= 0 {
+                    for weight in loads where weight.isFinite && weight > 0 {
                         aggregate.peakWeight = max(
                             aggregate.peakWeight ?? weight, weight
                         )
