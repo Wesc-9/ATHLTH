@@ -2069,7 +2069,10 @@ struct TrainingPlanCatalogDetailView: View {
 
                 ATHLTHPlanGhostCard {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Weekly rhythm")
+                        Text(ATHLTHLocalization.choose(
+                            english: "Weekly rhythm",
+                            norwegian: "Ukerytme"
+                        ))
                             .font(.headline)
 
                         HStack(spacing: 8) {
@@ -2118,7 +2121,10 @@ struct TrainingPlanCatalogDetailView: View {
 
                 ATHLTHPlanGhostCard {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Goal")
+                        Text(ATHLTHLocalization.choose(
+                            english: "Goal",
+                            norwegian: "Mål"
+                        ))
                             .font(.headline)
                         Text(entry.goal)
                             .font(.title3.weight(.semibold))
@@ -2138,7 +2144,10 @@ struct TrainingPlanCatalogDetailView: View {
                 } label: {
                     HStack {
                         Label(
-                            "Make it mine",
+                            ATHLTHLocalization.choose(
+                                english: "Make it mine",
+                                norwegian: "Gjør den til min"
+                            ),
                             systemImage: "slider.horizontal.3"
                         )
                         .font(.headline)
@@ -2255,14 +2264,20 @@ struct TrainingPlanCatalogDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("FULL PLAN PREVIEW")
+                    Text(ATHLTHLocalization.choose(
+                        english: "FULL PLAN PREVIEW",
+                        norwegian: "HELE PLANEN"
+                    ))
                         .font(.system(size: 9, weight: .bold))
                         .tracking(1.6)
                         .foregroundStyle(
                             ATHLTHTheme.mutedText
                         )
 
-                    Text("Week by week")
+                    Text(ATHLTHLocalization.choose(
+                        english: "Week by week",
+                        norwegian: "Uke for uke"
+                    ))
                         .font(.title3.weight(.semibold))
                 }
 
@@ -2304,8 +2319,15 @@ struct TrainingPlanCatalogDetailView: View {
                     HStack {
                         Text(
                             showAllWeeks
-                                ? "Show fewer weeks"
-                                : "Show all \(entry.durationWeeks) weeks"
+                                ? ATHLTHLocalization.choose(
+                                    english: "Show fewer weeks",
+                                    norwegian: "Vis færre uker"
+                                )
+                                : ATHLTHLocalization.format(
+                                    english: "Show all %d weeks",
+                                    norwegian: "Vis alle %d ukene",
+                                    entry.durationWeeks
+                                )
                         )
                         .font(.subheadline.weight(.semibold))
 
@@ -2621,7 +2643,10 @@ struct PersonalizeTrainingPlanView: View {
                                 )
 
                             DatePicker(
-                                "Preferred start",
+                                ATHLTHLocalization.choose(
+                                    english: "Preferred start",
+                                    norwegian: "Ønsket start"
+                                ),
                                 selection: $startDate,
                                 in: Calendar.current.startOfDay(
                                     for: Date()
@@ -2960,7 +2985,10 @@ struct PersonalizeTrainingPlanView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Close",
+                        norwegian: "Lukk"
+                    )) {
                         dismiss()
                     }
                 }
