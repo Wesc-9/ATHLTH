@@ -769,6 +769,65 @@ struct WatchRunningWorkoutTransfer: Codable, Hashable {
 }
 
 
+enum WatchWorkoutStartMode: String, CaseIterable, Identifiable, Codable, Hashable {
+    case immediate
+    case afterThirtySeconds
+    case onWatch
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .immediate:
+            return ATHLTHLocalization.choose(english: "Now", norwegian: "Nå")
+        case .afterThirtySeconds:
+            return ATHLTHLocalization.choose(english: "30 sec", norwegian: "30 sek")
+        case .onWatch:
+            return ATHLTHLocalization.choose(english: "On Watch", norwegian: "På klokken")
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .immediate:
+            return ATHLTHLocalization.choose(
+                english: "Starts automatically on Apple Watch.",
+                norwegian: "Starter automatisk på Apple Watch."
+            )
+        case .afterThirtySeconds:
+            return ATHLTHLocalization.choose(
+                english: "Apple Watch counts down 30 seconds before recording starts.",
+                norwegian: "Apple Watch teller ned 30 sekunder før registreringen starter."
+            )
+        case .onWatch:
+            return ATHLTHLocalization.choose(
+                english: "The workout stays ready until you tap START on Apple Watch.",
+                norwegian: "Økten ligger klar til du trykker START på Apple Watch."
+            )
+        }
+    }
+
+    var confirmationText: String {
+        switch self {
+        case .immediate:
+            return ATHLTHLocalization.choose(
+                english: "Starting workout on Apple Watch.",
+                norwegian: "Starter økten på Apple Watch."
+            )
+        case .afterThirtySeconds:
+            return ATHLTHLocalization.choose(
+                english: "Apple Watch will start your workout in 30 seconds.",
+                norwegian: "Apple Watch starter økten om 30 sekunder."
+            )
+        case .onWatch:
+            return ATHLTHLocalization.choose(
+                english: "Workout ready on Apple Watch. Press START when you're ready.",
+                norwegian: "Økten ligger klar på Apple Watch. Trykk START når du er klar."
+            )
+        }
+    }
+}
+
 struct WatchPreparedWorkoutTransfer: Codable, Hashable {
     var id: UUID
     var title: String
@@ -779,6 +838,8 @@ struct WatchPreparedWorkoutTransfer: Codable, Hashable {
     var audioCoach: WatchAudioCoachConfiguration?
     var ghostRace: WatchGhostRaceTransfer? = nil
     var indoor: Bool? = nil
+    // Optional for backwards-compatible decoding of transfers from older builds.
+    var startMode: WatchWorkoutStartMode? = nil
     var updatedAt: Date
 }
 
