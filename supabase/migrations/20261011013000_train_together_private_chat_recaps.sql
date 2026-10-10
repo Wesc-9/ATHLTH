@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS public.train_together_recaps (
   actual_minutes integer CHECK (actual_minutes IS NULL OR actual_minutes BETWEEN 1 AND 1440),
   actual_kilometers double precision CHECK (
     actual_kilometers IS NULL
-    OR (isfinite(actual_kilometers) AND actual_kilometers > 0 AND actual_kilometers <= 1000)
+    OR (actual_kilometers > 0 AND actual_kilometers <= 1000)
   ),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
