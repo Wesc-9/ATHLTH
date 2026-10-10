@@ -1637,6 +1637,43 @@ struct GoalCreationView: View {
         .ignoresSafeArea(edges: .top)
     }
 
+    // Small, consistent dismissal control for every step of the goal wizard.
+    // Dismiss works both when Goals opens from Home navigation and as a sheet.
+    private func goalCloseButton(onHero: Bool) -> some View {
+        Button {
+            dismiss()
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(
+                    onHero ? Color.white : ATHLTHTheme.primaryText
+                )
+                .frame(width: 44, height: 44)
+                .background(
+                    onHero
+                        ? Color.black.opacity(0.24)
+                        : Color.white.opacity(0.94),
+                    in: Circle()
+                )
+                .overlay {
+                    Circle()
+                        .stroke(
+                            onHero
+                                ? Color.white.opacity(0.30)
+                                : Color.black.opacity(0.055),
+                            lineWidth: 0.8
+                        )
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            ATHLTHLocalization.choose(
+                english: "Close goals",
+                norwegian: "Lukk mål"
+            )
+        )
+    }
+
     private var goalLightStepHeader: some View {
         VStack(alignment: .leading, spacing: 19) {
             HStack(spacing: 12) {
@@ -1668,20 +1705,7 @@ struct GoalCreationView: View {
 
                 Spacer()
 
-                Button {
-                    dismiss()
-                } label: {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Cancel",
-                            norwegian: "Avbryt"
-                        )
-                    )
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                    .frame(minWidth: 52)
-                }
-                .buttonStyle(.plain)
+                goalCloseButton(onHero: false)
             }
 
             VStack(alignment: .leading, spacing: 9) {
@@ -2219,33 +2243,50 @@ struct GoalCreationView: View {
                     alignment: .leading,
                     spacing: 0
                 ) {
-                    VStack(
-                        alignment: .leading,
-                        spacing: 3
-                    ) {
-                        Text("ATHLTH")
-                            .font(
-                                .system(
-                                    size: 24,
-                                    weight: .medium,
-                                    design: .default
+                    HStack(alignment: .center, spacing: 8) {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 44, height: 44)
+                                .background(
+                                    Color.black.opacity(0.24),
+                                    in: Circle()
                                 )
+                                .overlay {
+                                    Circle()
+                                        .stroke(
+                                            Color.white.opacity(0.30),
+                                            lineWidth: 0.8
+                                        )
+                                }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            ATHLTHLocalization.choose(
+                                english: "Back to previous screen",
+                                norwegian: "Tilbake til forrige skjerm"
                             )
-                            .tracking(7.2)
+                        )
 
-                        Text(
-                            "MOVE BETTER  LIVE LONGER"
-                        )
-                        .font(
-                            .system(
-                                size: 8.5,
-                                weight: .semibold
-                            )
-                        )
-                        .tracking(2.25)
-                        .opacity(0.82)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("ATHLTH")
+                                .font(.system(size: 20, weight: .medium))
+                                .tracking(5)
+
+                            Text("MOVE BETTER  LIVE LONGER")
+                                .font(.system(size: 8, weight: .semibold))
+                                .tracking(1.5)
+                                .opacity(0.82)
+                        }
+                        .foregroundStyle(.white)
+
+                        Spacer(minLength: 0)
+
+                        goalCloseButton(onHero: true)
                     }
-                    .foregroundStyle(.white)
 
                     Spacer(minLength: 22)
 
