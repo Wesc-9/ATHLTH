@@ -624,7 +624,7 @@ struct TrainTogetherMarketplaceView:
                                 post.creatorUsername,
                            !username.isEmpty {
                             Text(
-                                "@(username)"
+                                "@\(username)"
                             )
                             .font(.caption2)
                             .foregroundStyle(
@@ -791,7 +791,7 @@ struct TrainTogetherMarketplaceView:
                     if let duration =
                             post.durationMinutes {
                         infoPill(
-                            "(duration) min",
+                            "\(duration) min",
                             icon: "clock"
                         )
                     }
@@ -1683,7 +1683,7 @@ struct TrainTogetherPostDetailView:
                                 workout
                                     .durationMinutes {
                             Label(
-                                "(duration) min",
+                                "\(duration) min",
                                 systemImage:
                                     "clock"
                             )
@@ -1779,7 +1779,7 @@ struct TrainTogetherPostDetailView:
                         Spacer()
 
                         Text(
-                            "(pendingRequests.count)"
+                            "\(pendingRequests.count)"
                         )
                         .font(
                             .caption
