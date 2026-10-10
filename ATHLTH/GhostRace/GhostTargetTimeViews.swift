@@ -129,6 +129,46 @@ enum GhostTargetTimeFormatter {
     }
 }
 
+enum GhostTargetGoalType: String, CaseIterable, Identifiable {
+    case finishTime
+    case pace
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .finishTime: return ATHLTHLocalization.choose(english: "Finish time", norwegian: "Sluttid")
+        case .pace: return ATHLTHLocalization.choose(english: "Pace /km", norwegian: "Tempo per km")
+        }
+    }
+}
+
+enum GhostTargetPaceFormatter {
+    static func secondsPerKilometer(from text: String) -> TimeInterval? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = trimmed.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count == 2,
+              let minutes = Int(parts[0]),
+              let seconds = Int(parts[1]),
+              minutes >= 0, seconds >= 0, seconds < 60 else { return nil }
+        let value = Double(minutes * 60 + seconds)
+        return (120...1_800).contains(value) ? value : nil
+    }
+
+    static func text(secondsPerKilometer seconds: TimeInterval) -> String {
+        let value = max(Int(seconds.rounded()), 0)
+        return String(format: "%d:%02d", value / 60, value % 60)
+    }
+
+    static func duration(
+        paceSeconds: TimeInterval,
+        routeKilometers: Double
+    ) -> TimeInterval? {
+        guard paceSeconds.isFinite, (120...1_800).contains(paceSeconds),
+              routeKilometers.isFinite, routeKilometers > 0 else { return nil }
+        return max((paceSeconds * routeKilometers).rounded(), 60)
+    }
+}
+
 struct TargetGhostRoutePickerView: View {
     @EnvironmentObject private var session:
         AppSessionStore
@@ -248,6 +288,10 @@ struct TargetGhostSetupView: View {
     var challengeTitle: String? = nil
 
     @State private var targetTimeText: String
+    @State private var targetPaceText: String
+    @State private var goalType: GhostTargetGoalType = .finishTime
+    @State private var pacingStrategy: GhostTargetPacingStrategy = .even
+    @State private var confirmingStart = false
     @State private var starting = false
     @State private var loadingHistory = false
     @State private var errorMessage: String?
@@ -268,12 +312,15 @@ struct TargetGhostSetupView: View {
                 5 * 60
             )
 
-        _targetTimeText =
-            State(
-                initialValue:
-                    GhostTargetTimeFormatter
-                        .string(suggested)
+        _targetTimeText = State(
+            initialValue: GhostTargetTimeFormatter.string(suggested)
+        )
+        _targetPaceText = State(
+            initialValue: GhostTargetPaceFormatter.text(
+                secondsPerKilometer:
+                    suggested / max(route.distanceKilometers, 0.1)
             )
+        )
     }
 
     private var isPublicTrail: Bool {
@@ -288,11 +335,18 @@ struct TargetGhostSetupView: View {
         route.sharedSourceRouteID ?? route.id
     }
 
-    private var targetDuration:
-        TimeInterval? {
-        GhostTargetTimeFormatter.parse(
-            targetTimeText
-        )
+    private var targetDuration: TimeInterval? {
+        switch goalType {
+        case .finishTime:
+            return GhostTargetTimeFormatter.parse(targetTimeText)
+        case .pace:
+            guard let pace = GhostTargetPaceFormatter
+                .secondsPerKilometer(from: targetPaceText) else { return nil }
+            return GhostTargetPaceFormatter.duration(
+                paceSeconds: pace,
+                routeKilometers: route.distanceKilometers
+            )
+        }
     }
 
     private var historicalAttempts:
@@ -493,6 +547,7 @@ struct TargetGhostSetupView: View {
             VStack(spacing: 18) {
                 summaryCard
                 targetChoiceCard
+                ghostStrategyCard
 
                 if personalBest != nil ||
                     latestAttempt != nil ||
@@ -519,6 +574,24 @@ struct TargetGhostSetupView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task(id: route.id) {
             await loadAttemptHistory()
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Ready to chase your goal?",
+                norwegian: "Klar til å jage målet?"
+            ),
+            isPresented: $confirmingStart,
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Start Ghost Race",
+                norwegian: "Start Ghost Race"
+            )) {
+                Task { await start() }
+            }
+        } message: {
+            let device = captureDevice == .iPhone ? "iPhone" : "Apple Watch"
+            Text("\(route.title) · \(targetDuration.map(GhostTargetTimeFormatter.string) ?? "—") · \(pacingStrategy.title) · \(device)")
         }
         .alert(
             "Target Ghost",
@@ -661,11 +734,57 @@ struct TargetGhostSetupView: View {
                     }
                 }
 
+                Picker(
+                    ATHLTHLocalization.choose(
+                        english: "Goal type", norwegian: "Måltype"
+                    ),
+                    selection: $goalType
+                ) {
+                    ForEach(GhostTargetGoalType.allCases) { type in
+                        Text(type.title).tag(type)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                if goalType == .pace {
+                    VStack(alignment: .leading, spacing: 9) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Desired pace", norwegian: "Ønsket tempo"
+                        ))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                        HStack(spacing: 12) {
+                            paceStepButton(-5)
+                            TextField("5:00", text: $targetPaceText)
+                                .font(.system(size: 34, weight: .bold, design: .rounded))
+                                .keyboardType(.numbersAndPunctuation)
+                                .multilineTextAlignment(.center)
+                                .monospacedDigit()
+                                .padding(12)
+                                .background(ATHLTHTheme.surfaceSage,
+                                            in: RoundedRectangle(cornerRadius: 16))
+                            Text("/km")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            paceStepButton(5)
+                        }
+                        Text(ATHLTHLocalization.choose(
+                            english: "The finish time updates automatically from the course length.",
+                            norwegian: "Sluttiden beregnes automatisk ut fra rutelengden."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                } else {
                 VStack(
                     alignment: .leading,
                     spacing: 9
                 ) {
-                    Text("Exact finish time")
+                    Text(ATHLTHLocalization.choose(
+                        english: "Exact finish time",
+                        norwegian: "Ønsket sluttid"
+                    ))
                         .font(
                             .caption
                                 .weight(.semibold)
@@ -705,14 +824,29 @@ struct TargetGhostSetupView: View {
                             )
                     )
 
-                    Text(
-                        "Use MM:SS or H:MM:SS."
-                    )
+                    Text(ATHLTHLocalization.choose(
+                        english: "Use MM:SS or H:MM:SS.",
+                        norwegian: "Bruk MM:SS eller T:MM:SS."
+                    ))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 }
 
                 quickAdjuster
+                }
+
+                if let duration = targetDuration {
+                    Label(
+                        ATHLTHLocalization.format(
+                            english: "Estimated finish: %@",
+                            norwegian: "Beregnet sluttid: %@",
+                            GhostTargetTimeFormatter.string(duration)
+                        ),
+                        systemImage: "flag.checkered"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
 
                 if let targetDuration {
                     HStack {
@@ -753,6 +887,87 @@ struct TargetGhostSetupView: View {
                         .foregroundStyle(
                             ATHLTHTheme.vitality
                         )
+                    }
+                }
+            }
+        }
+    }
+
+    private func paceStepButton(_ step: Int) -> some View {
+        Button {
+            let current = GhostTargetPaceFormatter.secondsPerKilometer(
+                from: targetPaceText
+            ) ?? 300
+            let next = min(max(current + Double(step), 120), 1_800)
+            targetPaceText = GhostTargetPaceFormatter.text(
+                secondsPerKilometer: next
+            )
+        } label: {
+            Image(systemName: step < 0 ? "minus" : "plus")
+                .font(.system(size: 14, weight: .bold))
+                .frame(width: 36, height: 36)
+                .background(ATHLTHTheme.surfaceStone, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(step < 0 ? "Reduser tempo" : "Øk tempo")
+    }
+
+    private var ghostStrategyCard: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Ghost strategy",
+                    norwegian: "Ghost-strategi"
+                ))
+                .font(.headline)
+                Text(ATHLTHLocalization.choose(
+                    english: "Choose how your ghost spreads its pace over the route.",
+                    norwegian: "Velg hvordan Ghosten fordeler tempoet gjennom løypa."
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                HStack(alignment: .top, spacing: 7) {
+                    ForEach(GhostTargetPacingStrategy.allCases) { strategy in
+                        Button {
+                            pacingStrategy = strategy
+                        } label: {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Image(systemName: strategy.icon)
+                                    Spacer(minLength: 2)
+                                    if pacingStrategy == strategy {
+                                        Image(systemName: "checkmark.circle.fill")
+                                    }
+                                }
+                                .font(.system(size: 14, weight: .semibold))
+                                Text(strategy.title)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .lineLimit(2)
+                                Text(strategy.subtitle)
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .frame(maxWidth: .infinity, minHeight: 88, alignment: .topLeading)
+                            .padding(10)
+                            .background(
+                                pacingStrategy == strategy
+                                    ? ATHLTHTheme.accentSoft
+                                    : ATHLTHTheme.surfaceStone,
+                                in: RoundedRectangle(cornerRadius: 14)
+                            )
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(
+                                        pacingStrategy == strategy
+                                            ? ATHLTHTheme.accentDeep : ATHLTHTheme.border,
+                                        lineWidth: pacingStrategy == strategy ? 1.4 : 0.6
+                                    )
+                            }
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -927,7 +1142,7 @@ struct TargetGhostSetupView: View {
     private var startButton: some View {
         Button {
             Task {
-                await start()
+                confirmingStart = true
             }
         } label: {
             if starting {
@@ -1178,9 +1393,12 @@ struct TargetGhostSetupView: View {
     private func setTarget(
         _ duration: TimeInterval
     ) {
-        targetTimeText =
-            GhostTargetTimeFormatter
-                .string(duration)
+        targetTimeText = GhostTargetTimeFormatter.string(duration)
+        let pace = duration / max(route.distanceKilometers, 0.1)
+        targetPaceText = GhostTargetPaceFormatter.text(
+            secondsPerKilometer: pace
+        )
+        goalType = .finishTime
     }
 
     @MainActor
@@ -1253,8 +1471,8 @@ struct TargetGhostSetupView: View {
             try await GhostRaceStartService
                 .startTarget(
                     route: route,
-                    targetDurationSeconds:
-                        targetDuration,
+                    targetDurationSeconds: targetDuration,
+                    strategy: pacingStrategy,
                     ownerID:
                         session.profile.userID,
                     ghostRace:
