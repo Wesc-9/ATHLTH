@@ -3166,7 +3166,21 @@ struct PerformanceStatsView: View {
             mostStrengthExercisesItem,
             bestWeeklyStrengthVolumeItem,
             mostStrengthCaloriesItem
-        ]
+        ] + strengthWorkout.personalRecords
+            .filter {
+                $0.kind == .heaviestSet &&
+                $0.score > 0 &&
+                $0.score.isFinite
+            }
+            .map { record in
+                PerformanceMetricItem(
+                    icon: "dumbbell.fill",
+                    title: record.title,
+                    value: record.value,
+                    detail: formatDate(record.date),
+                    tint: ATHLTHTheme.accentDeep
+                )
+            }
     }
 
     private func sourceBadge(
