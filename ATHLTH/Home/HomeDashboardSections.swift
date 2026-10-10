@@ -2837,6 +2837,7 @@ struct HomeWeeklyProgressStrip:
     @State private var weekOffset = 0
     @State private var selectedDay:
         HomeWeeklyProgressDaySelection?
+    @State private var daySheetDetent: PresentationDetent = .medium
 
     private var calendar:
         Calendar {
@@ -2974,10 +2975,14 @@ struct HomeWeeklyProgressStrip:
         .sheet(item: $selectedDay) {
             selection in
             HomeWeeklyProgressDaySheet(
-                selection: selection
+                selection: selection,
+                onOpenWorkout: {
+                    daySheetDetent = .large
+                }
             )
             .presentationDetents(
-                [.medium, .large]
+                [.medium, .large],
+                selection: $daySheetDetent
             )
             .presentationDragIndicator(
                 .visible
@@ -3017,6 +3022,7 @@ struct HomeWeeklyProgressStrip:
             )
 
         Button {
+            daySheetDetent = .medium
             selectedDay =
                 HomeWeeklyProgressDaySelection(
                     date: date,
@@ -3998,6 +4004,7 @@ private struct HomeWeeklyProgressDaySheet:
 
     let selection:
         HomeWeeklyProgressDaySelection
+    let onOpenWorkout: () -> Void
 
     @State private var showingStandaloneSessionEditor = false
 
@@ -4132,6 +4139,7 @@ private struct HomeWeeklyProgressDaySheet:
                         ) { workout in
                             NavigationLink {
                                 completedWorkoutDestination(workout)
+                                    .onAppear(perform: onOpenWorkout)
                             } label: {
                                 actualRow(workout)
                             }
