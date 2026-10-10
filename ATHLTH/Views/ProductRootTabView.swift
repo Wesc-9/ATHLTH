@@ -907,7 +907,9 @@ struct ATHLTHHomeView: View {
                                 _ = await social
                                     .confirmCurrentJoinedWorkoutStarted()
                                 if configuration.captureDevice == .appleWatch {
-                                    homeWatchTransferMessage = configuration.watchStartMode.confirmationText
+                                    homeWatchTransferMessage = configuration.watchStartMode == .onWatch
+                                        ? configuration.watchStartMode.confirmationText
+                                        : nil
                                 }
                             } catch {
                                 await social
@@ -5429,7 +5431,9 @@ struct ATHLTHTrainView: View {
                             _ = await social
                                 .confirmCurrentJoinedWorkoutStarted()
                                 if configuration.captureDevice == .appleWatch {
-                                    watchTransferMessage = configuration.watchStartMode.confirmationText
+                                    watchTransferMessage = configuration.watchStartMode == .onWatch
+                                        ? configuration.watchStartMode.confirmationText
+                                        : nil
                                 }
                         } catch {
                             await social
@@ -5614,7 +5618,9 @@ struct ATHLTHTrainView: View {
                             _ = await social
                                 .confirmCurrentJoinedWorkoutStarted()
                                 if configuration.captureDevice == .appleWatch {
-                                    watchTransferMessage = configuration.watchStartMode.confirmationText
+                                    watchTransferMessage = configuration.watchStartMode == .onWatch
+                                        ? configuration.watchStartMode.confirmationText
+                                        : nil
                                 }
                         } catch {
                             await social
