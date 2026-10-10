@@ -19,6 +19,54 @@ final class GhostRaceCadenceTests:
         return defaults
     }
 
+    func testTargetPaceAndFinishTimeConversion() {
+        XCTAssertEqual(
+            GhostTargetPaceFormatter.secondsPerKilometer(from: "4:45"), 285
+        )
+        XCTAssertNil(
+            GhostTargetPaceFormatter.secondsPerKilometer(from: "4:80")
+        )
+        XCTAssertNil(
+            GhostTargetPaceFormatter.secondsPerKilometer(from: "0:30")
+        )
+        XCTAssertEqual(
+            GhostTargetPaceFormatter.text(secondsPerKilometer: 285), "4:45"
+        )
+        XCTAssertEqual(
+            GhostTargetPaceFormatter.duration(
+                paceSeconds: 285, routeKilometers: 12.4
+            ), 3534
+        )
+        XCTAssertEqual(GhostTargetTimeFormatter.string(3534), "58:54")
+    }
+
+    func testAllTargetStrategiesKeepFinishAndMonotonicProgress() {
+        for strategy in GhostTargetPacingStrategy.allCases {
+            XCTAssertEqual(strategy.elapsedFraction(at: 0), 0, accuracy: 0.0001)
+            XCTAssertEqual(strategy.elapsedFraction(at: 1), 1, accuracy: 0.0001)
+            var previous = 0.0
+            for step in 1...100 {
+                let fraction = strategy.elapsedFraction(
+                    at: Double(step) / 100
+                )
+                XCTAssertGreaterThan(fraction, previous)
+                previous = fraction
+            }
+        }
+        XCTAssertEqual(
+            GhostTargetPacingStrategy.even.elapsedFraction(at: 0.5),
+            0.5, accuracy: 0.00001
+        )
+        XCTAssertGreaterThan(
+            GhostTargetPacingStrategy.negativeSplit.elapsedFraction(at: 0.5),
+            0.5
+        )
+        XCTAssertGreaterThan(
+            GhostTargetPacingStrategy.progressive.elapsedFraction(at: 0.2),
+            0.2
+        )
+    }
+
     func testDefaultGhostCadenceIsOneKilometreWithoutExtraLeadAlerts() {
         let settings =
             AppSettingsStore(
