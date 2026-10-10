@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TrainTogetherCreatorLobbyView: View {
     @EnvironmentObject private var social: SocialStore
+    @StateObject private var companion = SocialWorkoutCompanionStore()
 
     let sessionID: UUID
 
@@ -49,6 +50,10 @@ struct TrainTogetherCreatorLobbyView: View {
                     headerCard
                     participantCard
 
+                    if !companion.liveStates.isEmpty {
+                        liveParticipantsCard
+                    }
+
                     if let startAt =
                             session?
                                 .coordinatedStartAt {
@@ -85,16 +90,17 @@ struct TrainTogetherCreatorLobbyView: View {
             .interactiveDismissDisabled()
         }
         .task(id: sessionID) {
+            var cycle = 0
             while !Task.isCancelled,
-                  social.coordinatedLobbySessionID ==
-                    sessionID {
-                try? await social
-                    .refreshWorkoutLobby(
-                        sessionID: sessionID
-                    )
-                try? await Task.sleep(
-                    for: .seconds(1)
+                  social.coordinatedLobbySessionID == sessionID {
+                try? await social.refreshWorkoutLobby(
+                    sessionID: sessionID
                 )
+                if cycle.isMultiple(of: 5) {
+                    await companion.refresh(sessionID: sessionID)
+                }
+                cycle += 1
+                try? await Task.sleep(for: .seconds(1))
             }
         }
     }
@@ -267,7 +273,12 @@ struct TrainTogetherCreatorLobbyView: View {
                     Spacer()
 
                     Text(
-                        "\(participants.count)"
+                        ATHLTHLocalization.format(
+                            english: "%d of %d ready",
+                            norwegian: "%d av %d klare",
+                            participants.filter(\.isReady).count,
+                            participants.count
+                        )
                     )
                     .font(
                         .caption.weight(
@@ -307,40 +318,26 @@ struct TrainTogetherCreatorLobbyView: View {
             SocialWorkoutParticipantRecord
     ) -> some View {
         HStack(spacing: 12) {
-            Circle()
-                .fill(
-                    participant.isReady
-                        ? ATHLTHTheme
-                            .vitality
-                            .opacity(0.14)
-                        : Color.primary
-                            .opacity(0.055)
-                )
-                .frame(
-                    width: 44,
-                    height: 44
-                )
-                .overlay {
-                    Image(
-                        systemName:
-                            participant.isReady
-                                ? "checkmark"
-                                : "person.fill"
-                    )
-                    .font(
-                        .system(
-                            size: 15,
-                            weight: .bold
-                        )
-                    )
-                    .foregroundStyle(
-                        participant.isReady
-                            ? ATHLTHTheme
-                                .vitality
-                            : ATHLTHTheme
-                                .mutedText
-                    )
+            Group {
+                if let profile = social.profile(for: participant.userID) {
+                    SocialAvatar(profile: profile, size: 44)
+                } else {
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.system(size: 36))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .frame(width: 44, height: 44)
                 }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if participant.isReady {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 9, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .frame(width: 17, height: 17)
+                        .background(ATHLTHTheme.vitality, in: Circle())
+                        .overlay { Circle().stroke(.white, lineWidth: 2) }
+                }
+            }
 
             VStack(
                 alignment: .leading,
@@ -447,6 +444,60 @@ struct TrainTogetherCreatorLobbyView: View {
                     )
                 }
                 .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var liveParticipantsCard: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Shared live progress",
+                        norwegian: "Felles fremdrift"
+                    ),
+                    systemImage: "waveform.path.ecg"
+                )
+                .font(.headline)
+
+                ForEach(companion.liveStates) { state in
+                    HStack(spacing: 12) {
+                        Image(systemName: state.workoutKind == "strength"
+                            ? "dumbbell.fill" : "figure.run")
+                            .foregroundStyle(ATHLTHTheme.vitality)
+                            .frame(width: 32, height: 32)
+                            .background(ATHLTHTheme.vitalitySoft,
+                                        in: RoundedRectangle(cornerRadius: 9))
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(state.displayNameSnapshot)
+                                .font(.subheadline.weight(.semibold))
+                            HStack(spacing: 8) {
+                                if let km = state.payload.distanceMeters {
+                                    Text(String(format: "%.2f km", km / 1000))
+                                }
+                                if let seconds = state.payload.elapsedSeconds {
+                                    Text("\(Int(seconds / 60)) min")
+                                }
+                                if let set = state.payload.currentSetNumber {
+                                    Text(
+                                        ATHLTHLocalization.format(
+                                            english: "Set %d",
+                                            norwegian: "Sett %d",
+                                            set
+                                        )
+                                    )
+                                }
+                                if let title = state.payload.currentTitle {
+                                    Text(title).lineLimit(1)
+                                }
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                    }
+                    .padding(.vertical, 3)
+                }
             }
         }
     }
