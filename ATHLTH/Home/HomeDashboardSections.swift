@@ -2749,6 +2749,17 @@ struct HomeHealthMetricDetailView:
 /// Pure calendar calculations shared by Home's week pager and tests.
 /// Plan weeks start on the configured plan start, not necessarily Monday.
 enum HomeWeeklyProgressCalendar {
+    // The Home shortcut must never offer scheduling on a previous day.
+    // Compare calendar days rather than clock times, so today is allowed all day.
+    static func canScheduleStandalone(
+        on date: Date,
+        asOf now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Bool {
+        calendar.startOfDay(for: date) >=
+            calendar.startOfDay(for: now)
+    }
+
     static func weekInterval(
         offset: Int,
         referenceDate: Date,
@@ -3986,6 +3997,14 @@ private struct HomeWeeklyProgressDaySheet:
     let selection:
         HomeWeeklyProgressDaySelection
 
+    @State private var showingStandaloneSessionEditor = false
+
+    private var canPlanWorkout: Bool {
+        HomeWeeklyProgressCalendar.canScheduleStandalone(
+            on: selection.date
+        )
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -3993,6 +4012,48 @@ private struct HomeWeeklyProgressDaySheet:
                     alignment: .leading,
                     spacing: 10
                 ) {
+                    if canPlanWorkout {
+                        HStack {
+                            Spacer(minLength: 0)
+
+                            Button {
+                                guard canPlanWorkout else { return }
+                                showingStandaloneSessionEditor = true
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Plan workout",
+                                        norwegian: "Planlegg økt"
+                                    ),
+                                    systemImage: "plus"
+                                )
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .padding(.horizontal, 14)
+                                .frame(height: 38)
+                                .background(
+                                    ATHLTHTheme.accentSoft.opacity(0.55),
+                                    in: Capsule()
+                                )
+                                .overlay {
+                                    Capsule()
+                                        .stroke(
+                                            ATHLTHTheme.accentDeep.opacity(0.14),
+                                            lineWidth: 0.8
+                                        )
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityHint(
+                                ATHLTHLocalization.choose(
+                                    english: "Schedule an extra workout for this date",
+                                    norwegian: "Planlegg en ekstra økt på denne datoen"
+                                )
+                            )
+                        }
+                        .padding(.bottom, 4)
+                    }
+
                     if selection.planned.isEmpty &&
                         selection.communityEvents.isEmpty &&
                         selection.actual.isEmpty {
@@ -4092,6 +4153,10 @@ private struct HomeWeeklyProgressDaySheet:
             .navigationBarTitleDisplayMode(
                 .inline
             )
+            .sheet(isPresented: $showingStandaloneSessionEditor) {
+                SessionEditorView(standaloneDate: selection.date)
+                    .presentationDetents([.large])
+            }
         }
     }
 
