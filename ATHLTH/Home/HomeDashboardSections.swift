@@ -4399,150 +4399,252 @@ private struct HomeWeeklyProgressDaySheet:
     private func actualRow(
         _ workout: WorkoutSummary
     ) -> some View {
-        HStack(spacing: 11) {
-            Image(
-                systemName:
-                    workout.activity.icon
-            )
-            .font(
-                .system(
-                    size: 13,
-                    weight: .semibold
-                )
-            )
-            .foregroundStyle(
-                ATHLTHTheme.accentDeep
-            )
-            .frame(
-                width: 36,
-                height: 36
-            )
-            .background(
-                ATHLTHTheme.accentSoft,
-                in: Circle()
-            )
+        let metrics = HomeCompletedWorkoutPresentation.metrics(for: workout)
 
-            VStack(
-                alignment: .leading,
-                spacing: 2
-            ) {
-                Text(
-                    workout.activity
-                        .rawValue
-                )
-                .font(
-                    .subheadline
-                        .weight(.semibold)
-                )
-
-                Text(
-                    actualDetail(
-                        workout
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 11) {
+                Image(systemName: workout.activity.icon)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 42, height: 42)
+                    .background(
+                        ATHLTHTheme.accentSoft.opacity(0.78),
+                        in: RoundedRectangle(
+                            cornerRadius: 14,
+                            style: .continuous
+                        )
                     )
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(HomeCompletedWorkoutPresentation.title(
+                        for: workout.activity
+                    ))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(1)
+
+                    Text(HomeCompletedWorkoutPresentation.timeAndLocation(
+                        for: workout
+                    ))
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(1)
+                }
+
+                Spacer(minLength: 5)
+
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(ATHLTHTheme.vitality)
+                    .accessibilityLabel(
+                        ATHLTHLocalization.choose(
+                            english: "Completed",
+                            norwegian: "Fullført"
+                        )
+                    )
             }
 
-            Spacer()
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 7),
+                    GridItem(.flexible(), spacing: 7)
+                ],
+                alignment: .leading,
+                spacing: 7
+            ) {
+                ForEach(metrics) { metric in
+                    HStack(spacing: 6) {
+                        Image(systemName: metric.icon)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 14)
+
+                        Text(metric.text)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 9)
+                    .frame(height: 29)
+                    .background(
+                        ATHLTHTheme.accentSoft.opacity(0.25),
+                        in: RoundedRectangle(
+                            cornerRadius: 10,
+                            style: .continuous
+                        )
+                    )
+                }
+            }
         }
-        .padding(11)
+        .padding(12)
         .background(
-            Color.white.opacity(0.92),
+            Color.white.opacity(0.94),
             in: RoundedRectangle(
-                cornerRadius: 16,
+                cornerRadius: 18,
                 style: .continuous
             )
         )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(Color.primary.opacity(0.045), lineWidth: 0.8)
+        }
+        .accessibilityElement(children: .combine)
     }
 
-    private func plannedDetail(
-        _ workout: PlannedSession
+}
+
+// The HealthKit summary intentionally contains no set count or average
+// heart rate. Show only values that were actually recorded; do not invent
+// strength stats or pulse measurements for compact Home cards.
+struct HomeCompletedWorkoutMetric: Identifiable {
+    let id: String
+    let icon: String
+    let text: String
+}
+
+enum HomeCompletedWorkoutPresentation {
+    static func title(
+        for activity: WorkoutActivity,
+        norwegian: Bool = ATHLTHLocalization.isNorwegian
     ) -> String {
-        var parts: [String] = []
-
-        if let start =
-                workout.scheduledStart {
-            parts.append(
-                start.formatted(
-                    date: .omitted,
-                    time: .shortened
-                )
-            )
+        guard norwegian else { return activity.rawValue }
+        switch activity {
+        case .running: return "Løping"
+        case .walking: return "Gåtur"
+        case .cycling: return "Sykling"
+        case .swimming: return "Svømming"
+        case .hiking: return "Fottur"
+        case .strength: return "Styrke"
+        case .hiit: return "Intervalltrening"
+        case .rowing: return "Roing"
+        case .elliptical: return "Ellipsemaskin"
+        case .stairClimbing: return "Trappetrening"
+        case .yoga: return "Yoga"
+        case .coreTraining: return "Kjernetrening"
+        case .other: return "Trening"
         }
-
-        if let minutes =
-                workout.durationMinutes {
-            parts.append(
-                "\(minutes) min"
-            )
-        }
-
-        if let distance =
-                workout
-                    .targetDistanceKilometers {
-            parts.append(
-                String(
-                    format:
-                        "%.1f km",
-                    distance
-                )
-            )
-        }
-
-        if !workout.exercises
-            .isEmpty {
-            parts.append(
-                ATHLTHLocalization.format(
-                    english:
-                        "%d exercises",
-                    norwegian:
-                        "%d øvelser",
-                    workout.exercises.count
-                )
-            )
-        }
-
-        return parts.isEmpty
-            ? workout.kind.title
-            : parts.joined(
-                separator: " · "
-            )
     }
 
-    private func actualDetail(
-        _ workout: WorkoutSummary
+    static func timeAndLocation(
+        for workout: WorkoutSummary,
+        norwegian: Bool = ATHLTHLocalization.isNorwegian
     ) -> String {
-        let minutes =
-            max(
-                Int(
-                    (workout.duration / 60)
-                        .rounded()
-                ),
-                0
-            )
-        var parts =
-            [
-                "\(minutes) min"
-            ]
-
-        if let distance =
-                workout.distanceMeters,
-           distance > 0 {
-            parts.append(
-                String(
-                    format:
-                        "%.1f km",
-                    distance / 1_000
-                )
-            )
-        }
-
-        return parts.joined(
-            separator: " · "
+        let start = workout.startDate.formatted(
+            date: .omitted, time: .shortened
         )
+        let end = workout.endDate.formatted(
+            date: .omitted, time: .shortened
+        )
+        let range = workout.endDate > workout.startDate
+            ? "\(start)–\(end)" : start
+
+        let location: String?
+        switch workout.isIndoor {
+        case .some(true):
+            location = norwegian ? "Inne" : "Indoor"
+        case .some(false):
+            location = norwegian ? "Ute" : "Outdoor"
+        case .none:
+            location = nil
+        }
+        return [range, location].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    static func metrics(
+        for workout: WorkoutSummary,
+        norwegian: Bool = ATHLTHLocalization.isNorwegian
+    ) -> [HomeCompletedWorkoutMetric] {
+        var items: [HomeCompletedWorkoutMetric] = []
+        let seconds = workout.duration
+        if seconds.isFinite && seconds >= 0 {
+            let minutes = max(Int((seconds / 60).rounded()), 0)
+            let duration: String
+            if minutes >= 60 {
+                let hours = minutes / 60
+                let remaining = minutes % 60
+                duration = norwegian
+                    ? "\(hours) t \(remaining) min"
+                    : "\(hours) h \(remaining) min"
+            } else {
+                duration = "\(minutes) min"
+            }
+            items.append(.init(
+                id: "duration",
+                icon: "clock",
+                text: duration
+            ))
+        }
+
+        if let meters = workout.distanceMeters,
+           meters.isFinite, meters > 0 {
+            let kilometers = meters / 1_000
+            let formatted = kilometers.formatted(
+                .number
+                    .precision(.fractionLength(1))
+                    .locale(Locale(identifier: norwegian ? "nb_NO" : "en_US"))
+            )
+            items.append(.init(
+                id: "distance",
+                icon: "point.topleft.down.curvedto.point.bottomright.up",
+                text: "\(formatted) km"
+            ))
+
+            if seconds.isFinite, seconds > 0, kilometers >= 0.25 {
+                switch workout.activity {
+                case .running, .walking, .hiking:
+                    let paceSeconds = seconds / kilometers
+                    if paceSeconds.isFinite &&
+                       paceSeconds >= 120 &&
+                       paceSeconds <= 2_700 {
+                        let rounded = Int(paceSeconds.rounded())
+                        let time = String(
+                            format: "%d:%02d",
+                            rounded / 60, rounded % 60
+                        )
+                        items.append(.init(
+                            id: "pace",
+                            icon: "speedometer",
+                            text: "\(time) min/km"
+                        ))
+                    }
+                case .cycling:
+                    let kilometersPerHour = kilometers / (seconds / 3_600)
+                    if kilometersPerHour.isFinite,
+                       kilometersPerHour > 0,
+                       kilometersPerHour <= 120 {
+                        let speed = kilometersPerHour.formatted(
+                            .number
+                                .precision(.fractionLength(1))
+                                .locale(Locale(identifier: norwegian ? "nb_NO" : "en_US"))
+                        )
+                        items.append(.init(
+                            id: "speed",
+                            icon: "speedometer",
+                            text: "\(speed) km/t"
+                        ))
+                    }
+                default:
+                    break
+                }
+            }
+        }
+
+        if let energy = workout.activeEnergyKilocalories,
+           energy.isFinite, energy > 0 {
+            items.append(.init(
+                id: "energy",
+                icon: "flame",
+                text: "\(Int(energy.rounded())) kcal"
+            ))
+        }
+
+        return items
     }
 }
 
