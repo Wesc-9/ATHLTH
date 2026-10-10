@@ -691,9 +691,21 @@ enum WorkoutLaunchCoordinator {
                 indoor:
                     configuration.environment ==
                     .treadmill,
+                startMode: configuration.watchStartMode,
                 updatedAt: Date()
             )
         )
+
+        // For automatic start, launch the Watch workout via HealthKit.
+        // The prepared payload carries the start mode and full route/coach
+        // context; the Watch applies it before starting its session.
+        // Manual mode retains the existing ready-to-start Watch card.
+        if configuration.watchStartMode != .onWatch {
+            try await watchConnection.startWorkoutOnWatch(
+                .running,
+                indoor: configuration.environment == .treadmill
+            )
+        }
 
         // Preserve the existing Quick Run music behavior. This is independent
         // of HealthKit workout timing and does not start the workout itself.
