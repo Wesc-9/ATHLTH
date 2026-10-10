@@ -4,6 +4,16 @@ import WatchConnectivity
 
 @MainActor
 final class WatchRouteStore: NSObject, ObservableObject {
+    // One WCSession delegate and prepared-workout cache shared by the Watch
+    // SwiftUI root and the HealthKit remote-launch delegate.
+    static let shared = WatchRouteStore()
+
+    @Published private(set) var automaticStartCountdownSeconds: Int?
+
+    func setAutomaticStartCountdown(_ seconds: Int?) {
+        automaticStartCountdownSeconds = seconds
+    }
+
     @Published private(set) var routes: [WatchRouteTransfer] = []
     @Published private(set) var connectionText = "Connecting to iPhone"
     @Published private(set) var companionLinked = false
@@ -216,6 +226,58 @@ final class WatchRouteStore: NSObject, ObservableObject {
         UserDefaults.standard.removeObject(
             forKey: preparedWorkoutDefaultsKey
         )
+    }
+
+    // Reused by both the manual START card and iPhone-triggered launch.
+    // Applying the payload before HealthKit starts preserves route, audio
+    // coach, Ghost and treadmill configuration on the first live frame.
+    @discardableResult
+    func launchPreparedWorkout(
+        _ workout: WatchPreparedWorkoutTransfer,
+        manager: WatchWorkoutManager
+    ) async -> Bool {
+        guard !manager.isActive,
+              manager.state != .preparing,
+              manager.state != .ending else {
+            return false
+        }
+
+        let route = workout.routeID.flatMap {
+            self.route(with: $0)
+        }
+        guard workout.routeID == nil || route != nil else {
+            return false
+        }
+
+        manager.configurePlannedRoute(route)
+        manager.configureAudioCoach(workout.audioCoach ?? .disabled)
+        manager.configureGhostRace(workout.ghostRace)
+
+        if let running = workout.runningWorkout {
+            manager.configureRunningWorkout(running)
+        } else if workout.kind == .running || workout.kind == .walking {
+            manager.configureRunningWorkout(
+                WatchRunningWorkoutTransfer(
+                    title: workout.title,
+                    steps: [],
+                    routeAlerts: .standard
+                )
+            )
+        }
+
+        await manager.startPreparedWorkout(
+            kind: workout.kind,
+            route: route,
+            indoor: workout.indoor
+        )
+
+        if case .failed = manager.state {
+            return false
+        }
+        guard manager.state != .idle else { return false }
+
+        consumePreparedWorkout(workout.id)
+        return true
     }
 
     private func applyPreparedWorkout(
