@@ -30,6 +30,10 @@ private func recoveryMuscleName(
     case "Quads": return "Forside lår"
     case "Hamstrings": return "Bakside lår"
     case "Calves": return "Legger"
+    case "Lower Back": return "Nedre rygg"
+    case "Adductors": return "Innsiden av lårene"
+    case "Hip Flexors": return "Hoftebøyere"
+    case "Shins": return "Leggframside"
     default: return value
     }
 }
@@ -177,7 +181,11 @@ final class RecoverySorenessStore: ObservableObject {
         "Glutes",
         "Quads",
         "Hamstrings",
-        "Calves"
+        "Calves",
+        "Lower Back",
+        "Adductors",
+        "Hip Flexors",
+        "Shins"
     ]
 
     init(defaults: UserDefaults = .standard) {
@@ -676,15 +684,7 @@ enum MuscleRecoveryEngine {
                     }
 
                     let groups =
-                        Array(
-                            Set(
-                                exercise.exercise
-                                    .primaryMuscles
-                                    .compactMap(
-                                        normalizedMuscleGroup
-                                    )
-                            )
-                        )
+                        resolvedMuscleGroups(for: exercise)
 
                     guard !groups.isEmpty else {
                         return nil
@@ -1060,14 +1060,9 @@ enum MuscleRecoveryEngine {
                     continue
                 }
 
-                let mapped =
-                    exercise.exercise
-                        .primaryMuscles
-                        .contains { muscle in
-                            normalizedMuscleGroup(
-                                muscle
-                            ) != nil
-                        }
+                let mapped = !resolvedMuscleGroups(
+                    for: exercise
+                ).isEmpty
 
                 if !mapped {
                     names.insert(
@@ -1100,61 +1095,96 @@ enum MuscleRecoveryEngine {
         }
     }
 
-    private static func normalizedMuscleGroup(
-        _ raw: String
-    ) -> String? {
+    // Single resolver for the recovery engine and the missing-mapping
+    // warning. Exact canonical anatomy avoids fragile substring matches
+    // (for example lateral_deltoid must never become Back, abductors Core).
+    static func normalizedMuscleGroup(_ raw: String) -> String? {
         let value = raw
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
-
-        if value.contains("chest") ||
-            value.contains("pectoral") {
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+        switch value {
+        case "chest", "pectoralis major", "pectoralis minor", "pecs":
             return "Chest"
-        }
-
-        if value.contains("lat") ||
-            value.contains("back") ||
-            value.contains("trap") {
+        case "back", "latissimus dorsi", "lats", "trapezius",
+             "rhomboids", "upper back", "middle back", "teres major":
             return "Back"
-        }
-
-        if value.contains("shoulder") ||
-            value.contains("delt") {
+        case "lower back", "erector spinae", "spinal erectors",
+             "quadratus lumborum":
+            return "Lower Back"
+        case "shoulders", "shoulder", "anterior deltoid",
+             "lateral deltoid", "posterior deltoid", "deltoids",
+             "supraspinatus":
             return "Shoulders"
-        }
-
-        if value.contains("bicep") ||
-            value.contains("tricep") ||
-            value.contains("forearm") ||
-            value == "arms" {
+        case "arms", "biceps", "triceps", "forearms", "biceps brachii",
+             "triceps brachii", "brachialis", "brachioradialis",
+             "forearm flexors", "forearm extensors", "grip":
             return "Arms"
-        }
-
-        if value.contains("ab") ||
-            value.contains("core") ||
-            value.contains("oblique") {
+        case "core", "waist", "abs", "abdominals", "rectus abdominis",
+             "transverse abdominis", "transversus abdominis",
+             "obliques", "serratus anterior":
             return "Core"
-        }
-
-        if value.contains("glute") {
+        case "glutes", "gluteus maximus", "gluteus medius",
+             "gluteus minimus", "abductors", "outer hip":
             return "Glutes"
-        }
-
-        if value.contains("quad") {
+        case "adductors", "inner thigh", "groin":
+            return "Adductors"
+        case "hip flexors", "iliopsoas", "psoas", "iliacus":
+            return "Hip Flexors"
+        case "quads", "quadriceps", "upper legs":
             return "Quads"
-        }
-
-        if value.contains("hamstring") {
+        case "hamstrings", "hamstring":
             return "Hamstrings"
-        }
-
-        if value.contains("calf") ||
-            value.contains("calves") {
+        case "calves", "calf", "gastrocnemius", "soleus":
             return "Calves"
+        case "shins", "tibialis anterior", "tibialis":
+            return "Shins"
+        default:
+            return nil
+        }
+    }
+
+    private static func resolvedMuscleGroups(
+        for exercise: StrengthExerciseLog
+    ) -> [String] {
+        let primary = Set(
+            exercise.exercise.primaryMuscles.compactMap(normalizedMuscleGroup)
+        )
+        if !primary.isEmpty { return primary.sorted() }
+
+        // A few historical workout snapshots lack muscle metadata. Known
+        // names can be recovered without modifying the saved workout log.
+        let name = exercise.exercise.name
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "-", with: " ")
+        if ["back extension", "machine back extension", "rygghev"].contains(name) {
+            return ["Lower Back"]
         }
 
-        return nil
+        let regions = StrengthMuscleResolver.fallbackRegions(
+            forExerciseName: name
+        )
+        return Array(Set(regions.compactMap { region -> String? in
+            switch region {
+            case .chest: return "Chest"
+            case .frontDelts, .sideDelts, .rearDelts: return "Shoulders"
+            case .biceps, .triceps, .forearms: return "Arms"
+            case .traps, .lats, .upperBack: return "Back"
+            case .lowerBack: return "Lower Back"
+            case .abs, .obliques, .serratus: return "Core"
+            case .glutes, .outerHip: return "Glutes"
+            case .innerThigh: return "Adductors"
+            case .hipFlexors: return "Hip Flexors"
+            case .quads: return "Quads"
+            case .hamstrings: return "Hamstrings"
+            case .calves: return "Calves"
+            case .shins: return "Shins"
+            }
+        })).sorted()
     }
+
 }
 
 enum RecoveryTool: String, CaseIterable, Identifiable {
@@ -3082,7 +3112,7 @@ struct MuscleRecoveryCard: View {
                         $1.muscleGroup
                     )
                 }
-                .prefix(7)
+                .prefix(13)
         )
     }
 
@@ -3324,80 +3354,22 @@ struct MuscleRecoveryCard: View {
     private func muscleRegions(
         for group: String
     ) -> [StrengthMuscleRegion] {
-        let normalized =
-            group.lowercased()
-
-        if normalized.contains(
-            "chest"
-        ) {
-            return [.chest]
+        switch group.lowercased() {
+        case "chest": return [.chest]
+        case "back": return [.lats, .upperBack, .lowerBack]
+        case "lower back": return [.lowerBack]
+        case "shoulders": return [.frontDelts, .sideDelts, .rearDelts]
+        case "arms": return [.biceps, .triceps, .forearms]
+        case "core": return [.abs, .obliques]
+        case "glutes": return [.glutes, .outerHip]
+        case "adductors": return [.innerThigh]
+        case "hip flexors": return [.hipFlexors]
+        case "quads": return [.quads]
+        case "hamstrings": return [.hamstrings]
+        case "calves": return [.calves]
+        case "shins": return [.shins]
+        default: return StrengthMuscleResolver.regions(for: group)
         }
-        if normalized.contains(
-            "back"
-        ) {
-            return [
-                .lats,
-                .upperBack,
-                .lowerBack
-            ]
-        }
-        if normalized.contains(
-            "shoulder"
-        ) {
-            return [
-                .frontDelts,
-                .sideDelts,
-                .rearDelts
-            ]
-        }
-        if normalized.contains(
-            "arm"
-        ) {
-            return [
-                .biceps,
-                .triceps,
-                .forearms
-            ]
-        }
-        if normalized.contains(
-            "core"
-        ) ||
-            normalized.contains(
-                "ab"
-            ) {
-            return [
-                .abs,
-                .obliques
-            ]
-        }
-        if normalized.contains(
-            "glute"
-        ) {
-            return [
-                .glutes,
-                .outerHip
-            ]
-        }
-        if normalized.contains(
-            "quad"
-        ) {
-            return [.quads]
-        }
-        if normalized.contains(
-            "hamstring"
-        ) {
-            return [.hamstrings]
-        }
-        if normalized.contains(
-            "calf"
-        ) ||
-            normalized.contains(
-                "calves"
-            ) {
-            return [.calves]
-        }
-
-        return []
     }
 
     private func readinessTint(
