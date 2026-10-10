@@ -91,6 +91,58 @@ struct TrainTogetherMarketplaceView:
                     }
                 }
 
+                if !pastJoinedPosts.isEmpty {
+                    sectionHeader(
+                        ATHLTHLocalization.choose(
+                            english: "Previously planned together",
+                            norwegian: "Tidligere fellesøkter"
+                        ),
+                        subtitle: ATHLTHLocalization.choose(
+                            english: "Open the shared chat and add memories. Only workouts you hosted or joined.",
+                            norwegian: "Åpne felles chat og del minner. Kun økter du arrangerte eller ble med på."
+                        )
+                    )
+
+                    ForEach(pastJoinedPosts.prefix(5)) { post in
+                        NavigationLink {
+                            TrainTogetherPostDetailView(postID: post.id)
+                                .environmentObject(marketplace)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: postKind(post).systemImage)
+                                    .foregroundStyle(ATHLTHTheme.vitality)
+                                    .frame(width: 35, height: 35)
+                                    .background(
+                                        ATHLTHTheme.vitalitySoft,
+                                        in: RoundedRectangle(cornerRadius: 10)
+                                    )
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(post.title)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(ATHLTHTheme.primaryText)
+                                    Text(
+                                        post.scheduledStart.formatted(
+                                            date: .abbreviated,
+                                            time: .shortened
+                                        )
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(14)
+                            .background(
+                                Color.white.opacity(0.91),
+                                in: RoundedRectangle(cornerRadius: 18)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
                 sectionHeader(
                     ATHLTHLocalization.choose(
                         english:
@@ -1000,6 +1052,22 @@ struct TrainTogetherMarketplaceView:
             }
     }
 
+    private var pastJoinedPosts: [TrainTogetherPost] {
+        marketplace.posts
+            .filter { post in
+                post.scheduledStart < Date() &&
+                post.status != .cancelled &&
+                (
+                    post.creatorID == session.profile.userID ||
+                    marketplace.request(
+                        for: post.id,
+                        userID: session.profile.userID
+                    )?.state == .accepted
+                )
+            }
+            .sorted { $0.scheduledStart > $1.scheduledStart }
+    }
+
     private var emptyState:
         some View {
         ATHLTHCard {
@@ -1244,6 +1312,15 @@ struct TrainTogetherPostDetailView:
                                     post.id
                                 ] {
                             meetupCard(meetup)
+                        }
+
+                        if post.creatorID == session.profile.userID ||
+                            currentRequest?.state == .accepted {
+                            TrainTogetherCircleView(
+                                post: post,
+                                isHost: post.creatorID ==
+                                    session.profile.userID
+                            )
                         }
                     }
                     .padding(16)
