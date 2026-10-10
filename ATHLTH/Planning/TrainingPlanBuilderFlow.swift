@@ -520,8 +520,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 10)
-                .padding(.bottom, 26)
+                .padding(.bottom, 18)
                 .padding(.horizontal, 10)
+
+                sourceModePicker
+                    .padding(.bottom, 18)
 
                 HStack(alignment: .top, spacing: 7) {
                     ForEach(SourceOption.allCases) { option in
@@ -603,6 +606,105 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
+    // One shared mode state controls both this first screen and the
+    // extra settings revealed by later steps of the plan builder.
+    private var sourceModePicker: some View {
+        VStack(spacing: 7) {
+            HStack(spacing: 0) {
+                sourceModeOption(
+                    .basic,
+                    title: ATHLTHLocalization.choose(
+                        english: "Beginner",
+                        norwegian: "Nybegynner"
+                    )
+                )
+
+                sourceModeOption(
+                    .advanced,
+                    title: ATHLTHLocalization.choose(
+                        english: "Advanced",
+                        norwegian: "Avansert"
+                    )
+                )
+            }
+            .padding(3)
+            .background(
+                Color.white.opacity(0.83),
+                in: RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(sourceGold.opacity(0.22), lineWidth: 0.8)
+            }
+
+            Text(
+                ATHLTHLocalization.choose(
+                    english: "Choose a simple or more detailed setup.",
+                    norwegian: "Velg enkel eller mer detaljert oppstart."
+                )
+            )
+            .font(.caption)
+            .foregroundStyle(sourceMuted)
+            .frame(maxWidth: .infinity)
+            .multilineTextAlignment(.center)
+            .accessibilityHidden(true)
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func sourceModeOption(
+        _ option: TrainingPlanBuilderMode,
+        title: String
+    ) -> some View {
+        let isSelected = mode == option
+
+        return Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                mode = option
+            }
+        } label: {
+            Text(title)
+                .font(.subheadline.weight(
+                    isSelected ? .semibold : .medium
+                ))
+                .foregroundStyle(sourceInk)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 44)
+                .background(
+                    isSelected
+                        ? sourceGold.opacity(0.15)
+                        : Color.clear,
+                    in: RoundedRectangle(
+                        cornerRadius: 17,
+                        style: .continuous
+                    )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 17,
+                        style: .continuous
+                    )
+                    .stroke(
+                        isSelected
+                            ? sourceGold.opacity(0.96)
+                            : Color.clear,
+                        lineWidth: 1.1
+                    )
+                }
+                .contentShape(
+                    RoundedRectangle(cornerRadius: 17)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(
+            isSelected ? .isSelected : []
+        )
+    }
+
     private func sourceSelectionCard(_ option: SourceOption) -> some View {
         let isSelected = selectedSource == option
 
@@ -616,7 +718,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     .resizable()
                     .scaledToFill()
                     .frame(maxWidth: .infinity)
-                    .frame(height: 191)
+                    .frame(height: 172)
                     .clipped()
                     .accessibilityHidden(true)
 
@@ -1023,7 +1125,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         ) {
             ATHLTHPremiumSegmentedControl(
                 titles: [
-                    "Basic",
+                    ATHLTHLocalization.choose(
+                        english: "Beginner",
+                        norwegian: "Nybegynner"
+                    ),
                     ATHLTHLocalization.choose(
                         english: "Advanced",
                         norwegian: "Avansert"
