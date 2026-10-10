@@ -56,6 +56,22 @@ final class TrainTogetherMarketplaceStore:
                     .execute()
                     .value
 
+            // Past entries are only returned when the logged-in athlete
+            // hosted or joined: server-side RLS prevents reading strangers'
+            // old sessions. Retain a small 14-day window for shared recaps.
+            async let archiveQuery: [TrainTogetherPost] = client
+                .from("train_together_posts")
+                .select()
+                .gte(
+                    "scheduled_start",
+                    value: Date().addingTimeInterval(-14 * 86400).ISO8601Format()
+                )
+                .lt("scheduled_start", value: Date().ISO8601Format())
+                .order("scheduled_start", ascending: false)
+                .limit(50)
+                .execute()
+                .value
+
             async let requestsQuery:
                 [TrainTogetherRequest] =
                 client
@@ -71,15 +87,19 @@ final class TrainTogetherMarketplaceStore:
                     .execute()
                     .value
 
-            let (
-                loadedPosts,
-                loadedRequests
-            ) = try await (
+            let (loadedPosts, loadedRequests, archives) = try await (
                 postsQuery,
-                requestsQuery
+                requestsQuery,
+                archiveQuery
             )
 
-            posts = loadedPosts
+            var unique: [UUID: TrainTogetherPost] = [:]
+            for post in archives + loadedPosts {
+                unique[post.id] = post
+            }
+            posts = unique.values.sorted {
+                $0.scheduledStart < $1.scheduledStart
+            }
             requests = loadedRequests
             errorMessage = nil
         } catch {
