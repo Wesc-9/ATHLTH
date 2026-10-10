@@ -72,6 +72,7 @@ enum GhostRaceStartService {
     static func startTarget(
         route: TrainingRoute,
         targetDurationSeconds: TimeInterval,
+        strategy: GhostTargetPacingStrategy = .even,
         ownerID: UUID,
         ghostRace: GhostRaceStore,
         watchConnection: AppleWatchConnectionStore,
@@ -81,8 +82,8 @@ enum GhostRaceStartService {
     ) async throws {
         try ghostRace.prepareTarget(
             route: route,
-            targetDurationSeconds:
-                targetDurationSeconds
+            targetDurationSeconds: targetDurationSeconds,
+            strategy: strategy
         )
 
         try await launchPrepared(
