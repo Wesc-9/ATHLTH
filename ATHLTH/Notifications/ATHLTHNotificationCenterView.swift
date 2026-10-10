@@ -46,7 +46,6 @@ struct ATHLTHNotificationCenterView: View {
     @EnvironmentObject private var trophies: TrophyStore
     @EnvironmentObject private var communityGroups: CommunityGroupStore
 
-    @State private var selectedWorkoutImportIDs: Set<UUID> = []
     @State private var selectedScope: ATHLTHNotificationScope = .all
     @State private var permissionBannerDismissed = false
 
@@ -339,116 +338,10 @@ struct ATHLTHNotificationCenterView: View {
                         )
             )
 
-            VStack(spacing: 0) {
-                ForEach(
-                    Array(
-                        health.pendingWorkoutImports.enumerated()
-                    ),
-                    id: \.element.id
-                ) { index, item in
+            LazyVStack(spacing: 10) {
+                ForEach(health.pendingWorkoutImports) { item in
                     pendingWorkoutRow(item)
-
-                    if index <
-                        health.pendingWorkoutImports.count - 1 {
-                        Divider()
-                            .padding(.leading, 60)
-                    }
                 }
-
-                Divider()
-
-                HStack(spacing: 10) {
-                    Button(
-                        selectedWorkoutImportIDs.isEmpty
-                            ? ATHLTHLocalization.choose(
-                                english: "Import all",
-                                norwegian: "Importer alle"
-                            )
-                            : ATHLTHLocalization.choose(
-                                english: "Import selected",
-                                norwegian: "Importer valgte"
-                            )
-                    ) {
-                        let ids =
-                            selectedWorkoutImportIDs.isEmpty
-                                ? Set(
-                                    health.pendingWorkoutImports
-                                        .map(\.id)
-                                )
-                                : selectedWorkoutImportIDs
-
-                        health.importPendingWorkouts(ids)
-                        selectedWorkoutImportIDs.subtract(ids)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.accentDeep)
-
-                    Menu {
-                        if !selectedWorkoutImportIDs.isEmpty {
-                            Button(
-                                ATHLTHLocalization.choose(
-                                    english: "Import All",
-                                    norwegian: "Importer alle"
-                                )
-                            ) {
-                                health.importAllPendingWorkouts()
-                                selectedWorkoutImportIDs.removeAll()
-                            }
-
-                            Button(
-                                ATHLTHLocalization.choose(
-                                    english: "Ignore Selected",
-                                    norwegian: "Ignorer valgte"
-                                ),
-                                role: .destructive
-                            ) {
-                                let ids =
-                                    selectedWorkoutImportIDs
-                                health.ignorePendingWorkouts(ids)
-                                selectedWorkoutImportIDs
-                                    .removeAll()
-                            }
-                        }
-
-                        Button(
-                            ATHLTHLocalization.choose(
-                                english: "Ignore All",
-                                norwegian: "Ignorer alle"
-                            ),
-                            role: .destructive
-                        ) {
-                            health.ignoreAllPendingWorkouts()
-                            selectedWorkoutImportIDs.removeAll()
-                        }
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "More",
-                                norwegian: "Mer"
-                            ),
-                            systemImage: "ellipsis"
-                        )
-                    }
-                    .buttonStyle(.bordered)
-                }
-                .padding(14)
-            }
-            .background(
-                ATHLTHTheme.card.opacity(0.97),
-                in: RoundedRectangle(
-                    cornerRadius: 22,
-                    style: .continuous
-                )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: 22,
-                    style: .continuous
-                )
-                .stroke(
-                    Color.primary.opacity(0.055),
-                    lineWidth: 1
-                )
             }
         }
     }
@@ -748,107 +641,111 @@ struct ATHLTHNotificationCenterView: View {
     private func pendingWorkoutRow(
         _ item: PendingWorkoutImport
     ) -> some View {
-        let isSelected =
-            selectedWorkoutImportIDs.contains(item.id)
-
-        return HStack(alignment: .center, spacing: 12) {
-            Button {
-                if isSelected {
-                    selectedWorkoutImportIDs.remove(item.id)
-                } else {
-                    selectedWorkoutImportIDs.insert(item.id)
-                }
-            } label: {
-                Image(
-                    systemName:
-                        isSelected
-                            ? "checkmark.circle.fill"
-                            : "circle"
-                )
-                .font(.system(size: 21, weight: .semibold))
-                .foregroundStyle(
-                    isSelected
-                        ? ATHLTHTheme.accent
-                        : Color.secondary.opacity(0.7)
-                )
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(
-                isSelected
-                    ? ATHLTHLocalization.choose(
-                        english: "Deselect workout",
-                        norwegian: "Fjern valg av økt"
-                    )
-                    : ATHLTHLocalization.choose(
-                        english: "Select workout",
-                        norwegian: "Velg økt"
-                    )
-            )
-
-            Image(systemName: item.summary.activity.icon)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(ATHLTHTheme.accentDeep)
-                .frame(width: 40, height: 40)
-                .background(
-                    ATHLTHTheme.accentSoft,
-                    in: RoundedRectangle(
-                        cornerRadius: 12,
-                        style: .continuous
-                    )
-                )
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(item.summary.activity.rawValue)
-                    .font(.subheadline.weight(.semibold))
-
-                Text(pendingWorkoutDetails(item))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-
-                Text(item.sourceDescription)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-            }
-
-            Spacer(minLength: 4)
-
-            Menu {
-                Button(
-                    ATHLTHLocalization.choose(
-                        english: "Import",
-                        norwegian: "Importer"
-                    )
-                ) {
-                    health.importPendingWorkout(item.id)
-                    selectedWorkoutImportIDs.remove(item.id)
-                }
-
-                Button(
-                    ATHLTHLocalization.choose(
-                        english: "Ignore",
-                        norwegian: "Ignorer"
-                    ),
-                    role: .destructive
-                ) {
-                    health.ignorePendingWorkout(item.id)
-                    selectedWorkoutImportIDs.remove(item.id)
-                }
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 32, height: 32)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: item.summary.activity.icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 44, height: 44)
                     .background(
-                        Color.primary.opacity(0.04),
-                        in: Circle()
+                        ATHLTHTheme.accentSoft,
+                        in: RoundedRectangle(
+                            cornerRadius: 13,
+                            style: .continuous
+                        )
                     )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.summary.activity.rawValue)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+
+                    Text(pendingWorkoutDetails(item))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .lineLimit(2)
+
+                    Text(item.sourceDescription)
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.82))
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
             }
-            .buttonStyle(.plain)
+
+            HStack(spacing: 10) {
+                Button {
+                    health.importPendingWorkout(item.id)
+                } label: {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Import",
+                            norwegian: "Importer"
+                        )
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(
+                        ATHLTHTheme.accentDeep,
+                        in: Capsule()
+                    )
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    health.ignorePendingWorkout(item.id)
+                } label: {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Dismiss",
+                            norwegian: "Avvis"
+                        )
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(
+                        Color.primary.opacity(0.045),
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .stroke(
+                                Color.primary.opacity(0.07),
+                                lineWidth: 1
+                            )
+                    }
+                }
+                .buttonStyle(.plain)
+            }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
+        .padding(14)
+        .background(
+            ATHLTHTheme.card.opacity(0.97),
+            in: RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                Color.primary.opacity(0.055),
+                lineWidth: 1
+            )
+        }
+        .shadow(
+            color: Color.black.opacity(0.035),
+            radius: 12,
+            y: 5
+        )
     }
 
     private func pendingWorkoutDetails(
