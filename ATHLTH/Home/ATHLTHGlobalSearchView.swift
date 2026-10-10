@@ -159,30 +159,6 @@ struct ATHLTHGlobalSearchView: View {
                 Color(red: 0.975, green: 0.971, blue: 0.961)
                     .ignoresSafeArea()
 
-                // Hero stays within a fixed viewport: no aspect-fill layout overflow.
-                GeometryReader { viewport in
-                    Image("HomeHero")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: viewport.size.width, height: 390)
-                        .clipped()
-                        .overlay {
-                            LinearGradient(
-                                stops: [
-                                    .init(color: .black.opacity(0.26), location: 0),
-                                    .init(color: .black.opacity(0.02), location: 0.28),
-                                    .init(color: Color(red: 0.975, green: 0.971, blue: 0.961).opacity(0.76), location: 0.72),
-                                    .init(color: Color(red: 0.975, green: 0.971, blue: 0.961), location: 1)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        }
-                        .frame(maxHeight: .infinity, alignment: .top)
-                }
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 16) {
                         searchHeader
@@ -244,7 +220,7 @@ struct ATHLTHGlobalSearchView: View {
                 Text("ATHLTH")
                     .font(.system(size: 10, weight: .bold, design: .rounded))
                     .tracking(3.0)
-                    .foregroundStyle(.white.opacity(0.86))
+                    .foregroundStyle(searchGraphite.opacity(0.6))
 
                 Text(
                     ATHLTHLocalization.format(
@@ -253,8 +229,7 @@ struct ATHLTHGlobalSearchView: View {
                     )
                 )
                 .font(.system(size: 36, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.22), radius: 6, y: 2)
+                .foregroundStyle(searchGraphite)
             }
 
             Spacer()
@@ -264,12 +239,12 @@ struct ATHLTHGlobalSearchView: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(searchGraphite)
                     .frame(width: 45, height: 45)
-                    .background(.ultraThinMaterial, in: Circle())
+                    .background(Color.white.opacity(0.88), in: Circle())
                     .overlay {
                         Circle()
-                            .stroke(.white.opacity(0.78), lineWidth: 1)
+                            .stroke(searchGraphite.opacity(0.08), lineWidth: 1)
                     }
             }
             .buttonStyle(.plain)
