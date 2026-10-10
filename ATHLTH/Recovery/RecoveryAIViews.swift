@@ -1626,6 +1626,10 @@ struct RecoveryCoachView: View {
 
                 Button {
                     draftHealthPermission = healthConsentApproved
+                    draftAutomaticHealthPermission =
+                        RecoveryCoachHealthSharingPreferences.canAutomaticallyShare(
+                            userID: session.profile.userID
+                        )
                     pendingShareAfterConsent = false
                     showingCoachConsentSheet = true
                 } label: {
