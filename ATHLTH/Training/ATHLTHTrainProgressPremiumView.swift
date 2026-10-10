@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 /// A new read-only progress surface over preserved workout history.
 /// Planned and performed sessions are always kept distinct.
@@ -8,6 +9,30 @@ struct ATHLTHTrainProgressPremiumView: View {
     @EnvironmentObject private var strength: StrengthWorkoutStore
 
     let onOpenPlan: () -> Void
+
+    @State private var selectedProgressArea: ProgressArea = .trainingPlan
+
+    private enum ProgressArea: String, CaseIterable, Identifiable {
+        case trainingPlan
+        case general
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .trainingPlan:
+                return ATHLTHLocalization.choose(
+                    english: "Training plan",
+                    norwegian: "Treningsplan"
+                )
+            case .general:
+                return ATHLTHLocalization.choose(
+                    english: "General progress",
+                    norwegian: "Generell fremgang"
+                )
+            }
+        }
+    }
 
     @State private var showingDetailedAnalysis = false
     @State private var showingGoals = false
@@ -41,10 +66,58 @@ struct ATHLTHTrainProgressPremiumView: View {
                 .foregroundStyle(muted)
             }
 
-            if let plan {
-                progressContent(for: plan)
-            } else {
-                noPlanContent
+            HStack(spacing: 4) {
+                ForEach(ProgressArea.allCases) { area in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            selectedProgressArea = area
+                        }
+                    } label: {
+                        Text(area.title)
+                            .font(.subheadline.weight(
+                                selectedProgressArea == area ? .semibold : .medium
+                            ))
+                            .foregroundStyle(
+                                selectedProgressArea == area ? Color.white : ink
+                            )
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.86)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 43)
+                            .background(
+                                selectedProgressArea == area
+                                    ? ink
+                                    : Color.clear,
+                                in: RoundedRectangle(
+                                    cornerRadius: 13,
+                                    style: .continuous
+                                )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(
+                        selectedProgressArea == area ? .isSelected : []
+                    )
+                }
+            }
+            .padding(4)
+            .background(
+                Color(red: 0.93, green: 0.92, blue: 0.90),
+                in: RoundedRectangle(
+                    cornerRadius: 17,
+                    style: .continuous
+                )
+            )
+
+            switch selectedProgressArea {
+            case .trainingPlan:
+                if let plan {
+                    progressContent(for: plan)
+                } else {
+                    noPlanContent
+                }
+            case .general:
+                ATHLTHTrainGeneralProgressContent()
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -391,6 +464,404 @@ struct ATHLTHTrainProgressPremiumView: View {
 
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+}
+
+// General progress is deliberately independent of any active training plan.
+// All figures come from recorded completed workouts, not planned sessions.
+private struct ATHLTHTrainGeneralProgressContent: View {
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var strength: StrengthWorkoutStore
+
+    @State private var exerciseID = ""
+    @State private var period: TimePeriod = .all
+
+    private let ink = Color(red: 0.18, green: 0.18, blue: 0.17)
+    private let muted = Color(red: 0.46, green: 0.45, blue: 0.43)
+    private let champagne = Color(red: 0.65, green: 0.53, blue: 0.35)
+    private let hairline = Color(red: 0.89, green: 0.87, blue: 0.84)
+
+    private enum TimePeriod: String, CaseIterable, Identifiable {
+        case fourWeeks
+        case twelveWeeks
+        case all
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .fourWeeks:
+                return ATHLTHLocalization.choose(
+                    english: "4 weeks", norwegian: "4 uker"
+                )
+            case .twelveWeeks:
+                return ATHLTHLocalization.choose(
+                    english: "12 weeks", norwegian: "12 uker"
+                )
+            case .all:
+                return ATHLTHLocalization.choose(
+                    english: "All time", norwegian: "Alle"
+                )
+            }
+        }
+
+        var earliestDate: Date {
+            switch self {
+            case .fourWeeks:
+                return Calendar.current.date(
+                    byAdding: .day, value: -28, to: .now
+                ) ?? .distantPast
+            case .twelveWeeks:
+                return Calendar.current.date(
+                    byAdding: .day, value: -84, to: .now
+                ) ?? .distantPast
+            case .all:
+                return .distantPast
+            }
+        }
+    }
+
+    private var snapshot: ATHLTHTrainTrendEngine.Snapshot {
+        ATHLTHTrainTrendEngine.makeGeneral(
+            strengthHistory: strength.workoutHistory
+        )
+    }
+
+    private var weightedExercises: [ATHLTHTrainTrendEngine.Exercise] {
+        snapshot.exercises.filter { exercise in
+            snapshot.points(for: exercise.id).contains {
+                ($0.peakWeightKilograms ?? 0) > 0
+            }
+        }
+    }
+
+    private var selectedExercise: ATHLTHTrainTrendEngine.Exercise? {
+        weightedExercises.first { $0.id == exerciseID }
+            ?? weightedExercises.first
+    }
+
+    private var points: [ATHLTHTrainTrendEngine.Point] {
+        guard let selectedExercise else { return [] }
+        return snapshot.points(for: selectedExercise.id).filter {
+            $0.date >= period.earliestDate &&
+            ($0.peakWeightKilograms ?? 0) > 0
+        }
+    }
+
+    private var maximumWeight: Double {
+        points.compactMap(\.peakWeightKilograms).max() ?? 0
+    }
+
+    private var changeFromFirst: Double? {
+        guard points.count > 1,
+              let first = points.first?.peakWeightKilograms,
+              let last = points.last?.peakWeightKilograms
+        else { return nil }
+        return last - first
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(tr("ALL YOUR TRAINING", "ALL DIN TRENING"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.5)
+                    .foregroundStyle(champagne)
+
+                Text(tr("Progress beyond the plan", "Fremgang utover planen"))
+                    .font(.system(size: 25, weight: .regular, design: .serif))
+                    .foregroundStyle(ink)
+
+                Text(tr(
+                    "Track your recorded strength workouts and exercise loads, whether you used a plan or Quick Train.",
+                    "Følg utviklingen i styrkeøktene dine – både fra treningsplaner og Quick Train."
+                ))
+                .font(.subheadline)
+                .foregroundStyle(muted)
+            }
+
+            HStack(spacing: 8) {
+                summaryStat(
+                    value: "\(snapshot.linkedWorkoutCount)",
+                    title: tr("Strength workouts", "Styrkeøkter"),
+                    icon: "dumbbell.fill"
+                )
+                summaryStat(
+                    value: "\(weightedExercises.count)",
+                    title: tr("Weighted exercises", "Vektøvelser"),
+                    icon: "chart.xyaxis.line"
+                )
+                summaryStat(
+                    value: "\(health.workouts.count)",
+                    title: tr("Apple Health workouts", "Health-økter"),
+                    icon: "heart.text.square"
+                )
+            }
+
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(tr("WEIGHT PROGRESSION", "VEKTUTVIKLING"))
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(1.4)
+                        .foregroundStyle(champagne)
+                    Spacer(minLength: 5)
+                    Text(tr("Max working weight · kg", "Tyngste arbeidsvekt · kg"))
+                        .font(.caption2)
+                        .foregroundStyle(muted)
+                }
+
+                if weightedExercises.isEmpty {
+                    VStack(spacing: 11) {
+                        Image(systemName: "dumbbell")
+                            .font(.system(size: 26, weight: .light))
+                            .foregroundStyle(champagne)
+                        Text(tr(
+                            "No recorded weighted exercises yet",
+                            "Ingen registrerte vektøvelser ennå"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ink)
+                        Text(tr(
+                            "Complete a strength workout with weighted working sets. Your exercise history will appear here automatically.",
+                            "Fullfør en styrkeøkt med registrerte arbeidssett og vekt. Da kommer utviklingen automatisk hit."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(muted)
+                        .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
+                } else {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(tr("Exercise", "Øvelse"))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(muted)
+                        Picker(
+                            tr("Choose exercise", "Velg øvelse"),
+                            selection: Binding(
+                                get: { selectedExercise?.id ?? "" },
+                                set: { exerciseID = $0 }
+                            )
+                        ) {
+                            ForEach(weightedExercises) { exercise in
+                                Text(exercise.title).tag(exercise.id)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .tint(ink)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 45)
+                        .background(
+                            Color.white.opacity(0.88),
+                            in: RoundedRectangle(
+                                cornerRadius: 13,
+                                style: .continuous
+                            )
+                        )
+                        .overlay {
+                            RoundedRectangle(
+                                cornerRadius: 13,
+                                style: .continuous
+                            )
+                            .stroke(hairline, lineWidth: 0.7)
+                        }
+                    }
+
+                    Picker(
+                        tr("Period", "Periode"),
+                        selection: $period
+                    ) {
+                        ForEach(TimePeriod.allCases) { choice in
+                            Text(choice.label).tag(choice)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    if points.isEmpty {
+                        Text(tr(
+                            "No completed sets with weight during this period.",
+                            "Ingen fullførte sett med vekt i denne perioden."
+                        ))
+                        .font(.subheadline)
+                        .foregroundStyle(muted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 26)
+                    } else {
+                        HStack(alignment: .firstTextBaseline) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(tr("PERSONAL BEST IN PERIOD", "BESTE VEKT I PERIODEN"))
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .tracking(0.8)
+                                    .foregroundStyle(muted)
+                                Text(
+                                    maximumWeight.formatted(
+                                        .number.precision(.fractionLength(0...1))
+                                    ) + " kg"
+                                )
+                                .font(.system(size: 26, weight: .semibold, design: .rounded))
+                                .foregroundStyle(ink)
+                            }
+                            Spacer()
+                            if let changeFromFirst {
+                                VStack(alignment: .trailing, spacing: 3) {
+                                    Text(tr("CHANGE", "ENDRING"))
+                                        .font(.system(size: 9, weight: .semibold))
+                                        .foregroundStyle(muted)
+                                    Text(
+                                        (changeFromFirst > 0 ? "+" : "") +
+                                        changeFromFirst.formatted(
+                                            .number.precision(.fractionLength(0...1))
+                                        ) + " kg"
+                                    )
+                                    .font(.subheadline.weight(.bold))
+                                    .foregroundStyle(
+                                        changeFromFirst >= 0
+                                            ? Color(red: 0.28, green: 0.53, blue: 0.43)
+                                            : ink
+                                    )
+                                }
+                            }
+                        }
+
+                        Chart {
+                            ForEach(points) { point in
+                                if let weight = point.peakWeightKilograms {
+                                    LineMark(
+                                        x: .value("Dato", point.date),
+                                        y: .value("Vekt", weight)
+                                    )
+                                    .interpolationMethod(.linear)
+                                    .foregroundStyle(champagne)
+
+                                    PointMark(
+                                        x: .value("Dato", point.date),
+                                        y: .value("Vekt", weight)
+                                    )
+                                    .foregroundStyle(champagne)
+                                    .symbolSize(46)
+                                }
+                            }
+                        }
+                        .chartYScale(domain: 0...max(1, maximumWeight * 1.15))
+                        .chartXAxis {
+                            AxisMarks(values: .automatic(desiredCount: 4)) {
+                                AxisGridLine(
+                                    stroke: StrokeStyle(lineWidth: 0.5)
+                                )
+                                AxisValueLabel(
+                                    format: .dateTime.day().month(.abbreviated)
+                                )
+                            }
+                        }
+                        .chartYAxis {
+                            AxisMarks(position: .leading) {
+                                AxisGridLine(
+                                    stroke: StrokeStyle(lineWidth: 0.5)
+                                )
+                                AxisValueLabel()
+                            }
+                        }
+                        .frame(height: 218)
+
+                        Text(tr(
+                            "Each point is the heaviest completed working-set load for that exercise on that day.",
+                            "Hvert punkt viser tyngste fullførte arbeidsvekt for øvelsen den dagen."
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(muted)
+                    }
+                }
+            }
+            .padding(16)
+            .freshProgressSurface(line: hairline)
+
+            if let selectedExercise, !points.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(tr("RECENT RESULTS", "SISTE RESULTATER"))
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(1.3)
+                        .foregroundStyle(champagne)
+                    ForEach(Array(points.suffix(5).reversed())) { point in
+                        HStack(spacing: 10) {
+                            Image(systemName: "dumbbell.fill")
+                                .font(.caption)
+                                .foregroundStyle(champagne)
+                            Text(selectedExercise.title)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(ink)
+                                .lineLimit(1)
+                            Spacer(minLength: 3)
+                            Text(point.date.formatted(
+                                date: .abbreviated,
+                                time: .omitted
+                            ))
+                            .font(.caption2)
+                            .foregroundStyle(muted)
+                            if let weight = point.peakWeightKilograms {
+                                Text(
+                                    weight.formatted(
+                                        .number.precision(.fractionLength(0...1))
+                                    ) + " kg"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ink)
+                                .monospacedDigit()
+                            }
+                        }
+                    }
+                }
+                .padding(15)
+                .freshProgressSurface(line: hairline)
+            }
+
+            Label(
+                tr(
+                    "The strength graph uses ATHLTH workout logs. Apple Health-only workouts are counted separately and cannot supply exercise weights.",
+                    "Styrkegrafen bruker ATHLTHs øktlogg. Økter kun fra Apple Health telles separat og inneholder ikke øvelsesvekter her."
+                ),
+                systemImage: "info.circle"
+            )
+            .font(.caption2)
+            .foregroundStyle(muted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func summaryStat(
+        value: String,
+        title: String,
+        icon: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(champagne)
+            Text(value)
+                .font(.system(size: 24, weight: .semibold, design: .rounded))
+                .foregroundStyle(ink)
+                .monospacedDigit()
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(muted)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(minHeight: 110, alignment: .topLeading)
+        .background(
+            .regularMaterial,
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(.white.opacity(0.75), lineWidth: 0.8)
+        }
+    }
+
+    private func tr(_ english: String, _ norwegian: String) -> String {
+        ATHLTHLocalization.choose(english: english, norwegian: norwegian)
     }
 }
 
