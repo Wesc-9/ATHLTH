@@ -12,162 +12,113 @@ private func recoveryAIText(
 }
 
 
-private struct RecoveryCoachLegacyConversationHero<
-    Avatar: View,
-    Trailing: View
->: View {
+// Compact Coach header: no hero photo and no fabricated online indicator.
+private struct RecoveryCoachCompactHeader<Avatar: View, Trailing: View>: View {
     let title: String
     let subtitle: String
-    let backgroundAsset: String
     let onBack: () -> Void
-
     private let avatar: Avatar
     private let trailing: Trailing
 
     init(
         title: String,
         subtitle: String,
-        backgroundAsset: String = "GoalMountain",
         onBack: @escaping () -> Void,
         @ViewBuilder avatar: () -> Avatar,
         @ViewBuilder trailing: () -> Trailing
     ) {
         self.title = title
         self.subtitle = subtitle
-        self.backgroundAsset = backgroundAsset
         self.onBack = onBack
         self.avatar = avatar()
         self.trailing = trailing()
     }
 
     var body: some View {
-        GeometryReader { viewport in
-            ZStack(alignment: .top) {
-                Image(backgroundAsset)
-                    .resizable()
-                    .scaledToFill()
-                    // Cropping needs a finite width or this image expands
-                    // the entire chat beyond the iPhone screen.
-                    .frame(width: viewport.size.width, height: 164)
-                    .clipped()
-
-            LinearGradient(
-                colors: [
-                    Color.black.opacity(0.34),
-                    Color.black.opacity(0.06),
-                    Color.black.opacity(0.18)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-
-            HStack(spacing: 10) {
-                Button(action: onBack) {
-                    Image(systemName: "chevron.left")
-                        .font(
-                            .system(
-                                size: 17,
-                                weight: .bold
-                            )
-                        )
-                        .foregroundStyle(.white)
-                        .frame(
-                            width: 42,
-                            height: 42
-                        )
-                        .background(
-                            Color.black.opacity(0.16),
-                            in: Circle()
-                        )
-                        .background(
-                            .ultraThinMaterial,
-                            in: Circle()
-                        )
-                        .overlay {
-                            Circle()
-                                .stroke(
-                                    Color.white.opacity(0.34),
-                                    lineWidth: 0.8
-                                )
-                        }
-                }
-                .buttonStyle(.plain)
-
-                avatar
-                    .frame(
-                        width: 44,
-                        height: 44
-                    )
-                    .shadow(
-                        color: Color.black.opacity(0.12),
-                        radius: 7,
-                        y: 3
-                    )
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 2
-                ) {
-                    Text(title)
-                        .font(
-                            .title3.weight(.bold)
-                        )
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
-
-                    Text(subtitle)
-                        .font(.subheadline)
-                        .foregroundStyle(
-                            Color.white.opacity(0.88)
-                        )
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.80)
-                }
-                .shadow(
-                    color: Color.black.opacity(0.28),
-                    radius: 5,
-                    y: 2
-                )
-
-                Spacer(minLength: 8)
-
-                trailing
-                    .frame(
-                        width: 42,
-                        height: 42
-                    )
+        HStack(spacing: 10) {
+            Button(action: onBack) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .frame(width: 44, height: 44)
+                    .background(Color.white.opacity(0.82), in: Circle())
+                    .overlay {
+                        Circle()
+                            .stroke(Color.primary.opacity(0.09), lineWidth: 0.8)
+                    }
             }
-            .padding(.horizontal, 14)
-            .padding(.top, 14)
+            .buttonStyle(.plain)
+            .accessibilityLabel(recoveryAIText("Back", "Tilbake"))
+
+            Spacer(minLength: 2)
+
+            avatar.frame(width: 38, height: 38)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+
+                Text(subtitle)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 2)
+
+            trailing.frame(width: 44, height: 44)
         }
-        .frame(width: viewport.size.width, height: 164)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 30,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 30,
-                style: .continuous
-            )
-            .stroke(
-                Color.white.opacity(0.34),
-                lineWidth: 0.8
-            )
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .background(Color(uiColor: .systemBackground).opacity(0.96))
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.primary.opacity(0.06))
+                .frame(height: 0.7)
         }
-        .shadow(
-            color:
-                ATHLTHTheme
-                    .accentDeep
-                    .opacity(0.09),
-            radius: 15,
-            y: 7
-        )
+    }
+}
+
+private func recoveryCoachMuscleName(_ value: String) -> String {
+    guard ATHLTHLocalization.isNorwegian else { return value }
+    switch value {
+    case "Chest": return "Bryst"
+    case "Back": return "Rygg"
+    case "Shoulders": return "Skuldre"
+    case "Arms": return "Armer"
+    case "Core": return "Kjerne"
+    case "Glutes": return "Setemuskler"
+    case "Quads": return "Forside lår"
+    case "Hamstrings": return "Bakside lår"
+    case "Calves": return "Legger"
+    default: return value
+    }
+}
+
+private enum RecoveryCoachMuscleFeeling: String, CaseIterable, Identifiable {
+    case ready
+    case uncertain
+    case sore
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .ready: return recoveryAIText("Ready to train", "Føles klar")
+        case .uncertain: return recoveryAIText("A little tired", "Litt sliten")
+        case .sore: return recoveryAIText("Sore / needs rest", "Støl / trenger hvile")
         }
-        .frame(height: 164)
+    }
+
+    var message: String {
+        switch self {
+        case .ready: return recoveryAIText("feels ready to train", "føles klar til trening")
+        case .uncertain: return recoveryAIText("feels a little tired", "føles litt sliten")
+        case .sore: return recoveryAIText("feels sore and needs more rest", "kjennes støl ut og trenger mer hvile")
+        }
     }
 }
 
@@ -1064,6 +1015,10 @@ struct RecoveryCoachView: View {
     @State private var draftHealthPermission = false
     @State private var showingCoachConsentSheet = false
     @State private var pendingShareAfterConsent = false
+    @State private var showingMuscleFeedbackSheet = false
+    @State private var feedbackMuscleName = ""
+    @State private var feedbackFeeling: RecoveryCoachMuscleFeeling = .sore
+    @State private var feedbackNote = ""
 
     private let service = RecoveryAIService()
     private let bottomAnchorID =
@@ -1080,14 +1035,6 @@ struct RecoveryCoachView: View {
 
             VStack(spacing: 0) {
                 coachConversationHero
-                    .padding(
-                        .horizontal,
-                        8
-                    )
-                    .padding(
-                        .top,
-                        8
-                    )
                     .zIndex(2)
 
                 ScrollViewReader { proxy in
@@ -1096,8 +1043,12 @@ struct RecoveryCoachView: View {
                             alignment: .leading,
                             spacing: 14
                         ) {
-                            // The Coach conversation is a dedicated chat, not a
-                            // second Insights dashboard under a giant header.
+                            // Locally derived insight; opening this card never
+                            // sends health information to the AI provider.
+                            if context.recoveryScore != nil || !context.muscles.isEmpty {
+                                coachInsightCard
+                            }
+
                             if messages.isEmpty {
                                 Text(
                                     recoveryAIText(
@@ -1247,10 +1198,7 @@ struct RecoveryCoachView: View {
                     .horizontal,
                     4
                 )
-                .padding(
-                    .top,
-                    -14
-                )
+                .padding(.top, 0)
                 .zIndex(1)
             }
             .containerRelativeFrame(.horizontal)
@@ -1282,6 +1230,9 @@ struct RecoveryCoachView: View {
         }
         .sheet(isPresented: $showingCoachConsentSheet) {
             coachConsentSheet
+        }
+        .sheet(isPresented: $showingMuscleFeedbackSheet) {
+            coachMuscleFeedbackSheet
         }
         .alert(
             recoveryAIText(
@@ -1522,7 +1473,7 @@ struct RecoveryCoachView: View {
 
     private var coachConversationHero:
         some View {
-        RecoveryCoachLegacyConversationHero(
+        RecoveryCoachCompactHeader(
             title:
                 "ATHLTH Coach",
             subtitle:
@@ -1654,24 +1605,12 @@ struct RecoveryCoachView: View {
                         weight: .bold
                     )
                 )
-                .foregroundStyle(
-                    .white
-                )
-                .frame(
-                    width: 42,
-                    height: 42
-                )
-                .background(
-                    .ultraThinMaterial,
-                    in: Circle()
-                )
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .frame(width: 42, height: 42)
+                .background(Color.white.opacity(0.85), in: Circle())
                 .overlay {
                     Circle()
-                        .stroke(
-                            Color.white
-                                .opacity(0.30),
-                            lineWidth: 0.8
-                        )
+                        .stroke(Color.primary.opacity(0.09), lineWidth: 0.8)
                 }
             }
         }
@@ -1806,7 +1745,193 @@ struct RecoveryCoachView: View {
                 )
             }
             .padding(.top, 11)
+
+            coachMuscleReadinessSection
+                .padding(.top, 12)
         }
+    }
+
+    // Show both areas estimated to need rest and areas estimated ready.
+    // These percentages are not a medical measurement or a guarantee.
+    private var coachVisibleMuscles: [RecoveryAIMuscleInput] {
+        let ordered = context.muscles.sorted {
+            $0.recoveryPercent < $1.recoveryPercent
+        }
+        let needingRest = Array(ordered.prefix(3))
+        let ready = ordered.reversed().filter { muscle in
+            !needingRest.contains(where: { $0.name == muscle.name })
+        }.prefix(2)
+        return needingRest + ready
+    }
+
+    private var coachMuscleReadinessSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "figure.strengthtraining.traditional")
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                Text(recoveryAIText("MUSCLE RECOVERY · INSIGHTS", "MUSKELRESTITUSJON · INNSIKT"))
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(0.5)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                Spacer(minLength: 0)
+            }
+
+            if context.muscles.isEmpty {
+                Text(recoveryAIText(
+                    "No muscle estimates available yet.",
+                    "Ingen beregnede muskelverdier tilgjengelig ennå."
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } else {
+                ForEach(coachVisibleMuscles, id: \.name) { muscle in
+                    HStack(spacing: 7) {
+                        Circle()
+                            .fill(muscle.recoveryPercent < 60 ? Color.orange :
+                                  (muscle.recoveryPercent < 85 ? Color.yellow : Color.green))
+                            .frame(width: 6, height: 6)
+
+                        Text(recoveryCoachMuscleName(muscle.name))
+                            .font(.system(size: 11, weight: .medium))
+                            .lineLimit(1)
+
+                        Spacer(minLength: 5)
+
+                        Text("\(muscle.recoveryPercent)%")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                }
+
+                Button {
+                    feedbackMuscleName = coachVisibleMuscles.first?.name ?? ""
+                    feedbackFeeling = .sore
+                    feedbackNote = ""
+                    showingMuscleFeedbackSheet = true
+                } label: {
+                    Label(
+                        recoveryAIText(
+                            "Tell Coach how your muscles actually feel",
+                            "Fortell Coach hvordan musklene kjennes"
+                        ),
+                        systemImage: "slider.horizontal.3"
+                    )
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Text(recoveryAIText(
+                "Estimates, not a verdict. Your own feeling matters. Nothing is shared without confirming a question.",
+                "Beregnete verdier, ikke en fasit. Din egen opplevelse teller. Ingenting deles uten at du bekrefter et spørsmål."
+            ))
+            .font(.system(size: 10))
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.top, 3)
+    }
+
+    private var coachMuscleFeedbackSheet: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Picker(
+                        recoveryAIText("Muscle group", "Muskelgruppe"),
+                        selection: $feedbackMuscleName
+                    ) {
+                        ForEach(context.muscles, id: \.name) { muscle in
+                            Text(recoveryCoachMuscleName(muscle.name))
+                                .tag(muscle.name)
+                        }
+                    }
+
+                    Picker(
+                        recoveryAIText("How does it feel?", "Hvordan kjennes det?"),
+                        selection: $feedbackFeeling
+                    ) {
+                        ForEach(RecoveryCoachMuscleFeeling.allCases) { feeling in
+                            Text(feeling.title).tag(feeling)
+                        }
+                    }
+                } header: {
+                    Text(recoveryAIText("Your assessment", "Din vurdering"))
+                } footer: {
+                    Text(recoveryAIText(
+                        "The estimate in Insights will not be overwritten.",
+                        "Beregningen i Innsikt blir ikke overskrevet."
+                    ))
+                }
+
+                Section(recoveryAIText("Optional note", "Valgfri kommentar")) {
+                    TextField(
+                        recoveryAIText(
+                            "For example: legs feel heavy after yesterday",
+                            "For eksempel: tunge bein etter gårsdagen"
+                        ),
+                        text: $feedbackNote,
+                        axis: .vertical
+                    )
+                    .lineLimit(2...4)
+                }
+
+                Section {
+                    Button {
+                        prepareMuscleFeedbackQuestion()
+                    } label: {
+                        Label(
+                            recoveryAIText(
+                                "Add to question",
+                                "Legg til i spørsmål"
+                            ),
+                            systemImage: "text.bubble.fill"
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                    .disabled(feedbackMuscleName.isEmpty)
+                } footer: {
+                    Text(recoveryAIText(
+                        "Review the draft in chat before you send it. If you want Coach to compare it with your health data, choose health sharing and confirm that particular question.",
+                        "Se gjennom utkastet i chatten før du sender. Vil du at Coach skal sammenligne med helsedata, må du velge deling og bekrefte akkurat det spørsmålet."
+                    ))
+                }
+            }
+            .navigationTitle(recoveryAIText("Correct muscle estimate", "Korriger muskelvurdering"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(recoveryAIText("Cancel", "Avbryt")) {
+                        showingMuscleFeedbackSheet = false
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func prepareMuscleFeedbackQuestion() {
+        guard !feedbackMuscleName.isEmpty else { return }
+        let name = recoveryCoachMuscleName(feedbackMuscleName)
+        let note = feedbackNote.trimmingCharacters(in: .whitespacesAndNewlines)
+        let correction: String
+        if ATHLTHLocalization.isNorwegian {
+            correction = "Min egen opplevelse er at \(name.lowercased()) \(feedbackFeeling.message). " +
+                (note.isEmpty ? "" : "Tilleggsinfo: \(note). ") +
+                "Kan du justere treningsrådet etter dette? Muskelprosenten er bare et usikkert estimat."
+        } else {
+            correction = "I feel that \(name.lowercased()) \(feedbackFeeling.message). " +
+                (note.isEmpty ? "" : "Additional context: \(note). ") +
+                "Please adapt your training recommendation to how I feel. Muscle recovery percentages are estimates."
+        }
+        let previous = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        question = previous.isEmpty ? correction : previous + "\n\n" + correction
+        showingMuscleFeedbackSheet = false
+        // Draft only: the normal send and explicit health-sharing
+        // confirmation remain the sole way to contact Groq.
     }
 
     private var scoreBadge:
