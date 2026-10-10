@@ -335,21 +335,26 @@ struct GhostRaceHubView: View {
         switch selectedMode {
         case .live:
             liveModeIntro
-
             if let selectedLiveSession {
-                selectedLiveGhostCard(
-                    selectedLiveSession
-                )
+                selectedLiveGhostCard(selectedLiveSession)
             }
-
             liveNowSection
-
-            liveFriendEntry
 
         case .past:
             pastSelfSection
-            routeSection
-            friendSection
+            DisclosureGroup(
+                ATHLTHLocalization.choose(
+                    english: "Other ways to compete",
+                    norwegian: "Flere konkurransemuligheter"
+                )
+            ) {
+                routeSection
+                friendSection
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(ATHLTHTheme.accentDeep)
+            .padding(14)
+            .background(Color.white, in: RoundedRectangle(cornerRadius: 18))
 
         case .target:
             targetGhostSection
@@ -358,60 +363,102 @@ struct GhostRaceHubView: View {
 
     private var liveModeIntro: some View {
         ATHLTHCard {
-            HStack(
-                alignment: .top,
-                spacing: 13
-            ) {
-                Image(
-                    systemName:
-                        "dot.radiowaves.left.and.right"
-                )
-                .font(.title2)
-                .foregroundStyle(
-                    Color.green
-                )
-                .frame(
-                    width: 48,
-                    height: 48
-                )
-                .background(
-                    Color.green
-                        .opacity(0.10),
-                    in:
-                        RoundedRectangle(
-                            cornerRadius: 14,
-                            style: .continuous
-                        )
-                )
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 5
-                ) {
-                    Text("Live Ghost")
-                        .font(.headline)
-
-                    Text(
-                        "Choose a runner who is active now. When they share a route, ATHLTH loads the same course and compares your positions along it. If route data is unavailable, Live Ghost safely falls back to distance."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(
-                        horizontal: false,
-                        vertical: true
-                    )
-
-                    Text(
-                        "Route-aware races ignore detours when calculating who is ahead."
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
+            VStack(alignment: .leading, spacing: 13) {
+                HStack {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose your opponent",
+                        norwegian: "Velg motstander"
+                    ))
+                    .font(.headline)
+                    Spacer()
+                    Image(systemName: "person.2.fill")
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
                 }
 
-                Spacer()
+                HStack(spacing: 8) {
+                    liveOption(
+                        title: ATHLTHLocalization.choose(
+                            english: "Live runners", norwegian: "Live nå"
+                        ),
+                        detail: ATHLTHLocalization.choose(
+                            english: "Available below", norwegian: "Se løpere under"
+                        ),
+                        icon: "dot.radiowaves.left.and.right",
+                        selected: true
+                    )
+                    NavigationLink {
+                        GhostFriendRaceHubView()
+                    } label: {
+                        liveOption(
+                            title: ATHLTHLocalization.choose(
+                                english: "Friends", norwegian: "Venner"
+                            ),
+                            detail: ATHLTHLocalization.choose(
+                                english: "Send invitation", norwegian: "Inviter en venn"
+                            ),
+                            icon: "person.2",
+                            selected: false
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        withAnimation { selectedMode = .past }
+                    } label: {
+                        liveOption(
+                            title: ATHLTHLocalization.choose(
+                                english: "Your Ghost", norwegian: "Eget løp"
+                            ),
+                            detail: ATHLTHLocalization.choose(
+                                english: "Previous run", norwegian: "Tidligere økt"
+                            ),
+                            icon: "clock.arrow.circlepath",
+                            selected: false
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+                Text(ATHLTHLocalization.choose(
+                    english: "Only runners who share their activity appear in the list.",
+                    norwegian: "Bare løpere som deler aktiviteten sin, vises i listen."
+                ))
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    private func liveOption(
+        title: String,
+        detail: String,
+        icon: String,
+        selected: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Text(detail)
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, minHeight: 80, alignment: .topLeading)
+        .padding(10)
+        .background(
+            selected ? ATHLTHTheme.accentSoft : ATHLTHTheme.surfaceStone,
+            in: RoundedRectangle(cornerRadius: 14)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(selected ? ATHLTHTheme.accentDeep : ATHLTHTheme.border,
+                        lineWidth: selected ? 1.1 : 0.7)
         }
     }
 
