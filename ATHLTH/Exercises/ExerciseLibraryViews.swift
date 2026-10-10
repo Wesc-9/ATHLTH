@@ -904,10 +904,13 @@ struct ExerciseDetailView: View {
                         .font(.subheadline)
                 }
 
-                if !entry.exercise.instructions.isEmpty {
-                    detailCard("How to perform") {
+                if !library.localizedExerciseInstructions(entry).isEmpty {
+                    detailCard(ATHLTHLocalization.choose(
+                        english: "How to perform",
+                        norwegian: "Slik utfører du øvelsen"
+                    )) {
                         ForEach(
-                            Array(entry.exercise.instructions.enumerated()),
+                            Array(library.localizedExerciseInstructions(entry).enumerated()),
                             id: \.offset
                         ) { index, instruction in
                             HStack(alignment: .top, spacing: 10) {
