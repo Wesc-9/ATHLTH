@@ -1464,7 +1464,7 @@ struct CommunityGroupChallengeRecord: Codable, Identifiable, Hashable {
     let imageURL: String?
     let activityConfiguration:
         CommunityGroupActivityConfiguration?
-    let challengeKind: String
+    var challengeKind: String = "standard"
     let status: String
     let organizerKind: CommunityGroupOrganizerKind
     let organizerUserID: UUID?
@@ -20650,8 +20650,7 @@ struct CommunityGroupChallengeCreateView: View {
             return [
                 .mostCompletions,
                 .mostDistance,
-                .mostActiveMinutes,
-                .completeTarget
+                .mostActiveMinutes
             ]
         }
 
