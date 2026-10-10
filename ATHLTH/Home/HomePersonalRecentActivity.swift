@@ -703,42 +703,15 @@ struct HomePersonalRecentActivitySection:
     }
 
     private var header: some View {
-        HStack(
-            alignment: .firstTextBaseline,
-            spacing: 12
-        ) {
-            VStack(
-                alignment: .leading,
-                spacing: 3
-            ) {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Recent activity",
-                        norwegian:
-                            "Siste aktivitet"
-                    )
+        HStack(alignment: .center, spacing: 12) {
+            Text(
+                ATHLTHLocalization.choose(
+                    english: "Recent activity",
+                    norwegian: "Siste aktivitet"
                 )
-                .font(
-                    .headline.weight(.bold)
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.primaryText
-                )
-
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Your workouts and people you follow.",
-                        norwegian:
-                            "Dine økter og økter fra de du følger."
-                    )
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-            }
+            )
+            .font(.headline.weight(.bold))
+            .foregroundStyle(ATHLTHTheme.primaryText)
 
             Spacer()
 
@@ -3956,21 +3929,6 @@ private struct HomeFollowingSocialFeedCard: View {
                     activity: activity,
                     height: 190
                 )
-                .overlay(alignment: .bottomLeading) {
-                    Label(
-                        activityLabel,
-                        systemImage: activity.icon
-                    )
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 10)
-                    .frame(height: 30)
-                    .background(
-                        Color.black.opacity(0.30),
-                        in: Capsule()
-                    )
-                    .padding(12)
-                }
             }
             .buttonStyle(.plain)
 
@@ -4141,27 +4099,6 @@ private struct HomeFollowingSocialFeedCard: View {
         .foregroundStyle(ATHLTHTheme.primaryText)
     }
 
-    private var activityLabel: String {
-        switch activity {
-        case .running:
-            return ATHLTHLocalization.choose(
-                english: "RUN",
-                norwegian: "LØP"
-            )
-        case .strength:
-            return ATHLTHLocalization.choose(
-                english: "STRENGTH",
-                norwegian: "STYRKE"
-            )
-        case .walking:
-            return ATHLTHLocalization.choose(
-                english: "WALK",
-                norwegian: "GÅTUR"
-            )
-        default:
-            return activity.rawValue.uppercased()
-        }
-    }
 }
 
 private struct HomeActivityCommentsSheet: View {
@@ -4745,76 +4682,15 @@ private struct HomePersonalWorkoutVisual:
     }
 
     var body: some View {
-        ZStack {
-            background
-
-            VStack {
-                HStack {
-                    Label(
-                        activityLabel,
-                        systemImage:
-                            workout.activity.icon
-                    )
-                    .font(
-                        .caption.weight(
-                            .bold
-                        )
-                    )
-                    .foregroundStyle(
-                        workout.activity ==
-                            .strength
-                            ? Color(
-                                red: 0.11,
-                                green: 0.12,
-                                blue: 0.13
-                            )
-                            : Color.white
-                                .opacity(
-                                    0.94
-                                )
-                    )
-                    .padding(
-                        .horizontal,
-                        10
-                    )
-                    .frame(height: 30)
-                    .background(
-                        workout.activity ==
-                            .strength
-                            ? Color.white
-                                .opacity(0.80)
-                            : Color.black
-                                .opacity(0.24),
-                        in: Capsule()
-                    )
-                    .overlay {
-                        if workout.activity ==
-                            .strength {
-                            Capsule()
-                                .stroke(
-                                    Color.black
-                                        .opacity(
-                                            0.055
-                                        ),
-                                    lineWidth:
-                                        0.7
-                                )
-                        }
-                    }
-
-                    Spacer()
-                }
-
-                Spacer()
+        // The activity name already appears in the card title below.
+        // Let the muscle map, route and treadmill metrics remain unobscured.
+        background
+            .frame(height: height)
+            .clipped()
+            .task(id: workout.id) {
+                await loadRoutePreviewIfNeeded()
+                await loadTreadmillHeartRateIfNeeded()
             }
-            .padding(12)
-        }
-        .frame(height: height)
-        .clipped()
-        .task(id: workout.id) {
-            await loadRoutePreviewIfNeeded()
-            await loadTreadmillHeartRateIfNeeded()
-        }
     }
 
     @ViewBuilder
@@ -4999,37 +4875,6 @@ private struct HomePersonalWorkoutVisual:
             return true
         default:
             return false
-        }
-    }
-
-    private var activityLabel:
-        String {
-        switch workout.activity {
-        case .running:
-            return workout.isIndoor == true
-                ? ATHLTHLocalization.choose(
-                    english: "TREADMILL",
-                    norwegian: "TREDEMØLLE"
-                )
-                : ATHLTHLocalization.choose(
-                    english: "RUN",
-                    norwegian: "LØP"
-                )
-        case .walking:
-            return ATHLTHLocalization.choose(
-                english: "WALK",
-                norwegian: "GÅTUR"
-            )
-        case .strength:
-            return ATHLTHLocalization.choose(
-                english: "STRENGTH",
-                norwegian: "STYRKE"
-            )
-        default:
-            return workout
-                .activity
-                .rawValue
-                .uppercased()
         }
     }
 
