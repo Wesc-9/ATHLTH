@@ -1598,58 +1598,144 @@ struct GoalCreationView: View {
     }
 
     private var goalStepScreen: some View {
-        ZStack(alignment: .top) {
-            goalStaticHeroBackdrop(height: 286)
+        ZStack(alignment: .bottom) {
+            ScrollView {
+                VStack(spacing: 0) {
+                    goalLightStepHeader
 
-            ZStack(alignment: .bottom) {
-                ScrollView {
-                    VStack(spacing: 0) {
-                        goalStepHero
+                    VStack(spacing: 14) {
+                        goalSelectedCategoryCard
 
-                        VStack(spacing: 14) {
-                            goalSelectedCategoryCard
-
-                            Group {
-                                switch step {
-                                case 1:
-                                    targetStep
-                                case 2:
-                                    identityStep
-                                case 3:
-                                    milestoneStep
-                                default:
-                                    reviewStep
-                                }
+                        Group {
+                            switch step {
+                            case 1:
+                                targetStep
+                            case 2:
+                                identityStep
+                            case 3:
+                                milestoneStep
+                            default:
+                                reviewStep
                             }
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.top, 16)
-                        .padding(.bottom, 112)
-                        .frame(maxWidth: .infinity)
-                        .background(
-                            goalFlowCanvas,
-                            in: UnevenRoundedRectangle(
-                                topLeadingRadius: 28,
-                                bottomLeadingRadius: 0,
-                                bottomTrailingRadius: 0,
-                                topTrailingRadius: 28,
-                                style: .continuous
-                            )
-                        )
-                        .offset(y: -18)
                     }
-                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 112)
                 }
-                .scrollIndicators(.hidden)
-                .background(Color.clear)
-                .clipped()
-
-                footer
+                .frame(maxWidth: .infinity)
             }
+            .scrollIndicators(.hidden)
+            .background(goalFlowCanvas)
+
+            footer
         }
         .background(goalFlowCanvas)
-        .clipped()
         .ignoresSafeArea(edges: .top)
+    }
+
+    private var goalLightStepHeader: some View {
+        VStack(alignment: .leading, spacing: 19) {
+            HStack(spacing: 12) {
+                Button {
+                    withAnimation(.snappy(duration: 0.22)) {
+                        step = max(0, step - 1)
+                    }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .frame(width: 42, height: 42)
+                        .background(Color.white, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english: "Back",
+                        norwegian: "Tilbake"
+                    )
+                )
+
+                Spacer()
+
+                Text("ATHLTH")
+                    .font(.system(size: 13, weight: .semibold))
+                    .tracking(4)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                Spacer()
+
+                Button {
+                    dismiss()
+                } label: {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel",
+                            norwegian: "Avbryt"
+                        )
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .frame(minWidth: 52)
+                }
+                .buttonStyle(.plain)
+            }
+
+            VStack(alignment: .leading, spacing: 9) {
+                HStack {
+                    Text(
+                        ATHLTHLocalization.format(
+                            english: "Step %d of 5",
+                            norwegian: "Steg %d av 5",
+                            step + 1
+                        )
+                    )
+                    Spacer()
+                    Text(stepTitle)
+                }
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+
+                HStack(spacing: 5) {
+                    ForEach(0..<5, id: \.self) { index in
+                        Capsule()
+                            .fill(
+                                index <= step
+                                    ? goalFlowBlue
+                                    : Color(red: 0.86, green: 0.90, blue: 0.96)
+                            )
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 4)
+                    }
+                }
+                .accessibilityHidden(true)
+            }
+
+            VStack(alignment: .leading, spacing: 7) {
+                Text(goalStepHeroTitle)
+                    .font(.system(size: 29, weight: .bold, design: .rounded))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                Text(goalStepHeroSubtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 56)
+        .padding(.bottom, 20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white,
+                    Color(red: 0.953, green: 0.971, blue: 0.997)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
     }
 
     private func goalStaticHeroBackdrop(
@@ -2049,18 +2135,18 @@ struct GoalCreationView: View {
         switch step {
         case 1:
             return ATHLTHLocalization.format(
-                english: "Set the target",
-                norwegian: "Sett målet"
+                english: "Goal details",
+                norwegian: "Måldetaljer"
             )
         case 2:
             return ATHLTHLocalization.format(
-                english: "Make it yours",
-                norwegian: "Gjør målet til ditt"
+                english: "Make it personal",
+                norwegian: "Gjør målet personlig"
             )
         case 3:
             return ATHLTHLocalization.format(
-                english: "Milestones",
-                norwegian: "Delmål"
+                english: "Your milestones",
+                norwegian: "Dine delmål"
             )
         default:
             return ATHLTHLocalization.format(
