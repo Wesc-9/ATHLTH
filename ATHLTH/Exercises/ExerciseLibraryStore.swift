@@ -161,28 +161,41 @@ final class ExerciseLibraryStore: ObservableObject {
         )
     }
 
-    // Handpicked, copyright-safe editorial collection of existing RepDB
-    // records. We never repackage the art or duplicate exercise identities:
-    // these entries keep their RepDB source, license credit and image URLs.
-    static let featuredCoreExerciseIDs: [String] = [
-        "plank", "side-plank", "crunches", "sit-ups",
-        "bicycle-crunch", "reverse-crunches", "dead-bug",
-        "bird-dog", "hollow-body-hold", "russian-twist",
-        "hanging-knee-raise", "hanging-leg-raise", "lying-leg-raise",
-        "cable-crunch", "cable-pallof-press", "ab-wheel-rollout",
-        "flutter-kicks", "mountain-climbers", "dragon-flag",
-        "heel-touches"
+    // These 20 exercises are ORIGINAL additions to ATHLTH's Supabase
+    // exercise_catalog. Never pass off RepDB's existing exercises as new.
+    static let originalCoreSlugs: [String] = [
+        "athlth-core-plank-shoulder-tap",
+        "athlth-core-plank-jack",
+        "athlth-core-plank-walkout",
+        "athlth-core-rkc-plank",
+        "athlth-core-hollow-body-rock",
+        "athlth-core-toe-touch-crunch",
+        "athlth-core-standing-cable-woodchop",
+        "athlth-core-half-kneeling-cable-chop",
+        "athlth-core-pallof-step-out",
+        "athlth-core-banded-dead-bug-pulldown",
+        "athlth-core-bird-dog-row",
+        "athlth-core-side-plank-hip-dip",
+        "athlth-core-side-plank-reach-through",
+        "athlth-core-bear-plank-shoulder-tap",
+        "athlth-core-windshield-wiper",
+        "athlth-core-stir-the-pot",
+        "athlth-core-swiss-ball-body-saw",
+        "athlth-core-copenhagen-plank",
+        "athlth-core-suitcase-march",
+        "athlth-core-standing-knee-elbow-crunch"
     ]
 
     var featuredCoreExercises: [ExerciseLibraryEntry] {
-        let catalog = Dictionary(
-            repDBExercises.compactMap { entry -> (String, ExerciseLibraryEntry)? in
-                guard let key = entry.sourceIdentifier else { return nil }
-                return (key, entry)
-            },
-            uniquingKeysWith: { first, _ in first }
+        let bySlug = Dictionary(
+            athlthCatalogExercises.compactMap { entry -> (String, ExerciseLibraryEntry)? in
+                guard entry.source == .athlthCatalog,
+                      let slug = entry.sourceIdentifier,
+                      slug.hasPrefix("athlth-core-") else { return nil }
+                return (slug, entry)
+            }, uniquingKeysWith: { first, _ in first }
         )
-        return Self.featuredCoreExerciseIDs.compactMap { catalog[$0] }
+        return Self.originalCoreSlugs.compactMap { bySlug[$0] }
     }
 
     // Local aliases make Norwegian searches work without altering or
@@ -209,7 +222,27 @@ final class ExerciseLibraryStore: ObservableObject {
         "dragon-flag": "Dragon flag",
         "heel-touches": "Hælberøring",
         "machine-back-extension": "Rygghev i maskin",
-        "back-extension": "Rygghev"
+        "back-extension": "Rygghev",
+        "athlth-core-plank-shoulder-tap": "Planke med skulderklapp",
+        "athlth-core-plank-jack": "Plankehopp",
+        "athlth-core-plank-walkout": "Plankegange",
+        "athlth-core-rkc-plank": "RKC-planke",
+        "athlth-core-hollow-body-rock": "Hollow rock",
+        "athlth-core-toe-touch-crunch": "Tåberøring med crunch",
+        "athlth-core-standing-cable-woodchop": "Stående kabelrotasjon",
+        "athlth-core-half-kneeling-cable-chop": "Knående kabelrotasjon",
+        "athlth-core-pallof-step-out": "Pallof steg ut",
+        "athlth-core-banded-dead-bug-pulldown": "Dead bug med strikk",
+        "athlth-core-bird-dog-row": "Bird dog med roing",
+        "athlth-core-side-plank-hip-dip": "Sideplanke med hoftesenk",
+        "athlth-core-side-plank-reach-through": "Sideplanke med rotasjon",
+        "athlth-core-bear-plank-shoulder-tap": "Bjørneplanke med skulderklapp",
+        "athlth-core-windshield-wiper": "Vindusvisker",
+        "athlth-core-stir-the-pot": "Rør i gryten",
+        "athlth-core-swiss-ball-body-saw": "Plankesag på ball",
+        "athlth-core-copenhagen-plank": "Copenhagen-planke",
+        "athlth-core-suitcase-march": "Koffertmarsj",
+        "athlth-core-standing-knee-elbow-crunch": "Stående kne-til-albue"
     ]
 
     // Written specifically for ATHLTH: not copied from the RepDB
@@ -255,13 +288,34 @@ final class ExerciseLibraryStore: ObservableObject {
         "dragon-flag": ["Hold fast i et stabilt feste over hodet mens du ligger på ryggen.",
                         "Senk den strake kroppen svært kontrollert; velg en enklere variant ved behov."],
         "heel-touches": ["Ligg på ryggen med knærne bøyd og skuldrene litt hevet.",
-                         "Nå vekselvis mot hælene med en liten sidebøy i overkroppen."]
+                         "Nå vekselvis mot hælene med en liten sidebøy i overkroppen."],
+        "athlth-core-plank-shoulder-tap": ["Start i høy planke med hendene under skuldrene.", "Berør motsatt skulder uten å svinge hoftene og bytt rolig side."],
+        "athlth-core-plank-jack": ["Start i høy planke med føttene sammen.", "Hopp føttene kontrollert ut og inn mens overkroppen er stabil."],
+        "athlth-core-plank-walkout": ["Stå oppreist og bøy deg frem mot gulvet.", "Gå med hendene ut i planke og tilbake før du reiser deg."],
+        "athlth-core-rkc-plank": ["Støtt deg på underarmene med stram mage og sete.", "Trekk albuene svakt mot tærne uten å bevege deg, og pust rolig."],
+        "athlth-core-hollow-body-rock": ["Ligg på ryggen og hold korsryggen forsiktig ned mot underlaget.", "Løft skuldre og bein og vugg kontrollert uten å miste spennet."],
+        "athlth-core-toe-touch-crunch": ["Ligg på ryggen med beina pekt opp mot taket.", "Løft skulderbladene og strekk hendene opp mot tærne før du senker rolig."],
+        "athlth-core-standing-cable-woodchop": ["Stå sidelengs mot et kabelapparat med håndtaket høyt.", "Trekk diagonalt ned foran kroppen mens du holder stabil mage."],
+        "athlth-core-half-kneeling-cable-chop": ["Sett ett kne i gulvet og hold overkroppen høy.", "Trekk kabelen skrått ned uten å lene deg, og bytt side."],
+        "athlth-core-pallof-step-out": ["Stå sidelengs mot kabelen med håndtaket ved brystet.", "Press armene ut og ta et kontrollert sidesteg uten å rotere."],
+        "athlth-core-banded-dead-bug-pulldown": ["Ligg på ryggen med knærne over hoftene og strikk festet bak hodet.", "Hold strikken i spenn mens du strekker ett bein kontrollert ut."],
+        "athlth-core-bird-dog-row": ["Støtt en hånd og motsatt kne mot en stabil benk.", "Strekk det frie beinet bak og ro en lett manual uten å vri hoftene."],
+        "athlth-core-side-plank-hip-dip": ["Start i sideplanke med albuen under skulderen.", "Senk hoften litt mot gulvet og løft rolig tilbake."],
+        "athlth-core-side-plank-reach-through": ["Hold en sideplanke og strekk øverste arm mot taket.", "Før armen under overkroppen og roter rolig tilbake."],
+        "athlth-core-bear-plank-shoulder-tap": ["Stå på alle fire og løft knærne noen centimeter fra gulvet.", "Berør motsatt skulder uten å flytte hoftene."],
+        "athlth-core-windshield-wiper": ["Ligg på ryggen med armene ut til siden og beina løftet.", "Før beina et kort stykke side til side uten å miste kontrollen."],
+        "athlth-core-stir-the-pot": ["Støtt underarmene på en treningsball i plankeposisjon.", "Tegn små sirkler med albuene mens du stabiliserer hoftene."],
+        "athlth-core-swiss-ball-body-saw": ["Plasser underarmene på en stabil treningsball i planke.", "Flytt kroppen rolig litt frem og tilbake uten å svaie i ryggen."],
+        "athlth-core-copenhagen-plank": ["Støtt øverste bein på en stabil, polstret benk i sideplanke.", "Løft hoften og hold kroppen rett mens innside lår jobber."],
+        "athlth-core-suitcase-march": ["Hold én manual eller kettlebell langs den ene siden.", "Marsjer rolig på stedet uten å lene deg bort fra vekten."],
+        "athlth-core-standing-knee-elbow-crunch": ["Stå oppreist med hendene lett ved hodet.", "Løft kneet mot albuen på samme side uten å dra i nakken."]
     ]
 
     func localizedExerciseInstructions(_ entry: ExerciseLibraryEntry) -> [String] {
         if ATHLTHLocalization.isNorwegian,
-           entry.source == .repDB,
            let key = entry.sourceIdentifier,
+           (entry.source == .repDB ||
+            (entry.source == .athlthCatalog && key.hasPrefix("athlth-core-"))),
            let steps = Self.norwegianCoreInstructions[key] {
             return steps
         }
@@ -271,7 +325,8 @@ final class ExerciseLibraryStore: ObservableObject {
     func localizedExerciseName(_ entry: ExerciseLibraryEntry) -> String {
         guard ATHLTHLocalization.isNorwegian,
               let id = entry.sourceIdentifier,
-              entry.source == .repDB
+              (entry.source == .repDB ||
+               (entry.source == .athlthCatalog && id.hasPrefix("athlth-core-")))
         else { return entry.name }
         return Self.norwegianExerciseNames[id] ?? entry.name
     }
