@@ -258,12 +258,12 @@ struct GhostRaceHubView: View {
     }
 
     private var hero: some View {
-        ZStack(alignment: .leading) {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
             Image(selectedMode == .live ? "TrainHero" : "GoalMountain")
                 .resizable()
                 .scaledToFill()
-                .frame(height: 194)
-                .frame(maxWidth: .infinity)
+                .frame(width: geometry.size.width, height: 194)
                 .clipped()
                 .overlay {
                     LinearGradient(
@@ -320,6 +320,9 @@ struct GhostRaceHubView: View {
                 }
             }
             .padding(19)
+            }
+            .frame(width: geometry.size.width, height: 194)
+            .clipped()
         }
         .frame(height: 194)
         .background(Color.white, in: RoundedRectangle(cornerRadius: 23))
