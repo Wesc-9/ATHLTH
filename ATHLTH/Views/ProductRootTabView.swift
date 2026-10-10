@@ -5264,10 +5264,6 @@ struct ATHLTHTrainView: View {
                     case 1:
                         ATHLTHTrainPlanPremiumView()
                     case 2:
-                        ATHLTHTrainLibraryPremiumView {
-                            selectedSection = 1
-                        }
-                    case 3:
                         ATHLTHTrainProgressPremiumView {
                             selectedSection = 1
                         }
@@ -5746,22 +5742,12 @@ struct ATHLTHTrainView: View {
 
             premiumTrainTab(
                 ATHLTHLocalization.choose(
-                    english: "Library",
-                    norwegian: "Bibliotek"
+                    english: "Progress",
+                    norwegian: "Fremgang"
                 ),
                 selected: selectedSection == 2
             ) {
                 selectedSection = 2
-            }
-
-            premiumTrainTab(
-                ATHLTHLocalization.choose(
-                    english: "Progress",
-                    norwegian: "Fremgang"
-                ),
-                selected: selectedSection == 3
-            ) {
-                selectedSection = 3
             }
         }
         .padding(4)
