@@ -6560,6 +6560,7 @@ struct CommunityGroupDetailView: View {
     @State private var showingCreateEvent = false
     @State private var showingCreateChallenge = false
     @State private var showingCreateWeeklyChallenge = false
+    @State private var dismissedEmptyWeeklyChallenge = false
     @State private var showingGroupSettings = false
     @State private var showingNotificationSettings = false
     @State private var showingUpcomingOverview = false
@@ -7421,22 +7422,22 @@ struct CommunityGroupDetailView: View {
 
     private var overview: some View {
         VStack(spacing: 12) {
+            // Immediately below Club tabs: the curated weekly challenge
+            // appears before the post composer and the four action tiles.
+            // Regular route/activity challenges remain under Challenges.
+            if let challenge = featuredClubChallenge {
+                referenceClubChallengeCard(challenge)
+            } else if groups.canPublishUpdates(currentGroup) &&
+                        !dismissedEmptyWeeklyChallenge {
+                referenceEmptyChallengeCard
+            }
+
             // Creation/member shortcuts are available to every member.
             // Only the announcement composer is role-gated.
             referenceClubComposer
 
             referenceClubPostsSection
-
-            // Weekly Club challenge is an editorial feature, not the
-            // same as the member-created route/activity challenges below.
-            if let challenge = featuredClubChallenge {
-                referenceClubChallengeCard(challenge)
-            } else {
-                referenceEmptyChallengeCard
-            }
-
             referenceComingUpSection
-
             clubLeaderboardCard
         }
     }
@@ -8130,6 +8131,32 @@ struct CommunityGroupDetailView: View {
         }
         .buttonStyle(.plain)
         .disabled(!canCreate)
+        .overlay(alignment: .topTrailing) {
+            // Only owners/admins can dismiss the empty placeholder.
+            // Dismissing never deletes or changes Club challenges.
+            if groups.canManage(currentGroup) {
+                Button {
+                    dismissedEmptyWeeklyChallenge = true
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(clubForest.opacity(0.78))
+                        .frame(width: 38, height: 38)
+                        .background(
+                            Color.white.opacity(0.90),
+                            in: Circle()
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english: "Hide empty weekly challenge card",
+                        norwegian: "Skjul tomt kort for ukens challenge"
+                    )
+                )
+                .padding(8)
+            }
+        }
     }
 
     private func referenceClubChallengeCard(
