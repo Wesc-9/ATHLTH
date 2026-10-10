@@ -336,6 +336,7 @@ struct RunQuickStartConfiguration {
     let socialMode:
         SocialWorkoutParticipationMode
     let gearIDs: Set<UUID>
+    var watchStartMode: WatchWorkoutStartMode = .immediate
 
     var title: String {
         switch mode {
@@ -973,6 +974,7 @@ struct RunQuickStartSheet: View {
             .physical
     @State private var selectedGearIDs: Set<UUID> = []
     @State private var captureDevice: WorkoutCaptureDevice
+    @State private var watchStartMode: WatchWorkoutStartMode = .immediate
     @State private var environment: RunEnvironment = .outdoor
     @StateObject private var routeLocationProbe =
         QuickStartRouteLocationProbe()
@@ -1440,6 +1442,37 @@ struct RunQuickStartSheet: View {
             }
             .padding(.top, 10)
 
+            if captureDevice == .appleWatch &&
+                !ATHLTHDeviceRole.isIPad {
+                VStack(alignment: .leading, spacing: 9) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Start on Apple Watch",
+                            norwegian: "Start på Apple Watch"
+                        )
+                    )
+                    .font(.subheadline.weight(.semibold))
+
+                    Picker(
+                        ATHLTHLocalization.choose(
+                            english: "Start timing",
+                            norwegian: "Starttidspunkt"
+                        ),
+                        selection: $watchStartMode
+                    ) {
+                        ForEach(WatchWorkoutStartMode.allCases) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    Text(watchStartMode.detail)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.top, 12)
+            }
+
             Text(
                 ATHLTHDeviceRole.isIPad
                     ? ATHLTHLocalization.choose(
@@ -1451,10 +1484,8 @@ struct RunQuickStartSheet: View {
                     : (
                         captureDevice == .appleWatch
                             ? ATHLTHLocalization.choose(
-                                english:
-                                    "The workout is sent to Apple Watch. Recording starts when you press START on the watch.",
-                                norwegian:
-                                    "Økten sendes til Apple Watch. Registreringen starter når du trykker START på klokken."
+                                english: watchStartMode.detail,
+                                norwegian: watchStartMode.detail
                             )
                             : ATHLTHLocalization.choose(
                                 english:
@@ -2154,8 +2185,8 @@ struct RunQuickStartSheet: View {
         .accessibilityHint(
             captureDevice == .appleWatch
                 ? ATHLTHLocalization.choose(
-                    english: "Send to Apple Watch; start the workout from the watch.",
-                    norwegian: "Send til Apple Watch og start økten på klokken."
+                    english: watchStartMode.detail,
+                    norwegian: watchStartMode.detail
                 )
                 : ATHLTHLocalization.choose(
                     english: "Start recording the workout on iPhone.",
@@ -2272,7 +2303,8 @@ struct RunQuickStartSheet: View {
                 friends: friends,
                 socialMode:
                     socialMode,
-                gearIDs: selectedGearIDs
+                gearIDs: selectedGearIDs,
+                watchStartMode: watchStartMode
             )
         )
         dismiss()
@@ -2305,8 +2337,8 @@ struct RunQuickStartSheet: View {
         }
 
         return ATHLTHLocalization.choose(
-            english: "Send to Apple Watch",
-            norwegian: "Send til Apple Watch"
+            english: watchStartMode == .onWatch ? "Send to Apple Watch" : "Start on Apple Watch",
+            norwegian: watchStartMode == .onWatch ? "Send til Apple Watch" : "Start på Apple Watch"
         )
     }
 
