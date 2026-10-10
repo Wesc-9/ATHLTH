@@ -9,33 +9,70 @@ struct GoalsHubView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Goals")
-                            .font(.largeTitle.bold())
-                        Text("Turn the things that matter into measurable progress.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("ATHLTH  /  GOALS")
+                            .font(.caption2.weight(.bold))
+                            .tracking(2)
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Your goals",
+                                norwegian: "Målene dine"
+                            )
+                        )
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "From ambition to progress. One milestone at a time.",
+                                norwegian: "Fra ambisjon til fremgang. Ett delmål av gangen."
+                            )
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
                     }
 
-                    Spacer()
+                    Spacer(minLength: 0)
 
                     Button {
                         showingCreateGoal = true
                     } label: {
                         Image(systemName: "plus")
-                            .font(.headline)
-                            .frame(width: 42, height: 42)
-                            .background(ATHLTHTheme.accent.opacity(0.12), in: Circle())
+                            .font(.headline.weight(.bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 46, height: 46)
+                            .background(
+                                ATHLTHTheme.accentDeep,
+                                in: RoundedRectangle(
+                                    cornerRadius: 15,
+                                    style: .continuous
+                                )
+                            )
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        ATHLTHLocalization.choose(
+                            english: "Create goal",
+                            norwegian: "Opprett mål"
+                        )
+                    )
                 }
+                .padding(.bottom, 10)
 
                 if let primary = goalStore.primaryGoal {
-                    Text("PRIMARY GOAL")
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.4)
-                        .foregroundStyle(.secondary)
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Primary goal",
+                            norwegian: "Hovedmål"
+                        ).uppercased(),
+                        systemImage: "star.fill"
+                    )
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.2)
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
 
                     NavigationLink {
                         GoalDetailView(goalID: primary.id)
@@ -47,10 +84,16 @@ struct GoalsHubView: View {
 
                 let secondary = goalStore.activeGoals.filter { !$0.isPrimary }
                 if !secondary.isEmpty {
-                    Text("OTHER GOALS")
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.4)
-                        .foregroundStyle(.secondary)
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Other goals",
+                            norwegian: "Andre mål"
+                        ).uppercased()
+                    )
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.3)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .padding(.top, 5)
 
                     ForEach(secondary) { goal in
                         NavigationLink {
@@ -63,23 +106,79 @@ struct GoalsHubView: View {
                 }
 
                 if goalStore.activeGoals.isEmpty {
-                    ContentUnavailableView(
-                        "No goals yet",
-                        systemImage: "target",
-                        description: Text("Create a goal and ATHLTH can track milestones from Apple Health, ATHLTH workouts or manual check-ins.")
-                    )
+                    VStack(spacing: 16) {
+                        Image(systemName: "target")
+                            .font(.system(size: 34, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 76, height: 76)
+                            .background(
+                                ATHLTHTheme.accentSoft,
+                                in: RoundedRectangle(
+                                    cornerRadius: 24,
+                                    style: .continuous
+                                )
+                            )
 
-                    Button("Create your first goal") {
-                        showingCreateGoal = true
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Your next goal starts here",
+                                norwegian: "Ditt neste mål starter her"
+                            )
+                        )
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Set a goal, break it into milestones and track your progress.",
+                                norwegian: "Sett deg et mål, del det opp og følg fremgangen."
+                            )
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .multilineTextAlignment(.center)
+
+                        Button {
+                            showingCreateGoal = true
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Create your first goal",
+                                    norwegian: "Opprett ditt første mål"
+                                ),
+                                systemImage: "arrow.right"
+                            )
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 52)
+                            .background(
+                                ATHLTHTheme.accentDeep,
+                                in: Capsule()
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.accent)
+                    .padding(24)
                     .frame(maxWidth: .infinity)
+                    .goalCard()
                 }
             }
-            .padding()
+            .padding(16)
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
         }
-        .navigationTitle("Goals")
+        .scrollIndicators(.hidden)
+        .background(
+            Color(red: 0.965, green: 0.975, blue: 0.992)
+                .ignoresSafeArea()
+        )
+        .navigationTitle(
+            ATHLTHLocalization.choose(
+                english: "Goals",
+                norwegian: "Mål"
+            )
+        )
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingCreateGoal) {
             GoalCreationView()
@@ -381,10 +480,8 @@ struct GoalDetailView: View {
                     edges: .top
                 )
                 .background(
-                    Color(
-                        .systemGroupedBackground
-                    )
-                    .ignoresSafeArea()
+                    Color(red: 0.965, green: 0.975, blue: 0.992)
+                        .ignoresSafeArea()
                 )
                 .safeAreaInset(
                     edge: .bottom,
@@ -911,7 +1008,7 @@ struct GoalDetailView: View {
                 )
                 goalStatTile(
                     icon: "calendar",
-                    value: remainingDays.map(String.init) ?? "—",
+                    value: remainingDays.map { String($0) } ?? "—",
                     label: ATHLTHLocalization.choose(
                         english: "Days left",
                         norwegian: "Dager igjen"
@@ -6020,13 +6117,22 @@ private extension View {
     func goalCard() -> some View {
         self
             .background(
-                Color(.secondarySystemGroupedBackground),
-                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                Color.white.opacity(0.97),
+                in: RoundedRectangle(cornerRadius: 22, style: .continuous)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(Color.primary.opacity(0.05), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(
+                        Color(red: 0.82, green: 0.87, blue: 0.94)
+                            .opacity(0.46),
+                        lineWidth: 0.8
+                    )
             }
+            .shadow(
+                color: Color.black.opacity(0.045),
+                radius: 12,
+                y: 5
+            )
     }
 
     func goalHint() -> some View {
