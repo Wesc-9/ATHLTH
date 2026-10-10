@@ -10,6 +10,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     @State private var step: BuilderStep
     @State private var mode: TrainingPlanBuilderMode
+    @State private var selectedSource: SourceOption = .scratch
+    @State private var sourceRoute: [ExistingPlanDestination] = []
 
     @State private var title = ""
     @State private var weekCount = 8
@@ -60,8 +62,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             startsAtSourceChoice
         self.initialAdvanced =
             initialAdvanced
-        // Name and duration come first for every entry path.
-        _step = State(initialValue: .basics)
+        // The entry screen always offers three clear starting paths.
+        // The existing basics/profile/week/review steps remain intact.
+        _step = State(initialValue: .source)
         _mode = State(
             initialValue:
                 initialAdvanced
@@ -78,17 +81,70 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         case review
 
         var number: Int {
+            rawValue + 1
+        }
+    }
+
+    private enum SourceOption: String, CaseIterable, Identifiable {
+        case scratch
+        case library
+        case saved
+
+        var id: String { rawValue }
+
+        var title: String {
             switch self {
-            case .source:
-                return 0
-            case .basics:
-                return 1
-            case .profile:
-                return 2
-            case .week:
-                return 3
-            case .review:
-                return 4
+            case .scratch:
+                return ATHLTHLocalization.choose(
+                    english: "Start from scratch",
+                    norwegian: "Start fra scratch"
+                )
+            case .library:
+                return ATHLTHLocalization.choose(
+                    english: "From the library",
+                    norwegian: "Hent fra bibliotek"
+                )
+            case .saved:
+                return ATHLTHLocalization.choose(
+                    english: "Your saved plans",
+                    norwegian: "Dine lagrede"
+                )
+            }
+        }
+
+        var subtitle: String {
+            switch self {
+            case .scratch:
+                return ATHLTHLocalization.choose(
+                    english: "Build your plan from the ground up.",
+                    norwegian: "Bygg treningsplanen helt fra bunnen av."
+                )
+            case .library:
+                return ATHLTHLocalization.choose(
+                    english: "Choose a ready-made plan and make it yours.",
+                    norwegian: "Velg en mal eller ferdig plan og gjør den til din."
+                )
+            case .saved:
+                return ATHLTHLocalization.choose(
+                    english: "Continue with a plan you've saved.",
+                    norwegian: "Fortsett med en plan du allerede har lagret."
+                )
+            }
+        }
+
+        var symbol: String {
+            switch self {
+            case .scratch: return "pencil"
+            case .library: return "book.closed"
+            case .saved: return "folder"
+            }
+        }
+
+        var image: String {
+            switch self {
+            case .scratch: return "GoalStrength"
+            case .library: return "GoalMountain"
+            case .saved: return "GoalProgress"
             }
         }
     }
@@ -219,7 +275,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $sourceRoute) {
             ZStack {
                 ATHLTHPremiumCanvas(
                     accent:
@@ -239,19 +295,20 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 )
             )
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar(step == .source ? .hidden : .visible, for: .navigationBar)
             .toolbar {
-                ToolbarItem(
-                    placement: .cancellationAction
-                ) {
-                    Button(
-                        backButtonTitle
-                    ) {
-                        goBack()
+                if step != .source {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(backButtonTitle) {
+                            goBack()
+                        }
                     }
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                if step != .source {
+                if step == .source {
+                    sourceContinueBar
+                } else {
                     bottomActionBar
                 }
             }
@@ -428,190 +485,246 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .scrollIndicators(.hidden)
     }
 
+    private let sourceInk = Color(red: 0.16, green: 0.16, blue: 0.16)
+    private let sourceMuted = Color(red: 0.43, green: 0.42, blue: 0.41)
+    private let sourceGold = Color(red: 0.64, green: 0.51, blue: 0.34)
+    private let sourceCanvas = Color(red: 0.991, green: 0.986, blue: 0.979)
+
     private var sourceChoice: some View {
         ScrollView {
-            LazyVStack(
-                alignment: .leading,
-                spacing: 18
-            ) {
-                VStack(
-                    alignment: .leading,
-                    spacing: 8
-                ) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "TRAINING PLAN",
-                            norwegian: "TRENINGSPLAN"
-                        )
-                    )
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(2.0)
-                    .foregroundStyle(
-                        ATHLTHTheme.accentDeep
-                    )
+            VStack(alignment: .leading, spacing: 0) {
+                sourceChoiceHeader
+                    .padding(.bottom, 30)
 
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "How do you want to start?",
-                            norwegian: "Hvordan vil du starte?"
-                        )
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Choose how to start",
+                        norwegian: "Velg hvordan du vil starte"
                     )
-                    .font(
-                        .system(
-                            size: 33,
-                            weight: .semibold,
-                            design: .serif
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
+                )
+                .font(.system(size: 33, weight: .regular, design: .serif))
+                .foregroundStyle(sourceInk)
+                .lineLimit(2)
+                .minimumScaleFactor(0.80)
+                .frame(maxWidth: .infinity)
+                .multilineTextAlignment(.center)
 
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Build a plan around you, or start from something that already works and make it yours.",
-                            norwegian:
-                                "Bygg en plan rundt deg, eller start fra noe som allerede fungerer og gjør det til ditt."
-                        )
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Every great plan starts somewhere. Choose what fits you, and make it yours along the way.",
+                        norwegian: "Alle gode planer starter et sted. Velg det som passer deg best, så tilpasser vi resten underveis."
                     )
-                    .font(.subheadline)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-                    .lineSpacing(2)
-                }
+                )
+                .font(.subheadline)
+                .foregroundStyle(sourceMuted)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 10)
+                .padding(.bottom, 26)
+                .padding(.horizontal, 10)
 
-                Button {
-                    withAnimation(
-                        .easeInOut(duration: 0.18)
-                    ) {
-                        step = .profile
+                HStack(alignment: .top, spacing: 7) {
+                    ForEach(SourceOption.allCases) { option in
+                        sourceSelectionCard(option)
                     }
-                } label: {
-                    sourceCard(
-                        eyebrow:
-                            ATHLTHLocalization.choose(
-                                english: "NEW PLAN",
-                                norwegian: "NY PLAN"
-                            ),
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "Build from scratch",
-                                norwegian: "Bygg fra scratch"
-                            ),
-                        subtitle:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Name it, choose the length, tell ATHLTH what you want and build the week.",
-                                norwegian:
-                                    "Gi planen navn, velg lengde, fortell hva du ønsker og bygg treningsuken."
-                            ),
-                        footnote:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Basic or Advanced · change anytime",
-                                norwegian:
-                                    "Basic eller Avansert · bytt når du vil"
-                            ),
-                        icon: "wand.and.stars",
-                        prominent: true
-                    )
                 }
-                .buttonStyle(.plain)
-
-                NavigationLink(
-                    value:
-                        ExistingPlanDestination.library
-                ) {
-                    sourceCard(
-                        eyebrow:
-                            ATHLTHLocalization.choose(
-                                english: "EXISTING PLAN",
-                                norwegian: "EKSISTERENDE PLAN"
-                            ),
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "Use an existing plan",
-                                norwegian: "Bruk eksisterende plan"
-                            ),
-                        subtitle:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Choose a finished plan from the Library and adapt it to your dates and needs.",
-                                norwegian:
-                                    "Velg en ferdig plan fra biblioteket og tilpass den til dine datoer og behov."
-                            ),
-                        footnote:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Curated plans · preview before use",
-                                norwegian:
-                                    "Ferdige planer · forhåndsvis før bruk"
-                            ),
-                        icon:
-                            "square.stack.3d.up.fill",
-                        prominent: false
-                    )
-                }
-                .buttonStyle(.plain)
-
-                NavigationLink(
-                    value:
-                        ExistingPlanDestination.mine
-                ) {
-                    compactSourceRow(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "My plans & templates",
-                                norwegian: "Mine planer og maler"
-                            ),
-                        subtitle:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Reuse a saved, previous or scheduled plan.",
-                                norwegian:
-                                    "Bruk en lagret, tidligere eller planlagt plan på nytt."
-                            ),
-                        icon: "calendar.badge.clock"
-                    )
-                }
-                .buttonStyle(.plain)
-
-                HStack(
-                    alignment: .top,
-                    spacing: 10
-                ) {
-                    Image(
-                        systemName:
-                            "checkmark.shield.fill"
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.vitality
-                    )
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "The original is never changed when you start from an existing plan.",
-                            norwegian:
-                                "Originalen endres aldri når du starter fra en eksisterende plan."
-                        )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-                }
-                .padding(.horizontal, 4)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 22)
-            .padding(.bottom, 36)
+            .padding(.horizontal, 16)
+            .padding(.top, 15)
+            .padding(.bottom, 24)
             .frame(maxWidth: 720)
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
+        .background(sourceCanvas.ignoresSafeArea())
+    }
+
+    private var sourceChoiceHeader: some View {
+        VStack(spacing: 22) {
+            HStack(spacing: 8) {
+                Button {
+                    dismiss()
+                } label: {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Close",
+                            norwegian: "Lukk"
+                        )
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(sourceInk)
+                    .padding(.horizontal, 15)
+                    .frame(height: 40)
+                    .background(
+                        Color.white.opacity(0.85),
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .stroke(Color.black.opacity(0.08), lineWidth: 0.8)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english: "Close plan builder",
+                        norwegian: "Lukk planbygger"
+                    )
+                )
+
+                Spacer(minLength: 0)
+
+                Text("ATHLTH / PLAN")
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(2.8)
+                    .foregroundStyle(sourceInk)
+
+                Spacer(minLength: 0)
+
+                Text("1 / 5")
+                    .font(.subheadline)
+                    .monospacedDigit()
+                    .foregroundStyle(sourceInk)
+                    .frame(minWidth: 42, alignment: .trailing)
+            }
+
+            HStack(spacing: 5) {
+                ForEach(1...5, id: \.self) { index in
+                    Capsule()
+                        .fill(
+                            index == 1
+                                ? sourceGold
+                                : Color(red: 0.87, green: 0.85, blue: 0.82)
+                        )
+                        .frame(height: 3)
+                }
+            }
+            .accessibilityHidden(true)
+        }
+    }
+
+    private func sourceSelectionCard(_ option: SourceOption) -> some View {
+        let isSelected = selectedSource == option
+
+        return Button {
+            withAnimation(.easeInOut(duration: 0.16)) {
+                selectedSource = option
+            }
+        } label: {
+            VStack(spacing: 0) {
+                Image(option.image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 191)
+                    .clipped()
+                    .accessibilityHidden(true)
+
+                VStack(spacing: 8) {
+                    Image(systemName: option.symbol)
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(sourceInk)
+                        .frame(width: 39, height: 39)
+                        .background(Color.white.opacity(0.90), in: Circle())
+                        .overlay {
+                            Circle()
+                                .stroke(Color.black.opacity(0.055), lineWidth: 0.7)
+                        }
+                        .padding(.top, 12)
+
+                    Text(option.title)
+                        .font(.system(size: 18, weight: .regular, design: .serif))
+                        .foregroundStyle(sourceInk)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(3)
+                        .minimumScaleFactor(0.79)
+                        .frame(height: 45, alignment: .center)
+
+                    Text(option.subtitle)
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundStyle(sourceMuted)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(4)
+                        .minimumScaleFactor(0.88)
+                        .frame(height: 64, alignment: .top)
+
+                    Image(
+                        systemName: isSelected
+                            ? "checkmark.circle.fill"
+                            : "circle"
+                    )
+                    .font(.system(size: 22, weight: .regular))
+                    .foregroundStyle(isSelected ? sourceInk : sourceMuted.opacity(0.3))
+                    .frame(height: 29)
+                    .padding(.bottom, 9)
+                }
+                .padding(.horizontal, 5)
+                .frame(maxWidth: .infinity)
+                .background(isSelected ? sourceGold.opacity(0.07) : Color.white)
+            }
+            .frame(maxWidth: .infinity)
+            .background(Color.white)
+            .clipShape(
+                RoundedRectangle(cornerRadius: 17, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 17, style: .continuous)
+                    .stroke(
+                        isSelected ? sourceGold : Color.black.opacity(0.09),
+                        lineWidth: isSelected ? 1.35 : 0.75
+                    )
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 17))
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(option.title + ". " + option.subtitle)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var sourceContinueBar: some View {
+        VStack(spacing: 0) {
+            Button {
+                switch selectedSource {
+                case .scratch:
+                    goForward()
+                case .library:
+                    sourceRoute.append(.library)
+                case .saved:
+                    sourceRoute.append(.mine)
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Spacer(minLength: 22)
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Continue",
+                            norwegian: "Fortsett"
+                        )
+                    )
+                    .font(.subheadline.weight(.semibold))
+
+                    Spacer()
+
+                    Image(systemName: "arrow.right")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 20)
+                .frame(height: 52)
+                .background(
+                    sourceInk,
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                )
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 10)
+        }
+        .frame(maxWidth: .infinity)
+        .background(sourceCanvas.opacity(0.98))
     }
 
     private func sourceCard(
@@ -837,9 +950,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 Text(
                     ATHLTHLocalization.choose(
                         english:
-                            "STEP \(step.number) OF 4",
+                            "STEP \(step.number) OF 5",
                         norwegian:
-                            "STEG \(step.number) AV 4"
+                            "STEG \(step.number) AV 5"
                     )
                 )
                 .font(.system(size: 9, weight: .bold))
@@ -858,7 +971,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
 
             HStack(spacing: 6) {
-                ForEach(1...4, id: \.self) {
+                ForEach(1...5, id: \.self) {
                     index in
                     Capsule()
                         .fill(
@@ -876,7 +989,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private var stepTitle: String {
         switch step {
         case .source:
-            return ""
+            return ATHLTHLocalization.choose(
+                english: "Choose a starting point",
+                norwegian: "Velg startmåte"
+            )
         case .basics:
             return ATHLTHLocalization.choose(
                 english: "Plan basics",
@@ -3417,10 +3533,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private var backButtonTitle: String {
-        if step == .basics {
+        if step == .source {
             return ATHLTHLocalization.choose(
-                english: "Cancel",
-                norwegian: "Avbryt"
+                english: "Close",
+                norwegian: "Lukk"
             )
         }
 
@@ -3534,9 +3650,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         ) {
             switch step {
             case .source:
-                step = .profile
+                step = .basics
             case .basics:
-                step = startsAtSourceChoice ? .source : .profile
+                step = .profile
             case .profile:
                 step = .week
             case .week:
@@ -3553,13 +3669,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         ) {
             switch step {
             case .source:
-                step = .basics
-
-            case .basics:
                 dismiss()
 
+            case .basics:
+                step = .source
+
             case .profile:
-                step = startsAtSourceChoice ? .source : .basics
+                step = .basics
 
             case .week:
                 step = .profile
