@@ -125,6 +125,12 @@ final class ExerciseLibraryStore: ObservableObject {
             norwegian = "Bryst"
         case "core":
             norwegian = "Mage og kjerne"
+        case "adductors", "inner thigh":
+            norwegian = "Innsiden av lårene"
+        case "hip flexors":
+            norwegian = "Hoftebøyere"
+        case "lower back", "erector spinae":
+            norwegian = "Nedre rygg"
         case "forearms", "lower arms":
             norwegian = "Underarmer"
         case "full body":
@@ -195,7 +201,12 @@ final class ExerciseLibraryStore: ObservableObject {
                 return (slug, entry)
             }, uniquingKeysWith: { first, _ in first }
         )
-        return Self.originalCoreSlugs.compactMap { bySlug[$0] }
+        let repDBNames = Set(repDBExercises.map {
+            $0.canonicalName.lowercased()
+        })
+        return Self.originalCoreSlugs
+            .compactMap { bySlug[$0] }
+            .filter { !repDBNames.contains($0.canonicalName.lowercased()) }
     }
 
     // Local aliases make Norwegian searches work without altering or
