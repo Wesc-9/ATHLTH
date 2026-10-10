@@ -94,6 +94,10 @@ private func recoveryCoachMuscleName(_ value: String) -> String {
     case "Quads": return "Forside lår"
     case "Hamstrings": return "Bakside lår"
     case "Calves": return "Legger"
+    case "Lower Back": return "Nedre rygg"
+    case "Adductors": return "Innsiden av lårene"
+    case "Hip Flexors": return "Hoftebøyere"
+    case "Shins": return "Leggframside"
     default: return value
     }
 }
