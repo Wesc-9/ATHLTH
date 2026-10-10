@@ -19,7 +19,6 @@ struct ATHLTHTrainTodayPremiumView: View {
     let onQuickTrain: (WorkoutKind) -> Void
     let onGhostRace: () -> Void
 
-    @State private var quickTrainExpanded = false
 
     private let ink = Color(red: 0.16, green: 0.16, blue: 0.16)
     private let muted = Color(red: 0.47, green: 0.45, blue: 0.42)
@@ -370,78 +369,112 @@ struct ATHLTHTrainTodayPremiumView: View {
     }
 
     private var quickTrainSection: some View {
-        VStack(spacing: 0) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    quickTrainExpanded.toggle()
-                }
-            } label: {
-                HStack(spacing: 13) {
-                    Image(systemName: "bolt")
-                        .font(.system(size: 22, weight: .regular))
-                        .foregroundStyle(champagne)
-                        .frame(width: 34)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Quick Train")
-                            .font(.system(size: 18, weight: .medium, design: .serif))
-                            .foregroundStyle(ink)
-                        Text(tr("Run, walk or strength – anytime", "Løping, gåing eller styrke – når som helst"))
-                            .font(.caption)
-                            .foregroundStyle(muted)
-                    }
-                    Spacer(minLength: 0)
-                    Image(systemName: quickTrainExpanded ? "chevron.up" : "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ink)
-                }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint(tr("Choose a training type", "Velg treningsform"))
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 9) {
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(champagne)
 
-            if quickTrainExpanded {
-                HStack(spacing: 8) {
-                    quickChoice("figure.run", tr("Run", "Løping"), kind: .running)
-                    quickChoice("figure.walk", tr("Walk", "Gåing"), kind: .walking)
-                    quickChoice("dumbbell", tr("Strength", "Styrke"), kind: .strength)
-                }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 12)
+                Text("Quick Train")
+                    .font(.system(size: 20, weight: .semibold, design: .serif))
+                    .foregroundStyle(ink)
+
+                Spacer()
+
+                Text(tr("Start anytime", "Start når som helst"))
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(muted)
+            }
+
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 9),
+                    GridItem(.flexible(), spacing: 9)
+                ],
+                spacing: 9
+            ) {
+                quickChoice(
+                    "figure.run",
+                    tr("Run", "Løping"),
+                    kind: .running
+                )
+                quickChoice(
+                    "figure.walk",
+                    tr("Walk", "Gå"),
+                    kind: .walking
+                )
+                quickChoice(
+                    "dumbbell.fill",
+                    tr("Strength", "Styrke"),
+                    kind: .strength
+                )
+                quickChoice(
+                    "square.grid.2x2.fill",
+                    tr("Other", "Andre"),
+                    kind: .custom
+                )
             }
         }
+        .padding(14)
         .background(
             LinearGradient(
                 colors: [
-                    Color(red: 0.94, green: 0.92, blue: 0.89),
-                    Color(red: 0.97, green: 0.96, blue: 0.94)
+                    Color.white.opacity(0.86),
+                    Color(red: 0.94, green: 0.94, blue: 0.96).opacity(0.85)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             ),
-            in: RoundedRectangle(cornerRadius: 16)
+            in: RoundedRectangle(cornerRadius: 21, style: .continuous)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(hairline.opacity(0.75), lineWidth: 0.7)
+            RoundedRectangle(cornerRadius: 21, style: .continuous)
+                .stroke(.white.opacity(0.94), lineWidth: 1)
         }
+        .shadow(color: ink.opacity(0.045), radius: 12, y: 5)
     }
 
     private func quickChoice(
-        _ icon: String, _ title: String, kind: WorkoutKind
+        _ icon: String,
+        _ title: String,
+        kind: WorkoutKind
     ) -> some View {
-        Button { onQuickTrain(kind) } label: {
-            VStack(spacing: 7) {
-                Image(systemName: icon).font(.system(size: 18))
-                Text(title).font(.caption2.weight(.semibold))
+        Button {
+            onQuickTrain(kind)
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(ink)
+                    .frame(width: 35, height: 35)
+                    .background(
+                        Color(red: 0.94, green: 0.95, blue: 0.97),
+                        in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    )
+
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ink)
+                    .lineLimit(1)
+
+                Spacer(minLength: 0)
             }
-            .foregroundStyle(ink)
-            .frame(maxWidth: .infinity)
-            .frame(height: 64)
-            .background(.white.opacity(0.78),
-                        in: RoundedRectangle(cornerRadius: 11))
+            .padding(.horizontal, 11)
+            .frame(maxWidth: .infinity, minHeight: 59)
+            .background(
+                Color.white.opacity(0.92),
+                in: RoundedRectangle(cornerRadius: 15, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 15, style: .continuous)
+                    .stroke(hairline.opacity(0.55), lineWidth: 0.8)
+            }
+            .contentShape(
+                RoundedRectangle(cornerRadius: 15, style: .continuous)
+            )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(title)
     }
 
     private var ghostRaceSection: some View {
