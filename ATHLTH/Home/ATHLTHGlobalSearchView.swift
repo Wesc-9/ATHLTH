@@ -869,6 +869,8 @@ struct ATHLTHGlobalSearchView: View {
                     .foregroundStyle(ATHLTHTheme.mutedText)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
+
+                routeTravelTimes(route)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -886,6 +888,7 @@ struct ATHLTHGlobalSearchView: View {
                 .stroke(.white.opacity(0.86), lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.055), radius: 13, y: 6)
+        .onAppear { routeCities.enqueue(route) }
     }
 
     @ViewBuilder
@@ -943,7 +946,8 @@ struct ATHLTHGlobalSearchView: View {
                                     subtitle: routeDiscoverySubtitle(
                                         route,
                                         location: nearbyLocation
-                                    )
+                                    ),
+                                    route: route
                                 )
                             }
                             .buttonStyle(.plain)
@@ -1337,7 +1341,8 @@ struct ATHLTHGlobalSearchView: View {
                                 icon: "map.fill",
                                 tint: .green,
                                 title: route.title,
-                                subtitle: routeSubtitle(route)
+                                subtitle: routeSubtitle(route),
+                                route: route
                             )
                         }
                         .buttonStyle(.plain)
@@ -1912,7 +1917,8 @@ struct ATHLTHGlobalSearchView: View {
         icon: String,
         tint: Color,
         title: String,
-        subtitle: String
+        subtitle: String,
+        route: CommunityRouteRecord? = nil
     ) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
@@ -1933,7 +1939,11 @@ struct ATHLTHGlobalSearchView: View {
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(ATHLTHTheme.mutedText)
-                    .lineLimit(1)
+                    .lineLimit(route == nil ? 1 : 2)
+
+                if let route {
+                    routeTravelTimes(route)
+                }
             }
 
             Spacer()
@@ -1943,7 +1953,12 @@ struct ATHLTHGlobalSearchView: View {
                 .foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 12)
-        .frame(minHeight: 62)
+        .frame(minHeight: route == nil ? 62 : 83)
+        .onAppear {
+            if let route {
+                routeCities.enqueue(route)
+            }
+        }
     }
 
     private func discoveryRow(
@@ -2026,12 +2041,63 @@ struct ATHLTHGlobalSearchView: View {
         return group.locationName + " · " + clubLabel
     }
 
+    @ViewBuilder
+    private func routeTravelTimes(_ route: CommunityRouteRecord) -> some View {
+        let walk = ATHLTHSearchRoutePresentation.estimatedMinutes(
+            distanceKilometers: route.distanceKilometers,
+            ascentMeters: route.elevationGainMeters,
+            walking: true
+        )
+        let run = ATHLTHSearchRoutePresentation.estimatedMinutes(
+            distanceKilometers: route.distanceKilometers,
+            ascentMeters: route.elevationGainMeters,
+            walking: false
+        )
+        if let walk, let run {
+            HStack(spacing: 11) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Walk approx.", norwegian: "Gå ca."
+                    ) + " " + ATHLTHSearchRoutePresentation.localizedDuration(
+                        walk, norwegian: ATHLTHLocalization.isNorwegian
+                    ),
+                    systemImage: "figure.walk"
+                )
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Run approx.", norwegian: "Løp ca."
+                    ) + " " + ATHLTHSearchRoutePresentation.localizedDuration(
+                        run, norwegian: ATHLTHLocalization.isNorwegian
+                    ),
+                    systemImage: "figure.run"
+                )
+            }
+            .font(.system(size: 10.5, weight: .medium))
+            .foregroundStyle(ATHLTHTheme.accentDeep)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .accessibilityLabel(
+                ATHLTHLocalization.choose(
+                    english: "Estimated times based on typical walking and running speed",
+                    norwegian: "Anslåtte tider basert på vanlig gå- og løpefart"
+                )
+            )
+        }
+    }
+
     private func routeSubtitle(
         _ route: CommunityRouteRecord
     ) -> String {
         var parts = [
-            String(format: "%.1f km", route.distanceKilometers)
+            ATHLTHSearchRoutePresentation.distance(
+                route.distanceKilometers,
+                norwegian: ATHLTHLocalization.isNorwegian
+            )
         ]
+
+        if let city = routeCities.cityNames[route.id] {
+            parts.append(city)
+        }
 
         if let elevation = route.elevationGainMeters {
             parts.append("\(Int(elevation.rounded())) m ↑")
@@ -2049,8 +2115,15 @@ struct ATHLTHGlobalSearchView: View {
         location: CLLocation?
     ) -> String {
         var parts = [
-            String(format: "%.1f km", route.distanceKilometers)
+            ATHLTHSearchRoutePresentation.distance(
+                route.distanceKilometers,
+                norwegian: ATHLTHLocalization.isNorwegian
+            )
         ]
+
+        if let city = routeCities.cityNames[route.id] {
+            parts.append(city)
+        }
 
         if let elevation = route.elevationGainMeters {
             parts.append("\(Int(elevation.rounded())) m ↑")
