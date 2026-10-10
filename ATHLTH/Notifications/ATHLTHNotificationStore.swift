@@ -337,7 +337,7 @@ final class ATHLTHNotificationStore: ObservableObject {
                     )
                     : ATHLTHLocalization.choose(
                         english: "New achievement unlocked",
-                        norwegian: "Ny achievement låst opp"
+                        norwegian: "Nytt prestasjonsmerke låst opp"
                     )
 
             let message =
