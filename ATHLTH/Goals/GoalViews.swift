@@ -1159,7 +1159,7 @@ struct GoalCreationView: View {
 
     private var goalTypeScreen: some View {
         ZStack(alignment: .top) {
-            goalStaticHeroBackdrop(height: 344)
+            goalStaticHeroBackdrop(height: 326)
 
             ZStack(alignment: .bottom) {
                 ScrollView {
@@ -1261,7 +1261,7 @@ struct GoalCreationView: View {
             ZStack {
                 Color.black
 
-                Image("OnboardingHero")
+                Image(goalHeroAssetName)
                     .resizable()
                     .interpolation(.high)
                     .antialiased(true)
@@ -1300,6 +1300,23 @@ struct GoalCreationView: View {
         .frame(height: height)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    private var goalHeroAssetName: String {
+        switch category {
+        case .endurance, .event:
+            return "GoalRunning"
+        case .strength:
+            return "GoalStrength"
+        case .body:
+            return "GoalRecovery"
+        case .consistency:
+            return "GoalConsistency"
+        case .recovery:
+            return "GoalRelax"
+        case .custom:
+            return "GoalMountain"
+        }
     }
 
     private var goalStepHero: some View {
@@ -1845,11 +1862,11 @@ struct GoalCreationView: View {
             }
             .frame(
                 width: proxy.size.width,
-                height: 344
+                height: 326
             )
             .clipped()
         }
-        .frame(height: 344)
+        .frame(height: 326)
         .clipped()
     }
 
@@ -1988,10 +2005,16 @@ struct GoalCreationView: View {
             alignment: .leading,
             spacing: 12
         ) {
-            goalTargetDateRow
-
             ForEach(
-                GoalCategory.allCases
+                [
+                    GoalCategory.endurance,
+                    .strength,
+                    .body,
+                    .consistency,
+                    .event,
+                    .recovery,
+                    .custom
+                ]
             ) { option in
                 let isSelected =
                     category == option
@@ -2022,8 +2045,8 @@ struct GoalCreationView: View {
                                 : tint
                         )
                         .frame(
-                            width: 54,
-                            height: 54
+                            width: 50,
+                            height: 50
                         )
                         .background(
                             isSelected
@@ -2113,10 +2136,10 @@ struct GoalCreationView: View {
                         }
                     }
                     .padding(.horizontal, 14)
-                    .padding(.vertical, 11)
+                    .padding(.vertical, 9)
                     .frame(
                         maxWidth: .infinity,
-                        minHeight: 78
+                        minHeight: 70
                     )
                     .background(
                         isSelected
@@ -2435,6 +2458,8 @@ struct GoalCreationView: View {
                     )
                 )
             }
+
+            goalTargetDateRow
 
             switch category {
             case .event:
