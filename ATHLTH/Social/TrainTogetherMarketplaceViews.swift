@@ -2673,11 +2673,32 @@ struct TrainTogetherPostCreateView:
             .physical
 
     init(
-        initialParticipationMode: SocialWorkoutParticipationMode = .physical
+        initialParticipationMode: SocialWorkoutParticipationMode = .physical,
+        repeating post: TrainTogetherPost? = nil
     ) {
         _participationMode = State(
-            initialValue: initialParticipationMode
+            initialValue: post?.resolvedParticipationMode ??
+                initialParticipationMode
         )
+        if let post {
+            // Prefill public workout parameters, never copy a private
+            // meeting location or another participant's personal data.
+            _title = State(initialValue: post.title)
+            _kind = State(
+                initialValue: WorkoutKind(rawValue: post.workoutKind) ?? .running
+            )
+            _durationMinutes = State(initialValue: post.durationMinutes ?? 60)
+            _distanceText = State(
+                initialValue: post.distanceKilometers.map {
+                    String(format: "%.1f", $0)
+                } ?? ""
+            )
+            _level = State(initialValue: post.level)
+            _maxGuests = State(initialValue: post.maxGuests)
+            if post.resolvedParticipationMode == .physical {
+                _broadArea = State(initialValue: post.broadArea)
+            }
+        }
     }
     @State private var joinPolicy:
         TrainTogetherJoinPolicy =
