@@ -287,6 +287,8 @@ final class TrainTogetherCircleStore: ObservableObject {
 /// Chat is available before training. Recap and gallery open after scheduled start.
 struct TrainTogetherCircleView: View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var marketplace: TrainTogetherMarketplaceStore
     @StateObject private var circle = TrainTogetherCircleStore()
 
     let post: TrainTogetherPost
@@ -297,6 +299,7 @@ struct TrainTogetherCircleView: View {
     @State private var recapMinutes = ""
     @State private var recapKilometers = ""
     @State private var recapLoaded = false
+    @State private var showingRepeatWorkout = false
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var isLoadingPhoto = false
 
@@ -319,6 +322,15 @@ struct TrainTogetherCircleView: View {
                 await circle.refresh(postID: post.id)
                 loadRecapOnce()
                 try? await Task.sleep(for: .seconds(8))
+            }
+        }
+        .sheet(isPresented: $showingRepeatWorkout) {
+            NavigationStack {
+                TrainTogetherPostCreateView(
+                    initialParticipationMode: post.resolvedParticipationMode,
+                    repeating: post
+                )
+                .environmentObject(marketplace)
             }
         }
         .onChange(of: selectedPhoto) { _, item in
@@ -446,6 +458,7 @@ struct TrainTogetherCircleView: View {
                             .font(.title2)
                     }
                     .disabled(
+                        post.status == .cancelled ||
                         circle.isSending ||
                         messageDraft.trimmingCharacters(
                             in: .whitespacesAndNewlines
@@ -583,6 +596,80 @@ struct TrainTogetherCircleView: View {
 
                 Divider()
 
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Train together again",
+                        norwegian: "Tren sammen igjen"
+                    )
+                )
+                .font(.subheadline.weight(.semibold))
+
+                ForEach(followableAthletes, id: \.userID) { profile in
+                    HStack(spacing: 10) {
+                        SocialAvatar(profile: profile, size: 34)
+                        Text(profile.resolvedName)
+                            .font(.subheadline)
+                            .lineLimit(1)
+                        Spacer()
+
+                        if social.isFollowing(profile.userID) {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Following", norwegian: "Følger"
+                                )
+                            )
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.vitality)
+                        } else if social.relationshipState(
+                            with: profile.userID
+                        ) == .outgoingPending {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Requested", norwegian: "Forespurt"
+                                )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        } else {
+                            Button {
+                                Task {
+                                    if profile.isPrivateProfile {
+                                        await social.sendFollowRequest(to: profile)
+                                    } else {
+                                        await social.follow(profile)
+                                    }
+                                }
+                            } label: {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english: "Follow", norwegian: "Følg"
+                                    )
+                                )
+                                .font(.caption.weight(.semibold))
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(ATHLTHTheme.vitality)
+                        }
+                    }
+                }
+
+                Button {
+                    showingRepeatWorkout = true
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Plan a similar workout",
+                            norwegian: "Planlegg en lignende økt"
+                        ),
+                        systemImage: "calendar.badge.plus"
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(ATHLTHTheme.vitality)
+
+                Divider()
+
                 HStack {
                     Text(
                         ATHLTHLocalization.choose(
@@ -662,6 +749,30 @@ struct TrainTogetherCircleView: View {
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
             }
+        }
+    }
+
+    private var followableAthletes: [SocialProfileCard] {
+        var people: [SocialProfileCard] = []
+        if post.creatorID != session.profile.userID,
+           let creator = social.profile(for: post.creatorID) {
+            people.append(creator)
+        }
+        if isHost {
+            for request in marketplace.requests where
+                request.postID == post.id && request.state == .accepted {
+                // Only use an actual loaded profile with its privacy setting,
+                // not the public-visibility snapshot in an old RSVP.
+                if let profile = social.profile(for: request.requesterID) {
+                    people.append(profile)
+                }
+            }
+        }
+        var seen = Set<UUID>()
+        return people.filter {
+            $0.userID != session.profile.userID &&
+            social.relationshipState(with: $0.userID) != .blocked &&
+            seen.insert($0.userID).inserted
         }
     }
 
