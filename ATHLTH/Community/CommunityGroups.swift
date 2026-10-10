@@ -7624,7 +7624,8 @@ struct CommunityGroupDetailView: View {
                 if groups.canManage(currentGroup) {
                     NavigationLink {
                         CommunityGroupMembersView(
-                            group: currentGroup
+                            group: currentGroup,
+                            managementMode: true
                         )
                     } label: {
                         referenceActionTile(
@@ -14286,7 +14287,10 @@ private struct CommunityGroupManagementView: View {
                     CommunityGroupSettingsView(group: group)
                 } else {
                     NavigationStack {
-                        CommunityGroupMembersView(group: group)
+                        CommunityGroupMembersView(
+                            group: group,
+                            managementMode: true
+                        )
                     }
                 }
             } else {
@@ -16654,6 +16658,7 @@ struct CommunityGroupMembersView: View {
 
     let group: CommunityGroupRecord
     var embedded = false
+    var managementMode = false
 
     @State private var showingInvite = false
     @State private var showingNotificationOptions = false
@@ -16673,7 +16678,7 @@ struct CommunityGroupMembersView: View {
 
     var body: some View {
         List {
-            if groups.canManage(currentGroup) &&
+            if managementMode && groups.canManage(currentGroup) &&
                 !groups.joinRequests(
                     in: group.id
                 ).isEmpty {
@@ -16747,7 +16752,7 @@ struct CommunityGroupMembersView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(embedded ? .hidden : .visible, for: .navigationBar)
         .toolbar {
-            if groups.canManage(currentGroup) && !embedded {
+            if managementMode && groups.canManage(currentGroup) && !embedded {
                 ToolbarItem(
                     placement: .topBarTrailing
                 ) {
@@ -16968,7 +16973,7 @@ struct CommunityGroupMembersView: View {
                     .minimumScaleFactor(0.75)
             }
 
-            if groups.canManage(currentGroup) &&
+            if managementMode && groups.canManage(currentGroup) &&
                 member.role != "owner" &&
                 member.userID != social.currentUserID {
                 Menu {
