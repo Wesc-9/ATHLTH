@@ -78,6 +78,7 @@ final class ExerciseLibraryStore: ObservableObject {
         [ExerciseLibraryEntry] =
             ExerciseLibraryStore.fallbackATHLTHExercises
     @Published private(set) var repDBExercises: [ExerciseLibraryEntry] = []
+    @Published private(set) var repDBExpectedCount: Int?
     @Published private(set) var customExercises: [ExerciseLibraryEntry] = []
     @Published private(set) var isLoading = false
     @Published private(set) var lastUpdated: Date?
@@ -158,6 +159,100 @@ final class ExerciseLibraryStore: ObservableObject {
             english: value,
             norwegian: norwegian
         )
+    }
+
+    // Handpicked, copyright-safe editorial collection of existing RepDB
+    // records. We never repackage the art or duplicate exercise identities:
+    // these entries keep their RepDB source, license credit and image URLs.
+    static let featuredCoreExerciseIDs: [String] = [
+        "plank", "side-plank", "crunches", "sit-ups",
+        "bicycle-crunch", "reverse-crunches", "dead-bug",
+        "bird-dog", "hollow-body-hold", "russian-twist",
+        "hanging-knee-raise", "hanging-leg-raise", "lying-leg-raise",
+        "cable-crunch", "cable-pallof-press", "ab-wheel-rollout",
+        "flutter-kicks", "mountain-climbers", "dragon-flag",
+        "heel-touches"
+    ]
+
+    var featuredCoreExercises: [ExerciseLibraryEntry] {
+        let catalog = Dictionary(
+            repDBExercises.compactMap { entry -> (String, ExerciseLibraryEntry)? in
+                guard let key = entry.sourceIdentifier else { return nil }
+                return (key, entry)
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
+        return Self.featuredCoreExerciseIDs.compactMap { catalog[$0] }
+    }
+
+    // Local aliases make Norwegian searches work without altering or
+    // redistributing the upstream RepDB dataset.
+    static let norwegianExerciseNames: [String: String] = [
+        "plank": "Planke",
+        "side-plank": "Sideplanke",
+        "crunches": "Magecrunch",
+        "sit-ups": "Situps",
+        "bicycle-crunch": "Sykkelcrunch",
+        "reverse-crunches": "Omvendt crunch",
+        "dead-bug": "Død bille",
+        "bird-dog": "Fuglehund",
+        "hollow-body-hold": "Hollow hold",
+        "russian-twist": "Russisk rotasjon",
+        "hanging-knee-raise": "Hengende kneløft",
+        "hanging-leg-raise": "Hengende beinhev",
+        "lying-leg-raise": "Liggende beinhev",
+        "cable-crunch": "Magecrunch i kabel",
+        "cable-pallof-press": "Pallof press",
+        "ab-wheel-rollout": "Magehjul",
+        "flutter-kicks": "Saksespark",
+        "mountain-climbers": "Fjellklatrer",
+        "dragon-flag": "Dragon flag",
+        "heel-touches": "Hælberøring",
+        "machine-back-extension": "Rygghev i maskin",
+        "back-extension": "Rygghev"
+    ]
+
+    func localizedExerciseName(_ entry: ExerciseLibraryEntry) -> String {
+        guard ATHLTHLocalization.isNorwegian,
+              let id = entry.sourceIdentifier,
+              entry.source == .repDB
+        else { return entry.name }
+        return Self.norwegianExerciseNames[id] ?? entry.name
+    }
+
+    private static let norwegianMuscleSearchTerms: [String: [String]] = [
+        "core": ["mage", "magen", "magemuskler", "kjerne", "kjernemuskler", "buk", "skråmage"],
+        "back": ["rygg", "ryggmuskler", "rygghev"],
+        "lower back": ["korsrygg", "nedrerygg", "ryggstrekkere"],
+        "chest": ["bryst"],
+        "shoulders": ["skulder", "skuldre"],
+        "glutes": ["sete", "rumpa", "setemuskler"],
+        "quadriceps": ["forsidelår", "lår", "bein"],
+        "hamstrings": ["bakside", "bakside lår"],
+        "calves": ["legger", "tåhev"],
+        "hip flexors": ["hoftebøyer", "hoftebøyere"]
+    ]
+
+    static func searchableNorwegianTerms(
+        sourceIdentifier: String?,
+        bodyPart: String?,
+        primaryMuscles: [String]
+    ) -> String {
+        var words: [String] = []
+        if let sourceIdentifier,
+           let localized = norwegianExerciseNames[sourceIdentifier] {
+            words.append(localized)
+        }
+        let groups = ([bodyPart].compactMap { $0 } + primaryMuscles)
+            .map {
+                $0.replacingOccurrences(of: "_", with: " ").lowercased()
+            }
+        for (muscle, synonyms) in norwegianMuscleSearchTerms {
+            if groups.contains(where: { $0 == muscle || $0.contains(muscle) }) {
+                words.append(contentsOf: synonyms)
+            }
+        }
+        return words.joined(separator: " ")
     }
 
     var allExercises: [ExerciseLibraryEntry] {
@@ -273,6 +368,7 @@ final class ExerciseLibraryStore: ObservableObject {
             )
 
             let mapped = dataset.exercises.map(mapRepDB)
+            repDBExpectedCount = dataset.count ?? mapped.count
             repDBExercises = mapped
             invalidateDerivedCaches()
             lastUpdated = Date()
@@ -293,6 +389,8 @@ final class ExerciseLibraryStore: ObservableObject {
     ) -> [ExerciseLibraryEntry] {
         let cleanQuery = query
             .trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.diacriticInsensitive, .caseInsensitive],
+                     locale: Locale(identifier: "nb_NO"))
             .lowercased()
 
         return allExercises.filter { entry in
@@ -306,9 +404,16 @@ final class ExerciseLibraryStore: ObservableObject {
                     entry.bodyPart ?? "",
                     entry.exercise.primaryMuscles.joined(separator: " "),
                     entry.exercise.secondaryMuscles.joined(separator: " "),
-                    entry.exercise.equipment.joined(separator: " ")
+                    entry.exercise.equipment.joined(separator: " "),
+                    Self.searchableNorwegianTerms(
+                        sourceIdentifier: entry.sourceIdentifier,
+                        bodyPart: entry.bodyPart,
+                        primaryMuscles: entry.exercise.primaryMuscles
+                    )
                 ]
                 .joined(separator: " ")
+                .folding(options: [.diacriticInsensitive, .caseInsensitive],
+                         locale: Locale(identifier: "nb_NO"))
                 .lowercased()
 
                 let queryTokens =
@@ -643,6 +748,7 @@ final class ExerciseLibraryStore: ObservableObject {
         }
 
         repDBExercises = dataset.exercises.map(mapRepDB)
+        repDBExpectedCount = dataset.count ?? repDBExercises.count
         invalidateDerivedCaches()
 
         if let values = try? url.resourceValues(forKeys: [.contentModificationDateKey]) {
