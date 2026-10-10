@@ -214,6 +214,14 @@ struct ExerciseLibraryView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 10) {
+                            if selectedSection == .library &&
+                               query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                               selectedBodyPart == "All" &&
+                               selectedEquipment == "All" &&
+                               !favoritesOnly {
+                                coreEssentialsSection
+                            }
+
                             ForEach(
                                 displayedResults
                             ) { entry in
@@ -664,13 +672,125 @@ struct ExerciseLibraryView: View {
         )
     }
 
+    // A curated shelf of the upstream, attributed RepDB exercises, rather
+    // than 20 duplicate records or newly copied third-party artwork.
+    private var coreEssentialsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 6) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "CORE ESSENTIALS",
+                        norwegian: "MAGE & KJERNE"
+                    ))
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.3)
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "20 popular core exercises",
+                        norwegian: "20 populære mageøvelser"
+                    ))
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(.primary)
+                }
+
+                Spacer(minLength: 0)
+
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "RepDB loaded",
+                        norwegian: "RepDB innlastet"
+                    ))
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    Text("\(library.repDBExercises.count) / \(library.repDBExpectedCount ?? 637)")
+                        .font(.caption.weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+            }
+            .padding(.horizontal, 6)
+
+            if !library.featuredCoreExercises.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 10) {
+                        ForEach(library.featuredCoreExercises) { entry in
+                            NavigationLink {
+                                ExerciseDetailView(
+                                    entry: entry,
+                                    selectionTitle: selectionTitle,
+                                    onSelect: onSelect
+                                )
+                            } label: {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    ExerciseArtwork(entry: entry, size: 94)
+                                        .frame(maxWidth: .infinity)
+
+                                    Text(library.localizedExerciseName(entry))
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(2)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                                    Text(library.localizedBodyPartTitle(entry.bodyPart ?? "Core"))
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                                .padding(10)
+                                .frame(width: 142, height: 169, alignment: .topLeading)
+                                .background(
+                                    ATHLTHTheme.card,
+                                    in: RoundedRectangle(
+                                        cornerRadius: 19, style: .continuous
+                                    )
+                                )
+                                .overlay {
+                                    RoundedRectangle(
+                                        cornerRadius: 19, style: .continuous
+                                    )
+                                    .stroke(Color.white.opacity(0.78), lineWidth: 0.8)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                }
+                .contentMargins(.horizontal, 2)
+            } else {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.down.circle")
+                    Text(ATHLTHLocalization.choose(
+                        english: "Core exercises and illustrations appear once the RepDB catalog loads. Pull down to retry.",
+                        norwegian: "Mageøvelser og bilder vises når RepDB er lastet inn. Dra ned for å prøve igjen."
+                    ))
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(12)
+            }
+
+            if let url = URL(string: "https://repdb.co") {
+                Link(destination: url) {
+                    Label("Exercise data by RepDB", systemImage: "arrow.up.right")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 6)
+            }
+        }
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private func exerciseRow(_ entry: ExerciseLibraryEntry) -> some View {
         HStack(spacing: 13) {
             ExerciseArtwork(entry: entry, size: 68)
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    Text(entry.name)
+                    Text(library.localizedExerciseName(entry))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(2)
@@ -763,7 +883,7 @@ struct ExerciseDetailView: View {
                 artwork
 
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(entry.name)
+                    Text(library.localizedExerciseName(entry))
                         .font(.largeTitle.bold())
 
                     Text(
