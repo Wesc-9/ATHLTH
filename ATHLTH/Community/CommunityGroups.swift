@@ -4016,7 +4016,12 @@ final class CommunityGroupStore: ObservableObject {
     ) async -> Bool {
         guard let group = group(for: groupID),
               canManage(group),
-              userID != group.creatorID
+              userID != group.creatorID,
+              userID != currentUserID,
+              let target = members(in: groupID).first(
+                  where: { $0.userID == userID }
+              ),
+              target.role != "admin" || isOwner(of: group)
         else {
             return false
         }
@@ -4047,7 +4052,14 @@ final class CommunityGroupStore: ObservableObject {
         guard let group = group(for: groupID),
               canManage(group),
               userID != group.creatorID,
-              ["admin", "contributor", "member"].contains(role)
+              ["admin", "contributor", "member"].contains(role),
+              let currentMember = members(in: groupID).first(
+                  where: { $0.userID == userID }
+              ),
+              // Owners alone appoint or remove other admins.
+              isOwner(of: group) ||
+                  (role != "admin" && currentMember.role != "admin"),
+              userID != currentUserID
         else {
             return false
         }
@@ -16691,10 +16703,15 @@ struct CommunityGroupInviteMemberView: View {
 
 struct CommunityGroupMembersView: View {
     @EnvironmentObject private var groups: CommunityGroupStore
+    @EnvironmentObject private var social: SocialStore
 
     let group: CommunityGroupRecord
+    var embedded = false
 
     @State private var showingInvite = false
+    @State private var showingNotificationOptions = false
+    @State private var showingLeaveConfirmation = false
+    @State private var memberPendingRemoval: UUID?
 
     private var sortedMembers:
         [CommunityGroupMemberRecord] {
@@ -16725,7 +16742,12 @@ struct CommunityGroupMembersView: View {
                 }
             }
 
-            Section("Members") {
+            Section(
+                ATHLTHLocalization.choose(
+                    english: "Club members",
+                    norwegian: "Klubbmedlemmer"
+                )
+            ) {
                 ForEach(
                     sortedMembers,
                     id: \.userID
@@ -16733,12 +16755,52 @@ struct CommunityGroupMembersView: View {
                     memberRow(member)
                 }
             }
+
+            Section(
+                ATHLTHLocalization.choose(
+                    english: "Your Club",
+                    norwegian: "Din klubb"
+                )
+            ) {
+                Button {
+                    showingNotificationOptions = true
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Notification settings",
+                            norwegian: "Varselinnstillinger"
+                        ),
+                        systemImage: "bell"
+                    )
+                }
+
+                if !groups.isOwner(of: currentGroup) {
+                    Button(role: .destructive) {
+                        showingLeaveConfirmation = true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Leave Club",
+                                norwegian: "Forlat klubben"
+                            ),
+                            systemImage: "rectangle.portrait.and.arrow.right"
+                        )
+                    }
+                }
+            }
         }
-        .navigationTitle("Members")
+        .scrollContentBackground(.hidden)
+        .background(ATHLTHTheme.canvasTop)
+        .navigationTitle(
+            embedded ? "" : ATHLTHLocalization.choose(
+                english: "Members",
+                norwegian: "Medlemmer"
+            )
+        )
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.visible, for: .navigationBar)
+        .toolbar(embedded ? .hidden : .visible, for: .navigationBar)
         .toolbar {
-            if groups.canManage(currentGroup) {
+            if groups.canManage(currentGroup) && !embedded {
                 ToolbarItem(
                     placement: .topBarTrailing
                 ) {
@@ -16760,6 +16822,57 @@ struct CommunityGroupMembersView: View {
             CommunityGroupInviteMemberView(
                 group: currentGroup
             )
+        }
+        .sheet(isPresented: $showingNotificationOptions) {
+            CommunityGroupNotificationSettingsView(
+                group: currentGroup
+            )
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Leave this Club?",
+                norwegian: "Forlate klubben?"
+            ),
+            isPresented: $showingLeaveConfirmation
+        ) {
+            Button(
+                ATHLTHLocalization.choose(
+                    english: "Leave Club",
+                    norwegian: "Forlat klubben"
+                ),
+                role: .destructive
+            ) {
+                Task { await groups.leave(currentGroup) }
+            }
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Remove this person from the Club?",
+                norwegian: "Fjerne medlemmet fra klubben?"
+            ),
+            isPresented: Binding(
+                get: { memberPendingRemoval != nil },
+                set: { if !$0 { memberPendingRemoval = nil } }
+            )
+        ) {
+            Button(
+                ATHLTHLocalization.choose(
+                    english: "Remove member",
+                    norwegian: "Fjern medlem"
+                ),
+                role: .destructive
+            ) {
+                guard let userID = memberPendingRemoval else {
+                    return
+                }
+                memberPendingRemoval = nil
+                Task {
+                    _ = await groups.removeMember(
+                        groupID: group.id,
+                        userID: userID
+                    )
+                }
+            }
         }
         .task {
             await groups.loadGroupContent(
@@ -16890,7 +17003,13 @@ struct CommunityGroupMembersView: View {
                     )
             }
 
-            Spacer()
+            Spacer(minLength: 4)
+
+            if member.userID != social.currentUserID,
+               let profile = groups.profileCard(for: member.userID)
+                    ?? social.profile(for: member.userID) {
+                memberFollowAction(profile)
+            }
 
             Text(roleTitle(member.role))
                 .font(.caption2.weight(.bold))
@@ -16907,16 +17026,21 @@ struct CommunityGroupMembersView: View {
                 )
 
             if groups.canManage(currentGroup) &&
-                member.role != "owner" {
+                member.role != "owner" &&
+                member.userID != social.currentUserID {
                 Menu {
-                    roleButton(
-                        member,
-                        role: "admin",
-                        title: "Admin",
-                        icon: "shield.fill"
-                    )
+                    if groups.isOwner(of: currentGroup) {
+                        roleButton(
+                            member,
+                            role: "admin",
+                            title: "Admin",
+                            icon: "shield.fill"
+                        )
+                    }
 
-                    roleButton(
+                    if member.role != "admin" ||
+                        groups.isOwner(of: currentGroup) {
+                        roleButton(
                         member,
                         role: "contributor",
                         title: "Contributor",
@@ -16929,18 +17053,20 @@ struct CommunityGroupMembersView: View {
                         title: "Member",
                         icon: "person.fill"
                     )
+                    }
 
-                    Divider()
+                    if member.role != "admin" ||
+                        groups.isOwner(of: currentGroup) {
+                        Divider()
 
-                    Button(
-                        "Remove from Group",
-                        role: .destructive
-                    ) {
-                        Task {
-                            _ = await groups.removeMember(
-                                groupID: group.id,
-                                userID: member.userID
-                            )
+                        Button(
+                            ATHLTHLocalization.choose(
+                                english: "Remove from Club",
+                                norwegian: "Fjern fra klubben"
+                            ),
+                            role: .destructive
+                        ) {
+                            memberPendingRemoval = member.userID
                         }
                     }
                 } label: {
@@ -16951,6 +17077,57 @@ struct CommunityGroupMembersView: View {
                         )
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func memberFollowAction(_ profile: SocialProfileCard) -> some View {
+        if social.isFollowing(profile.userID) {
+            Button {
+                Task { await social.unfollow(profile.userID) }
+            } label: {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Following",
+                        norwegian: "Følger"
+                    )
+                )
+                .font(.caption2.weight(.semibold))
+            }
+            .buttonStyle(.bordered)
+            .tint(ATHLTHTheme.accentDeep)
+            .controlSize(.small)
+        } else if social.relationshipState(with: profile.userID) == .outgoingPending {
+            Text(
+                ATHLTHLocalization.choose(
+                    english: "Requested",
+                    norwegian: "Forespurt"
+                )
+            )
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        } else if social.relationshipState(with: profile.userID) != .blocked {
+            Button {
+                Task {
+                    if profile.isPrivateProfile {
+                        await social.sendFollowRequest(to: profile)
+                    } else {
+                        await social.follow(profile)
+                    }
+                }
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Follow",
+                        norwegian: "Følg"
+                    ),
+                    systemImage: "person.badge.plus"
+                )
+                .font(.caption2.weight(.semibold))
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(ATHLTHTheme.accentDeep)
+            .controlSize(.small)
         }
     }
 
