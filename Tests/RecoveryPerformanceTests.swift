@@ -177,6 +177,83 @@ final class RecoveryPerformanceTests:
         ))
     }
 
+    func testCoachContinuousHealthSharingStaysOffUntilComplianceRelease() {
+        let suite = "ATHLTH.CoachHealthV2.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suite) else {
+            return XCTFail("Unable to create isolated defaults")
+        }
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let user = UUID()
+        let otherUser = UUID()
+
+        // Neither preexisting HealthKit access nor new chat consent opts
+        // users into ongoing external transfer.
+        XCTAssertEqual(
+            RecoveryCoachHealthSharingPreferences.effectiveMode(
+                userID: user, defaults: defaults
+            ), .off
+        )
+        _ = RecoveryCoachConsentPreferences.approve(
+            userID: user, healthSharingAllowed: true, defaults: defaults
+        )
+        XCTAssertEqual(
+            RecoveryCoachHealthSharingPreferences.effectiveMode(
+                userID: user, defaults: defaults
+            ), .confirmEveryQuestion
+        )
+        XCTAssertFalse(
+            RecoveryCoachHealthSharingPreferences.canAutomaticallyShare(
+                userID: user, defaults: defaults
+            )
+        )
+
+        // A bypassed/modified interface still cannot activate automation.
+        let attempted = RecoveryCoachHealthSharingPreferences.save(
+            userID: user, requestedMode: .automatic, defaults: defaults
+        )
+        XCTAssertEqual(attempted.mode, .confirmEveryQuestion)
+        XCTAssertNil(attempted.automaticConsentAt)
+        XCTAssertFalse(
+            RecoveryCoachHealthSharingPreferences.canAutomaticallyShare(
+                userID: user, defaults: defaults
+            )
+        )
+        XCTAssertEqual(
+            RecoveryCoachHealthSharingPreferences.effectiveMode(
+                userID: otherUser, defaults: defaults
+            ), .off
+        )
+
+        _ = RecoveryCoachHealthSharingPreferences.save(
+            userID: user, requestedMode: .off, defaults: defaults
+        )
+        XCTAssertEqual(
+            RecoveryCoachHealthSharingPreferences.effectiveMode(
+                userID: user, defaults: defaults
+            ), .off
+        )
+        _ = RecoveryCoachHealthSharingPreferences.save(
+            userID: user, requestedMode: .confirmEveryQuestion,
+            defaults: defaults
+        )
+        XCTAssertEqual(
+            RecoveryCoachHealthSharingPreferences.effectiveMode(
+                userID: user, defaults: defaults
+            ), .confirmEveryQuestion
+        )
+
+        RecoveryCoachConsentPreferences.revoke(userID: user, defaults: defaults)
+        XCTAssertNil(RecoveryCoachHealthSharingPreferences.load(
+            userID: user, defaults: defaults
+        ))
+        XCTAssertEqual(
+            RecoveryCoachHealthSharingPreferences.effectiveMode(
+                userID: user, defaults: defaults
+            ), .off
+        )
+    }
+
     func testInsightsAIRequiresSeparateExplicitAccountConsent() {
         let name = "ATHLTH.InsightsConsentTests.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: name) else {
