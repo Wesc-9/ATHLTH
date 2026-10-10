@@ -2,6 +2,7 @@ import SwiftUI
 
 private enum WatchShortcutDestination: Hashable {
     case routes
+    case ghostRace
 }
 
 struct WatchHomeView: View {
@@ -128,6 +129,8 @@ struct WatchHomeView: View {
                 switch target {
                 case .routes:
                     WatchRoutesListView()
+                case .ghostRace:
+                    WatchGhostRaceShortcutView()
                 }
             }
         }
@@ -159,6 +162,11 @@ struct WatchHomeView: View {
 
             case "routes":
                 shortcutPath = [.routes]
+
+            case "ghost-race":
+                // A plain run is not a Ghost Race. Navigate to the prepared
+                // Ghost state rather than starting an unconfigured session.
+                shortcutPath = [.ghostRace]
 
             default:
                 break
