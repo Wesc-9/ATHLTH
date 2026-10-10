@@ -935,6 +935,40 @@ enum StrengthMuscleResolver {
 
         if contains(
             value,
+            "machine back extension",
+            "back extension",
+            "rygghev"
+        ) {
+            return [.lowerBack, .glutes, .hamstrings]
+        }
+
+        if contains(
+            value,
+            "pallof",
+            "woodchop",
+            "wood chop",
+            "russian twist",
+            "side plank",
+            "sideplank"
+        ) {
+            return [.abs, .obliques]
+        }
+
+        if contains(
+            value,
+            "dead bug",
+            "bird dog",
+            "hollow hold",
+            "hollow body",
+            "leg raise",
+            "knee raise",
+            "mountain climber"
+        ) {
+            return [.abs, .obliques]
+        }
+
+        if contains(
+            value,
             "rowing machine",
             "row erg",
             "rower",
