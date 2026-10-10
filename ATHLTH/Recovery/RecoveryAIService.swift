@@ -140,6 +140,7 @@ private struct RecoveryAIRequest: Encodable {
     let language: String
     let history: [RecoveryAIChatTurn]?
     let shareHealthData: Bool?
+    let healthSharingMode: String?
 }
 
 // Separate, versioned first-use consent for automatic Insights AI.
@@ -452,6 +453,20 @@ enum RecoveryCoachConsentPreferences {
 
 // A separate, account-scoped v2 preference for future continuous health
 // sharing. Legacy Coach/HealthKit consent NEVER opts users into this mode.
+enum RecoveryCoachHealthSharingError: LocalizedError {
+    case automaticUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .automaticUnavailable:
+            return ATHLTHLocalization.choose(
+                english: "Automatic health sharing is not available yet.",
+                norwegian: "Automatisk deling av helsedata er ikke tilgjengelig ennå."
+            )
+        }
+    }
+}
+
 enum RecoveryCoachHealthSharingMode: String, Codable, Equatable {
     case off
     case confirmEveryQuestion
@@ -749,7 +764,8 @@ final class RecoveryAIService {
                                 ? "nb"
                                 : "en",
                         history: nil,
-                        shareHealthData: true
+                        shareHealthData: true,
+                        healthSharingMode: nil
                     )
                 )
             )
@@ -843,8 +859,17 @@ final class RecoveryAIService {
         _ question: String,
         context: RecoveryAIContext,
         history: [RecoveryCoachMessage],
-        shareHealthData: Bool = false
+        shareHealthData: Bool = false,
+        shareHealthAutomatically: Bool = false
     ) async throws -> RecoveryCoachReply {
+        // Defense in depth: a caller cannot use an unreleased automatic
+        // mode even if the UI check is bypassed.
+        if shareHealthAutomatically &&
+            !RecoveryCoachHealthSharingPreferences
+                .automaticTransferApprovedForRelease {
+            throw RecoveryCoachHealthSharingError.automaticUnavailable
+        }
+
         let requestHistory =
             history
                 .suffix(16)
@@ -877,7 +902,11 @@ final class RecoveryAIService {
                             shareHealthData && !requestHistory.isEmpty
                                 ? requestHistory
                                 : nil,
-                        shareHealthData: shareHealthData
+                        shareHealthData: shareHealthData,
+                        healthSharingMode: shareHealthData
+                            ? (shareHealthAutomatically
+                                ? "automatic" : "confirmEachQuestion")
+                            : nil
                     )
                 )
             )
