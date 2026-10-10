@@ -7620,53 +7620,42 @@ struct CommunityGroupDetailView: View {
                     .buttonStyle(.plain)
                 }
 
-                NavigationLink {
-                    CommunityGroupMembersView(
-                        group: currentGroup
-                    )
-                } label: {
-                    referenceActionTile(
-                        title:
-                            groups.canManage(
-                                currentGroup
-                            )
-                                ? ATHLTHLocalization
-                                    .choose(
-                                        english:
-                                            "Invite",
-                                        norwegian:
-                                            "Inviter"
-                                    )
-                                : ATHLTHLocalization
-                                    .choose(
-                                        english:
-                                            "Members",
-                                        norwegian:
-                                            "Medlemmer"
-                                    ),
-                        detail:
-                            groups.canManage(
-                                currentGroup
-                            )
-                                ? ATHLTHLocalization
-                                    .choose(
-                                        english:
-                                            "Add people",
-                                        norwegian:
-                                            "Få med flere"
-                                    )
-                                : memberCountText,
-                        icon:
-                            groups.canManage(
-                                currentGroup
-                            )
-                                ? "person.badge.plus"
-                                : "person.2.fill",
-                        tint:
-                            clubForest
-                    )
+                if groups.canManage(currentGroup) {
+                    NavigationLink {
+                        CommunityGroupMembersView(
+                            group: currentGroup
+                        )
+                    } label: {
+                        referenceActionTile(
+                            title: ATHLTHLocalization.choose(
+                                english: "Invite",
+                                norwegian: "Inviter"
+                            ),
+                            detail: ATHLTHLocalization.choose(
+                                english: "Add people",
+                                norwegian: "Få med flere"
+                            ),
+                            icon: "person.badge.plus",
+                            tint: clubForest
+                        )
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Button {
+                        selectTab(.chat)
+                    } label: {
+                        referenceActionTile(
+                            title: "Chat",
+                            detail: ATHLTHLocalization.choose(
+                                english: "Talk together",
+                                norwegian: "Snakk sammen"
+                            ),
+                            icon: "bubble.left.and.bubble.right.fill",
+                            tint: clubForest
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
 
                 Button {
                     if groups
@@ -7933,8 +7922,6 @@ struct CommunityGroupDetailView: View {
         return Button {
             if canCreate {
                 showingCreateWeeklyChallenge = true
-            } else {
-                selectTab(.challenges)
             }
         } label: {
             HStack(spacing: 14) {
@@ -8140,6 +8127,7 @@ struct CommunityGroupDetailView: View {
             )
         }
         .buttonStyle(.plain)
+        .disabled(!canCreate)
     }
 
     private func referenceClubChallengeCard(
@@ -16967,19 +16955,15 @@ struct CommunityGroupMembersView: View {
                 memberFollowAction(profile)
             }
 
-            Text(roleTitle(member.role))
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(
-                    roleTint(member.role)
-                )
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(
-                    Color(
-                        .secondarySystemGroupedBackground
-                    ),
-                    in: Capsule()
-                )
+            // Role remains visible, but a full badge beside Follow and
+            // actions made member rows overflow on narrow iPhones.
+            if member.role != "member" {
+                Text(roleTitle(member.role))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(roleTint(member.role))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
 
             if groups.canManage(currentGroup) &&
                 member.role != "owner" &&
