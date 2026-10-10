@@ -906,15 +906,8 @@ struct ATHLTHHomeView: View {
                                     )
                                 _ = await social
                                     .confirmCurrentJoinedWorkoutStarted()
-                                if configuration.captureDevice ==
-                                        .appleWatch {
-                                    homeWatchTransferMessage =
-                                        ATHLTHLocalization.choose(
-                                            english:
-                                                "Workout sent to Apple Watch. Press START on Watch when you're ready.",
-                                            norwegian:
-                                                "Økten er sendt til Apple Watch. Trykk START på klokken når du er klar."
-                                        )
+                                if configuration.captureDevice == .appleWatch {
+                                    homeWatchTransferMessage = configuration.watchStartMode.confirmationText
                                 }
                             } catch {
                                 await social
@@ -5435,15 +5428,8 @@ struct ATHLTHTrainView: View {
                                 )
                             _ = await social
                                 .confirmCurrentJoinedWorkoutStarted()
-                                if configuration.captureDevice ==
-                                        .appleWatch {
-                                    watchTransferMessage =
-                                        ATHLTHLocalization.choose(
-                                            english:
-                                                "Workout sent to Apple Watch. Press START on Watch when you're ready.",
-                                            norwegian:
-                                                "Økten er sendt til Apple Watch. Trykk START på klokken når du er klar."
-                                        )
+                                if configuration.captureDevice == .appleWatch {
+                                    watchTransferMessage = configuration.watchStartMode.confirmationText
                                 }
                         } catch {
                             await social
@@ -5627,15 +5613,8 @@ struct ATHLTHTrainView: View {
                                 )
                             _ = await social
                                 .confirmCurrentJoinedWorkoutStarted()
-                                if configuration.captureDevice ==
-                                        .appleWatch {
-                                    watchTransferMessage =
-                                        ATHLTHLocalization.choose(
-                                            english:
-                                                "Workout sent to Apple Watch. Press START on Watch when you're ready.",
-                                            norwegian:
-                                                "Økten er sendt til Apple Watch. Trykk START på klokken når du er klar."
-                                        )
+                                if configuration.captureDevice == .appleWatch {
+                                    watchTransferMessage = configuration.watchStartMode.confirmationText
                                 }
                         } catch {
                             await social
