@@ -1926,6 +1926,31 @@ struct TrainingPlanLibraryView: View {
     }
 }
 
+// A reusable light glass surface for catalog details and plan setup.
+// The material adapts to system appearance without an opaque white slab.
+private struct ATHLTHPlanGhostCard<Content: View>: View {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                .regularMaterial,
+                in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(.white.opacity(0.70), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.045), radius: 15, y: 6)
+    }
+}
+
 struct TrainingPlanCatalogDetailView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
@@ -1934,7 +1959,7 @@ struct TrainingPlanCatalogDetailView: View {
     let entry: TrainingPlanCatalogEntry
     var onPlanCreated: (() -> Void)? = nil
 
-    @State private var addedToLibrary = false
+    @State private var createEditableCopy = false
     @State private var showingPersonalizePlan = false
     @State private var showAllWeeks = false
 
@@ -2002,8 +2027,8 @@ struct TrainingPlanCatalogDetailView: View {
                 .background(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.96),
-                            detailAccent.opacity(0.055)
+                            Color.white.opacity(0.86),
+                            detailAccent.opacity(0.085)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -2042,7 +2067,7 @@ struct TrainingPlanCatalogDetailView: View {
                     )
                 }
 
-                ATHLTHCard {
+                ATHLTHPlanGhostCard {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Weekly rhythm")
                             .font(.headline)
@@ -2091,7 +2116,7 @@ struct TrainingPlanCatalogDetailView: View {
                     }
                 }
 
-                ATHLTHCard {
+                ATHLTHPlanGhostCard {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Goal")
                             .font(.headline)
@@ -2108,6 +2133,7 @@ struct TrainingPlanCatalogDetailView: View {
                 planPreview
 
                 Button {
+                    createEditableCopy = false
                     showingPersonalizePlan = true
                 } label: {
                     HStack {
@@ -2144,27 +2170,43 @@ struct TrainingPlanCatalogDetailView: View {
                 .buttonStyle(.plain)
 
                 Button {
-                    _ = session.saveCatalogPlanTemplate(
-                        entry
-                    )
-                    addedToLibrary = true
+                    createEditableCopy = true
+                    showingPersonalizePlan = true
                 } label: {
-                    Label(
-                        isAlreadySaved
-                            ? "Saved for later"
-                            : "Save for later",
-                        systemImage:
-                            isAlreadySaved
-                                ? "checkmark.circle.fill"
-                                : "bookmark"
-                    )
-                    .font(.subheadline.weight(.semibold))
+                    HStack(spacing: 10) {
+                        Image(systemName: "square.on.square")
+                            .font(.subheadline.weight(.semibold))
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Build a plan using this plan",
+                                norwegian: "Lag en plan med denne planen"
+                            )
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        Spacer(minLength: 4)
+                        Image(systemName: "arrow.right")
+                            .font(.caption.weight(.bold))
+                    }
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .padding(.horizontal, 17)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 46)
+                    .frame(minHeight: 53)
+                    .background(
+                        .regularMaterial,
+                        in: RoundedRectangle(
+                            cornerRadius: 17,
+                            style: .continuous
+                        )
+                    )
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 17,
+                            style: .continuous
+                        )
+                        .stroke(.white.opacity(0.75), lineWidth: 1)
+                    }
                 }
-                .buttonStyle(.bordered)
-                .tint(ATHLTHTheme.accent)
-                .disabled(isAlreadySaved)
+                .buttonStyle(.plain)
             }
             .padding(20)
             .frame(maxWidth: 720)
@@ -2202,32 +2244,8 @@ struct TrainingPlanCatalogDetailView: View {
         .sheet(isPresented: $showingPersonalizePlan) {
             PersonalizeTrainingPlanView(
                 entry: entry,
-                onPlanCreated: onPlanCreated
-            )
-        }
-        .alert(
-            "Added to My Plans",
-            isPresented: $addedToLibrary
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(
-                ATHLTHLocalization.format(
-                            english: "%@ is now saved as a reusable plan. Open My Plans when you are ready to schedule it.",
-                            norwegian: "%@ er nå lagret som en gjenbrukbar plan. Åpne Mine planer når du er klar til å planlegge den.",
-                            entry.title
-                        )
-            )
-        }
-    }
-
-    private var isAlreadySaved: Bool {
-        session.planTemplates.contains {
-            $0.tags.contains(
-                "catalog:\(entry.slug)"
-            ) &&
-            $0.tags.contains(
-                "catalog-version:\(entry.catalogVersion)"
+                onPlanCreated: onPlanCreated,
+                createEditableCopy: createEditableCopy
             )
         }
     }
@@ -2408,7 +2426,7 @@ struct TrainingPlanCatalogDetailView: View {
         }
         .padding(13)
         .background(
-            Color.white.opacity(0.70),
+            .regularMaterial,
             in: RoundedRectangle(
                 cornerRadius: 17,
                 style: .continuous
@@ -2447,8 +2465,8 @@ struct TrainingPlanCatalogDetailView: View {
         .background(
             LinearGradient(
                 colors: [
-                    Color.white.opacity(0.94),
-                    detailAccent.opacity(0.025)
+                    Color.white.opacity(0.78),
+                    detailAccent.opacity(0.065)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
