@@ -343,6 +343,57 @@ final class TrainingPlanCatalogSchedulingTests: XCTestCase {
         XCTAssertEqual(store.trainingPlan(withID: plan.id)?.weeks.count, 2)
     }
 
+    @MainActor
+    func testBuildingFromCatalogMakesSeparateEditableCopy() {
+        let suite = "TrainingCatalogCopyTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+        }
+
+        let store = AppSessionStore(defaults: defaults)
+        let entry = makeEntry(
+            slug: "independent-copy",
+            title: "Original training plan"
+        )
+        let days = [1, 3, 5, 7]
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+
+        guard let template = store.saveCatalogPlanTemplate(
+            entry,
+            preferredDayIndexes: days
+        ) else {
+            return XCTFail("Expected a private template copy")
+        }
+
+        XCTAssertNil(template.startDate)
+        XCTAssertEqual(template.weeks.count, entry.durationWeeks)
+        XCTAssertTrue(template.title.contains("Custom"))
+
+        guard let ownPlan = store.usePlanTemplate(
+            template.id,
+            startDate: date
+        ) else {
+            return XCTFail("Expected editable scheduled copy")
+        }
+
+        XCTAssertNotEqual(template.id, ownPlan.id)
+        XCTAssertEqual(ownPlan.weeks.count, entry.durationWeeks)
+        XCTAssertTrue(store.planTemplates.contains {
+            $0.id == template.id && $0.startDate == nil
+        })
+        XCTAssertEqual(
+            store.trainingPlan(withID: ownPlan.id)?.id,
+            ownPlan.id
+        )
+
+        // The same start period cannot be silently scheduled twice.
+        XCTAssertNil(
+            store.usePlanTemplate(template.id, startDate: date)
+        )
+        XCTAssertEqual(store.trainingPlans.count, 1)
+    }
+
     private func makeEntry(
         slug: String,
         title: String
