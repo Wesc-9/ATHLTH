@@ -807,7 +807,8 @@ struct RecoveryCoachInboxDestinationView:
             muscles:
                 derivedSnapshot
                     .statuses
-                    .prefix(8)
+                    .sorted { $0.progress < $1.progress }
+                    .prefix(10)
                     .map {
                         RecoveryAIMuscleInput(
                             name:
