@@ -170,84 +170,92 @@ enum GhostTargetPaceFormatter {
 }
 
 struct TargetGhostRoutePickerView: View {
-    @EnvironmentObject private var session:
-        AppSessionStore
+    @EnvironmentObject private var session: AppSessionStore
 
     var body: some View {
-        List {
-            Section {
-                Text(
-                    "Choose a saved route, set the finish time you want, and ATHLTH creates a synthetic ghost that follows the course at the required average pace."
-                )
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            }
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 13) {
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose a route",
+                        norwegian: "Velg løype"
+                    ))
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    Text(ATHLTHLocalization.choose(
+                        english: "Your Ghost follows this course at your chosen finish time or pace.",
+                        norwegian: "Ghosten følger løypa i sluttiden eller tempoet du velger."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
+                .padding(.bottom, 4)
 
-            Section("My routes") {
                 if session.savedRoutes.isEmpty {
                     ContentUnavailableView(
-                        "No saved routes",
-                        systemImage:
-                            "map.fill",
-                        description: Text(
-                            "Create or save a route first."
-                        )
+                        ATHLTHLocalization.choose(
+                            english: "No saved routes",
+                            norwegian: "Ingen lagrede ruter"
+                        ),
+                        systemImage: "map",
+                        description: Text(ATHLTHLocalization.choose(
+                            english: "Save or create a route to start.",
+                            norwegian: "Lagre eller opprett en rute for å starte."
+                        ))
                     )
                 } else {
-                    ForEach(
-                        session.savedRoutes
-                            .sorted {
-                                $0.createdAt >
-                                $1.createdAt
-                            }
-                    ) { route in
+                    ForEach(session.savedRoutes.sorted {
+                        $0.createdAt > $1.createdAt
+                    }) { route in
                         NavigationLink {
-                            TargetGhostSetupView(
-                                route: route
-                            )
+                            TargetGhostSetupView(route: route)
                         } label: {
-                            HStack(spacing: 12) {
-                                Image(
-                                    systemName:
-                                        "timer.circle.fill"
-                                )
-                                .font(.title3)
-                                .foregroundStyle(
-                                    ATHLTHTheme.vitality
-                                )
-
-                                VStack(
-                                    alignment: .leading,
-                                    spacing: 3
-                                ) {
+                            HStack(spacing: 11) {
+                                RouteMapSnapshotThumbnail(route: route, height: 96)
+                                    .frame(width: 115, height: 96)
+                                VStack(alignment: .leading, spacing: 6) {
                                     Text(route.title)
-                                        .font(
-                                            .subheadline
-                                                .weight(
-                                                    .semibold
-                                                )
-                                        )
-
-                                    Text(
-                                        String(
-                                            format:
-                                                "%.2f km",
-                                            route
-                                                .distanceKilometers
-                                        )
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(ATHLTHTheme.primaryText)
+                                        .lineLimit(2)
+                                    Label(
+                                        String(format: "%.1f km", route.distanceKilometers),
+                                        systemImage: "point.topleft.down.to.point.bottomright.curvepath"
                                     )
                                     .font(.caption)
-                                    .foregroundStyle(
-                                        .secondary
-                                    )
+                                    .foregroundStyle(.secondary)
+                                    if let elevation = route.elevationGainMeters {
+                                        Label(
+                                            String(format: "%.0f hm", elevation),
+                                            systemImage: "mountain.2"
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    }
                                 }
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                            }
+                            .padding(11)
+                            .background(
+                                Color.white, in: RoundedRectangle(cornerRadius: 18)
+                            )
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 18)
+                                    .stroke(ATHLTHTheme.border.opacity(0.45), lineWidth: 0.7)
                             }
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
+            .padding(16)
+            .frame(maxWidth: 700)
+            .frame(maxWidth: .infinity)
         }
-        .navigationTitle("Target Ghost")
+        .background(ATHLTHTheme.canvasTop.ignoresSafeArea())
+        .navigationTitle("Ghost Race")
         .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -556,11 +564,17 @@ struct TargetGhostSetupView: View {
                 }
 
                 workoutDeviceCard
-                startButton
             }
             .padding()
+            .padding(.bottom, 12)
             .frame(maxWidth: 680)
             .frame(maxWidth: .infinity)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            startButton
+                .padding(.horizontal, 18)
+                .padding(.vertical, 10)
+                .background(.regularMaterial)
         }
         .background(
             ATHLTHPremiumCanvas(
@@ -619,78 +633,52 @@ struct TargetGhostSetupView: View {
 
     private var summaryCard: some View {
         ATHLTHCard {
-            VStack(
-                alignment: .leading,
-                spacing: 13
-            ) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Label(
-                        "TARGET GHOST",
-                        systemImage:
-                            "timer.circle.fill"
-                    )
-                    .font(
-                        .caption
-                            .weight(.bold)
-                    )
-                    .tracking(1.5)
-                    .foregroundStyle(
-                        ATHLTHTheme.vitality
-                    )
-
+                    Text("GHOST RACE")
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(1.8)
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
                     Spacer()
-
-                    if loadingHistory {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
+                    if loadingHistory { ProgressView().controlSize(.small) }
                 }
+                Text(ATHLTHLocalization.choose(
+                    english: "Set your goal. Chase it.",
+                    norwegian: "Sett et mål og jag det."
+                ))
+                .font(.system(size: 25, weight: .bold, design: .rounded))
+                .foregroundStyle(ATHLTHTheme.primaryText)
 
-                Text(
-                    challengeTitle ??
-                    route.title
-                )
-                .font(.title2.bold())
-
-                Text(
-                    "Choose exactly how hard your ghost should be. Set any finish time, match a previous run, or make your best effort a little faster."
-                )
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(
-                    horizontal: false,
-                    vertical: true
-                )
-
-                HStack(spacing: 18) {
-                    Label(
-                        String(
-                            format:
-                                "%.2f km",
-                            route
-                                .distanceKilometers
-                        ),
-                        systemImage:
-                            "location.fill"
-                    )
-
-                    if let targetDuration {
+                HStack(alignment: .top, spacing: 12) {
+                    RouteMapSnapshotThumbnail(route: route, height: 115)
+                        .frame(width: 124, height: 115)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(challengeTitle ?? route.title)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(2)
+                            .foregroundStyle(ATHLTHTheme.primaryText)
                         Label(
-                            GhostTargetTimeFormatter
-                                .paceText(
-                                    distanceKilometers:
-                                        route
-                                            .distanceKilometers,
-                                    duration:
-                                        targetDuration
-                                ),
-                            systemImage:
-                                "gauge.with.dots.needle.50percent"
+                            String(format: "%.1f km", route.distanceKilometers),
+                            systemImage: "figure.run"
                         )
+                        if let elevation = route.elevationGainMeters {
+                            Label(String(format: "%.0f hm", elevation),
+                                  systemImage: "mountain.2")
+                        }
+                        if let duration = targetDuration {
+                            Label(
+                                GhostTargetTimeFormatter.paceText(
+                                    distanceKilometers: route.distanceKilometers,
+                                    duration: duration
+                                ),
+                                systemImage: "speedometer"
+                            )
+                        }
                     }
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    Spacer(minLength: 0)
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
             }
         }
     }
