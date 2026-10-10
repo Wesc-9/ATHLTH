@@ -4454,6 +4454,45 @@ private struct HomeWeeklyProgressDaySheet:
         }
     }
 
+    // Planned sessions keep their original compact time, duration,
+    // distance and exercise summary. This helper was inadvertently removed
+    // while the completed-workout cards were upgraded.
+    private func plannedDetail(
+        _ workout: PlannedSession
+    ) -> String {
+        var parts: [String] = []
+
+        if let start = workout.scheduledStart {
+            parts.append(
+                start.formatted(date: .omitted, time: .shortened)
+            )
+        }
+
+        if let minutes = workout.durationMinutes {
+            parts.append("\(minutes) min")
+        }
+
+        if let distance = workout.targetDistanceKilometers {
+            parts.append(
+                String(format: "%.1f km", distance)
+            )
+        }
+
+        if !workout.exercises.isEmpty {
+            parts.append(
+                ATHLTHLocalization.format(
+                    english: "%d exercises",
+                    norwegian: "%d øvelser",
+                    workout.exercises.count
+                )
+            )
+        }
+
+        return parts.isEmpty
+            ? workout.kind.title
+            : parts.joined(separator: " · ")
+    }
+
     private func actualRow(
         _ workout: WorkoutSummary
     ) -> some View {
