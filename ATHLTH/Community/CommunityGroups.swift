@@ -4779,6 +4779,7 @@ enum CommunityGroupsTab: String, CaseIterable, Identifiable {
     case chat = "Chat"
     case events = "Events"
     case challenges = "Challenges"
+    case members = "Members"
 
     var id: String { rawValue }
 
@@ -4795,6 +4796,11 @@ enum CommunityGroupsTab: String, CaseIterable, Identifiable {
             return "Events"
         case .challenges:
             return "Challenges"
+        case .members:
+            return ATHLTHLocalization.choose(
+                english: "Members",
+                norwegian: "Medlemmer"
+            )
         }
     }
 }
@@ -6525,6 +6531,7 @@ struct CommunityGroupDetailView: View {
     @State private var chatImageError: String?
     @State private var showingCreateEvent = false
     @State private var showingCreateChallenge = false
+    @State private var showingCreateWeeklyChallenge = false
     @State private var showingGroupSettings = false
     @State private var showingNotificationSettings = false
     @State private var showingUpcomingOverview = false
@@ -6577,7 +6584,7 @@ struct CommunityGroupDetailView: View {
                     accent: clubEmerald.opacity(0.16)
                 )
 
-                if isMember && selectedTab == .chat {
+                if isMember && (selectedTab == .chat || selectedTab == .members) {
                     VStack(spacing: 0) {
                         groupHeader(
                             topInset:
@@ -6606,8 +6613,16 @@ struct CommunityGroupDetailView: View {
                         Divider()
                             .opacity(0.55)
 
-                        chat
+                        if selectedTab == .chat {
+                            chat
+                                .frame(maxHeight: .infinity)
+                        } else {
+                            CommunityGroupMembersView(
+                                group: currentGroup,
+                                embedded: true
+                            )
                             .frame(maxHeight: .infinity)
+                        }
                     }
                     .ignoresSafeArea(edges: .top)
                     .frame(
@@ -6639,6 +6654,8 @@ struct CommunityGroupDetailView: View {
                                         events
                                     case .challenges:
                                         challenges
+                                    case .members:
+                                        EmptyView() // Shown in its own scrolling list.
                                     }
                                 } else {
                                     membershipAccessCard
@@ -6666,8 +6683,14 @@ struct CommunityGroupDetailView: View {
                 group: currentGroup
             )
         }
+        .sheet(isPresented: $showingCreateWeeklyChallenge) {
+            CommunityGroupChallengeCreateView(
+                group: currentGroup,
+                isWeeklyChallenge: true
+            )
+        }
         .sheet(isPresented: $showingGroupSettings) {
-            CommunityGroupSettingsView(
+            CommunityGroupManagementView(
                 group: currentGroup
             )
         }
@@ -6811,7 +6834,7 @@ struct CommunityGroupDetailView: View {
                     Text(tab.displayTitle)
                         .font(
                             .system(
-                                size: 13,
+                                size: 11.5,
                                 weight:
                                     tabIndicator == tab
                                         ? .semibold
@@ -7037,105 +7060,9 @@ struct CommunityGroupDetailView: View {
 
                     Spacer()
 
-                    if groups.canManage(
-                        currentGroup
-                    ) {
-                        Button {
-                            showingGroupSettings = true
-                        } label: {
-                            headerCircleButton(
-                                icon:
-                                    "photo.on.rectangle.angled"
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Change Club header image",
-                                norwegian:
-                                    "Endre headerbilde"
-                            )
-                        )
-                    }
-
-                    if isMember ||
-                        currentGroup.creatorID ==
-                            session.profile.userID {
-                        NavigationLink {
-                            CommunityGroupMembersView(
-                                group: currentGroup
-                            )
-                        } label: {
-                            headerCircleButton(
-                                icon: "person.2.fill"
-                            )
-                        }
-                        .buttonStyle(.plain)
-
-                        Menu {
-                            if groups.canManage(
-                                currentGroup
-                            ) {
-                                Button {
-                                    showingGroupSettings =
-                                        true
-                                } label: {
-                                    Label(
-                                        ATHLTHLocalization
-                                            .choose(
-                                                english:
-                                                    "Club Settings",
-                                                norwegian:
-                                                    "Club-innstillinger"
-                                            ),
-                                        systemImage:
-                                            "gearshape"
-                                    )
-                                }
-                            }
-
-                            Button {
-                                showingNotificationSettings =
-                                    true
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization
-                                        .choose(
-                                            english:
-                                                "Notifications",
-                                            norwegian:
-                                                "Varsler"
-                                        ),
-                                    systemImage: "bell"
-                                )
-                            }
-
-                            if !groups.isOwner(
-                                of: currentGroup
-                            ) {
-                                Button(
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "Leave Club",
-                                        norwegian:
-                                            "Forlat Club"
-                                    ),
-                                    role: .destructive
-                                ) {
-                                    Task {
-                                        await groups.leave(
-                                            currentGroup
-                                        )
-                                    }
-                                }
-                            }
-                        } label: {
-                            headerCircleButton(
-                                icon: "ellipsis"
-                            )
-                        }
-                    }
+                    // Membership, notifications and management now have
+                    // dedicated destinations rather than competing with
+                    // the hero artwork in the header.
                 }
                 .padding(.horizontal, 16)
                 .padding(
@@ -14350,6 +14277,71 @@ private struct CommunityGroupUpcomingOverviewView:
                 lineWidth: 0.8
             )
         }
+    }
+}
+
+/// Two clearly separated Club management areas. This sheet is only
+/// reachable by owners/admins, while server-side membership policies
+/// remain authoritative for changes to roles and membership.
+private struct CommunityGroupManagementView: View {
+    @EnvironmentObject private var groups: CommunityGroupStore
+    let group: CommunityGroupRecord
+
+    @State private var section: Section = .club
+
+    private enum Section: String, CaseIterable {
+        case club
+        case members
+
+        var title: String {
+            switch self {
+            case .club:
+                return ATHLTHLocalization.choose(
+                    english: "Club", norwegian: "Klubb"
+                )
+            case .members:
+                return ATHLTHLocalization.choose(
+                    english: "Members", norwegian: "Medlemmer"
+                )
+            }
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if groups.canManage(groups.group(for: group.id) ?? group) {
+                Picker(
+                    ATHLTHLocalization.choose(
+                        english: "Manage", norwegian: "Administrer"
+                    ),
+                    selection: $section
+                ) {
+                    ForEach(Section.allCases, id: \.self) { item in
+                        Text(item.title).tag(item)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+
+                if section == .club {
+                    CommunityGroupSettingsView(group: group)
+                } else {
+                    NavigationStack {
+                        CommunityGroupMembersView(group: group)
+                    }
+                }
+            } else {
+                ContentUnavailableView(
+                    ATHLTHLocalization.choose(
+                        english: "Admin access required",
+                        norwegian: "Krever administratorrettigheter"
+                    ),
+                    systemImage: "lock.shield"
+                )
+            }
+        }
+        .background(ATHLTHTheme.canvasTop)
     }
 }
 
