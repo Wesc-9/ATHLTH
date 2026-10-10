@@ -60,6 +60,99 @@ enum ATHLTHGlobalSearchScope: String, CaseIterable, Identifiable {
     }
 }
 
+// Estimated travel times shown in search results, not recorded workout
+// durations. Assumptions: 5 km/h walking, 9 km/h easy running, with a modest
+// uphill allowance. Terrain, weather, fitness and stops can change these.
+enum ATHLTHSearchRoutePresentation {
+    static func estimatedMinutes(
+        distanceKilometers: Double,
+        ascentMeters: Double?,
+        walking: Bool
+    ) -> Int? {
+        guard distanceKilometers.isFinite,
+              distanceKilometers > 0 else { return nil }
+        let ascent = ascentMeters.flatMap { $0.isFinite ? max(0, $0) : nil } ?? 0
+        let baseMinutes = distanceKilometers * (walking ? 12.0 : 60.0 / 9.0)
+        let ascentMinutes = ascent / 100.0 * (walking ? 6.0 : 4.0)
+        let total = baseMinutes + ascentMinutes
+        guard total.isFinite, total < Double(Int.max / 2) else { return nil }
+        return max(Int(total.rounded()), 1)
+    }
+
+    static func localizedDuration(_ minutes: Int, norwegian: Bool) -> String {
+        if minutes < 60 { return "\(minutes) min" }
+        let hours = minutes / 60
+        let remainder = minutes % 60
+        if remainder == 0 { return norwegian ? "\(hours) t" : "\(hours) h" }
+        return norwegian
+            ? "\(hours) t \(remainder) min"
+            : "\(hours) h \(remainder) min"
+    }
+
+    static func distance(_ kilometers: Double, norwegian: Bool) -> String {
+        guard kilometers.isFinite, kilometers >= 0 else { return "—" }
+        let locale = Locale(identifier: norwegian ? "nb_NO" : "en_US")
+        let number = kilometers.formatted(
+            .number.precision(.fractionLength(1)).locale(locale)
+        )
+        return "\(number) km"
+    }
+}
+
+// City names come from the actual route coordinate. 'locality' is a city or
+// town; do not substitute 'subAdministrativeArea', which is a municipality.
+// A serial queue avoids flooding Apple's reverse-geocoder when search changes.
+@MainActor
+private final class ATHLTHSearchRouteCityLookup: ObservableObject {
+    @Published private(set) var cityNames: [UUID: String] = [:]
+    private var completedIDs = Set<UUID>()
+    private var pendingIDs = Set<UUID>()
+    private var queue: [CommunityRouteRecord] = []
+    private var processing = false
+
+    func enqueue(_ route: CommunityRouteRecord) {
+        guard !completedIDs.contains(route.id),
+              !pendingIDs.contains(route.id),
+              CLLocationCoordinate2DIsValid(route.centerCoordinate) else {
+            return
+        }
+        pendingIDs.insert(route.id)
+        queue.append(route)
+        guard !processing else { return }
+        processing = true
+        Task { await drainQueue() }
+    }
+
+    private func drainQueue() async {
+        while !queue.isEmpty {
+            let route = queue.removeFirst()
+            defer {
+                pendingIDs.remove(route.id)
+                completedIDs.insert(route.id)
+            }
+            let location = CLLocation(
+                latitude: route.centerLatitude,
+                longitude: route.centerLongitude
+            )
+            do {
+                let placemarks = try await CLGeocoder().reverseGeocodeLocation(
+                    location,
+                    preferredLocale: Locale(identifier: "nb_NO")
+                )
+                if let city = placemarks.first?.locality?
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                    !city.isEmpty {
+                    cityNames[route.id] = city
+                }
+            } catch {
+                // Network/geocoder unavailable: omit the city rather than
+                // inventing one or displaying an administrative region.
+            }
+        }
+        processing = false
+    }
+}
+
 struct ATHLTHGlobalSearchView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var social: SocialStore
@@ -69,6 +162,7 @@ struct ATHLTHGlobalSearchView: View {
     @EnvironmentObject private var groups: CommunityGroupStore
 
     @StateObject private var searchLocation = ChallengeLocationStore()
+    @StateObject private var routeCities = ATHLTHSearchRouteCityLookup()
 
     @AppStorage("athlth.globalSearch.recent")
     private var recentSearchesRaw = "[]"
