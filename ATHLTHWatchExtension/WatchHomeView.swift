@@ -233,6 +233,7 @@ struct WatchHomeView: View {
             } != nil
         let canStart =
             routeReady &&
+            routeStore.automaticStartCountdownSeconds == nil &&
             workoutManager.state !=
                 .preparing
 
@@ -266,12 +267,15 @@ struct WatchHomeView: View {
                     Spacer()
 
                     Text(
-                        routeReady
+                        routeStore.automaticStartCountdownSeconds.map {
+                            "\($0)s"
+                        } ??
+                        (routeReady
                             ? "START"
                             : ATHLTHLocalization.choose(
                                 english: "SYNCING",
                                 norwegian: "SYNKER"
-                            )
+                            ))
                     )
                     .font(
                         .system(
@@ -396,80 +400,13 @@ struct WatchHomeView: View {
     }
 
     private func startPreparedWorkout(
-        _ workout:
-            WatchPreparedWorkoutTransfer
+        _ workout: WatchPreparedWorkoutTransfer
     ) {
-        let route =
-            workout.routeID.flatMap {
-                routeStore.route(
-                    with: $0
-                )
-            }
-
-        guard workout.routeID == nil ||
-                route != nil
-        else {
-            return
-        }
-
-        workoutManager
-            .configurePlannedRoute(
-                route
-            )
-        workoutManager
-            .configureAudioCoach(
-                workout.audioCoach ??
-                    .disabled
-            )
-        workoutManager
-            .configureGhostRace(
-                workout.ghostRace
-            )
-
-        if let running =
-                workout.runningWorkout {
-            workoutManager
-                .configureRunningWorkout(
-                    running
-                )
-        } else if workout.kind ==
-                    .running ||
-                    workout.kind ==
-                    .walking {
-            workoutManager
-                .configureRunningWorkout(
-                    WatchRunningWorkoutTransfer(
-                        title:
-                            workout.title,
-                        steps: [],
-                        routeAlerts:
-                            .standard
-                    )
-                )
-        }
-
         Task {
-            await workoutManager
-                .startPreparedWorkout(
-                    kind:
-                        workout.kind,
-                    route: route,
-                    indoor:
-                        workout.indoor
-                )
-
-            if case .failed =
-                    workoutManager.state {
-                return
-            }
-
-            if workoutManager.state !=
-                    .idle {
-                routeStore
-                    .consumePreparedWorkout(
-                        workout.id
-                    )
-            }
+            await routeStore.launchPreparedWorkout(
+                workout,
+                manager: workoutManager
+            )
         }
     }
 
