@@ -1100,112 +1100,201 @@ struct GhostRaceHubView: View {
 
     private var targetGhostSection: some View {
         ATHLTHCard {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 12) {
-                    Image(
-                        systemName:
-                            "timer.circle.fill"
-                    )
-                    .font(.title2)
-                    .foregroundStyle(
-                        ATHLTHTheme.vitality
-                    )
-                    .frame(
-                        width: 48,
-                        height: 48
-                    )
-                    .background(
-                        ATHLTHTheme
-                            .vitalitySoft,
-                        in:
-                            RoundedRectangle(
-                                cornerRadius: 14
-                            )
-                    )
+            VStack(alignment: .leading, spacing: 13) {
+                HStack {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose your course", norwegian: "Velg løype"
+                    ))
+                    .font(.headline)
+                    Spacer()
+                    NavigationLink {
+                        TargetGhostRoutePickerView()
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "See all", norwegian: "Se alle"
+                            ))
+                            Image(systemName: "chevron.right")
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+                }
 
-                    VStack(
-                        alignment: .leading,
-                        spacing: 3
-                    ) {
-                        Text("Target time ghost")
-                            .font(.headline)
-
-                        Text(
-                            "Choose a route and a finish time. ATHLTH creates a synthetic pacer to follow all the way to the finish."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(
-                            .secondary
+                if session.savedRoutes.isEmpty {
+                    ContentUnavailableView(
+                        ATHLTHLocalization.choose(
+                            english: "No saved courses",
+                            norwegian: "Ingen lagrede løyper"
+                        ),
+                        systemImage: "map",
+                        description: Text(ATHLTHLocalization.choose(
+                            english: "Save a route to create a target Ghost.",
+                            norwegian: "Lagre en rute for å opprette en mål-Ghost."
+                        ))
+                    )
+                    NavigationLink {
+                        RouteLibraryListView()
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Browse routes",
+                                norwegian: "Finn løyper"
+                            ),
+                            systemImage: "map.fill"
                         )
                     }
-
-                    Spacer()
+                    .buttonStyle(.bordered)
+                } else {
+                    ForEach(
+                        Array(session.savedRoutes.sorted {
+                            $0.createdAt > $1.createdAt
+                        }.prefix(3))
+                    ) { route in
+                        NavigationLink {
+                            TargetGhostSetupView(route: route)
+                        } label: {
+                            HStack(spacing: 12) {
+                                RouteMapSnapshotThumbnail(route: route, height: 80)
+                                    .frame(width: 103, height: 80)
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text(route.title)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(ATHLTHTheme.primaryText)
+                                        .lineLimit(1)
+                                    Text(
+                                        String(format: "%.1f km", route.distanceKilometers)
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Choose finish time or pace",
+                                        norwegian: "Velg sluttid eller tempo"
+                                    ))
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                }
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(8)
+                            .background(
+                                ATHLTHTheme.surfaceStone,
+                                in: RoundedRectangle(cornerRadius: 16)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
+            }
+        }
+    }
 
-                NavigationLink {
-                    TargetGhostRoutePickerView()
-                } label: {
-                    Label(
-                        "Choose route & target time",
-                        systemImage:
-                            "arrow.right.circle.fill"
-                    )
-                    .font(
-                        .subheadline
-                            .weight(.semibold)
-                    )
-                    .frame(
-                        maxWidth: .infinity
-                    )
-                }
-                .buttonStyle(
-                    .borderedProminent
-                )
-                .tint(
-                    ATHLTHTheme.vitality
-                )
-                .controlSize(.large)
+    private var visibleReplayRuns: [WorkoutSummary] {
+        let query = replaySearch.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ).lowercased()
+        let filtered = recentRuns.filter { workout in
+            guard !query.isEmpty else { return true }
+            let searchable = [
+                workout.startDate.formatted(date: .abbreviated, time: .omitted),
+                workout.distanceKilometers.map {
+                    String(format: "%.1f", $0)
+                } ?? ""
+            ].joined(separator: " ").lowercased()
+            return searchable.localizedStandardContains(query)
+        }
+        switch replaySort {
+        case .newest:
+            return filtered.sorted { $0.startDate > $1.startDate }
+        case .fastest:
+            return filtered.sorted {
+                ($0.paceMinutesPerKilometer ?? .infinity) <
+                ($1.paceMinutesPerKilometer ?? .infinity)
+            }
+        case .longest:
+            return filtered.sorted {
+                ($0.distanceMeters ?? 0) > ($1.distanceMeters ?? 0)
             }
         }
     }
 
     private var pastSelfSection: some View {
         ATHLTHCard {
-            VStack(alignment: .leading, spacing: 13) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Race past self")
-                            .font(.headline)
-                        Text("Choose a previous GPS run to use as the ghost.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
+                    Text(ATHLTHLocalization.choose(
+                        english: "Previous runs",
+                        norwegian: "Tidligere løp"
+                    ))
+                    .font(.headline)
                     Spacer()
-
-                    if loading {
-                        ProgressView()
-                            .controlSize(.small)
+                    if loading { ProgressView().controlSize(.small) }
+                    Menu {
+                        ForEach(GhostReplaySort.allCases) { option in
+                            Button {
+                                replaySort = option
+                            } label: {
+                                Label(
+                                    option.title,
+                                    systemImage: replaySort == option
+                                        ? "checkmark" : "arrow.up.arrow.down"
+                                )
+                            }
+                        }
+                    } label: {
+                        Label(replaySort.title, systemImage: "line.3.horizontal.decrease")
+                            .font(.caption.weight(.semibold))
                     }
                 }
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english: "Find runs by date or distance",
+                            norwegian: "Søk på dato eller distanse"
+                        ),
+                        text: $replaySearch
+                    )
+                    .font(.subheadline)
+                    .textInputAutocapitalization(.never)
+                }
+                .padding(11)
+                .background(
+                    ATHLTHTheme.surfaceStone,
+                    in: RoundedRectangle(cornerRadius: 13)
+                )
 
                 if recentRuns.isEmpty && !loading {
                     ContentUnavailableView(
-                        "No running history",
+                        ATHLTHLocalization.choose(
+                            english: "No running history",
+                            norwegian: "Ingen tidligere løp"
+                        ),
                         systemImage: "figure.run",
-                        description: Text(
-                            "Outdoor runs from Apple Health will appear here when a GPS route is available."
-                        )
+                        description: Text(ATHLTHLocalization.choose(
+                            english: "Runs from Apple Health can be used once a GPS route is available.",
+                            norwegian: "Løp fra Apple Helse kan brukes når GPS-rute er tilgjengelig."
+                        ))
                     )
-                    .frame(minHeight: 150)
+                    .frame(minHeight: 140)
+                } else if visibleReplayRuns.isEmpty {
+                    Text(ATHLTHLocalization.choose(
+                        english: "No runs match your search.",
+                        norwegian: "Ingen løp samsvarer med søket."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 20)
                 } else {
-                    VStack(spacing: 0) {
-                        ForEach(recentRuns.prefix(8)) { workout in
+                    LazyVStack(spacing: 0) {
+                        ForEach(visibleReplayRuns.prefix(30)) { workout in
                             runRow(workout)
-
-                            if workout.id !=
-                                recentRuns.prefix(8).last?.id {
-                                Divider()
+                            if workout.id != visibleReplayRuns.prefix(30).last?.id {
+                                Divider().opacity(0.65)
                             }
                         }
                     }
