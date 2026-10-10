@@ -811,7 +811,11 @@ struct ATHLTHHomeView: View {
             .sheet(isPresented: $showingGlobalSearch) {
                 ATHLTHGlobalSearchView()
                     .presentationDetents([.large])
-                    .presentationDragIndicator(.hidden)
+                    // Allow the native downward sheet gesture to dismiss search
+                    // directly back to Home. Keep the list scrollable and
+                    // prefer dragging the sheet when at the top of the list.
+                    .presentationDragIndicator(.visible)
+                    .presentationContentInteraction(.resizes)
                     .presentationCornerRadius(30)
             }
             .sheet(item: $selectedHomeStrengthSession) { workout in
