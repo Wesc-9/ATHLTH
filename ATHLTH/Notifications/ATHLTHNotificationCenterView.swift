@@ -1097,7 +1097,9 @@ struct ATHLTHNotificationCenterView: View {
                             .frame(maxWidth: .infinity)
                             .frame(height: 38)
                             .background(
-                                ATHLTHTheme.accentDeep,
+                                item.isUnread
+                                    ? ATHLTHTheme.accentDeep
+                                    : Color(uiColor: .darkGray),
                                 in: Capsule()
                             )
                     }
@@ -1259,7 +1261,11 @@ struct ATHLTHNotificationCenterView: View {
         _ item: ATHLTHNotificationItem,
         showsChevron: Bool
     ) -> some View {
-        let tint = notificationTint(item)
+        // Once read, every category accent becomes a neutral gray.
+        // Keep the original palette for unread items only.
+        let tint = item.isUnread
+            ? notificationTint(item)
+            : Color(uiColor: .secondaryLabel)
 
         return HStack(alignment: .top, spacing: 13) {
             notificationLeading(item, tint: tint)
@@ -1401,7 +1407,7 @@ struct ATHLTHNotificationCenterView: View {
                     // Read notifications deliberately lose their category tint.
                     // The neutral surface makes it obvious they no longer need
                     // attention while keeping the content fully legible.
-                    Color(uiColor: .systemGray6)
+                    Color(uiColor: .systemGray5)
                         .opacity(0.96)
                 }
             }
@@ -1458,6 +1464,7 @@ struct ATHLTHNotificationCenterView: View {
                     profile: profile,
                     size: 46
                 )
+                .saturation(item.isUnread ? 1 : 0)
             } else {
                 Image(systemName: notificationIcon(item))
                     .font(.system(size: 18, weight: .semibold))
