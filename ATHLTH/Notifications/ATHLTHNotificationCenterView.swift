@@ -1944,6 +1944,10 @@ struct ATHLTHNotificationCenterView: View {
         }
 
         switch item.socialEventKind?.lowercased() {
+        case "train_together_chat":
+            return "bubble.left.and.bubble.right.fill"
+        case "train_together_recap":
+            return "photo.on.rectangle.angled"
         case "friend_request",
              "follow_request":
             return "person.crop.circle.badge.plus"
@@ -2065,6 +2069,13 @@ struct ATHLTHNotificationCenterView: View {
             )
         }
 
+        if workoutTogetherNotificationID(item) != nil {
+            return ATHLTHLocalization.choose(
+                english: "Open workout",
+                norwegian: "Åpne økt"
+            )
+        }
+
         if notificationGroupID(item) != nil {
             return ATHLTHLocalization.choose(
                 english: "Open Club",
@@ -2159,6 +2170,10 @@ struct ATHLTHNotificationCenterView: View {
             return true
         }
 
+        if workoutTogetherNotificationID(item) != nil {
+            return true
+        }
+
         if notificationGroupID(item) != nil {
             return true
         }
@@ -2217,6 +2232,8 @@ struct ATHLTHNotificationCenterView: View {
             CommunityEventDetailView(
                 eventID: eventID
             )
+        } else if let postID = workoutTogetherNotificationID(item) {
+            TrainTogetherNotificationDestination(postID: postID)
         } else if let groupID =
                     notificationGroupID(item) {
             CommunityGroupNotificationDestination(
@@ -2270,6 +2287,14 @@ struct ATHLTHNotificationCenterView: View {
         default:
             return .overview
         }
+    }
+
+    private func workoutTogetherNotificationID(
+        _ item: ATHLTHNotificationItem
+    ) -> UUID? {
+        guard item.socialEntityType?.lowercased() == "train_together_post"
+        else { return nil }
+        return item.socialEntityID
     }
 
     private func communityEventNotificationID(
@@ -2888,6 +2913,41 @@ private struct NotificationSwipeDeleteContainer<
                 )
         ) {
             onDelete()
+        }
+    }
+}
+
+
+/// Notifications open the original listing, using the same server-side
+/// membership rules as the marketplace. A removed guest sees a safe fallback.
+private struct TrainTogetherNotificationDestination: View {
+    @StateObject private var marketplace = TrainTogetherMarketplaceStore()
+    let postID: UUID
+
+    var body: some View {
+        Group {
+            if marketplace.posts.contains(where: { $0.id == postID }) {
+                TrainTogetherPostDetailView(postID: postID)
+                    .environmentObject(marketplace)
+            } else if marketplace.isLoading {
+                ProgressView(
+                    ATHLTHLocalization.choose(
+                        english: "Opening workout…",
+                        norwegian: "Åpner økt…"
+                    )
+                )
+            } else {
+                ContentUnavailableView(
+                    ATHLTHLocalization.choose(
+                        english: "Workout unavailable",
+                        norwegian: "Økten er ikke tilgjengelig"
+                    ),
+                    systemImage: "lock.shield"
+                )
+            }
+        }
+        .task(id: postID) {
+            await marketplace.refresh()
         }
     }
 }
