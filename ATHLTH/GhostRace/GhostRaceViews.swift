@@ -115,6 +115,8 @@ struct GhostRaceHubView: View {
         GhostRaceHubMode = .live
     @State private var replaySearch = ""
     @State private var replaySort: GhostReplaySort = .newest
+    @State private var replayFavoritesOnly = false
+    @State private var replayFavoriteIDs: Set<UUID> = []
     @State private var pendingReplayRun: WorkoutSummary?
     @State private var pendingLiveRace: ATHLTHLiveWorkoutSession?
     @State private var errorMessage: String?
@@ -167,6 +169,7 @@ struct GhostRaceHubView: View {
         .navigationTitle("Ghost Race")
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            loadReplayFavorites()
             async let runs: Void =
                 loadRuns()
             async let live: Void =
@@ -1248,6 +1251,9 @@ struct GhostRaceHubView: View {
             in: .whitespacesAndNewlines
         ).lowercased()
         let filtered = recentRuns.filter { workout in
+            if replayFavoritesOnly && !replayFavoriteIDs.contains(workout.id) {
+                return false
+            }
             guard !query.isEmpty else { return true }
             let searchable = [
                 workout.startDate.formatted(date: .abbreviated, time: .omitted),
@@ -1270,6 +1276,29 @@ struct GhostRaceHubView: View {
                 ($0.distanceMeters ?? 0) > ($1.distanceMeters ?? 0)
             }
         }
+    }
+
+    private var replayFavoritesKey: String {
+        "athlth.ghost.replay.favorites.\(session.profile.userID.uuidString)"
+    }
+
+    private func loadReplayFavorites() {
+        replayFavoriteIDs = Set(
+            (UserDefaults.standard.stringArray(forKey: replayFavoritesKey) ?? [])
+                .compactMap(UUID.init(uuidString:))
+        )
+    }
+
+    private func toggleReplayFavorite(_ id: UUID) {
+        if replayFavoriteIDs.contains(id) {
+            replayFavoriteIDs.remove(id)
+        } else {
+            replayFavoriteIDs.insert(id)
+        }
+        UserDefaults.standard.set(
+            replayFavoriteIDs.map(\.uuidString).sorted(),
+            forKey: replayFavoritesKey
+        )
     }
 
     private var pastSelfSection: some View {
@@ -1318,6 +1347,29 @@ struct GhostRaceHubView: View {
                     ATHLTHTheme.surfaceStone,
                     in: RoundedRectangle(cornerRadius: 13)
                 )
+
+                Button {
+                    replayFavoritesOnly.toggle()
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Favorites", norwegian: "Favoritter"
+                        ),
+                        systemImage: replayFavoritesOnly ? "star.fill" : "star"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(replayFavoritesOnly
+                        ? ATHLTHTheme.accentDeep : ATHLTHTheme.mutedText)
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 7)
+                    .background(
+                        replayFavoritesOnly
+                            ? ATHLTHTheme.accentSoft
+                            : ATHLTHTheme.surfaceStone,
+                        in: Capsule()
+                    )
+                }
+                .buttonStyle(.plain)
 
                 if recentRuns.isEmpty && !loading {
                     ContentUnavailableView(
@@ -1544,6 +1596,26 @@ struct GhostRaceHubView: View {
             }
 
             Spacer()
+
+            Button {
+                toggleReplayFavorite(workout.id)
+            } label: {
+                Image(systemName: replayFavoriteIDs.contains(workout.id)
+                    ? "star.fill" : "star")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 32, height: 40)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                replayFavoriteIDs.contains(workout.id)
+                    ? ATHLTHLocalization.choose(
+                        english: "Remove favorite", norwegian: "Fjern favoritt"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Add favorite", norwegian: "Legg til favoritt"
+                    )
+            )
 
             Button {
                 pendingReplayRun = workout
