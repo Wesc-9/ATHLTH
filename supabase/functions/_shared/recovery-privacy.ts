@@ -13,3 +13,13 @@ export function mustRejectUnconsentedInsight(
 ): boolean {
   return mode === "insight" && !canForwardRecoveryHealth(shareHealthData);
 }
+
+// Reject every request that attempts to use continuous Coach sharing.
+// Client consent alone is insufficient: release requires reviewed legal
+// documentation and a separate server-side authorization implementation.
+export function mustRejectUnreleasedAutomaticCoachSharing(
+  mode: string | undefined,
+  healthSharingMode: string | undefined,
+): boolean {
+  return mode === "ask" && healthSharingMode === "automatic";
+}
