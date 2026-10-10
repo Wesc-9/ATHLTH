@@ -153,6 +153,16 @@ private struct ATHLTHWatchShortcutView: View {
 private struct ATHLTHWatchShortcutWidget: Widget {
     let shortcut: ATHLTHWatchShortcut
 
+    // Widget requires init() in Xcode 27 / watchOS 27. The explicit
+    // shortcut initializer is used for each separate complication kind.
+    init() {
+        self.shortcut = .run
+    }
+
+    init(shortcut: ATHLTHWatchShortcut) {
+        self.shortcut = shortcut
+    }
+
     var body: some WidgetConfiguration {
         StaticConfiguration(
             kind: shortcut.kind,
