@@ -1,6 +1,8 @@
 # ATHLTH development baseline
 
-- Active development version: 1.7.0 on `release/v1.7.0`, build 76.
+- Active development version: 1.7.1 on `release/v1.7.1`, build 77.
+- Version 1.7.0 is locked and must not receive further development changes. Frozen commit: `e001d3aa8300e1e4309bd08b18ccfd856fe59ad3` (build 76; iOS build, backend regressions and TestFlight upload succeeded).
+- Preservation branch: `backup/v1.7.0-locked-before-v1.7.1-20261010`.
 - Version 1.6.9 is locked. Do not modify `release/v1.6.9` for new development.
 - Frozen 1.6.9 commit: `cdc02dc313a20f8430cc96fb882b7fa2e09850d5` (build 75, published to TestFlight).
 - Preservation branch: `backup/v1.6.9-locked-before-v1.7.0-20261009`.
