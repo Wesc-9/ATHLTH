@@ -442,6 +442,124 @@ enum RecoveryCoachConsentPreferences {
         defaults: UserDefaults = .standard
     ) {
         defaults.removeObject(forKey: key(userID: userID))
+        // Full AI revocation also removes the separately recorded
+        // continuous-sharing preference.
+        RecoveryCoachHealthSharingPreferences.revoke(
+            userID: userID, defaults: defaults
+        )
+    }
+}
+
+// A separate, account-scoped v2 preference for future continuous health
+// sharing. Legacy Coach/HealthKit consent NEVER opts users into this mode.
+enum RecoveryCoachHealthSharingMode: String, Codable, Equatable {
+    case off
+    case confirmEveryQuestion
+    case automatic
+}
+
+struct RecoveryCoachHealthSharingRecord: Codable, Equatable {
+    let version: Int
+    let mode: RecoveryCoachHealthSharingMode
+    let changedAt: Date
+    let automaticConsentAt: Date?
+}
+
+enum RecoveryCoachHealthSharingPreferences {
+    private static let version = 2
+
+    // RELEASE SAFETY GATE. Keep false until Groq DPA, transfers, retention,
+    // deletion and DPIA assessment are reviewed and the app has been
+    // explicitly approved for automatic health-data transmission.
+    // Do not make this remote-configurable without a separate release review.
+    static let automaticTransferApprovedForRelease = false
+
+    private static func key(userID: UUID) -> String {
+        "athlth.recoveryCoach.healthSharing.v2.\(userID.uuidString)"
+    }
+
+    static func load(
+        userID: UUID,
+        defaults: UserDefaults = .standard
+    ) -> RecoveryCoachHealthSharingRecord? {
+        guard let data = defaults.data(forKey: key(userID: userID)),
+              let saved = try? JSONDecoder().decode(
+                RecoveryCoachHealthSharingRecord.self, from: data
+              ),
+              saved.version == version
+        else { return nil }
+        return saved
+    }
+
+    static func effectiveMode(
+        userID: UUID,
+        defaults: UserDefaults = .standard
+    ) -> RecoveryCoachHealthSharingMode {
+        guard RecoveryCoachConsentPreferences.load(
+            userID: userID, defaults: defaults
+        )?.healthSharingAllowed == true else { return .off }
+
+        // Old consent was one-question-only, never continuous.
+        guard let saved = load(userID: userID, defaults: defaults) else {
+            return .confirmEveryQuestion
+        }
+
+        if saved.mode == .automatic {
+            return automaticTransferApprovedForRelease &&
+                saved.automaticConsentAt != nil
+                ? .automatic : .confirmEveryQuestion
+        }
+        return saved.mode
+    }
+
+    @discardableResult
+    static func save(
+        userID: UUID,
+        requestedMode: RecoveryCoachHealthSharingMode,
+        defaults: UserDefaults = .standard
+    ) -> RecoveryCoachHealthSharingRecord {
+        let healthApproved = RecoveryCoachConsentPreferences.load(
+            userID: userID, defaults: defaults
+        )?.healthSharingAllowed == true
+        // Fail closed: a premature/invalid automatic selection never grants
+        // ongoing sharing, even if a caller bypasses the UI.
+        let chosen: RecoveryCoachHealthSharingMode
+        if !healthApproved {
+            chosen = .off
+        } else if requestedMode == .automatic &&
+                  !automaticTransferApprovedForRelease {
+            chosen = .confirmEveryQuestion
+        } else {
+            chosen = requestedMode
+        }
+
+        let previous = load(userID: userID, defaults: defaults)
+        let record = RecoveryCoachHealthSharingRecord(
+            version: version,
+            mode: chosen,
+            changedAt: Date(),
+            automaticConsentAt: chosen == .automatic
+                ? (previous?.automaticConsentAt ?? Date()) : nil
+        )
+        if let data = try? JSONEncoder().encode(record) {
+            defaults.set(data, forKey: key(userID: userID))
+        }
+        return record
+    }
+
+    static func canAutomaticallyShare(
+        userID: UUID,
+        defaults: UserDefaults = .standard
+    ) -> Bool {
+        automaticTransferApprovedForRelease &&
+            effectiveMode(userID: userID, defaults: defaults) == .automatic
+    }
+
+    static func revoke(
+        userID: UUID,
+        defaults: UserDefaults = .standard
+    ) {
+        defaults.removeObject(forKey: key(userID: userID))
     }
 }
 
