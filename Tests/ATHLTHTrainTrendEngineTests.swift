@@ -185,14 +185,15 @@ final class ATHLTHTrainTrendEngineTests: XCTestCase {
             strengthHistory: [quick, planned]
         )
 
+        let squatID = ATHLTHTrainTrendEngine.normalize("Knebøy")
         XCTAssertEqual(general.linkedWorkoutCount, 2)
-        XCTAssertEqual(general.points(for: "kneboy").count, 1)
+        XCTAssertEqual(general.points(for: squatID).count, 1)
         XCTAssertEqual(
-            general.points(for: "kneboy").first?.peakWeightKilograms,
+            general.points(for: squatID).first?.peakWeightKilograms,
             60
         )
         XCTAssertEqual(planSpecific.linkedWorkoutCount, 1)
-        XCTAssertTrue(planSpecific.points(for: "kneboy").isEmpty)
+        XCTAssertTrue(planSpecific.points(for: squatID).isEmpty)
     }
 
     func testGeneralTrendsExcludeWarmupsUnfinishedAndDuplicateWorkouts() {
