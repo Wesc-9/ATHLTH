@@ -7420,11 +7420,9 @@ struct CommunityGroupDetailView: View {
 
     private var overview: some View {
         VStack(spacing: 12) {
-            if groups.canPublishUpdates(
-                currentGroup
-            ) {
-                referenceClubComposer
-            }
+            // Creation/member shortcuts are available to every member.
+            // Only the announcement composer is role-gated.
+            referenceClubComposer
 
             referenceClubPostsSection
 
@@ -7444,7 +7442,8 @@ struct CommunityGroupDetailView: View {
 
     private var referenceClubComposer: some View {
         VStack(spacing: 12) {
-            HStack(spacing: 10) {
+            if groups.canPublishUpdates(currentGroup) {
+                HStack(spacing: 10) {
                 if let profile =
                     groups.profileCard(
                         for:
@@ -7567,6 +7566,7 @@ struct CommunityGroupDetailView: View {
                     updateDraft.count > 1200 ||
                     postingUpdate
                 )
+                }
             }
 
             LazyVGrid(
