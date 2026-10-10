@@ -48,6 +48,8 @@ struct ATHLTHNotificationCenterView: View {
 
     @State private var selectedScope: ATHLTHNotificationScope = .all
     @State private var permissionBannerDismissed = false
+    @State private var showingOlderWorkoutDismissConfirmation = false
+    @State private var olderWorkoutIDsPendingDismissal: Set<UUID> = []
 
     var body: some View {
         ScrollView {
@@ -338,11 +340,65 @@ struct ATHLTHNotificationCenterView: View {
                         )
             )
 
+            let pendingItems = sortedPendingWorkoutImports
             LazyVStack(spacing: 10) {
-                ForEach(health.pendingWorkoutImports) { item in
+                ForEach(Array(pendingItems.prefix(5))) { item in
                     pendingWorkoutRow(item)
                 }
+
+                if pendingItems.count > 5 {
+                    olderWorkoutImportCard(
+                        Array(pendingItems.dropFirst(5))
+                    )
+                }
             }
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Dismiss older workouts?",
+                norwegian: "Avvise eldre økter?"
+            ),
+            isPresented: $showingOlderWorkoutDismissConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(
+                ATHLTHLocalization.choose(
+                    english: "Dismiss all",
+                    norwegian: "Avvis alle"
+                ),
+                role: .destructive
+            ) {
+                health.ignorePendingWorkouts(
+                    olderWorkoutIDsPendingDismissal
+                )
+                olderWorkoutIDsPendingDismissal.removeAll()
+            }
+
+            Button(
+                ATHLTHLocalization.choose(
+                    english: "Cancel",
+                    norwegian: "Avbryt"
+                ),
+                role: .cancel
+            ) {
+                olderWorkoutIDsPendingDismissal.removeAll()
+            }
+        } message: {
+            Text(
+                ATHLTHLocalization.choose(
+                    english: "Only the grouped older workouts will be dismissed from ATHLTH. They remain in Apple Health.",
+                    norwegian: "Kun de eldre øktene i samlekortet avvises fra ATHLTH. De blir fortsatt liggende i Apple Health."
+                )
+            )
+        }
+    }
+
+    private var sortedPendingWorkoutImports: [PendingWorkoutImport] {
+        health.pendingWorkoutImports.sorted {
+            if $0.summary.endDate != $1.summary.endDate {
+                return $0.summary.endDate > $1.summary.endDate
+            }
+            return $0.id.uuidString < $1.id.uuidString
         }
     }
 
@@ -702,6 +758,130 @@ struct ATHLTHNotificationCenterView: View {
                         ATHLTHLocalization.choose(
                             english: "Dismiss",
                             norwegian: "Avvis"
+                        )
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(
+                        Color.primary.opacity(0.045),
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .stroke(
+                                Color.primary.opacity(0.07),
+                                lineWidth: 1
+                            )
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(14)
+        .background(
+            ATHLTHTheme.card.opacity(0.97),
+            in: RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                Color.primary.opacity(0.055),
+                lineWidth: 1
+            )
+        }
+        .shadow(
+            color: Color.black.opacity(0.035),
+            radius: 12,
+            y: 5
+        )
+    }
+
+    private func olderWorkoutImportCard(
+        _ items: [PendingWorkoutImport]
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: "square.stack.3d.up.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: RoundedRectangle(
+                            cornerRadius: 13,
+                            style: .continuous
+                        )
+                    )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Older workouts",
+                            norwegian: "Eldre økter"
+                        )
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                    Text(
+                        items.count == 1
+                            ? ATHLTHLocalization.choose(
+                                english: "1 older workout grouped",
+                                norwegian: "1 eldre økt samlet"
+                            )
+                            : ATHLTHLocalization.format(
+                                english: "%d older workouts grouped",
+                                norwegian: "%d eldre økter samlet",
+                                items.count
+                            )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 10) {
+                Button {
+                    health.importPendingWorkouts(
+                        Set(items.map(\.id))
+                    )
+                } label: {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Import all",
+                            norwegian: "Importer alle"
+                        )
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(
+                        ATHLTHTheme.accentDeep,
+                        in: Capsule()
+                    )
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    olderWorkoutIDsPendingDismissal =
+                        Set(items.map(\.id))
+                    showingOlderWorkoutDismissConfirmation = true
+                } label: {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Dismiss all",
+                            norwegian: "Avvis alle"
                         )
                     )
                     .font(.subheadline.weight(.semibold))
