@@ -2,6 +2,56 @@ import Combine
 import CoreLocation
 import Foundation
 
+/// Determines how a target Ghost distributes its total time along a course.
+/// All strategies preserve the requested finish time and route geometry.
+enum GhostTargetPacingStrategy: String, CaseIterable, Identifiable, Codable {
+    case even
+    case negativeSplit
+    case progressive
+
+    var id: String { rawValue }
+    var icon: String {
+        switch self {
+        case .even: return "equal"
+        case .negativeSplit: return "arrow.down.right"
+        case .progressive: return "arrow.up.right"
+        }
+    }
+    var title: String {
+        switch self {
+        case .even:
+            return ATHLTHLocalization.choose(english: "Even pace", norwegian: "Jevnt tempo")
+        case .negativeSplit:
+            return ATHLTHLocalization.choose(english: "Negative split", norwegian: "Negativ splitt")
+        case .progressive:
+            return ATHLTHLocalization.choose(english: "Progressive", norwegian: "Progressiv")
+        }
+    }
+    var subtitle: String {
+        switch self {
+        case .even:
+            return ATHLTHLocalization.choose(english: "Same pace throughout", norwegian: "Samme tempo hele veien")
+        case .negativeSplit:
+            return ATHLTHLocalization.choose(english: "Faster second half", norwegian: "Raskere andre halvdel")
+        case .progressive:
+            return ATHLTHLocalization.choose(english: "Build speed gradually", norwegian: "Øk farten gradvis")
+        }
+    }
+
+    /// Normalized elapsed-time fraction for a normalized distance.
+    /// Smooth monotone curves maintain exact start and end times.
+    func elapsedFraction(at progress: Double) -> Double {
+        let p = min(max(progress, 0), 1)
+        switch self {
+        case .even: return p
+        case .negativeSplit:
+            return p + 0.18 * p * (1 - p)
+        case .progressive:
+            return p + 0.30 * p * (1 - p) * (1 - p)
+        }
+    }
+}
+
 struct GhostRacePoint: Identifiable, Hashable {
     let id: Int
     let latitude: Double
@@ -280,7 +330,8 @@ final class GhostRaceStore: ObservableObject {
 
     func prepareTarget(
         route: TrainingRoute,
-        targetDurationSeconds: TimeInterval
+        targetDurationSeconds: TimeInterval,
+        strategy: GhostTargetPacingStrategy = .even
     ) throws {
         guard targetDurationSeconds >= 60 else {
             throw GhostRacePreparationError
@@ -350,7 +401,7 @@ final class GhostRaceStore: ObservableObject {
                         coordinate.altitude,
                     elapsedTime:
                         targetDurationSeconds *
-                        progress,
+                        strategy.elapsedFraction(at: progress),
                     cumulativeMeters:
                         distance
                 )
