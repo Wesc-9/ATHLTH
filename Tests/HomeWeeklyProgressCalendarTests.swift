@@ -79,6 +79,22 @@ final class HomeWeeklyProgressCalendarTests: XCTestCase {
         ))
     }
 
+    func testStandaloneShortcutAllowsOnlyTodayAndFutureDays() {
+        let now = calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 10, hour: 23, minute: 59
+        ))!
+
+        XCTAssertFalse(HomeWeeklyProgressCalendar.canScheduleStandalone(
+            on: date(2026, 10, 9), asOf: now, calendar: calendar
+        ))
+        XCTAssertTrue(HomeWeeklyProgressCalendar.canScheduleStandalone(
+            on: date(2026, 10, 10), asOf: now, calendar: calendar
+        ))
+        XCTAssertTrue(HomeWeeklyProgressCalendar.canScheduleStandalone(
+            on: date(2026, 10, 14), asOf: now, calendar: calendar
+        ))
+    }
+
     func testWeekPagerWorksForUnscheduledFutureWeeks() {
         let reference = date(2026, 10, 9)
         let interval = HomeWeeklyProgressCalendar.weekInterval(
