@@ -563,6 +563,12 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
         case "train_together_cancelled":
             return "Train Together-økt avlyst"
 
+        case "train_together_chat":
+            return "Ny øktmelding"
+
+        case "train_together_recap":
+            return "Felles oppsummering er klar"
+
         case "message_request":
             let prefix = "Message request from "
             if title.hasPrefix(prefix) {
@@ -750,6 +756,21 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
                     of: " cancelled ",
                     with: " avlyste "
                 )
+
+        case "train_together_chat":
+            return message.replacingOccurrences(
+                of: "New message in ",
+                with: "Ny melding i "
+            )
+
+        case "train_together_recap":
+            return message.replacingOccurrences(
+                of: "The recap for ",
+                with: "Oppsummeringen for "
+            ).replacingOccurrences(
+                of: " is ready.",
+                with: " er klar."
+            )
 
         case "message",
              "message_request":
