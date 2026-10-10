@@ -3085,10 +3085,15 @@ struct PersonalizeTrainingPlanView: View {
                 entry,
                 preferredDayIndexes: selectedDays.sorted()
             ) {
-                plan = session.usePlanTemplate(
+                let created = session.usePlanTemplate(
                     template.id,
                     startDate: resolvedStartDate
                 )
+                if created == nil {
+                    // Do not leave a stray template if scheduling failed.
+                    session.deletePlanTemplate(template.id)
+                }
+                plan = created
             } else {
                 plan = nil
             }
