@@ -96,4 +96,83 @@ final class ProfileRecordRegressionTests:
                 }
         )
     }
+
+    private func weightedExerciseRecord(
+        _ title: String,
+        kilograms: Double,
+        kind: StrengthPersonalRecordKind = .heaviestSet
+    ) -> StrengthPersonalRecord {
+        StrengthPersonalRecord(
+            id: "heaviest-set-\(title.lowercased())",
+            kind: kind,
+            title: title,
+            value: "\(kilograms) kg × 5",
+            date: Date(timeIntervalSince1970: 1_000),
+            score: kilograms
+        )
+    }
+
+    func testExerciseWeightRecordsDefaultToThreeMeasuredExerciseBests() {
+        let records = [
+            weightedExerciseRecord("Benkpress", kilograms: 100),
+            weightedExerciseRecord("Knebøy", kilograms: 150),
+            weightedExerciseRecord("Markløft", kilograms: 180),
+            weightedExerciseRecord("Skulderpress", kilograms: 65)
+        ]
+        XCTAssertEqual(
+            ProfileStrengthExerciseRecordSelection.selectedIDs(
+                from: "",
+                availableRecords: records
+            ),
+            records.prefix(3).map(\.id)
+        )
+    }
+
+    func testExerciseWeightRecordSelectionsPersistAndExcludeUnknownOrDuplicateIDs() {
+        let bench = weightedExerciseRecord("Benkpress", kilograms: 100)
+        let squat = weightedExerciseRecord("Knebøy", kilograms: 150)
+        let stored = ProfileStrengthExerciseRecordSelection.encoded([
+            squat.id, bench.id, bench.id, "missing-exercise"
+        ])
+        XCTAssertEqual(
+            ProfileStrengthExerciseRecordSelection.selectedIDs(
+                from: stored,
+                availableRecords: [bench, squat]
+            ),
+            [squat.id, bench.id]
+        )
+    }
+
+    func testExerciseWeightRecordsIgnoreUnweightedAndNonHeaviestEntries() {
+        let zero = weightedExerciseRecord("Nedtrekk", kilograms: 0)
+        let rep = weightedExerciseRecord(
+            "Benkpress",
+            kilograms: 90,
+            kind: .estimatedOneRepMax
+        )
+        let valid = weightedExerciseRecord("Knebøy", kilograms: 110)
+        XCTAssertEqual(
+            ProfileStrengthExerciseRecordSelection.selectedIDs(
+                from: "",
+                availableRecords: [zero, rep, valid]
+            ),
+            [valid.id]
+        )
+    }
+
+    func testExerciseWeightRecordProfileSelectionCanBeExplicitlyEmpty() {
+        let bench = weightedExerciseRecord("Benkpress", kilograms: 100)
+        XCTAssertEqual(
+            ProfileStrengthExerciseRecordSelection.selectedIDs(
+                from: ProfileStrengthExerciseRecordSelection.encoded([]),
+                availableRecords: [bench]
+            ),
+            []
+        )
+        XCTAssertEqual(
+            ProfileStrengthExerciseRecordSelection.showcaseLimit,
+            4
+        )
+    }
+
 }
