@@ -1,11 +1,16 @@
 import SwiftUI
 
+private enum WatchShortcutDestination: Hashable {
+    case routes
+}
+
 struct WatchHomeView: View {
     @EnvironmentObject private var routeStore: WatchRouteStore
     @EnvironmentObject private var workoutManager: WatchWorkoutManager
+    @State private var shortcutPath: [WatchShortcutDestination] = []
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $shortcutPath) {
             ScrollView {
                 VStack(spacing: 9) {
                     header
@@ -119,6 +124,12 @@ struct WatchHomeView: View {
                 .hidden,
                 for: .navigationBar
             )
+            .navigationDestination(for: WatchShortcutDestination.self) { target in
+                switch target {
+                case .routes:
+                    WatchRoutesListView()
+                }
+            }
         }
         .onOpenURL { url in
             guard url.scheme ==
@@ -138,13 +149,16 @@ struct WatchHomeView: View {
                 }
 
             case "quick-run":
-                Task {
-                    await workoutManager
-                        .start(
-                            kind:
-                                .running
-                        )
-                }
+                Task { await workoutManager.start(kind: .running) }
+
+            case "quick-strength":
+                Task { await workoutManager.start(kind: .strength) }
+
+            case "quick-walk":
+                Task { await workoutManager.start(kind: .walking) }
+
+            case "routes":
+                shortcutPath = [.routes]
 
             default:
                 break
