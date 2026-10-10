@@ -15770,8 +15770,9 @@ struct ATHLTHProfileView: View {
                     )
                 )
         ) {
-            HStack(spacing: 8) {
-                ForEach(
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    ForEach(
                     0..<ProfileFeaturedRecordKind
                         .showcaseLimit,
                     id: \.self
@@ -15801,6 +15802,10 @@ struct ATHLTHProfileView: View {
                         .buttonStyle(.plain)
                     }
                 }
+                }
+
+                ProfileStrengthExerciseRecordsSection()
+                    .environmentObject(strengthWorkout)
             }
         }
     }
