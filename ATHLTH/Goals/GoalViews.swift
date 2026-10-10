@@ -1413,25 +1413,28 @@ struct AddManualMilestoneView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Milestone") {
-                    TextField("Title", text: $title)
-                    TextField("What counts as complete?", text: $detail, axis: .vertical)
+                Section(ATHLTHLocalization.choose(english: "Milestone", norwegian: "Delmål")) {
+                    TextField(ATHLTHLocalization.choose(english: "Title", norwegian: "Navn på delmål"), text: $title)
+                    TextField(ATHLTHLocalization.choose(english: "What counts as complete?", norwegian: "Hva skal til for å fullføre?"), text: $detail, axis: .vertical)
                 }
 
                 Section {
-                    Text("This milestone is manual. You can check or uncheck it at any time.")
+                    Text(ATHLTHLocalization.choose(english: "This milestone is manual. You can check or uncheck it at any time.", norwegian: "Delmålet kan fullføres eller oppheves manuelt når du ønsker."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("Add Milestone")
+            .scrollContentBackground(.hidden)
+            .background(Color(red: 0.965, green: 0.975, blue: 0.992).ignoresSafeArea())
+            .tint(ATHLTHTheme.accentDeep)
+            .navigationTitle(ATHLTHLocalization.choose(english: "Add Milestone", norwegian: "Legg til delmål"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt")) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
+                    Button(ATHLTHLocalization.choose(english: "Add", norwegian: "Legg til")) {
                         guard let goal = goalStore.goals.first(where: { $0.id == goalID }) else {
                             return
                         }
@@ -1439,7 +1442,7 @@ struct AddManualMilestoneView: View {
                         milestones.append(
                             GoalMilestone(
                                 title: title.trimmingCharacters(in: .whitespacesAndNewlines),
-                                targetDescription: detail.isEmpty ? "Manual milestone" : detail
+                                targetDescription: detail.isEmpty ? ATHLTHLocalization.choose(english: "Manual milestone", norwegian: "Manuelt delmål") : detail
                             )
                         )
                         goalStore.replaceMilestones(milestones, for: goalID)
@@ -5849,28 +5852,28 @@ struct GoalEditView: View {
     var body: some View {
         let photoButtonTitle =
             imageData == nil
-                ? "Choose or change photo"
-                : "New photo selected"
+                ? ATHLTHLocalization.choose(english: "Choose or change photo", norwegian: "Velg eller endre bilde")
+                : ATHLTHLocalization.choose(english: "New photo selected", norwegian: "Nytt bilde valgt")
 
         return NavigationStack {
             Form {
-                Section("Goal") {
-                    TextField("Title", text: $title)
+                Section(ATHLTHLocalization.choose(english: "Goal", norwegian: "Mål")) {
+                    TextField(ATHLTHLocalization.choose(english: "Title", norwegian: "Tittel"), text: $title)
 
-                    Toggle("Deadline", isOn: $hasDeadline)
+                    Toggle(ATHLTHLocalization.choose(english: "Deadline", norwegian: "Måldato"), isOn: $hasDeadline)
                     if hasDeadline {
                         DatePicker(
-                            "Target date",
+                            ATHLTHLocalization.choose(english: "Target date", norwegian: "Måldato"),
                             selection: $deadline,
                             in: Calendar.current.startOfDay(for: Date())...,
                             displayedComponents: .date
                         )
                     }
 
-                    Toggle("Primary Goal", isOn: $makePrimary)
+                    Toggle(ATHLTHLocalization.choose(english: "Primary Goal", norwegian: "Hovedmål"), isOn: $makePrimary)
                 }
 
-                Section("Identity") {
+                Section(ATHLTHLocalization.choose(english: "Identity", norwegian: "Utseende og motivasjon")) {
                     PhotosPicker(selection: $selectedPhoto, matching: .images) {
                         Label(
                             photoButtonTitle,
@@ -5878,27 +5881,27 @@ struct GoalEditView: View {
                         )
                     }
 
-                    Picker("Fallback cover", selection: $coverStyle) {
+                    Picker(ATHLTHLocalization.choose(english: "Fallback cover", norwegian: "Standardbilde"), selection: $coverStyle) {
                         ForEach(GoalCoverStyle.selectableCases) { style in
                             Text(style.title).tag(style)
                         }
                     }
 
-                    TextField("Why this matters", text: $whyItMatters, axis: .vertical)
+                    TextField(ATHLTHLocalization.choose(english: "Why this matters", norwegian: "Hvorfor er målet viktig?"), text: $whyItMatters, axis: .vertical)
                         .lineLimit(2...5)
 
-                    TextField("Notes", text: $notes, axis: .vertical)
+                    TextField(ATHLTHLocalization.choose(english: "Notes", norwegian: "Notater"), text: $notes, axis: .vertical)
                         .lineLimit(2...5)
                 }
 
                 if !session.trainingPlans.isEmpty {
-                    Section("Training plan") {
+                    Section(ATHLTHLocalization.choose(english: "Training plan", norwegian: "Treningsplan")) {
                         Picker(
-                            "Linked plan",
+                            ATHLTHLocalization.choose(english: "Linked plan", norwegian: "Tilknyttet plan"),
                             selection:
                                 $selectedTrainingPlanID
                         ) {
-                            Text("No plan")
+                            Text(ATHLTHLocalization.choose(english: "No plan", norwegian: "Ingen plan"))
                                 .tag(
                                     Optional<UUID>.none
                                 )
@@ -5920,8 +5923,8 @@ struct GoalEditView: View {
                     }
                 }
 
-                Section("Privacy") {
-                    Picker("Visibility", selection: $privacy) {
+                Section(ATHLTHLocalization.choose(english: "Privacy", norwegian: "Personvern")) {
+                    Picker(ATHLTHLocalization.choose(english: "Visibility", norwegian: "Synlighet"), selection: $privacy) {
                         ForEach(GoalPrivacy.allCases) { option in
                             Text(option.title).tag(option)
                         }
@@ -5929,20 +5932,23 @@ struct GoalEditView: View {
                 }
 
                 Section {
-                    Text("Target rules and existing automatic milestones are kept unchanged when editing metadata. This prevents accidental changes to what counts as completion.")
+                    Text(ATHLTHLocalization.choose(english: "Target rules and existing automatic milestones are kept unchanged when editing metadata. This prevents accidental changes to what counts as completion.", norwegian: "Målregler og automatiske delmål beholdes uendret når du redigerer. Dette hindrer at fullføringskriteriene endres ved et uhell."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("Edit Goal")
+            .scrollContentBackground(.hidden)
+            .background(Color(red: 0.965, green: 0.975, blue: 0.992).ignoresSafeArea())
+            .tint(ATHLTHTheme.accentDeep)
+            .navigationTitle(ATHLTHLocalization.choose(english: "Edit Goal", norwegian: "Rediger mål"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt")) { dismiss() }
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }
+                    Button(ATHLTHLocalization.choose(english: "Save", norwegian: "Lagre")) { save() }
                         .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
