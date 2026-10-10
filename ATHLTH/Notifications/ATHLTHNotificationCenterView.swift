@@ -835,42 +835,42 @@ struct ATHLTHNotificationCenterView: View {
             } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "square.stack.3d.up.fill")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .frame(width: 44, height: 44)
-                    .background(
-                        ATHLTHTheme.accentSoft,
-                        in: RoundedRectangle(
-                            cornerRadius: 13,
-                            style: .continuous
-                        )
-                    )
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Older workouts",
-                            norwegian: "Eldre økter"
-                        )
-                    )
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-
-                    Text(
-                        items.count == 1
-                            ? ATHLTHLocalization.choose(
-                                english: "1 older workout grouped",
-                                norwegian: "1 eldre økt samlet"
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 44, height: 44)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: RoundedRectangle(
+                                cornerRadius: 13,
+                                style: .continuous
                             )
-                            : ATHLTHLocalization.format(
-                                english: "%d older workouts grouped",
-                                norwegian: "%d eldre økter samlet",
-                                items.count
+                        )
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Older workouts",
+                                norwegian: "Eldre økter"
                             )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                }
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        Text(
+                            items.count == 1
+                                ? ATHLTHLocalization.choose(
+                                    english: "1 older workout grouped",
+                                    norwegian: "1 eldre økt samlet"
+                                )
+                                : ATHLTHLocalization.format(
+                                    english: "%d older workouts grouped",
+                                    norwegian: "%d eldre økter samlet",
+                                    items.count
+                                )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
 
                     Spacer(minLength: 0)
 
