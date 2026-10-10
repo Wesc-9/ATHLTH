@@ -217,6 +217,7 @@ jobs:
             local udid="$1"
             local screenshot="$2"
             local label="$3"
+            local retry_mode="${4:-final}"
             local attempt=1
             local entropy="0"
 
@@ -243,7 +244,11 @@ jobs:
               attempt=$((attempt + 1))
             done
 
-            echo "::error::$label remained visually blank after three checks (entropy=$entropy)."
+            if [ "$retry_mode" = "probe" ]; then
+              echo "::warning::$label looks blank after initial checks (entropy=$entropy); relaunching once to distinguish a simulator rendering issue."
+              return 1
+            fi
+            echo "::error::$label remained visually blank after relaunch and three more checks (entropy=$entropy)."
             xcrun simctl spawn "$udid" log show --last 3m --style compact --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' || true
             return 1
           }
@@ -281,7 +286,30 @@ jobs:
             fi
 
             SCREENSHOT="$RUNNER_TEMP/athlth-$CLASS.png"
-            validate_nonblank_screen               "$UDID"               "$SCREENSHOT"               "$DEVICE_NAME onboarding"
+            if ! validate_nonblank_screen "$UDID" "$SCREENSHOT" "$DEVICE_NAME onboarding" probe; then
+              # A headless CoreSimulator framebuffer can remain blank even
+              # after a successful process launch on a freshly created device.
+              # Reopen the real app once; do not lower the visual threshold or
+              # mark a persistently blank screen as a passing result.
+              xcrun simctl terminate "$UDID" com.wesc9.athlth || true
+              sleep 3
+              set +e
+              RETRY_LAUNCH_OUTPUT=$(xcrun simctl launch "$UDID" com.wesc9.athlth 2>&1)
+              RETRY_LAUNCH_STATUS=$?
+              set -e
+              echo "$RETRY_LAUNCH_OUTPUT"
+              if [ "$RETRY_LAUNCH_STATUS" -ne 0 ]; then
+                echo "::error::ATHLTH failed to relaunch after blank screenshot on $DEVICE_NAME."
+                exit 1
+              fi
+              PID=$(echo "$RETRY_LAUNCH_OUTPUT" | awk -F': ' '/com\.wesc9\.athlth:/ {print $2}')
+              sleep 12
+              if [ -z "$PID" ] || ! kill -0 "$PID" 2>/dev/null; then
+                echo "::error::ATHLTH exited during blank-screen relaunch on $DEVICE_NAME."
+                exit 1
+              fi
+              validate_nonblank_screen "$UDID" "$SCREENSHOT" "$DEVICE_NAME onboarding"
+            fi
 
             echo "ATHLTH remained alive and rendered non-blank onboarding UI on $DEVICE_NAME (PID $PID)."
 
