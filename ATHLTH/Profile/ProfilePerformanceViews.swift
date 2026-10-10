@@ -8187,6 +8187,405 @@ private struct PerformanceTrainingVolumeDetailView:
     }
 }
 
+
+enum ProfileStrengthExerciseRecordSelection {
+    static let storageKey =
+        "athlth.profile.featuredStrengthExerciseRecords.v1"
+    static let showcaseLimit = 4
+
+    // An empty setting uses the best recorded exercises by default.
+    // An explicitly saved [] means that the athlete chose to hide them.
+    static func selectedIDs(
+        from raw: String,
+        availableRecords: [StrengthPersonalRecord]
+    ) -> [String] {
+        let available = availableRecords.filter {
+            $0.kind == .heaviestSet &&
+            $0.score > 0 &&
+            $0.score.isFinite
+        }
+        let validIDs = Set(available.map(\.id))
+
+        if raw.isEmpty {
+            return Array(available.prefix(3)).map(\.id)
+        }
+
+        guard let data = raw.data(using: .utf8),
+              let savedIDs = try? JSONDecoder().decode([String].self, from: data)
+        else {
+            return []
+        }
+
+        var seen = Set<String>()
+        return savedIDs.filter {
+            validIDs.contains($0) && seen.insert($0).inserted
+        }
+        .prefix(showcaseLimit)
+        .map { $0 }
+    }
+
+    static func encoded(_ ids: [String]) -> String {
+        let trimmed = Array(ids.prefix(showcaseLimit))
+        guard let data = try? JSONEncoder().encode(trimmed),
+              let value = String(data: data, encoding: .utf8)
+        else {
+            return "[]"
+        }
+        return value
+    }
+}
+
+// Personal records reflect completed, weighted strength efforts only.
+// The strength store is the single source of truth for record values.
+struct ProfileStrengthExerciseRecordsSection: View {
+    @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
+    @AppStorage(ProfileStrengthExerciseRecordSelection.storageKey)
+    private var storedSelection = ""
+
+    private var allRecords: [StrengthPersonalRecord] {
+        strengthWorkout.personalRecords
+            .filter {
+                $0.kind == .heaviestSet &&
+                $0.score > 0 &&
+                $0.score.isFinite
+            }
+            .sorted {
+                if $0.score == $1.score {
+                    return $0.title.localizedStandardCompare($1.title) == .orderedAscending
+                }
+                return $0.score > $1.score
+            }
+    }
+
+    private var selectedRecords: [StrengthPersonalRecord] {
+        let byID = Dictionary(uniqueKeysWithValues: allRecords.map { ($0.id, $0) })
+        return ProfileStrengthExerciseRecordSelection.selectedIDs(
+            from: storedSelection,
+            availableRecords: allRecords
+        ).compactMap { byID[$0] }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(spacing: 10) {
+                Image(systemName: "dumbbell.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 34, height: 34)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Heaviest weight by exercise",
+                            norwegian: "Høyeste vekt per øvelse"
+                        )
+                    )
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "From completed strength sets",
+                            norwegian: "Fra fullførte styrkesett"
+                        )
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                Spacer(minLength: 4)
+
+                if !allRecords.isEmpty {
+                    NavigationLink {
+                        ProfileStrengthExerciseRecordPickerView(
+                            storedSelection: $storedSelection,
+                            records: allRecords
+                        )
+                    } label: {
+                        HStack(spacing: 3) {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Choose",
+                                    norwegian: "Velg"
+                                )
+                            )
+                            Image(systemName: "chevron.right")
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            if allRecords.isEmpty {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Complete a weighted strength set to see your first record.",
+                        norwegian: "Fullfør et styrkesett med vekt for å få din første rekord."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .padding(.vertical, 7)
+            } else if selectedRecords.isEmpty {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Choose exercises to display your weight records here.",
+                        norwegian: "Velg hvilke øvelser du ønsker å vise rekordene for."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .padding(.vertical, 7)
+            } else {
+                ForEach(selectedRecords) { record in
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(record.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                                .lineLimit(1)
+
+                            Text(
+                                record.date.formatted(
+                                    date: .abbreviated,
+                                    time: .omitted
+                                )
+                            )
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+
+                        Spacer(minLength: 5)
+
+                        Text(record.value)
+                            .font(.subheadline.weight(.bold))
+                            .monospacedDigit()
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(
+                        Color(red: 0.95, green: 0.97, blue: 0.995),
+                        in: RoundedRectangle(
+                            cornerRadius: 14,
+                            style: .continuous
+                        )
+                    )
+                }
+            }
+        }
+        .padding(12)
+        .background(
+            Color.white.opacity(0.96),
+            in: RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(ATHLTHTheme.border.opacity(0.55), lineWidth: 0.8)
+        }
+    }
+}
+
+private struct ProfileStrengthExerciseRecordPickerView: View {
+    @Binding var storedSelection: String
+    let records: [StrengthPersonalRecord]
+
+    @State private var searchText = ""
+
+    private var selectedIDs: [String] {
+        ProfileStrengthExerciseRecordSelection.selectedIDs(
+            from: storedSelection,
+            availableRecords: records
+        )
+    }
+
+    private var filteredRecords: [StrengthPersonalRecord] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return records }
+
+        return records.filter {
+            $0.title.localizedStandardContains(query)
+        }
+    }
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 10) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Choose up to four exercises to show on your profile. The highest completed weight and reps update automatically.",
+                        norwegian: "Velg opptil fire øvelser å vise på profilen. Høyeste fullførte vekt og antall repetisjoner oppdateres automatisk."
+                    )
+                )
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .padding(.bottom, 5)
+
+                ForEach(filteredRecords) { record in
+                    let selected = selectedIDs.contains(record.id)
+                    Button {
+                        toggle(record.id)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "dumbbell.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .frame(width: 42, height: 42)
+                                .background(
+                                    ATHLTHTheme.accentSoft,
+                                    in: RoundedRectangle(
+                                        cornerRadius: 12,
+                                        style: .continuous
+                                    )
+                                )
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(record.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                                Text(
+                                    record.date.formatted(
+                                        date: .abbreviated,
+                                        time: .omitted
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+
+                            Spacer(minLength: 4)
+
+                            VStack(alignment: .trailing, spacing: 5) {
+                                Text(record.value)
+                                    .font(.subheadline.weight(.bold))
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    .monospacedDigit()
+
+                                Image(
+                                    systemName: selected
+                                        ? "checkmark.circle.fill"
+                                        : "circle"
+                                )
+                                .font(.system(size: 22))
+                                .foregroundStyle(
+                                    selected
+                                        ? ATHLTHTheme.accentDeep
+                                        : ATHLTHTheme.mutedText
+                                )
+                            }
+                        }
+                        .padding(14)
+                        .background(
+                            selected
+                                ? ATHLTHTheme.accentSoft.opacity(0.65)
+                                : Color.white,
+                            in: RoundedRectangle(
+                                cornerRadius: 19,
+                                style: .continuous
+                            )
+                        )
+                        .overlay {
+                            RoundedRectangle(
+                                cornerRadius: 19,
+                                style: .continuous
+                            )
+                            .stroke(
+                                selected
+                                    ? ATHLTHTheme.accentDeep.opacity(0.5)
+                                    : ATHLTHTheme.border.opacity(0.7),
+                                lineWidth: 1
+                            )
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(
+                        !selected &&
+                        selectedIDs.count >=
+                            ProfileStrengthExerciseRecordSelection.showcaseLimit
+                    )
+                    .opacity(
+                        !selected &&
+                        selectedIDs.count >=
+                            ProfileStrengthExerciseRecordSelection.showcaseLimit
+                            ? 0.52
+                            : 1
+                    )
+                    .accessibilityValue(
+                        selected
+                            ? ATHLTHLocalization.choose(
+                                english: "Shown on profile",
+                                norwegian: "Vises på profil"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Not selected",
+                                norwegian: "Ikke valgt"
+                            )
+                    )
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: 720)
+            .frame(maxWidth: .infinity)
+        }
+        .searchable(
+            text: $searchText,
+            prompt: ATHLTHLocalization.choose(
+                english: "Search exercises",
+                norwegian: "Søk etter øvelse"
+            )
+        )
+        .background(
+            ATHLTHPremiumCanvas(
+                accent: ATHLTHTheme.accentDeep.opacity(0.12)
+            )
+        )
+        .navigationTitle(
+            ATHLTHLocalization.choose(
+                english: "Exercise weight records",
+                norwegian: "Vektrekorder per øvelse"
+            )
+        )
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Text(
+                    "\(selectedIDs.count)/\(ProfileStrengthExerciseRecordSelection.showcaseLimit)"
+                )
+                .font(.caption.weight(.bold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+            }
+        }
+    }
+
+    private func toggle(_ id: String) {
+        var updated = selectedIDs
+        if let index = updated.firstIndex(of: id) {
+            updated.remove(at: index)
+        } else {
+            guard updated.count <
+                ProfileStrengthExerciseRecordSelection.showcaseLimit
+            else {
+                return
+            }
+            updated.append(id)
+        }
+        storedSelection =
+            ProfileStrengthExerciseRecordSelection.encoded(updated)
+    }
+}
+
 private struct PerformanceMilestonesDetailView:
     View {
     let stats: ProfilePerformanceStats?
