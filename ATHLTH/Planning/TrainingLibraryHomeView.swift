@@ -2518,6 +2518,7 @@ struct PersonalizeTrainingPlanView: View {
 
     let entry: TrainingPlanCatalogEntry
     var onPlanCreated: (() -> Void)? = nil
+    var createEditableCopy = false
 
     @State private var startDate = Date()
     @State private var selectedDays: Set<Int> = []
@@ -2548,7 +2549,8 @@ struct PersonalizeTrainingPlanView: View {
     }
 
     private var existingScheduledPlan: TrainingPlan? {
-        session.existingScheduledCatalogPlan(
+        guard !createEditableCopy else { return nil }
+        return session.existingScheduledCatalogPlan(
             entry,
             startDate: resolvedStartDate
         )
@@ -2570,10 +2572,25 @@ struct PersonalizeTrainingPlanView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     LibraryPremiumIntro(
-                        eyebrow: "MAKE IT MINE",
+                        eyebrow: createEditableCopy
+                            ? ATHLTHLocalization.choose(
+                                english: "BUILD FROM TEMPLATE",
+                                norwegian: "BYGG FRA MAL"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "MAKE IT MINE",
+                                norwegian: "GJØR DEN TIL MIN"
+                            ),
                         title: entry.title,
-                        subtitle:
-                            "Choose when this plan fits your life. ATHLTH keeps the training structure, but places the sessions on the days you prefer.",
+                        subtitle: createEditableCopy
+                            ? ATHLTHLocalization.choose(
+                                english: "Start with this plan's workouts, choose your days and edit your own version after creating it.",
+                                norwegian: "Bruk øktene fra denne planen, velg treningsdager og rediger din egen versjon etter opprettelsen."
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Choose when this plan fits your life. ATHLTH keeps its structure and places workouts on your preferred days.",
+                                norwegian: "Velg startdato og treningsdager. ATHLTH beholder oppbyggingen og legger øktene på dagene du ønsker."
+                            ),
                         icon: "slider.horizontal.3",
                         accent: ATHLTHTheme.accent
                     ) {
@@ -2594,7 +2611,7 @@ struct PersonalizeTrainingPlanView: View {
                         }
                     }
 
-                    ATHLTHCard {
+                    ATHLTHPlanGhostCard {
                         VStack(alignment: .leading, spacing: 13) {
                             Text("START")
                                 .font(.system(size: 9, weight: .bold))
@@ -2660,7 +2677,7 @@ struct PersonalizeTrainingPlanView: View {
                         }
                     }
 
-                    ATHLTHCard {
+                    ATHLTHPlanGhostCard {
                         VStack(alignment: .leading, spacing: 13) {
                             HStack {
                                 VStack(alignment: .leading, spacing: 3) {
@@ -2744,7 +2761,7 @@ struct PersonalizeTrainingPlanView: View {
                         }
                     }
 
-                    ATHLTHCard {
+                    ATHLTHPlanGhostCard {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("PLAN FIT")
                                 .font(.system(size: 9, weight: .bold))
@@ -2862,9 +2879,20 @@ struct PersonalizeTrainingPlanView: View {
                     } label: {
                         HStack {
                             Label(
-                                existingScheduledPlan == nil
-                                    ? "Create My Plan"
-                                    : "Open Existing Plan",
+                                createEditableCopy
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Build my version",
+                                        norwegian: "Bygg min versjon"
+                                    )
+                                    : existingScheduledPlan == nil
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Create my plan",
+                                            norwegian: "Opprett min plan"
+                                        )
+                                        : ATHLTHLocalization.choose(
+                                            english: "Open existing plan",
+                                            norwegian: "Åpne eksisterende plan"
+                                        ),
                                 systemImage:
                                     existingScheduledPlan == nil
                                         ? "calendar.badge.plus"
@@ -2908,25 +2936,6 @@ struct PersonalizeTrainingPlanView: View {
                             : 1
                     )
 
-                    Button {
-                        _ = session.saveCatalogPlanTemplate(
-                            entry,
-                            preferredDayIndexes:
-                                selectedDays.sorted()
-                        )
-                        dismiss()
-                    } label: {
-                        Label(
-                            "Save for later",
-                            systemImage: "bookmark"
-                        )
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 46)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(ATHLTHTheme.accent)
-                    .disabled(!hasValidDays)
                 }
                 .padding(18)
                 .frame(maxWidth: 720)
@@ -2937,7 +2946,17 @@ struct PersonalizeTrainingPlanView: View {
                     accent: ATHLTHTheme.accent.opacity(0.24)
                 )
             )
-            .navigationTitle("Make it mine")
+            .navigationTitle(
+                createEditableCopy
+                    ? ATHLTHLocalization.choose(
+                        english: "Build from this plan",
+                        norwegian: "Bygg fra denne planen"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Make it mine",
+                        norwegian: "Gjør den til min"
+                    )
+            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -3028,24 +3047,39 @@ struct PersonalizeTrainingPlanView: View {
     }
 
     private func createScheduledPlan() {
-        guard hasValidDays else { return }
+        guard hasValidDays, conflictingPlan == nil else { return }
 
-        guard let plan =
-            session.scheduleCatalogPlan(
+        let plan: TrainingPlan?
+        if createEditableCopy {
+            // A separate plan is scheduled from a private reusable copy.
+            // The curated catalog entry itself is never mutated.
+            if let template = session.saveCatalogPlanTemplate(
+                entry,
+                preferredDayIndexes: selectedDays.sorted()
+            ) {
+                plan = session.usePlanTemplate(
+                    template.id,
+                    startDate: resolvedStartDate
+                )
+            } else {
+                plan = nil
+            }
+        } else {
+            plan = session.scheduleCatalogPlan(
                 entry,
                 startDate: resolvedStartDate,
-                preferredDayIndexes:
-                    selectedDays.sorted()
+                preferredDayIndexes: selectedDays.sorted()
             )
-        else {
-            scheduleError =
-                "The plan could not be scheduled. Check that its dates do not overlap another active or upcoming plan."
+        }
+
+        guard let plan else {
+            scheduleError = ATHLTHLocalization.choose(
+                english: "The plan could not be scheduled. Choose dates that do not overlap an existing plan.",
+                norwegian: "Planen kunne ikke opprettes. Velg datoer som ikke overlapper en eksisterende plan."
+            )
             return
         }
 
-        // Keep a concrete route back to the created plan. Upcoming
-        // plans are valid plans even though they are not the active
-        // plan until their start date.
         existingPlanToOpen = plan
         onPlanCreated?()
     }
