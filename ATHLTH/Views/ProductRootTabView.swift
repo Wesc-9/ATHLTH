@@ -11034,6 +11034,17 @@ struct ATHLTHRecoveryView: View {
                                     context: recoveryAIContext,
                                     isLoading: isLoadingRecoveryAI
                                 )
+
+                                // Preserve the existing Coach workout advice
+                                // for users who opt into automatic AI insights.
+                                RecoverySuggestedTodayCard(
+                                    suggestion:
+                                        (recoveryAIInsight ??
+                                            fallbackRecoveryAIInsight)
+                                            .suggestion
+                                ) {
+                                    onSelectTab(1)
+                                }
                             }
 
                             RecoveryReadinessBreakdownCard(
