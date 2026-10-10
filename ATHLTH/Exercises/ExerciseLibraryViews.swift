@@ -672,23 +672,24 @@ struct ExerciseLibraryView: View {
         )
     }
 
-    // A curated shelf of the upstream, attributed RepDB exercises, rather
-    // than 20 duplicate records or newly copied third-party artwork.
+    // A shelf of 20 NEW ATHLTH-authored core movements from the ATHLTH
+    // catalog. Illustrations are locally rendered original vectors, not
+    // copies of RepDB photographs or third-party image assets.
     private var coreEssentialsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 6) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(ATHLTHLocalization.choose(
-                        english: "CORE ESSENTIALS",
-                        norwegian: "MAGE & KJERNE"
+                        english: "NEW IN ATHLTH",
+                        norwegian: "NYTT I ATHLTH"
                     ))
                     .font(.system(size: 10, weight: .bold))
                     .tracking(1.3)
                     .foregroundStyle(ATHLTHTheme.accentDeep)
 
                     Text(ATHLTHLocalization.choose(
-                        english: "20 popular core exercises",
-                        norwegian: "20 populære mageøvelser"
+                        english: "20 new core exercises",
+                        norwegian: "20 nye mageøvelser"
                     ))
                     .font(.headline.weight(.bold))
                     .foregroundStyle(.primary)
@@ -698,12 +699,12 @@ struct ExerciseLibraryView: View {
 
                 VStack(alignment: .trailing, spacing: 3) {
                     Text(ATHLTHLocalization.choose(
-                        english: "RepDB loaded",
-                        norwegian: "RepDB innlastet"
+                        english: "New exercises",
+                        norwegian: "Nye øvelser"
                     ))
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(.secondary)
-                    Text("\(library.repDBExercises.count) / \(library.repDBExpectedCount ?? 637)")
+                    Text("\(library.featuredCoreExercises.count) / 20")
                         .font(.caption.weight(.semibold))
                         .monospacedDigit()
                         .foregroundStyle(ATHLTHTheme.accentDeep)
@@ -762,8 +763,8 @@ struct ExerciseLibraryView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.down.circle")
                     Text(ATHLTHLocalization.choose(
-                        english: "Core exercises and illustrations appear once the RepDB catalog loads. Pull down to retry.",
-                        norwegian: "Mageøvelser og bilder vises når RepDB er lastet inn. Dra ned for å prøve igjen."
+                        english: "New ATHLTH exercises will appear when the ATHLTH catalog refreshes. Pull down to retry.",
+                        norwegian: "De nye ATHLTH-øvelsene vises når øvelseskatalogen er oppdatert. Dra ned for å prøve igjen."
                     ))
                 }
                 .font(.caption)
@@ -1492,7 +1493,12 @@ struct ExerciseArtwork: View {
 
     var body: some View {
         Group {
-            if let url = entry.imageStartURL {
+            if let slug = entry.sourceIdentifier,
+               entry.source == .athlthCatalog,
+               slug.hasPrefix("athlth-core-") {
+                // Distinct royalty-free local artwork for all 20 originals.
+                ATHLTHOriginalCoreArtwork(slug: slug)
+            } else if let url = entry.imageStartURL {
                 if url.isFileURL,
                    let image = UIImage(contentsOfFile: url.path) {
                     Image(uiImage: image)
