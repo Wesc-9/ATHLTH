@@ -1410,6 +1410,22 @@ struct AppRootView: View {
     private var lifecycleSocialContent: AnyView {
         AnyView(
             lifecycleCompletionContent
+        .onChange(of: settings.language) { _, _ in
+            guard appSession.signedIn else { return }
+
+            // Local notifications are localized when scheduled, not when
+            // delivered. Replacing the same request IDs refreshes pending
+            // wording without sending an additional alert now.
+            notifications.syncChallengeEvents(
+                from: challengeStore.challenges,
+                currentUserID: appSession.profile.userID
+            )
+            // Remote APNs notifications use the selected language stored
+            // on this device registration, so update it in the same flow.
+            Task {
+                await APNsPushManager.shared.syncCurrentToken()
+            }
+        }
         .onChange(of: challengeStore.challenges) { _, updatedChallenges in
             notifications.syncChallengeEvents(
                 from: updatedChallenges,
