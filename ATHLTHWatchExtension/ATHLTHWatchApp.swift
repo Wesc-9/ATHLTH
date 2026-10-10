@@ -43,8 +43,11 @@ final class WatchAppDelegate: NSObject, WKApplicationDelegate {
         }
 
         let requestedAt = Date()
-        let deadline = requestedAt.addingTimeInterval(15)
-        while Date() < deadline {
+        // Existing Watch-initiated running launches must not wait 15
+        // seconds for a Quick Train transfer they never requested.
+        let transferDeadline = requestedAt.addingTimeInterval(2)
+        let routeDeadline = requestedAt.addingTimeInterval(15)
+        while Date() < routeDeadline {
             // A second request must never create a second HKWorkoutSession.
             if manager.isActive ||
                 manager.state == .preparing ||
@@ -67,6 +70,12 @@ final class WatchAppDelegate: NSObject, WKApplicationDelegate {
                     if mode == .afterThirtySeconds {
                         let startAt = workout.updatedAt.addingTimeInterval(30)
                         while Date() < startAt {
+                            // A newer quick-start request supersedes this
+                            // countdown, including switching to manual start.
+                            if routeStore.preparedWorkout?.id != workout.id {
+                                routeStore.setAutomaticStartCountdown(nil)
+                                return
+                            }
                             if manager.isActive ||
                                 manager.state == .preparing ||
                                 manager.state == .ending {
@@ -88,6 +97,19 @@ final class WatchAppDelegate: NSObject, WKApplicationDelegate {
                     )
                     return
                 }
+            }
+
+            if Date() >= transferDeadline {
+                // Once an automatic transfer exists we can wait longer for
+                // its route file. Without that transfer, keep legacy Watch
+                // launches responsive.
+                let waitingForRoute = routeStore.preparedWorkout.map {
+                    $0.kind == .running &&
+                    $0.startMode != nil &&
+                    $0.startMode != .onWatch &&
+                    $0.updatedAt >= requestedAt.addingTimeInterval(-20)
+                } ?? false
+                if !waitingForRoute { break }
             }
 
             try? await Task.sleep(for: .milliseconds(200))
