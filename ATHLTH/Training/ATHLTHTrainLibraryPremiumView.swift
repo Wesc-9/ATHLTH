@@ -417,48 +417,9 @@ struct ATHLTHTrainLibraryPremiumView: View {
 
     private func catalogPreview(_ entry: TrainingPlanCatalogEntry) -> some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    previewHeading(entry.title, subtitle: entry.categoryTitle)
-                    Text(entry.summary)
-                        .font(.subheadline)
-                        .foregroundStyle(secondary)
-                    HStack {
-                        Label("\(entry.durationWeeks) " + tr("weeks", "uker"),
-                              systemImage: "calendar")
-                        Spacer()
-                        Label("\(entry.sessionsPerWeek) " + tr("per week", "per uke"),
-                              systemImage: "figure.run")
-                    }
-                    .font(.caption)
-                    .foregroundStyle(secondary)
-                    Text(entry.goal)
-                        .font(.subheadline)
-                    Button {
-                        let saved = session.saveCatalogPlanTemplate(entry)
-                        if saved != nil {
-                            selectedCatalogPlan = nil
-                            section = .plans
-                        } else {
-                            alertMessage = tr(
-                                "Could not save this plan.",
-                                "Kunne ikke lagre treningsplanen."
-                            )
-                        }
-                    } label: {
-                        primaryLabel(tr("Save to my plans", "Lagre i mine planer"))
-                    }
-                    .buttonStyle(.plain)
-                    Text(tr("You can personalize the saved plan before starting it.",
-                            "Du kan tilpasse den lagrede planen før du starter."))
-                        .font(.caption)
-                        .foregroundStyle(secondary)
-                }
-                .padding(20)
-            }
-            .background(paper.ignoresSafeArea())
-            .navigationTitle(tr("Plan template", "Treningsmal"))
-            .navigationBarTitleDisplayMode(.inline)
+            // Use the same full, editable catalog detail flow in the new
+            // Train Library. Avoid the old miniature save-only preview.
+            TrainingPlanCatalogDetailView(entry: entry)
         }
     }
 
