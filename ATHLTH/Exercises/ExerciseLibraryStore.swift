@@ -212,6 +212,62 @@ final class ExerciseLibraryStore: ObservableObject {
         "back-extension": "Rygghev"
     ]
 
+    // Written specifically for ATHLTH: not copied from the RepDB
+    // descriptions or translations. The RepDB photo and exercise
+    // attribution remain attached to the original library entry.
+    static let norwegianCoreInstructions: [String: [String]] = [
+        "plank": ["Plasser albuene under skuldrene og strekk kroppen ut.",
+                  "Hold magen aktiv og pust rolig uten å svaie i korsryggen."],
+        "side-plank": ["Støtt deg på underarmen med skulderen rett over albuen.",
+                       "Løft hoften og hold kroppen i en rett linje."],
+        "crunches": ["Ligg på ryggen med knærne bøyd og føttene i gulvet.",
+                     "Løft øvre del av ryggen kontrollert og senk rolig tilbake."],
+        "sit-ups": ["Ligg på ryggen med bøyde knær.",
+                    "Rull overkroppen kontrollert opp og senk den rolig ned igjen."],
+        "bicycle-crunch": ["Ligg på ryggen med hendene lett ved hodet.",
+                          "Roter skulderen mot motsatt kne og bytt side i rolig tempo."],
+        "reverse-crunches": ["Ligg på ryggen og trekk knærne mot brystet.",
+                             "Rull bekkenet forsiktig opp og senk det kontrollert."],
+        "dead-bug": ["Ligg på ryggen med armer og ben løftet.",
+                     "Senk motsatt arm og ben rolig uten å miste kontakten i korsryggen."],
+        "bird-dog": ["Stå på alle fire med hendene under skuldrene.",
+                     "Strekk motsatt arm og ben ut, hold bekkenet stabilt og bytt."],
+        "hollow-body-hold": ["Ligg på ryggen og press korsryggen lett mot gulvet.",
+                             "Løft skuldre og ben så langt du kan med god kontroll."],
+        "russian-twist": ["Sitt med bøyde knær og en lett bakoverlent overkropp.",
+                          "Roter rolig fra side til side uten å rykke."],
+        "hanging-knee-raise": ["Heng stabilt i en stang med kontrollert grep.",
+                               "Trekk knærne opp, unngå sving og senk langsomt."],
+        "hanging-leg-raise": ["Heng i en stang og stabiliser overkroppen.",
+                              "Løft bena kontrollert og senk uten å svinge."],
+        "lying-leg-raise": ["Ligg flatt på ryggen med hendene langs sidene.",
+                            "Løft bena kontrollert og senk til du fortsatt kan holde korsryggen stabil."],
+        "cable-crunch": ["Still deg ved kabelapparatet og hold tauet ved hodet.",
+                         "Bøy overkroppen ved å trekke ribbeina mot bekkenet, uten å dra med armene."],
+        "cable-pallof-press": ["Stå sidelengs mot en kabel med håndtaket ved brystet.",
+                               "Press hendene ut foran kroppen og motstå rotasjon."],
+        "ab-wheel-rollout": ["Start på knærne med magehjulet under skuldrene.",
+                              "Rull rolig frem så langt du klarer uten å svaie, og trekk tilbake."],
+        "flutter-kicks": ["Ligg på ryggen med bena strukket.",
+                          "Hold magen aktiv og bytt på å heve bena i små kontrollerte bevegelser."],
+        "mountain-climbers": ["Start i en stabil høy plankeposisjon.",
+                              "Før knærne vekselvis frem uten at hoftene løftes høyt."],
+        "dragon-flag": ["Hold fast i et stabilt feste over hodet mens du ligger på ryggen.",
+                        "Senk den strake kroppen svært kontrollert; velg en enklere variant ved behov."],
+        "heel-touches": ["Ligg på ryggen med knærne bøyd og skuldrene litt hevet.",
+                         "Nå vekselvis mot hælene med en liten sidebøy i overkroppen."]
+    ]
+
+    func localizedExerciseInstructions(_ entry: ExerciseLibraryEntry) -> [String] {
+        if ATHLTHLocalization.isNorwegian,
+           entry.source == .repDB,
+           let key = entry.sourceIdentifier,
+           let steps = Self.norwegianCoreInstructions[key] {
+            return steps
+        }
+        return entry.exercise.instructions
+    }
+
     func localizedExerciseName(_ entry: ExerciseLibraryEntry) -> String {
         guard ATHLTHLocalization.isNorwegian,
               let id = entry.sourceIdentifier,
