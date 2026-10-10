@@ -115,6 +115,8 @@ struct GhostRaceHubView: View {
         GhostRaceHubMode = .live
     @State private var replaySearch = ""
     @State private var replaySort: GhostReplaySort = .newest
+    @State private var pendingReplayRun: WorkoutSummary?
+    @State private var pendingLiveRace: ATHLTHLiveWorkoutSession?
     @State private var errorMessage: String?
     @State private var captureDevice:
         WorkoutCaptureDevice = .iPhone
@@ -171,6 +173,56 @@ struct GhostRaceHubView: View {
                 realtime
                     .refreshVisibleLiveSessions()
             _ = await (runs, live)
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Start Live Ghost?",
+                norwegian: "Starte Live Ghost?"
+            ),
+            isPresented: Binding(
+                get: { pendingLiveRace != nil },
+                set: { if !$0 { pendingLiveRace = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let session = pendingLiveRace {
+                Button(ATHLTHLocalization.choose(
+                    english: "Start race",
+                    norwegian: "Start konkurransen"
+                )) {
+                    pendingLiveRace = nil
+                    Task { await startLiveGhost(session) }
+                }
+            }
+        } message: {
+            let device = captureDevice == .iPhone ? "iPhone" : "Apple Watch"
+            Text("\(pendingLiveRace?.routeTitle ?? "Live Ghost") · \(device)")
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Race this previous run?",
+                norwegian: "Konkurrere mot denne økten?"
+            ),
+            isPresented: Binding(
+                get: { pendingReplayRun != nil },
+                set: { if !$0 { pendingReplayRun = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let run = pendingReplayRun {
+                Button(ATHLTHLocalization.choose(
+                    english: "Start Replay",
+                    norwegian: "Start Replay"
+                )) {
+                    pendingReplayRun = nil
+                    Task { await start(run) }
+                }
+            }
+        } message: {
+            let duration = pendingReplayRun.map { clock($0.duration) } ?? "—"
+            let distance = pendingReplayRun?.distanceKilometers ?? 0
+            let device = captureDevice == .iPhone ? "iPhone" : "Apple Watch"
+            Text(String(format: "%.1f km · %@ · %@", distance, duration, device))
         }
         .onChange(
             of: selectedMode
@@ -547,11 +599,7 @@ struct GhostRaceHubView: View {
                 }
 
                 Button {
-                    Task {
-                        await startLiveGhost(
-                            liveSession
-                        )
-                    }
+                    pendingLiveRace = liveSession
                 } label: {
                     if liveStartingSessionID ==
                         liveSession.id {
@@ -1495,9 +1543,7 @@ struct GhostRaceHubView: View {
             Spacer()
 
             Button {
-                Task {
-                    await start(workout)
-                }
+                pendingReplayRun = workout
             } label: {
                 if startingWorkoutID == workout.id {
                     ProgressView()
