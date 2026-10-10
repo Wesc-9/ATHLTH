@@ -2818,7 +2818,11 @@ struct RecoveryCoachView: View {
                     clean,
                     context: context,
                     history: priorHistory,
-                    shareHealthData: shareHealthData
+                    shareHealthData: shareHealthData,
+                    shareHealthAutomatically:
+                        RecoveryCoachHealthSharingPreferences.canAutomaticallyShare(
+                            userID: session.profile.userID
+                        )
                 )
 
             messages.append(
