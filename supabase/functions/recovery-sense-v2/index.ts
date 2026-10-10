@@ -2,6 +2,7 @@ import { enforceAIRequestBudget } from "../_shared/ai-request-budget.ts";
 import {
   canForwardRecoveryHealth,
   mustRejectUnconsentedInsight,
+  mustRejectUnreleasedAutomaticCoachSharing,
 } from "../_shared/recovery-privacy.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
@@ -45,6 +46,8 @@ type RecoveryRequest = {
   history?: RecoveryChatTurn[];
   // Explicitly set true only after the user confirms sending health data.
   shareHealthData?: boolean;
+  // Mandatory future-mode signal. Automatic transport is not released.
+  healthSharingMode?: "confirmEachQuestion" | "automatic";
 };
 
 const json = (body: Record<string, unknown>, status = 200) =>
@@ -419,6 +422,7 @@ Important:
 - You provide general fitness and recovery guidance, not medical diagnosis or treatment.
 - Never invent symptoms, injuries, illnesses, medications, lab values or personal history.
 - Avoid certainty. Recovery and muscle-recovery values are estimates from consumer wearable/training data.
+- Treat the user's own report of soreness, pain or readiness as essential context. Do not override what the user feels based only on estimated recovery percentages. Adapt the proposed workout accordingly.
 - Prefer the user's own baselines over generic population norms.
 - When data is missing, say it is missing rather than guessing.
 - Keep language concise, calm and useful.
@@ -448,6 +452,11 @@ Deno.serve(async (req: Request) => {
   }
   if (mustRejectUnconsentedInsight(body.mode, body.shareHealthData)) {
     return json({ error: "Explicit Insights health permission required." }, 403);
+  }
+  if (mustRejectUnreleasedAutomaticCoachSharing(
+    body.mode, body.healthSharingMode,
+  )) {
+    return json({ error: "Automatic Coach health sharing is not released." }, 403);
   }
   const canShareHealth = canForwardRecoveryHealth(body.shareHealthData);
   const context = sanitizeContext(
