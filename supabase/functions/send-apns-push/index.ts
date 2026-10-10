@@ -123,7 +123,8 @@ function preferenceAllows(
 
   if (
     normalized.includes("message") ||
-    normalized.includes("dm")
+    normalized.includes("dm") ||
+    normalized === "train_together_chat"
   ) {
     return preferences.message_notifications_enabled;
   }
@@ -136,6 +137,10 @@ function preferenceAllows(
 }
 
 function threadID(event: InboxEvent): string {
+  if (event.entity_type === "train_together_post" && event.entity_id) {
+    return `train_together:${event.entity_id}`;
+  }
+
   if (event.entity_type === "community_event" && event.entity_id) {
     return `community_event:${event.entity_id}`;
   }
@@ -285,6 +290,18 @@ function localizedAlert(
           " godtok invitasjonen din til ",
         );
       }
+      break;
+
+    case "train_together_chat":
+      title = "Ny melding i treningsøkt";
+      body = body.replace("New message in ", "Ny melding i ");
+      break;
+
+    case "train_together_recap":
+      title = "Felles oppsummering klar";
+      body = body
+        .replace("The recap for ", "Oppsummeringen for ")
+        .replace(" is ready.", " er klar.");
       break;
 
     case "message":
