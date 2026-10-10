@@ -20,6 +20,8 @@ struct TrainTogetherMarketplaceView:
         WorkoutKind?
     @State private var timeFilter:
         TrainTogetherTimeFilter = .upcoming
+    @State private var modeFilter:
+        TrainTogetherModeFilter = .all
 
     var body: some View {
         ScrollView {
@@ -184,10 +186,15 @@ struct TrainTogetherMarketplaceView:
                 $showingCreate
         ) {
             NavigationStack {
-                TrainTogetherPostCreateView()
-                    .environmentObject(
-                        marketplace
-                    )
+                TrainTogetherPostCreateView(
+                    initialParticipationMode:
+                        modeFilter == .sameWorkout
+                            ? .remote
+                            : .physical
+                )
+                .environmentObject(
+                    marketplace
+                )
             }
         }
         .task {
@@ -361,25 +368,73 @@ struct TrainTogetherMarketplaceView:
         }
     }
 
-    private var filterBar:
-        some View {
-        VStack(spacing: 10) {
-            ScrollView(
-                .horizontal,
-                showsIndicators: false
-            ) {
+    private var filterBar: some View {
+        VStack(spacing: 12) {
+            // The primary tabs describe HOW people train together.
+            // A short first tab keeps both longer Norwegian labels
+            // readable on narrow iPhones without horizontal scrolling.
+            HStack(spacing: 4) {
+                ForEach(TrainTogetherModeFilter.allCases) { option in
+                    Button {
+                        modeFilter = option
+                    } label: {
+                        Text(option.title)
+                            .font(
+                                .system(
+                                    size: 12,
+                                    weight: modeFilter == option
+                                        ? .semibold
+                                        : .medium
+                                )
+                            )
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.85)
+                            .foregroundStyle(
+                                modeFilter == option
+                                    ? Color.white
+                                    : ATHLTHTheme.primaryText
+                            )
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(
+                                modeFilter == option
+                                    ? ATHLTHTheme.vitality
+                                    : Color.clear,
+                                in: RoundedRectangle(
+                                    cornerRadius: 15,
+                                    style: .continuous
+                                )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .frame(
+                        width: option == .all ? 64 : nil
+                    )
+                    .accessibilityAddTraits(
+                        modeFilter == option ? .isSelected : []
+                    )
+                }
+            }
+            .padding(4)
+            .background(
+                Color.primary.opacity(0.055),
+                in: RoundedRectangle(
+                    cornerRadius: 19,
+                    style: .continuous
+                )
+            )
+
+            // Keep sport filters independently usable in all three tabs.
+            ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     filterChip(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "All",
-                                norwegian: "Alle"
-                            ),
-                        icon:
-                            "sparkles",
-                        selected:
-                            selectedKind ==
-                                nil
+                        title: ATHLTHLocalization.choose(
+                            english: "All sports",
+                            norwegian: "Alle aktiviteter"
+                        ),
+                        icon: "sparkles",
+                        selected: selectedKind == nil
                     ) {
                         selectedKind = nil
                     }
@@ -393,35 +448,57 @@ struct TrainTogetherMarketplaceView:
                         ]
                     ) { kind in
                         filterChip(
-                            title:
-                                kind.title,
-                            icon:
-                                kind
-                                    .systemImage,
-                            selected:
-                                selectedKind ==
-                                    kind
+                            title: kind.title,
+                            icon: kind.systemImage,
+                            selected: selectedKind == kind
                         ) {
-                            selectedKind =
-                                kind
+                            selectedKind = kind
                         }
                     }
                 }
             }
 
-            Picker(
-                "",
-                selection: $timeFilter
-            ) {
-                ForEach(
-                    TrainTogetherTimeFilter
-                        .allCases
-                ) { filter in
-                    Text(filter.title)
-                        .tag(filter)
+            // Date filtering is retained as a menu rather than
+            // competing with the new primary participation tabs.
+            HStack {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "When",
+                        norwegian: "Når"
+                    )
+                )
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Menu {
+                    Picker(
+                        ATHLTHLocalization.choose(
+                            english: "When",
+                            norwegian: "Når"
+                        ),
+                        selection: $timeFilter
+                    ) {
+                        ForEach(TrainTogetherTimeFilter.allCases) { filter in
+                            Text(filter.title).tag(filter)
+                        }
+                    }
+                } label: {
+                    Label(
+                        timeFilter.title,
+                        systemImage: "calendar"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.vitality)
+                    .padding(.horizontal, 12)
+                    .frame(height: 34)
+                    .background(
+                        Color.white.opacity(0.86),
+                        in: Capsule()
+                    )
                 }
             }
-            .pickerStyle(.segmented)
         }
     }
 
@@ -788,6 +865,12 @@ struct TrainTogetherMarketplaceView:
                     return false
                 }
 
+                if !modeFilter.includes(
+                    post.resolvedParticipationMode
+                ) {
+                    return false
+                }
+
                 if let selectedKind,
                    postKind(post) !=
                     selectedKind {
@@ -842,7 +925,10 @@ struct TrainTogetherMarketplaceView:
                     $0.status == .full
                 ) &&
                 $0.scheduledStart >
-                    Date()
+                    Date() &&
+                modeFilter.includes(
+                    $0.resolvedParticipationMode
+                )
             }
             .sorted {
                 $0.scheduledStart <
@@ -904,6 +990,47 @@ struct TrainTogetherMarketplaceView:
                 .vertical,
                 18
             )
+        }
+    }
+}
+
+/// Primary marketplace filter. A remote Train Together session
+/// shares a workout start/progress, not a physical meeting place.
+private enum TrainTogetherModeFilter: String, CaseIterable, Identifiable {
+    case all
+    case physical
+    case sameWorkout
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all:
+            return ATHLTHLocalization.choose(
+                english: "All",
+                norwegian: "Alle"
+            )
+        case .physical:
+            return ATHLTHLocalization.choose(
+                english: "Train in person",
+                norwegian: "Trene fysisk sammen"
+            )
+        case .sameWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Train in the same workout",
+                norwegian: "Trene i samme økt"
+            )
+        }
+    }
+
+    func includes(_ mode: SocialWorkoutParticipationMode) -> Bool {
+        switch self {
+        case .all:
+            return true
+        case .physical:
+            return mode == .physical
+        case .sameWorkout:
+            return mode == .remote
         }
     }
 }
@@ -2403,6 +2530,14 @@ struct TrainTogetherPostCreateView:
     @State private var participationMode:
         SocialWorkoutParticipationMode =
             .physical
+
+    init(
+        initialParticipationMode: SocialWorkoutParticipationMode = .physical
+    ) {
+        _participationMode = State(
+            initialValue: initialParticipationMode
+        )
+    }
     @State private var joinPolicy:
         TrainTogetherJoinPolicy =
             .request
