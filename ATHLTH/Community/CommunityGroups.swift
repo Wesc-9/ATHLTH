@@ -1464,6 +1464,7 @@ struct CommunityGroupChallengeRecord: Codable, Identifiable, Hashable {
     let imageURL: String?
     let activityConfiguration:
         CommunityGroupActivityConfiguration?
+    let challengeKind: String
     let status: String
     let organizerKind: CommunityGroupOrganizerKind
     let organizerUserID: UUID?
@@ -1488,6 +1489,7 @@ struct CommunityGroupChallengeRecord: Codable, Identifiable, Hashable {
         case endsAt = "ends_at"
         case imageURL = "image_url"
         case activityConfiguration = "activity_config"
+        case challengeKind = "challenge_kind"
         case status
         case organizerKind = "organizer_kind"
         case organizerUserID = "organizer_user_id"
@@ -3443,10 +3445,13 @@ final class CommunityGroupStore: ObservableObject {
 
         if let challengeID,
            !challenges(in: group.id).contains(
-                where: { $0.id == challengeID }
+                where: {
+                    $0.id == challengeID &&
+                    $0.challengeKind == "weekly"
+                }
            ) {
             errorMessage =
-                "That challenge does not belong to this Club."
+                "Only weekly Club challenges can be featured."
             return false
         }
 
@@ -4449,7 +4454,9 @@ final class CommunityGroupStore: ObservableObject {
 
             try await client
                 .rpc(
-                    "create_community_group_challenge_v2",
+                    featureAsWeekly
+                        ? "create_community_group_weekly_challenge_v1"
+                        : "create_community_group_challenge_v2",
                     params:
                         CommunityGroupChallengeCreateV2Params(
                             id: challengeID,
@@ -4482,16 +4489,10 @@ final class CommunityGroupStore: ObservableObject {
             errorMessage = nil
             await loadGroupContent(groupID)
 
-            // Reuse the dedicated featured weekly slot already on the Club.
-            // Contributors can propose a weekly goal; an owner/admin must
-            // choose to feature it in Club settings.
-            if featureAsWeekly && canManage(group) {
-                let featured = await setFeaturedChallenge(
-                    challengeID, in: group
-                )
-                if !featured {
-                    return false
-                }
+            // The dedicated weekly endpoint categorizes the challenge and
+            // automatically features it only when the old feature has expired.
+            if featureAsWeekly {
+                await refresh(force: true)
             }
 
             mergeGroupActivityIntoCommunityFeed(
@@ -9700,6 +9701,7 @@ struct CommunityGroupDetailView: View {
                             $0.id == featuredID
                         }
                     ),
+            challenge.challengeKind == "weekly",
             challenge.status != "draft",
             challenge.status != "cancelled",
             challenge.endsAt >= Date()
@@ -10234,7 +10236,7 @@ struct CommunityGroupDetailView: View {
 
         return groups.challenges(in: group.id)
             .filter {
-                $0.id != currentGroup.featuredChallengeID &&
+                $0.challengeKind == "standard" &&
                 $0.endsAt >= now &&
                 $0.status != "draft" &&
                 $0.status != "cancelled"
@@ -11420,8 +11422,8 @@ struct CommunityGroupDetailView: View {
         groups.challenges(in: group.id).filter {
             challenge in
 
-            // Weekly featured challenge lives in its own Overview section.
-            challenge.id != currentGroup.featuredChallengeID &&
+            // All weekly challenges (featured or scheduled) stay separate.
+            challenge.challengeKind == "standard" &&
             (
                 challenge.status != "draft" ||
                 groups.canManage(currentGroup) ||
@@ -15934,6 +15936,7 @@ struct CommunityGroupSettingsView: View {
 
         return groups.challenges(in: currentGroup.id)
             .filter {
+                $0.challengeKind == "weekly" &&
                 $0.status != "draft" &&
                 $0.status != "cancelled" &&
                 $0.endsAt >= now
