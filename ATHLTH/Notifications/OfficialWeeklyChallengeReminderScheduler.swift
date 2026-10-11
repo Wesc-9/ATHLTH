@@ -38,15 +38,17 @@ enum OfficialWeeklyChallengeReminderScheduler {
         completed: Bool
     ) async {
         let center = UNUserNotificationCenter.current()
-        let pending: [UNNotificationRequest] = await withCheckedContinuation {
-            (continuation: CheckedContinuation<[UNNotificationRequest], Never>) in
+        // Only send immutable, Sendable identifiers across the callback
+        // boundary. UNNotificationRequest is not Sendable in Swift 6.
+        let pendingIDs: [String] = await withCheckedContinuation {
+            (continuation: CheckedContinuation<[String], Never>) in
             center.getPendingNotificationRequests { requests in
-                continuation.resume(returning: requests)
+                continuation.resume(returning: requests.map(\.identifier))
             }
         }
 
-        let existing = pending.filter {
-            $0.identifier.hasPrefix(
+        let existing = pendingIDs.filter {
+            $0.hasPrefix(
                 OfficialWeeklyChallengeReminderPolicy.identifierPrefix
             )
         }
@@ -84,7 +86,7 @@ enum OfficialWeeklyChallengeReminderScheduler {
 
         // Cancels a pending notification as soon as completion is synced,
         // the challenge ends, the user leaves or notifications are disabled.
-        let obsoleteIDs = existing.map(\.identifier).filter {
+        let obsoleteIDs = existing.filter {
             $0 != reminder?.id
         }
         if !obsoleteIDs.isEmpty {
@@ -92,7 +94,7 @@ enum OfficialWeeklyChallengeReminderScheduler {
         }
 
         guard let reminder,
-              !existing.contains(where: { $0.identifier == reminder.id }),
+              !existing.contains(reminder.id),
               let challenge
         else { return }
 
