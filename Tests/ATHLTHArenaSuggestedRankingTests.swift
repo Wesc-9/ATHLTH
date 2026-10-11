@@ -775,6 +775,69 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
         ).isEmpty)
     }
 
+    func testAutoTeamDistributionBalancesFourAndFiveAcceptedMembers() throws {
+        let seriesID = UUID()
+        let athletes = (0..<5).map { index in
+            ATHLTHArenaRemoteMember(
+                slotID: UUID(),
+                seriesID: seriesID,
+                userID: UUID(),
+                response: "accepted",
+                points: Double(index * 2),
+                createdAt: initialDate
+            )
+        }
+        for count in [4, 5] {
+            let chosen = Array(athletes.prefix(count))
+            let assignments = try XCTUnwrap(
+                ATHLTHArenaTeamBalancer.suggestedAssignments(members: chosen)
+            )
+            XCTAssertEqual(assignments.count, count)
+            XCTAssertEqual(Set(assignments.keys), Set(chosen.map(\.slotID)))
+            XCTAssertEqual(assignments.values.filter { $0 == 1 }.count,
+                           (count + 1) / 2)
+            XCTAssertEqual(assignments.values.filter { $0 == 2 }.count,
+                           count / 2)
+            // Same members in a different order produce the same draft.
+            XCTAssertEqual(
+                assignments,
+                ATHLTHArenaTeamBalancer.suggestedAssignments(
+                    members: Array(chosen.reversed())
+                )
+            )
+        }
+    }
+
+    func testAutoTeamDistributionNeverAssignsUnacceptedOrForeignAthletes() {
+        let seriesID = UUID()
+        let accepted = (0..<4).map { _ in
+            ATHLTHArenaRemoteMember(
+                slotID: UUID(), seriesID: seriesID, userID: UUID(),
+                response: "accepted", points: 0, createdAt: initialDate
+            )
+        }
+        XCTAssertNil(ATHLTHArenaTeamBalancer.suggestedAssignments(
+            members: Array(accepted.prefix(3))
+        ))
+        let invited = ATHLTHArenaRemoteMember(
+            slotID: UUID(), seriesID: seriesID, userID: UUID(),
+            response: "invited", points: 0, createdAt: initialDate
+        )
+        XCTAssertNil(ATHLTHArenaTeamBalancer.suggestedAssignments(
+            members: Array(accepted.prefix(3)) + [invited]
+        ))
+        let foreign = ATHLTHArenaRemoteMember(
+            slotID: UUID(), seriesID: UUID(), userID: UUID(),
+            response: "accepted", points: 0, createdAt: initialDate
+        )
+        XCTAssertNil(ATHLTHArenaTeamBalancer.suggestedAssignments(
+            members: Array(accepted.prefix(3)) + [foreign]
+        ))
+        XCTAssertNil(ATHLTHArenaTeamBalancer.suggestedAssignments(
+            members: accepted + [accepted[0]]
+        ))
+    }
+
     func testCustomRoundsDoNotInferUnsupportedResults() {
         let standings = ATHLTHArenaSuggestedRanking.standings(
             template: .custom,
