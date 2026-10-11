@@ -361,6 +361,91 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
         )
     }
 
+    /// Informational progress, never a contribution to series scoring.
+    private var personalTimeTrends: [ATHLTHArenaLiveTimeTrend] {
+        ATHLTHArenaLiveTimeTrend.summaries(
+            challenges: linked,
+            rooms: rooms,
+            participants: participants,
+            eligibleRoundIDs: Set(
+                rounds.filter { $0.template == .fastestRoute }.map(\.id)
+            ),
+            currentUserID: session.profile.userID
+        )
+    }
+
+    private var personalProgressCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Your route progress",
+                    norwegian: "Din utvikling på ruten"
+                ),
+                systemImage: "chart.line.uptrend.xyaxis"
+            )
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(ATHLTHTheme.accentDeep)
+
+            ForEach(Array(personalTimeTrends.prefix(3))) { trend in
+                HStack(spacing: 12) {
+                    Image(systemName: abs(trend.improvementSeconds) < 0.5
+                        ? "equal.circle"
+                        : trend.improvementSeconds > 0
+                            ? "arrow.up.right.circle.fill"
+                            : "arrow.down.right.circle.fill"
+                    )
+                    .font(.title3)
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 30)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(rounds.first(where: {
+                            $0.id == trend.roundID
+                        })?.title ?? ATHLTHLocalization.choose(
+                            english: "Route round", norwegian: "Ruterunde"
+                        ))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(1)
+                        Text(
+                            GhostTargetTimeFormatter.string(trend.previousSeconds)
+                            + " → "
+                            + GhostTargetTimeFormatter.string(trend.latestSeconds)
+                        )
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    Spacer(minLength: 4)
+                    Text(abs(trend.improvementSeconds) < 0.5
+                        ? ATHLTHLocalization.choose(
+                            english: "Same time", norwegian: "Samme tid"
+                        )
+                        : String(format: "%.1f s", abs(trend.improvementSeconds)) +
+                          " " + (trend.improvementSeconds > 0
+                            ? ATHLTHLocalization.choose(
+                                english: "faster", norwegian: "raskere"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "slower", norwegian: "langsommere"
+                            ))
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .multilineTextAlignment(.trailing)
+                }
+            }
+
+            Text(ATHLTHLocalization.choose(
+                english: "Compares your two latest consistent, reported Live Ghost attempts in each route round. Not independent GPS verification or official Arena points.",
+                norwegian: "Sammenligner dine to siste samsvarende, oppgitte Live Ghost-forsøk per ruterunde. Ikke uavhengig GPS-verifisering eller offisielle Arena-poeng."
+            ))
+            .font(.caption2)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+        }
+        .padding(14)
+        .background(ATHLTHArenaLightStyle.card(17))
+    }
+
     private var rivalryRecord: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 7) {
@@ -485,6 +570,10 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
 
                 if rivalry.finishedCount > 0 || rivalry.excluded > 0 {
                     rivalryRecord
+                }
+
+                if !personalTimeTrends.isEmpty {
+                    personalProgressCard
                 }
 
                 Picker(
