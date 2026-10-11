@@ -21,14 +21,18 @@ struct ATHLTHArenaRemoteSeries: Decodable, Identifiable {
 }
 
 struct ATHLTHArenaRemoteMember: Decodable, Identifiable {
+    let slotID: UUID
     let seriesID: UUID
-    let userID: UUID
+    let userID: UUID?
     let response: String
+    let points: Double
 
-    var id: UUID { userID }
+    var id: UUID { slotID }
+    var isDeleted: Bool { userID == nil || response == "deleted" }
 
     enum CodingKeys: String, CodingKey {
-        case response
+        case response, points
+        case slotID = "slot_id"
         case seriesID = "series_id"
         case userID = "user_id"
     }
@@ -37,7 +41,7 @@ struct ATHLTHArenaRemoteMember: Decodable, Identifiable {
 struct ATHLTHArenaRemoteProposal: Decodable, Identifiable {
     let id: UUID
     let seriesID: UUID
-    let proposedBy: UUID
+    let proposedBy: UUID?
     let template: ATHLTHArenaRoundTemplate
     let title: String
     let rules: String
@@ -57,6 +61,73 @@ struct ATHLTHArenaRemoteApproval: Decodable {
     enum CodingKeys: String, CodingKey {
         case roundID = "round_id"
         case userID = "user_id"
+    }
+}
+
+struct ATHLTHArenaRemoteMessage: Decodable, Identifiable {
+    let id: UUID
+    let seriesID: UUID
+    let senderID: UUID?
+    let body: String
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id, body
+        case seriesID = "series_id"
+        case senderID = "sender_id"
+        case createdAt = "created_at"
+    }
+}
+
+struct ATHLTHArenaReplacement: Decodable, Identifiable {
+    let id: UUID
+    let seriesID: UUID
+    let slotID: UUID
+    let nomineeID: UUID?
+    let status: String
+    enum CodingKeys: String, CodingKey {
+        case id, status
+        case seriesID = "series_id"
+        case slotID = "slot_id"
+        case nomineeID = "nominee_id"
+    }
+}
+
+struct ATHLTHArenaReplacementVote: Decodable {
+    let proposalID: UUID
+    let voterID: UUID
+    let accepted: Bool
+    enum CodingKeys: String, CodingKey {
+        case accepted
+        case proposalID = "proposal_id"
+        case voterID = "voter_id"
+    }
+}
+
+private struct ATHLTHArenaNewMessage: Encodable {
+    let seriesID: UUID
+    let senderID: UUID
+    let body: String
+    enum CodingKeys: String, CodingKey {
+        case body
+        case seriesID = "series_id"
+        case senderID = "sender_id"
+    }
+}
+private struct ATHLTHArenaProposalReplacementParams: Encodable {
+    let slot: UUID
+    let nominee: UUID
+    enum CodingKeys: String, CodingKey {
+        case slot = "p_slot"
+        case nominee = "p_nominee"
+    }
+}
+private struct ATHLTHArenaVoteReplacementParams: Encodable {
+    let proposal: UUID
+    let accept: Bool
+    enum CodingKeys: String, CodingKey {
+        case proposal = "p_proposal"
+        case accept = "p_accept"
     }
 }
 
@@ -198,6 +269,59 @@ final class ATHLTHArenaCloudService: Sendable {
             .in("round_id", values: roundIDs)
             .execute()
             .value
+    }
+
+    func loadGroupMessages(seriesID: UUID) async throws -> [ATHLTHArenaRemoteMessage] {
+        try await client
+            .from("arena_series_messages")
+            .select()
+            .eq("series_id", value: seriesID)
+            .order("created_at", ascending: true)
+            .limit(200)
+            .execute()
+            .value
+    }
+
+    func sendGroupMessage(seriesID: UUID, body: String) async throws {
+        guard let senderID = currentUserID else {
+            throw ATHLTHArenaCloudError.signInRequired
+        }
+        let message = String(body.trimmingCharacters(in: .whitespacesAndNewlines).prefix(2000))
+        guard !message.isEmpty else { return }
+        try await client.from("arena_series_messages")
+            .insert(ATHLTHArenaNewMessage(seriesID: seriesID, senderID: senderID, body: message))
+            .execute()
+    }
+
+    func loadReplacements(seriesID: UUID) async throws -> [ATHLTHArenaReplacement] {
+        try await client.from("arena_replacement_proposals")
+            .select()
+            .eq("series_id", value: seriesID)
+            .order("created_at", ascending: false)
+            .execute().value
+    }
+
+    func loadReplacementVotes(proposalID: UUID) async throws -> [ATHLTHArenaReplacementVote] {
+        try await client.from("arena_replacement_votes")
+            .select()
+            .eq("proposal_id", value: proposalID)
+            .execute().value
+    }
+
+    func proposeReplacement(slotID: UUID, nomineeID: UUID) async throws {
+        guard currentUserID != nil else { throw ATHLTHArenaCloudError.signInRequired }
+        let _: UUID = try await client.rpc(
+            "arena_propose_replacement",
+            params: ATHLTHArenaProposalReplacementParams(slot: slotID, nominee: nomineeID)
+        ).execute().value
+    }
+
+    func voteReplacement(proposalID: UUID, approve: Bool) async throws {
+        guard currentUserID != nil else { throw ATHLTHArenaCloudError.signInRequired }
+        let _: String = try await client.rpc(
+            "arena_vote_replacement",
+            params: ATHLTHArenaVoteReplacementParams(proposal: proposalID, accept: approve)
+        ).execute().value
     }
 
     /// All writes happen in one server-side transaction. If any invitee
