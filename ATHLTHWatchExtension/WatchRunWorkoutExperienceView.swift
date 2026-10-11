@@ -3527,6 +3527,29 @@ struct WatchRunWorkoutExperienceView: View {
                 .buttonStyle(.plain)
 
                 if workoutManager.audioCoachConfiguration.enabled {
+                    NavigationLink {
+                        WatchAudioCoachLiveSettingsView(
+                            workoutManager: workoutManager
+                        )
+                    } label: {
+                        HStack {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Voice & style",
+                                    norwegian: "Stemme og talemåte"
+                                ),
+                                systemImage: "slider.horizontal.3"
+                            )
+                            .font(.system(size: 11, weight: .semibold))
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption2)
+                        }
+                        .padding(10)
+                        .watchSurface(radius: 14)
+                    }
+                    .buttonStyle(.plain)
+
                     HStack(spacing: 8) {
                         controlButton(
                             title: workoutManager.coachSpeechPaused
