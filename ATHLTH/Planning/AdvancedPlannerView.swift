@@ -314,6 +314,18 @@ struct AdvancedPlannerView: View {
                     )
                 }
 
+                if hasStandaloneDraft {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Saved draft · Tap + to continue",
+                            norwegian: "Utkast lagret · Trykk + for å fortsette"
+                        ),
+                        systemImage: "clock.arrow.circlepath"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+
                 if !upcomingStandaloneSessions
                     .isEmpty {
                     VStack(spacing: 8) {
@@ -342,6 +354,11 @@ struct AdvancedPlannerView: View {
                 )
             }
         }
+    }
+
+    private var hasStandaloneDraft: Bool {
+        let key = "athlth.sessionEditor.draft.v1.\(session.profile.userID.uuidString).standalone"
+        return UserDefaults.standard.data(forKey: key) != nil
     }
 
     private var upcomingStandaloneSessions:
