@@ -209,6 +209,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         ATHLTHGuidancePriorityGate()
     private var coachEventLedger = ATHLTHCoachEventLedger()
     private var coachCueQueue = ATHLTHCoachCueQueue()
+    /// Temporary voice mute; HealthKit capture and safety haptics continue.
+    @Published private(set) var coachSpeechPaused = false
     private var nextDistanceAnnouncementMeters: Double?
     private var nextTimeAnnouncementSeconds: TimeInterval?
     private var structuredStepStartElapsedTime: TimeInterval = 0
@@ -317,6 +319,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             audioCoachActivationTask = nil
             speechSynthesizer.stopSpeaking(at: .immediate)
             coachCueQueue.reset()
+            coachSpeechPaused = false
             deactivateAudioCoachAudioSession()
             return
         }
@@ -369,6 +372,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             strengthStatusCoachTask = nil
             speechSynthesizer.stopSpeaking(at: .immediate)
             coachCueQueue.reset()
+            coachSpeechPaused = false
             deactivateAudioCoachAudioSession()
         } else {
             if !wasEnabled {
@@ -661,6 +665,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
+        coachSpeechPaused = false
+        coachCueQueue.reset()
         publish {
             self.audioCoachConfiguration.enabled = enabled
         }
@@ -685,6 +691,52 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             speechSynthesizer.stopSpeaking(at: .immediate)
             deactivateAudioCoachAudioSession()
         }
+    }
+
+    /// Silences only the voice, not recording or haptic alerts.
+    func setCoachSpeechPaused(_ paused: Bool) {
+        guard audioCoachConfiguration.enabled, isActive else {
+            coachSpeechPaused = false
+            return
+        }
+        guard coachSpeechPaused != paused else { return }
+        coachSpeechPaused = paused
+        coachCueQueue.reset()
+        guidancePriorityGate.reset()
+        if paused {
+            audioCoachActivationTask?.cancel()
+            audioCoachActivationTask = nil
+            speechSynthesizer.stopSpeaking(at: .immediate)
+            deactivateAudioCoachAudioSession()
+        }
+    }
+
+    /// A direct Watch tap should be spoken on the Watch, even when the
+    /// paired iPhone normally owns automatic commentary.
+    func announceCoachStatusNow() {
+        guard audioCoachConfiguration.enabled,
+              !coachSpeechPaused,
+              isActive
+        else { return }
+
+        let summary = metricsAnnouncement
+        let spoken = summary.isEmpty
+            ? coachPhrase(
+                english: "Workout is active.",
+                norwegian: "Treningen er aktiv."
+            )
+            : summary
+        speak(
+            spoken,
+            priority: .structuredStep,
+            event: ATHLTHCoachEvent(
+                kind: .manualStatus,
+                key: UUID().uuidString,
+                priority: .structuredStep,
+                validFor: 8
+            ),
+            forceLocal: true
+        )
     }
 
     func markLap() {
@@ -3066,6 +3118,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         guidancePriorityGate.reset()
         coachEventLedger.reset()
         coachCueQueue.reset()
+        coachSpeechPaused = false
         publish {
             self.state = .idle
             self.elapsedTime = 0
@@ -3201,6 +3254,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         guidancePriorityGate.reset()
         coachEventLedger.reset()
         coachCueQueue.reset()
+        coachSpeechPaused = false
         resetAudioCoachThresholds()
 
         do {
@@ -5462,15 +5516,19 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         priority:
             ATHLTHGuidancePriority =
                 .routineCoach,
-        event: ATHLTHCoachEvent? = nil
+        event: ATHLTHCoachEvent? = nil,
+        forceLocal: Bool = false
     ) {
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty,
+              audioCoachConfiguration.enabled,
+              !coachSpeechPaused
+        else { return }
         if let event,
            !coachEventLedger.canDeliver(event) {
             return
         }
 
-        guard shouldSpeakLocally(priority: priority) else {
+        guard forceLocal || shouldSpeakLocally(priority: priority) else {
             // iPhone handles routine and structured running commentary.
             // Critical route/target alerts, Ghost and strength cues remain
             // local because the mirrored iPhone coach does not reproduce them.
@@ -5593,7 +5651,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 // was activating. Re-check ownership and any phone receipt
                 // before beginning the utterance or marking it delivered.
                 guard self.audioCoachConfiguration.enabled,
-                      self.shouldSpeakLocally(priority: priority),
+                      !self.coachSpeechPaused,
+                      (forceLocal || self.shouldSpeakLocally(priority: priority)),
                       event.map({ self.coachEventLedger.canDeliver($0) }) ?? true
                 else {
                     self.guidancePriorityGate.voiceDidFinish()
