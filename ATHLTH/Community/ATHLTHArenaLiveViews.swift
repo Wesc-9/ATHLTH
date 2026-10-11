@@ -2031,13 +2031,17 @@ struct ATHLTHArenaOnlineDetailView: View {
                         norwegian: "Sett opp mål-Ghost for konkurranseruten"
                     ))
 
-                    if round.template == .fastestRoute,
-                       let opponentID = linkedLiveDuelOpponentID {
+                    if let opponentID = linkedLiveDuelOpponentID,
+                       let linkedRoundID = ATHLTHArenaLiveRoundSelection.linkedRoundID(
+                           selectedRoundID: round.id,
+                           selectedRouteID: route.id,
+                           rounds: rounds
+                       ) {
                         NavigationLink {
                             GhostFriendRaceHubView(
                                 preferredFriendID: opponentID,
                                 preferredRoute: route,
-                                arenaRoundID: round.id
+                                arenaRoundID: linkedRoundID
                             )
                         } label: {
                             HStack(spacing: 10) {
