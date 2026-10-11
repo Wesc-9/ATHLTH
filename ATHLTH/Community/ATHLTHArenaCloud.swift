@@ -223,11 +223,13 @@ struct ATHLTHArenaWorkoutEvidence: Decodable, Identifiable {
     let metricType: String
     let metricValue: Double
     let reportedDistanceMeters: Double?
+    let reportedRouteMatchPercent: Double?
     let verificationLevel: String
 
     enum CodingKeys: String, CodingKey {
         case id, source
         case reportedDistanceMeters = "reported_distance_meters"
+        case reportedRouteMatchPercent = "reported_route_match_percent"
         case verificationLevel = "verification_level"
         case seriesID = "series_id"
         case roundID = "round_id"
@@ -280,6 +282,30 @@ private struct ATHLTHArenaEvidenceParams: Encodable {
         } else {
             try fields.encodeNil(forKey: .distanceMeters)
         }
+    }
+}
+
+private struct ATHLTHArenaRouteEvidenceParams: Encodable {
+    let roundID: UUID
+    let workoutID: UUID
+    let startedAt: Date
+    let endedAt: Date
+    let elapsedSeconds: Double
+    let distanceMeters: Double
+    let matchPercent: Double
+    let startGapMeters: Double
+    let endGapMeters: Double
+
+    enum CodingKeys: String, CodingKey {
+        case roundID = "p_round"
+        case workoutID = "p_source_workout"
+        case startedAt = "p_started"
+        case endedAt = "p_ended"
+        case elapsedSeconds = "p_elapsed_seconds"
+        case distanceMeters = "p_distance_meters"
+        case matchPercent = "p_route_match_percent"
+        case startGapMeters = "p_start_gap_meters"
+        case endGapMeters = "p_end_gap_meters"
     }
 }
 
@@ -654,6 +680,43 @@ final class ATHLTHArenaCloudService: Sendable {
                 metricType: metricType,
                 metricValue: metricValue,
                 distanceMeters: workout.distanceMeters
+            )
+        ).execute().value
+    }
+
+    /// The device compares GPS points locally, then shares just the result.
+    /// This is a participant report, NOT independent GPS attestation.
+    func shareRouteWorkoutEvidence(
+        roundID: UUID,
+        workout: SocialPublishableWorkout,
+        matchPercent: Double,
+        startGapMeters: Double,
+        endGapMeters: Double
+    ) async throws {
+        guard currentUserID != nil else {
+            throw ATHLTHArenaCloudError.signInRequired
+        }
+        guard workout.activity == .running,
+              let distance = workout.distanceMeters,
+              distance.isFinite,
+              workout.duration.isFinite,
+              matchPercent.isFinite,
+              startGapMeters.isFinite,
+              endGapMeters.isFinite else {
+            throw ATHLTHArenaCloudError.needRounds
+        }
+        let _: UUID = try await client.rpc(
+            "arena_share_route_evidence",
+            params: ATHLTHArenaRouteEvidenceParams(
+                roundID: roundID,
+                workoutID: workout.id,
+                startedAt: workout.startDate,
+                endedAt: workout.endDate,
+                elapsedSeconds: workout.duration,
+                distanceMeters: distance,
+                matchPercent: matchPercent,
+                startGapMeters: startGapMeters,
+                endGapMeters: endGapMeters
             )
         ).execute().value
     }
