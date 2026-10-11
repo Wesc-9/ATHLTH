@@ -3094,6 +3094,9 @@ struct DirectMessageThreadView: View {
     @State private var respondingToChallengeID: UUID?
     @State private var respondingToProposalID: UUID?
     @State private var challengeDetailsDestination: ThreadChallengeDetailsDestination?
+    @State private var showingFriendProfile = false
+    @State private var cancellingChallengeID: UUID?
+    @State private var cancellationError: String?
 
     var body: some View {
         ZStack {
@@ -3214,6 +3217,19 @@ struct DirectMessageThreadView: View {
         }
         .alert(
             ATHLTHLocalization.choose(
+                english: "Could not cancel challenge", norwegian: "Kunne ikke avlyse"
+            ),
+            isPresented: Binding(
+                get: { cancellationError != nil },
+                set: { if !$0 { cancellationError = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(cancellationError ?? "")
+        }
+        .alert(
+            ATHLTHLocalization.choose(
                 english: "Could not respond to invitation",
                 norwegian: "Kunne ikke svare på invitasjonen"
             ),
@@ -3225,6 +3241,11 @@ struct DirectMessageThreadView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(plannedInviteError ?? "")
+        }
+        .sheet(isPresented: $showingFriendProfile) {
+            NavigationStack {
+                FriendProfileView(userID: friend.userID)
+            }
         }
         .sheet(item: $challengeDetailsDestination) { destination in
             NavigationStack {
@@ -3251,6 +3272,9 @@ struct DirectMessageThreadView: View {
                 threadStatusText,
             onBack: {
                 dismiss()
+            },
+            onProfileTap: {
+                showingFriendProfile = true
             }
         ) {
             SocialAvatar(
@@ -3507,6 +3531,11 @@ struct DirectMessageThreadView: View {
                                 onOpenChallenge: { id in
                                     openChallengeDetails(id)
                                 },
+                                cancellingChallenge: cancellingChallengeID ==
+                                    message.sourceObjectID,
+                                onCancelChallenge: { challenge in
+                                    cancelSharedChallenge(challenge)
+                                },
                                 challengeChangeResponse: proposalResponse(
                                     for: message, in: messages
                                 ),
@@ -3533,6 +3562,10 @@ struct DirectMessageThreadView: View {
                                 },
                                 onDetails: {
                                     openChallengeDetails(challenge.id)
+                                },
+                                cancelling: cancellingChallengeID == challenge.id,
+                                onCancel: {
+                                    cancelSharedChallenge(challenge)
                                 }
                             )
                             .id(item.id)
@@ -4799,6 +4832,46 @@ struct DirectMessageThreadView: View {
         }
     }
 
+    private func cancelSharedChallenge(_ challenge: ATHLTHChallenge) {
+        guard cancellingChallengeID == nil,
+              challenge.creatorID == session.profile.userID,
+              challenge.status != .cancelled,
+              challenge.status != .completed
+        else { return }
+
+        cancellingChallengeID = challenge.id
+        Task {
+            defer { cancellingChallengeID = nil }
+            guard await social.cancelChallenge(challengeID: challenge.id) else {
+                cancellationError = social.errorMessage ??
+                    ATHLTHLocalization.choose(
+                        english: "Could not cancel the challenge.",
+                        norwegian: "Kunne ikke avlyse utfordringen."
+                    )
+                return
+            }
+
+            var cancelled = challenge
+            cancelled.status = .cancelled
+            challengeStore.update(cancelled)
+
+            if let conversationID {
+                let body = ATHLTHLocalization.choose(
+                    english: "The challenge \(challenge.title) has been cancelled.",
+                    norwegian: "Utfordringen \(challenge.title) er avlyst."
+                )
+                _ = await messaging.send(
+                    to: friend.userID,
+                    conversationID: conversationID,
+                    body: body,
+                    attachment: nil
+                )
+                await messaging.refreshConversation(conversationID)
+            }
+            await social.refreshChallenges(challengeStore: challengeStore)
+        }
+    }
+
     private func withdrawThreadChallenge(
         _ challenge: ATHLTHChallenge
     ) {
@@ -5797,6 +5870,9 @@ private struct ThreadChallengeInvitationBubble: View {
     let onDetails: () -> Void
     let onAccept: () -> Void
     let onDecline: () -> Void
+    let cancelling: Bool
+    let onCancel: () -> Void
+    @State private var confirmCancellation = false
 
     private var invitee: ChallengeParticipant? {
         guard let challenge, let currentUserID else { return nil }
@@ -5827,8 +5903,8 @@ private struct ThreadChallengeInvitationBubble: View {
         }
         if challenge.status == .cancelled {
             return (ATHLTHLocalization.choose(
-                english: "Cancelled", norwegian: "Avlyst"
-            ), "xmark.circle")
+                english: "CANCELLED", norwegian: "AVLYST"
+            ), "xmark.octagon.fill")
         }
         switch invitee?.state {
         case .accepted:
@@ -5905,8 +5981,10 @@ private struct ThreadChallengeInvitationBubble: View {
             .disabled(challenge == nil)
 
             Label(status.text, systemImage: status.icon)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(challenge?.status == .cancelled ? Color.red :
+                    invitee?.state == .declined ? Color.red :
+                    ATHLTHTheme.accentDeep)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
                 .background(Color.white.opacity(0.59), in: Capsule())
@@ -5918,6 +5996,29 @@ private struct ThreadChallengeInvitationBubble: View {
                 )
                 .font(.caption2)
                 .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+
+            if isMine,
+               challenge?.status != .cancelled,
+               challenge?.status != .completed,
+               invitee?.state == .invited {
+                Button(role: .destructive) {
+                    confirmCancellation = true
+                } label: {
+                    HStack {
+                        if cancelling { ProgressView().controlSize(.mini) }
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Cancel challenge", norwegian: "Avlys utfordring"
+                            ),
+                            systemImage: "xmark.circle"
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+                .buttonStyle(.bordered)
+                .tint(.red)
+                .disabled(cancelling)
             }
 
             if mayRespond {
@@ -5988,6 +6089,25 @@ private struct ThreadChallengeInvitationBubble: View {
         }
         .shadow(color: ATHLTHTheme.accentDeep.opacity(0.08),
                 radius: 14, x: 0, y: 6)
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Cancel this challenge for everyone?",
+                norwegian: "Avlyse utfordringen for alle?"
+            ),
+            isPresented: $confirmCancellation,
+            titleVisibility: .visible
+        ) {
+            Button(
+                ATHLTHLocalization.choose(
+                    english: "Cancel challenge", norwegian: "Avlys utfordring"
+                ),
+                role: .destructive,
+                action: onCancel
+            )
+            Button(ATHLTHLocalization.choose(
+                english: "Keep challenge", norwegian: "Behold utfordringen"
+            ), role: .cancel) {}
+        }
     }
 }
 
@@ -6000,6 +6120,8 @@ private struct ThreadChallengeTimelineRow: View {
     let onAccept: () -> Void
     let onDecline: () -> Void
     let onDetails: () -> Void
+    let cancelling: Bool
+    let onCancel: () -> Void
 
     private var isMine: Bool { challenge.creatorID == currentUserID }
 
@@ -6021,7 +6143,9 @@ private struct ThreadChallengeTimelineRow: View {
                     responding: responding,
                     onDetails: onDetails,
                     onAccept: onAccept,
-                    onDecline: onDecline
+                    onDecline: onDecline,
+                    cancelling: cancelling,
+                    onCancel: onCancel
                 )
                 Text(invitedAt.formatted(date: .omitted, time: .shortened))
                     .font(.caption2)
@@ -6046,6 +6170,8 @@ private struct MessageBubble: View {
     let respondingToChallenge: Bool
     let onRespondToChallenge: (ATHLTHChallenge, Bool) -> Void
     let onOpenChallenge: (UUID) -> Void
+    let cancellingChallenge: Bool
+    let onCancelChallenge: (ATHLTHChallenge) -> Void
     let challengeChangeResponse: ChallengeChangeProposalResponse?
     let respondingToProposal: Bool
     let onReviewProposal: (Bool) -> Void
@@ -6279,6 +6405,12 @@ private struct MessageBubble: View {
                         onDecline: {
                             if let linkedChallenge {
                                 onRespondToChallenge(linkedChallenge, false)
+                            }
+                        },
+                        cancelling: cancellingChallenge,
+                        onCancel: {
+                            if let linkedChallenge {
+                                onCancelChallenge(linkedChallenge)
                             }
                         }
                     )
