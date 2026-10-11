@@ -271,8 +271,7 @@ struct ATHLTHArenaScoringSection: View {
                             Text(workoutMetricLabel(entry))
                                 .font(.caption.weight(.semibold))
                                 .monospacedDigit()
-                            Text(entry.source == "apple_health"
-                                 ? "Health" : entry.source == "iphone" ? "iPhone" : "ATHLTH")
+                            Text(workoutSourceLabel(entry))
                                 .font(.caption2)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
                         }
@@ -445,6 +444,19 @@ struct ATHLTHArenaScoringSection: View {
         case .mostRepetitions, .custom:
             return ""
         }
+    }
+
+    private func workoutSourceLabel(_ entry: ATHLTHArenaWorkoutEvidence) -> String {
+        let source: String
+        switch entry.source {
+        case "apple_health": source = "Apple Health"
+        case "iphone": source = "iPhone"
+        default: source = "ATHLTH"
+        }
+        return ATHLTHLocalization.choose(
+            english: "Reported: " + source,
+            norwegian: "Oppgitt: " + source
+        )
     }
 
     private func workoutMetricLabel(_ entry: ATHLTHArenaWorkoutEvidence) -> String {
