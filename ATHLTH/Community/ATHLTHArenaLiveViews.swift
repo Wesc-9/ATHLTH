@@ -4412,7 +4412,12 @@ struct ATHLTHArenaOnlineDetailView: View {
             try await cloud.respond(seriesID: series.id, accept: accept)
             await refresh()
         } catch {
-            message = error.localizedDescription
+            // A second device can handle or replace an invite while this
+            // device is showing the old screen. Refresh first, then surface
+            // the conflict rather than showing a stale invite as actionable.
+            let failure = error.localizedDescription
+            await refresh()
+            message = failure
         }
     }
 
@@ -4425,7 +4430,11 @@ struct ATHLTHArenaOnlineDetailView: View {
             try await cloud.approve(roundID: roundID)
             await refresh()
         } catch {
-            message = error.localizedDescription
+            // This vote may already have been recorded on another device,
+            // or the series could have started. Always re-read the server.
+            let failure = error.localizedDescription
+            await refresh()
+            message = failure
         }
     }
 
