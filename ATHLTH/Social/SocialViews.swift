@@ -1530,32 +1530,6 @@ struct FriendProfileView: View {
         .navigationBarBackButtonHidden(true)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(
-                            ATHLTHTheme.accentDeep.opacity(0.74)
-                        )
-                        .frame(width: 32, height: 32)
-                        .background(
-                            Color.white.opacity(0.46),
-                            in: Circle()
-                        )
-                        .overlay {
-                            Circle()
-                                .stroke(
-                                    Color.white.opacity(0.58),
-                                    lineWidth: 0.8
-                                )
-                        }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Back")
-            }
-
             if profile != nil {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -1584,13 +1558,20 @@ struct FriendProfileView: View {
                         }
                     } label: {
                         Image(systemName: "ellipsis")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(ATHLTHTheme.accentDeep)
-                            .frame(width: 40, height: 40)
+                            .frame(width: 29, height: 29)
                             .background(
                                 ATHLTHTheme.cardWarm.opacity(0.82),
                                 in: Circle()
                             )
+                            .overlay {
+                                Circle()
+                                    .stroke(Color.white.opacity(0.46), lineWidth: 0.7)
+                            }
+                            // A smaller visual control still keeps a 44pt hit target.
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
                 }
             }
@@ -1771,7 +1752,7 @@ struct FriendProfileView: View {
                     Spacer()
 
                     HStack(
-                        alignment: .bottom,
+                        alignment: .top,
                         spacing: 14
                     ) {
                         SocialAvatar(
@@ -1792,75 +1773,12 @@ struct FriendProfileView: View {
                             y: 4
                         )
 
-                        VStack(
-                            alignment: .leading,
-                            spacing: 4
-                        ) {
-                            Text(
-                                profile.card
-                                    .resolvedName
-                            )
-                            .font(
-                                .system(
-                                    size: 27,
-                                    weight: .bold,
-                                    design: .rounded
-                                )
-                            )
-                            .foregroundStyle(.white)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.70)
-
-                            if !profile.card
-                                .usernameLabel
-                                .isEmpty {
-                                Text(
-                                    profile.card
-                                        .usernameLabel
-                                )
-                                .font(
-                                    .subheadline
-                                        .weight(.medium)
-                                )
-                                .foregroundStyle(
-                                    .white.opacity(0.86)
-                                )
-                            }
-
-                            if let focus =
-                                    profile
-                                        .trainingFocus {
-                                Text(focus.title)
-                                    .font(
-                                        .caption
-                                            .weight(
-                                                .semibold
-                                            )
-                                    )
-                                    .foregroundStyle(
-                                        .white.opacity(
-                                            0.92
-                                        )
-                                    )
-                            }
-
-                            if let bio =
-                                    profile.card.bio?
-                                        .trimmingCharacters(
-                                            in:
-                                                .whitespacesAndNewlines
-                                        ),
-                               !bio.isEmpty {
-                                Text(bio)
-                                    .font(.caption)
-                                    .foregroundStyle(
-                                        .white.opacity(
-                                            0.88
-                                        )
-                                    )
-                                    .lineLimit(2)
-                            }
-                        }
+                        ATHLTHProfileHeroIdentityView(
+                            name: profile.card.resolvedName,
+                            username: profile.card.usernameLabel,
+                            trainingFocus: profile.trainingFocus?.title,
+                            bio: profile.card.bio
+                        )
 
                         Spacer(minLength: 0)
                     }
