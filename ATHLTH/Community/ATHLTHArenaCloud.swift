@@ -157,6 +157,27 @@ struct ATHLTHArenaRoundPoints: Decodable {
     }
 }
 
+private struct ATHLTHArenaInvitationChangeParams: Encodable {
+    let seriesID: UUID
+    let oldUserID: UUID
+    let replacementUserID: UUID?
+    enum CodingKeys: String, CodingKey {
+        case seriesID = "p_series"
+        case oldUserID = "p_old_user"
+        case replacementUserID = "p_replacement"
+    }
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(seriesID, forKey: .seriesID)
+        try values.encode(oldUserID, forKey: .oldUserID)
+        if let replacementUserID {
+            try values.encode(replacementUserID, forKey: .replacementUserID)
+        } else {
+            try values.encodeNil(forKey: .replacementUserID)
+        }
+    }
+}
+
 private struct ATHLTHArenaStartParams: Encodable {
     let series: UUID
     enum CodingKeys: String, CodingKey { case series = "p_series" }
@@ -685,6 +706,24 @@ final class ATHLTHArenaCloudService: Sendable {
             .execute()
             .value
         return publishedID
+    }
+
+    func changeInvitation(
+        seriesID: UUID,
+        oldUserID: UUID,
+        replacementUserID: UUID?
+    ) async throws {
+        guard currentUserID != nil else {
+            throw ATHLTHArenaCloudError.signInRequired
+        }
+        let _: String = try await client.rpc(
+            "arena_change_invitation",
+            params: ATHLTHArenaInvitationChangeParams(
+                seriesID: seriesID,
+                oldUserID: oldUserID,
+                replacementUserID: replacementUserID
+            )
+        ).execute().value
     }
 
     func respond(seriesID: UUID, accept: Bool) async throws {
