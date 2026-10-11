@@ -2732,6 +2732,8 @@ private struct ATHLTHArenaRelaySection: View {
     @State private var legs: [ATHLTHArenaRelayLeg] = []
     @State private var reports: [ATHLTHArenaRelayLegReport] = []
     @State private var legTimeText = ""
+    @State private var nextNoticeStatus: String?
+    @State private var nextNoticeAttempted = false
     @State private var loading = false
     @State private var writing = false
     @State private var editing = false
@@ -2755,6 +2757,18 @@ private struct ATHLTHArenaRelaySection: View {
     private var reportWindowOpen: Bool {
         series.status == "active" &&
             (series.endsAt.map { Date() <= $0 } ?? true)
+    }
+
+    /// A runner may remind only the next scheduled teammate, after
+    /// this and all earlier stages are reported. Never a live baton.
+    private var nextUnreportedTeammate: ATHLTHArenaRelayLeg? {
+        guard reportWindowOpen, let ownLeg,
+              reports.contains(where: { $0.slotID == ownLeg.slotID }),
+              let nextLeg = ATHLTHArenaRelayProgress.nextUnreportedLeg(
+                  for: ownLeg.teamIndex, legs: legs, reports: reports
+              ), nextLeg.legOrder == ownLeg.legOrder + 1
+        else { return nil }
+        return nextLeg
     }
 
     private var availableRoutes: [ATHLTHArenaRemoteProposal] {
@@ -3108,6 +3122,35 @@ private struct ATHLTHArenaRelaySection: View {
                                         .disabled(writing)
                                     }
                                 }
+
+                                if let next = nextUnreportedTeammate {
+                                    Button {
+                                        Task { await notifyNextRunner(ownLeg.slotID) }
+                                    } label: {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Remind next runner: ",
+                                                norwegian: "Varsle neste løper: "
+                                            ) + athleteName(for: next.slotID),
+                                            systemImage: "bell.badge"
+                                        )
+                                        .frame(maxWidth: .infinity, minHeight: 38)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .tint(ATHLTHTheme.accentDeep)
+                                    .disabled(writing || nextNoticeAttempted)
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Sends one inbox reminder after your time is reported. This does not start their workout or exchange a baton automatically.",
+                                        norwegian: "Sender én påminnelse i innboksen når din tid er registrert. Det starter ikke treningsøkten eller veksler stafettpinnen automatisk."
+                                    ))
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+                                if let nextNoticeStatus {
+                                    Label(nextNoticeStatus, systemImage: "bell")
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                }
                             }
                             .padding(12)
                             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
@@ -3240,6 +3283,31 @@ private struct ATHLTHArenaRelaySection: View {
             )
             if seconds == nil { legTimeText = "" }
             await refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func notifyNextRunner(_ fromSlotID: UUID) async {
+        guard !writing, !nextNoticeAttempted,
+              nextUnreportedTeammate != nil else { return }
+        writing = true
+        defer { writing = false }
+        do {
+            let sent = try await cloud.notifyNextRelayRunner(
+                seriesID: series.id, fromSlotID: fromSlotID
+            )
+            nextNoticeAttempted = true
+            nextNoticeStatus = sent
+                ? ATHLTHLocalization.choose(
+                    english: "Reminder sent. The next runner opens Arena to plan their stage.",
+                    norwegian: "Varsel sendt. Neste løper åpner Arena for å planlegge etappen."
+                )
+                : ATHLTHLocalization.choose(
+                    english: "Already reminded, or the next stage is reported.",
+                    norwegian: "Allerede varslet, eller neste etappe er registrert."
+                )
         } catch {
             errorMessage = error.localizedDescription
         }
