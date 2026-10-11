@@ -42,6 +42,7 @@ struct LiveGhostRaceLobbyView: View {
     @State private var isLaunching = false
     @State private var isConnectingLiveSession = false
     @State private var rematchSent = false
+    @State private var confirmCancelDuel = false
     @State private var accessibleArenaSeries: ATHLTHArenaRemoteSeries?
 
     var body: some View {
@@ -58,6 +59,35 @@ struct LiveGhostRaceLobbyView: View {
                 }
 
                 phaseCard
+
+                if !ATHLTHDeviceRole.isIPad,
+                   ownParticipant != nil,
+                   let room = liveRace.room,
+                   room.status == .lobby ||
+                   room.status == .countdown ||
+                   room.status == .racing {
+                    Button(role: .destructive) {
+                        confirmCancelDuel = true
+                    } label: {
+                        if liveRace.isCancelling {
+                            ProgressView()
+                        } else {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Leave synchronized duel",
+                                    norwegian: "Avbryt synkronisert duell"
+                                ),
+                                systemImage: "xmark.circle"
+                            )
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(liveRace.isCancelling)
+                    .accessibilityHint(ATHLTHLocalization.choose(
+                        english: "Cancels the shared duel, not your local workout.",
+                        norwegian: "Avlyser fellesduellen, men avslutter ikke din lokale treningsøkt."
+                    ))
+                }
 
                 if (didLaunch || canReconnectRecoveredPhoneRace) &&
                    LiveGhostRaceReentry.canReconnectSharedSession(
@@ -217,6 +247,40 @@ struct LiveGhostRaceLobbyView: View {
         }
         .onDisappear {
             liveRace.close()
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Cancel the synchronized duel?",
+                norwegian: "Avbryte den synkroniserte duellen?"
+            ),
+            isPresented: $confirmCancelDuel,
+            titleVisibility: .visible
+        ) {
+            Button(
+                ATHLTHLocalization.choose(
+                    english: "Cancel duel", norwegian: "Avbryt duell"
+                ),
+                role: .destructive
+            ) {
+                Task {
+                    let cancelled = await liveRace.cancelDuel()
+                    if cancelled,
+                       realtime.currentSession?.ghostChallengeID == challenge.id {
+                        await realtime.setCurrentLiveLocationSharing(false)
+                    }
+                }
+            }
+            Button(
+                ATHLTHLocalization.choose(
+                    english: "Continue race", norwegian: "Fortsett duellen"
+                ),
+                role: .cancel
+            ) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "This ends the shared race without declaring a winner or awarding Arena points. Your current iPhone or Apple Watch workout is not ended.",
+                norwegian: "Fellesduellen avlyses uten vinner eller Arena-poeng. En pågående treningsøkt på iPhone eller Apple Watch avsluttes ikke."
+            ))
         }
         .alert(
             "Live Ghost",
