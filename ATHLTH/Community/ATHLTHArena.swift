@@ -597,9 +597,9 @@ struct ATHLTHArenaDraftDetailView: View {
                     .padding(16)
                 }
 
-                ForEach(Array(draft.rounds.enumerated()), id: \.element.id) { index, round in
+                ForEach(draft.rounds) { round in
                     HStack(alignment: .top, spacing: 12) {
-                        Text("\(index + 1)")
+                        Text("\((draft.rounds.firstIndex(where: { $0.id == round.id }) ?? 0) + 1)")
                             .font(.headline)
                             .foregroundStyle(ATHLTHTheme.accentDeep)
                             .frame(width: 27)
