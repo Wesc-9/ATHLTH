@@ -209,8 +209,7 @@ struct ATHLTHArenaReplacementSection: View {
             proposals = loaded
             votes = allVotes
             error = nil
-        } catch {
-            error = error.localizedDescription
+        } catch { self.error = error.localizedDescription
         }
     }
 
@@ -223,7 +222,7 @@ struct ATHLTHArenaReplacementSection: View {
             try await cloud.proposeReplacement(slotID: slotID, nomineeID: nomineeID)
             await reload()
             await onChanged()
-        } catch { error = error.localizedDescription }
+        } catch { self.error = error.localizedDescription }
     }
 
     @MainActor
@@ -235,7 +234,7 @@ struct ATHLTHArenaReplacementSection: View {
             try await cloud.voteReplacement(proposalID: proposalID, approve: approve)
             await reload()
             await onChanged()
-        } catch { error = error.localizedDescription }
+        } catch { self.error = error.localizedDescription }
     }
 }
 
