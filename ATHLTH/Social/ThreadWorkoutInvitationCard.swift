@@ -438,3 +438,338 @@ struct ThreadWorkoutInvitationCard: View {
     }
 
 }
+
+
+// The calendar lobby deliberately reads status from invitation messages.
+// The planned workout belongs to its creator, regardless of the response.
+struct PlannedWorkoutLobbyView: View {
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var social: SocialStore
+
+    let workout: PlannedSession
+
+    @State private var messages: [DirectMessageRecord] = []
+    @State private var isRefreshing = false
+    @State private var hasLoaded = false
+    @State private var loadError: String?
+
+    private let service = SupabaseMessagingService()
+
+    private struct InvitedAthlete: Identifiable {
+        let id: UUID
+        let decision: PlannedWorkoutInviteDecision?
+    }
+
+    private var sourceWorkoutID: UUID {
+        workout.sharedSourceSessionID ?? workout.id
+    }
+
+    private var organizerID: UUID {
+        workout.sharedSourceOwnerID ?? session.profile.userID
+    }
+
+    private var invitedAthletes: [InvitedAthlete] {
+        let invitations = messages
+            .filter {
+                $0.sourceObjectID == sourceWorkoutID &&
+                $0.shareVersion == 2 &&
+                $0.senderID == organizerID &&
+                $0.deletedAt == nil
+            }
+            .sorted { $0.createdAt > $1.createdAt }
+
+        var seen = Set<UUID>()
+        return invitations.compactMap { invitation in
+            guard seen.insert(invitation.recipientID).inserted else {
+                return nil
+            }
+            let latestResponse = messages
+                .filter {
+                    $0.sourceObjectID == sourceWorkoutID &&
+                    $0.shareVersion == 3 &&
+                    $0.senderID == invitation.recipientID &&
+                    $0.recipientID == organizerID &&
+                    $0.deletedAt == nil
+                }
+                .sorted { $0.createdAt > $1.createdAt }
+                .compactMap {
+                    $0.decodeSnapshot(PlannedWorkoutInviteResponse.self)
+                }
+                .first { $0.sourceWorkoutID == sourceWorkoutID }
+
+            return InvitedAthlete(
+                id: invitation.recipientID,
+                decision: latestResponse?.decision
+            )
+        }
+    }
+
+    private var acceptedCount: Int {
+        invitedAthletes.filter { $0.decision == .accepted }.count
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 17) {
+                headerCard
+                workoutCard
+                participantsCard
+                Text(ATHLTHLocalization.choose(
+                    english: "Your workout is in your calendar whether friends accept, decline or do not respond. You can train on your own.",
+                    norwegian: "Økten ligger i kalenderen din uansett om venner godtar, avslår eller ikke svarer. Du kan gjennomføre økten alene."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .padding(.horizontal, 5)
+            }
+            .frame(maxWidth: 640)
+            .frame(maxWidth: .infinity)
+            .padding(16)
+        }
+        .scrollIndicators(.hidden)
+        .background(ATHLTHPremiumCanvas().ignoresSafeArea())
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Workout lobby", norwegian: "Øktlobby"
+        ))
+        .navigationBarTitleDisplayMode(.inline)
+        .task(id: sourceWorkoutID) {
+            while !Task.isCancelled {
+                await refresh()
+                try? await Task.sleep(for: .seconds(25))
+            }
+        }
+    }
+
+    private var headerCard: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack {
+                Label(ATHLTHLocalization.choose(
+                    english: "TRAIN TOGETHER",
+                    norwegian: "TREN SAMMEN"
+                ), systemImage: "person.2.fill")
+                .font(.caption.weight(.bold))
+                .tracking(1.1)
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                Spacer()
+                Image(systemName: "person.2.circle.fill")
+                    .font(.system(size: 34))
+                    .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.8))
+            }
+            Text(workout.title)
+                .font(.system(size: 25, weight: .bold, design: .rounded))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(3)
+            Text(workout.trainTogetherMode == .sameWorkout
+                ? ATHLTHLocalization.choose(
+                    english: "Same workout · your own pace",
+                    norwegian: "Samme økt · eget tempo")
+                : ATHLTHLocalization.choose(
+                    english: "Meet and train in person",
+                    norwegian: "Møt opp og tren fysisk sammen"))
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            RoundedRectangle(cornerRadius: 25, style: .continuous)
+                .fill(LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.94),
+                        ATHLTHTheme.surfaceStone.opacity(0.83),
+                        ATHLTHTheme.cardWarm.opacity(0.71)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 25, style: .continuous)
+                .stroke(.white.opacity(0.88), lineWidth: 1)
+        }
+        .shadow(color: ATHLTHTheme.accentDeep.opacity(0.08),
+                radius: 18, x: 0, y: 9)
+    }
+
+    private var workoutCard: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 12) {
+                if let start = workout.scheduledStart {
+                    Label(start.formatted(date: .complete, time: .shortened),
+                          systemImage: "calendar")
+                }
+                if let minutes = workout.durationMinutes {
+                    Label("\(minutes) min", systemImage: "clock")
+                }
+                if let meeting = workout.meetingPoint,
+                   workout.trainTogetherMode == .physical {
+                    Label(meeting.name, systemImage: "mappin.and.ellipse")
+                    if let url = URL(string:
+                        "https://maps.apple.com/?ll=\(meeting.latitude),\(meeting.longitude)") {
+                        Link(ATHLTHLocalization.choose(
+                            english: "Open meeting point in Maps",
+                            norwegian: "Åpne møtested i Kart"
+                        ), destination: url)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+                }
+            }
+            .font(.subheadline)
+            .foregroundStyle(ATHLTHTheme.primaryText)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var participantsCard: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Participants",
+                            norwegian: "Deltakere"
+                        ))
+                        .font(.headline)
+                        Text(ATHLTHLocalization.choose(
+                            english: "\(acceptedCount) of \(invitedAthletes.count) accepted",
+                            norwegian: "\(acceptedCount) av \(invitedAthletes.count) godtatt"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    Spacer()
+                    Button {
+                        Task { await refresh() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(width: 38, height: 38)
+                            .background(Color.white.opacity(0.7), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isRefreshing)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Refresh invitation status",
+                        norwegian: "Oppdater invitasjonsstatus"
+                    ))
+                }
+
+                Divider()
+                athleteRow(
+                    userID: organizerID,
+                    status: ATHLTHLocalization.choose(
+                        english: "Organizer", norwegian: "Arrangør"
+                    ),
+                    icon: "star.circle.fill",
+                    tint: ATHLTHTheme.accentDeep
+                )
+
+                ForEach(invitedAthletes) { athlete in
+                    Divider()
+                    let status = invitationStatus(athlete.decision)
+                    athleteRow(
+                        userID: athlete.id,
+                        status: status.text,
+                        icon: status.icon,
+                        tint: status.color
+                    )
+                }
+
+                if isRefreshing && !hasLoaded {
+                    HStack(spacing: 9) {
+                        ProgressView().controlSize(.small)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Loading invitation status…",
+                            norwegian: "Henter invitasjonsstatus…"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                } else if hasLoaded && invitedAthletes.isEmpty {
+                    Text(ATHLTHLocalization.choose(
+                        english: "No sent invitations were found for this workout yet.",
+                        norwegian: "Ingen sendte invitasjoner er funnet for denne økten ennå."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                if let loadError {
+                    Label(loadError, systemImage: "exclamationmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    private func athleteRow(
+        userID: UUID,
+        status: String,
+        icon: String,
+        tint: Color
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "person.crop.circle.fill")
+                .font(.system(size: 34))
+                .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.75))
+                .frame(width: 42, height: 42)
+                .background(Color.white.opacity(0.6), in: Circle())
+            VStack(alignment: .leading, spacing: 4) {
+                Text(userID == session.profile.userID
+                    ? ATHLTHLocalization.choose(english: "You", norwegian: "Du")
+                    : social.profile(for: userID)?.resolvedName ??
+                        ATHLTHLocalization.choose(
+                            english: "Athlete", norwegian: "Deltaker"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                Label(status, systemImage: icon)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(tint)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func invitationStatus(
+        _ decision: PlannedWorkoutInviteDecision?
+    ) -> (text: String, icon: String, color: Color) {
+        switch decision {
+        case .accepted:
+            return (ATHLTHLocalization.choose(
+                english: "Accepted", norwegian: "Godtatt"),
+                "checkmark.circle.fill", ATHLTHTheme.vitality)
+        case .declined:
+            return (ATHLTHLocalization.choose(
+                english: "Declined", norwegian: "Avslått"),
+                "xmark.circle.fill", .red)
+        case .none:
+            return (ATHLTHLocalization.choose(
+                english: "Invited · awaiting reply",
+                norwegian: "Invitert · venter på svar"),
+                "clock", ATHLTHTheme.accentDeep)
+        }
+    }
+
+    private func refresh() async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        defer {
+            isRefreshing = false
+            hasLoaded = true
+        }
+        do {
+            messages = try await service.loadPlannedWorkoutInvitationMessages(
+                sourceWorkoutID: sourceWorkoutID
+            )
+            loadError = nil
+        } catch {
+            loadError = ATHLTHLocalization.choose(
+                english: "Unable to refresh status. Try again.",
+                norwegian: "Kunne ikke oppdatere status. Prøv igjen."
+            )
+        }
+    }
+}
