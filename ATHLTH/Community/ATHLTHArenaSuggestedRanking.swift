@@ -1,5 +1,25 @@
 import Foundation
 
+/// Separate active duels from immutable race history. A completed or
+/// cancelled room never re-enters the live list, while an already-started
+/// race stays live even if its initial invitation has expired.
+enum ATHLTHArenaLiveDuelBrowsing {
+    static func isHistorical(
+        roomStatus: LiveGhostRaceRoomStatus?,
+        expiresAt: Date,
+        now: Date = Date()
+    ) -> Bool {
+        switch roomStatus {
+        case .finished, .cancelled:
+            return true
+        case .racing, .countdown:
+            return false
+        case .lobby, nil:
+            return expiresAt <= now
+        }
+    }
+}
+
 /// Whether a linked Arena Live Ghost room may be reopened. A started
 /// race remains recoverable after invite expiry; an unstarted or finished
 /// race may never start a new workout from a stale invitation.
