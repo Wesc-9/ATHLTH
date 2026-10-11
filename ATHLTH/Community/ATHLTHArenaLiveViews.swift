@@ -3306,6 +3306,7 @@ struct ATHLTHArenaOnlineDetailView: View {
                             }
                         }
                     )
+                    .id("arena-live-duels")
                 }
 
                 if currentSeries.status == "active" && canParticipate {
@@ -3755,6 +3756,35 @@ struct ATHLTHArenaOnlineDetailView: View {
     private func detailNavigator(_ proxy: ScrollViewProxy) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
+                if currentSeries.scope == .duel && canParticipate {
+                    navigationButton(
+                        title: ATHLTHLocalization.choose(
+                            english: "Live duels", norwegian: "Live-dueller"
+                        ),
+                        icon: "bolt.horizontal.circle.fill",
+                        target: "arena-live-duels",
+                        proxy: proxy
+                    )
+                }
+                if currentSeries.scope != .duel &&
+                   (canParticipate || isOrganizer) {
+                    navigationButton(
+                        title: ATHLTHLocalization.choose(
+                            english: "Teams", norwegian: "Lag"
+                        ),
+                        icon: "person.3.sequence.fill",
+                        target: "arena-teams",
+                        proxy: proxy
+                    )
+                    navigationButton(
+                        title: ATHLTHLocalization.choose(
+                            english: "Relay", norwegian: "Stafett"
+                        ),
+                        icon: "figure.run",
+                        target: "arena-relay",
+                        proxy: proxy
+                    )
+                }
                 navigationButton(
                     title: ATHLTHLocalization.choose(english: "Standings", norwegian: "Stilling"),
                     icon: "chart.bar.fill",
