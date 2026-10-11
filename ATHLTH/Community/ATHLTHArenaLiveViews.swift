@@ -3514,10 +3514,11 @@ private struct ATHLTHArenaRelaySection: View {
     @MainActor
     private func suggestOwnLegTime(from route: TrainingRoute) async {
         guard !checkingOwnGPS, !writing, reportWindowOpen,
-              let ownLeg, let routeRoundID = ownLeg.routeRoundID,
+              let ownLeg,
               let startsAt = series.startsAt,
               let endsAt = series.endsAt,
               startsAt <= endsAt else { return }
+        let routeRoundID = ownLeg.routeRoundID
 
         checkingOwnGPS = true
         ownGPSNotice = nil
