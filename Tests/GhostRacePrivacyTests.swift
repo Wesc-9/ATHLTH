@@ -131,24 +131,25 @@ final class GhostRacePrivacyTests: XCTestCase {
     func testLiveGhostFinishGateRejectsDuplicatesAndInvalidTimes() {
         let challenge = UUID()
         var gate = ATHLTHLiveGhostFinishGate()
-        XCTAssertFalse(gate.begin(challengeID: challenge, seconds: .nan))
-        XCTAssertFalse(gate.begin(challengeID: challenge, seconds: 0))
-        XCTAssertFalse(gate.begin(challengeID: challenge, seconds: 86_401))
-        XCTAssertTrue(gate.begin(challengeID: challenge, seconds: 900))
-        XCTAssertFalse(gate.begin(challengeID: challenge, seconds: 901))
+        XCTAssertFalse(gate.begin(challengeID: challenge, completedRouteID: challenge, seconds: .nan))
+        XCTAssertFalse(gate.begin(challengeID: challenge, completedRouteID: challenge, seconds: 0))
+        XCTAssertFalse(gate.begin(challengeID: challenge, completedRouteID: challenge, seconds: 86_401))
+        XCTAssertTrue(gate.begin(challengeID: challenge, completedRouteID: challenge, seconds: 900))
+        XCTAssertFalse(gate.begin(challengeID: challenge, completedRouteID: challenge, seconds: 901))
         gate.end(challengeID: challenge, succeeded: true)
-        XCTAssertFalse(gate.begin(challengeID: challenge, seconds: 900))
-        XCTAssertTrue(gate.begin(challengeID: UUID(), seconds: 900))
+        XCTAssertFalse(gate.begin(challengeID: challenge, completedRouteID: challenge, seconds: 900))
+        let anotherChallenge = UUID()
+        XCTAssertTrue(gate.begin(challengeID: anotherChallenge, completedRouteID: anotherChallenge, seconds: 900))
     }
 
     func testLiveGhostFinishGateAllowsRetryAfterNetworkFailure() {
         let challenge = UUID()
         var gate = ATHLTHLiveGhostFinishGate()
-        XCTAssertTrue(gate.begin(challengeID: challenge, seconds: 1_200))
+        XCTAssertTrue(gate.begin(challengeID: challenge, completedRouteID: challenge, seconds: 1_200))
         gate.end(challengeID: challenge, succeeded: false)
-        XCTAssertTrue(gate.begin(challengeID: challenge, seconds: 1_200))
+        XCTAssertTrue(gate.begin(challengeID: challenge, completedRouteID: challenge, seconds: 1_200))
         gate.end(challengeID: challenge, succeeded: true)
-        XCTAssertFalse(gate.begin(challengeID: challenge, seconds: 1_200))
+        XCTAssertFalse(gate.begin(challengeID: challenge, completedRouteID: challenge, seconds: 1_200))
     }
 
     @MainActor
