@@ -50,6 +50,9 @@ struct LiveGhostRaceLobbyView: View {
                 phaseCard
 
                 if (didLaunch || canReconnectRecoveredPhoneRace) &&
+                   LiveGhostRaceReentry.canReconnectSharedSession(
+                       roomStatus: liveRace.room?.status
+                   ) &&
                    realtime.currentSession?.ghostChallengeID != challenge.id {
                     ATHLTHCard {
                         VStack(alignment: .leading, spacing: 10) {
@@ -1114,6 +1117,9 @@ struct LiveGhostRaceLobbyView: View {
     @MainActor
     private func connectLiveSession() async {
         guard didLaunch || canReconnectRecoveredPhoneRace,
+              LiveGhostRaceReentry.canReconnectSharedSession(
+                  roomStatus: liveRace.room?.status
+              ),
               !isConnectingLiveSession,
               realtime.currentSession?.ghostChallengeID != challenge.id else {
             return
