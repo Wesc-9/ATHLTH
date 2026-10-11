@@ -306,8 +306,15 @@ struct ATHLTHLiveGhostFinishGate {
     private var inFlight: Set<UUID> = []
     private var submitted: Set<UUID> = []
 
-    mutating func begin(challengeID: UUID, seconds: TimeInterval) -> Bool {
-        guard seconds.isFinite,
+    mutating func begin(
+        challengeID: UUID,
+        completedRouteID: UUID?,
+        seconds: TimeInterval
+    ) -> Bool {
+        // Do not settle a Live Ghost duel using an unrelated run, or a
+        // completion from an older Watch transfer without route identity.
+        guard completedRouteID == challengeID,
+              seconds.isFinite,
               (5...86_400).contains(seconds),
               !inFlight.contains(challengeID),
               !submitted.contains(challengeID)
@@ -1545,7 +1552,8 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
     }
 
     func finishCurrentLiveGhostRace(
-        elapsedSeconds: TimeInterval
+        elapsedSeconds: TimeInterval,
+        completedRouteID: UUID?
     ) async {
         guard
             let session = currentSession,
@@ -1554,6 +1562,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             let currentUserID,
             liveGhostFinishGate.begin(
                 challengeID: challengeID,
+                completedRouteID: completedRouteID,
                 seconds: elapsedSeconds
             )
         else {
