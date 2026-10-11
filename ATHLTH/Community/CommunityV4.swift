@@ -245,6 +245,15 @@ struct ATHLTHCommunityV4View: View {
                     referenceWeeklyChallengeSection
                     referenceFriendsVsFriendsSection
 
+                    // Arena is distinct from both Weekly Challenge and
+                    // the existing one-off friends/challenge workflows.
+                    NavigationLink {
+                        ATHLTHArenaHomeView()
+                    } label: {
+                        ATHLTHArenaEntryCard()
+                    }
+                    .buttonStyle(.plain)
+
                     CommunityReferenceQuickActions()
 
                     referenceRecentActivitySection
