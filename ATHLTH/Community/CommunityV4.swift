@@ -3583,7 +3583,6 @@ private struct CommunityDiscoveryDivider:
 }
 
 private struct CommunityReferenceQuickActions: View {
-    @State private var showingCreateChallenge = false
     @State private var showingCreateEvent = false
 
     var body: some View {
@@ -3609,8 +3608,8 @@ private struct CommunityReferenceQuickActions: View {
             }
             .buttonStyle(.plain)
 
-            Button {
-                showingCreateChallenge = true
+            NavigationLink {
+                ATHLTHArenaHomeView()
             } label: {
                 tile(
                     title:
@@ -3666,11 +3665,6 @@ private struct CommunityReferenceQuickActions: View {
                 )
             }
             .buttonStyle(.plain)
-        }
-        .sheet(
-            isPresented: $showingCreateChallenge
-        ) {
-            ChallengeCreationView()
         }
         .sheet(
             isPresented: $showingCreateEvent
