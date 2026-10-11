@@ -13,6 +13,45 @@ final class StrengthAudioCoachSpeaker:
     private var cueQueue = ATHLTHCoachCueQueue()
     private var eventLedger = ATHLTHCoachEventLedger()
     private var latestConfiguration: StrengthAudioCoachConfiguration?
+    private var replayMemory = ATHLTHCoachReplayMemory()
+
+    @Published private(set) var speechPaused = false
+    @Published private(set) var lastCoachMessage: String?
+
+    var canReplayLastMessage: Bool {
+        latestConfiguration?.enabled == true &&
+        !speechPaused &&
+        replayMemory.replayableText() != nil
+    }
+
+    /// Mutes strength speech only. Recording, rest timers and Watch haptics
+    /// run independently and are never touched by this temporary setting.
+    func setSpeechPaused(_ paused: Bool) {
+        guard latestConfiguration?.enabled == true else {
+            speechPaused = false
+            return
+        }
+        guard speechPaused != paused else { return }
+        speechPaused = paused
+        cueQueue.reset()
+        if paused {
+            synthesizer.stopSpeaking(at: .immediate)
+            deactivateAudioSession()
+        }
+    }
+
+    func replayLastMessage() {
+        guard canReplayLastMessage,
+              let text = replayMemory.replayableText(),
+              let configuration = latestConfiguration
+        else { return }
+        speak(
+            english: text,
+            norwegian: text,
+            configuration: configuration,
+            rememberForReplay: false
+        )
+    }
 
     override init() {
         super.init()
@@ -25,7 +64,8 @@ final class StrengthAudioCoachSpeaker:
         configuration:
             StrengthAudioCoachConfiguration,
         cueKind: ATHLTHCoachEventKind = .strengthSet,
-        event: ATHLTHCoachEvent? = nil
+        event: ATHLTHCoachEvent? = nil,
+        rememberForReplay: Bool = true
     ) {
         guard configuration.enabled else {
             return
@@ -57,6 +97,8 @@ final class StrengthAudioCoachSpeaker:
         }
 
         latestConfiguration = configuration
+        guard !speechPaused else { return }
+
         let resolvedEvent = event ?? ATHLTHCoachEvent(
             kind: cueKind,
             key: UUID().uuidString,
@@ -151,6 +193,10 @@ final class StrengthAudioCoachSpeaker:
             )
 
         synthesizer.speak(utterance)
+        if rememberForReplay {
+            replayMemory.remember(text, priority: .structuredStep)
+            lastCoachMessage = replayMemory.text
+        }
     }
 
     private func deliverNextQueuedCue() {
@@ -172,6 +218,9 @@ final class StrengthAudioCoachSpeaker:
     func stop() {
         cueQueue.reset()
         eventLedger.reset()
+        replayMemory.reset()
+        lastCoachMessage = nil
+        speechPaused = false
         latestConfiguration = nil
         synthesizer.stopSpeaking(
             at: .immediate
