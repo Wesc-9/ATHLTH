@@ -367,5 +367,17 @@ begin
  ) then
    raise exception 'Clients must not call the private relay history trigger';
  end if;
+ if pg_get_functiondef('public.arena_report_relay_leg(uuid,uuid,numeric)'::regprocedure)
+      not like '%arena_round_results%'
+    or pg_get_functiondef('public.arena_report_relay_leg(uuid,uuid,numeric)'::regprocedure)
+      not like '%pending%approved%'
+ then
+   raise exception 'Relay times must be frozen while a round result is pending or approved';
+ end if;
+ if has_table_privilege('authenticated','public.arena_relay_leg_reports','UPDATE')
+    or has_table_privilege('authenticated','public.arena_relay_leg_reports','DELETE') then
+   raise exception 'Clients must not circumvent relay vote freeze using direct updates';
+ end if;
+
 end $;
 rollback;
