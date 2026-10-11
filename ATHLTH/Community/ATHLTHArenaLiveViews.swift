@@ -3934,22 +3934,41 @@ struct ATHLTHArenaOnlineDetailView: View {
     }
 
     private var summary: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 12) {
             Label("ATHLTH ARENA", systemImage: "trophy.fill")
                 .font(.caption.weight(.semibold))
                 .tracking(1.5)
                 .foregroundStyle(.white.opacity(0.88))
-            Text(series.title)
-                .font(.title2.weight(.bold))
+            Text(currentSeries.title)
+                .font(.system(.title2, design: .rounded, weight: .bold))
+                .fixedSize(horizontal: false, vertical: true)
                 .foregroundStyle(.white)
             Text(series.scope.title + " · " +
                  "\(series.durationDays) " +
                  ATHLTHLocalization.choose(english: "days", norwegian: "dager"))
                 .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.74))
-            Text(series.scoring.title)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    summaryMetric("\(rounds.count) " + ATHLTHLocalization.choose(
+                        english: "rounds", norwegian: "runder"
+                    ), symbol: "flag.checkered")
+                    summaryMetric("\(acceptedMembers.count) " + ATHLTHLocalization.choose(
+                        english: "athletes", norwegian: "deltakere"
+                    ), symbol: "person.2.fill")
+                }
+                VStack(alignment: .leading, spacing: 7) {
+                    summaryMetric("\(rounds.count) " + ATHLTHLocalization.choose(
+                        english: "rounds", norwegian: "runder"
+                    ), symbol: "flag.checkered")
+                    summaryMetric("\(acceptedMembers.count) " + ATHLTHLocalization.choose(
+                        english: "athletes", norwegian: "deltakere"
+                    ), symbol: "person.2.fill")
+                }
+            }
+            Label(series.scoring.title, systemImage: "medal")
                 .font(.caption)
-                .foregroundStyle(.white.opacity(0.74))
+                .foregroundStyle(.white.opacity(0.88))
             Text(currentSeries.status == "completed"
                 ? ATHLTHLocalization.choose(english: "Completed", norwegian: "Fullført")
                 : currentSeries.status == "active"
@@ -4010,14 +4029,16 @@ struct ATHLTHArenaOnlineDetailView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
-        .background(
-            LinearGradient(
-                colors: [ATHLTHTheme.accentDeep, ATHLTHTheme.vitality],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
-        )
+        .background(ATHLTHArenaLightStyle.heroSurface(24))
+    }
+
+    private func summaryMetric(_ value: String, symbol: String) -> some View {
+        Label(value, systemImage: symbol)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.white.opacity(0.94))
+            .padding(.horizontal, 11)
+            .padding(.vertical, 8)
+            .background(.white.opacity(0.12), in: Capsule())
     }
 
     private var invitationActions: some View {
