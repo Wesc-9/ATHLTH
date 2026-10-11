@@ -2,6 +2,26 @@ import Combine
 import Foundation
 import Supabase
 
+/// A Live Ghost duel is only attributable to an agreed Arena route when
+/// the organizer's immutable route is the one actually selected. A previous
+/// GPS run remains available, but is never silently credited to another route.
+enum GhostFriendRaceArenaLinkPolicy {
+    static func eligibleRoundID(
+        roundID: UUID?,
+        agreedRouteID: UUID?,
+        selectedRouteID: UUID?,
+        isPlannedRoute: Bool
+    ) -> UUID? {
+        guard isPlannedRoute,
+              let roundID,
+              let agreedRouteID,
+              agreedRouteID == selectedRouteID else {
+            return nil
+        }
+        return roundID
+    }
+}
+
 enum GhostFriendRaceStatus: String, Codable, Hashable {
     case pending
     case accepted
