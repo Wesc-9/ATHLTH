@@ -3090,6 +3090,8 @@ struct DirectMessageThreadView: View {
     @State private var requestResponseAccepting: Bool?
     @State private var requestResponseError: String?
     @State private var respondingToPlannedInviteID: UUID?
+    @State private var respondingToWorkoutProposalID: UUID?
+    @State private var workoutInvitationForProposal: DirectMessageRecord?
     @State private var plannedInviteError: String?
     @State private var respondingToChallengeID: UUID?
     @State private var respondingToProposalID: UUID?
@@ -3191,6 +3193,25 @@ struct DirectMessageThreadView: View {
             MessageSharePicker { draft in
                 selectedShare = draft
                 showingSharePicker = false
+            }
+        }
+        .sheet(item: $workoutInvitationForProposal) { invitation in
+            if let original = invitation.decodeSnapshot(PlannedSession.self) {
+                SessionEditorView(
+                    standaloneDate: original.scheduledStart ?? Date(),
+                    initialSourceWorkout: latestAgreedWorkout(
+                        for: invitation,
+                        in: conversationID.map {
+                            messaging.messages(in: $0)
+                        } ?? []
+                    ) ?? original,
+                    preserveSourceID: true,
+                    onPreparedWorkout: { proposed in
+                        sendWorkoutChangeProposal(
+                            invitation: invitation, proposed: proposed
+                        )
+                    }
+                )
             }
         }
         .alert(
@@ -3522,6 +3543,20 @@ struct DirectMessageThreadView: View {
                                 respondingToInvite: respondingToPlannedInviteID == message.id,
                                 onRespondToInvite: { accept in
                                     respondToPlannedInvite(message, accept: accept)
+                                },
+                                agreedWorkout: latestAgreedWorkout(
+                                    for: message, in: messages
+                                ),
+                                workoutChangeDecision: workoutChangeDecision(
+                                    for: message, in: messages
+                                ),
+                                reviewingWorkoutChange: respondingToWorkoutProposalID ==
+                                    message.id,
+                                onProposeWorkoutChange: {
+                                    workoutInvitationForProposal = message
+                                },
+                                onReviewWorkoutChange: { approve in
+                                    reviewWorkoutProposal(message, approve: approve)
                                 },
                                 respondingToChallenge: respondingToChallengeID ==
                                     message.sourceObjectID,
@@ -5130,6 +5165,231 @@ struct DirectMessageThreadView: View {
         }
     }
 
+    private func workoutChangeDecision(
+        for message: DirectMessageRecord,
+        in messages: [DirectMessageRecord]
+    ) -> WorkoutChangeDecision? {
+        guard message.attachmentKind == .workout,
+              message.shareVersion == 4,
+              let proposal = message.decodeSnapshot(WorkoutChangeProposal.self)
+        else { return nil }
+        return messages
+            .filter {
+                $0.attachmentKind == .workout &&
+                $0.shareVersion == 5 &&
+                $0.sourceObjectID == proposal.workoutID &&
+                $0.senderID == proposal.ownerID
+            }
+            .sorted { $0.createdAt > $1.createdAt }
+            .compactMap { $0.decodeSnapshot(WorkoutChangeDecision.self) }
+            .first { $0.proposalID == proposal.id }
+    }
+
+    private func latestAgreedWorkout(
+        for invitation: DirectMessageRecord,
+        in messages: [DirectMessageRecord]
+    ) -> PlannedSession? {
+        guard invitation.shareVersion == 2,
+              let id = invitation.sourceObjectID else { return nil }
+        return messages
+            .filter {
+                $0.attachmentKind == .workout &&
+                $0.shareVersion == 5 &&
+                $0.sourceObjectID == id &&
+                $0.senderID == invitation.senderID
+            }
+            .sorted { $0.createdAt > $1.createdAt }
+            .compactMap { $0.decodeSnapshot(WorkoutChangeDecision.self) }
+            .first { $0.approved && $0.workoutID == id }?
+            .approvedWorkout
+    }
+
+    private func sendWorkoutChangeProposal(
+        invitation: DirectMessageRecord,
+        proposed: PlannedSession
+    ) {
+        guard invitation.attachmentKind == .workout,
+              invitation.shareVersion == 2,
+              invitation.senderID == friend.userID,
+              let original = invitation.decodeSnapshot(PlannedSession.self),
+              let conversationID,
+              proposed.id == original.id,
+              original.scheduledStart.map({ $0 > Date() }) ?? true
+        else { return }
+
+        let agreed = latestAgreedWorkout(
+            for: invitation,
+            in: messaging.messages(in: conversationID)
+        ) ?? original
+        let proposal = WorkoutChangeProposal(
+            id: UUID(),
+            proposedBy: session.profile.userID,
+            ownerID: invitation.senderID,
+            original: agreed,
+            proposed: proposed,
+            submittedAt: Date()
+        )
+        guard proposal.hasChanges else {
+            plannedInviteError = ATHLTHLocalization.choose(
+                english: "Change at least one detail before sending.",
+                norwegian: "Endre minst én detalj før du sender."
+            )
+            return
+        }
+
+        Task {
+            do {
+                let payload = try MessageShareDraft(
+                    kind: .workout,
+                    title: proposed.title,
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Workout changes pending approval",
+                        norwegian: "Øktendringer venter på godkjenning"
+                    ),
+                    snapshot: proposal,
+                    sourceObjectID: original.id,
+                    sourceOwnerID: invitation.senderID,
+                    shareVersion: 4
+                )
+                let sent = await messaging.send(
+                    to: invitation.senderID,
+                    conversationID: conversationID,
+                    body: ATHLTHLocalization.choose(
+                        english: "I suggest changes to our workout. See the red details.",
+                        norwegian: "Jeg foreslår endringer i økten vår. Se detaljene merket rødt."
+                    ),
+                    attachment: payload
+                )
+                if !sent {
+                    plannedInviteError = messaging.errorMessage ??
+                        ATHLTHLocalization.choose(
+                            english: "Could not send the changes.",
+                            norwegian: "Kunne ikke sende endringene."
+                        )
+                } else {
+                    await messaging.refreshConversation(conversationID)
+                }
+            } catch {
+                plannedInviteError = error.localizedDescription
+            }
+        }
+    }
+
+    private func reviewWorkoutProposal(
+        _ message: DirectMessageRecord, approve: Bool
+    ) {
+        guard message.shareVersion == 4,
+              message.attachmentKind == .workout,
+              let proposal = message.decodeSnapshot(WorkoutChangeProposal.self),
+              proposal.ownerID == session.profile.userID,
+              proposal.proposedBy == friend.userID,
+              message.senderID == friend.userID,
+              respondingToWorkoutProposalID == nil,
+              let conversationID
+        else { return }
+
+        respondingToWorkoutProposalID = message.id
+        Task {
+            defer { respondingToWorkoutProposalID = nil }
+            var revision: PlannedSession?
+            if approve {
+                let inStandalone = session.standalonePlannedSessions.contains {
+                    $0.id == proposal.workoutID
+                }
+                let inPlan = session.activePlan.flatMap { plan in
+                    plan.weeks.flatMap(\.days).flatMap(\.sessions)
+                        .first(where: { $0.id == proposal.workoutID })
+                }
+                guard let current = session.standalonePlannedSessions.first(
+                    where: { $0.id == proposal.workoutID }
+                ) ?? inPlan,
+                current.id == proposal.original.id,
+                current.scheduledStart.map({ $0 > Date() }) ?? true,
+                WorkoutChangeComparison.rows(WorkoutChangeProposal(
+                    id: proposal.id,
+                    proposedBy: proposal.proposedBy,
+                    ownerID: proposal.ownerID,
+                    original: proposal.original,
+                    proposed: current,
+                    submittedAt: proposal.submittedAt
+                )).isEmpty,
+                proposal.proposed.id == current.id,
+                !proposal.proposed.title
+                    .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                proposal.proposed.scheduledStart.map({ $0 > Date() }) ?? true
+                else {
+                    plannedInviteError = ATHLTHLocalization.choose(
+                        english: "The workout has changed or started. Ask for a new proposal.",
+                        norwegian: "Økten er endret eller startet. Be om et nytt forslag."
+                    )
+                    return
+                }
+                var approved = proposal.proposed
+                // The original creator's gear and music preferences are
+                // private and must never be replaced by the recipient.
+                approved.gearIDs = current.gearIDs
+                approved.spotifyPlaylist = current.spotifyPlaylist
+                approved.spotifyAutoplayOnStart = current.spotifyAutoplayOnStart
+                revision = approved
+
+                if inStandalone {
+                    session.updateStandalonePlannedSession(approved)
+                } else if let planID = session.activePlan?.id {
+                    session.updateSession(approved, inPlan: planID)
+                }
+            }
+
+            do {
+                let decision = WorkoutChangeDecision(
+                    proposalID: proposal.id,
+                    workoutID: proposal.workoutID,
+                    approved: approve,
+                    approvedWorkout: revision
+                )
+                let payload = try MessageShareDraft(
+                    kind: .workout,
+                    title: proposal.proposed.title,
+                    subtitle: approve
+                        ? ATHLTHLocalization.choose(
+                            english: "Changes approved", norwegian: "Endringene er godkjent"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Changes declined", norwegian: "Endringene er avslått"
+                        ),
+                    snapshot: decision,
+                    sourceObjectID: proposal.workoutID,
+                    sourceOwnerID: proposal.ownerID,
+                    shareVersion: 5
+                )
+                let sent = await messaging.send(
+                    to: friend.userID,
+                    conversationID: conversationID,
+                    body: approve
+                        ? ATHLTHLocalization.choose(
+                            english: "I approved your changes to our workout.",
+                            norwegian: "Jeg har godkjent endringene i økten vår."
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "I declined the proposed changes.",
+                            norwegian: "Jeg har avslått endringsforslaget."
+                        ),
+                    attachment: payload
+                )
+                if !sent {
+                    plannedInviteError = messaging.errorMessage ??
+                        ATHLTHLocalization.choose(
+                            english: "Could not deliver the decision.",
+                            norwegian: "Kunne ikke sende svaret."
+                        )
+                } else {
+                    await messaging.refreshConversation(conversationID)
+                }
+            } catch {
+                plannedInviteError = error.localizedDescription
+            }
+        }
+    }
+
     private func plannedInviteResponse(
         for invitation: DirectMessageRecord,
         in messages: [DirectMessageRecord]
@@ -5162,10 +5422,13 @@ struct DirectMessageThreadView: View {
               invitation.shareVersion == 2,
               respondingToPlannedInviteID == nil,
               let conversationID,
-              let workout = invitation.decodeSnapshot(PlannedSession.self),
+              let originalWorkout = invitation.decodeSnapshot(PlannedSession.self),
               let sourceID = invitation.sourceObjectID
         else { return }
 
+        let workout = latestAgreedWorkout(
+            for: invitation, in: messaging.messages(in: conversationID)
+        ) ?? originalWorkout
         respondingToPlannedInviteID = invitation.id
         Task {
             defer { respondingToPlannedInviteID = nil }
@@ -5239,7 +5502,10 @@ struct DirectMessageThreadView: View {
     }
 
     private func saveAttachment(_ message: DirectMessageRecord) {
-        guard message.shareVersion != 3 && message.shareVersion != 2
+        guard message.shareVersion != 3 &&
+              message.shareVersion != 2 &&
+              message.shareVersion != 4 &&
+              message.shareVersion != 5
             else { return }
 
         guard message.senderID != messaging.currentUserID else { return }
@@ -6181,6 +6447,11 @@ private struct MessageBubble: View {
     let inviteResponse: PlannedWorkoutInviteResponse?
     let respondingToInvite: Bool
     let onRespondToInvite: (Bool) -> Void
+    let agreedWorkout: PlannedSession?
+    let workoutChangeDecision: WorkoutChangeDecision?
+    let reviewingWorkoutChange: Bool
+    let onProposeWorkoutChange: () -> Void
+    let onReviewWorkoutChange: (Bool) -> Void
     let respondingToChallenge: Bool
     let onRespondToChallenge: (ATHLTHChallenge, Bool) -> Void
     let onOpenChallenge: (UUID) -> Void
@@ -6428,15 +6699,48 @@ private struct MessageBubble: View {
                             }
                         }
                     )
+                } else if message.attachmentKind == .workout &&
+                          message.shareVersion == 4,
+                          let proposal = message.decodeSnapshot(WorkoutChangeProposal.self) {
+                    ThreadWorkoutChangeProposalCard(
+                        proposal: proposal,
+                        decision: workoutChangeDecision,
+                        currentUserID: currentUserID,
+                        isWorking: reviewingWorkoutChange,
+                        onApprove: { onReviewWorkoutChange(true) },
+                        onDecline: { onReviewWorkoutChange(false) }
+                    )
+                } else if message.attachmentKind == .workout &&
+                          message.shareVersion == 5,
+                          let decision = message.decodeSnapshot(WorkoutChangeDecision.self) {
+                    Label(
+                        decision.approved
+                            ? ATHLTHLocalization.choose(
+                                english: "Workout changes approved",
+                                norwegian: "Endringene i økten er godkjent"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Workout changes declined",
+                                norwegian: "Endringene i økten er avslått"
+                            ),
+                        systemImage: decision.approved
+                            ? "checkmark.circle.fill" : "xmark.circle.fill"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .padding(14)
+                    .background(.ultraThinMaterial,
+                                in: RoundedRectangle(cornerRadius: 16))
                 } else if isPlannedInvitation,
                           let workout = message.decodeSnapshot(PlannedSession.self) {
                     ThreadWorkoutInvitationCard(
-                        workout: workout,
+                        workout: agreedWorkout ?? workout,
                         response: inviteResponse,
                         isMine: isMine,
                         isResponding: respondingToInvite,
                         onAccept: { onRespondToInvite(true) },
-                        onDecline: { onRespondToInvite(false) }
+                        onDecline: { onRespondToInvite(false) },
+                        onProposeChanges: onProposeWorkoutChange
                     )
                 } else if let attachmentKind = message.attachmentKind {
                     VStack(alignment: .leading, spacing: 9) {
