@@ -3,6 +3,19 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHArenaSafetyTests: XCTestCase {
+    func testTeamQuickStartRequiresBalancedMinimumRoster() {
+        // Organizer is always the first member. Three invited athletes
+        // therefore make two teams of two; two invitees cannot.
+        XCTAssertFalse(ATHLTHArenaTeamStartRules.validInviteeCount(0))
+        XCTAssertFalse(ATHLTHArenaTeamStartRules.validInviteeCount(1))
+        XCTAssertFalse(ATHLTHArenaTeamStartRules.validInviteeCount(2))
+        XCTAssertTrue(ATHLTHArenaTeamStartRules.validInviteeCount(3))
+        XCTAssertFalse(ATHLTHArenaTeamStartRules.validInviteeCount(4))
+        XCTAssertTrue(ATHLTHArenaTeamStartRules.validInviteeCount(5))
+        XCTAssertTrue(ATHLTHArenaTeamStartRules.validInviteeCount(19))
+        XCTAssertFalse(ATHLTHArenaTeamStartRules.validInviteeCount(20))
+    }
+
     private func decoder() -> JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
