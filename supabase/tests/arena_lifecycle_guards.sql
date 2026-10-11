@@ -3,6 +3,27 @@ begin;
 do $$
 declare v_policy text;
 begin
+ -- Every Arena storage table (including new season/team/relay data)
+ -- must keep RLS enabled and deny all table-level access to anonymous users.
+ -- This future-proofs new Arena migrations without exposing personal results.
+ if exists (
+   select 1
+   from pg_class c
+   join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public'
+     and c.relkind in ('r','p')
+     and (c.relname like 'arena\\_%' escape '\\'
+       or c.relname = 'ghost_race_challenges')
+     and (
+       not c.relrowsecurity
+       or has_table_privilege('anon', c.oid, 'SELECT')
+       or has_table_privilege('anon', c.oid, 'INSERT')
+       or has_table_privilege('anon', c.oid, 'UPDATE')
+       or has_table_privilege('anon', c.oid, 'DELETE')
+     )
+ ) then
+   raise exception 'An Arena or Ghost data table has disabled RLS or anonymous access';
+ end if;
  if has_function_privilege(
    'anon',
    'public.arena_change_invitation(uuid,uuid,uuid)'::regprocedure,
