@@ -274,6 +274,35 @@ struct ATHLTHArenaTeamStanding: Identifiable, Equatable {
 
 /// Uses ONLY settled member points from Arena's server-side score engine.
 /// Does not infer wins, add bonus points or re-score previous workouts.
+/// A *draft-only* starting suggestion: balances the number of accepted
+/// athletes, not their ability or predicted outcome. Users can adjust the
+/// choices before the organizer confirms them through the server RPC.
+enum ATHLTHArenaTeamBalancer {
+    static func suggestedAssignments(
+        members: [ATHLTHArenaRemoteMember]
+    ) -> [UUID: Int]? {
+        guard (4...50).contains(members.count),
+              members.allSatisfy({
+                  $0.response == "accepted" && $0.userID != nil
+              }),
+              Set(members.map(\.slotID)).count == members.count,
+              Set(members.compactMap(\.userID)).count == members.count,
+              Set(members.map(\.seriesID)).count == 1
+        else { return nil }
+
+        // Sorting makes the draft stable across app refreshes and devices;
+        // no fabricated performance ratings or personal data are consulted.
+        let ordered = members.sorted {
+            $0.slotID.uuidString < $1.slotID.uuidString
+        }
+        var proposed: [UUID: Int] = [:]
+        for (index, member) in ordered.enumerated() {
+            proposed[member.slotID] = index.isMultiple(of: 2) ? 1 : 2
+        }
+        return proposed
+    }
+}
+
 enum ATHLTHArenaTeamStandings {
     static func calculate(
         members: [ATHLTHArenaRemoteMember],
