@@ -45,8 +45,7 @@ struct ATHLTHArenaNotificationDestination: View {
                         norwegian: "Denne invitasjonen er ikke lenger tilgjengelig."
                     )
                 }
-            } catch {
-                error = error.localizedDescription
+            } catch { self.error = error.localizedDescription
             }
         }
     }
