@@ -31,6 +31,7 @@ struct LiveGhostRaceLobbyView: View {
     @State private var launchError: String?
     @State private var didLaunch = false
     @State private var isLaunching = false
+    @State private var isConnectingLiveSession = false
     @State private var rematchSent = false
 
     var body: some View {
@@ -47,6 +48,49 @@ struct LiveGhostRaceLobbyView: View {
                 }
 
                 phaseCard
+
+                if didLaunch &&
+                   realtime.currentSession?.ghostChallengeID != challenge.id {
+                    ATHLTHCard {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Workout started – live connection pending",
+                                    norwegian: "Økten er startet – live-tilkobling mangler"
+                                ),
+                                systemImage: "wifi.exclamationmark"
+                            )
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                            Text(ATHLTHLocalization.choose(
+                                english: "Keep your ongoing workout. Reconnect Live Ghost without starting a second recording.",
+                                norwegian: "Behold treningsøkten som allerede går. Koble Live Ghost til på nytt uten å starte en ny registrering."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+
+                            Button {
+                                Task { await connectLiveSession() }
+                            } label: {
+                                if isConnectingLiveSession {
+                                    ProgressView()
+                                } else {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english: "Reconnect Live Ghost",
+                                            norwegian: "Koble til Live Ghost igjen"
+                                        ),
+                                        systemImage: "arrow.clockwise"
+                                    )
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(ATHLTHTheme.accentDeep)
+                            .disabled(isConnectingLiveSession)
+                        }
+                    }
+                }
 
                 if let liveSession {
                     NavigationLink {
@@ -1037,50 +1081,47 @@ struct LiveGhostRaceLobbyView: View {
                         settings
                 )
 
-            guard let liveSession =
-                    await realtime
-                        .beginGhostSession(
-                            challenge:
-                                challenge
-                        )
-            else {
-                throw NSError(
-                    domain:
-                        "ATHLTH.LiveGhost",
-                    code: 2,
-                    userInfo: [
-                        NSLocalizedDescriptionKey:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "The race started, but ATHLTH could not connect the shared Live Ghost session.",
-                                norwegian:
-                                    "Racen startet, men ATHLTH klarte ikke å koble til den delte Live Ghost-sesjonen."
-                            )
-                    ]
-                )
-            }
-
-            await realtime
-                .refreshVisibleLiveSessions(
-                    force: true
-                )
-            realtime.selectLiveGhost(
-                liveSession
-            )
-
-            // Touching the ready row after the synchronized start lets the
-            // server promote countdown -> racing atomically.
-            await liveRace.setReady(
-                true,
-                captureDevice:
-                    captureDevice
-            )
-
+            // The local workout is authoritative. Mark it as started
+            // immediately: a transient network failure must never cause a
+            // second iPhone/Watch workout to be launched.
             didLaunch = true
+            await connectLiveSession()
         } catch {
-            launchError =
-                error.localizedDescription
+            launchError = error.localizedDescription
         }
+    }
+
+    @MainActor
+    private func connectLiveSession() async {
+        guard didLaunch,
+              !isConnectingLiveSession,
+              realtime.currentSession?.ghostChallengeID != challenge.id else {
+            return
+        }
+
+        isConnectingLiveSession = true
+        defer { isConnectingLiveSession = false }
+
+        guard let liveSession = await realtime.beginGhostSession(
+            challenge: challenge
+        ) else {
+            launchError = ATHLTHLocalization.choose(
+                english: "Your workout is still running, but the shared Live Ghost session could not connect. Use 'Reconnect Live Ghost' to retry without starting another workout.",
+                norwegian: "Treningsøkten fortsetter, men den delte Live Ghost-sesjonen kunne ikke kobles til. Bruk «Koble til Live Ghost igjen» for å prøve uten å starte en ny økt."
+            )
+            return
+        }
+
+        await realtime.refreshVisibleLiveSessions(force: true)
+        realtime.selectLiveGhost(liveSession)
+        launchError = nil
+
+        // Touching the ready row after start allows the server to promote
+        // the shared countdown to racing without changing the local workout.
+        await liveRace.setReady(
+            true,
+            captureDevice: captureDevice
+        )
     }
 
     private func displayName(
