@@ -887,6 +887,68 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
         ))
     }
 
+    func testRelayOwnGPSSuggestionRequiresAgreedRouteMatch() {
+        XCTAssertTrue(ATHLTHArenaRelayGPSMatch.qualifies(
+            routeLengthMeters: 7_500,
+            coveredMeters: 7_460,
+            elapsedSeconds: 2_100,
+            routeMatchPercent: 96,
+            startGapMeters: 22,
+            endGapMeters: 39
+        ))
+        XCTAssertFalse(ATHLTHArenaRelayGPSMatch.qualifies(
+            routeLengthMeters: 7_500,
+            coveredMeters: 7_460,
+            elapsedSeconds: 2_100,
+            routeMatchPercent: 89,
+            startGapMeters: 22,
+            endGapMeters: 39
+        ))
+        XCTAssertFalse(ATHLTHArenaRelayGPSMatch.qualifies(
+            routeLengthMeters: 7_500,
+            coveredMeters: 6_000,
+            elapsedSeconds: 2_100,
+            routeMatchPercent: 98,
+            startGapMeters: 22,
+            endGapMeters: 39
+        ))
+    }
+
+    func testRelayOwnGPSSuggestionRejectsInvalidAndWrongEndpoints() {
+        XCTAssertFalse(ATHLTHArenaRelayGPSMatch.qualifies(
+            routeLengthMeters: 5_000,
+            coveredMeters: 5_000,
+            elapsedSeconds: .infinity,
+            routeMatchPercent: 99,
+            startGapMeters: 10,
+            endGapMeters: 10
+        ))
+        XCTAssertFalse(ATHLTHArenaRelayGPSMatch.qualifies(
+            routeLengthMeters: 5_000,
+            coveredMeters: 5_000,
+            elapsedSeconds: 1_800,
+            routeMatchPercent: .nan,
+            startGapMeters: 10,
+            endGapMeters: 10
+        ))
+        XCTAssertFalse(ATHLTHArenaRelayGPSMatch.qualifies(
+            routeLengthMeters: 5_000,
+            coveredMeters: 5_000,
+            elapsedSeconds: 1_800,
+            routeMatchPercent: 99,
+            startGapMeters: 250,
+            endGapMeters: 10
+        ))
+        XCTAssertFalse(ATHLTHArenaRelayGPSMatch.qualifies(
+            routeLengthMeters: 5_000,
+            coveredMeters: 5_000,
+            elapsedSeconds: 8,
+            routeMatchPercent: 99,
+            startGapMeters: 10,
+            endGapMeters: 10
+        ))
+    }
+
     func testCustomRoundsDoNotInferUnsupportedResults() {
         let standings = ATHLTHArenaSuggestedRanking.standings(
             template: .custom,
