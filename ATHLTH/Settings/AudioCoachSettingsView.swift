@@ -218,6 +218,7 @@ struct ATHLTHAudioCoachSettingsView: View {
                     VStack(spacing: 0) {
                         defaultsSection
                         contentLevelSection
+                        speechStyleSection
                         voiceSection
                         triggerSection
                         updateSection
@@ -412,6 +413,76 @@ struct ATHLTHAudioCoachSettingsView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(ATHLTHTheme.accentDeep)
                     }
+                }
+                .padding(16)
+            }
+        }
+    }
+
+    private var speechStyleSection: some View {
+        premiumSection(
+            ATHLTHLocalization.choose(
+                english: "Speaking style",
+                norwegian: "Talemåte"
+            )
+        ) {
+            premiumCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.flexible(), spacing: 8),
+                            GridItem(.flexible(), spacing: 8)
+                        ],
+                        spacing: 8
+                    ) {
+                        ForEach(ATHLTHCoachSpeechStyle.allCases) { style in
+                            Button {
+                                settings.audioCoachSpeechStyle = style
+                            } label: {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack {
+                                        Text(style.title)
+                                            .font(.subheadline.weight(.semibold))
+                                        Spacer(minLength: 0)
+                                        if settings.audioCoachSpeechStyle == style {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .font(.caption)
+                                        }
+                                    }
+                                    Text(style.subtitle)
+                                        .font(.caption2)
+                                        .lineLimit(2)
+                                        .frame(
+                                            maxWidth: .infinity,
+                                            alignment: .leading
+                                        )
+                                }
+                                .foregroundStyle(
+                                    settings.audioCoachSpeechStyle == style
+                                        ? Color.white
+                                        : ATHLTHTheme.primaryText
+                                )
+                                .frame(maxWidth: .infinity, minHeight: 57)
+                                .padding(12)
+                                .background(
+                                    settings.audioCoachSpeechStyle == style
+                                        ? ATHLTHTheme.accentDeep
+                                        : ATHLTHTheme.accentSoft,
+                                    in: RoundedRectangle(
+                                        cornerRadius: 16,
+                                        style: .continuous
+                                    )
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    Text(ATHLTHLocalization.choose(
+                        english: "Your default tone. It only changes phrasing; the guidance level, cue frequency, safety alerts and voice speed stay the same.",
+                        norwegian: "Din standard talemåte. Den endrer bare ordlyden. Veiledningsnivå, talefrekvens, sikkerhetsvarsler og talehastighet beholdes."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
                 }
                 .padding(16)
             }
