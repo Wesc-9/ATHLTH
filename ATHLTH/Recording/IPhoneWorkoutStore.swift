@@ -2943,20 +2943,19 @@ final class IPhoneWorkoutStore:
             ATHLTHLiveWorkoutPreferencesStore
                 .load()
 
-        if delivery.usesHaptics,
-           deliveryPreferences
-                .hapticsEnabled,
-           guidancePriorityGate
-            .allowsHaptic(
-                for: priority
-            ) {
+        let channels = ATHLTHCoachAlertChannels.resolve(
+            delivery: delivery,
+            voiceEnabled: deliveryPreferences.audioAlertsEnabled,
+            hapticsEnabled: deliveryPreferences.hapticsEnabled,
+            hapticPermittedByPriority:
+                guidancePriorityGate.allowsHaptic(for: priority)
+        )
+        if channels.haptic {
             UINotificationFeedbackGenerator()
                 .notificationOccurred(haptic)
         }
 
-        if delivery.usesVoice,
-           deliveryPreferences
-                .audioAlertsEnabled {
+        if channels.voice {
             let phrase =
                 localizedCoachPhrase(
                     english: english,
