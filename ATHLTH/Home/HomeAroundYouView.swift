@@ -2994,6 +2994,77 @@ struct AroundYouExploreView: View {
             .map(\.0)
     }
 
+    /// Only marketplace listings can become public map pins.
+    /// Private invitations and private meeting coordinates are NEVER used.
+    private var publicMapPosts: [TrainTogetherPost] {
+        marketplace.posts.filter { post in
+            (post.status == .open || post.status == .full) &&
+            post.scheduledStart > Date().addingTimeInterval(-2 * 3_600) &&
+            !post.broadArea.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            post.broadArea.lowercased() != "online" &&
+            post.broadArea.lowercased() != "på avstand"
+        }
+    }
+
+    private var publicWorkoutLookupKey: String {
+        publicMapPosts
+            .prefix(30)
+            .map { $0.id.uuidString + ":" + $0.broadArea }
+            .sorted()
+            .joined(separator: "|")
+    }
+
+    private var nearbyPublicWorkoutPins: [ExploreTrainTogetherAreaPin] {
+        guard let center = activeSearchCenter ?? locationStore.location else {
+            return publicWorkoutPins
+        }
+        return publicWorkoutPins.filter { pin in
+            CLLocation(
+                latitude: pin.coordinate.latitude,
+                longitude: pin.coordinate.longitude
+            ).distance(from: center) <= 50_000
+        }
+    }
+
+    @MainActor
+    private func resolvePublicWorkoutAreas() async {
+        let posts = Array(publicMapPosts.prefix(30))
+        var resolved: [ExploreTrainTogetherAreaPin] = []
+
+        for post in posts {
+            if Task.isCancelled { return }
+            let area = post.broadArea.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            let key = area.lowercased()
+
+            if let center = cachedPublicAreaCenters[key] {
+                resolved.append(.init(post: post, coordinate: center))
+                continue
+            }
+
+            // Apple Maps resolves an approximate public city/area.
+            // train_together_post_meetups is never accessed here.
+            let request = MKLocalSearch.Request()
+            request.naturalLanguageQuery = area
+            request.resultTypes = .address
+            do {
+                let result = try await MKLocalSearch(request: request).start()
+                guard let coordinate = result.mapItems.first?.placemark.coordinate
+                else { continue }
+                cachedPublicAreaCenters[key] = coordinate
+                resolved.append(.init(post: post, coordinate: coordinate))
+            } catch {
+                // A location lookup failure must not hide other workouts.
+                continue
+            }
+        }
+
+        if !Task.isCancelled {
+            publicWorkoutPins = resolved
+        }
+    }
+
     private var nearbyEvents:
         [CommunityEventItem] {
         let candidates =
