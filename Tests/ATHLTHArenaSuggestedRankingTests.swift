@@ -714,6 +714,67 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
         XCTAssertEqual(progress.approvedFraction, 0)
     }
 
+    func testArenaTeamsSumOnlyApprovedPointsAndKeepDeletedSlots() {
+        let seriesID = UUID()
+        let slots = (0..<4).map { _ in UUID() }
+        let members = slots.enumerated().map { index, slot in
+            ATHLTHArenaRemoteMember(
+                slotID: slot,
+                seriesID: seriesID,
+                userID: index == 3 ? nil : UUID(),
+                response: index == 3 ? "deleted" : "accepted",
+                points: Double(index + 1),
+                createdAt: initialDate
+            )
+        }
+        let lineup = slots.enumerated().map { index, slot in
+            ATHLTHArenaTeamAssignment(
+                slotID: slot,
+                seriesID: seriesID,
+                teamIndex: index < 2 ? 1 : 2
+            )
+        }
+        let standings = ATHLTHArenaTeamStandings.calculate(
+            members: members, assignments: lineup
+        )
+        XCTAssertEqual(standings.count, 2)
+        XCTAssertEqual(standings[0].points, 3)
+        XCTAssertEqual(standings[1].points, 7)
+        XCTAssertEqual(standings[1].athleteCount, 2)
+    }
+
+    func testArenaTeamsIgnoreDuplicateOrForeignSlots() {
+        let seriesID = UUID()
+        let slot = UUID()
+        let athlete = ATHLTHArenaRemoteMember(
+            slotID: slot,
+            seriesID: seriesID,
+            userID: UUID(),
+            response: "accepted",
+            points: 5,
+            createdAt: initialDate
+        )
+        let roster = [
+            ATHLTHArenaTeamAssignment(
+                slotID: slot, seriesID: seriesID, teamIndex: 1
+            ),
+            ATHLTHArenaTeamAssignment(
+                slotID: slot, seriesID: seriesID, teamIndex: 2
+            ),
+            ATHLTHArenaTeamAssignment(
+                slotID: UUID(), seriesID: seriesID, teamIndex: 2
+            )
+        ]
+        let totals = ATHLTHArenaTeamStandings.calculate(
+            members: [athlete], assignments: roster
+        )
+        XCTAssertEqual(totals.map(\.points).reduce(0,+), 5)
+        XCTAssertEqual(totals.map(\.athleteCount).reduce(0,+), 1)
+        XCTAssertTrue(ATHLTHArenaTeamStandings.calculate(
+            members: [athlete], assignments: []
+        ).isEmpty)
+    }
+
     func testCustomRoundsDoNotInferUnsupportedResults() {
         let standings = ATHLTHArenaSuggestedRanking.standings(
             template: .custom,
