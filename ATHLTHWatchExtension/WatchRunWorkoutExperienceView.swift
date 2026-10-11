@@ -3669,7 +3669,6 @@ struct WatchRunWorkoutExperienceView: View {
             .multilineTextAlignment(
                 .center
             )
-        }
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
