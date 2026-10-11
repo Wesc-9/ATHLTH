@@ -5441,12 +5441,14 @@ struct SessionEditorView: View {
                 ) != nil
                 restoreDraftIfNeeded()
                 if isStandalone && existingWorkout == nil {
-                    if !existingDraft, let initialSourceWorkout {
-                        applySavedWorkout(initialSourceWorkout)
-                        if !preserveSourceID { title = "" }
+                    if !hasSelectedWorkoutSource {
+                        if !existingDraft, let initialSourceWorkout {
+                            applySavedWorkout(initialSourceWorkout)
+                            if !preserveSourceID { title = "" }
+                        }
+                        hasSelectedWorkoutSource = existingDraft ||
+                            initialSourceWorkout != nil
                     }
-                    hasSelectedWorkoutSource = existingDraft ||
-                        initialSourceWorkout != nil
                 } else {
                     hasSelectedWorkoutSource = true
                 }
@@ -8605,7 +8607,9 @@ struct SessionEditorView: View {
     }
 
     private func persistDraft() {
-        guard draftRestored, !draftFinalized else { return }
+        // Do not create an empty draft before the athlete chooses a source.
+        guard draftRestored, !draftFinalized,
+              hasSelectedWorkoutSource else { return }
         let draft = SessionEditorStoredDraft(
             workout: composeSession(),
             selectedPartnerID: selectedPartnerID,
