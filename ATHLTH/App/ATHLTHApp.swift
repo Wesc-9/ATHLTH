@@ -2310,7 +2310,8 @@ struct AppRootView: View {
             // integration work can delay the opponent's result.
             if result.kind == .running {
                 await realtimeSocial.finishCurrentLiveGhostRace(
-                    elapsedSeconds: result.duration
+                    elapsedSeconds: result.duration,
+                    completedRouteID: result.routeComparisonID
                 )
             }
 
@@ -2498,7 +2499,8 @@ struct AppRootView: View {
             // post-workout integrations, on both iPhone and Watch.
             if !workout.walking {
                 await realtimeSocial.finishCurrentLiveGhostRace(
-                    elapsedSeconds: publishable.duration
+                    elapsedSeconds: publishable.duration,
+                    completedRouteID: workout.plannedComparisonRouteID
                 )
             }
 
