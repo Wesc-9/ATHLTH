@@ -5258,8 +5258,9 @@ struct SessionEditorView: View {
                 }
                 plannedWorkoutLogisticsSection
 
-                if existingWorkout == nil ||
-                    kind == .strength {
+                if (existingWorkout == nil || kind == .strength) &&
+                    (onPreparedWorkout == nil ||
+                        initialSourceWorkout?.allowInviteeExercises == true) {
                     Section {
                         Menu {
                             Button {
@@ -7681,6 +7682,8 @@ struct SessionEditorView: View {
     private func duplicatePlannedExercise(
         at index: Int
     ) {
+        guard onPreparedWorkout == nil ||
+            initialSourceWorkout?.allowInviteeExercises == true else { return }
         guard
             plannedExercises.indices
                 .contains(index)
