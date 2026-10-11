@@ -130,4 +130,92 @@ final class PlannedWorkoutInviteTests: XCTestCase {
         XCTAssertFalse(restored.resolvedStartIndependently)
     }
 
+    func testSocialWorkoutPhaseSeparatesPlanningFromRecording() throws {
+        var record = SocialWorkoutSessionRecord(
+            id: UUID(),
+            creatorID: UUID(),
+            title: "Evening run",
+            workoutKind: WorkoutKind.running.rawValue,
+            status: .active,
+            startedAt: Date(),
+            endedAt: nil,
+            sourceWorkoutID: nil,
+            createdAt: Date()
+        )
+
+        // Legacy "active" means the invitation is still open.
+        XCTAssertEqual(record.resolvedWorkoutPhase, .planned)
+
+        record.workoutPhase = .planned
+        let planned = try JSONDecoder().decode(
+            SocialWorkoutSessionRecord.self,
+            from: JSONEncoder().encode(record)
+        )
+        XCTAssertEqual(planned.resolvedWorkoutPhase, .planned)
+
+        record.workoutPhase = .active
+        let recording = try JSONDecoder().decode(
+            SocialWorkoutSessionRecord.self,
+            from: JSONEncoder().encode(record)
+        )
+        XCTAssertEqual(recording.resolvedWorkoutPhase, .active)
+
+        record.status = .completed
+        record.workoutPhase = .completed
+        XCTAssertEqual(record.resolvedWorkoutPhase, .completed)
+    }
+
+    func testSocialWorkoutPhaseDecodesFromDatabaseField() throws {
+        let sessionID = UUID()
+        let creatorID = UUID()
+        let source = """
+        {
+          "id": "\(sessionID.uuidString)",
+          "creator_id": "\(creatorID.uuidString)",
+          "title": "Shared run",
+          "workout_kind": "running",
+          "status": "active",
+          "started_at": 0,
+          "created_at": 0,
+          "workout_phase": "planned"
+        }
+        """
+        let session = try JSONDecoder().decode(
+            SocialWorkoutSessionRecord.self,
+            from: Data(source.utf8)
+        )
+        XCTAssertEqual(session.id, sessionID)
+        XCTAssertEqual(session.resolvedWorkoutPhase, .planned)
+    }
+
+    func testSocialParticipantReadinessAndActualStartDecode() throws {
+        let userID = UUID()
+        let sessionID = UUID()
+        let source = """
+        {
+          "id": "\(UUID().uuidString)",
+          "session_id": "\(sessionID.uuidString)",
+          "user_id": "\(userID.uuidString)",
+          "invited_by": "\(UUID().uuidString)",
+          "state": "accepted",
+          "display_name_snapshot": "Partner",
+          "invited_at": 0,
+          "ready_at": 0,
+          "capture_device": "iphone",
+          "workout_started_at": null
+        }
+        """
+        let ready = try JSONDecoder().decode(
+            SocialWorkoutParticipantRecord.self,
+            from: Data(source.utf8)
+        )
+        XCTAssertTrue(ready.isReady)
+        XCTAssertFalse(ready.isTraining)
+        XCTAssertNil(ready.workoutStartedAt)
+
+        var started = ready
+        started.workoutStartedAt = Date()
+        XCTAssertTrue(started.isTraining)
+    }
+
 }
