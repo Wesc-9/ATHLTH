@@ -3007,93 +3007,102 @@ struct TrainTogetherPostCreateView:
         }
     }
 
+    // Keep the source selector in a small independent view-builder.
+    // A local if-let inside the original huge Train Together body triggers
+    // a Swift 6/Xcode 27 type-checker assertion on the simulator.
+    @ViewBuilder
     private var sourceCard: some View {
-        Group {
-            if let preparedWorkout {
-                ATHLTHCard {
-                    VStack(alignment: .leading, spacing: 14) {
-                        HStack(spacing: 11) {
-                            Image(systemName: preparedWorkout.kind.systemImage)
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(ATHLTHTheme.accentDeep)
-                                .frame(width: 46, height: 46)
-                                .background(ATHLTHTheme.accentSoft,
+        if let workout = preparedWorkout {
+            preparedWorkoutCard(workout)
+        } else {
+            WorkoutPlanningSourceCard(
+                context: ATHLTHLocalization.choose(
+                    english: "Build your workout in the shared planner. Then choose how and where to train together.",
+                    norwegian: "Bygg økten i den felles planleggeren. Velg deretter hvordan og hvor dere trener sammen."
+                ),
+                onCreateNew: {
+                    selectedSourceID = nil
+                    workoutToEdit = nil
+                    showingSharedWorkoutEditor = true
+                },
+                onUsePlanned: {
+                    showingPlannedWorkoutPicker = true
+                }
+            )
+        }
+    }
+
+    private func preparedWorkoutCard(_ workout: PlannedSession) -> some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 11) {
+                    Image(systemName: workout.kind.systemImage)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 46, height: 46)
+                        .background(ATHLTHTheme.accentSoft,
                                     in: RoundedRectangle(cornerRadius: 14))
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(ATHLTHLocalization.choose(
-                                    english: "PLANNED WORKOUT",
-                                    norwegian: "PLANLAGT ØKT"
-                                ))
-                                .font(.caption2.weight(.bold))
-                                .tracking(1.2)
-                                .foregroundStyle(ATHLTHTheme.accentDeep)
-                                Text(preparedWorkout.title)
-                                    .font(.headline)
-                                Text(preparedWorkout.kind.title)
-                                    .font(.caption)
-                                    .foregroundStyle(ATHLTHTheme.mutedText)
-                            }
-                            Spacer()
-                        }
-                        if let time = preparedWorkout.scheduledStart {
-                            Label(time.formatted(date: .abbreviated,
-                                                 time: .shortened),
-                                  systemImage: "calendar")
-                                .font(.caption)
-                        }
-                        if let duration = preparedWorkout.durationMinutes {
-                            Label("\(duration) min", systemImage: "clock")
-                                .font(.caption)
-                        }
-                        if !preparedWorkout.exercises.isEmpty {
-                            Text(ATHLTHLocalization.format(
-                                english: "%d exercises",
-                                norwegian: "%d øvelser",
-                                preparedWorkout.exercises.count
-                            ))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "PLANNED WORKOUT",
+                            norwegian: "PLANLAGT ØKT"
+                        ))
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.2)
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        Text(workout.title)
+                            .font(.headline)
+                        Text(workout.kind.title)
                             .font(.caption)
                             .foregroundStyle(ATHLTHTheme.mutedText)
-                        }
-                        Button {
-                            workoutToEdit = preparedWorkout
-                            showingSharedWorkoutEditor = true
-                        } label: {
-                            Label(ATHLTHLocalization.choose(
-                                english: "Edit workout", norwegian: "Rediger økt"
-                            ), systemImage: "square.and.pencil")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(ATHLTHTheme.accentDeep)
-                        Button {
-                            preparedWorkout = nil
-                            workoutToEdit = nil
-                            selectedSourceID = nil
-                        } label: {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Choose another workout",
-                                norwegian: "Velg en annen økt"
-                            ))
-                            .font(.caption.weight(.semibold))
-                        }
-                        .buttonStyle(.plain)
                     }
+                    Spacer()
                 }
-            } else {
-                WorkoutPlanningSourceCard(
-                    context: ATHLTHLocalization.choose(
-                        english: "Build the workout in the shared planner. Then choose how and where to train together.",
-                        norwegian: "Bygg økten i den felles planleggeren. Velg deretter hvordan og hvor dere trener sammen."
-                    ),
-                    onCreateNew: {
-                        selectedSourceID = nil
-                        workoutToEdit = nil
-                        showingSharedWorkoutEditor = true
-                    },
-                    onUsePlanned: {
-                        showingPlannedWorkoutPicker = true
-                    }
-                )
+                if let time = workout.scheduledStart {
+                    Label(
+                        time.formatted(date: .abbreviated, time: .shortened),
+                        systemImage: "calendar"
+                    )
+                    .font(.caption)
+                }
+                if let duration = workout.durationMinutes {
+                    Label("\(duration) min", systemImage: "clock")
+                        .font(.caption)
+                }
+                if !workout.exercises.isEmpty {
+                    Text(ATHLTHLocalization.format(
+                        english: "%d exercises",
+                        norwegian: "%d øvelser",
+                        workout.exercises.count
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                Button {
+                    workoutToEdit = workout
+                    showingSharedWorkoutEditor = true
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Edit workout", norwegian: "Rediger økt"
+                    ), systemImage: "square.and.pencil")
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accentDeep)
+
+                Button {
+                    preparedWorkout = nil
+                    workoutToEdit = nil
+                    selectedSourceID = nil
+                } label: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose another workout",
+                        norwegian: "Velg en annen økt"
+                    ))
+                    .font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.plain)
             }
         }
     }
