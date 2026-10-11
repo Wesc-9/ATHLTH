@@ -263,8 +263,18 @@ private enum ATHLTHArenaCreationMode: String, Identifiable {
     case distance
     case strength
     case series
+    case teamRelay
 
     var id: String { rawValue }
+}
+
+/// A team competition needs at least two athletes on each side and an
+/// even total roster, including the organizer. It is still only a draft
+/// until the invited athletes consent and the organizer configures teams.
+enum ATHLTHArenaTeamStartRules {
+    static func validInviteeCount(_ count: Int) -> Bool {
+        (3...19).contains(count) && count.isMultiple(of: 2) == false
+    }
 }
 
 /// Shows existing Challenge activity in Arena without copying its rules or data.
@@ -700,6 +710,13 @@ struct ATHLTHArenaHomeView: View {
                     friends: social.mutualFollows,
                     onCreate: upsert
                 )
+            case .teamRelay:
+                ATHLTHArenaCreateView(
+                    ownerID: session.profile.userID,
+                    friends: social.mutualFollows,
+                    teamMode: true,
+                    onCreate: upsert
+                )
             }
         }
         .confirmationDialog(
@@ -874,6 +891,45 @@ struct ATHLTHArenaHomeView: View {
                 }
             }
             .buttonStyle(.plain)
+
+            Button { creationMode = .teamRelay } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "person.3.sequence.fill")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 40, height: 40)
+                        .background(
+                            ATHLTHTheme.vitalitySoft.opacity(0.68),
+                            in: RoundedRectangle(cornerRadius: 13)
+                        )
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Team & relay competition",
+                            norwegian: "Lag og stafett"
+                        ))
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Invite teammates, plan relay legs, compete together",
+                            norwegian: "Inviter lag, planlegg etapper og konkurrer sammen"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 4)
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                .padding(14)
+                .background(ATHLTHArenaLightStyle.card(19))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Create team or relay competition",
+                norwegian: "Opprett lag- eller stafettkonkurranse"
+            ))
         }
     }
 
@@ -1128,6 +1184,7 @@ struct ATHLTHArenaCreateView: View {
     let ownerID: UUID
     let friends: [SocialProfileCard]
     let onCreate: (ATHLTHArenaCompetitionDraft) -> Void
+    private let teamMode: Bool
 
     @State private var title = ""
     @State private var scope: ATHLTHArenaScope = .duel
@@ -1145,11 +1202,18 @@ struct ATHLTHArenaCreateView: View {
         ownerID: UUID,
         friends: [SocialProfileCard],
         preselectedFriendID: UUID? = nil,
+        teamMode: Bool = false,
         onCreate: @escaping (ATHLTHArenaCompetitionDraft) -> Void
     ) {
         self.ownerID = ownerID
         self.friends = friends
         self.onCreate = onCreate
+        self.teamMode = teamMode
+        _scope = State(initialValue: teamMode ? .friends : .duel)
+        _title = State(initialValue: teamMode
+            ? ATHLTHLocalization.choose(
+                english: "Team Arena", norwegian: "Lagduellen"
+            ) : "")
         _selectedFriendIDs = State(initialValue:
             preselectedFriendID.map { Set([$0]) } ?? []
         )
@@ -1158,6 +1222,42 @@ struct ATHLTHArenaCreateView: View {
     var body: some View {
         NavigationStack {
             Form {
+                if teamMode {
+                    Section {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Set up a two-team Arena competition",
+                            norwegian: "Opprett en Arena-konkurranse med to lag"
+                        ), systemImage: "person.3.sequence.fill")
+                        .font(.subheadline.weight(.semibold))
+                        Text(ATHLTHLocalization.choose(
+                            english: "Choose at least three friends: you and the invited athletes must make an even number (4, 6, 8…). After invitations are accepted, configure balanced teams in the competition lobby. For a relay, add a Route round first, then assign relay legs.",
+                            norwegian: "Velg minst tre venner: du og de inviterte må bli et partall (4, 6, 8 …). Etter at invitasjonene er godtatt, fordeler du deltakerne på to like store lag i konkurranselobbyen. For stafett legger du først til en ruterunde og fordeler deretter etappene."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        Label(
+                            ATHLTHArenaTeamStartRules.validInviteeCount(selectedFriendIDs.count)
+                                ? ATHLTHLocalization.choose(
+                                    english: "Roster size ready for teams",
+                                    norwegian: "Riktig antall deltakere for lag"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Select an odd number of friends, at least three",
+                                    norwegian: "Velg et oddetall venner, minst tre"
+                                ),
+                            systemImage: ATHLTHArenaTeamStartRules.validInviteeCount(selectedFriendIDs.count)
+                                ? "checkmark.circle.fill" : "info.circle"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHArenaTeamStartRules.validInviteeCount(selectedFriendIDs.count)
+                            ? ATHLTHTheme.accentDeep : ATHLTHTheme.mutedText)
+                    } header: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Team setup", norwegian: "Lagoppsett"
+                        ))
+                    }
+                }
+
                 Section {
                     ForEach(ATHLTHArenaSeriesPreset.allCases) { preset in
                         Button {
@@ -1201,11 +1301,19 @@ struct ATHLTHArenaCreateView: View {
                         text: $title
                     )
                     .textInputAutocapitalization(.sentences)
-                    Picker(ATHLTHLocalization.choose(
-                        english: "Format", norwegian: "Konkurranseform"
-                    ), selection: $scope) {
-                        ForEach(ATHLTHArenaScope.allCases) { option in
-                            Label(option.title, systemImage: option.symbol).tag(option)
+                    if teamMode {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Friends · two teams",
+                            norwegian: "Venner · to lag"
+                        ), systemImage: "person.3.fill")
+                        .font(.subheadline)
+                    } else {
+                        Picker(ATHLTHLocalization.choose(
+                            english: "Format", norwegian: "Konkurranseform"
+                        ), selection: $scope) {
+                            ForEach(ATHLTHArenaScope.allCases) { option in
+                                Label(option.title, systemImage: option.symbol).tag(option)
+                            }
                         }
                     }
                     Picker(ATHLTHLocalization.choose(
@@ -1383,7 +1491,8 @@ struct ATHLTHArenaCreateView: View {
                     }
                     .disabled(
                         title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                        (scope == .club && selectedClubID == nil)
+                        (scope == .club && selectedClubID == nil) ||
+                        (teamMode && !ATHLTHArenaTeamStartRules.validInviteeCount(selectedFriendIDs.count))
                     )
                 }
             }
