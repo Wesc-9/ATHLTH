@@ -71,24 +71,23 @@ final class ATHLTHArenaClubDirectory: Sendable {
             .select("user_id,display_name")
             .in("user_id", values: ids)
             .execute().value
-        let names = Dictionary(uniqueKeysWithValues: profiles.map {
-            ($0.userID, $0.displayName)
-        })
+        var names: [UUID: String] = [:]
+        for profile in profiles {
+            if let name = profile.displayName?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+               !name.isEmpty {
+                names[profile.userID] = name
+            }
+        }
         return ids.map { id in
             let fallback = ATHLTHLocalization.choose(
                 english: "Club member", norwegian: "Klubbmedlem"
             )
             return ATHLTHArenaClubAthlete(
-                id: id,
-                displayName: (names[id] ?? nil)?.trimmingCharacters(in: .whitespacesAndNewlines)
-                    .nonEmptyOr(fallback) ?? fallback
+                id: id, displayName: names[id] ?? fallback
             )
-        }.sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
-    }
-}
-
-private extension String {
-    func nonEmptyOr(_ fallback: String) -> String {
-        isEmpty ? fallback : self
+        }.sorted {
+            $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
+        }
     }
 }
