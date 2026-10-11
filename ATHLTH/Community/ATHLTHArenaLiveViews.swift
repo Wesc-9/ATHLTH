@@ -1,6 +1,7 @@
 import Foundation
 import MapKit
 import SwiftUI
+import Supabase
 
 /// Shared Arena series with live invitations, consensual scoring and
 /// deadline-based completion. Club and Weekly Challenges remain separate.
