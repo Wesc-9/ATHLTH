@@ -2423,6 +2423,56 @@ final class SocialStore: ObservableObject {
         // Deliberately no-op; retained to avoid changing existing callers.
     }
 
+    /// Only a user-confirmed, completed attempt may enter the activity log.
+    /// Creating, accepting or negotiating a challenge never invokes this.
+    @discardableResult
+    func publishCompletedChallengeResult(
+        _ challenge: ATHLTHChallenge,
+        attempt: ChallengeAttempt,
+        visibility: ProfileVisibility
+    ) async -> Bool {
+        guard let currentUserID,
+              attempt.userID == currentUserID,
+              attempt.isEligible,
+              challenge.participants.contains(where: {
+                  $0.userID == currentUserID
+              })
+        else { return false }
+
+        errorMessage = nil
+        do {
+            var metadata: [String: String] = [
+                "challenge_id": challenge.id.uuidString,
+                "sport": challenge.sport.rawValue,
+                "source": "athlth_challenge_result",
+                "score": String(attempt.score),
+                "verification": attempt.verification.rawValue
+            ]
+            if let workoutID = attempt.sourceWorkoutID {
+                metadata["workout_id"] = workoutID.uuidString
+            }
+
+            try await service.publishActivity(
+                eventKey: "challenge-\(challenge.id.uuidString)-result-\(currentUserID.uuidString)",
+                kind: "workout",
+                title: ATHLTHLocalization.choose(
+                    english: "Challenge workout completed",
+                    norwegian: "Treningsutfordring fullført"
+                ),
+                subtitle: "\(challenge.title) · \(attempt.detail)",
+                metadata: metadata,
+                visibility: visibility
+            )
+            if let loaded = try? await service.loadFeed() {
+                feed = scopedFeed(loaded)
+            }
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     @discardableResult
     func shareChallengeToCommunity(
         _ challenge: ATHLTHChallenge
