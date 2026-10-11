@@ -59,17 +59,19 @@ Audio Coach skal være integrert i alle støttede økter fra planlegging til opp
 - [x] Enhetstester for prioriteringsrekkefølge, FIFO, coalescing, dubletter, utløp, begrenset kø og reset.
 - [ ] Fullført grønn iOS + watchOS-bygg og kjøring av testene mot siste samlede commit.
 - [x] **Delvis hendelseskvittering fra iPhone til Watch:** kortvarig, øktbundet `ATHLTHCoachDeliveryReceipt` for milepæler og løpesteg (hendelsestype/nøkkel, øktens starttid og sendetid, ingen tale-/helsetekst). Watch sjekker økt, alder og tillatt type før lokal dublettmarkering.
-- [ ] Full **toveis** hendelseskvittering, ACK på faktisk avspilling og tverrenhets exactly-once-attempt ved alle lydruteoverganger.
+- [x] **Toveis best-effort-kvittering for tale-forsøk:** Watch→iPhone er koblet til den samme HealthKit-speilingen som iPhone→Watch. Bare ferske kvitteringer for riktig økt og tillatte hendelses-ID-er registreres. Watch sjekker lydansvar og ledger **etter** lydaktivering, før tale starter.
+- [ ] ACK på **faktisk hørbar avspilling** og full exactly-once-attempt/levering ved krasj, utfall og alle ruteoverganger; kan ikke garanteres av dagens speilings-API.
 - [x] `ATHLTHCoachSensorFreshness` med plausibilitets- og tidsgrenser for puls (12 s), GPS-tempo (8 s) og speilet snapshot (5 s).
 - [x] Watch-målsonevarsler krever ferske puls- og tempomålinger. Stale signaler kan heller ikke utløse falsk «tilbake i målområdet».
 - [x] Speilet iPhone leser ikke opp gamle puls-/tempotall; eldre Watch-versjoner uten måletidsstempler behandles konservativt.
 - [x] iPhone-løping utelater gammel GPS-basert tidsprognose i Audio Coach.
 - [x] Testtilfeller for ugyldige/utdaterte sensorer, gamle kvitteringer, feil økt, øktbytte, begrenset dublettlager og bakoverkompatible snapshot-felt.
-- [ ] Tydelige regler for haptikk/voice-kombinasjon og lokalisering av samtlige meldinger.
+- [x] Felles `ATHLTHCoachAlertChannels` brukes for rute-/målalerts på både iPhone og Watch: tale og haptikk evalueres uavhengig, slik at stengt lydkanal ikke fjerner tillatt sikkerhetsvibrasjon.
+- [ ] Lokaliseringsgjennomgang og kanalregler for **øvrige** styrke-, Ghost- og rutinemeldinger.
 - [ ] Event-telemetri uten identifiserende eller følsomme treningsopplysninger.
 - [ ] Fysisk test av AirPods/Spotify, bakgrunn, pause/fortsett, live Ghost og iPhone-til-/frakobling.
 
-**Merknad:** Implementert prioritetskø og enveiskvittering er fortsatt *best-effort*. En iPhone-kvittering rapporterer et **taleavspillingsforsøk**, ikke bevis for at lyd ble hørt. Enhetsbytte og appkrasj kan fremdeles gi et tapt eller duplisert lydvarsel. Fysisk enhetstest og toveis-kvittering gjenstår.
+**Merknad:** Implementert prioritetskø og toveis kvittering for et **tale-forsøk** er fortsatt *best-effort*. Kvitteringen er ikke bevis for at lyd faktisk ble hørt. Dette gjelder foreløpig øktstart, løpesteg og rutinemilepæler – ikke alle Ghost-, rute-, mål- eller styrkemeldinger. Appkrasj, bakgrunnsavbrudd og lydrutebytte kan fortsatt gi tapte/dupliserte varsler, og fysisk test gjenstår.
 
 **Avgrensning:** 2A gir *lokal* duplikatkontroll for utvalgte typer, ikke global exactly-once-garanti på tvers av enheter. Markører inneholder kun type og intervall-/steg-ID, ikke selve talemeldingen eller brukerens helsehistorikk.
 
