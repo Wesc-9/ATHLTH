@@ -318,15 +318,14 @@ enum OfficialWeeklyChallengeCountdown {
             return norwegian ? "Avsluttet" : "Ended"
         }
 
-        // Round up to whole minutes so an active challenge never shows 0 min.
-        let totalMinutes = Int(ceil(remainingSeconds / 60))
-        if totalMinutes < 60 {
+        if remainingSeconds < 3600 {
+            let minutes = max(Int(remainingSeconds / 60), 1)
             return norwegian
-                ? "\(totalMinutes) \(totalMinutes == 1 ? "minutt" : "minutter") igjen"
-                : "\(totalMinutes) \(totalMinutes == 1 ? "minute" : "minutes") left"
+                ? "\(minutes) \(minutes == 1 ? "minutt" : "minutter") igjen"
+                : "\(minutes) \(minutes == 1 ? "minute" : "minutes") left"
         }
 
-        let totalHours = totalMinutes / 60
+        let totalHours = Int(remainingSeconds / 3600)
         let days = totalHours / 24
         let hours = totalHours % 24
 
