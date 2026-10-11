@@ -580,7 +580,8 @@ struct TrainTogetherCreatorLobbyView: View {
                     ATHLTHTheme.vitality
                 )
                 .disabled(
-                    !allAcceptedGuestsReady
+                    !allAcceptedGuestsReady ||
+                    session?.invitePayload?.resolvedStartIndependently == true
                 )
 
                 Button {
@@ -611,6 +612,7 @@ struct TrainTogetherCreatorLobbyView: View {
                     .frame(height: 46)
                 }
                 .buttonStyle(.bordered)
+                .disabled(session?.invitePayload?.resolvedStartIndependently == true)
 
                 if session?.invitePayload != nil {
                     Button {
