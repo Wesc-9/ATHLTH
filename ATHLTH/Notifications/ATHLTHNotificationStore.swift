@@ -162,6 +162,12 @@ final class ATHLTHNotificationStore: ObservableObject {
         if item.kind == .social {
             let eventKind = item.socialEventKind?.lowercased() ?? ""
 
+            if eventKind.hasPrefix("arena_") {
+                return eventKind == "arena_chat"
+                    ? preferenceEnabled("settings.messageNotifications")
+                    : preferenceEnabled("settings.challengeNotifications")
+            }
+
             if eventKind == "mention" {
                 return preferenceEnabled("settings.mentionNotifications")
             }
