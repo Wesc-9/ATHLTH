@@ -78,6 +78,47 @@ final class ATHLTHArenaSafetyTests: XCTestCase {
         XCTAssertEqual(row.scoring, .winner)
     }
 
+    func testClubSeasonCreatedByDeletedUserStillDecodes() throws {
+        let seasonID = UUID()
+        let clubID = UUID()
+        let payload = """
+        {
+          "id":"\(seasonID.uuidString)",
+          "club_id":"\(clubID.uuidString)",
+          "title":"Autumn Arena",
+          "starts_on":"2026-10-01",
+          "ends_on":"2026-11-01",
+          "created_by":null
+        }
+        """
+        let season = try decoder().decode(
+            ATHLTHArenaClubSeason.self,
+            from: Data(payload.utf8)
+        )
+        XCTAssertEqual(season.id, seasonID)
+        XCTAssertEqual(season.clubID, clubID)
+        XCTAssertNil(season.createdBy)
+    }
+
+    func testClubSeasonWithActiveCreatorStillDecodes() throws {
+        let userID = UUID()
+        let payload = """
+        {
+          "id":"\(UUID().uuidString)",
+          "club_id":"\(UUID().uuidString)",
+          "title":"Autumn Arena",
+          "starts_on":"2026-10-01",
+          "ends_on":"2026-11-01",
+          "created_by":"\(userID.uuidString)"
+        }
+        """
+        let season = try decoder().decode(
+            ATHLTHArenaClubSeason.self,
+            from: Data(payload.utf8)
+        )
+        XCTAssertEqual(season.createdBy, userID)
+    }
+
     func testDeletedChatAuthorHasNoProfileID() throws {
         let payload = """
         {
