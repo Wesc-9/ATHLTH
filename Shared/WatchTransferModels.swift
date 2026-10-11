@@ -501,15 +501,78 @@ enum ATHLTHGuidancePriority:
 ///
 /// This policy is deliberately pure so routing decisions can be regression
 /// tested without an active HealthKit workout or an audio route.
+/// Short lived, session-bound claim for ordinary mirrored Audio Coach speech.
+/// Only an acknowledged claim allows iPhone to become the voice owner.
+/// Older Watch/iPhone builds ignore these standalone JSON messages.
+struct ATHLTHAudioCoachLeaseOffer: Codable, Hashable {
+    var generationID: UUID
+    var requestID: UUID
+    var workoutStartedAt: Date
+    var issuedAt: Date
+}
+
+struct ATHLTHAudioCoachLeaseAcknowledgement: Codable, Hashable {
+    var generationID: UUID
+    var requestID: UUID
+    var workoutStartedAt: Date
+    var acknowledgedAt: Date
+}
+
+struct ATHLTHAudioCoachVoiceLease {
+    static let duration: TimeInterval = 6
+    static let offerMaximumAge: TimeInterval = 4
+
+    private(set) var expiresAt: Date?
+    private var latestOfferDate: Date?
+
+    mutating func grant(
+        offer: ATHLTHAudioCoachLeaseOffer,
+        workoutStartedAt: Date?,
+        eligible: Bool,
+        now: Date = Date()
+    ) -> ATHLTHAudioCoachLeaseAcknowledgement? {
+        guard eligible,
+              let workoutStartedAt,
+              abs(workoutStartedAt.timeIntervalSince(
+                  offer.workoutStartedAt
+              )) <= 1,
+              now.timeIntervalSince(offer.issuedAt) >= -2,
+              now.timeIntervalSince(offer.issuedAt) <= Self.offerMaximumAge,
+              latestOfferDate.map({ offer.issuedAt >= $0 }) ?? true
+        else {
+            return nil
+        }
+
+        latestOfferDate = offer.issuedAt
+        expiresAt = now.addingTimeInterval(Self.duration)
+        return ATHLTHAudioCoachLeaseAcknowledgement(
+            generationID: offer.generationID,
+            requestID: offer.requestID,
+            workoutStartedAt: workoutStartedAt,
+            acknowledgedAt: now
+        )
+    }
+
+    func isActive(at now: Date = Date()) -> Bool {
+        guard let expiresAt else { return false }
+        return now < expiresAt
+    }
+
+    mutating func reset() {
+        expiresAt = nil
+        latestOfferDate = nil
+    }
+}
+
 enum ATHLTHAudioCoachVoiceRouting {
     static func shouldSpeakOnWatch(
         configuration: WatchAudioCoachConfiguration,
         workoutKind: WatchWorkoutKind,
         priority: ATHLTHGuidancePriority,
-        iPhoneReachable: Bool
+        iPhoneVoiceLeaseActive: Bool
     ) -> Bool {
         guard configuration.shouldPreferIPhoneAudioWhenReachable,
-              iPhoneReachable
+              iPhoneVoiceLeaseActive
         else {
             return true
         }
