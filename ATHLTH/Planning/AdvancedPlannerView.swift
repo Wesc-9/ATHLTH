@@ -5457,7 +5457,11 @@ struct SessionEditorView: View {
                             ATHLTHLocalization.choose(
                                 english: "Add to Workout",
                                 norwegian: "Legg til i økten"
-                            )
+                            ),
+                        selectedExerciseCounts: Dictionary(
+                            plannedExercises.compactMap(\.exerciseID).map { ($0, 1) },
+                            uniquingKeysWith: +
+                        )
                     ) { entry in
                         addExercise(entry.exercise)
                     }
