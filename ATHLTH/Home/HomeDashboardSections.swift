@@ -4223,6 +4223,27 @@ private struct HomeWeeklyProgressDaySheet:
     private func plannedRow(
         _ workout: PlannedSession
     ) -> some View {
+        Group {
+            if workout.trainTogetherMode != nil {
+                NavigationLink {
+                    PlannedWorkoutLobbyView(workout: workout)
+                } label: {
+                    plannedRowContent(workout)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(ATHLTHLocalization.choose(
+                    english: "Open invited athletes and their responses",
+                    norwegian: "Åpne lobby med inviterte og svarstatus"
+                ))
+            } else {
+                plannedRowContent(workout)
+            }
+        }
+    }
+
+    private func plannedRowContent(
+        _ workout: PlannedSession
+    ) -> some View {
         let completed =
             selection
                 .completedPlannedIDs
@@ -4292,8 +4313,8 @@ private struct HomeWeeklyProgressDaySheet:
                 if workout.trainTogetherMode != nil && !completed {
                     Label(
                         ATHLTHLocalization.choose(
-                            english: "Friend invited · your workout is scheduled",
-                            norwegian: "Venn invitert · økten din er planlagt"
+                            english: "Friend invited · tap for lobby and status",
+                            norwegian: "Venn invitert · åpne lobby og status"
                         ),
                         systemImage: "person.crop.circle.badge.clock"
                     )
