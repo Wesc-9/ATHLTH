@@ -4543,6 +4543,8 @@ struct SessionEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var gear: ProfileGearStore
@@ -4567,6 +4569,9 @@ struct SessionEditorView: View {
     @State private var selectedPartnerID: UUID?
     @State private var draftRestored = false
     @State private var draftFinalized = false
+    @State private var isSaving = false
+    @State private var invitationError = ""
+    @State private var showingInvitationError = false
 
     @State private var plannedExercises: [PlannedExercise] = []
     @State private var exerciseBeingEdited: PlannedExercise?
@@ -5085,6 +5090,8 @@ struct SessionEditorView: View {
                 )
 
 
+                partnerPlanningSection
+
                 if existingWorkout == nil ||
                     kind == .strength {
                     Section {
@@ -5237,8 +5244,19 @@ struct SessionEditorView: View {
                     ) {
                         saveSession()
                     }
-                    .disabled(!canAdd)
+                    .disabled(!canAdd || isSaving)
                 }
+            }
+            .alert(
+                ATHLTHLocalization.choose(
+                    english: "Invitation not sent",
+                    norwegian: "Invitasjonen ble ikke sendt"
+                ),
+                isPresented: $showingInvitationError
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(invitationError)
             }
             .sheet(isPresented: $showingSavedWorkoutPicker) {
                 PlanWorkoutPickerView { workout in
@@ -5304,6 +5322,9 @@ struct SessionEditorView: View {
             }
             .onAppear {
                 restoreDraftIfNeeded()
+                if social.trainingPartners.isEmpty {
+                    Task { await social.refresh() }
+                }
             }
             .onDisappear {
                 persistDraft()
@@ -6245,6 +6266,62 @@ struct SessionEditorView: View {
             ATHLTHTheme.border
         )
         .environment(\.editMode, .constant(.active))
+    }
+
+    private var partnerPlanningSection: some View {
+        Section {
+            HStack(spacing: 11) {
+                Image(systemName: "person.2.fill")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 32)
+
+                Picker(
+                    ATHLTHLocalization.choose(
+                        english: "Plan with someone",
+                        norwegian: "Planlegg med en person"
+                    ),
+                    selection: $selectedPartnerID
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Just me",
+                            norwegian: "Bare meg"
+                        )
+                    )
+                    .tag(nil as UUID?)
+
+                    ForEach(social.trainingPartners, id: \.userID) { friend in
+                        Text(friend.resolvedName)
+                            .tag(friend.userID as UUID?)
+                    }
+                }
+            }
+
+            Text(
+                selectedPartnerID == nil
+                    ? ATHLTHLocalization.choose(
+                        english: "Choose someone you follow mutually. Your planned workout will be shared in ATHLTH Messages.",
+                        norwegian: "Velg en person dere følger gjensidig. Den planlagte økten deles via meldinger i ATHLTH."
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Your friend will receive the date and workout in Messages. They can respond in chat.",
+                        norwegian: "Personen får en melding med tidspunkt og øktinnhold og kan svare i chatten."
+                    )
+            )
+            .font(.caption)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+            .fixedSize(horizontal: false, vertical: true)
+        } header: {
+            Text(
+                ATHLTHLocalization.choose(
+                    english: "Train together",
+                    norwegian: "Tren sammen"
+                )
+            )
+        }
+        .listRowBackground(ATHLTHTheme.card)
+        .listRowSeparatorTint(ATHLTHTheme.border)
     }
 
     private var workoutBuilderOverview:
@@ -8165,8 +8242,67 @@ struct SessionEditorView: View {
     }
 
     private func saveSession() {
-        guard canAdd else { return }
-        commitSession(composeSession())
+        guard canAdd, !isSaving else { return }
+        let workout = composeSession()
+
+        guard let partnerID = selectedPartnerID else {
+            commitSession(workout)
+            return
+        }
+
+        // A planned invitation is a share through Messages, not a live lobby.
+        isSaving = true
+        Task {
+            do {
+                let conversationID = try await messaging.openConversation(
+                    with: partnerID
+                )
+                let scheduled = workout.scheduledStart?.formatted(
+                    date: .abbreviated, time: .shortened
+                ) ?? ATHLTHLocalization.choose(
+                    english: "Time to be agreed",
+                    norwegian: "Tidspunkt avtales"
+                )
+                var sharedWorkout = workout
+                // Private device, gear and music preferences belong to the
+                // person planning the workout, not the invited athlete.
+                sharedWorkout.gearIDs = []
+                sharedWorkout.spotifyPlaylist = nil
+                sharedWorkout.spotifyAutoplayOnStart = false
+                let attachment = try MessageShareDraft(
+                    kind: .workout,
+                    title: workout.title,
+                    subtitle: scheduled,
+                    snapshot: sharedWorkout,
+                    sourceObjectID: workout.id,
+                    sourceOwnerID: session.profile.userID
+                )
+                let body = ATHLTHLocalization.choose(
+                    english: "Would you like to train together? \(workout.title) · \(scheduled). The session is attached.",
+                    norwegian: "Vil du trene sammen? \(workout.title) · \(scheduled). Økten er vedlagt."
+                )
+                let sent = await messaging.send(
+                    to: partnerID,
+                    conversationID: conversationID,
+                    body: body,
+                    attachment: attachment
+                )
+                if sent {
+                    commitSession(workout)
+                } else {
+                    invitationError = messaging.errorMessage ??
+                        ATHLTHLocalization.choose(
+                            english: "Try again, or choose Just me.",
+                            norwegian: "Prøv igjen, eller velg Bare meg."
+                        )
+                    showingInvitationError = true
+                }
+            } catch {
+                invitationError = error.localizedDescription
+                showingInvitationError = true
+            }
+            isSaving = false
+        }
     }
 
     private func commitSession(_ workout: PlannedSession) {
