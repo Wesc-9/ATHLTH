@@ -120,6 +120,67 @@ final class ATHLTHArenaSafetyTests: XCTestCase {
         )
     }
 
+    func testArenaRelayCourseUsesFrozenRouteWithoutChangingOwner() {
+        let id = UUID(), owner = UUID()
+        let snapshot = ChallengeRouteSnapshot(
+            routeID: id,
+            title: "Stafettløype",
+            distanceKilometers: 4.2,
+            coordinates: [
+                RouteCoordinate(latitude: 59.90, longitude: 10.70,
+                                altitude: nil, sequence: 0),
+                RouteCoordinate(latitude: 59.91, longitude: 10.72,
+                                altitude: nil, sequence: 1)
+            ]
+        )
+        let route = ATHLTHArenaCompetitionCourse.route(
+            from: snapshot, ownerID: owner
+        )
+        XCTAssertEqual(route?.id, id)
+        XCTAssertEqual(route?.ownerID, owner)
+        XCTAssertEqual(route?.distanceKilometers, 4.2)
+        XCTAssertEqual(route?.coordinates.count, 2)
+        XCTAssertEqual(route?.visibility, .privateOnly)
+        XCTAssertEqual(route?.routeSource, "arena_competition")
+    }
+
+    func testArenaRelayCourseRejectsMalformedOrUnsafeCoordinates() {
+        let owner = UUID()
+        let first = RouteCoordinate(
+            latitude: 59.90, longitude: 10.70, altitude: nil, sequence: 0
+        )
+        let outOfRange = RouteCoordinate(
+            latitude: 95, longitude: 10.71, altitude: nil, sequence: 1
+        )
+        let invalidCourse = ChallengeRouteSnapshot(
+            routeID: UUID(),
+            title: "Ugyldig",
+            distanceKilometers: 5,
+            coordinates: [first, outOfRange]
+        )
+        XCTAssertNil(ATHLTHArenaCompetitionCourse.route(
+            from: invalidCourse, ownerID: owner
+        ))
+        let singlePoint = ChallengeRouteSnapshot(
+            routeID: UUID(),
+            title: "For kort",
+            distanceKilometers: 5,
+            coordinates: [first]
+        )
+        XCTAssertNil(ATHLTHArenaCompetitionCourse.route(
+            from: singlePoint, ownerID: owner
+        ))
+        let invalidDistance = ChallengeRouteSnapshot(
+            routeID: UUID(),
+            title: "Ugyldig lengde",
+            distanceKilometers: .infinity,
+            coordinates: [first, first]
+        )
+        XCTAssertNil(ATHLTHArenaCompetitionCourse.route(
+            from: invalidDistance, ownerID: owner
+        ))
+    }
+
     private func relayFixture(
         series: UUID, route: UUID, first: [UUID], second: [UUID]
     ) -> [ATHLTHArenaRelayLeg] {
