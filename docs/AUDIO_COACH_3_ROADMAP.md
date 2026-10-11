@@ -23,14 +23,20 @@ Audio Coach skal være integrert i alle støttede økter fra planlegging til opp
 
 **Begrensning:** At telefonen er `WCSession.isReachable` er *ikke* bevis for at den faktisk kan levere tale. Denne første endringen sikrer unike Watch-meldinger, men fullfører ikke bekreftet lydansvar, og talekanaler kan i sjeldne tilfeller overlappe. 1B må derfor komme før en full «garantert» overlevering kan hevdes.
 
-### 1B. Bekreftet lydansvar og hendelseslevering
+### 1B. Bekreftet lydansvar og hendelseslevering — PROTOKOLL IMPLEMENTERT, IKKE FULLT VERIFISERT
 
-- [ ] Eksplisitt handshake/ACK mellom iPhone og Watch: klar til å tale, ikke bare tilkoblet.
-- [ ] Eier-ID/økts-ID og generasjon på overgang; automatisk fallback ved manglende ACK/stale speiling.
-- [ ] Dedup per hendelses-ID, prioritet og tidsfrist; ingen avspilling etter at meldingen er irrelevant.
-- [ ] Ingen dobbeltale ved til-/frakobling, pause, gjenopptak eller avslutning.
-- [ ] Lydrute/AirPods/Spotify ducking, avbrytelser, offline, restart og støytest.
-- [ ] Verifiser at meldinger ikke forsvinner mellom Watch- og iPhone-lyd.
+- [x] Eksplisitt iPhone→Watch lease-offer og Watch→iPhone ACK for ordinære løpevarsler; telefonen snakker først etter bekreftelse (for nyere Watch).
+- [x] Hver lease er bundet til øktens starttid, unik generasjon og request-ID; 6 s Watch-utløp / 4,5 s iPhone-utløp, fornyes kun med fersk speiling.
+- [x] Ved manglende ACK / utløpt bekreftelse tar Watch over tale; Ghost, mål-/rutevarsler og styrke forblir Watch-eid.
+- [x] Eldre Watch-snapshots støttes gjennom bakoverkompatibel capabilities-markør og eksisterende lydvei.
+- [x] Enhetstester lagt til for utløp, gammel/feil økt, feil rekkefølge, serialisering og blandede versjoner.
+- [ ] Verifiser full iOS/Watch-bygg og tester på relevant commit (CI-status separat).
+- [ ] Verifiser fysisk lydlevering under normal start, til-/frakobling, pause, gjenopptak og avslutning.
+- [ ] Full dedup per **hendelses-ID** og frister/utløp på meldinger; håndteres sammen med typed Coach Event Engine i steg 2.
+- [ ] Sikker lydruteoverlevering ved Spotify/AirPods/Watch-høyttaler, telefon uten lydrute, iPhone i bakgrunn og app-restart.
+- [ ] Bevis gjennom fysisk test at **ingen** dobbelte eller manglende rutinemeldinger forekommer ved handoff.
+
+**Viktig presisering:** ACK bekrefter at Watch har mottatt leieforespørselen og at økten matcher; den bekrefter **ikke** at en fysisk lydutgang fungerer eller at brukeren hørte meldingen. Må ikke omtales som fullstendig «garantert lydlevering» før lydrute- og hendelsesleveringstester er gjennomført.
 
 ### 2. Felles Coach Event Engine
 
