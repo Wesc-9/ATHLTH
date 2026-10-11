@@ -1867,21 +1867,11 @@ final class SocialStore: ObservableObject {
             return
         }
 
-        // Builds before the dedicated delete flow could leave creator-owned
-        // challenges locally marked as cancelled while the backend row stayed
-        // alive. Convert those legacy tombstones into real deletions instead
-        // of re-uploading them and resurrecting the challenge on other devices.
+        // Cancelled challenges are intentionally retained so both parties
+        // continue to see the cancelled status on their invitations.
         for challenge in challengeStore.challenges {
             do {
-                if challenge.creatorID == currentUserID,
-                   challenge.status == .cancelled {
-                    try await service.deleteChallenge(
-                        challengeID:
-                            challenge.id
-                    )
-                    challengeStore.remove(
-                        challenge.id
-                    )
+                if challenge.status == .cancelled {
                     continue
                 }
 
@@ -1949,6 +1939,26 @@ final class SocialStore: ObservableObject {
         } catch {
             errorMessage =
                 error.localizedDescription
+            return false
+        }
+    }
+
+    @discardableResult
+    func cancelChallenge(
+        challengeID: UUID
+    ) async -> Bool {
+        guard service.currentUserID != nil else {
+            errorMessage = ATHLTHLocalization.choose(
+                english: "Sign in to cancel the challenge.",
+                norwegian: "Logg inn for å avlyse utfordringen."
+            )
+            return false
+        }
+        do {
+            try await service.cancelChallenge(challengeID)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
             return false
         }
     }
