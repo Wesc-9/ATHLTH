@@ -11,6 +11,7 @@ struct AdvancedPlannerView: View {
     @State private var selectedWeekID: UUID?
     @State private var selectedDayID: UUID?
     @State private var selectedWorkout: PlannedSession?
+    @State private var selectedStandaloneLobbyWorkout: PlannedSession?
     @State private var showingSessionEditor = false
     @State private var showingStandaloneSessionEditor = false
     @State private var showingPlanEditor = false
@@ -112,6 +113,20 @@ struct AdvancedPlannerView: View {
         }
         .sheet(isPresented: $showingProgramCreation) {
             TrainingPlanCreationView()
+        }
+        .sheet(item: $selectedStandaloneLobbyWorkout) { workout in
+            NavigationStack {
+                PlannedWorkoutLobbyView(workout: workout)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(ATHLTHLocalization.choose(
+                                english: "Done", norwegian: "Ferdig"
+                            )) {
+                                selectedStandaloneLobbyWorkout = nil
+                            }
+                        }
+                    }
+            }
         }
         .sheet(item: $selectedWorkout) { workout in
             if let planID = displayedPlan?.id {
@@ -462,6 +477,23 @@ struct AdvancedPlannerView: View {
             }
 
             Spacer()
+
+            if workout.trainTogetherMode != nil {
+                Button {
+                    selectedStandaloneLobbyWorkout = workout
+                } label: {
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 34, height: 34)
+                        .background(ATHLTHTheme.accentSoft, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Open workout lobby",
+                    norwegian: "Åpne øktlobby"
+                ))
+            }
 
             Menu {
                 Button(
