@@ -3124,6 +3124,62 @@ private struct IPhoneAudioCoachLiveSheet: View {
                         if configuration.enabled {
                             coachCard {
                                 VStack(alignment: .leading, spacing: 12) {
+                                    HStack {
+                                        Image(systemName: "waveform.path")
+                                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                                        Text(ATHLTHLocalization.choose(
+                                            english: "Guidance level",
+                                            norwegian: "Veiledningsnivå"
+                                        ))
+                                        .font(.headline)
+                                    }
+                                    HStack(spacing: 7) {
+                                        ForEach(ATHLTHCoachContentLevel.allCases) { level in
+                                            Button {
+                                                update { value in
+                                                    value = level.applying(to: value)
+                                                }
+                                            } label: {
+                                                VStack(spacing: 4) {
+                                                    Text(level.title)
+                                                        .font(.subheadline.weight(.semibold))
+                                                    Text(level.subtitle)
+                                                        .font(.system(size: 10))
+                                                        .lineLimit(2)
+                                                        .minimumScaleFactor(0.85)
+                                                }
+                                                .frame(maxWidth: .infinity, minHeight: 65)
+                                                .foregroundStyle(
+                                                    ATHLTHCoachContentLevel.matching(configuration) == level
+                                                        ? Color.white
+                                                        : ATHLTHTheme.primaryText
+                                                )
+                                                .background(
+                                                    ATHLTHCoachContentLevel.matching(configuration) == level
+                                                        ? ATHLTHTheme.accentDeep
+                                                        : ATHLTHTheme.canvasBottom,
+                                                    in: RoundedRectangle(cornerRadius: 13)
+                                                )
+                                            }
+                                            .buttonStyle(.plain)
+                                            .accessibilityAddTraits(
+                                                ATHLTHCoachContentLevel.matching(configuration) == level
+                                                    ? .isSelected
+                                                    : []
+                                            )
+                                        }
+                                    }
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Controls what you hear. The intervals below control how often.",
+                                        norwegian: "Styrer hva coachen sier. Intervallene nedenfor styrer hvor ofte."
+                                    ))
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+                            }
+
+                            coachCard {
+                                VStack(alignment: .leading, spacing: 12) {
                                     Text(ATHLTHLocalization.choose(
                                         english: "Frequency", norwegian: "Hvor ofte?"
                                     ))
