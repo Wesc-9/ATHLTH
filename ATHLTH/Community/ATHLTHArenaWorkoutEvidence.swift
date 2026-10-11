@@ -455,8 +455,9 @@ struct ATHLTHArenaEvidenceSection: View {
                     endsAt: endsAt
                 )
             })
+            .sorted { $0.endDate > $1.endDate }
             .prefix(25) {
-            if Task.isCancelled { break }
+            if Task.isCancelled { return }
 
             let workout = SocialPublishableWorkout(summary: summary)
             guard !ATHLTHArenaWorkoutIdentity.alreadyShared(
@@ -498,6 +499,7 @@ struct ATHLTHArenaEvidenceSection: View {
                 )
             ))
         }
+        guard !Task.isCancelled else { return }
         routeCandidates[round.id] = matches
         if matches.isEmpty {
             notice = ATHLTHLocalization.choose(
