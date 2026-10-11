@@ -19,6 +19,8 @@ private struct LiveGhostStartTrigger: Equatable {
 
 struct LiveGhostRaceLobbyView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
@@ -838,10 +840,25 @@ struct LiveGhostRaceLobbyView: View {
                     )
                 )
 
-                Text(resultTitle)
-                    .font(
-                        .title2.weight(.bold)
+                HStack(spacing: 12) {
+                    Image(systemName: resultCandidate == nil
+                        ? "exclamationmark.shield.fill"
+                        : resultCandidate?.winnerID == nil
+                            ? "equal.circle.fill"
+                            : "trophy.fill"
                     )
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(resultCandidate == nil
+                        ? .orange : ATHLTHTheme.accentDeep)
+                    .frame(width: 46, height: 46)
+                    .background(
+                        ATHLTHTheme.vitalitySoft.opacity(0.56),
+                        in: Circle()
+                    )
+                    Text(resultTitle)
+                        .font(.system(.title2, design: .rounded, weight: .bold))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 Label(
                     challenge.arenaRoundID != nil
@@ -860,7 +877,7 @@ struct LiveGhostRaceLobbyView: View {
                 .foregroundStyle(resultCandidate == nil
                     ? .orange : ATHLTHTheme.mutedText)
 
-                HStack(spacing: 10) {
+                LazyVGrid(columns: resultMetricColumns, spacing: 9) {
                     resultMetric(
                         title:
                             ATHLTHLocalization.choose(
@@ -897,7 +914,7 @@ struct LiveGhostRaceLobbyView: View {
                     )
                 }
 
-                HStack(spacing: 10) {
+                LazyVGrid(columns: resultMetricColumns, spacing: 9) {
                     resultMetric(
                         title:
                             ATHLTHLocalization.choose(
@@ -1519,6 +1536,14 @@ struct LiveGhostRaceLobbyView: View {
         )
     }
 
+    private var resultMetricColumns: [GridItem] {
+        if dynamicTypeSize.isAccessibilitySize {
+            return [GridItem(.flexible())]
+        }
+        let count = horizontalSizeClass == .regular ? 3 : 2
+        return (0..<count).map { _ in GridItem(.flexible(), spacing: 9) }
+    }
+
     private func resultMetric(
         title: String,
         value: String
@@ -1539,12 +1564,14 @@ struct LiveGhostRaceLobbyView: View {
                 .foregroundStyle(
                     ATHLTHTheme.mutedText
                 )
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(
-            maxWidth: .infinity,
-            alignment: .leading
+        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+        .padding(11)
+        .background(
+            ATHLTHTheme.accentDeep.opacity(0.055),
+            in: RoundedRectangle(cornerRadius: 13, style: .continuous)
         )
     }
 
