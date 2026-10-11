@@ -120,6 +120,90 @@ final class ATHLTHArenaSafetyTests: XCTestCase {
         )
     }
 
+    private func relayFixture(
+        series: UUID, route: UUID, first: [UUID], second: [UUID]
+    ) -> [ATHLTHArenaRelayLeg] {
+        let firstLegs = first.enumerated().map { offset, slot in
+            ATHLTHArenaRelayLeg(
+                slotID: slot, seriesID: series, teamIndex: 1,
+                legOrder: offset + 1, routeRoundID: route
+            )
+        }
+        let secondLegs = second.enumerated().map { offset, slot in
+            ATHLTHArenaRelayLeg(
+                slotID: slot, seriesID: series, teamIndex: 2,
+                legOrder: offset + 1, routeRoundID: route
+            )
+        }
+        return firstLegs + secondLegs
+    }
+
+    private func relayReport(
+        slot: UUID, series: UUID, seconds: Double
+    ) -> ATHLTHArenaRelayLegReport {
+        ATHLTHArenaRelayLegReport(
+            slotID: slot, seriesID: series, elapsedSeconds: seconds,
+            submittedAt: Date(timeIntervalSince1970: 1_800_000_000)
+        )
+    }
+
+    func testRelayShowsNoTotalUntilAllLegsReport() {
+        let series = UUID(), route = UUID()
+        let a = UUID(), b = UUID(), c = UUID(), d = UUID()
+        let stages = relayFixture(series: series, route: route,
+                                  first: [a,b], second: [c,d])
+        let partial = ATHLTHArenaRelayProgress.team(
+            1, legs: stages,
+            reports: [relayReport(slot: a, series: series, seconds: 550)]
+        )
+        XCTAssertEqual(partial?.completedLegs, 1)
+        XCTAssertEqual(partial?.totalLegs, 2)
+        XCTAssertNil(partial?.completeTotalSeconds)
+
+        let complete = ATHLTHArenaRelayProgress.team(
+            1, legs: stages, reports: [
+                relayReport(slot: a, series: series, seconds: 550),
+                relayReport(slot: b, series: series, seconds: 660)
+            ]
+        )
+        XCTAssertEqual(complete?.completeTotalSeconds, 1210)
+        XCTAssertNil(ATHLTHArenaRelayProgress.team(
+            2, legs: stages, reports: []
+        )?.completeTotalSeconds)
+    }
+
+    func testRelayIgnoresDuplicateForeignOrInvalidTimes() {
+        let series = UUID(), route = UUID()
+        let a = UUID(), b = UUID()
+        let stages = relayFixture(series: series, route: route,
+                                  first: [a,b], second: [UUID(),UUID()])
+        let reports = [
+            relayReport(slot: a, series: series, seconds: 300),
+            relayReport(slot: a, series: series, seconds: 250),
+            relayReport(slot: b, series: UUID(), seconds: 350),
+            relayReport(slot: UUID(), series: series, seconds: 20),
+            relayReport(slot: b, series: series, seconds: .infinity)
+        ]
+        let progress = ATHLTHArenaRelayProgress.team(
+            1, legs: stages, reports: reports
+        )
+        XCTAssertEqual(progress?.completedLegs, 0)
+        XCTAssertNil(progress?.completeTotalSeconds)
+    }
+
+    func testRelayRejectsMalformedPlanBeforeShowingResults() {
+        let series = UUID(), route = UUID(), a = UUID(), b = UUID()
+        let valid = relayFixture(series: series, route: route,
+                                 first: [a,b], second: [UUID(),UUID()])
+        let duplicate = [valid[0], valid[0], valid[2], valid[3]]
+        XCTAssertNil(ATHLTHArenaRelayProgress.team(
+            1, legs: duplicate, reports: []
+        ))
+        XCTAssertNil(ATHLTHArenaRelayProgress.team(
+            0, legs: valid, reports: []
+        ))
+    }
+
     func testArenaNextActionPrioritizesInvitationAndDoesNotShowForOutsiders() {
         XCTAssertEqual(
             nextAction(response: "invited", organizer: true, rounds: []),
