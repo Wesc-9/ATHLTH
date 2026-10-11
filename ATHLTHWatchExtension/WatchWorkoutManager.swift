@@ -211,6 +211,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var coachCueQueue = ATHLTHCoachCueQueue()
     /// Temporary voice mute; HealthKit capture and safety haptics continue.
     @Published private(set) var coachSpeechPaused = false
+    @Published private(set) var lastCoachMessage: String?
+    private var coachReplayMemory = ATHLTHCoachReplayMemory()
+
+    var canReplayLastCoachMessage: Bool {
+        audioCoachConfiguration.enabled &&
+        !coachSpeechPaused &&
+        isActive &&
+        coachReplayMemory.replayableText() != nil
+    }
     private var nextDistanceAnnouncementMeters: Double?
     private var nextTimeAnnouncementSeconds: TimeInterval?
     private var structuredStepStartElapsedTime: TimeInterval = 0
@@ -736,6 +745,21 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 validFor: 8
             ),
             forceLocal: true
+        )
+    }
+
+    /// Replay only the recent message spoken by this Watch. iPhone-owned
+    /// commentary is deliberately not claimed as Watch audio history.
+    func replayLastCoachMessage() {
+        guard canReplayLastCoachMessage,
+              let phrase = coachReplayMemory.replayableText()
+        else { return }
+
+        speak(
+            phrase,
+            priority: .structuredStep,
+            forceLocal: true,
+            rememberForReplay: false
         )
     }
 
@@ -3119,6 +3143,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         coachEventLedger.reset()
         coachCueQueue.reset()
         coachSpeechPaused = false
+        coachReplayMemory.reset()
+        lastCoachMessage = nil
         publish {
             self.state = .idle
             self.elapsedTime = 0
@@ -3255,6 +3281,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         coachEventLedger.reset()
         coachCueQueue.reset()
         coachSpeechPaused = false
+        coachReplayMemory.reset()
+        lastCoachMessage = nil
         resetAudioCoachThresholds()
 
         do {
@@ -5520,7 +5548,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             ATHLTHGuidancePriority =
                 .routineCoach,
         event: ATHLTHCoachEvent? = nil,
-        forceLocal: Bool = false
+        forceLocal: Bool = false,
+        rememberForReplay: Bool = true
     ) {
         guard !text.isEmpty,
               ATHLTHCoachVoicePausePolicy.allowsSpeech(
@@ -5670,6 +5699,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     self.coachEventLedger.didDeliver(event)
                 }
                 self.speechSynthesizer.speak(utterance)
+                if rememberForReplay,
+                   ATHLTHCoachReplayMemory.mayRemember(priority: priority) {
+                    self.coachReplayMemory.remember(
+                        text,
+                        priority: priority
+                    )
+                    self.lastCoachMessage = self.coachReplayMemory.text
+                }
                 if let event {
                     self.reportWatchSpokenEventAttempt(event)
                 }
