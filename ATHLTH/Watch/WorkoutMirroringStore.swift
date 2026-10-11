@@ -30,6 +30,116 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         Date?
     private var iPhoneAudioCoachAttached =
         false
+    private var voiceLeaseGenerationID = UUID()
+    private var latestVoiceLeaseRequestID: UUID?
+    private var lastVoiceLeaseOfferAt: Date?
+    private var voiceLeaseAcknowledgedUntil: Date?
+    private var voiceLeaseExpiryTask: Task<Void, Never>?
+
+    private var hasAcknowledgedVoiceLease: Bool {
+        guard let voiceLeaseAcknowledgedUntil else {
+            return false
+        }
+        return Date() < voiceLeaseAcknowledgedUntil
+    }
+
+    private func resetVoiceLease() {
+        voiceLeaseExpiryTask?.cancel()
+        voiceLeaseExpiryTask = nil
+        voiceLeaseGenerationID = UUID()
+        latestVoiceLeaseRequestID = nil
+        lastVoiceLeaseOfferAt = nil
+        voiceLeaseAcknowledgedUntil = nil
+        iPhoneAudioCoach.suspendForWatchFallback()
+    }
+
+    private func offerVoiceLeaseIfNeeded(
+        for snapshot: WatchWorkoutLiveSnapshot
+    ) {
+        guard iPhoneAudioCoachAttached,
+              iPhoneAudioCoach.isEnabled,
+              snapshot.kind == .running ||
+                snapshot.kind == .walking,
+              snapshot.state == .running ||
+                snapshot.state == .paused ||
+                snapshot.state == .preparing,
+              let startedAt = snapshot.startedAt,
+              let session = mirroredSession
+        else {
+            return
+        }
+
+        let now = Date()
+        guard abs(now.timeIntervalSince(snapshot.capturedAt)) <= 4,
+              lastVoiceLeaseOfferAt.map({
+                  now.timeIntervalSince($0) >= 2
+              }) ?? true
+        else {
+            return
+        }
+
+        let requestID = UUID()
+        let offer = ATHLTHAudioCoachLeaseOffer(
+            generationID: voiceLeaseGenerationID,
+            requestID: requestID,
+            workoutStartedAt: startedAt,
+            issuedAt: now
+        )
+        guard let payload = try? JSONEncoder().encode(offer) else {
+            return
+        }
+
+        latestVoiceLeaseRequestID = requestID
+        lastVoiceLeaseOfferAt = now
+        Task { @MainActor in
+            try? await session.sendToRemoteWorkoutSession(
+                data: payload
+            )
+        }
+    }
+
+    private func receiveVoiceLeaseAcknowledgement(
+        _ acknowledgement: ATHLTHAudioCoachLeaseAcknowledgement
+    ) {
+        guard iPhoneAudioCoachAttached,
+              iPhoneAudioCoach.isEnabled,
+              mirroredSession != nil,
+              acknowledgement.generationID ==
+                voiceLeaseGenerationID,
+              acknowledgement.requestID ==
+                latestVoiceLeaseRequestID,
+              let current = snapshot,
+              let startedAt = current.startedAt,
+              abs(startedAt.timeIntervalSince(
+                  acknowledgement.workoutStartedAt
+              )) <= 1,
+              abs(Date().timeIntervalSince(
+                  acknowledgement.acknowledgedAt
+              )) <= 4
+        else {
+            return
+        }
+
+        let wasActive = hasAcknowledgedVoiceLease
+        voiceLeaseAcknowledgedUntil =
+            Date().addingTimeInterval(4.5)
+        voiceLeaseExpiryTask?.cancel()
+        let generationID = voiceLeaseGenerationID
+        voiceLeaseExpiryTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(4.5))
+            guard !Task.isCancelled,
+                  let self,
+                  self.voiceLeaseGenerationID == generationID,
+                  !self.hasAcknowledgedVoiceLease
+            else { return }
+            self.voiceLeaseAcknowledgedUntil = nil
+            self.iPhoneAudioCoach.suspendForWatchFallback()
+        }
+
+        if !wasActive {
+            iPhoneAudioCoach.synchronizeOnHandoff(current)
+        }
+    }
 
     override init() {
         super.init()
@@ -52,12 +162,11 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
             WatchAudioCoachConfiguration
     ) {
         guard configuration.enabled else {
-            iPhoneAudioCoach.stop()
-            iPhoneAudioCoachPreparedAt = nil
-            iPhoneAudioCoachAttached = false
+            clearIPhoneAudioCoach()
             return
         }
 
+        resetVoiceLease()
         iPhoneAudioCoach.prepare(
             configuration
         )
@@ -68,6 +177,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     }
 
     func clearIPhoneAudioCoach() {
+        resetVoiceLease()
         iPhoneAudioCoach.stop()
         iPhoneAudioCoachPreparedAt = nil
         iPhoneAudioCoachAttached = false
@@ -251,8 +361,8 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
                 ) <= 90 {
             iPhoneAudioCoachAttached =
                 true
-            iPhoneAudioCoach.handle(
-                initialSnapshot
+            offerVoiceLeaseIfNeeded(
+                for: initialSnapshot
             )
         } else {
             clearIPhoneAudioCoach()
@@ -276,6 +386,17 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         var latestSnapshot: WatchWorkoutLiveSnapshot?
 
         for data in incoming {
+            if let acknowledgement =
+                try? JSONDecoder().decode(
+                    ATHLTHAudioCoachLeaseAcknowledgement.self,
+                    from: data
+                ) {
+                receiveVoiceLeaseAcknowledgement(
+                    acknowledgement
+                )
+                continue
+            }
+
             if let decoded = try? JSONDecoder().decode(
                 WatchWorkoutLiveSnapshot.self,
                 from: data
@@ -287,8 +408,15 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         guard let latestSnapshot else { return }
 
         if iPhoneAudioCoachAttached {
-            iPhoneAudioCoach.handle(
-                latestSnapshot
+            if hasAcknowledgedVoiceLease {
+                iPhoneAudioCoach.handle(
+                    latestSnapshot
+                )
+            } else {
+                iPhoneAudioCoach.suspendForWatchFallback()
+            }
+            offerVoiceLeaseIfNeeded(
+                for: latestSnapshot
             )
         }
 
@@ -387,9 +515,10 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
             )
 
         if iPhoneAudioCoachAttached {
-            iPhoneAudioCoach.handle(
-                snapshot
-            )
+            if hasAcknowledgedVoiceLease {
+                iPhoneAudioCoach.handle(snapshot)
+            }
+            resetVoiceLease()
             iPhoneAudioCoachAttached =
                 false
             iPhoneAudioCoachPreparedAt =
@@ -503,9 +632,12 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
             self.snapshot = snapshot
 
             if self.iPhoneAudioCoachAttached {
-                self.iPhoneAudioCoach.handle(
-                    snapshot
-                )
+                if self.hasAcknowledgedVoiceLease {
+                    self.iPhoneAudioCoach.handle(
+                        snapshot
+                    )
+                }
+                self.offerVoiceLeaseIfNeeded(for: snapshot)
             }
 
             self.connectionText =
@@ -581,6 +713,7 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
             guard let self else { return }
 
             self.mirroredSession = nil
+            self.clearIPhoneAudioCoach()
             ATHLTHWatchWorkoutRuntime
                 .lastMirrorDetectedAt =
                 Date()
