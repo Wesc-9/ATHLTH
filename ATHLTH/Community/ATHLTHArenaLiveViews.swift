@@ -1099,6 +1099,82 @@ private struct ATHLTHArenaSeasonDetailView: View {
                     .accessibilityElement(children: .combine)
                 }
 
+                // Never infer finality from the device-visible subset of
+                // competitions. This server aggregate is Club-membership
+                // protected and contains no private result or GPS details.
+                if seasonPhase == .completed && !championsAreFinal {
+                    VStack(alignment: .leading, spacing: 11) {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Season result review",
+                                norwegian: "Resultatkontroll for sesongen"
+                            ),
+                            systemImage: "checkmark.shield"
+                        )
+                        .font(.headline)
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                        if let closeout {
+                            if closeout.linkedCompetitions == 0 {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "No competitions were linked to this season. No champion can be declared.",
+                                    norwegian: "Ingen konkurranser er knyttet til sesongen. Det kan derfor ikke kåres en sesongmester."
+                                ))
+                                .font(.subheadline)
+                            } else {
+                                HStack(spacing: 10) {
+                                    seasonReviewMetric(
+                                        count: closeout.incompleteCompetitions,
+                                        title: ATHLTHLocalization.choose(
+                                            english: "Not completed",
+                                            norwegian: "Ikke fullført"
+                                        ),
+                                        symbol: "timer"
+                                    )
+                                    seasonReviewMetric(
+                                        count: closeout.unresolvedCompetitions,
+                                        title: ATHLTHLocalization.choose(
+                                            english: "Unresolved",
+                                            norwegian: "Uavklart"
+                                        ),
+                                        symbol: "exclamationmark.circle"
+                                    )
+                                }
+
+                                Text(ATHLTHLocalization.choose(
+                                    english: "The season is over, but the result is provisional until all linked competitions finish and disputes are resolved. Only approved Arena points count.",
+                                    norwegian: "Sesongen er over, men resultatet er foreløpig til alle tilknyttede konkurranser er fullført og uenigheter er avklart. Bare godkjente Arena-poeng teller."
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                        } else {
+                            Text(ATHLTHLocalization.choose(
+                                english: "The server could not confirm the final result. Refresh before declaring a champion.",
+                                norwegian: "Serveren kunne ikke bekrefte sluttresultatet. Oppdater før en sesongmester kan kåres."
+                            ))
+                            .font(.subheadline)
+                        }
+
+                        Button {
+                            Task { await refresh() }
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Check results again",
+                                    norwegian: "Kontroller resultatene på nytt"
+                                ),
+                                systemImage: "arrow.clockwise"
+                            )
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(loading)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(15)
+                    .background(ATHLTHArenaLightStyle.card(20))
+                }
+
                 if standings.isEmpty && !loading {
                     Text(ATHLTHLocalization.choose(
                         english: "No approved Arena points yet. Add a Club competition and finish its rounds to start the table.",
@@ -1332,6 +1408,30 @@ private struct ATHLTHArenaSeasonDetailView: View {
                 norwegian: "Selve konkurransen og alle økter beholdes. En påbegynt konkurranse kan ikke fjernes."
             ))
         }
+    }
+
+    private func seasonReviewMetric(
+        count: Int,
+        title: String,
+        symbol: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Image(systemName: symbol)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+            Text("\(max(0, count))")
+                .font(.title2.weight(.bold).monospacedDigit())
+                .foregroundStyle(ATHLTHTheme.primaryText)
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(ATHLTHTheme.vitalitySoft.opacity(0.42),
+                    in: RoundedRectangle(cornerRadius: 13))
+        .accessibilityElement(children: .combine)
     }
 
     @MainActor
