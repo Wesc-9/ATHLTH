@@ -503,7 +503,7 @@ struct ATHLTHArenaScoringSection: View {
         template: ATHLTHArenaRoundTemplate
     ) -> String {
         switch template {
-        case .fastest5K, .fastest1K, .fastestDistance:
+        case .fastest5K, .fastest1K, .fastestDistance, .fastestRoute:
             let seconds = Int(value.rounded())
             return String(format: "%d:%02d", seconds / 60, seconds % 60)
         case .mostDistance:
@@ -512,7 +512,7 @@ struct ATHLTHArenaScoringSection: View {
             return "\(Int(value)) " + ATHLTHLocalization.choose(
                 english: "workouts", norwegian: "økter"
             )
-        case .mostRepetitions, .fastestRoute, .custom:
+        case .mostRepetitions, .custom:
             return ""
         }
     }
