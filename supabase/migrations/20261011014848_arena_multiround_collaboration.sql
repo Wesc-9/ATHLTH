@@ -131,22 +131,27 @@ grant update(response) on public.arena_series_members to authenticated;
 grant select, insert, delete on public.arena_round_proposals to authenticated;
 grant select, insert on public.arena_round_approvals to authenticated;
 
+drop policy if exists arena_series_read on public.arena_series;
 create policy arena_series_read on public.arena_series
 for select to authenticated using (private.arena_can_access(id));
 
+drop policy if exists arena_series_insert on public.arena_series;
 create policy arena_series_insert on public.arena_series
 for insert to authenticated
 with check (owner_id = (select auth.uid()) and status = 'draft');
 
+drop policy if exists arena_series_delete on public.arena_series;
 create policy arena_series_delete on public.arena_series
 for delete to authenticated using (
   owner_id = (select auth.uid()) and status = 'draft'
 );
 
+drop policy if exists arena_members_read on public.arena_series_members;
 create policy arena_members_read on public.arena_series_members
 for select to authenticated
 using (private.arena_can_access(series_id));
 
+drop policy if exists arena_members_invite on public.arena_series_members;
 create policy arena_members_invite on public.arena_series_members
 for insert to authenticated with check (
   response = 'invited'
@@ -158,14 +163,17 @@ for insert to authenticated with check (
   )
 );
 
+drop policy if exists arena_members_respond on public.arena_series_members;
 create policy arena_members_respond on public.arena_series_members
 for update to authenticated
 using (user_id = (select auth.uid()) and response = 'invited')
 with check (user_id = (select auth.uid()) and response in ('accepted','declined'));
 
+drop policy if exists arena_rounds_read on public.arena_round_proposals;
 create policy arena_rounds_read on public.arena_round_proposals
 for select to authenticated using (private.arena_can_access(series_id));
 
+drop policy if exists arena_rounds_propose on public.arena_round_proposals;
 create policy arena_rounds_propose on public.arena_round_proposals
 for insert to authenticated with check (
   proposed_by = (select auth.uid())
@@ -178,6 +186,7 @@ for insert to authenticated with check (
   )
 );
 
+drop policy if exists arena_rounds_remove_unvoted on public.arena_round_proposals;
 create policy arena_rounds_remove_unvoted on public.arena_round_proposals
 for delete to authenticated using (
   proposed_by = (select auth.uid())
@@ -186,6 +195,7 @@ for delete to authenticated using (
   )
 );
 
+drop policy if exists arena_approvals_read on public.arena_round_approvals;
 create policy arena_approvals_read on public.arena_round_approvals
 for select to authenticated using (
   exists (
@@ -194,6 +204,7 @@ for select to authenticated using (
   )
 );
 
+drop policy if exists arena_approvals_vote on public.arena_round_approvals;
 create policy arena_approvals_vote on public.arena_round_approvals
 for insert to authenticated with check (
   user_id = (select auth.uid())
