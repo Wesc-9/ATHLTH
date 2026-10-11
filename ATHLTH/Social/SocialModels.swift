@@ -1110,6 +1110,15 @@ struct BackendChallengeCheckIn: Codable, Hashable {
 }
 
 
+// The legacy session status stays compatible with previously installed
+// versions. workout_phase is the authoritative recording lifecycle.
+enum SocialWorkoutExecutionPhase: String, Codable, Hashable {
+    case planned
+    case active
+    case completed
+    case cancelled
+}
+
 enum SocialWorkoutSessionStatus: String, Codable, Hashable {
     case active
     case completed
@@ -1247,6 +1256,20 @@ struct SocialWorkoutSessionRecord: Identifiable, Codable, Hashable {
     var updatedAt: Date?
     var invitePayload: SocialWorkoutInvitePayload? = nil
     var coordinatedStartAt: Date? = nil
+    var workoutPhase: SocialWorkoutExecutionPhase? = nil
+
+    /// A ready participant or a scheduled countdown is not a started
+    /// workout. The server moves this to active when recording begins.
+    var resolvedWorkoutPhase: SocialWorkoutExecutionPhase {
+        if let workoutPhase { return workoutPhase }
+        switch status {
+        case .completed: return .completed
+        case .cancelled: return .cancelled
+        case .active:
+            // Fallback for servers that have not deployed the new column.
+            return coordinatedStartAt == nil ? .planned : .active
+        }
+    }
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -1261,6 +1284,7 @@ struct SocialWorkoutSessionRecord: Identifiable, Codable, Hashable {
         case updatedAt = "updated_at"
         case invitePayload = "invite_payload"
         case coordinatedStartAt = "coordinated_start_at"
+        case workoutPhase = "workout_phase"
     }
 }
 
