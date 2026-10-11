@@ -50,15 +50,21 @@ Audio Coach skal være integrert i alle støttede økter fra planlegging til opp
 - [x] Enhetstester: duplicate, eventtyper, manglende/ugyldig nøkkel, gammelt tidsstempel, minnegrense og reset.
 - [ ] Bekreftet godkjent iOS+Watch-bygg og automatisk testkjøring på den samlede grenen.
 
-**2B: Leveringssikkerhet og flere kategorier**
+**2B: Leveringssikkerhet og flere kategorier — DELLEVERANSE IMPLEMENTERT, VERIFISERING GJENSTÅR**
 
-- [ ] Ekte felles prioritetskø, sammenslåing og utløp for alle talte Ghost-/rute-/styrke-/målsonehendelser.
-- [ ] Kvittering for event-ID på tvers av iPhone/Watch, med korrekt at-most-once-forsøk ved overlevering.
-- [ ] Tydelige regler for haptikk/voice-kombinasjon og lokalisering av alle treningsmeldinger.
-- [ ] Regelstyrt, offline og uten nettanrop på live-kritisk bane.
-- [ ] Kontroll av sensorers alder og kvalitet før målsone- og tempoanbefalinger.
-- [ ] Minimal hendelsesdiagnostikk uten identifiserende eller følsomme treningsopplysninger.
-- [ ] Fysisk test av AirPods/Spotify, bakgrunn, pause/fortsett og iPhone-til-/frakobling.
+- [x] Felles, tidsbegrenset `ATHLTHCoachCueQueue`: maks 6 ventende meldinger, viktigste først, eldste ved lik prioritet, erstatt tidligere status av samme type.
+- [x] Rutinemeldinger legges ikke i kø; viktige steg-, Ghost-, mål- og rutevarsler kan vente kort når stemmen er opptatt.
+- [x] Koblet til Audio Coach på iPhone, speilet iPhone og Apple Watch; ventende melding leses først når pågående tale faktisk er avsluttet.
+- [x] Styrkens talemotor bruker samme prinsipp i stedet for alltid å avbryte tale; hvilemeldinger kategoriseres særskilt med kortere utløp.
+- [x] Enhetstester for prioriteringsrekkefølge, FIFO, coalescing, dubletter, utløp, begrenset kø og reset.
+- [ ] Fullført grønn iOS + watchOS-bygg og kjøring av testene mot siste samlede commit.
+- [ ] Kvittering for event-ID **på tvers av enhetene**, for å redusere overleveringsduplikater ytterligere.
+- [ ] Tydelige regler for haptikk/voice-kombinasjon og lokalisering av samtlige meldinger.
+- [ ] Kontroll av sensorers alder og kvalitet før pulssone-, GPS- og tempoanbefalinger.
+- [ ] Event-telemetri uten identifiserende eller følsomme treningsopplysninger.
+- [ ] Fysisk test av AirPods/Spotify, bakgrunn, pause/fortsett, live Ghost og iPhone-til-/frakobling.
+
+**Merknad:** Implementert prioritetskø er *lokal og best-effort*. Den gir ikke garantert lydlevering, bekrefter ikke fysisk lydutgang og eliminerer ennå ikke samtlige dobbelte varsler på tvers av iPhone og Watch.
 
 **Avgrensning:** 2A gir *lokal* duplikatkontroll for utvalgte typer, ikke global exactly-once-garanti på tvers av enheter. Markører inneholder kun type og intervall-/steg-ID, ikke selve talemeldingen eller brukerens helsehistorikk.
 
