@@ -485,6 +485,51 @@ enum ATHLTHArenaRelayGPSMatch {
     }
 }
 
+/// A Live Ghost race may be linked to a round without having covered the
+/// agreed distance. Never prefill a scoring proposal for an unrelated course.
+/// This is a conservative compatibility check, NOT GPS route verification.
+enum ATHLTHArenaLiveRoundCompatibility {
+    static func permitsPrefilledResult(
+        template: ATHLTHArenaRoundTemplate,
+        targetDistanceMeters: Double?,
+        routeDistanceKilometers: Double?,
+        sharedCourseDistanceMeters: Double,
+        sourceKind: String?
+    ) -> Bool {
+        let requiredMeters: Double
+        switch template {
+        case .fastest1K:
+            requiredMeters = 1_000
+        case .fastest5K:
+            requiredMeters = 5_000
+        case .fastestDistance:
+            guard let targetDistanceMeters else { return false }
+            requiredMeters = targetDistanceMeters
+        case .fastestRoute:
+            // A previously recorded run with the same length need not follow
+            // the agreed route. Keep those attempts on the manual review path.
+            guard sourceKind == "planned_route",
+                  let routeDistanceKilometers else { return false }
+            requiredMeters = routeDistanceKilometers * 1_000
+        default:
+            return false
+        }
+
+        guard requiredMeters.isFinite,
+              sharedCourseDistanceMeters.isFinite,
+              (100...500_000).contains(requiredMeters),
+              sharedCourseDistanceMeters > 0 else {
+            return false
+        }
+
+        // The actual *shared race course* must match the agreed round.
+        // Privacy-trimmed Ghost routes are shorter than the original course;
+        // never silently count a shortened 4.5 km race as a 5 km result.
+        let tolerance = max(20, requiredMeters * 0.02)
+        return abs(sharedCourseDistanceMeters - requiredMeters) <= tolerance
+    }
+}
+
 enum ATHLTHArenaSuggestedRanking {
     /// A suggested pace target only, never a verified result or a replay of
     /// someone else's private GPS trace. Based on an explicitly shared round
