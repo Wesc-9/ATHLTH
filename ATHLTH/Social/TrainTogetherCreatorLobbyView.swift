@@ -2,10 +2,14 @@ import SwiftUI
 
 struct TrainTogetherCreatorLobbyView: View {
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @StateObject private var companion = SocialWorkoutCompanionStore()
 
     let sessionID: UUID
     @State private var isStarting = false
+    @State private var isMarkingReady = false
+    @State private var selectedCaptureDevice: WorkoutCaptureDevice = .iPhone
+    @State private var didLoadCaptureDevice = false
     @State private var startError: String?
 
     private var hasStarted: Bool {
@@ -36,17 +40,31 @@ struct TrainTogetherCreatorLobbyView: View {
         }
     }
 
-    private var acceptedGuests:
-        [SocialWorkoutParticipantRecord] {
+    private var creatorParticipant: SocialWorkoutParticipantRecord? {
+        participants.first { $0.userID == social.currentUserID }
+    }
+
+    private var creatorReady: Bool {
+        creatorParticipant?.isReady == true
+    }
+
+    private var invitedGuests: [SocialWorkoutParticipantRecord] {
         participants.filter {
             $0.userID != social.currentUserID &&
-            $0.state == .accepted
+            $0.state != .declined
         }
     }
 
-    private var allAcceptedGuestsReady: Bool {
-        !acceptedGuests.isEmpty &&
-        acceptedGuests.allSatisfy(\.isReady)
+    private var everyoneReady: Bool {
+        creatorReady &&
+        !invitedGuests.isEmpty &&
+        invitedGuests.allSatisfy {
+            $0.state == .accepted && $0.isReady
+        }
+    }
+
+    private var watchSelectable: Bool {
+        ATHLTHDeviceRole.isIPad || watchConnection.isReady
     }
 
     var body: some View {
@@ -96,6 +114,12 @@ struct TrainTogetherCreatorLobbyView: View {
             .interactiveDismissDisabled()
         }
         .task(id: sessionID) {
+            if !didLoadCaptureDevice {
+                selectedCaptureDevice = social.proposedCreatorCaptureDevice(
+                    for: sessionID
+                )
+                didLoadCaptureDevice = true
+            }
             var cycle = 0
             while !Task.isCancelled,
                   social.coordinatedLobbySessionID == sessionID {
@@ -285,8 +309,10 @@ struct TrainTogetherCreatorLobbyView: View {
                         ATHLTHLocalization.format(
                             english: "%d of %d ready",
                             norwegian: "%d av %d klare",
-                            participants.filter(\.isReady).count,
-                            participants.count
+                            participants.filter {
+                                $0.state != .declined && $0.isReady
+                            }.count,
+                            participants.filter { $0.state != .declined }.count
                         )
                     )
                     .font(
@@ -515,21 +541,21 @@ struct TrainTogetherCreatorLobbyView: View {
         ATHLTHCard {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 10) {
-                    Image(systemName: allAcceptedGuestsReady
+                    Image(systemName: everyoneReady
                           ? "checkmark.circle.fill" : "clock")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(allAcceptedGuestsReady
+                        .foregroundStyle(everyoneReady
                             ? ATHLTHTheme.vitality
                             : ATHLTHTheme.premiumGold)
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(ATHLTHLocalization.choose(
-                            english: allAcceptedGuestsReady
-                                ? "Your group is ready"
-                                : "Waiting for your friend",
-                            norwegian: allAcceptedGuestsReady
-                                ? "Dere er klare"
-                                : "Venter på vennen din"
+                            english: everyoneReady
+                                ? "Everyone ready · host can start"
+                                : "Waiting for everyone to be ready",
+                            norwegian: everyoneReady
+                                ? "Alle klare · eier kan starte"
+                                : "Venter på at alle skal bli klare"
                         ))
                         .font(.subheadline.weight(.semibold))
 
@@ -541,6 +567,76 @@ struct TrainTogetherCreatorLobbyView: View {
                         .foregroundStyle(ATHLTHTheme.mutedText)
                     }
                     Spacer(minLength: 0)
+                }
+
+                if !creatorReady {
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Your recording device",
+                            norwegian: "Din opptaksenhet"
+                        ))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                        Picker(
+                            ATHLTHLocalization.choose(
+                                english: "Recording device",
+                                norwegian: "Opptaksenhet"
+                            ),
+                            selection: $selectedCaptureDevice
+                        ) {
+                            Text("iPhone").tag(WorkoutCaptureDevice.iPhone)
+                            if watchSelectable {
+                                Text("Apple Watch").tag(WorkoutCaptureDevice.appleWatch)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                    }
+
+                    Button {
+                        guard !isMarkingReady else { return }
+                        isMarkingReady = true
+                        startError = nil
+                        Task {
+                            let ready = await social.markCurrentUserReady(
+                                sessionID: sessionID,
+                                captureDevice: selectedCaptureDevice
+                            )
+                            if !ready {
+                                startError = social.errorMessage ??
+                                    ATHLTHLocalization.choose(
+                                        english: "Could not mark you ready.",
+                                        norwegian: "Kunne ikke markere deg som klar."
+                                    )
+                            }
+                            isMarkingReady = false
+                        }
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "I'm ready",
+                                norwegian: "Klar"
+                            ),
+                            systemImage: "checkmark.circle"
+                        )
+                        .font(.headline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.vitality)
+                    .disabled(isMarkingReady || isStarting)
+                } else {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "You are ready",
+                            norwegian: "Du er klar"
+                        ),
+                        systemImage: "checkmark.circle.fill"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.vitality)
                 }
 
                 Button {
@@ -577,8 +673,8 @@ struct TrainTogetherCreatorLobbyView: View {
                 .tint(ATHLTHTheme.vitality)
                 .disabled(
                     isStarting ||
-                    !allAcceptedGuestsReady ||
-                    session?.invitePayload?.resolvedStartIndependently == true
+                    !everyoneReady ||
+                    session?.invitePayload?.startIndependently == true
                 )
 
                 Button {
@@ -586,6 +682,19 @@ struct TrainTogetherCreatorLobbyView: View {
                     isStarting = true
                     startError = nil
                     Task {
+                        let isReady = creatorReady || await social.markCurrentUserReady(
+                            sessionID: sessionID,
+                            captureDevice: selectedCaptureDevice
+                        )
+                        guard isReady else {
+                            startError = social.errorMessage ??
+                                ATHLTHLocalization.choose(
+                                    english: "Could not mark you ready.",
+                                    norwegian: "Kunne ikke markere deg som klar."
+                                )
+                            isStarting = false
+                            return
+                        }
                         let started = await social.enableIndependentWorkoutStart(
                             sessionID: sessionID
                         )
