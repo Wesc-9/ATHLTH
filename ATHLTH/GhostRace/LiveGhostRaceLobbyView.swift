@@ -10,6 +10,7 @@ private struct LiveGhostStartTrigger: Equatable {
 
 struct LiveGhostRaceLobbyView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var settings: AppSettingsStore
@@ -71,6 +72,8 @@ struct LiveGhostRaceLobbyView: View {
                 if case .finished =
                     liveRace.phase() {
                     resultCard
+                } else if ownParticipant?.finishedAt != nil {
+                    pendingFinishCard
                 }
 
                 if let message =
@@ -115,6 +118,21 @@ struct LiveGhostRaceLobbyView: View {
             opponentReady: opponentParticipant?.ready == true
         )) {
             await waitForSynchronizedStart()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task {
+                await liveRace.refresh(challengeID: challenge.id)
+                await waitForSynchronizedStart()
+            }
+        }
+        .onChange(of: liveRace.room?.status) { _, status in
+            guard status == .finished || status == .cancelled,
+                  realtime.currentSession?.ghostChallengeID == challenge.id
+            else { return }
+            // Stop sharing this user's live position when the duel settles.
+            // Local HealthKit workouts are left untouched.
+            Task { await realtime.setCurrentLiveLocationSharing(false) }
         }
         .onDisappear {
             liveRace.close()
@@ -817,6 +835,44 @@ struct LiveGhostRaceLobbyView: View {
         }
     }
 
+    private var pendingFinishCard: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Your finish has been recorded",
+                        norwegian: "Din sluttid er registrert"
+                    ),
+                    systemImage: "checkmark.circle.fill"
+                )
+                .font(.headline)
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                HStack {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Your reported time",
+                        norwegian: "Din oppgitte tid"
+                    ))
+                    .font(.subheadline)
+                    Spacer()
+                    Text(resultTime(ownParticipant?.elapsedSeconds))
+                        .font(.headline.monospacedDigit())
+                }
+                Text(opponentParticipant?.finishedAt == nil
+                    ? ATHLTHLocalization.choose(
+                        english: "Waiting for the other athlete. No winner is declared until both finishes are recorded.",
+                        norwegian: "Venter på motstanderen. Ingen vinner blir kåret før begge sluttider er registrert."
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Both athletes have reported a finish. Waiting for the shared result to be finalized.",
+                        norwegian: "Begge har rapportert målgang. Venter på at fellesresultatet blir ferdigstilt."
+                    ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+        }
+    }
+
     private var deviceCanStart: Bool {
         switch captureDevice {
         case .iPhone:
@@ -864,6 +920,7 @@ struct LiveGhostRaceLobbyView: View {
         async {
         guard
             !ATHLTHDeviceRole.isIPad,
+            scenePhase == .active,
             !didLaunch,
             ownParticipant?.ready ==
                 true,
@@ -896,6 +953,7 @@ struct LiveGhostRaceLobbyView: View {
 
         guard
             !Task.isCancelled,
+            scenePhase == .active,
             !didLaunch,
             ownParticipant?.ready == true,
             liveRace.participant(userID: opponentID)?.ready == true,
