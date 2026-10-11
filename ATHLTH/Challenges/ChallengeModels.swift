@@ -312,6 +312,12 @@ struct ChallengeMeetup: Codable, Hashable {
     var checkInRadiusMeters: Double
 }
 
+/// A private Train Together intent, not a discoverable marketplace post.
+enum ChallengeTrainTogetherMode: String, Codable, Hashable {
+    case physical
+    case sameWorkout
+}
+
 struct ATHLTHChallengeRules: Codable, Hashable {
     var scoring: ATHLTHChallengeScoring
     var verificationPolicy: ChallengeVerificationPolicy
@@ -363,6 +369,15 @@ struct ATHLTHChallengeRules: Codable, Hashable {
     var lockRulesAtStart: Bool
 
     var meetup: ChallengeMeetup?
+    // nil means no Train Together request. Historical meetups are physical.
+    var trainTogetherModeRaw: String? = nil
+
+    var trainTogetherMode: ChallengeTrainTogetherMode? {
+        if let trainTogetherModeRaw {
+            return ChallengeTrainTogetherMode(rawValue: trainTogetherModeRaw)
+        }
+        return meetup != nil ? .physical : nil
+    }
 
     var targetGhostAllowed: Bool {
         allowTargetGhost ?? true

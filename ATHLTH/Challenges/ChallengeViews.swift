@@ -696,7 +696,9 @@ struct ChallengeCreationView: View {
             _invitees = State(initialValue: challenge.participants.filter {
                 $0.state != .creator
             })
-            _meetupEnabled = State(initialValue: r.meetup != nil)
+            _meetupEnabled = State(initialValue: r.trainTogetherMode != nil)
+            _sameWorkoutMode = State(initialValue:
+                r.trainTogetherMode == .sameWorkout)
             _meetupPlaceName = State(initialValue: r.meetup?.placeName ?? "")
             _meetupAt = State(initialValue: r.meetup?.scheduledAt ?? r.startsAt)
             if let meetup = r.meetup {
@@ -768,6 +770,7 @@ struct ChallengeCreationView: View {
     @State private var invitees: [ChallengeParticipant] = []
 
     @State private var meetupEnabled = false
+    @State private var sameWorkoutMode = false
     @State private var meetupPlaceName = ""
     @State private var meetupPlaceAddress = ""
     @State private var meetupAt = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
@@ -2269,6 +2272,25 @@ struct ChallengeCreationView: View {
                     alignment: .leading,
                     spacing: 12
                 ) {
+                    Picker(
+                        ATHLTHLocalization.choose(
+                            english: "Train Together mode",
+                            norwegian: "Hvordan vil dere trene?"
+                        ),
+                        selection: $sameWorkoutMode
+                    ) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Train in person",
+                            norwegian: "Trene fysisk sammen"
+                        )).tag(false)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Do the same workout",
+                            norwegian: "Trene samme økt"
+                        )).tag(true)
+                    }
+                    .pickerStyle(.segmented)
+
+                    if !sameWorkoutMode {
                     meetupPlaceSearch
 
                     DatePicker(
@@ -2391,9 +2413,15 @@ struct ChallengeCreationView: View {
                         )
                     )
                     .font(.caption)
-                    .foregroundStyle(
-                        .secondary
-                    )
+                    .foregroundStyle(.secondary)
+                    } else {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Complete the same workout independently. Only invited participants can see this agreement.",
+                            norwegian: "Gjennomfør samme økt hver for dere. Bare inviterte deltakere ser avtalen."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
                 }
                 .padding(.top, 12)
             } label: {
@@ -4038,7 +4066,7 @@ struct ChallengeCreationView: View {
             return false
         }
 
-        if meetupEnabled &&
+        if meetupEnabled && !sameWorkoutMode &&
             meetupCoordinate == nil {
             return false
         }
@@ -6525,7 +6553,8 @@ struct ChallengeCreationView: View {
 
         case 3:
             if hasEnd && endsAt <= startsAt { return false }
-            if meetupEnabled && meetupCoordinate == nil { return false }
+            if meetupEnabled && !sameWorkoutMode &&
+                meetupCoordinate == nil { return false }
             return true
 
         default:
@@ -6756,7 +6785,8 @@ struct ChallengeCreationView: View {
             : nil
 
         let meetup: ChallengeMeetup?
-        if meetupEnabled, let meetupCoordinate {
+        if meetupEnabled && !sameWorkoutMode,
+           let meetupCoordinate {
             meetup = ChallengeMeetup(
                 placeName: meetupPlaceName.isEmpty
                     ? "Meetup point"
@@ -6863,6 +6893,11 @@ struct ChallengeCreationView: View {
                     ? selectedCoverArtworkName
                     : nil,
             coverImageURL: uploadedCoverURL,
+            trainTogetherModeRaw: meetupEnabled
+                ? (sameWorkoutMode
+                    ? ChallengeTrainTogetherMode.sameWorkout.rawValue
+                    : ChallengeTrainTogetherMode.physical.rawValue)
+                : nil,
             startsAt: startsAt,
             endsAt: hasEnd ? endsAt : nil,
             allowMultipleAttempts: allowMultipleAttempts,
