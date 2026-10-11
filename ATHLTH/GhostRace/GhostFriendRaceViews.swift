@@ -360,7 +360,10 @@ struct GhostFriendRaceHubView: View {
             .foregroundStyle(ATHLTHTheme.vitality)
 
             Text(
-                "A friend receives only the sampled route and timing needed to replay the ghost. Heart rate, calories, HealthKit identifiers and the original workout are never shared."
+                ATHLTHLocalization.choose(
+                    english: "Only a reduced route and timing reference are shared. For previous runs this comes from the chosen GPS workout; for planned routes it is generated from your selected course. Heart rate, calories and HealthKit identifiers are not shared.",
+                    norwegian: "Bare en forenklet rute og tidsreferanse deles. For tidligere økter brukes den valgte GPS-økten; for planlagte ruter lages en beregnet mål-Ghost. Puls, kalorier og HealthKit-ID-er deles ikke."
+                )
             )
             .font(.subheadline)
             .foregroundStyle(.secondary)
@@ -417,6 +420,21 @@ struct GhostFriendRaceHubView: View {
                     Text(challenge.title)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                    Label(
+                        challenge.sourceKind == "planned_route"
+                            ? ATHLTHLocalization.choose(
+                                english: "Planned route · synchronized duel",
+                                norwegian: "Planlagt rute · synkronisert duell"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Previous GPS run · synchronized duel",
+                                norwegian: "Tidligere GPS-økt · synkronisert duell"
+                            ),
+                        systemImage: challenge.sourceKind == "planned_route"
+                            ? "map.fill" : "figure.run"
+                    )
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
                 }
 
                 Spacer()
@@ -544,6 +562,18 @@ struct GhostFriendRaceHubView: View {
                     Text(challenge.title)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Text(challenge.sourceKind == "planned_route"
+                        ? ATHLTHLocalization.choose(
+                            english: "Planned course · live start",
+                            norwegian: "Planlagt rute · felles start"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Previous GPS run · live start",
+                            norwegian: "Tidligere GPS-økt · felles start"
+                        )
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
                 }
 
                 Spacer()
