@@ -586,6 +586,65 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
         XCTAssertEqual(summary.excluded, 1)
     }
 
+    private func roundResult(
+        roundID: UUID,
+        status: String
+    ) -> ATHLTHArenaRoundResult {
+        ATHLTHArenaRoundResult(
+            id: UUID(),
+            seriesID: UUID(),
+            roundID: roundID,
+            proposedBy: UUID(),
+            rankedSlots: [UUID()],
+            evidenceNote: "Participant-reviewed",
+            status: status,
+            createdAt: initialDate
+        )
+    }
+
+    func testRoundProgressCountsOnlyApprovedAndPendingUniqueRounds() {
+        let first = UUID(), second = UUID(), third = UUID(), fourth = UUID()
+        let progress = ATHLTHArenaRoundProgress.summarize(
+            roundIDs: [first, second, third, fourth, first],
+            results: [
+                roundResult(roundID: first, status: "rejected"),
+                roundResult(roundID: first, status: "approved"),
+                roundResult(roundID: first, status: "approved"),
+                roundResult(roundID: second, status: "pending"),
+                roundResult(roundID: third, status: "expired"),
+                roundResult(roundID: UUID(), status: "approved")
+            ]
+        )
+        XCTAssertEqual(progress.total, 4)
+        XCTAssertEqual(progress.approved, 1)
+        XCTAssertEqual(progress.pending, 1)
+        XCTAssertEqual(progress.unresolved, 2)
+        XCTAssertEqual(progress.approvedFraction, 0.25, accuracy: 0.0001)
+    }
+
+    func testApprovedRoundOverridesOldPendingResult() {
+        let round = UUID()
+        let progress = ATHLTHArenaRoundProgress.summarize(
+            roundIDs: [round],
+            results: [
+                roundResult(roundID: round, status: "pending"),
+                roundResult(roundID: round, status: "approved")
+            ]
+        )
+        XCTAssertEqual(progress.approved, 1)
+        XCTAssertEqual(progress.pending, 0)
+    }
+
+    func testEmptyRoundProgressNeverDividesByZero() {
+        let progress = ATHLTHArenaRoundProgress.summarize(
+            roundIDs: [],
+            results: [roundResult(roundID: UUID(), status: "approved")]
+        )
+        XCTAssertEqual(progress.total, 0)
+        XCTAssertEqual(progress.unresolved, 0)
+        XCTAssertEqual(progress.approvedFraction, 0)
+    }
+
     func testCustomRoundsDoNotInferUnsupportedResults() {
         let standings = ATHLTHArenaSuggestedRanking.standings(
             template: .custom,
