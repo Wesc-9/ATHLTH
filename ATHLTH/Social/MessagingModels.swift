@@ -132,6 +132,30 @@ struct PlannedWorkoutInviteResponse: Codable, Hashable {
     let decision: PlannedWorkoutInviteDecision
 }
 
+/// Proposed challenge edits travel privately as version-2 challenge attachments.
+/// The original challenge is not mutated until its creator approves.
+struct ChallengeChangeProposal: Codable, Hashable, Identifiable {
+    let id: UUID
+    let challengerID: UUID
+    let original: ATHLTHChallenge
+    let proposed: ATHLTHChallenge
+    let submittedAt: Date
+
+    var challengeID: UUID { original.id }
+    var hasChanges: Bool {
+        original.title != proposed.title ||
+        original.sport != proposed.sport ||
+        original.rules != proposed.rules ||
+        original.participants != proposed.participants
+    }
+}
+
+struct ChallengeChangeProposalResponse: Codable, Hashable {
+    let proposalID: UUID
+    let challengeID: UUID
+    let accepted: Bool
+}
+
 struct MessageShareDraft: Hashable {
     let kind: MessageShareKind
     let title: String
