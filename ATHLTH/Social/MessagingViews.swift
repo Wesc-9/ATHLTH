@@ -3091,6 +3091,8 @@ struct DirectMessageThreadView: View {
     @State private var requestResponseError: String?
     @State private var respondingToPlannedInviteID: UUID?
     @State private var plannedInviteError: String?
+    @State private var respondingToChallengeID: UUID?
+    @State private var challengeDetailsDestination: ThreadChallengeDetailsDestination?
 
     var body: some View {
         ZStack {
@@ -3222,6 +3224,18 @@ struct DirectMessageThreadView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(plannedInviteError ?? "")
+        }
+        .sheet(item: $challengeDetailsDestination) { destination in
+            NavigationStack {
+                ChallengeDetailView(challengeID: destination.id)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(ATHLTHLocalization.choose(
+                                english: "Done", norwegian: "Ferdig"
+                            )) { challengeDetailsDestination = nil }
+                        }
+                    }
+            }
         }
         .task(id: friend.userID) {
             await openAndPoll()
@@ -3440,160 +3454,14 @@ struct DirectMessageThreadView: View {
             messaging.messages(
                 in: conversationID
             )
-        let challenges =
-            pendingChallengesFromFriend
-        let outgoingChallenges =
-            outgoingChallengesToFriend
-        let lifecycleEvents =
-            challengeLifecycleEventsWithFriend
+        let lifecycleEvents = challengeLifecycleEventsWithFriend
+        let standaloneInvites = challengeInvitationsWithoutMessages(messages)
 
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 10) {
-                    if !challenges.isEmpty {
-                        HStack {
-                            Text(
-                                ATHLTHLocalization
-                                    .choose(
-                                        english:
-                                            "REQUESTS",
-                                        norwegian:
-                                            "FORESPØRSLER"
-                                    )
-                            )
-                            .font(
-                                .caption2
-                                    .weight(.bold)
-                            )
-                            .tracking(1.5)
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .mutedText
-                            )
-
-                            Text(
-                                "\(challenges.count)"
-                            )
-                            .font(
-                                .caption2
-                                    .weight(.bold)
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .accentDeep
-                            )
-                            .padding(
-                                .horizontal,
-                                7
-                            )
-                            .padding(
-                                .vertical,
-                                3
-                            )
-                            .background(
-                                ATHLTHTheme
-                                    .accentSoft,
-                                in: Capsule()
-                            )
-
-                            Spacer()
-                        }
-                        .padding(
-                            .top,
-                            4
-                        )
-
-                        ForEach(
-                            challenges
-                        ) { challenge in
-                            ThreadChallengeRequestCard(
-                                challenge:
-                                    challenge,
-                                onAccept: {
-                                    respondToThreadChallenge(
-                                        challenge,
-                                        accept:
-                                            true
-                                    )
-                                },
-                                onDecline: {
-                                    respondToThreadChallenge(
-                                        challenge,
-                                        accept:
-                                            false
-                                    )
-                                }
-                            )
-                        }
-                    }
-
-                    if !outgoingChallenges.isEmpty {
-                        HStack {
-                            Text(
-                                ATHLTHLocalization
-                                    .choose(
-                                        english:
-                                            "SENT",
-                                        norwegian:
-                                            "SENDT"
-                                    )
-                            )
-                            .font(
-                                .caption2
-                                    .weight(.bold)
-                            )
-                            .tracking(1.5)
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .mutedText
-                            )
-
-                            Text(
-                                "\(outgoingChallenges.count)"
-                            )
-                            .font(
-                                .caption2
-                                    .weight(.bold)
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .accentDeep
-                            )
-                            .padding(
-                                .horizontal,
-                                7
-                            )
-                            .padding(
-                                .vertical,
-                                3
-                            )
-                            .background(
-                                ATHLTHTheme
-                                    .accentSoft,
-                                in: Capsule()
-                            )
-
-                            Spacer()
-                        }
-
-                        ForEach(
-                            outgoingChallenges
-                        ) { challenge in
-                            ThreadOutgoingChallengeCard(
-                                challenge:
-                                    challenge,
-                                onCancel: {
-                                    withdrawThreadChallenge(
-                                        challenge
-                                    )
-                                }
-                            )
-                        }
-                    }
-
                     if messages.isEmpty &&
-                        challenges.isEmpty &&
-                        outgoingChallenges.isEmpty &&
+                        standaloneInvites.isEmpty &&
                         lifecycleEvents.isEmpty {
                         ContentUnavailableView(
                             ATHLTHLocalization
@@ -3624,8 +3492,8 @@ struct DirectMessageThreadView: View {
                     ForEach(
                         threadTimelineItems(
                             messages: messages,
-                            lifecycleEvents:
-                                lifecycleEvents
+                            lifecycleEvents: lifecycleEvents,
+                            challengeInvitations: standaloneInvites
                         )
                     ) { item in
                         switch item {
@@ -3647,10 +3515,36 @@ struct DirectMessageThreadView: View {
                                 respondingToInvite: respondingToPlannedInviteID == message.id,
                                 onRespondToInvite: { accept in
                                     respondToPlannedInvite(message, accept: accept)
+                                },
+                                respondingToChallenge: respondingToChallengeID ==
+                                    message.sourceObjectID,
+                                onRespondToChallenge: { challenge, accept in
+                                    respondToThreadChallenge(challenge, accept: accept)
+                                },
+                                onOpenChallenge: { id in
+                                    openChallengeDetails(id)
                                 }
                             )
                             .id(item.id)
 
+                        case .challengeInvite(let challenge, let invitedAt):
+                            ThreadChallengeTimelineRow(
+                                challenge: challenge,
+                                friend: friend,
+                                currentUserID: session.profile.userID,
+                                invitedAt: invitedAt,
+                                responding: respondingToChallengeID == challenge.id,
+                                onAccept: {
+                                    respondToThreadChallenge(challenge, accept: true)
+                                },
+                                onDecline: {
+                                    respondToThreadChallenge(challenge, accept: false)
+                                },
+                                onDetails: {
+                                    openChallengeDetails(challenge.id)
+                                }
+                            )
+                            .id(item.id)
                         case .challengeEvent(let event):
                             NavigationLink {
                                 ChallengeDetailView(
@@ -3693,8 +3587,7 @@ struct DirectMessageThreadView: View {
             .task {
                 if let last =
                         messages.last,
-                   challenges.isEmpty &&
-                   outgoingChallenges.isEmpty {
+                   standaloneInvites.isEmpty {
                     proxy.scrollTo(
                         last.id,
                         anchor:
@@ -3920,27 +3813,53 @@ struct DirectMessageThreadView: View {
         }
     }
 
+    private func challengeInvitationsWithoutMessages(
+        _ messages: [DirectMessageRecord]
+    ) -> [(challenge: ATHLTHChallenge, invitedAt: Date)] {
+        let referenced = Set(messages.compactMap { message -> UUID? in
+            guard message.attachmentKind == .challenge else { return nil }
+            return message.sourceObjectID ??
+                message.decodeSnapshot(ATHLTHChallenge.self)?.id
+        })
+        return challengeStore.visibleChallenges.compactMap { challenge in
+            guard !referenced.contains(challenge.id),
+                  challenge.creatorID == friend.userID ||
+                  challenge.creatorID == session.profile.userID
+            else { return nil }
+
+            let userID = challenge.creatorID == friend.userID
+                ? session.profile.userID : friend.userID
+            guard let participant = challenge.participants.first(where: {
+                $0.userID == userID && $0.state != .creator
+            }) else { return nil }
+            return (challenge: challenge, invitedAt: participant.invitedAt)
+        }
+    }
+
+    private func openChallengeDetails(_ id: UUID) {
+        guard challengeStore.challenge(id: id) != nil else {
+            plannedInviteError = ATHLTHLocalization.choose(
+                english: "This challenge is no longer available.",
+                norwegian: "Denne utfordringen er ikke lenger tilgjengelig."
+            )
+            return
+        }
+        challengeDetailsDestination = ThreadChallengeDetailsDestination(id: id)
+    }
+
     private func threadTimelineItems(
         messages: [DirectMessageRecord],
-        lifecycleEvents: [ThreadChallengeLifecycleEvent]
+        lifecycleEvents: [ThreadChallengeLifecycleEvent],
+        challengeInvitations: [(challenge: ATHLTHChallenge, invitedAt: Date)]
     ) -> [ThreadTimelineItem] {
         (
-            messages.map {
-                ThreadTimelineItem.message(
-                    $0
-                )
-            } +
-            lifecycleEvents.map {
-                ThreadTimelineItem
-                    .challengeEvent(
-                        $0
-                    )
+            messages.map { ThreadTimelineItem.message($0) } +
+            lifecycleEvents.map { ThreadTimelineItem.challengeEvent($0) } +
+            challengeInvitations.map {
+                ThreadTimelineItem.challengeInvite($0.challenge, $0.invitedAt)
             }
         )
-        .sorted {
-            $0.createdAt <
-                $1.createdAt
-        }
+        .sorted { $0.createdAt < $1.createdAt }
     }
 
     private var currentConversation: DirectConversationRecord? {
@@ -5139,7 +5058,10 @@ struct DirectMessageThreadView: View {
             }
 
         case .challenge:
-            savedFeedback = "Challenges stay linked to the original challenge. Open Challenges to accept or view it."
+            if let challengeID = message.sourceObjectID ??
+                message.decodeSnapshot(ATHLTHChallenge.self)?.id {
+                openChallengeDetails(challengeID)
+            }
 
         case .none:
             break
@@ -5147,10 +5069,13 @@ struct DirectMessageThreadView: View {
     }
 }
 
+private struct ThreadChallengeDetailsDestination: Identifiable {
+    let id: UUID
+}
+
 private enum ThreadTimelineItem: Identifiable {
-    case message(
-        DirectMessageRecord
-    )
+    case message(DirectMessageRecord)
+    case challengeInvite(ATHLTHChallenge, Date)
     case challengeEvent(
         ThreadChallengeLifecycleEvent
     )
@@ -5158,8 +5083,9 @@ private enum ThreadTimelineItem: Identifiable {
     var id: String {
         switch self {
         case .message(let message):
-            return "message:" +
-                message.id.uuidString
+            return "message:" + message.id.uuidString
+        case .challengeInvite(let challenge, _):
+            return "challenge-invite:" + challenge.id.uuidString
         case .challengeEvent(let event):
             return "challenge-event:" +
                 event.id
@@ -5170,6 +5096,8 @@ private enum ThreadTimelineItem: Identifiable {
         switch self {
         case .message(let message):
             return message.createdAt
+        case .challengeInvite(_, let date):
+            return date
         case .challengeEvent(let event):
             return event.createdAt
         }
