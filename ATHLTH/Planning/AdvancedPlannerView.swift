@@ -4581,7 +4581,12 @@ struct SessionEditorView: View {
     let planID: UUID?
     let existingWorkout: PlannedSession?
     let isStandalone: Bool
+    /// When set, this editor prepares the same complete PlannedSession model
+    /// for Train Together without creating a separate calendar entry.
+    let onPreparedWorkout: ((PlannedSession) -> Void)?
+    let initialSourceWorkout: PlannedSession?
 
+    @State private var hasSelectedWorkoutSource = false
     @State private var title = ""
     @State private var kind: WorkoutKind = .strength
     @State private var durationMinutes = 0
@@ -4660,6 +4665,8 @@ struct SessionEditorView: View {
         self.planID = nil
         self.existingWorkout = nil
         self.isStandalone = false
+        self.onPreparedWorkout = nil
+        self.initialSourceWorkout = nil
     }
 
     init(
@@ -4670,15 +4677,21 @@ struct SessionEditorView: View {
         self.planID = planID
         self.existingWorkout = nil
         self.isStandalone = false
+        self.onPreparedWorkout = nil
+        self.initialSourceWorkout = nil
     }
 
     init(
-        standaloneDate: Date
+        standaloneDate: Date,
+        initialSourceWorkout: PlannedSession? = nil,
+        onPreparedWorkout: ((PlannedSession) -> Void)? = nil
     ) {
         self.dayID = nil
         self.planID = nil
         self.existingWorkout = nil
         self.isStandalone = true
+        self.onPreparedWorkout = onPreparedWorkout
+        self.initialSourceWorkout = initialSourceWorkout
 
         let calendar =
             Calendar.current
@@ -4728,6 +4741,9 @@ struct SessionEditorView: View {
         self.planID = planID
         self.existingWorkout = workout
         self.isStandalone = false
+        self.onPreparedWorkout = nil
+        self.initialSourceWorkout = nil
+        _hasSelectedWorkoutSource = State(initialValue: true)
 
         _title = State(initialValue: workout.title)
         _kind = State(initialValue: workout.kind)
@@ -4919,6 +4935,26 @@ struct SessionEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
+                if isStandalone && !hasSelectedWorkoutSource {
+                    Section {
+                        WorkoutPlanningSourceCard(
+                            context: ATHLTHLocalization.choose(
+                                english: "The same workout builder is used for personal plans and Train Together.",
+                                norwegian: "Den samme øktmotoren brukes for egen planlegging og Train Together."
+                            ),
+                            onCreateNew: {
+                                hasSelectedWorkoutSource = true
+                                title = ""
+                            },
+                            onUsePlanned: {
+                                showingSavedWorkoutPicker = true
+                            }
+                        )
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 14, leading: 14,
+                                              bottom: 14, trailing: 14))
+                } else {
                 Section {
                     workoutBuilderOverview
                 }
@@ -5240,6 +5276,7 @@ struct SessionEditorView: View {
                         .foregroundStyle(.secondary)
                     }
                 }
+                } // shared workout-source selection
             }
             .scrollContentBackground(.hidden)
             .background(
@@ -5296,7 +5333,7 @@ struct SessionEditorView: View {
                     ) {
                         saveSession()
                     }
-                    .disabled(!canAdd || isSaving)
+                    .disabled(!hasSelectedWorkoutSource || !canAdd || isSaving)
                 }
             }
             .alert(
@@ -5330,6 +5367,7 @@ struct SessionEditorView: View {
                     if existingWorkout == nil {
                         title = ""
                     }
+                    hasSelectedWorkoutSource = true
                     showingSavedWorkoutPicker = false
                 }
             }
@@ -5390,7 +5428,20 @@ struct SessionEditorView: View {
                 )
             }
             .onAppear {
+                let existingDraft = UserDefaults.standard.data(
+                    forKey: draftStorageKey
+                ) != nil
                 restoreDraftIfNeeded()
+                if isStandalone && existingWorkout == nil {
+                    if !existingDraft, let initialSourceWorkout {
+                        applySavedWorkout(initialSourceWorkout)
+                        title = ""
+                    }
+                    hasSelectedWorkoutSource = existingDraft ||
+                        initialSourceWorkout != nil
+                } else {
+                    hasSelectedWorkoutSource = true
+                }
                 if social.trainingPartners.isEmpty {
                     Task { await social.refresh() }
                 }
@@ -8477,6 +8528,12 @@ struct SessionEditorView: View {
     }
 
     private func commitSession(_ workout: PlannedSession) {
+        if let onPreparedWorkout {
+            onPreparedWorkout(workout)
+            finishDraft()
+            dismiss()
+            return
+        }
         if isStandalone {
             session
                 .addStandalonePlannedSession(
@@ -8511,7 +8568,9 @@ struct SessionEditorView: View {
 
     private var draftStorageKey: String {
         let context: String
-        if let workout = existingWorkout {
+        if onPreparedWorkout != nil {
+            context = "together.marketplace"
+        } else if let workout = existingWorkout {
             context = "edit.\(workout.id.uuidString)"
         } else if isStandalone {
             context = directPartnerID.map {
