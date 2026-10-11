@@ -57,6 +57,42 @@ enum ATHLTHArenaSuggestedRanking {
         }
     }
 
+    /// Safely preselect an outcome only when *every* competing slot has
+    /// shared evidence and no ranked/award boundary is tied. No points
+    /// are granted: the organizer must explicitly submit the proposal
+    /// and all active participants still vote.
+    static func eligibleSuggestion(
+        template: ATHLTHArenaRoundTemplate,
+        scoring: ATHLTHArenaScoring,
+        roundID: UUID,
+        requiredSlots: [UUID],
+        evidence: [ATHLTHArenaWorkoutEvidence]
+    ) -> [UUID]? {
+        guard requiredSlots.count >= 2 else { return nil }
+        let ranked = standings(
+            template: template,
+            roundID: roundID,
+            evidence: evidence
+        )
+        let required = Set(requiredSlots)
+        guard Set(ranked.map(\.slotID)) == required,
+              ranked.count == requiredSlots.count
+        else { return nil }
+
+        let awarded = scoring == .winner ? 1 : min(3, ranked.count)
+        guard awarded > 0 else { return nil }
+
+        // A tied award position is ambiguous, even if the tie spans the
+        // first excluded athlete. Never silently break ties using a UUID.
+        for index in 1..<ranked.count {
+            if abs(ranked[index].result - ranked[index - 1].result) < 0.001,
+               index <= awarded {
+                return nil
+            }
+        }
+        return Array(ranked.prefix(awarded).map(\.slotID))
+    }
+
     static func hasTieAtTop(
         _ standings: [ATHLTHArenaSuggestedStanding]
     ) -> Bool {
