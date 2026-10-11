@@ -4382,7 +4382,14 @@ struct ATHLTHArenaOnlineDetailView: View {
     @MainActor
     private func propose(_ round: ATHLTHArenaRoundDraft) async {
         guard !writing else { return }
-        guard currentSeries.status == "draft", rounds.count < 16 else {
+        guard currentSeries.status == "draft" else {
+            message = ATHLTHLocalization.choose(
+                english: "Rounds are locked after the competition starts.",
+                norwegian: "Rundene er låst etter at konkurransen har startet."
+            )
+            return
+        }
+        guard rounds.count < 16 else {
             message = ATHLTHArenaDraftIssue.tooManyRounds.message
             return
         }
