@@ -2749,6 +2749,21 @@ struct HomeHealthMetricDetailView:
 /// Pure calendar calculations shared by Home's week pager and tests.
 /// Plan weeks start on the configured plan start, not necessarily Monday.
 enum HomeWeeklyProgressCalendar {
+    /// Only use a plan ID when this exact workout belongs to that plan.
+    /// Standalone calendar workouts intentionally have no plan parent.
+    static func containingPlanID(
+        for workout: PlannedSession,
+        in plan: TrainingPlan?
+    ) -> UUID? {
+        guard let plan else { return nil }
+        let containsWorkout = plan.weeks.contains { week in
+            week.days.contains { day in
+                day.sessions.contains { $0.id == workout.id }
+            }
+        }
+        return containsWorkout ? plan.id : nil
+    }
+
     // The Home shortcut must never offer scheduling on a previous day.
     // Compare calendar days rather than clock times, so today is allowed all day.
     static func canScheduleStandalone(
@@ -4243,23 +4258,14 @@ private struct HomeWeeklyProgressDaySheet:
             .padding(.top, 4)
     }
 
-    /// Resolve the real parent plan. Calendar-only workouts have no plan,
-    /// so never invent a plan ID just to open a detail screen.
-    private func planID(for workout: PlannedSession) -> UUID? {
-        guard let plan else { return nil }
-        let belongsToPlan = plan.weeks.contains { week in
-            week.days.contains { day in
-                day.sessions.contains { $0.id == workout.id }
-            }
-        }
-        return belongsToPlan ? plan.id : nil
-    }
-
     @ViewBuilder
     private func plannedRow(
         _ workout: PlannedSession
     ) -> some View {
-        if let planID = planID(for: workout) {
+        if let planID = HomeWeeklyProgressCalendar.containingPlanID(
+            for: workout,
+            in: plan
+        ) {
             NavigationLink {
                 PlannedWorkoutDetailView(
                     planID: planID,
