@@ -3482,12 +3482,14 @@ final class IPhoneWorkoutStore:
             // Speech remains best-effort and must never stop the workout.
         }
 
-        let spokenPhrase = (configuration.speechStyle ?? .balanced).render(
-            phrase,
-            language: configuration.language,
-            priority: priority,
-            eventKind: event?.kind
-        )
+        let spokenPhrase = rememberForReplay
+            ? (configuration.speechStyle ?? .balanced).render(
+                phrase,
+                language: configuration.language,
+                priority: priority,
+                eventKind: event?.kind
+            )
+            : phrase
         let utterance =
             AVSpeechUtterance(
                 string: spokenPhrase
