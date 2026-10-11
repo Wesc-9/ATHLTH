@@ -5279,7 +5279,12 @@ struct ATHLTHTrainView: View {
                 .padding(.horizontal, 17)
                 .padding(.top, 18)
                 .padding(.bottom, 36)
-                .frame(maxWidth: 760)
+                // A vertical ScrollView may let scaled images or long
+                // labels propose a width wider than the device. Always
+                // measure against the scroll container, never its content.
+                .containerRelativeFrame(.horizontal) { availableWidth, _ in
+                    min(availableWidth, 760)
+                }
                 .frame(maxWidth: .infinity)
             }
             .scrollIndicators(.hidden)
