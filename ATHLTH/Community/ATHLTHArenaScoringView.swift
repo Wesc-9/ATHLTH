@@ -22,7 +22,7 @@ struct ATHLTHArenaScoringSection: View {
     let members: [ATHLTHArenaRemoteMember]
     let rounds: [ATHLTHArenaRemoteProposal]
     let isOrganizer: Bool
-    let liveOutcomeDraft: ATHLTHArenaLiveOutcomeDraft?
+    @Binding var liveOutcomeDraft: ATHLTHArenaLiveOutcomeDraft?
     let onChanged: () async -> Void
 
     @State private var results: [ATHLTHArenaRoundResult] = []
@@ -275,7 +275,9 @@ struct ATHLTHArenaScoringSection: View {
             // The editor still requires an explicit Submit and unanimous votes.
             roundToScore = round
         }
-        .sheet(item: $roundToScore) { round in
+        .sheet(item: $roundToScore, onDismiss: {
+            liveOutcomeDraft = nil
+        }) { round in
             ATHLTHArenaOutcomeEditor(
                 round: round,
                 series: series,
@@ -670,6 +672,7 @@ private struct ATHLTHArenaOutcomeEditor: View {
     let series: ATHLTHArenaRemoteSeries
     let members: [ATHLTHArenaRemoteMember]
     let suggestedSlots: [UUID]?
+    let hasLiveEvidence: Bool
     let onPropose: ([UUID], String) -> Void
 
     @State private var slots: [UUID?]
@@ -689,6 +692,7 @@ private struct ATHLTHArenaOutcomeEditor: View {
         self.series = series
         self.members = members
         self.suggestedSlots = suggestedSlots
+        self.hasLiveEvidence = initialEvidence != nil
         self.onPropose = onPropose
         let needed = series.scoring == .winner ? 1 : min(3, members.count)
         let suggestion = suggestedSlots ?? []
@@ -779,10 +783,15 @@ private struct ATHLTHArenaOutcomeEditor: View {
                 Section {
                     if suggestedSlots != nil {
                         Label(
-                            ATHLTHLocalization.choose(
-                                english: "Suggested from complete shared workout results. Review before submitting.",
-                                norwegian: "Foreslått fra komplette delte øktresultater. Kontroller plasseringene før du sender."
-                            ),
+                            hasLiveEvidence
+                                ? ATHLTHLocalization.choose(
+                                    english: "Prefilled from participant-reported Live Ghost times. Verify the result before submitting.",
+                                    norwegian: "Forhåndsutfylt fra deltakerrapporterte Live Ghost-tider. Kontroller resultatet før du sender."
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Suggested from complete shared workout results. Review before submitting.",
+                                    norwegian: "Foreslått fra komplette delte øktresultater. Kontroller plasseringene før du sender."
+                                ),
                             systemImage: "checkmark.shield"
                         )
                         .font(.caption)
