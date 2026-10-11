@@ -218,6 +218,17 @@ extension SupabaseSocialService {
             .execute()
     }
 
+    func enableIndependentWorkoutStart(
+        sessionID: UUID,
+        invitePayload: SocialWorkoutInvitePayload
+    ) async throws {
+        try await client
+            .from("social_workout_sessions")
+            .update(WorkoutSessionInvitePayloadWrite(invitePayload: invitePayload))
+            .eq("id", value: sessionID)
+            .execute()
+    }
+
     func respondToWorkoutInvite(
         participantID: UUID,
         state: SocialWorkoutParticipantState
@@ -561,6 +572,14 @@ private struct WorkoutParticipantLaunchFailedWrite: Encodable {
 
     enum CodingKeys: String, CodingKey {
         case launchFailedAt = "launch_failed_at"
+    }
+}
+
+private struct WorkoutSessionInvitePayloadWrite: Encodable {
+    let invitePayload: SocialWorkoutInvitePayload
+
+    enum CodingKeys: String, CodingKey {
+        case invitePayload = "invite_payload"
     }
 }
 
