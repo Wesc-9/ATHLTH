@@ -489,6 +489,94 @@ enum ATHLTHArenaRelayGPSMatch {
 /// agreed distance. Never prefill a scoring proposal for an unrelated course.
 /// This is a conservative compatibility check, NOT GPS route verification.
 enum ATHLTHArenaLiveRoundCompatibility {
+    /// A matching distance is not a matching route: a similarly long
+    /// unrelated course must never prefill an Arena result proposal.
+    ///
+    /// This is a conservative local geometry check for *suggestions*, not
+    /// independent verification of a completed GPS workout. A failed match
+    /// leaves the normal manual group-review flow available.
+    static func matchesFrozenRoute(
+        snapshot: ChallengeRouteSnapshot?,
+        sharedPoints: [GhostFriendRacePoint],
+        privacyTrimmed: Bool
+    ) -> Bool {
+        guard !privacyTrimmed,
+              let snapshot,
+              (2...1_500).contains(snapshot.coordinates.count),
+              (2...1_000).contains(sharedPoints.count),
+              snapshot.coordinates.allSatisfy({
+                  $0.latitude.isFinite && $0.longitude.isFinite &&
+                  (-90...90).contains($0.latitude) &&
+                  (-180...180).contains($0.longitude)
+              }),
+              sharedPoints.allSatisfy({
+                  $0.latitude.isFinite && $0.longitude.isFinite &&
+                  (-90...90).contains($0.latitude) &&
+                  (-180...180).contains($0.longitude)
+              }) else {
+            return false
+        }
+
+        let course = snapshot.coordinates
+        let trace = sharedPoints.sorted { $0.sequence < $1.sequence }
+        let metersPerDegreeLon =
+            max(0.01, abs(cos(course[0].latitude * .pi / 180))) * 111_000.0
+        let metersPerDegreeLat = 111_000.0
+
+        func separation(
+            _ lat1: Double, _ lon1: Double,
+            _ lat2: Double, _ lon2: Double
+        ) -> Double {
+            hypot((lat1 - lat2) * metersPerDegreeLat,
+                  (lon1 - lon2) * metersPerDegreeLon)
+        }
+
+        // A reversed, shortened or privacy-cropped run cannot silently
+        // qualify as a full run of the agreed route.
+        guard let first = trace.first, let last = trace.last,
+              separation(first.latitude, first.longitude,
+                         course[0].latitude, course[0].longitude) <= 60,
+              separation(last.latitude, last.longitude,
+                         course[course.count - 1].latitude,
+                         course[course.count - 1].longitude) <= 60 else {
+            return false
+        }
+
+        // Check up to 17 positions along the shared race against the actual
+        // frozen course *segments*, not merely the published distance.
+        let checks = min(17, trace.count)
+        for index in 0..<checks {
+            let position = index * (trace.count - 1) / max(1, checks - 1)
+            let point = trace[position]
+            var nearestSquared = Double.infinity
+
+            for segment in 1..<course.count {
+                let start = course[segment - 1]
+                let end = course[segment]
+                let ax = start.longitude * metersPerDegreeLon
+                let ay = start.latitude * metersPerDegreeLat
+                let bx = end.longitude * metersPerDegreeLon
+                let by = end.latitude * metersPerDegreeLat
+                let px = point.longitude * metersPerDegreeLon
+                let py = point.latitude * metersPerDegreeLat
+                let dx = bx - ax
+                let dy = by - ay
+                let segmentLengthSquared = dx * dx + dy * dy
+                let fraction = segmentLengthSquared > 0
+                    ? min(1, max(0, ((px - ax) * dx + (py - ay) * dy) /
+                                 segmentLengthSquared))
+                    : 0
+                let offsetX = px - (ax + fraction * dx)
+                let offsetY = py - (ay + fraction * dy)
+                nearestSquared = min(
+                    nearestSquared, offsetX * offsetX + offsetY * offsetY
+                )
+            }
+            guard nearestSquared <= 80 * 80 else { return false }
+        }
+        return true
+    }
+
     static func permitsPrefilledResult(
         template: ATHLTHArenaRoundTemplate,
         targetDistanceMeters: Double?,
