@@ -19,6 +19,13 @@ struct ATHLTHArenaLiveDuelCandidate: Equatable {
     let marginSeconds: TimeInterval
 }
 
+/// Compact live-race telemetry for the Arena recap. These are reported
+/// estimates, not GPS verification or a basis for awarding points.
+struct ATHLTHArenaLiveDuelHighlights: Equatable {
+    let peakLeadMeters: Double
+    let leadChanges: Int
+}
+
 enum ATHLTHArenaLiveDuelReview {
     /// Preselect ranks only when a completed live duel has a single winner.
     /// This NEVER awards points: every result still needs review and votes.
@@ -39,6 +46,24 @@ enum ATHLTHArenaLiveDuelReview {
         let first = winner == senderID ? senderSlotID : recipientSlotID
         let second = winner == senderID ? recipientSlotID : senderSlotID
         return scoring == .winner ? [first] : [first, second]
+    }
+
+    static func highlights(
+        senderPeakLeadMeters: Double,
+        recipientPeakLeadMeters: Double,
+        leadChangeCount: Int
+    ) -> ATHLTHArenaLiveDuelHighlights? {
+        guard senderPeakLeadMeters.isFinite,
+              recipientPeakLeadMeters.isFinite,
+              (0...100_000).contains(senderPeakLeadMeters),
+              (0...100_000).contains(recipientPeakLeadMeters),
+              (0...10_000).contains(leadChangeCount) else {
+            return nil
+        }
+        return ATHLTHArenaLiveDuelHighlights(
+            peakLeadMeters: max(senderPeakLeadMeters, recipientPeakLeadMeters),
+            leadChanges: leadChangeCount
+        )
     }
 
     static func candidate(
