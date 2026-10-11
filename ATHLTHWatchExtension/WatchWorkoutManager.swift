@@ -6644,6 +6644,18 @@ extension WatchWorkoutManager:
             guard let self else { return }
 
             for payload in data {
+                if let receipt = try? JSONDecoder().decode(
+                    ATHLTHCoachDeliveryReceipt.self,
+                    from: payload
+                ) {
+                    if receipt.isValid(for: self.startedAt) {
+                        self.coachEventLedger.noteCompanionDelivery(
+                            id: receipt.deliveryID
+                        )
+                    }
+                    continue
+                }
+
                 if let offer = try? JSONDecoder().decode(
                     ATHLTHAudioCoachLeaseOffer.self,
                     from: payload
