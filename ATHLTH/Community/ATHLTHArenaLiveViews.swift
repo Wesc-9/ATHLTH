@@ -198,6 +198,57 @@ struct ATHLTHArenaOnlineDetailView: View {
                 }
                 detailNavigator(scrollProxy)
 
+                if currentSeries.scope == .duel,
+                   currentSeries.status == "active",
+                   canParticipate,
+                   let opponentID = acceptedMembers
+                       .compactMap(\.userID)
+                       .first(where: { $0 != session.profile.userID }),
+                   social.mutualFollows.contains(where: { $0.userID == opponentID }) {
+                    NavigationLink {
+                        GhostFriendRaceHubView(preferredFriendID: opponentID)
+                    } label: {
+                        HStack(spacing: 11) {
+                            Image(systemName: "bolt.horizontal.circle.fill")
+                                .font(.title3)
+                                .frame(width: 40, height: 40)
+                                .background(.white.opacity(0.13), in: Circle())
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Start a synchronized live duel",
+                                    norwegian: "Start en synkronisert live-duell"
+                                ))
+                                .font(.subheadline.weight(.bold))
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Opponent selected. Invite using an earlier GPS run.",
+                                    norwegian: "Motstanderen er valgt. Inviter med en tidligere GPS-økt."
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(.white.opacity(0.84))
+                            }
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                        }
+                        .foregroundStyle(.white)
+                        .padding(14)
+                        .background(
+                            LinearGradient(
+                                colors: [ATHLTHTheme.accentDeep, ATHLTHTheme.vitality],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Live Ghost uses a separate invite and synchronized race lobby. A live result does not automatically award Arena series points.",
+                        norwegian: "Live Ghost bruker egen invitasjon og synkronisert race-lobby. Resultatet gir ikke automatisk poeng i Arena-serien."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
                         Text(ATHLTHLocalization.choose(
