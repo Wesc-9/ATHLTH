@@ -5,7 +5,12 @@ struct TrainTogetherCreatorLobbyView: View {
     @StateObject private var companion = SocialWorkoutCompanionStore()
 
     let sessionID: UUID
-    let onStartAnotherWorkout: () -> Void
+    @State private var isStarting = false
+    @State private var startError: String?
+
+    private var hasStarted: Bool {
+        participants.contains { $0.workoutStartedAt != nil }
+    }
 
     private var session: SocialWorkoutSessionRecord? {
         social.workoutSessions.first {
@@ -132,7 +137,10 @@ struct TrainTogetherCreatorLobbyView: View {
             ) {
                 HStack {
                     Label(
-                        "TRAIN TOGETHER",
+                        ATHLTHLocalization.choose(
+                            english: hasStarted ? "TRAIN TOGETHER" : "PLANNED · NOT STARTED",
+                            norwegian: hasStarted ? "TREN SAMMEN" : "PLANLAGT · IKKE STARTET"
+                        ),
                         systemImage:
                             "person.2.fill"
                     )
@@ -155,7 +163,7 @@ struct TrainTogetherCreatorLobbyView: View {
                     } label: {
                         Image(
                             systemName:
-                                "rectangle.compress.vertical"
+                                "xmark"
                         )
                         .font(
                             .system(
@@ -180,9 +188,9 @@ struct TrainTogetherCreatorLobbyView: View {
                     .accessibilityLabel(
                         ATHLTHLocalization.choose(
                             english:
-                                "Minimize Train Together",
+                                "Close lobby (keep invitation)",
                             norwegian:
-                                "Minimer Tren sammen"
+                                "Lukk lobby (behold invitasjonen)"
                         )
                     )
                 }
@@ -205,9 +213,9 @@ struct TrainTogetherCreatorLobbyView: View {
                 Text(
                     ATHLTHLocalization.choose(
                         english:
-                            "Everyone keeps their own workout. Start together when everyone is ready.",
+                            "The invitation is planned, not started. Wait for your friend or choose how to begin.",
                         norwegian:
-                            "Alle får sin egen økt. Start sammen når alle er klare."
+                            "Invitasjonen er planlagt, ikke startet. Vent på vennen din eller velg å starte."
                     )
                 )
                 .font(.subheadline)
@@ -505,177 +513,96 @@ struct TrainTogetherCreatorLobbyView: View {
 
     private var actionCard: some View {
         ATHLTHCard {
-            VStack(spacing: 11) {
-                HStack(spacing: 8) {
-                    Image(
-                        systemName:
-                            allAcceptedGuestsReady
-                                ? "checkmark.circle.fill"
-                                : "clock.fill"
-                    )
-                    .foregroundStyle(
-                        allAcceptedGuestsReady
-                            ? ATHLTHTheme
-                                .vitality
-                            : ATHLTHTheme
-                                .premiumGold
-                    )
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    Image(systemName: allAcceptedGuestsReady
+                          ? "checkmark.circle.fill" : "clock")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(allAcceptedGuestsReady
+                            ? ATHLTHTheme.vitality
+                            : ATHLTHTheme.premiumGold)
 
-                    Text(
-                        allAcceptedGuestsReady
-                            ? ATHLTHLocalization.choose(
-                                english:
-                                    "Everyone is ready",
-                                norwegian:
-                                    "Alle er klare"
-                            )
-                            : ATHLTHLocalization.choose(
-                                english:
-                                    "Waiting for the others",
-                                norwegian:
-                                    "Venter på de andre"
-                            )
-                    )
-                    .font(
-                        .subheadline
-                            .weight(.semibold)
-                    )
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: allAcceptedGuestsReady
+                                ? "Your group is ready"
+                                : "Waiting for your friend",
+                            norwegian: allAcceptedGuestsReady
+                                ? "Dere er klare"
+                                : "Venter på vennen din"
+                        ))
+                        .font(.subheadline.weight(.semibold))
 
-                    Spacer()
+                        Text(ATHLTHLocalization.choose(
+                            english: "Planned · not started",
+                            norwegian: "Planlagt · ikke startet"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    Spacer(minLength: 0)
                 }
 
                 Button {
+                    guard !isStarting else { return }
+                    isStarting = true
+                    startError = nil
                     Task {
-                        _ = await social
-                            .scheduleCoordinatedWorkoutStart(
-                                sessionID:
-                                    sessionID,
-                                countdownSeconds: 3
-                            )
+                        let started = await social.scheduleCoordinatedWorkoutStart(
+                            sessionID: sessionID,
+                            countdownSeconds: 3
+                        )
+                        if !started {
+                            startError = social.errorMessage ??
+                                ATHLTHLocalization.choose(
+                                    english: "Could not start the group workout.",
+                                    norwegian: "Kunne ikke starte fellesøkten."
+                                )
+                        }
+                        isStarting = false
                     }
                 } label: {
                     Label(
                         ATHLTHLocalization.choose(
-                            english:
-                                "Start together",
-                            norwegian:
-                                "Start sammen"
+                            english: "Start together",
+                            norwegian: "Start sammen"
                         ),
-                        systemImage:
-                            "person.3.sequence.fill"
+                        systemImage: "person.3.sequence.fill"
                     )
-                    .font(
-                        .headline.weight(
-                            .semibold
-                        )
-                    )
-                    .frame(
-                        maxWidth: .infinity
-                    )
+                    .font(.headline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
                     .frame(height: 52)
                 }
-                .buttonStyle(
-                    .borderedProminent
-                )
-                .tint(
-                    ATHLTHTheme.vitality
-                )
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.vitality)
                 .disabled(
+                    isStarting ||
                     !allAcceptedGuestsReady ||
                     session?.invitePayload?.resolvedStartIndependently == true
                 )
 
                 Button {
+                    guard !isStarting else { return }
+                    isStarting = true
+                    startError = nil
                     Task {
-                        _ = await social
-                            .scheduleCoordinatedWorkoutStart(
-                                sessionID:
-                                    sessionID,
-                                countdownSeconds: 3
-                            )
+                        let started = await social.enableIndependentWorkoutStart(
+                            sessionID: sessionID
+                        )
+                        if !started {
+                            startError = social.errorMessage ??
+                                ATHLTHLocalization.choose(
+                                    english: "Could not start the workout.",
+                                    norwegian: "Kunne ikke starte økten."
+                                )
+                        }
+                        isStarting = false
                     }
                 } label: {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Start now",
-                            norwegian:
-                                "Start nå"
-                        )
-                    )
-                    .font(
-                        .subheadline
-                            .weight(.semibold)
-                    )
-                    .frame(
-                        maxWidth: .infinity
-                    )
-                    .frame(height: 46)
-                }
-                .buttonStyle(.bordered)
-                .disabled(session?.invitePayload?.resolvedStartIndependently == true)
-
-                if session?.invitePayload != nil {
-                    Button {
-                        Task {
-                            _ = await social.enableIndependentWorkoutStart(
-                                sessionID: sessionID
-                            )
-                        }
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Start at your own pace",
-                                norwegian: "Start i eget tempo"
-                            ),
-                            systemImage: "person.2.wave.2"
-                        )
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 46)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(session?.invitePayload?.resolvedStartIndependently == true)
-
-                    if session?.invitePayload?.resolvedStartIndependently == true {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Individual start enabled. Each athlete starts when ready; your live progress remains shared.",
-                            norwegian: "Individuell start er aktiv. Hver deltaker starter når de er klare, men ser fortsatt hverandres fremdrift."
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.vitality)
-                    }
-                }
-
-                Text(
-                    allAcceptedGuestsReady
-                        ? ATHLTHLocalization.choose(
-                            english:
-                                "ATHLTH starts one synchronized countdown for everyone.",
-                            norwegian:
-                                "ATHLTH starter én synkronisert nedtelling for alle."
-                        )
-                        : ATHLTHLocalization.choose(
-                            english:
-                                "You can minimize this lobby while you wait. Late participants can still join.",
-                            norwegian:
-                                "Du kan minimere lobbyen mens du venter. De som er sene kan fortsatt bli med."
-                        )
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .mutedText
-                )
-                .multilineTextAlignment(
-                    .center
-                )
-
-                Button(action: onStartAnotherWorkout) {
                     Label(
                         ATHLTHLocalization.choose(
-                            english: "Start another workout",
-                            norwegian: "Start en annen økt"
+                            english: "Start alone",
+                            norwegian: "Start alene"
                         ),
                         systemImage: "figure.run"
                     )
@@ -684,38 +611,34 @@ struct TrainTogetherCreatorLobbyView: View {
                     .frame(height: 48)
                 }
                 .buttonStyle(.bordered)
-                .tint(ATHLTHTheme.accent)
+                .disabled(isStarting || session?.invitePayload == nil)
+
+                if let startError {
+                    Text(startError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
 
                 Text(ATHLTHLocalization.choose(
-                    english: "Your invitation stays sent. This workout has not started yet.",
-                    norwegian: "Invitasjonen blir liggende. Denne økten er ikke startet."
+                    english: "Nothing starts while you wait. Close the lobby whenever you want and train something else normally. This invitation stays planned.",
+                    norwegian: "Ingenting starter mens du venter. Du kan lukke lobbyen og trene noe annet som vanlig. Invitasjonen forblir planlagt."
                 ))
                 .font(.caption)
                 .foregroundStyle(ATHLTHTheme.mutedText)
-                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
 
                 Divider()
 
-                Button(
-                    role: .destructive
-                ) {
+                Button(role: .destructive) {
                     Task {
-                        await social
-                            .cancelActiveWorkout(sessionID: sessionID)
+                        await social.cancelActiveWorkout(sessionID: sessionID)
                     }
                 } label: {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Cancel shared workout",
-                            norwegian:
-                                "Avbryt fellesøkten"
-                        )
-                    )
-                    .font(
-                        .subheadline
-                            .weight(.semibold)
-                    )
+                    Text(ATHLTHLocalization.choose(
+                        english: "Cancel invitation",
+                        norwegian: "Avlys invitasjonen"
+                    ))
+                    .font(.subheadline.weight(.semibold))
                 }
             }
         }
