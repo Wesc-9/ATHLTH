@@ -687,9 +687,15 @@ final class MirroredWorkoutAudioCoach:
             // Spoken coaching must never interfere with workout capture.
         }
 
+        let spokenText = (configuration.speechStyle ?? .balanced).render(
+            text,
+            language: configuration.language,
+            priority: priority,
+            eventKind: event?.kind
+        )
         let utterance =
             AVSpeechUtterance(
-                string: text
+                string: spokenText
             )
 
         if let identifier =
@@ -730,7 +736,7 @@ final class MirroredWorkoutAudioCoach:
         )
         if rememberForReplay,
            ATHLTHCoachReplayMemory.mayRemember(priority: priority) {
-            coachReplayMemory.remember(text, priority: priority)
+            coachReplayMemory.remember(spokenText, priority: priority)
             onLastSpokenCoachMessage?(coachReplayMemory.text)
         }
         if let event,
