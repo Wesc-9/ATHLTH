@@ -51,6 +51,42 @@ jobs:
       - uses: actions/checkout@v4
       - name: Select Xcode 27
         run: sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
+      - name: Fast Swift syntax preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import sys
+
+          roots = [Path("ATHLTH"), Path("ATHLTHWatchApp"), Path("Shared")]
+          sources = sorted(
+              str(source)
+              for root in roots if root.is_dir()
+              for source in root.rglob("*.swift")
+          )
+          if not sources:
+              raise SystemExit("No Swift sources found for syntax preflight")
+
+          # Syntax-only: no signing, simulator build, linked frameworks,
+          # dependencies, or generated Xcode project needed.
+          result = subprocess.run(
+              ["xcrun", "swiftc", "-frontend", "-parse", *sources],
+              text=True,
+              stdout=subprocess.PIPE,
+              stderr=subprocess.STDOUT,
+              check=False,
+          )
+          if result.stdout:
+              print(result.stdout)
+          if result.returncode:
+              raise SystemExit(
+                  "Swift syntax preflight failed before Xcode build"
+              )
+          print(f"Swift syntax valid in {len(sources)} source files")
+          PY
+
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Regenerate and validate approved app icons
