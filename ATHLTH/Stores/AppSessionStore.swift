@@ -3210,6 +3210,71 @@ final class AppSessionStore: ObservableObject {
         persistAccountContent()
     }
 
+    /// Apply organizer-approved revisions to the calendar copies of guests.
+    /// Approval messages are the source of truth: proposals alone never mutate
+    /// a saved workout. Keep the recipient's device, gear and music private.
+    func syncApprovedSharedWorkouts(
+        from messages: [DirectMessageRecord]
+    ) {
+        guard !standalonePlannedSessions.isEmpty else { return }
+        let decisions = messages
+            .filter {
+                $0.attachmentKind == .workout &&
+                $0.shareVersion == 5 &&
+                $0.deletedAt == nil
+            }
+            .sorted { $0.createdAt > $1.createdAt }
+        var changed = false
+
+        for index in standalonePlannedSessions.indices {
+            let existing = standalonePlannedSessions[index]
+            guard let ownerID = existing.sharedSourceOwnerID,
+                  let sourceID = existing.sharedSourceSessionID
+            else { continue }
+
+            let revision = decisions
+                .filter {
+                    $0.senderID == ownerID &&
+                    $0.sourceOwnerID == ownerID &&
+                    $0.sourceObjectID == sourceID
+                }
+                .compactMap {
+                    $0.decodeSnapshot(WorkoutChangeDecision.self)
+                }
+                .first {
+                    $0.approved &&
+                    $0.workoutID == sourceID &&
+                    $0.approvedWorkout?.id == sourceID
+                }?
+                .approvedWorkout
+
+            guard var revision,
+                  revision.scheduledStart != nil
+            else { continue }
+
+            // The guest keeps their own capture/gear/music configuration.
+            revision.sharedSourceOwnerID = ownerID
+            revision.sharedSourceSessionID = sourceID
+            revision.invitedPartnerID = nil
+            revision.gearIDs = existing.gearIDs
+            revision.spotifyPlaylist = existing.spotifyPlaylist
+            revision.spotifyAutoplayOnStart = existing.spotifyAutoplayOnStart
+            guard revision != existing else { continue }
+
+            standalonePlannedSessions[index] = revision
+            PlannedWorkoutReminderScheduler.sync(revision)
+            changed = true
+        }
+
+        if changed {
+            standalonePlannedSessions.sort {
+                ($0.scheduledStart ?? .distantFuture) <
+                    ($1.scheduledStart ?? .distantFuture)
+            }
+            persistAccountContent()
+        }
+    }
+
     func updateStandalonePlannedSession(
         _ session: PlannedSession
     ) {
