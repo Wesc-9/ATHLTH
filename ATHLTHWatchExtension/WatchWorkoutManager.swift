@@ -728,7 +728,41 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
               isActive
         else { return }
 
-        let summary = metricsAnnouncement
+        let summary: String
+        if kind == .strength, let strengthSession {
+            var strengthParts: [String] = [
+                coachPhrase(
+                    english: "\(strengthSession.completedSets) of \(strengthSession.totalSets) sets completed.",
+                    norwegian: "\(strengthSession.completedSets) av \(strengthSession.totalSets) sett fullført."
+                )
+            ]
+            if let exerciseName = strengthSession.exerciseName,
+               !exerciseName.isEmpty {
+                strengthParts.append(
+                    coachPhrase(
+                        english: "Current exercise",
+                        norwegian: "Nåværende øvelse"
+                    ) + ": " + exerciseName
+                )
+            }
+            if let restEndsAt = strengthSession.restEndsAt {
+                let seconds = max(
+                    Int(restEndsAt.timeIntervalSinceNow.rounded()),
+                    0
+                )
+                if seconds > 0 {
+                    strengthParts.append(
+                        coachPhrase(
+                            english: "\(seconds) seconds of rest remaining.",
+                            norwegian: "\(seconds) sekunder igjen av hvilen."
+                        )
+                    )
+                }
+            }
+            summary = strengthParts.joined(separator: " ")
+        } else {
+            summary = metricsAnnouncement
+        }
         let spoken = summary.isEmpty
             ? coachPhrase(
                 english: "Workout is active.",
@@ -5685,8 +5719,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 // The mirror owner may have changed while the audio route
                 // was activating. Re-check ownership and any phone receipt
                 // before beginning the utterance or marking it delivered.
-                guard self.audioCoachConfiguration.enabled,
-                      !self.coachSpeechPaused,
+                guard ATHLTHCoachVoicePausePolicy.allowsSpeech(
+                          coachEnabled: self.audioCoachConfiguration.enabled,
+                          speechPaused: self.coachSpeechPaused,
+                          priority: priority
+                      ),
                       (forceLocal || self.shouldSpeakLocally(priority: priority)),
                       event.map({ self.coachEventLedger.canDeliver($0) }) ?? true
                 else {
