@@ -43,6 +43,7 @@ final class ATHLTHArenaWorkoutIdentityTests: XCTestCase {
             metricType: "distance_meters",
             metricValue: workout.distanceMeters ?? 0,
             reportedDistanceMeters: workout.distanceMeters,
+            reportedRouteMatchPercent: nil,
             verificationLevel: "participant_reported"
         )
     }
