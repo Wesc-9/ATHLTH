@@ -225,6 +225,14 @@ struct ATHLTHArenaOnlineDetailView: View {
                 )
                 .id(remoteRevision)
 
+                if currentSeries.status == "active" && canParticipate {
+                    ATHLTHArenaEvidenceSection(
+                        series: currentSeries,
+                        rounds: rounds
+                    )
+                    .id(remoteRevision)
+                }
+
                 ATHLTHArenaReplacementSection(
                     series: currentSeries,
                     members: members,
