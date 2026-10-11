@@ -21,6 +21,9 @@ final class SocialStore: ObservableObject {
     @Published private(set) var coordinatedLobbySessionID: UUID?
     @Published private(set) var isCoordinatedLobbyMinimized = false
     @Published private(set) var currentJoinedWorkoutSessionID: UUID?
+    /// The creator must tap Start alone, even for remote workouts.
+    /// This local intent is not the server-side participation mode.
+    private var creatorIndependentStartRequestedID: UUID?
     @Published private(set) var privacy: SocialPrivacySettings?
     @Published private(set) var workoutMedia: [WorkoutMediaRecord] = []
     @Published private(set) var isRefreshing = false
@@ -988,6 +991,7 @@ final class SocialStore: ObservableObject {
     func prepareForAnotherWorkout() {
         coordinatedLobbySessionID = nil
         isCoordinatedLobbyMinimized = false
+        creatorIndependentStartRequestedID = nil
 
         if let sessionID = currentJoinedWorkoutSessionID,
            !workoutParticipants.contains(where: {
@@ -1046,18 +1050,9 @@ final class SocialStore: ObservableObject {
                 try await refreshWorkoutLobby(sessionID: session.id)
             }
 
-            if invitePayload?
-                .resolvedParticipationMode ==
-                .remote {
-                // Remote social workouts share the workout and live status,
-                // but each athlete starts independently.
-                currentJoinedWorkoutSessionID =
-                    session.id
-                coordinatedLobbySessionID = nil
-                isCoordinatedLobbyMinimized = false
-                return true
-            }
-
+            // Both physical and remote invitations wait in the lobby.
+            // Neither mode starts its training engine before an explicit
+            // Start together / Start alone action by the creator.
             return await waitForCoordinatedWorkoutStart(
                 sessionID: session.id
             )
@@ -1158,7 +1153,8 @@ final class SocialStore: ObservableObject {
         sessionID: UUID,
         countdownSeconds: TimeInterval = 3
     ) async -> Bool {
-        guard activeWorkoutSession?.creatorID == currentUserID else {
+        guard workoutSessions.first(where: { $0.id == sessionID })?
+            .creatorID == currentUserID else {
             return false
         }
 
@@ -1202,13 +1198,20 @@ final class SocialStore: ObservableObject {
             return false
         }
 
-        payload.startIndependently = true
         do {
-            try await service.enableIndependentWorkoutStart(
-                sessionID: sessionID,
-                invitePayload: payload
-            )
-            try await refreshWorkoutLobby(sessionID: sessionID)
+            if !payload.resolvedStartIndependently {
+                payload.startIndependently = true
+                try await service.enableIndependentWorkoutStart(
+                    sessionID: sessionID,
+                    invitePayload: payload
+                )
+                try await refreshWorkoutLobby(sessionID: sessionID)
+            }
+
+            // Explicit tap, not 'ready' or invitation creation, starts
+            // the creator's recording. Invited athletes still start
+            // independently after tapping their own start control.
+            creatorIndependentStartRequestedID = sessionID
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -1281,9 +1284,12 @@ final class SocialStore: ObservableObject {
 
                 if session.invitePayload?
                     .resolvedStartIndependently == true,
-                   currentParticipant.readyAt != nil {
+                   currentParticipant.readyAt != nil,
+                   (session.creatorID != currentUserID ||
+                    creatorIndependentStartRequestedID == sessionID) {
                     currentJoinedWorkoutSessionID =
                         sessionID
+                    creatorIndependentStartRequestedID = nil
 
                     if coordinatedLobbySessionID ==
                         sessionID {
@@ -1448,6 +1454,9 @@ final class SocialStore: ObservableObject {
             if coordinatedLobbySessionID == target.id {
                 coordinatedLobbySessionID = nil
                 isCoordinatedLobbyMinimized = false
+            }
+            if creatorIndependentStartRequestedID == target.id {
+                creatorIndependentStartRequestedID = nil
             }
             if currentJoinedWorkoutSessionID == target.id {
                 currentJoinedWorkoutSessionID = nil
