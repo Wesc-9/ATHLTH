@@ -138,7 +138,24 @@ struct ATHLTHArenaOnlineDetailView: View {
     }
 
     private var acceptedMembers: [ATHLTHArenaRemoteMember] {
-        members.filter { $0.response == "accepted" }
+        members.filter { $0.response == "accepted" && $0.userID != nil }
+    }
+
+    private var isOrganizer: Bool {
+        if series.ownerID == session.profile.userID { return true }
+        guard series.ownerID == nil else { return false }
+        return acceptedMembers
+            .sorted {
+                if $0.createdAt != $1.createdAt {
+                    return $0.createdAt < $1.createdAt
+                }
+                return $0.slotID.uuidString < $1.slotID.uuidString
+            }
+            .first?.userID == session.profile.userID
+    }
+
+    private var isGroupSeries: Bool {
+        series.scope == .friends
     }
 
     var body: some View {
@@ -161,21 +178,75 @@ struct ATHLTHArenaOnlineDetailView: View {
                     }
 
                     ForEach(members) { member in
-                        HStack {
-                            Image(systemName: member.userID == series.ownerID
-                                  ? "crown.fill" : "person.crop.circle")
-                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                        HStack(spacing: 10) {
+                            Image(systemName: member.isDeleted
+                                  ? "person.crop.circle.badge.xmark"
+                                  : member.userID == series.ownerID
+                                      ? "crown.fill" : "person.crop.circle")
+                                .foregroundStyle(
+                                    member.isDeleted ? Color.gray : ATHLTHTheme.accentDeep
+                                )
                             Text(displayName(for: member.userID))
                                 .font(.subheadline)
+                                .foregroundStyle(
+                                    member.isDeleted ? Color.gray : ATHLTHTheme.primaryText
+                                )
                             Spacer()
-                            Text(responseTitle(member.response))
-                                .font(.caption)
-                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            VStack(alignment: .trailing, spacing: 3) {
+                                Text("\(member.points.formatted()) p")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(
+                                        member.isDeleted ? Color.gray : ATHLTHTheme.primaryText
+                                    )
+                                Text(responseTitle(member.response))
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
                         }
                         .padding(11)
                         .background(.regularMaterial,
                                     in: RoundedRectangle(cornerRadius: 14))
                     }
+                }
+
+                ATHLTHArenaReplacementSection(
+                    series: series,
+                    members: members,
+                    isOrganizer: isOrganizer,
+                    onChanged: { await refresh() }
+                )
+
+                if isGroupSeries && canParticipate {
+                    NavigationLink {
+                        ATHLTHArenaGroupChatView(series: series)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "bubble.left.and.bubble.right.fill")
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .font(.title3)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Competition group chat",
+                                    norwegian: "Konkurransens gruppechat"
+                                ))
+                                .font(.subheadline.weight(.semibold))
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Discuss proposals with the group",
+                                    norwegian: "Diskuter forslag med gruppen"
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .padding(16)
+                        .background(.regularMaterial,
+                                    in: RoundedRectangle(cornerRadius: 18))
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
@@ -334,7 +405,7 @@ struct ATHLTHArenaOnlineDetailView: View {
     }
 
     private func roundCard(_ round: ATHLTHArenaRemoteProposal) -> some View {
-        let acceptedIDs = Set(acceptedMembers.map(\.userID))
+        let acceptedIDs = Set(acceptedMembers.compactMap(\.userID))
         let approvedIDs = Set(
             approvals.filter { $0.roundID == round.id }.map(\.userID)
         )
@@ -396,12 +467,19 @@ struct ATHLTHArenaOnlineDetailView: View {
             return ATHLTHLocalization.choose(english: "Accepted", norwegian: "Godtatt")
         case "declined":
             return ATHLTHLocalization.choose(english: "Declined", norwegian: "Avslått")
+        case "deleted":
+            return ATHLTHLocalization.choose(english: "Deleted", norwegian: "Slettet")
         default:
             return ATHLTHLocalization.choose(english: "Invited", norwegian: "Invitert")
         }
     }
 
-    private func displayName(for userID: UUID) -> String {
+    private func displayName(for userID: UUID?) -> String {
+        guard let userID else {
+            return ATHLTHLocalization.choose(
+                english: "Deleted user", norwegian: "Slettet bruker"
+            )
+        }
         if userID == session.profile.userID {
             return ATHLTHLocalization.choose(english: "You", norwegian: "Du")
         }
