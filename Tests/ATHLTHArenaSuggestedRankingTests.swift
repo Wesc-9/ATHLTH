@@ -304,6 +304,34 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
         }
     }
 
+    func testArenaLiveDuelHighlightsUsePeakLeadAndCount() {
+        let telemetry = ATHLTHArenaLiveDuelReview.highlights(
+            senderPeakLeadMeters: 84.2,
+            recipientPeakLeadMeters: 131.5,
+            leadChangeCount: 4
+        )
+        XCTAssertEqual(telemetry?.peakLeadMeters, 131.5)
+        XCTAssertEqual(telemetry?.leadChanges, 4)
+    }
+
+    func testArenaLiveDuelHighlightsRejectInvalidTelemetry() {
+        XCTAssertNil(ATHLTHArenaLiveDuelReview.highlights(
+            senderPeakLeadMeters: .infinity,
+            recipientPeakLeadMeters: 10,
+            leadChangeCount: 2
+        ))
+        XCTAssertNil(ATHLTHArenaLiveDuelReview.highlights(
+            senderPeakLeadMeters: -2,
+            recipientPeakLeadMeters: 12,
+            leadChangeCount: 3
+        ))
+        XCTAssertNil(ATHLTHArenaLiveDuelReview.highlights(
+            senderPeakLeadMeters: 100,
+            recipientPeakLeadMeters: 80,
+            leadChangeCount: -1
+        ))
+    }
+
     func testCustomRoundsDoNotInferUnsupportedResults() {
         let standings = ATHLTHArenaSuggestedRanking.standings(
             template: .custom,
