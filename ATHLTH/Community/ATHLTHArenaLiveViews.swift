@@ -139,7 +139,10 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
 
     let series: ATHLTHArenaRemoteSeries
     let rounds: [ATHLTHArenaRemoteProposal]
+    let members: [ATHLTHArenaRemoteMember]
+    let isOrganizer: Bool
     let onReview: () -> Void
+    let onPropose: (ATHLTHArenaLiveOutcomeDraft) -> Void
 
     @State private var rooms: [LiveGhostRaceRoomRecord] = []
     @State private var participants: [LiveGhostRaceParticipantRecord] = []
@@ -292,17 +295,37 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
                             .font(.caption2)
                             .foregroundStyle(ATHLTHTheme.mutedText)
 
-                            Button(action: onReview) {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Go to result review",
-                                        norwegian: "Gå til resultatgodkjenning"
-                                    ),
-                                    systemImage: "checkmark.shield"
-                                )
+                            if isOrganizer,
+                               let review,
+                               let liveDraft = proposalDraft(
+                                   for: challenge, result: review
+                               ) {
+                                Button {
+                                    onPropose(liveDraft)
+                                } label: {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english: "Prepare result proposal",
+                                            norwegian: "Klargjør resultatforslag"
+                                        ),
+                                        systemImage: "square.and.pencil"
+                                    )
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(ATHLTHTheme.accentDeep)
+                            } else {
+                                Button(action: onReview) {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english: "Go to result review",
+                                            norwegian: "Gå til resultatgodkjenning"
+                                        ),
+                                        systemImage: "checkmark.shield"
+                                    )
+                                }
+                                .buttonStyle(.bordered)
+                                .tint(ATHLTHTheme.accentDeep)
                             }
-                            .buttonStyle(.bordered)
-                            .tint(ATHLTHTheme.accentDeep)
                         } else if challenge.expiresAt > Date() {
                             NavigationLink {
                                 LiveGhostRaceLobbyView(challenge: challenge)
@@ -341,6 +364,44 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
                 if phase == .active { Task { await refresh() } }
             }
         }
+    }
+
+    /// Convert only a consistent, completed 1v1 report into an editable
+    /// proposal. Missing/tied values must go through manual result review.
+    private func proposalDraft(
+        for challenge: GhostFriendRaceChallengeRecord,
+        result: ATHLTHArenaLiveDuelCandidate
+    ) -> ATHLTHArenaLiveOutcomeDraft? {
+        guard series.status == "active",
+              let roundID = challenge.arenaRoundID,
+              rounds.contains(where: { $0.id == roundID }),
+              let winnerID = result.winnerID,
+              winnerID == challenge.senderID || winnerID == challenge.recipientID,
+              let sender = members.first(where: {
+                  $0.userID == challenge.senderID && $0.response == "accepted"
+              }),
+              let recipient = members.first(where: {
+                  $0.userID == challenge.recipientID && $0.response == "accepted"
+              }),
+              sender.slotID != recipient.slotID else {
+            return nil
+        }
+
+        let winner = winnerID == challenge.senderID ? sender : recipient
+        let runnerUp = winnerID == challenge.senderID ? recipient : sender
+        let slots = series.scoring == .winner
+            ? [winner.slotID] : [winner.slotID, runnerUp.slotID]
+        let details = String(
+            format: "Live Ghost %@. Rapporterte tider: %.1f s / %.1f s. Deltakerdata, ikke uavhengig GPS-verifisert; krever godkjenning.",
+            challenge.id.uuidString,
+            result.senderSeconds,
+            result.recipientSeconds
+        )
+        return ATHLTHArenaLiveOutcomeDraft(
+            roundID: roundID,
+            rankedSlots: slots,
+            evidenceNote: details
+        )
     }
 
     private func userName(_ id: UUID) -> String {
@@ -406,6 +467,7 @@ struct ATHLTHArenaOnlineDetailView: View {
     @State private var showingRoundCreator = false
     @State private var latestSeries: ATHLTHArenaRemoteSeries?
     @State private var remoteRevision = UUID()
+    @State private var pendingLiveOutcome: ATHLTHArenaLiveOutcomeDraft?
     @State private var invitationToReplace: ATHLTHArenaRemoteMember?
     @State private var invitationToRemove: ATHLTHArenaRemoteMember?
     @State private var replacementChoices: [ATHLTHArenaClubAthlete] = []
@@ -606,6 +668,7 @@ struct ATHLTHArenaOnlineDetailView: View {
                     members: members,
                     rounds: rounds,
                     isOrganizer: isOrganizer,
+                    liveOutcomeDraft: pendingLiveOutcome,
                     onChanged: { await refresh() },
                     approvedRules: Dictionary(grouping: approvals, by: \.roundID)
                 )
@@ -615,7 +678,17 @@ struct ATHLTHArenaOnlineDetailView: View {
                     ATHLTHArenaLinkedLiveDuelsSection(
                         series: currentSeries,
                         rounds: rounds,
+                        members: members,
+                        isOrganizer: isOrganizer,
                         onReview: {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                scrollProxy.scrollTo(
+                                    "arena-standings", anchor: .top
+                                )
+                            }
+                        },
+                        onPropose: { proposal in
+                            pendingLiveOutcome = proposal
                             withAnimation(.easeInOut(duration: 0.25)) {
                                 scrollProxy.scrollTo(
                                     "arena-standings", anchor: .top
