@@ -456,6 +456,136 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
         ))
     }
 
+    private func rivalryChallenge(
+        id: UUID = UUID(),
+        roundID: UUID,
+        sender: UUID,
+        recipient: UUID,
+        status: GhostFriendRaceStatus = .accepted
+    ) -> GhostFriendRaceChallengeRecord {
+        GhostFriendRaceChallengeRecord(
+            id: id,
+            senderID: sender,
+            recipientID: recipient,
+            title: "Test duel",
+            referenceDurationSeconds: 1_600,
+            distanceMeters: 5_000,
+            routePoints: [],
+            privacyTrimmed: true,
+            sourceKind: "planned_route",
+            arenaRoundID: roundID,
+            status: status,
+            createdAt: initialDate,
+            respondedAt: initialDate,
+            expiresAt: initialDate.addingTimeInterval(86_400)
+        )
+    }
+
+    private func rivalryRoom(
+        challengeID: UUID,
+        winnerID: UUID?,
+        status: LiveGhostRaceRoomStatus = .finished
+    ) -> LiveGhostRaceRoomRecord {
+        LiveGhostRaceRoomRecord(
+            challengeID: challengeID,
+            status: status,
+            countdownStartedAt: initialDate,
+            startsAt: initialDate.addingTimeInterval(5),
+            finishedAt: initialDate.addingTimeInterval(1_600),
+            winnerID: winnerID,
+            senderMaxLeadMeters: 45,
+            recipientMaxLeadMeters: 20,
+            leadChangeCount: 2,
+            lastLeaderID: winnerID,
+            createdAt: initialDate,
+            updatedAt: initialDate.addingTimeInterval(1_600)
+        )
+    }
+
+    private func rivalryParticipant(
+        challengeID: UUID, userID: UUID, seconds: Double?
+    ) -> LiveGhostRaceParticipantRecord {
+        LiveGhostRaceParticipantRecord(
+            challengeID: challengeID,
+            userID: userID,
+            ready: true,
+            deviceType: "iphone",
+            joinedAt: initialDate,
+            readyAt: initialDate,
+            finishedAt: seconds == nil ? nil
+                : initialDate.addingTimeInterval(seconds!),
+            elapsedSeconds: seconds,
+            updatedAt: initialDate.addingTimeInterval(1_800)
+        )
+    }
+
+    func testRivalryCountsOnlyFinishedValidLinkedResults() {
+        let me = UUID(), opponent = UUID(), stranger = UUID()
+        let won = UUID(), lost = UUID(), tied = UUID(), unverified = UUID()
+        let otherRound = UUID(), other = UUID(), racing = UUID()
+        let races = [
+            rivalryChallenge(id: won, roundID: roundID, sender: me, recipient: opponent),
+            rivalryChallenge(id: lost, roundID: roundID, sender: me, recipient: opponent),
+            rivalryChallenge(id: tied, roundID: roundID, sender: me, recipient: opponent),
+            rivalryChallenge(id: unverified, roundID: roundID, sender: me, recipient: opponent),
+            rivalryChallenge(id: other, roundID: otherRound, sender: me, recipient: opponent),
+            rivalryChallenge(id: racing, roundID: roundID, sender: stranger, recipient: opponent)
+        ]
+        let rooms = [
+            rivalryRoom(challengeID: won, winnerID: me),
+            rivalryRoom(challengeID: lost, winnerID: opponent),
+            rivalryRoom(challengeID: tied, winnerID: nil),
+            rivalryRoom(challengeID: unverified, winnerID: me),
+            rivalryRoom(challengeID: other, winnerID: me),
+            rivalryRoom(challengeID: racing, winnerID: stranger)
+        ]
+        let times: [LiveGhostRaceParticipantRecord] = [
+            rivalryParticipant(challengeID: won, userID: me, seconds: 1_400),
+            rivalryParticipant(challengeID: won, userID: opponent, seconds: 1_600),
+            rivalryParticipant(challengeID: lost, userID: me, seconds: 1_700),
+            rivalryParticipant(challengeID: lost, userID: opponent, seconds: 1_500),
+            rivalryParticipant(challengeID: tied, userID: me, seconds: 1_600),
+            rivalryParticipant(challengeID: tied, userID: opponent, seconds: 1_600.2),
+            rivalryParticipant(challengeID: unverified, userID: me, seconds: 1_300),
+            rivalryParticipant(challengeID: unverified, userID: opponent, seconds: nil),
+            rivalryParticipant(challengeID: other, userID: me, seconds: 1_400),
+            rivalryParticipant(challengeID: other, userID: opponent, seconds: 1_600),
+            rivalryParticipant(challengeID: racing, userID: stranger, seconds: 1_400),
+            rivalryParticipant(challengeID: racing, userID: opponent, seconds: 1_600)
+        ]
+        let record = ATHLTHArenaRivalrySummary.calculate(
+            challenges: races + [races[0]],
+            rooms: rooms,
+            participants: times,
+            eligibleRoundIDs: [roundID],
+            currentUserID: me
+        )
+        XCTAssertEqual(record.wins, 1)
+        XCTAssertEqual(record.losses, 1)
+        XCTAssertEqual(record.ties, 1)
+        XCTAssertEqual(record.excluded, 1)
+        XCTAssertEqual(record.finishedCount, 3)
+    }
+
+    func testRivalryExcludesFinishedRaceWithMismatchedServerWinner() {
+        let me = UUID(), opponent = UUID(), challengeID = UUID()
+        let summary = ATHLTHArenaRivalrySummary.calculate(
+            challenges: [
+                rivalryChallenge(id: challengeID, roundID: roundID,
+                                 sender: me, recipient: opponent)
+            ],
+            rooms: [rivalryRoom(challengeID: challengeID, winnerID: opponent)],
+            participants: [
+                rivalryParticipant(challengeID: challengeID, userID: me, seconds: 1_300),
+                rivalryParticipant(challengeID: challengeID, userID: opponent, seconds: 1_500)
+            ],
+            eligibleRoundIDs: [roundID],
+            currentUserID: me
+        )
+        XCTAssertEqual(summary.finishedCount, 0)
+        XCTAssertEqual(summary.excluded, 1)
+    }
+
     func testCustomRoundsDoNotInferUnsupportedResults() {
         let standings = ATHLTHArenaSuggestedRanking.standings(
             template: .custom,
