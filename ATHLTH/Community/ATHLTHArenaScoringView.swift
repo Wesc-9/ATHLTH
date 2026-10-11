@@ -578,6 +578,8 @@ private struct ATHLTHArenaOutcomeEditor: View {
 
     @State private var slots: [UUID?]
     @State private var evidence = ""
+    @State private var exerciseName = ""
+    @State private var repetitionValues: [String]
 
     init(
         round: ATHLTHArenaRemoteProposal,
@@ -597,6 +599,7 @@ private struct ATHLTHArenaOutcomeEditor: View {
             index < suggestion.count ? suggestion[index] : nil
         }
         _slots = State(initialValue: initial)
+        _repetitionValues = State(initialValue: Array(repeating: "", count: needed))
     }
 
     private func memberLabel(_ member: ATHLTHArenaRemoteMember) -> String {
@@ -635,12 +638,38 @@ private struct ATHLTHArenaOutcomeEditor: View {
         }
     }
 
+    private func repetitionsField(at index: Int) -> some View {
+        let value = Binding<String>(
+            get: { repetitionValues[index] },
+            set: { repetitionValues[index] = $0 }
+        )
+        return TextField(
+            "\(index + 1). " + ATHLTHLocalization.choose(
+                english: "place: repetitions", norwegian: "plass: repetisjoner"
+            ),
+            text: value
+        )
+        .keyboardType(.numberPad)
+    }
+
+    private var submittedEvidence: String? {
+        if round.template == .mostRepetitions {
+            return ATHLTHArenaRepetitionResult.explanation(
+                exercise: exerciseName,
+                repetitions: repetitionValues,
+                optionalNote: evidence
+            )
+        }
+        let trimmed = evidence.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty || trimmed.count > 600 ? nil : trimmed
+    }
+
     private var valid: Bool {
         let selected = slots.compactMap { $0 }
         return slots.count == (series.scoring == .winner ? 1 : min(3, members.count)) &&
             selected.count == slots.count &&
             Set(selected).count == slots.count &&
-            !evidence.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            submittedEvidence != nil
     }
 
     var body: some View {
@@ -674,10 +703,36 @@ private struct ATHLTHArenaOutcomeEditor: View {
                     ))
                 }
 
+                if round.template == .mostRepetitions {
+                    Section {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Enter the specific exercise and measured repetitions for each ranked athlete. These are manual claims that need unanimous approval.",
+                            norwegian: "Oppgi konkret øvelse og registrerte repetisjoner for hver plassering. Dette er manuelle resultater som må godkjennes av alle."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        TextField(
+                            ATHLTHLocalization.choose(
+                                english: "Exercise name", norwegian: "Øvelsesnavn"
+                            ),
+                            text: $exerciseName
+                        )
+                        ForEach(repetitionValues.indices, id: \.self) { index in
+                            repetitionsField(at: index)
+                        }
+                    } header: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Exercise-specific result",
+                            norwegian: "Resultat for bestemt øvelse"
+                        ))
+                    }
+                }
                 Section {
                     TextField(
                         ATHLTHLocalization.choose(
-                            english: "E.g. final times and distance...",
+                            english: "Optional notes for repetitions; otherwise describe the result...",
+                            norwegian: "Valgfri kommentar ved repetisjoner, ellers beskriv resultatet..."
+                        ),
                             norwegian: "For eksempel tider og distanse..."
                         ),
                         text: $evidence,
@@ -708,10 +763,11 @@ private struct ATHLTHArenaOutcomeEditor: View {
                         english: "Submit", norwegian: "Send forslag"
                     )) {
                         guard valid else { return }
-                        onPropose(slots.compactMap { $0 }, evidence)
+                        guard let note = submittedEvidence else { return }
+                        onPropose(slots.compactMap { $0 }, note)
                         dismiss()
                     }
-                    .disabled(!valid || evidence.count > 600)
+                    .disabled(!valid)
                 }
             }
         }
