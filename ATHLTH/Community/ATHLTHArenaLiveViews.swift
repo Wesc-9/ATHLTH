@@ -2769,6 +2769,7 @@ private struct ATHLTHArenaRelaySection: View {
     @State private var legs: [ATHLTHArenaRelayLeg] = []
     @State private var reports: [ATHLTHArenaRelayLegReport] = []
     @State private var reportHistory: [ATHLTHArenaRelayLegHistory] = []
+    @State private var historyUnavailable = false
     @State private var historyExpanded = false
     @State private var legTimeText = ""
     @State private var checkingOwnGPS = false
@@ -3444,7 +3445,14 @@ private struct ATHLTHArenaRelaySection: View {
     private var relayHistoryCard: some View {
         DisclosureGroup(isExpanded: $historyExpanded) {
             VStack(alignment: .leading, spacing: 8) {
-                if reportHistory.isEmpty {
+                if historyUnavailable {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Time history could not be loaded. Refresh before reviewing the result.",
+                        norwegian: "Kunne ikke hente historikken. Oppdater før resultatet kontrolleres."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                } else if reportHistory.isEmpty {
                     Text(ATHLTHLocalization.choose(
                         english: "No changes recorded since relay history was enabled.",
                         norwegian: "Ingen endringer registrert etter at stafettloggen ble aktivert."
@@ -3552,7 +3560,13 @@ private struct ATHLTHArenaRelaySection: View {
             assignments = try await roster
             legs = try await plan
             reports = try await resultRows
-            reportHistory = (try? await historyRows) ?? []
+            do {
+                reportHistory = try await historyRows
+                historyUnavailable = false
+            } catch {
+                reportHistory = []
+                historyUnavailable = true
+            }
             if let slot = ownLeg?.slotID,
                let existing = reports.first(where: { $0.slotID == slot }),
                legTimeText.isEmpty {
