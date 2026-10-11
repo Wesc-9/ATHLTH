@@ -110,6 +110,7 @@ struct ATHLTHArenaOnlineSection: View {
 }
 
 struct ATHLTHArenaOnlineDetailView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
 
@@ -124,6 +125,10 @@ struct ATHLTHArenaOnlineDetailView: View {
     @State private var showingRoundCreator = false
     @State private var latestSeries: ATHLTHArenaRemoteSeries?
     @State private var remoteRevision = UUID()
+    @State private var invitationToReplace: ATHLTHArenaRemoteMember?
+    @State private var invitationToRemove: ATHLTHArenaRemoteMember?
+    @State private var replacementChoices: [ATHLTHArenaClubAthlete] = []
+    private let clubDirectory = ATHLTHArenaClubDirectory()
 
     private var currentSeries: ATHLTHArenaRemoteSeries {
         latestSeries ?? series
@@ -207,6 +212,34 @@ struct ATHLTHArenaOnlineDetailView: View {
                                 Text(responseTitle(member.response))
                                     .font(.caption2)
                                     .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            if currentSeries.status == "draft" && isOrganizer &&
+                               (member.response == "invited" || member.response == "declined"),
+                               member.userID != nil {
+                                Menu {
+                                    Button {
+                                        invitationToReplace = member
+                                        Task { await loadReplacementChoices() }
+                                    } label: {
+                                        Label(ATHLTHLocalization.choose(
+                                            english: "Replace invitation",
+                                            norwegian: "Erstatt invitasjon"
+                                        ), systemImage: "person.crop.circle.badge.plus")
+                                    }
+                                    Button(role: .destructive) {
+                                        invitationToRemove = member
+                                    } label: {
+                                        Label(ATHLTHLocalization.choose(
+                                            english: "Remove invitation",
+                                            norwegian: "Fjern invitasjon"
+                                        ), systemImage: "trash")
+                                    }
+                                } label: {
+                                    Image(systemName: "ellipsis.circle")
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                        .frame(minWidth: 35, minHeight: 35)
+                                }
+                                .disabled(writing)
                             }
                         }
                         .padding(11)
@@ -361,6 +394,70 @@ struct ATHLTHArenaOnlineDetailView: View {
             await refresh()
         }
         .refreshable { await refresh() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await refresh() } }
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Remove this invitation?",
+                norwegian: "Fjerne denne invitasjonen?"
+            ),
+            isPresented: Binding(
+                get: { invitationToRemove != nil },
+                set: { if !$0 { invitationToRemove = nil } }
+            )
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Remove invitation", norwegian: "Fjern invitasjon"
+            ), role: .destructive) {
+                if let member = invitationToRemove, let userID = member.userID {
+                    Task { await changeInvitation(oldUserID: userID, replacement: nil) }
+                }
+                invitationToRemove = nil
+            }
+        }
+        .sheet(item: $invitationToReplace) { member in
+            NavigationStack {
+                List {
+                    if replacementChoices.isEmpty {
+                        Text(ATHLTHLocalization.choose(
+                            english: "No eligible athletes found. Select a Club member or mutual follower.",
+                            norwegian: "Ingen aktuelle utøvere funnet. Velg et klubbmedlem eller en gjensidig følger."
+                        ))
+                        .foregroundStyle(.secondary)
+                    }
+                    ForEach(replacementChoices) { athlete in
+                        Button {
+                            invitationToReplace = nil
+                            if let oldUser = member.userID {
+                                Task {
+                                    await changeInvitation(
+                                        oldUserID: oldUser,
+                                        replacement: athlete.id
+                                    )
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text(athlete.displayName)
+                                Spacer()
+                                Image(systemName: "arrow.right.circle")
+                            }
+                        }
+                    }
+                }
+                .navigationTitle(ATHLTHLocalization.choose(
+                    english: "Choose replacement", norwegian: "Velg erstatter"
+                ))
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Cancel", norwegian: "Avbryt"
+                        )) { invitationToReplace = nil }
+                    }
+                }
+            }
+        }
         .sheet(isPresented: $showingRoundCreator) {
             ATHLTHArenaAddRoundView { round in
                 Task { await propose(round) }
@@ -551,6 +648,45 @@ struct ATHLTHArenaOnlineDetailView: View {
             approvals = approvalRows
             remoteRevision = UUID()
             message = nil
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func loadReplacementChoices() async {
+        do {
+            let choices: [ATHLTHArenaClubAthlete]
+            if let club = currentSeries.clubID {
+                choices = try await clubDirectory.athletes(in: club)
+            } else {
+                choices = social.mutualFollows.map {
+                    ATHLTHArenaClubAthlete(id: $0.userID, displayName: $0.resolvedName)
+                }
+            }
+            let used = Set(members.compactMap(\.userID))
+            replacementChoices = choices.filter { !used.contains($0.id) }
+                .sorted {
+                    $0.displayName.localizedStandardCompare($1.displayName)
+                        == .orderedAscending
+                }
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func changeInvitation(oldUserID: UUID, replacement: UUID?) async {
+        guard !writing else { return }
+        writing = true
+        defer { writing = false }
+        do {
+            try await cloud.changeInvitation(
+                seriesID: currentSeries.id,
+                oldUserID: oldUserID,
+                replacementUserID: replacement
+            )
+            await refresh()
         } catch {
             message = error.localizedDescription
         }
