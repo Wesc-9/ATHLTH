@@ -1061,10 +1061,14 @@ struct AroundYouExploreView: View {
                     }
                 }
                 .onTapGesture { point in
-                    guard let coordinate = proxy.convert(
-                        point,
-                        from: .local
-                    ) else {
+                    // A tap on an event or public workout annotation must
+                    // not be reinterpreted as a nearby route-polyline tap.
+                    guard selectedEvent == nil,
+                          selectedPublicWorkout == nil,
+                          let coordinate = proxy.convert(
+                            point,
+                            from: .local
+                          ) else {
                         return
                     }
 
