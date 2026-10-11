@@ -510,13 +510,17 @@ private struct ATHLTHArenaInvitationChangeParams: Encodable {
     }
 }
 
-private struct ATHLTHArenaInvitationReceipt: Decodable {
+struct ATHLTHArenaInvitationReceipt: Decodable {
     let slotID: UUID
     let response: String
 
     enum CodingKeys: String, CodingKey {
         case slotID = "slot_id"
         case response
+    }
+
+    static func confirms(_ receipts: [Self], expected: String) -> Bool {
+        receipts.count == 1 && receipts[0].response == expected
     }
 }
 
@@ -1382,8 +1386,9 @@ final class ATHLTHArenaCloudService: Sendable {
             .eq("response", value: "invited")
             .select("slot_id,response")
             .execute().value
-        guard changed.count == 1,
-              changed[0].response == desiredResponse else {
+        guard ATHLTHArenaInvitationReceipt.confirms(
+            changed, expected: desiredResponse
+        ) else {
             throw ATHLTHArenaCloudError.invitationAlreadyHandled
         }
     }
