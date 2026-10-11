@@ -2768,6 +2768,8 @@ private struct ATHLTHArenaRelaySection: View {
     @State private var assignments: [ATHLTHArenaTeamAssignment] = []
     @State private var legs: [ATHLTHArenaRelayLeg] = []
     @State private var reports: [ATHLTHArenaRelayLegReport] = []
+    @State private var reportHistory: [ATHLTHArenaRelayLegHistory] = []
+    @State private var historyExpanded = false
     @State private var legTimeText = ""
     @State private var checkingOwnGPS = false
     @State private var ownGPSCandidates: [ATHLTHArenaRelayGPSCandidate] = []
@@ -3089,6 +3091,8 @@ private struct ATHLTHArenaRelaySection: View {
                             .font(.caption)
                             .foregroundStyle(ATHLTHTheme.mutedText)
                         }
+
+                        relayHistoryCard
 
                         if reportWindowOpen, let ownLeg {
                             VStack(alignment: .leading, spacing: 8) {
@@ -3437,6 +3441,87 @@ private struct ATHLTHArenaRelaySection: View {
         }
     }
 
+    private var relayHistoryCard: some View {
+        DisclosureGroup(isExpanded: $historyExpanded) {
+            VStack(alignment: .leading, spacing: 8) {
+                if reportHistory.isEmpty {
+                    Text(ATHLTHLocalization.choose(
+                        english: "No changes recorded since relay history was enabled.",
+                        norwegian: "Ingen endringer registrert etter at stafettloggen ble aktivert."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                } else {
+                    ForEach(Array(reportHistory.prefix(20))) { entry in
+                        HStack(alignment: .top, spacing: 9) {
+                            Image(systemName: entry.action == "withdrawn"
+                                ? "arrow.uturn.backward.circle"
+                                : entry.action == "corrected"
+                                    ? "pencil.circle" : "checkmark.circle")
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(athleteName(for: entry.slotID))
+                                    .font(.caption.weight(.semibold))
+                                Text(historyDescription(entry))
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                Text(entry.changedAt.formatted(
+                                    date: .abbreviated, time: .shortened
+                                ))
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            Spacer(minLength: 4)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                Text(ATHLTHLocalization.choose(
+                    english: "Only reports and corrections made after history activation appear here. Times remain self-reported; this does not validate GPS or award points.",
+                    norwegian: "Kun registreringer og korrigeringer etter aktivering vises her. Tidene er fortsatt selvrapporterte og gir verken GPS-godkjenning eller poeng."
+                ))
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+            .padding(.top, 9)
+        } label: {
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Relay time history",
+                    norwegian: "Historikk over etappetider"
+                ),
+                systemImage: "clock.arrow.circlepath"
+            )
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(ATHLTHTheme.primaryText)
+        }
+        .padding(12)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func historyDescription(_ entry: ATHLTHArenaRelayLegHistory) -> String {
+        let before = entry.previousSeconds.map(GhostTargetTimeFormatter.string) ?? "—"
+        let after = entry.currentSeconds.map(GhostTargetTimeFormatter.string) ?? "—"
+        switch entry.action {
+        case "submitted":
+            return ATHLTHLocalization.choose(
+                english: "Submitted", norwegian: "Registrert"
+            ) + ": " + after
+        case "corrected":
+            return ATHLTHLocalization.choose(
+                english: "Corrected", norwegian: "Korrigert"
+            ) + ": " + before + " → " + after
+        case "withdrawn":
+            return ATHLTHLocalization.choose(
+                english: "Withdrawn", norwegian: "Trukket tilbake"
+            ) + ": " + before
+        default:
+            return ATHLTHLocalization.choose(
+                english: "Changed", norwegian: "Endret"
+            )
+        }
+    }
+
     private func athleteName(for slotID: UUID) -> String {
         guard let member = members.first(where: { $0.slotID == slotID }) else {
             return ATHLTHLocalization.choose(english: "Athlete", norwegian: "Deltaker")
@@ -3463,9 +3548,11 @@ private struct ATHLTHArenaRelaySection: View {
             async let roster = cloud.loadTeamAssignments(seriesID: series.id)
             async let plan = cloud.loadRelayLegs(seriesID: series.id)
             async let resultRows = cloud.loadRelayReports(seriesID: series.id)
+            async let historyRows = cloud.loadRelayHistory(seriesID: series.id)
             assignments = try await roster
             legs = try await plan
             reports = try await resultRows
+            reportHistory = (try? await historyRows) ?? []
             if let slot = ownLeg?.slotID,
                let existing = reports.first(where: { $0.slotID == slot }),
                legTimeText.isEmpty {
