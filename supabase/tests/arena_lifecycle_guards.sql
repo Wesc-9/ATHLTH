@@ -12,7 +12,7 @@ begin
    join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'public'
      and c.relkind in ('r','p')
-     and (c.relname like 'arena\\_%' escape '\\'
+     and (left(c.relname, 6) = 'arena_'
        or c.relname = 'ghost_race_challenges')
      and (
        not c.relrowsecurity
