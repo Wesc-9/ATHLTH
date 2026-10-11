@@ -914,6 +914,368 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
     }
 }
 
+/// Optional balanced two-team view. Existing Arena individual settlement
+/// remains authoritative; no team score is calculated from unapproved races.
+private struct ATHLTHArenaTeamsSection: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var social: SocialStore
+
+    let series: ATHLTHArenaRemoteSeries
+    let members: [ATHLTHArenaRemoteMember]
+    let isOrganizer: Bool
+
+    @State private var assignments: [ATHLTHArenaTeamAssignment] = []
+    @State private var loading = false
+    @State private var writing = false
+    @State private var showingEditor = false
+    @State private var confirmRemoval = false
+    @State private var errorMessage: String?
+    private let cloud = ATHLTHArenaCloudService()
+
+    private var eligible: [ATHLTHArenaRemoteMember] {
+        members.filter { $0.response == "accepted" && $0.userID != nil }
+    }
+
+    private var canEdit: Bool {
+        isOrganizer && series.status == "draft" &&
+            members.count >= 4 && eligible.count == members.count
+    }
+
+    private var standings: [ATHLTHArenaTeamStanding] {
+        ATHLTHArenaTeamStandings.calculate(
+            members: members, assignments: assignments
+        )
+    }
+
+    private var isVisible: Bool {
+        !assignments.isEmpty ||
+            (isOrganizer && series.status == "draft" && series.scope != .duel)
+    }
+
+    var body: some View {
+        if isVisible {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 9) {
+                    Image(systemName: "person.3.sequence.fill")
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Team Arena", norwegian: "Lagkonkurranse"
+                    ))
+                    .font(.headline)
+                    Spacer()
+                    if loading { ProgressView().controlSize(.small) }
+                    if canEdit {
+                        Button {
+                            showingEditor = true
+                        } label: {
+                            Text(assignments.isEmpty
+                                ? ATHLTHLocalization.choose(
+                                    english: "Set up", norwegian: "Sett opp"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Edit teams", norwegian: "Endre lag"
+                                ))
+                            .font(.caption.weight(.semibold))
+                        }
+                        .disabled(writing)
+                    }
+                }
+
+                if assignments.isEmpty {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Divide the accepted athletes into two balanced teams before starting. Team points are the total of the already approved individual scores.",
+                        norwegian: "Fordel deltakerne i to balanserte lag før start. Lagpoengene er summen av allerede godkjente individuelle poeng."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    if !canEdit {
+                        Text(ATHLTHLocalization.choose(
+                            english: "At least four accepted athletes and resolved invitations are needed.",
+                            norwegian: "Du trenger minst fire deltakere som har takket ja, og alle invitasjonene må være avklart."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                } else {
+                    HStack(spacing: 10) {
+                        ForEach(standings) { standing in
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Team", norwegian: "Lag"
+                                ) + " \(standing.teamIndex)")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                Text(standing.points.formatted() + " p")
+                                    .font(.title2.weight(.bold).monospacedDigit())
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                                Text("\(standing.athleteCount) " +
+                                     ATHLTHLocalization.choose(
+                                         english: "athletes", norwegian: "utøvere"
+                                     ))
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(13)
+                            .background(
+                                ATHLTHTheme.vitalitySoft.opacity(0.5),
+                                in: RoundedRectangle(cornerRadius: 15)
+                            )
+                        }
+                    }
+                    ForEach(1...2, id: \.self) { team in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Team", norwegian: "Lag"
+                            ) + " \(team)")
+                            .font(.caption.weight(.semibold))
+                            ForEach(assignments.filter { $0.teamIndex == team }) { assigned in
+                                if let athlete = members.first(where: {
+                                    $0.slotID == assigned.slotID
+                                }) {
+                                    HStack {
+                                        Image(systemName: athlete.isDeleted
+                                              ? "person.crop.circle.badge.xmark"
+                                              : "person.crop.circle")
+                                        Text(name(for: athlete))
+                                        Spacer()
+                                        Text(athlete.points.formatted() + " p")
+                                            .monospacedDigit()
+                                    }
+                                    .font(.caption)
+                                    .foregroundStyle(athlete.isDeleted
+                                        ? Color.gray : ATHLTHTheme.primaryText)
+                                }
+                            }
+                        }
+                        .padding(.top, 4)
+                    }
+                    Text(ATHLTHLocalization.choose(
+                        english: "Only individually approved points count. Teams are locked when the competition begins.",
+                        norwegian: "Bare individuelt godkjente poeng teller. Lagene låses når konkurransen starter."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    if canEdit {
+                        Button(role: .destructive) { confirmRemoval = true } label: {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Remove team mode", norwegian: "Fjern lagmodus"
+                            ))
+                        }
+                        .font(.caption)
+                        .disabled(writing)
+                    }
+                }
+
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
+            .padding(15)
+            .background(ATHLTHArenaLightStyle.card(20))
+            .sheet(isPresented: $showingEditor) {
+                ATHLTHArenaTeamEditor(
+                    members: eligible,
+                    existing: assignments,
+                    onSave: { first, second in
+                        await saveTeams(first: first, second: second)
+                    }
+                )
+            }
+            .confirmationDialog(
+                ATHLTHLocalization.choose(
+                    english: "Remove the draft team arrangement?",
+                    norwegian: "Fjerne lagoppsettet fra utkastet?"
+                ),
+                isPresented: $confirmRemoval
+            ) {
+                Button(ATHLTHLocalization.choose(
+                    english: "Remove", norwegian: "Fjern"
+                ), role: .destructive) {
+                    Task { _ = await saveTeams(first: [], second: []) }
+                }
+            }
+            .task(id: series.id) { await refresh() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { Task { await refresh() } }
+            }
+        }
+    }
+
+    private func name(for member: ATHLTHArenaRemoteMember) -> String {
+        if member.isDeleted {
+            return ATHLTHLocalization.choose(
+                english: "Deleted athlete", norwegian: "Slettet deltaker"
+            )
+        }
+        if member.userID == session.profile.userID {
+            return ATHLTHLocalization.choose(english: "You", norwegian: "Du")
+        }
+        return (social.visibleProfiles + social.mutualFollows)
+            .first(where: { $0.userID == member.userID })?.resolvedName ??
+            ATHLTHLocalization.choose(english: "Athlete", norwegian: "Deltaker")
+    }
+
+    @MainActor
+    private func refresh() async {
+        guard !loading else { return }
+        loading = true
+        defer { loading = false }
+        do {
+            assignments = try await cloud.loadTeamAssignments(seriesID: series.id)
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func saveTeams(first: [UUID], second: [UUID]) async -> Bool {
+        guard !writing else { return false }
+        writing = true
+        defer { writing = false }
+        do {
+            try await cloud.saveTeamAssignments(
+                seriesID: series.id,
+                first: first, second: second
+            )
+            assignments = try await cloud.loadTeamAssignments(seriesID: series.id)
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+}
+
+private struct ATHLTHArenaTeamEditor: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let members: [ATHLTHArenaRemoteMember]
+    let onSave: ([UUID], [UUID]) async -> Bool
+    @State private var choices: [UUID: Int]
+    @State private var saving = false
+
+    init(
+        members: [ATHLTHArenaRemoteMember],
+        existing: [ATHLTHArenaTeamAssignment],
+        onSave: @escaping ([UUID], [UUID]) async -> Bool
+    ) {
+        self.members = members
+        self.onSave = onSave
+        _choices = State(initialValue: Dictionary(
+            uniqueKeysWithValues: existing.map { ($0.slotID, $0.teamIndex) }
+        ))
+    }
+
+    private var first: [UUID] {
+        members.filter { choices[$0.slotID] == 1 }.map(\.slotID)
+    }
+
+    private var second: [UUID] {
+        members.filter { choices[$0.slotID] == 2 }.map(\.slotID)
+    }
+
+    private var valid: Bool {
+        first.count >= 2 && second.count >= 2 &&
+        first.count + second.count == members.count &&
+        abs(first.count - second.count) <= 1
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Each accepted athlete belongs to one team. Choose balanced teams, then save before the series starts.",
+                        norwegian: "Alle godkjente deltakere skal tilhøre ett lag. Fordel dem jevnt og lagre før konkurransen starter."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
+                Section {
+                    ForEach(members) { member in
+                        Picker(member.userID?.uuidString.prefix(8).description ??
+                               ATHLTHLocalization.choose(
+                                   english: "Athlete", norwegian: "Deltaker"
+                               ), selection: Binding(
+                            get: { choices[member.slotID] ?? 0 },
+                            set: { choices[member.slotID] = $0 }
+                        )) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Unassigned", norwegian: "Ikke valgt"
+                            )).tag(0)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Team 1", norwegian: "Lag 1"
+                            )).tag(1)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Team 2", norwegian: "Lag 2"
+                            )).tag(2)
+                        }
+                    }
+                } header: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Team roster", norwegian: "Lagfordeling"
+                    ))
+                }
+                Section {
+                    HStack {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Team 1", norwegian: "Lag 1"
+                        ))
+                        Spacer()
+                        Text(first.count.formatted())
+                    }
+                    HStack {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Team 2", norwegian: "Lag 2"
+                        ))
+                        Spacer()
+                        Text(second.count.formatted())
+                    }
+                    if !valid {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Assign everyone. Each team needs at least two athletes and team sizes may differ by at most one.",
+                            norwegian: "Fordel alle. Hvert lag trenger minst to deltakere, og lagene kan høyst avvike med én person."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    }
+                }
+            }
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Set up teams", norwegian: "Sett opp lag"
+            ))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Cancel", norwegian: "Avbryt"
+                    )) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Save", norwegian: "Lagre"
+                    )) {
+                        Task {
+                            saving = true
+                            let ok = await onSave(first, second)
+                            saving = false
+                            if ok { dismiss() }
+                        }
+                    }
+                    .disabled(!valid || saving)
+                }
+            }
+        }
+    }
+}
+
 struct ATHLTHArenaOnlineDetailView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
@@ -1153,6 +1515,15 @@ struct ATHLTHArenaOnlineDetailView: View {
                     }
                 }
                 .id("arena-participants")
+
+                if (canParticipate || isOrganizer) && currentSeries.scope != .duel {
+                    ATHLTHArenaTeamsSection(
+                        series: currentSeries,
+                        members: members,
+                        isOrganizer: isOrganizer
+                    )
+                    .id("arena-teams")
+                }
 
                 if let route = rounds.compactMap(\.routeSnapshot).first {
                     arenaRoutePreview(route)
