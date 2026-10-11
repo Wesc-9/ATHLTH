@@ -370,6 +370,22 @@ enum ATHLTHArenaSeasonPresentation {
         }.count
     }
 
+    /// Never render NaN, infinity or negative legacy points as a trophy
+    /// total. This is display-only; no historical records are rewritten.
+    static func visiblePoints(_ value: Double) -> Double? {
+        guard value.isFinite, value >= 0 else { return nil }
+        return value
+    }
+
+    static func pointsToCatchLeader(
+        ownPoints: Double,
+        leaderPoints: Double
+    ) -> Double? {
+        guard let own = visiblePoints(ownPoints),
+              let leader = visiblePoints(leaderPoints) else { return nil }
+        return max(0, leader - own)
+    }
+
     static func orderedStandings(
         _ rows: [ATHLTHArenaSeasonStandingsRow]
     ) -> [ATHLTHArenaSeasonStandingsRow] {
@@ -893,6 +909,32 @@ private struct ATHLTHArenaSeasonDetailView: View {
         ATHLTHArenaSeasonPresentation.orderedStandings(standings)
     }
 
+    private var personalSeasonEntry: ATHLTHArenaSeasonStandingsRow? {
+        rankedStandings.first { $0.userID == session.profile.userID }
+    }
+
+    private var personalSeasonRank: Int? {
+        guard let personalSeasonEntry else { return nil }
+        return ATHLTHArenaSeasonPresentation.competitiveRank(
+            of: personalSeasonEntry, among: rankedStandings
+        )
+    }
+
+    private var personalGapToLeader: Double? {
+        guard let personalSeasonEntry,
+              let leader = leaders.first else { return nil }
+        return ATHLTHArenaSeasonPresentation.pointsToCatchLeader(
+            ownPoints: personalSeasonEntry.points,
+            leaderPoints: leader.points
+        )
+    }
+
+    private func seasonPointLabel(_ value: Double) -> String {
+        guard let points = ATHLTHArenaSeasonPresentation.visiblePoints(value)
+        else { return "—" }
+        return points.formatted() + " p"
+    }
+
     private var seasonProgress: (fraction: Double, daysToStart: Int, daysRemaining: Int)? {
         ATHLTHArenaSeasonPresentation.progress(
             startsOn: season.startsOn,
@@ -1103,6 +1145,96 @@ private struct ATHLTHArenaSeasonDetailView: View {
                     .accessibilityElement(children: .combine)
                 }
 
+                // Personal progress stays separate from the public
+                // provisional leader card, and never implies a final ranking.
+                if seasonPhase != .upcoming {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "person.crop.circle.fill")
+                                .font(.title3)
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .frame(width: 42, height: 42)
+                                .background(
+                                    ATHLTHTheme.vitalitySoft.opacity(0.65),
+                                    in: Circle()
+                                )
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Your season", norwegian: "Din sesong"
+                                ))
+                                .font(.headline)
+                                Text(championsAreFinal
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Approved season results",
+                                        norwegian: "Godkjent sesongresultat"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Provisional season progress",
+                                        norwegian: "Foreløpig sesongstatus"
+                                    ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            Spacer()
+                        }
+
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(personalSeasonRank.map { "\($0). plass" } ??
+                                    ATHLTHLocalization.choose(
+                                        english: "Unranked", norwegian: "Uten plassering"
+                                    ))
+                                .font(.title3.weight(.bold))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Your position", norwegian: "Din plassering"
+                                ))
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            Spacer(minLength: 3)
+                            VStack(alignment: .trailing, spacing: 3) {
+                                Text(personalSeasonEntry.map {
+                                    seasonPointLabel($0.points)
+                                } ?? "0 p")
+                                .font(.title3.weight(.bold).monospacedDigit())
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Approved points",
+                                    norwegian: "Godkjente poeng"
+                                ))
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                        }
+
+                        if let gap = personalGapToLeader, gap > 0 {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.up.right")
+                                Text(
+                                    gap.formatted() + " " +
+                                    ATHLTHLocalization.choose(
+                                        english: "points behind the lead",
+                                        norwegian: "poeng bak ledelsen"
+                                    )
+                                )
+                            }
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        } else if personalSeasonRank == nil {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Complete and approve an Arena round to enter the rankings.",
+                                norwegian: "Fullfør og godkjenn en Arena-runde for å få plassering."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                    }
+                    .padding(16)
+                    .background(ATHLTHArenaLightStyle.card(20))
+                    .accessibilityElement(children: .combine)
+                }
+
                 // Never infer finality from the device-visible subset of
                 // competitions. This server aggregate is Club-membership
                 // protected and contains no private result or GPS details.
@@ -1200,7 +1332,7 @@ private struct ATHLTHArenaSeasonDetailView: View {
                             .font(.subheadline.weight(isLeader ? .semibold : .regular))
                         Spacer()
                         VStack(alignment: .trailing, spacing: 2) {
-                            Text("\(entry.points.formatted()) p")
+                            Text(seasonPointLabel(entry.points))
                                 .font(.subheadline.weight(.bold).monospacedDigit())
                             Text("\(entry.competitions) " + ATHLTHLocalization.choose(
                                 english: "competitions", norwegian: "konkurranser"
@@ -1213,8 +1345,7 @@ private struct ATHLTHArenaSeasonDetailView: View {
                     .background(ATHLTHArenaLightStyle.card(17))
                     .accessibilityLabel(
                         (rank.map { "\($0). " } ?? "") + name(entry.userID) +
-                        ", \(entry.points.formatted()) " +
-                        ATHLTHLocalization.choose(english: "points", norwegian: "poeng")
+                        ", " + seasonPointLabel(entry.points)
                     )
                 }
 
