@@ -113,6 +113,27 @@ struct ATHLTHArenaRelayLegReport: Decodable, Identifiable {
     }
 }
 
+/// Immutable server-recorded changes to self-reported relay times.
+/// History starts at migration activation; it is not GPS verification.
+struct ATHLTHArenaRelayLegHistory: Decodable, Identifiable {
+    let id: UUID
+    let seriesID: UUID
+    let slotID: UUID
+    let action: String
+    let previousSeconds: Double?
+    let currentSeconds: Double?
+    let changedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id, action
+        case seriesID = "series_id"
+        case slotID = "slot_id"
+        case previousSeconds = "previous_seconds"
+        case currentSeconds = "current_seconds"
+        case changedAt = "changed_at"
+    }
+}
+
 /// A provisional comparison only; never a verified race or awarded
 /// team score. The participants must still review the source reports.
 struct ATHLTHArenaRelayComparison: Equatable {
@@ -763,6 +784,18 @@ final class ATHLTHArenaCloudService: Sendable {
             .from("arena_relay_leg_reports")
             .select("slot_id,series_id,elapsed_seconds,submitted_at")
             .eq("series_id", value: seriesID)
+            .execute().value
+    }
+
+    /// Read-only history of changes to submitted leg times.
+    /// Accessible only to members authorized for the Arena series by RLS.
+    func loadRelayHistory(seriesID: UUID) async throws -> [ATHLTHArenaRelayLegHistory] {
+        try await client
+            .from("arena_relay_leg_history")
+            .select("id,series_id,slot_id,action,previous_seconds,current_seconds,changed_at")
+            .eq("series_id", value: seriesID)
+            .order("changed_at", ascending: false)
+            .limit(50)
             .execute().value
     }
 
