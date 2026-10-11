@@ -111,17 +111,12 @@ struct ATHLTHArenaEvidenceSection: View {
             .map(SocialPublishableWorkout.init(phoneWorkout:))
         let fromHealth = health.workouts.map(SocialPublishableWorkout.init(summary:))
 
-        // iPhone and ATHLTH strength may also have a mirrored HealthKit
-        // workout with the same UUID. Keep one source per real workout.
-        var seen: Set<UUID> = []
-        return (finishedStrength + finishedPhone + fromHealth)
-            .sorted { $0.endDate > $1.endDate }
-            .filter { seen.insert($0.id).inserted }
-    }
-
-    private var existingOwnWorkouts: Set<UUID> {
-        Set(entries.filter { $0.userID == session.profile.userID }
-            .map(\.sourceWorkoutID))
+        // Mirrored workouts can be saved with *different* IDs. Collapse
+        // only near-identical activity, time span and distance snapshots.
+        return ATHLTHArenaWorkoutIdentity.distinct(
+            (finishedStrength + finishedPhone + fromHealth)
+                .sorted { $0.endDate > $1.endDate }
+        )
     }
 
     var body: some View {
@@ -274,7 +269,11 @@ struct ATHLTHArenaEvidenceSection: View {
         for round: ATHLTHArenaRemoteProposal
     ) -> [ATHLTHArenaEvidenceCandidate] {
         workouts.compactMap { workout in
-            guard !existingOwnWorkouts.contains(workout.id),
+            guard !ATHLTHArenaWorkoutIdentity.alreadyShared(
+                    workout,
+                    entries: entries,
+                    userID: session.profile.userID
+                  ),
                   let match = ATHLTHArenaEvidenceMatcher.match(
                     workout,
                     template: round.template,
