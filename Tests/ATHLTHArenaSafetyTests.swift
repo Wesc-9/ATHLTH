@@ -277,6 +277,29 @@ final class ATHLTHArenaSafetyTests: XCTestCase {
         ))
     }
 
+    func testSeasonPersonalProgressNeverUsesInvalidHistoricalPoints() {
+        XCTAssertNil(ATHLTHArenaSeasonPresentation.visiblePoints(.nan))
+        XCTAssertNil(ATHLTHArenaSeasonPresentation.visiblePoints(.infinity))
+        XCTAssertNil(ATHLTHArenaSeasonPresentation.visiblePoints(-4))
+        XCTAssertEqual(ATHLTHArenaSeasonPresentation.visiblePoints(0), 0)
+        XCTAssertEqual(ATHLTHArenaSeasonPresentation.visiblePoints(12), 12)
+        XCTAssertNil(ATHLTHArenaSeasonPresentation.pointsToCatchLeader(
+            ownPoints: .nan, leaderPoints: 14
+        ))
+        XCTAssertNil(ATHLTHArenaSeasonPresentation.pointsToCatchLeader(
+            ownPoints: 8, leaderPoints: .infinity
+        ))
+        XCTAssertEqual(ATHLTHArenaSeasonPresentation.pointsToCatchLeader(
+            ownPoints: 8, leaderPoints: 14
+        ), 6)
+        XCTAssertEqual(ATHLTHArenaSeasonPresentation.pointsToCatchLeader(
+            ownPoints: 14, leaderPoints: 14
+        ), 0)
+        XCTAssertEqual(ATHLTHArenaSeasonPresentation.pointsToCatchLeader(
+            ownPoints: 20, leaderPoints: 14
+        ), 0)
+    }
+
     func testSeasonProgressUsesWholeCalendarDaysIncludingLastDay() {
         let first = ATHLTHArenaSeasonPresentation.progress(
             startsOn: "2026-10-01", endsOn: "2026-10-31", today: "2026-10-01"
