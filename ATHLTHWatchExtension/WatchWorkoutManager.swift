@@ -5632,12 +5632,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             break
         }
 
-        let spokenText = (audioCoachConfiguration.speechStyle ?? .balanced).render(
-            text,
-            language: audioCoachConfiguration.language,
-            priority: priority,
-            eventKind: event?.kind
-        )
+        let spokenText = rememberForReplay
+            ? (audioCoachConfiguration.speechStyle ?? .balanced).render(
+                text,
+                language: audioCoachConfiguration.language,
+                priority: priority,
+                eventKind: event?.kind
+            )
+            : text
         let utterance = AVSpeechUtterance(
             string: spokenText
         )
