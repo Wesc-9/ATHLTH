@@ -244,6 +244,7 @@ final class IPhoneWorkoutStore:
         AVSpeechSynthesizer()
     private var guidancePriorityGate =
         ATHLTHGuidancePriorityGate()
+    private var coachEventLedger = ATHLTHCoachEventLedger()
     private var nextDistanceAnnouncementMeters: Double?
     private var nextTimeAnnouncementSeconds: TimeInterval?
     private var offRouteStartedAt: Date?
@@ -351,6 +352,7 @@ final class IPhoneWorkoutStore:
             ghostOpponentName =
                 active.ghostOpponentName
             guidancePriorityGate.reset()
+            coachEventLedger.reset()
         }
 
         lastRouteCompletion =
@@ -527,6 +529,7 @@ final class IPhoneWorkoutStore:
                 ghostUpdates
         )
         guidancePriorityGate.reset()
+        coachEventLedger.reset()
 
         let now = Date()
         recoveredWorkoutLastCheckpoint = nil
@@ -2007,6 +2010,7 @@ final class IPhoneWorkoutStore:
             configuration: nil
         )
         guidancePriorityGate.reset()
+        coachEventLedger.reset()
         speechSynthesizer.stopSpeaking(
             at: .immediate
         )
@@ -3056,8 +3060,13 @@ final class IPhoneWorkoutStore:
                 "Next. \(next.title).",
                 configuration:
                     workout.audioCoachConfiguration,
-                priority:
-                    .structuredStep
+                priority: .structuredStep,
+                event: ATHLTHCoachEvent(
+                    kind: .runningStep,
+                    key: "\(nextIndex)-next",
+                    priority: .structuredStep,
+                    validFor: 15
+                )
             )
         }
     }
@@ -3085,8 +3094,13 @@ final class IPhoneWorkoutStore:
             "\(prefix). \(plan.steps[workout.structuredStepIndex ?? 0].title).",
             configuration:
                 workout.audioCoachConfiguration,
-            priority:
-                .structuredStep
+            priority: .structuredStep,
+            event: ATHLTHCoachEvent(
+                kind: .runningStep,
+                key: "\(workout.structuredStepIndex ?? 0)-\(prefix)",
+                priority: .structuredStep,
+                validFor: 15
+            )
         )
     }
 
@@ -3101,6 +3115,7 @@ final class IPhoneWorkoutStore:
         }
 
         var shouldAnnounce = false
+        var milestoneKeys: [String] = []
 
         if let interval =
                 configuration.distanceIntervalMeters,
@@ -3108,6 +3123,7 @@ final class IPhoneWorkoutStore:
            let next =
                 nextDistanceAnnouncementMeters,
            workout.distanceMeters >= next {
+            milestoneKeys.append("d\(Int(next.rounded()))")
             repeat {
                 nextDistanceAnnouncementMeters =
                     (
@@ -3131,6 +3147,7 @@ final class IPhoneWorkoutStore:
            let next =
                 nextTimeAnnouncementSeconds,
            elapsed >= next {
+            milestoneKeys.append("t\(Int(next.rounded()))")
             repeat {
                 nextTimeAnnouncementSeconds =
                     (
@@ -3240,8 +3257,13 @@ final class IPhoneWorkoutStore:
                 separator: ". "
             ),
             configuration: configuration,
-            priority:
-                .routineCoach
+            priority: .routineCoach,
+            event: ATHLTHCoachEvent(
+                kind: .routineMilestone,
+                key: milestoneKeys.joined(separator: "-"),
+                priority: .routineCoach,
+                validFor: 10
+            )
         )
     }
 
@@ -3251,9 +3273,14 @@ final class IPhoneWorkoutStore:
             WatchAudioCoachConfiguration?,
         priority:
             ATHLTHGuidancePriority =
-                .routineCoach
+                .routineCoach,
+        event: ATHLTHCoachEvent? = nil
     ) {
         guard !phrase.isEmpty else {
+            return
+        }
+        if let event,
+           !coachEventLedger.canDeliver(event) {
             return
         }
 
@@ -3282,6 +3309,10 @@ final class IPhoneWorkoutStore:
                 )
         case .deliver:
             break
+        }
+
+        if let event {
+            coachEventLedger.didDeliver(event)
         }
 
         do {
