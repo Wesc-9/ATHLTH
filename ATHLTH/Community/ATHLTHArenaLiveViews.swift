@@ -122,6 +122,11 @@ struct ATHLTHArenaOnlineDetailView: View {
     @State private var writing = false
     @State private var message: String?
     @State private var showingRoundCreator = false
+    @State private var latestSeries: ATHLTHArenaRemoteSeries?
+
+    private var currentSeries: ATHLTHArenaRemoteSeries {
+        latestSeries ?? series
+    }
 
     private let cloud = ATHLTHArenaCloudService()
 
@@ -209,8 +214,18 @@ struct ATHLTHArenaOnlineDetailView: View {
                     }
                 }
 
+                ATHLTHArenaScoringSection(
+                    series: currentSeries,
+                    members: members,
+                    rounds: rounds,
+                    isOrganizer: isOrganizer,
+                    onChanged: { await refresh() },
+                    approvedRules: Dictionary(grouping: approvals, by: \.roundID)
+                )
+                .id(currentSeries.status)
+
                 ATHLTHArenaReplacementSection(
-                    series: series,
+                    series: currentSeries,
                     members: members,
                     isOrganizer: isOrganizer,
                     onChanged: { await refresh() }
@@ -257,7 +272,7 @@ struct ATHLTHArenaOnlineDetailView: View {
                         ))
                         .font(.headline)
                         Spacer()
-                        if canParticipate {
+                        if canParticipate && currentSeries.status == "draft" {
                             Button {
                                 showingRoundCreator = true
                             } label: {
@@ -285,14 +300,22 @@ struct ATHLTHArenaOnlineDetailView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 7) {
-                    Label(ATHLTHLocalization.choose(
-                        english: "Waiting for agreement",
-                        norwegian: "Avventer godkjenning"
-                    ), systemImage: "lock.shield")
+                    Label(
+                        currentSeries.status == "draft"
+                            ? ATHLTHLocalization.choose(
+                                english: "Waiting for agreement",
+                                norwegian: "Avventer godkjenning"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Group-verified scoring",
+                                norwegian: "Poeng godkjennes av gruppen"
+                            ),
+                        systemImage: "lock.shield"
+                    )
                         .font(.subheadline.weight(.semibold))
                     Text(ATHLTHLocalization.choose(
-                        english: "Publishing sends invitations and shares round proposals. Starting, automatic workout verification and final points are not yet available in this stage.",
-                        norwegian: "Publisering sender invitasjoner og deler forslag til runder. Oppstart, automatisk øktverifisering og sluttpoeng er foreløpig ikke tilgjengelig."
+                        english: "Accepted athletes approve each result before it awards points. Automatic activity verification remains in development.",
+                        norwegian: "Alle aktive deltakere godkjenner hvert resultat før poeng deles ut. Automatisk aktivitetsverifisering kommer senere."
                     ))
                     .font(.footnote)
                 }
@@ -352,6 +375,13 @@ struct ATHLTHArenaOnlineDetailView: View {
             Text(series.scoring.title)
                 .font(.caption)
                 .foregroundStyle(ATHLTHTheme.mutedText)
+            Text(currentSeries.status == "completed"
+                ? ATHLTHLocalization.choose(english: "Completed", norwegian: "Fullført")
+                : currentSeries.status == "active"
+                    ? ATHLTHLocalization.choose(english: "Active", norwegian: "Aktiv")
+                    : ATHLTHLocalization.choose(english: "Pending agreement", norwegian: "Avventer enighet"))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
             if outstandingInvitations > 0 {
                 Label(
                     "\(outstandingInvitations) " +
@@ -442,7 +472,7 @@ struct ATHLTHArenaOnlineDetailView: View {
             .font(.caption2)
             .foregroundStyle(ATHLTHTheme.mutedText)
 
-            if canParticipate && !alreadyVoted && !fullyApproved {
+            if currentSeries.status == "draft" && canParticipate && !alreadyVoted && !fullyApproved {
                 Button {
                     Task { await approve(roundID: round.id) }
                 } label: {
@@ -496,6 +526,7 @@ struct ATHLTHArenaOnlineDetailView: View {
         loading = true
         defer { loading = false }
         do {
+            async let loadedSeries = cloud.loadSeries()
             async let loadedMembers = cloud.loadMembers(seriesID: series.id)
             async let loadedRounds = cloud.loadProposals(seriesID: series.id)
             let memberRows = try await loadedMembers
@@ -503,6 +534,7 @@ struct ATHLTHArenaOnlineDetailView: View {
             let approvalRows = try await cloud.loadApprovals(
                 roundIDs: roundRows.map(\.id)
             )
+            latestSeries = try await loadedSeries.first { $0.id == series.id }
             members = memberRows
             rounds = roundRows
             approvals = approvalRows
