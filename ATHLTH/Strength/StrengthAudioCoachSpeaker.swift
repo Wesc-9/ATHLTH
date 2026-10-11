@@ -138,9 +138,15 @@ final class StrengthAudioCoachSpeaker:
         )
         try? audioSession.setActive(true)
 
+        let spokenText = (configuration.speechStyle ?? .balanced).render(
+            text,
+            language: configuration.language,
+            priority: .structuredStep,
+            eventKind: resolvedEvent.kind
+        )
         let utterance =
             AVSpeechUtterance(
-                string: text
+                string: spokenText
             )
 
         if let voiceIdentifier =
@@ -194,7 +200,7 @@ final class StrengthAudioCoachSpeaker:
 
         synthesizer.speak(utterance)
         if rememberForReplay {
-            replayMemory.remember(text, priority: .structuredStep)
+            replayMemory.remember(spokenText, priority: .structuredStep)
             lastCoachMessage = replayMemory.text
         }
     }
