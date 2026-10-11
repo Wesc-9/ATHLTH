@@ -3110,6 +3110,7 @@ struct ATHLTHArenaOnlineDetailView: View {
             allRulesApproved: allApproved,
             pendingInvites: outstandingInvitations,
             acceptedCount: activeIDs.count,
+            hasUnacceptedMembers: members.contains { $0.response != "accepted" },
             hasRoute: rounds.contains(where: {
                 $0.template == .fastestRoute && $0.routeSnapshot != nil
             }),
@@ -3372,7 +3373,8 @@ struct ATHLTHArenaOnlineDetailView: View {
                         ))
                         .font(.headline)
                         Spacer()
-                        if canParticipate && currentSeries.status == "draft" {
+                        if canParticipate && currentSeries.status == "draft" &&
+                            rounds.count < 16 {
                             Button {
                                 showingRoundCreator = true
                             } label: {
@@ -4380,6 +4382,10 @@ struct ATHLTHArenaOnlineDetailView: View {
     @MainActor
     private func propose(_ round: ATHLTHArenaRoundDraft) async {
         guard !writing else { return }
+        guard currentSeries.status == "draft", rounds.count < 16 else {
+            message = ATHLTHArenaDraftIssue.tooManyRounds.message
+            return
+        }
         writing = true
         defer { writing = false }
         do {
