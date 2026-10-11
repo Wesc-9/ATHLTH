@@ -822,6 +822,8 @@ private struct ATHLTHArenaOutcomeEditor: View {
                     ))
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(ATHLTHArenaLightStyle.canvasBackground)
             .navigationTitle(round.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -842,6 +844,8 @@ private struct ATHLTHArenaOutcomeEditor: View {
                     .disabled(!valid)
                 }
             }
+        .environment(\.colorScheme, .light)
+        .tint(ATHLTHArenaLightStyle.action)
         }
     }
 }
