@@ -4584,6 +4584,9 @@ struct SessionEditorView: View {
     @State private var workoutCategory: String?
     @State private var showingSavedWorkoutPicker = false
     @State private var selectedPartnerID: UUID?
+    @State private var meetingPoint: PlannedWorkoutMeetingPoint?
+    @State private var reminderMinutesBefore = 30
+    @State private var showingMeetingPointPicker = false
     @State private var draftRestored = false
     @State private var draftFinalized = false
     @State private var isSaving = false
@@ -4717,6 +4720,8 @@ struct SessionEditorView: View {
         _workoutCategory = State(
             initialValue: workout.workoutCategory
         )
+        _meetingPoint = State(initialValue: workout.meetingPoint)
+        _reminderMinutesBefore = State(initialValue: workout.reminderMinutesBefore ?? 0)
         _plannedExercises = State(initialValue: workout.exercises)
         _selectedRunningWorkouts = State(
             initialValue: workout.resolvedRunningWorkouts
@@ -5108,6 +5113,7 @@ struct SessionEditorView: View {
 
 
                 partnerPlanningSection
+                plannedWorkoutLogisticsSection
 
                 if existingWorkout == nil ||
                     kind == .strength {
@@ -5274,6 +5280,18 @@ struct SessionEditorView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(invitationError)
+            }
+            .sheet(isPresented: $showingMeetingPointPicker) {
+                NavigationStack {
+                    TrainTogetherMapPlacePickerView { place in
+                        meetingPoint = PlannedWorkoutMeetingPoint(
+                            name: place.name,
+                            address: place.address,
+                            latitude: place.latitude,
+                            longitude: place.longitude
+                        )
+                    }
+                }
             }
             .sheet(isPresented: $showingSavedWorkoutPicker) {
                 PlanWorkoutPickerView { workout in
@@ -6330,6 +6348,95 @@ struct SessionEditorView: View {
                     norwegian: "Tren sammen"
                 )
             )
+        }
+        .listRowBackground(ATHLTHTheme.card)
+        .listRowSeparatorTint(ATHLTHTheme.border)
+    }
+
+
+    private var plannedWorkoutLogisticsSection: some View {
+        Section {
+            if selectedPartnerID != nil {
+                Button {
+                    showingMeetingPointPicker = true
+                } label: {
+                    HStack(spacing: 11) {
+                        Image(systemName: "mappin.and.ellipse")
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 28)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Meeting point",
+                                norwegian: "Møtested"
+                            ))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            Text(meetingPoint?.name ?? ATHLTHLocalization.choose(
+                                english: "Choose a place on the map",
+                                norwegian: "Velg sted i kartet"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+
+                if let meetingPoint {
+                    HStack {
+                        Text(meetingPoint.address)
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        Spacer()
+                        Button(ATHLTHLocalization.choose(
+                            english: "Clear", norwegian: "Fjern"
+                        )) {
+                            self.meetingPoint = nil
+                        }
+                        .font(.caption.weight(.semibold))
+                    }
+                }
+            }
+
+            Picker(
+                ATHLTHLocalization.choose(
+                    english: "Remind me",
+                    norwegian: "Påminn meg"
+                ),
+                selection: $reminderMinutesBefore
+            ) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Off", norwegian: "Av"
+                )).tag(0)
+                Text(ATHLTHLocalization.choose(
+                    english: "15 minutes before", norwegian: "15 minutter før"
+                )).tag(15)
+                Text(ATHLTHLocalization.choose(
+                    english: "30 minutes before", norwegian: "30 minutter før"
+                )).tag(30)
+                Text(ATHLTHLocalization.choose(
+                    english: "1 hour before", norwegian: "1 time før"
+                )).tag(60)
+                Text(ATHLTHLocalization.choose(
+                    english: "2 hours before", norwegian: "2 timer før"
+                )).tag(120)
+            }
+            .disabled(!scheduledTimeEnabled)
+            if !scheduledTimeEnabled {
+                Text(ATHLTHLocalization.choose(
+                    english: "Choose a workout time to enable a reminder.",
+                    norwegian: "Velg tidspunkt for å få påminnelse."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+        } header: {
+            Text(ATHLTHLocalization.choose(
+                english: "Before the workout",
+                norwegian: "Før økten"
+            ))
         }
         .listRowBackground(ATHLTHTheme.card)
         .listRowSeparatorTint(ATHLTHTheme.border)
@@ -8247,7 +8354,10 @@ struct SessionEditorView: View {
                     ? nil
                     : workoutBlocks,
             workoutCategory:
-                workoutCategory
+                workoutCategory,
+            meetingPoint: selectedPartnerID == nil ? nil : meetingPoint,
+            reminderMinutesBefore: scheduledTimeEnabled && reminderMinutesBefore > 0
+                ? reminderMinutesBefore : nil
         )
 
     }
@@ -8343,6 +8453,7 @@ struct SessionEditorView: View {
             }
         }
 
+        PlannedWorkoutReminderScheduler.sync(workout)
         finishDraft()
         dismiss()
     }
@@ -8393,6 +8504,8 @@ struct SessionEditorView: View {
 
         applySavedWorkout(draft.workout)
         durationMinutes = draft.workout.durationMinutes ?? 0
+        meetingPoint = draft.workout.meetingPoint
+        reminderMinutesBefore = draft.workout.reminderMinutesBefore ?? 0
         scheduledTimeEnabled = draft.scheduledTimeEnabled
         selectedPartnerID = draft.selectedPartnerID
         editorMode = SessionEditorMode(rawValue: draft.editorModeRaw) ?? editorMode

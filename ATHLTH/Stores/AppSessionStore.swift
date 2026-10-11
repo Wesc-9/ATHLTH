@@ -3192,6 +3192,7 @@ final class AppSessionStore: ObservableObject {
             $0.id == session.id
         }
         standalonePlannedSessions.append(session)
+        PlannedWorkoutReminderScheduler.sync(session)
         standalonePlannedSessions.sort {
             ($0.scheduledStart ?? .distantFuture) <
             ($1.scheduledStart ?? .distantFuture)
@@ -3218,6 +3219,7 @@ final class AppSessionStore: ObservableObject {
 
         standalonePlannedSessions[index] =
             session
+        PlannedWorkoutReminderScheduler.sync(session)
         standalonePlannedSessions.sort {
             ($0.scheduledStart ?? .distantFuture) <
             ($1.scheduledStart ?? .distantFuture)
@@ -3228,6 +3230,7 @@ final class AppSessionStore: ObservableObject {
     func removeStandalonePlannedSession(
         _ sessionID: UUID
     ) {
+        PlannedWorkoutReminderScheduler.cancel(sessionID)
         standalonePlannedSessions
             .removeAll {
                 $0.id == sessionID
@@ -3646,6 +3649,7 @@ final class AppSessionStore: ObservableObject {
                 plan.weeks[weekIndex]
                     .days[dayIndex]
                     .sessions[sessionIndex] = updatedSession
+                PlannedWorkoutReminderScheduler.sync(updatedSession)
                 plan.updatedAt = Date()
                 plan.version += 1
                 replaceTrainingPlan(plan)

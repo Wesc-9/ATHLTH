@@ -971,6 +971,14 @@ struct PlannedExercise: Identifiable, Codable, Hashable {
     }
 }
 
+/// A place chosen explicitly by the athlete, shared only with invited partners.
+struct PlannedWorkoutMeetingPoint: Codable, Hashable {
+    var name: String
+    var address: String
+    var latitude: Double
+    var longitude: Double
+}
+
 struct PlannedSession: Identifiable, Codable, Hashable {
     let id: UUID
     var title: String
@@ -1028,6 +1036,12 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     var workoutTemplateID: UUID? = nil
     var workoutBlocks: [WorkoutTemplateBlock]? = nil
     var workoutCategory: String? = nil
+
+    // Optional to keep all historical saved sessions decodable.
+    var meetingPoint: PlannedWorkoutMeetingPoint? = nil
+    // nil/0 disables reminders; a local notification is scheduled only
+    // when a valid future start time has been chosen.
+    var reminderMinutesBefore: Int? = nil
 
     var sharedSourceOwnerID: UUID? = nil
     var sharedSourceSessionID: UUID? = nil

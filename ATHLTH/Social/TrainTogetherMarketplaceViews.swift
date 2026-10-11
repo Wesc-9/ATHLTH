@@ -4517,7 +4517,7 @@ struct TrainTogetherPostCreateView:
     }
 }
 
-private struct TrainTogetherMapPlace:
+struct TrainTogetherMapPlace:
     Identifiable,
     Hashable
 {
@@ -4529,7 +4529,7 @@ private struct TrainTogetherMapPlace:
     let longitude: Double
 }
 
-private struct TrainTogetherMapPlacePickerView:
+struct TrainTogetherMapPlacePickerView:
     View
 {
     @Environment(\.dismiss)
