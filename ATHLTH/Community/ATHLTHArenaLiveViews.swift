@@ -37,6 +37,58 @@ enum ATHLTHArenaCompetitionCourse {
     }
 }
 
+/// Presentation-only ordering and deadlines for the Arena overview.
+/// A missed deadline does not finalize a competition or award any points.
+enum ATHLTHArenaSeriesOverview {
+    enum Urgency: Equatable {
+        case review
+        case minutes(Int)
+        case hours(Int)
+        case days(Int)
+    }
+
+    static func urgency(
+        for series: ATHLTHArenaRemoteSeries,
+        at now: Date
+    ) -> Urgency? {
+        guard series.status == "active", let endsAt = series.endsAt else {
+            return nil
+        }
+        let remaining = endsAt.timeIntervalSince(now)
+        if remaining <= 0 { return .review }
+        if remaining > 72 * 3_600 { return nil }
+        if remaining < 3_600 {
+            return .minutes(max(1, Int(ceil(remaining / 60))))
+        }
+        if remaining < 24 * 3_600 {
+            return .hours(max(1, Int(ceil(remaining / 3_600))))
+        }
+        return .days(max(1, Int(ceil(remaining / 86_400))))
+    }
+
+    static func orderedActive(
+        _ items: [ATHLTHArenaRemoteSeries]
+    ) -> [ATHLTHArenaRemoteSeries] {
+        items.filter { $0.status == "active" }.sorted { lhs, rhs in
+            let leftDeadline = lhs.endsAt ?? .distantFuture
+            let rightDeadline = rhs.endsAt ?? .distantFuture
+            if leftDeadline != rightDeadline { return leftDeadline < rightDeadline }
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
+    }
+
+    static func orderedCompleted(
+        _ items: [ATHLTHArenaRemoteSeries]
+    ) -> [ATHLTHArenaRemoteSeries] {
+        items.filter { $0.status == "completed" }.sorted { lhs, rhs in
+            let left = lhs.completedAt ?? lhs.endsAt ?? .distantPast
+            let right = rhs.completedAt ?? rhs.endsAt ?? .distantPast
+            if left != right { return left > right }
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
+    }
+}
+
 /// Shared Arena series with live invitations, consensual scoring and
 /// deadline-based completion. Club and Weekly Challenges remain separate.
 struct ATHLTHArenaOnlineSection: View {
@@ -51,7 +103,7 @@ struct ATHLTHArenaOnlineSection: View {
     @State private var showsAllCompleted = false
 
     private var activeSeries: [ATHLTHArenaRemoteSeries] {
-        series.filter { $0.status == "active" }
+        ATHLTHArenaSeriesOverview.orderedActive(series)
     }
 
     private var awaitingSeries: [ATHLTHArenaRemoteSeries] {
@@ -59,7 +111,7 @@ struct ATHLTHArenaOnlineSection: View {
     }
 
     private var finishedSeries: [ATHLTHArenaRemoteSeries] {
-        series.filter { $0.status == "completed" }
+        ATHLTHArenaSeriesOverview.orderedCompleted(series)
     }
 
     private var otherSeries: [ATHLTHArenaRemoteSeries] {
@@ -229,15 +281,24 @@ struct ATHLTHArenaOnlineSection: View {
     ) -> some View {
         let isActive = item.status == "active"
         let isCompleted = item.status == "completed"
-        let statusLabel: String = isActive
+        let urgency = ATHLTHArenaSeriesOverview.urgency(
+            for: item, at: Date()
+        )
+        let deadlinePassed = urgency == .review
+        let statusLabel: String = deadlinePassed
+            ? ATHLTHLocalization.choose(
+                english: "REVIEW", norwegian: "KONTROLL"
+            )
+            : isActive
             ? ATHLTHLocalization.choose(english: "ACTIVE", norwegian: "AKTIV")
             : isCompleted
                 ? ATHLTHLocalization.choose(english: "FINISHED", norwegian: "FERDIG")
                 : item.status == "draft"
                     ? ATHLTHLocalization.choose(english: "AGREEMENT", norwegian: "ENIGHET")
                     : item.status.uppercased()
-        let accent: Color = isActive
-            ? ATHLTHTheme.accentDeep
+        let accent: Color = deadlinePassed
+            ? .orange
+            : isActive ? ATHLTHTheme.accentDeep
             : isCompleted ? .secondary : .orange
 
         return NavigationLink {
@@ -269,6 +330,16 @@ struct ATHLTHArenaOnlineSection: View {
                     .font(.caption)
                     .foregroundStyle(ATHLTHTheme.mutedText)
                     .lineLimit(1)
+
+                    if let urgency {
+                        Label(
+                            urgencyLabel(urgency),
+                            systemImage: deadlinePassed
+                                ? "exclamationmark.circle" : "clock"
+                        )
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(deadlinePassed ? Color.orange : ATHLTHTheme.accentDeep)
+                    }
                 }
 
                 Spacer(minLength: 4)
@@ -299,6 +370,33 @@ struct ATHLTHArenaOnlineSection: View {
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
+    }
+
+    private func urgencyLabel(
+        _ urgency: ATHLTHArenaSeriesOverview.Urgency
+    ) -> String {
+        switch urgency {
+        case .review:
+            return ATHLTHLocalization.choose(
+                english: "Deadline passed · review results",
+                norwegian: "Fristen er ute · kontroller resultater"
+            )
+        case .minutes(let value):
+            return ATHLTHLocalization.choose(
+                english: "Ends in \\(value) min",
+                norwegian: "Frist om \\(value) min"
+            )
+        case .hours(let value):
+            return ATHLTHLocalization.choose(
+                english: "Ends in \\(value) h",
+                norwegian: "Frist om \\(value) t"
+            )
+        case .days(let value):
+            return ATHLTHLocalization.choose(
+                english: "Ends in \\(value) d",
+                norwegian: "Frist om \\(value) d"
+            )
+        }
     }
 
     @MainActor
