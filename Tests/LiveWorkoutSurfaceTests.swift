@@ -296,3 +296,64 @@ extension LiveWorkoutSurfaceTests {
     }
 }
 
+
+extension LiveWorkoutSurfaceTests {
+    func testLiveGhostFinishRejectsUnrelatedWorkout() {
+        var gate = ATHLTHLiveGhostFinishGate()
+        let activeRace = UUID()
+        XCTAssertFalse(gate.begin(
+            challengeID: activeRace,
+            completedRouteID: UUID(),
+            seconds: 1_800
+        ))
+        XCTAssertFalse(gate.begin(
+            challengeID: activeRace,
+            completedRouteID: nil,
+            seconds: 1_800
+        ))
+        XCTAssertTrue(gate.begin(
+            challengeID: activeRace,
+            completedRouteID: activeRace,
+            seconds: 1_800
+        ))
+    }
+
+    func testLiveGhostFinishIsSingleSubmissionAndRetryableAfterFailure() {
+        var gate = ATHLTHLiveGhostFinishGate()
+        let raceID = UUID()
+        XCTAssertTrue(gate.begin(
+            challengeID: raceID,
+            completedRouteID: raceID,
+            seconds: 1_600
+        ))
+        XCTAssertFalse(gate.begin(
+            challengeID: raceID,
+            completedRouteID: raceID,
+            seconds: 1_600
+        ))
+        gate.end(challengeID: raceID, succeeded: false)
+        XCTAssertTrue(gate.begin(
+            challengeID: raceID,
+            completedRouteID: raceID,
+            seconds: 1_600
+        ))
+        gate.end(challengeID: raceID, succeeded: true)
+        XCTAssertFalse(gate.begin(
+            challengeID: raceID,
+            completedRouteID: raceID,
+            seconds: 1_600
+        ))
+    }
+
+    func testLiveGhostFinishRequiresFinitePlausibleDuration() {
+        var gate = ATHLTHLiveGhostFinishGate()
+        let raceID = UUID()
+        for seconds in [Double.nan, Double.infinity, -1.0, 0.0, 86_401.0] {
+            XCTAssertFalse(gate.begin(
+                challengeID: raceID,
+                completedRouteID: raceID,
+                seconds: seconds
+            ))
+        }
+    }
+}
