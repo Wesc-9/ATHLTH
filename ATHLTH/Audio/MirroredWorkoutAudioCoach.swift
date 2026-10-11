@@ -286,7 +286,7 @@ final class MirroredWorkoutAudioCoach:
                 nextDistanceMeters,
            snapshot.distanceMeters >= next {
             due = true
-            milestoneKeys.append("d\\(Int(next.rounded()))")
+            milestoneKeys.append("d\(Int(next.rounded()))")
 
             if let interval =
                     configuration
@@ -306,7 +306,7 @@ final class MirroredWorkoutAudioCoach:
                 nextTimeSeconds,
            snapshot.elapsedTime >= next {
             due = true
-            milestoneKeys.append("t\\(Int(next.rounded()))")
+            milestoneKeys.append("t\(Int(next.rounded()))")
 
             if let interval =
                     configuration
