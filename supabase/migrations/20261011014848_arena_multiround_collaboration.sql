@@ -176,8 +176,6 @@ for insert to authenticated with check (
       and m.user_id = (select auth.uid())
       and m.response = 'accepted' and s.status = 'draft'
   )
-  and (select count(*) from public.arena_round_proposals r
-       where r.series_id = arena_round_proposals.series_id) < 20
 );
 
 create policy arena_rounds_remove_unvoted on public.arena_round_proposals
