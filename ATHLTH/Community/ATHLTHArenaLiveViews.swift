@@ -288,7 +288,7 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
-    @StateObject private var races = GhostFriendRaceStore()
+    @State private var linkedChallenges: [GhostFriendRaceChallengeRecord] = []
 
     let series: ATHLTHArenaRemoteSeries
     let rounds: [ATHLTHArenaRemoteProposal]
@@ -307,7 +307,7 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
 
     private var linked: [GhostFriendRaceChallengeRecord] {
         let roundIDs = Set(rounds.map(\.id))
-        return races.challenges.filter {
+        return linkedChallenges.filter {
             guard let roundID = $0.arenaRoundID else { return false }
             return roundIDs.contains(roundID) &&
                 $0.status == .accepted
@@ -389,13 +389,7 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
                                 ))
                                 .font(.subheadline.weight(.semibold))
                             Spacer()
-                            Text(room?.status == .finished
-                                ? ATHLTHLocalization.choose(
-                                    english: "Finished", norwegian: "Fullført"
-                                )
-                                : ATHLTHLocalization.choose(
-                                    english: "Live / pending", norwegian: "Live / venter"
-                                ))
+                            Text(liveStatus(for: room, expiresAt: challenge.expiresAt))
                                 .font(.caption.weight(.medium))
                                 .foregroundStyle(ATHLTHTheme.accentDeep)
                         }
@@ -539,7 +533,7 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
                                 .buttonStyle(.bordered)
                                 .tint(ATHLTHTheme.accentDeep)
                             }
-                        } else if challenge.expiresAt > Date() {
+                        } else if canRejoin(room: room, expiresAt: challenge.expiresAt) {
                             NavigationLink {
                                 LiveGhostRaceLobbyView(challenge: challenge)
                             } label: {
@@ -570,7 +564,7 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
                         break
                     }
                     guard !Task.isCancelled else { break }
-                    await refresh()
+                    if scenePhase == .active { await refresh() }
                 }
             }
             .onChange(of: scenePhase) { _, phase in
@@ -642,6 +636,39 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
         .accessibilityElement(children: .combine)
     }
 
+    private func liveStatus(
+        for room: LiveGhostRaceRoomRecord?,
+        expiresAt: Date
+    ) -> String {
+        switch room?.status {
+        case .finished:
+            return ATHLTHLocalization.choose(english: "Finished", norwegian: "Fullført")
+        case .cancelled:
+            return ATHLTHLocalization.choose(english: "Cancelled", norwegian: "Avlyst")
+        case .racing:
+            return ATHLTHLocalization.choose(english: "Live now", norwegian: "Pågår nå")
+        case .countdown:
+            return ATHLTHLocalization.choose(english: "Countdown", norwegian: "Nedtelling")
+        case .lobby:
+            return ATHLTHLocalization.choose(english: "Waiting in lobby", norwegian: "Venter i lobby")
+        case nil:
+            return expiresAt <= Date()
+                ? ATHLTHLocalization.choose(english: "Expired", norwegian: "Utløpt")
+                : ATHLTHLocalization.choose(english: "Awaiting start", norwegian: "Venter på start")
+        }
+    }
+
+    private func canRejoin(
+        room: LiveGhostRaceRoomRecord?,
+        expiresAt: Date
+    ) -> Bool {
+        switch room?.status {
+        case .finished, .cancelled: return false
+        case .racing, .countdown: return true
+        case .lobby, nil: return expiresAt > Date()
+        }
+    }
+
     private func userName(_ id: UUID) -> String {
         if id == session.profile.userID {
             return ATHLTHLocalization.choose(english: "You", norwegian: "Du")
@@ -657,18 +684,45 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
         loading = true
         defer { loading = false }
 
-        await races.refresh()
-        let ids = linked.map(\.id)
-        guard !ids.isEmpty else {
+        let roundIDs = rounds.map(\.id)
+        guard !roundIDs.isEmpty else {
+            linkedChallenges = []
             rooms = []
             participants = []
             roundResults = []
             roundResultsLoaded = false
-            errorMessage = races.errorMessage
+            errorMessage = nil
             return
         }
 
         do {
+            // Filter server-side by the precise Arena rounds. The generic
+            // Ghost inbox loads only the latest 100 global invitations and
+            // can lose legitimate, older races from a longer competition.
+            let fetched: [GhostFriendRaceChallengeRecord] =
+                try await SupabaseEnvironment.client
+                    .from("ghost_race_challenges")
+                    .select()
+                    .in("arena_round_id", values: roundIDs)
+                    .order("created_at", ascending: false)
+                    .limit(150)
+                    .execute().value
+
+            let eligible = fetched.filter {
+                $0.status == .accepted &&
+                $0.arenaRoundID.map { roundIDs.contains($0) } == true
+            }
+            let ids = eligible.map(\.id)
+            guard !ids.isEmpty else {
+                linkedChallenges = []
+                rooms = []
+                participants = []
+                roundResults = []
+                roundResultsLoaded = false
+                errorMessage = nil
+                return
+            }
+
             async let roomsTask: [LiveGhostRaceRoomRecord] =
                 SupabaseEnvironment.client
                     .from("live_ghost_race_rooms")
@@ -682,18 +736,25 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
                     .in("challenge_id", values: ids)
                     .execute().value
             async let resultsTask = arenaCloud.loadRoundResults(seriesID: series.id)
-            let loadedRooms = try await roomsTask
-            let loadedParticipants = try await participantsTask
-            let loadedResults = try await resultsTask
-            rooms = loadedRooms
-            participants = loadedParticipants
-            roundResults = loadedResults
+
+            let fetchedRooms = try await roomsTask
+            let fetchedParticipants = try await participantsTask
+            let fetchedResults = try await resultsTask
+            guard !Task.isCancelled else { return }
+
+            rooms = fetchedRooms
+            participants = fetchedParticipants
+            roundResults = fetchedResults
+            linkedChallenges = eligible
             roundResultsLoaded = true
             errorMessage = nil
         } catch {
-            // Never offer a new result proposal if the server's current
-            // round status could not be fetched.
+            // Fail closed: never expose a score proposal using old
+            // result/permission data when a fresh query failed.
             roundResultsLoaded = false
+            linkedChallenges = []
+            rooms = []
+            participants = []
             errorMessage = error.localizedDescription
         }
     }
