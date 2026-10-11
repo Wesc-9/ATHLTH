@@ -79,6 +79,7 @@ enum ATHLTHArenaEvidenceMatcher {
 struct ATHLTHArenaEvidenceCandidate: Identifiable {
     let workout: SocialPublishableWorkout
     let match: ATHLTHArenaEvidenceMatcher.Match
+    let sourceCheck: ATHLTHArenaLocalSourceCheck
 
     var id: UUID { workout.id }
 }
@@ -136,8 +137,8 @@ struct ATHLTHArenaEvidenceSection: View {
             .foregroundStyle(ATHLTHTheme.primaryText)
 
             Text(ATHLTHLocalization.choose(
-                english: "ATHLTH can find qualifying workouts in your recorded history. Review a match and choose which round to share it with.",
-                norwegian: "ATHLTH kan finne aktuelle økter i treningshistorikken din. Kontroller resultatet før du velger å dele det med en runde."
+                english: "ATHLTH checks that each suggested workout is present in your local Apple Health or ATHLTH history. Review the result before choosing to share it.",
+                norwegian: "ATHLTH kontrollerer at foreslåtte økter finnes i Apple Health eller ATHLTH-historikken på enheten. Se over resultatet før du velger å dele."
             ))
             .font(.subheadline)
             .foregroundStyle(ATHLTHTheme.mutedText)
@@ -213,8 +214,8 @@ struct ATHLTHArenaEvidenceSection: View {
             }
 
             Text(ATHLTHLocalization.choose(
-                english: "Only a workout ID, source, timing and the relevant metric are shared after your confirmation. No location track, heart rate, or private health data are uploaded by Arena. These client-linked results require group review and are not independently verified.",
-                norwegian: "Først etter din bekreftelse deles økt-ID, kilde, tidspunkt og relevant resultat. Arena laster ikke opp GPS-spor, puls eller private helseopplysninger. Øktkoblinger fra enheten er ikke uavhengig verifisert og må vurderes av gruppen."
+                english: "A local workout-history match is not server verification. Only the workout ID, source, timing and relevant metric are shared after consent. GPS tracks and heart rate stay private; group review is still required.",
+                norwegian: "En lokal øktkobling er ikke serververifisering. Kun økt-ID, kilde, tidspunkt og relevant resultat deles etter samtykke. GPS-spor og puls forblir private; gruppen må fortsatt godkjenne."
             ))
             .font(.caption)
             .foregroundStyle(ATHLTHTheme.mutedText)
@@ -282,7 +283,18 @@ struct ATHLTHArenaEvidenceSection: View {
                   ) else {
                 return nil
             }
-            return ATHLTHArenaEvidenceCandidate(workout: workout, match: match)
+            let localCheck = ATHLTHArenaLocalEvidenceCheck.verify(
+                workout,
+                health: health.workouts,
+                phone: phone.history,
+                strength: strength.workoutHistory
+            )
+            guard localCheck.isUsable else { return nil }
+            return ATHLTHArenaEvidenceCandidate(
+                workout: workout,
+                match: match,
+                sourceCheck: localCheck
+            )
         }
         .prefix(30)
         .map { $0 }
@@ -321,6 +333,16 @@ struct ATHLTHArenaEvidenceSection: View {
         in round: ATHLTHArenaRemoteProposal
     ) async {
         guard !submitting else { return }
+        let localCheck = ATHLTHArenaLocalEvidenceCheck.verify(
+            candidate.workout,
+            health: health.workouts,
+            phone: phone.history,
+            strength: strength.workoutHistory
+        )
+        guard localCheck.isUsable else {
+            errorMessage = localCheck.description
+            return
+        }
         submitting = true
         defer { submitting = false }
         do {
@@ -375,7 +397,7 @@ private struct ATHLTHArenaEvidencePicker: View {
                                 Text(candidate.workout.startDate, style: .date)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                                Text(candidate.workout.source)
+                                Text(candidate.sourceCheck.description)
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
