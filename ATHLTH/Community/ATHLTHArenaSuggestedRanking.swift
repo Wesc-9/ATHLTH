@@ -10,6 +10,28 @@ struct ATHLTHArenaSuggestedStanding: Identifiable, Equatable {
 }
 
 enum ATHLTHArenaSuggestedRanking {
+    /// A suggested pace target only, never a verified result or a replay of
+    /// someone else's private GPS trace. Based on an explicitly shared round
+    /// result, and excluded when the report is absent or implausible.
+    static func fastestSharedRivalTime(
+        roundID: UUID,
+        currentUserID: UUID,
+        evidence: [ATHLTHArenaWorkoutEvidence]
+    ) -> TimeInterval? {
+        evidence
+            .filter {
+                $0.roundID == roundID &&
+                $0.userID != currentUserID &&
+                $0.activityType == "running" &&
+                $0.metricType == "elapsed_seconds" &&
+                $0.metricValue.isFinite &&
+                (60...86_400).contains($0.metricValue) &&
+                ($0.reportedRouteMatchPercent.map { (90...100).contains($0) } ?? false)
+            }
+            .map(\.metricValue)
+            .min()
+    }
+
     static func standings(
         template: ATHLTHArenaRoundTemplate,
         roundID: UUID,
