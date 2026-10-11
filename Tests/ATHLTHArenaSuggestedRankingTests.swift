@@ -417,6 +417,45 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
         ))
     }
 
+    func testArenaHistoricalDuelsKeepFinishedAndCancelledResults() {
+        let future = Date().addingTimeInterval(3600)
+        XCTAssertTrue(ATHLTHArenaLiveDuelBrowsing.isHistorical(
+            roomStatus: .finished, expiresAt: future
+        ))
+        XCTAssertTrue(ATHLTHArenaLiveDuelBrowsing.isHistorical(
+            roomStatus: .cancelled, expiresAt: future
+        ))
+    }
+
+    func testArenaActiveDuelSurvivesInvitationExpiry() {
+        let expired = Date().addingTimeInterval(-3600)
+        XCTAssertFalse(ATHLTHArenaLiveDuelBrowsing.isHistorical(
+            roomStatus: .racing, expiresAt: expired
+        ))
+        XCTAssertFalse(ATHLTHArenaLiveDuelBrowsing.isHistorical(
+            roomStatus: .countdown, expiresAt: expired
+        ))
+    }
+
+    func testArenaUnstartedExpiredDuelMovesToHistory() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        XCTAssertTrue(ATHLTHArenaLiveDuelBrowsing.isHistorical(
+            roomStatus: .lobby,
+            expiresAt: now.addingTimeInterval(-1),
+            now: now
+        ))
+        XCTAssertTrue(ATHLTHArenaLiveDuelBrowsing.isHistorical(
+            roomStatus: nil,
+            expiresAt: now,
+            now: now
+        ))
+        XCTAssertFalse(ATHLTHArenaLiveDuelBrowsing.isHistorical(
+            roomStatus: .lobby,
+            expiresAt: now.addingTimeInterval(1),
+            now: now
+        ))
+    }
+
     func testCustomRoundsDoNotInferUnsupportedResults() {
         let standings = ATHLTHArenaSuggestedRanking.standings(
             template: .custom,
