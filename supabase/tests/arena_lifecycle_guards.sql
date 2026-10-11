@@ -476,5 +476,41 @@ begin
    raise exception 'Clients must not circumvent relay vote freeze using direct updates';
  end if;
 
-end $$;
+ -- A participant can cancel only the shared Live Ghost room;
+ -- clients must not fabricate a winner or edit an already terminal race.
+ if to_regprocedure('public.cancel_live_ghost_duel(uuid)') is null then
+   raise exception 'Live Ghost participant cancellation RPC is missing';
+ end if;
+ if has_function_privilege(
+   'anon', 'public.cancel_live_ghost_duel(uuid)'::regprocedure, 'EXECUTE'
+ ) then
+   raise exception 'Anonymous users cannot cancel a synchronized duel';
+ end if;
+ if not has_function_privilege(
+   'authenticated', 'public.cancel_live_ghost_duel(uuid)'::regprocedure, 'EXECUTE'
+ ) then
+   raise exception 'Participants need the authorized Live Ghost cancellation RPC';
+ end if;
+ if not exists (
+   select 1 from pg_trigger
+   where tgrelid='public.live_ghost_race_rooms'::regclass
+     and tgname='live_ghost_preserve_terminal_room'
+     and tgenabled='O'
+ ) then
+   raise exception 'Finished/cancelled Live Ghost race rooms must be terminal';
+ end if;
+ if pg_get_functiondef(
+      'public.cancel_live_ghost_duel(uuid)'::regprocedure
+    ) not like '%actor not in (race.sender_id, race.recipient_id)%'
+   or pg_get_functiondef(
+      'public.cancel_live_ghost_duel(uuid)'::regprocedure
+    ) not like '%winner_id = null%'
+   or pg_get_functiondef(
+      'public.cancel_live_ghost_duel(uuid)'::regprocedure
+    ) not like '%ghost_challenge_id = p_challenge_id%'
+ then
+   raise exception 'Live Ghost cancel must enforce race membership and zero winners';
+ end if;
+
+end $;
 rollback;
