@@ -308,6 +308,191 @@ private struct ATHLTHArenaChallengeOverviewSection: View {
     }
 }
 
+/// One Arena entry point for the already-authorized Live Ghost race flow.
+/// Live duels are separate from multi-round scoring until an approved,
+/// server-enforced round-to-race link exists. No GPS tracks are loaded here.
+private struct ATHLTHArenaLiveDuelsSection: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var races = GhostFriendRaceStore()
+
+    private var activeRaces: [GhostFriendRaceChallengeRecord] {
+        (races.incoming + races.outgoing)
+            .filter { $0.status == .accepted && $0.expiresAt > Date() }
+            .sorted { $0.createdAt > $1.createdAt }
+    }
+
+    private var incomingInvites: [GhostFriendRaceChallengeRecord] {
+        races.incoming.filter {
+            $0.status == .pending && $0.expiresAt > Date()
+        }
+    }
+
+    private var outgoingInvites: [GhostFriendRaceChallengeRecord] {
+        races.outgoing.filter {
+            $0.status == .pending && $0.expiresAt > Date()
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(spacing: 8) {
+                Image(systemName: "bolt.horizontal.circle.fill")
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                Text(ATHLTHLocalization.choose(
+                    english: "Live duels", norwegian: "Live-dueller"
+                ))
+                .font(.headline)
+                Spacer()
+                if races.isLoading {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Button {
+                        Task { await races.refresh() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Refresh live duels", norwegian: "Oppdater live-dueller"
+                    ))
+                }
+            }
+
+            NavigationLink {
+                GhostFriendRaceHubView()
+            } label: {
+                HStack(spacing: 11) {
+                    Image(systemName: "person.2.wave.2.fill")
+                        .font(.title3)
+                        .frame(width: 40, height: 40)
+                        .background(.white.opacity(0.14), in: Circle())
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Challenge a friend live",
+                            norwegian: "Utfordre en venn direkte"
+                        ))
+                        .font(.subheadline.weight(.bold))
+                        Text(ATHLTHLocalization.choose(
+                            english: "Invite, get ready and start together.",
+                            norwegian: "Inviter, bli klare og start sammen."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.82))
+                    }
+                    Spacer(minLength: 3)
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption.weight(.bold))
+                }
+                .foregroundStyle(.white)
+                .padding(15)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    LinearGradient(
+                        colors: [ATHLTHTheme.accentDeep, ATHLTHTheme.vitality],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    in: RoundedRectangle(cornerRadius: 19, style: .continuous)
+                )
+            }
+            .buttonStyle(.plain)
+
+            if let error = races.errorMessage {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            if !incomingInvites.isEmpty {
+                NavigationLink {
+                    GhostFriendRaceHubView()
+                } label: {
+                    HStack(spacing: 11) {
+                        Image(systemName: "envelope.badge")
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                        Text(
+                            "\(incomingInvites.count) " +
+                            ATHLTHLocalization.choose(
+                                english: "live duel invitations to answer",
+                                norwegian: "invitasjoner til live-duell venter"
+                            )
+                        )
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    .padding(13)
+                    .background(ATHLTHArenaLightStyle.card(17))
+                }
+                .buttonStyle(.plain)
+            }
+
+            ForEach(Array(activeRaces.prefix(3))) { race in
+                NavigationLink {
+                    LiveGhostRaceLobbyView(challenge: race)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "figure.run.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 38, height: 38)
+                            .background(ATHLTHTheme.vitalitySoft.opacity(0.65), in: Circle())
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(race.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                                .lineLimit(1)
+                            Text(
+                                String(format: "%.1f km", race.distanceMeters / 1_000) +
+                                " · " +
+                                ATHLTHLocalization.choose(
+                                    english: "Ready for race lobby",
+                                    norwegian: "Klar for race-lobby"
+                                )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+                    .padding(12)
+                    .background(ATHLTHArenaLightStyle.card(17))
+                }
+                .buttonStyle(.plain)
+            }
+
+            if !outgoingInvites.isEmpty {
+                Text(
+                    "\(outgoingInvites.count) " +
+                    ATHLTHLocalization.choose(
+                        english: "sent invitations awaiting an answer",
+                        norwegian: "sendte invitasjoner venter på svar"
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+
+            Text(ATHLTHLocalization.choose(
+                english: "Live Ghost uses an earlier GPS run as a shared course, with route privacy controls. Live duels do not award Arena series points automatically.",
+                norwegian: "Live Ghost bruker en tidligere GPS-økt som konkurranseløype, med rutebeskyttelse. Live-dueller gir ikke automatisk poeng i Arena-serier."
+            ))
+            .font(.caption)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+        }
+        .task { await races.refresh() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await races.refresh() } }
+        }
+    }
+}
+
 struct ATHLTHArenaHomeView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
@@ -327,6 +512,8 @@ struct ATHLTHArenaHomeView: View {
                     .id(remoteRevision)
 
                 ATHLTHArenaChallengeOverviewSection()
+
+                ATHLTHArenaLiveDuelsSection()
 
                 HStack(spacing: 10) {
                     NavigationLink {
