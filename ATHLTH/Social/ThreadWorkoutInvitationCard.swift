@@ -236,20 +236,6 @@ struct ThreadWorkoutInvitationCard: View {
                     }
                     .disabled(isResponding)
 
-                    Button(action: onProposeChanges) {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Suggest changes",
-                                norwegian: "Foreslå endringer i økten"
-                            ),
-                            systemImage: "square.and.pencil"
-                        )
-                        .font(.caption.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .disabled(isResponding)
                 } else if response?.decision == .accepted {
                     Label(
                         ATHLTHLocalization.choose(
@@ -268,6 +254,25 @@ struct ThreadWorkoutInvitationCard: View {
                     .font(.caption)
                     .foregroundStyle(ATHLTHTheme.mutedText)
                     .fixedSize(horizontal: false, vertical: true)
+                }
+
+                // Acceptance schedules the workout; it does not close the
+                // negotiation window. Guests may suggest changes afterward.
+                if !isMine && response?.decision != .declined {
+                    Button(action: onProposeChanges) {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Suggest workout changes",
+                                norwegian: "Foreslå endringer i økten"
+                            ),
+                            systemImage: "square.and.pencil"
+                        )
+                        .font(.caption.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(ATHLTHTheme.accentDeep)
+                    .disabled(isResponding)
                 }
 
                 Button {
