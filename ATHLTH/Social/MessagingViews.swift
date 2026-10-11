@@ -6428,6 +6428,16 @@ private struct MessageBubble: View {
                             }
                         }
                     )
+                } else if isPlannedInvitation,
+                          let workout = message.decodeSnapshot(PlannedSession.self) {
+                    ThreadWorkoutInvitationCard(
+                        workout: workout,
+                        response: inviteResponse,
+                        isMine: isMine,
+                        isResponding: respondingToInvite,
+                        onAccept: { onRespondToInvite(true) },
+                        onDecline: { onRespondToInvite(false) }
+                    )
                 } else if let attachmentKind = message.attachmentKind {
                     VStack(alignment: .leading, spacing: 9) {
                         HStack(spacing: 8) {
