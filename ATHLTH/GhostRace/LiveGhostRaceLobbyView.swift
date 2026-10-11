@@ -938,6 +938,7 @@ struct LiveGhostRaceLobbyView: View {
         switch captureDevice {
         case .iPhone:
             return phoneWorkout.active == nil &&
+                phoneWorkout.canStartSynchronizedOutdoorWorkout &&
                 !watchConnection.hasActiveWatchWorkout &&
                 !watchConnection.workoutLaunchInProgress
 
@@ -962,10 +963,19 @@ struct LiveGhostRaceLobbyView: View {
                 false)
 
         if next && !deviceCanStart {
-            launchError = ATHLTHLocalization.choose(
-                english: "Finish the active workout or connect the selected device before marking ready.",
-                norwegian: "Avslutt den aktive økten eller koble til valgt enhet før du markerer deg klar."
-            )
+            if captureDevice == .iPhone &&
+               !phoneWorkout.canStartSynchronizedOutdoorWorkout {
+                phoneWorkout.requestLiveGhostLocationPermissionIfNeeded()
+                launchError = ATHLTHLocalization.choose(
+                    english: "Allow iPhone location access and make sure you are signed in before marking ready. Then tap Ready again.",
+                    norwegian: "Tillat stedstilgang på iPhone og kontroller at du er logget inn før du markerer deg klar. Trykk deretter Klar på nytt."
+                )
+            } else {
+                launchError = ATHLTHLocalization.choose(
+                    english: "Finish the active workout or connect the selected device before marking ready.",
+                    norwegian: "Avslutt den aktive økten eller koble til valgt enhet før du markerer deg klar."
+                )
+            }
             return
         }
 
