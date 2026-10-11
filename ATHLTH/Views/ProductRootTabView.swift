@@ -15306,7 +15306,7 @@ struct ATHLTHProfileView: View {
                     Spacer()
 
                     HStack(
-                        alignment: .bottom,
+                        alignment: .top,
                         spacing: 14
                     ) {
                         ZStack(alignment: .bottomTrailing) {
@@ -15401,79 +15401,14 @@ struct ATHLTHProfileView: View {
                             )
                         }
 
-                        VStack(
-                            alignment: .leading,
-                            spacing: 4
-                        ) {
-                            HStack(spacing: 7) {
-                                Text(
-                                    session.profile
-                                        .displayName
-                                )
-                                .font(
-                                    .system(
-                                        size: 24,
-                                        weight: .bold,
-                                        design: .rounded
-                                    )
-                                )
-                                .foregroundStyle(.white)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.70)
-
-
-                            }
-
-                            if !session.profile
-                                .username.isEmpty {
-                                Text(
-                                    "@\(session.profile.username)"
-                                )
-                                .font(
-                                    .subheadline
-                                        .weight(.medium)
-                                )
-                                .foregroundStyle(
-                                    .white.opacity(0.84)
-                                )
-                            }
-
-                            if let focus =
-                                trainingIdentityFocus {
-                                Text(
-                                    focus.title
-                                )
-                                .font(
-                                    .caption.weight(
-                                        .semibold
-                                    )
-                                )
-                                .foregroundStyle(
-                                    .white.opacity(0.92)
-                                )
-                            }
-
-                            let bio =
-                                session.profile.bio
-                                    .trimmingCharacters(
-                                        in:
-                                            .whitespacesAndNewlines
-                                    )
-
-                            if !bio.isEmpty {
-                                Text(bio)
-                                    .font(.caption)
-                                    .foregroundStyle(
-                                        .white.opacity(0.88)
-                                    )
-                                    .lineLimit(2)
-                                    .fixedSize(
-                                        horizontal: false,
-                                        vertical: true
-                                    )
-                                    .padding(.top, 2)
-                            }
-                        }
+                        ATHLTHProfileHeroIdentityView(
+                            name: session.profile.displayName,
+                            username: session.profile.username.isEmpty
+                                ? ""
+                                : "@\(session.profile.username)",
+                            trainingFocus: trainingIdentityFocus?.title,
+                            bio: session.profile.bio
+                        )
 
                         Spacer(minLength: 0)
                     }
