@@ -541,5 +541,5 @@ begin
    raise exception 'Live Ghost cancel must enforce race membership and zero winners';
  end if;
 
-end $;
+end $$;
 rollback;
