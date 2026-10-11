@@ -4849,7 +4849,7 @@ struct WorkoutInviteLaunchSheet: View {
                 }
 
                 Text(
-                    payload?.resolvedStartIndependently == true
+                    payload?.startIndependently == true
                         ? ATHLTHLocalization.choose(
                             english: "Start when you are ready. Your friends' live progress remains available.",
                             norwegian: "Start når du er klar. Du kan fortsatt følge vennenes fremdrift direkte."
