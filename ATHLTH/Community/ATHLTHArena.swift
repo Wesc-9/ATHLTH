@@ -545,8 +545,8 @@ private struct ATHLTHArenaLiveDuelsSection: View {
             }
 
             Text(ATHLTHLocalization.choose(
-                english: "Live Ghost uses an earlier GPS run as a shared course, with route privacy controls. Live duels do not award Arena series points automatically.",
-                norwegian: "Live Ghost bruker en tidligere GPS-økt som konkurranseløype, med rutebeskyttelse. Live-dueller gir ikke automatisk poeng i Arena-serier."
+                english: "Live Ghost uses your selected previous GPS run or planned route, with route privacy controls. Live duels do not award Arena series points automatically.",
+                norwegian: "Live Ghost bruker en tidligere GPS-økt eller en valgt rute, med rutebeskyttelse. Live-dueller gir ikke automatisk poeng i Arena-serier."
             ))
             .font(.caption)
             .foregroundStyle(ATHLTHTheme.mutedText)
@@ -559,6 +559,7 @@ private struct ATHLTHArenaLiveDuelsSection: View {
 }
 
 struct ATHLTHArenaHomeView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
 
@@ -576,43 +577,22 @@ struct ATHLTHArenaHomeView: View {
                 ATHLTHArenaOnlineSection()
                     .id(remoteRevision)
 
-                ATHLTHArenaSeasonsSection()
+                ATHLTHArenaLiveDuelsSection()
 
                 ATHLTHArenaChallengeOverviewSection()
 
-                ATHLTHArenaLiveDuelsSection()
+                ATHLTHArenaSeasonsSection()
 
-                HStack(spacing: 10) {
-                    NavigationLink {
-                        ATHLTHArenaSingleChallengesView()
-                    } label: {
-                        arenaDestination(
-                            title: ATHLTHLocalization.choose(
-                                english: "Challenges",
-                                norwegian: "Enkeltutfordringer"
-                            ),
-                            detail: ATHLTHLocalization.choose(
-                                english: "Invites, duels & results",
-                                norwegian: "Dueller, invitasjoner og resultater"
-                            ),
-                            icon: "flag.checkered"
-                        )
+                Group {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        VStack(spacing: 10) {
+                            arenaDestinations
+                        }
+                    } else {
+                        HStack(spacing: 10) {
+                            arenaDestinations
+                        }
                     }
-                    .buttonStyle(.plain)
-
-                    NavigationLink {
-                        CommunityGroupsView()
-                    } label: {
-                        arenaDestination(
-                            title: "Clubs",
-                            detail: ATHLTHLocalization.choose(
-                                english: "Group competitions",
-                                norwegian: "Klubbkonkurranser"
-                            ),
-                            icon: "person.3.fill"
-                        )
-                    }
-                    .buttonStyle(.plain)
                 }
 
                 HStack {
@@ -745,6 +725,47 @@ struct ATHLTHArenaHomeView: View {
         }
     }
 
+    @ViewBuilder
+    private var arenaDestinations: some View {
+        NavigationLink {
+            ATHLTHArenaSingleChallengesView()
+        } label: {
+            arenaDestination(
+                title: ATHLTHLocalization.choose(
+                    english: "Challenges", norwegian: "Enkeltutfordringer"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english: "Invites, duels & results",
+                    norwegian: "Dueller, invitasjoner og resultater"
+                ),
+                icon: "flag.checkered"
+            )
+        }
+        .buttonStyle(.plain)
+
+        NavigationLink {
+            CommunityGroupsView()
+        } label: {
+            arenaDestination(
+                title: "Clubs",
+                detail: ATHLTHLocalization.choose(
+                    english: "Club competitions", norwegian: "Klubbkonkurranser"
+                ),
+                icon: "person.3.fill"
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func heroCapability(_ title: String, icon: String) -> some View {
+        Label(title, systemImage: icon)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.white.opacity(0.89))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(.white.opacity(0.11), in: Capsule())
+    }
+
     private func arenaDestination(
         title: String,
         detail: String,
@@ -789,11 +810,14 @@ struct ATHLTHArenaHomeView: View {
                     .font(.caption.weight(.bold))
                     .tracking(1.2)
                 Spacer()
-                Text("2.0")
+                Text(ATHLTHLocalization.choose(
+                    english: "COMPETE", norwegian: "KONKURRER"
+                ))
                     .font(.caption2.weight(.bold))
+                    .tracking(0.6)
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(.white.opacity(0.13), in: Capsule())
+                    .padding(.vertical, 6)
+                    .background(.white.opacity(0.14), in: Capsule())
             }
             .foregroundStyle(.white.opacity(0.88))
 
@@ -801,7 +825,7 @@ struct ATHLTHArenaHomeView: View {
                 english: "Make every session a challenge.",
                 norwegian: "Gjør hver økt til en utfordring."
             ))
-            .font(.system(size: 29, weight: .bold, design: .rounded))
+            .font(.system(.largeTitle, design: .rounded, weight: .bold))
             .foregroundStyle(.white)
             .fixedSize(horizontal: false, vertical: true)
 
@@ -810,8 +834,22 @@ struct ATHLTHArenaHomeView: View {
                 norwegian: "Lag ruter, utfordre venner og konkurrer over flere runder."
             ))
             .font(.subheadline)
-            .foregroundStyle(.white.opacity(0.84))
+            .foregroundStyle(.white.opacity(0.88))
             .fixedSize(horizontal: false, vertical: true)
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 7) {
+                    heroCapability(ATHLTHLocalization.choose(english: "Routes", norwegian: "Ruter"), icon: "map")
+                    heroCapability("Live Ghost", icon: "bolt.fill")
+                    heroCapability(ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke"), icon: "dumbbell.fill")
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    heroCapability(ATHLTHLocalization.choose(english: "Routes", norwegian: "Ruter"), icon: "map")
+                    heroCapability("Live Ghost", icon: "bolt.fill")
+                    heroCapability(ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke"), icon: "dumbbell.fill")
+                }
+            }
+            .padding(.vertical, 2)
 
             Button {
                 creationMode = .challenge
@@ -835,14 +873,7 @@ struct ATHLTHArenaHomeView: View {
         }
         .padding(21)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(
-                colors: [ATHLTHTheme.accentDeep, ATHLTHTheme.vitality],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: 25, style: .continuous)
-        )
+        .background(ATHLTHArenaLightStyle.heroSurface(26))
         .accessibilityElement(children: .contain)
     }
 
@@ -952,7 +983,7 @@ struct ATHLTHArenaHomeView: View {
             Text(detail)
                 .font(.caption)
                 .foregroundStyle(ATHLTHTheme.mutedText)
-                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, minHeight: 116, alignment: .topLeading)
