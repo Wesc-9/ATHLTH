@@ -20,6 +20,27 @@ struct ATHLTHArenaLiveDuelCandidate: Equatable {
 }
 
 enum ATHLTHArenaLiveDuelReview {
+    /// Preselect ranks only when a completed live duel has a single winner.
+    /// This NEVER awards points: every result still needs review and votes.
+    static func proposedSlots(
+        candidate: ATHLTHArenaLiveDuelCandidate,
+        senderID: UUID,
+        recipientID: UUID,
+        senderSlotID: UUID,
+        recipientSlotID: UUID,
+        scoring: ATHLTHArenaScoring
+    ) -> [UUID]? {
+        guard senderID != recipientID,
+              senderSlotID != recipientSlotID,
+              let winner = candidate.winnerID,
+              winner == senderID || winner == recipientID else {
+            return nil
+        }
+        let first = winner == senderID ? senderSlotID : recipientSlotID
+        let second = winner == senderID ? recipientSlotID : senderSlotID
+        return scoring == .winner ? [first] : [first, second]
+    }
+
     static func candidate(
         senderID: UUID,
         recipientID: UUID,
