@@ -8010,6 +8010,21 @@ struct ChallengeDetailView: View {
                         participantsCard(challenge)
                         attemptsCard(challenge)
 
+                        // Completion-based sharing is an explicit opt-in.
+                        // No invitation or in-progress challenge can be posted.
+                        if let myCompletedAttempt = challenge.attempts
+                            .filter({
+                                $0.userID == session.profile.userID &&
+                                $0.isEligible
+                            })
+                            .sorted(by: { $0.submittedAt > $1.submittedAt })
+                            .first {
+                            ChallengeResultSharingCard(
+                                challenge: challenge,
+                                attempt: myCompletedAttempt
+                            )
+                        }
+
                         if challenge.sport == .strength,
                            challenge.rules.verificationPolicy.allowsManual,
                            challenge.status == .active {
