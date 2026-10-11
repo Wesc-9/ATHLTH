@@ -3804,7 +3804,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         if configuration.announceHeartRate,
-           heartRate > 0 {
+           ATHLTHCoachSensorFreshness.validHeartRate(
+               heartRate,
+               sampledAt: coachHeartRateSampleAt
+           ) {
             parts.append(
                 coachPhrase(
                     english: "Heart rate",
