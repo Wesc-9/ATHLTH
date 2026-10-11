@@ -55,6 +55,22 @@ final class OfficialWeeklyChallengeCountdownTests: XCTestCase {
         )
         XCTAssertEqual(
             OfficialWeeklyChallengeCountdown.remaining(
+                until: now.addingTimeInterval(59 * 60 + 59),
+                now: now,
+                norwegian: true
+            ),
+            "59 minutter igjen"
+        )
+        XCTAssertEqual(
+            OfficialWeeklyChallengeCountdown.remaining(
+                until: now.addingTimeInterval(23 * 3600 + 59 * 60 + 59),
+                now: now,
+                norwegian: true
+            ),
+            "23 timer igjen"
+        )
+        XCTAssertEqual(
+            OfficialWeeklyChallengeCountdown.remaining(
                 until: now.addingTimeInterval(20),
                 now: now,
                 norwegian: true
