@@ -150,13 +150,13 @@ final class MirroredWorkoutAudioCoach:
             }
         }
 
-        if snapshot.state == .running {
-            announceStepIfNeeded(
-                snapshot
-            )
-            announceRoutineIfNeeded(
-                snapshot
-            )
+        if snapshot.state == .running,
+           ATHLTHCoachSensorFreshness.isFresh(
+               sampledAt: snapshot.capturedAt,
+               maximumAge: ATHLTHCoachSensorFreshness.maximumSnapshotAge
+           ) {
+            announceStepIfNeeded(snapshot)
+            announceRoutineIfNeeded(snapshot)
         }
 
         if snapshot.state == .completed {
@@ -436,7 +436,10 @@ final class MirroredWorkoutAudioCoach:
 
         if configuration
             .announceHeartRate,
-           snapshot.heartRate > 0 {
+           ATHLTHCoachSensorFreshness.validHeartRate(
+               snapshot.heartRate,
+               sampledAt: snapshot.coachHeartRateSampleAt
+           ) {
             english.append(
                 "Heart rate \(Int(snapshot.heartRate.rounded()))"
             )
@@ -546,32 +549,14 @@ final class MirroredWorkoutAudioCoach:
     }
 
     private func resolvedPace(
-        _ snapshot:
-            WatchWorkoutLiveSnapshot
+        _ snapshot: WatchWorkoutLiveSnapshot
     ) -> TimeInterval? {
-        if let current =
-                snapshot
-                    .currentPaceSecondsPerKilometer,
-           current > 0,
-           current.isFinite {
-            return current
-        }
+        guard ATHLTHCoachSensorFreshness.validPace(
+            snapshot.currentPaceSecondsPerKilometer,
+            sampledAt: snapshot.coachPaceSampleAt
+        ) else { return nil }
 
-        guard snapshot.distanceMeters > 20,
-              snapshot.elapsedTime > 0
-        else {
-            return nil
-        }
-
-        let pace =
-            snapshot.elapsedTime /
-            snapshot.distanceMeters *
-            1_000
-
-        return pace.isFinite &&
-            pace > 0
-            ? pace
-            : nil
+        return snapshot.currentPaceSecondsPerKilometer
     }
 
     private func phrase(
