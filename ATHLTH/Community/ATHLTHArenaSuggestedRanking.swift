@@ -17,13 +17,13 @@ enum ATHLTHArenaSuggestedRanking {
     ) -> [ATHLTHArenaSuggestedStanding] {
         let expectedMetric: String
         switch template {
-        case .fastest5K, .fastest1K:
+        case .fastest5K, .fastest1K, .fastestDistance:
             expectedMetric = "elapsed_seconds"
         case .mostDistance:
             expectedMetric = "distance_meters"
         case .mostWorkouts:
             expectedMetric = "completed_workout"
-        case .mostRepetitions, .custom:
+        case .mostRepetitions, .fastestRoute, .custom:
             return []
         }
         let valid = evidence.filter {
@@ -36,7 +36,7 @@ enum ATHLTHArenaSuggestedRanking {
         let values = groups.compactMap { slot, entries -> ATHLTHArenaSuggestedStanding? in
             guard !entries.isEmpty else { return nil }
             let result: Double
-            if template == .fastest5K || template == .fastest1K {
+            if template == .fastest5K || template == .fastest1K || template == .fastestDistance {
                 result = entries.map(\.metricValue).min() ?? 0
             } else if template == .mostDistance {
                 result = entries.reduce(0.0) { $0 + $1.metricValue }
@@ -49,7 +49,7 @@ enum ATHLTHArenaSuggestedRanking {
         }
         return values.sorted { lhs, rhs in
             if lhs.result != rhs.result {
-                return template == .fastest5K || template == .fastest1K
+                return template == .fastest5K || template == .fastest1K || template == .fastestDistance
                     ? lhs.result < rhs.result
                     : lhs.result > rhs.result
             }
