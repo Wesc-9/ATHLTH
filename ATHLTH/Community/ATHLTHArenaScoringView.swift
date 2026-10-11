@@ -233,6 +233,7 @@ struct ATHLTHArenaScoringSection: View {
 
                 ForEach(rounds) { round in
                     resultRow(round)
+                        .id("arena-review-\(round.id.uuidString)")
                 }
             }
 
