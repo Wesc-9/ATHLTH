@@ -218,6 +218,15 @@ extension SupabaseSocialService {
             .execute()
     }
 
+    func scheduleIndependentWorkoutStart(sessionID: UUID) async throws {
+        try await client
+            .rpc(
+                "schedule_social_workout_independent_start",
+                params: WorkoutSessionIndependentStartParams(sessionID: sessionID)
+            )
+            .execute()
+    }
+
     func enableIndependentWorkoutStart(
         sessionID: UUID,
         invitePayload: SocialWorkoutInvitePayload
@@ -599,6 +608,14 @@ private struct WorkoutSessionStartParams: Encodable {
         case sessionID = "p_session_id"
         case countdownSeconds =
             "p_countdown_seconds"
+    }
+}
+
+private struct WorkoutSessionIndependentStartParams: Encodable {
+    let sessionID: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case sessionID = "p_session_id"
     }
 }
 
