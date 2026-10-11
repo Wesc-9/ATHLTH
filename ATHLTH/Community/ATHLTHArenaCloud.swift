@@ -771,6 +771,7 @@ enum ATHLTHArenaCloudError: LocalizedError {
     case invalidDraft(String)
     case invitationAlreadyHandled
     case evidenceNotFound
+    case invalidRouteEvidence
 
     var errorDescription: String? {
         switch self {
@@ -805,6 +806,11 @@ enum ATHLTHArenaCloudError: LocalizedError {
             return ATHLTHLocalization.choose(
                 english: "This invitation has changed or was already answered. Refresh Arena to see the latest status.",
                 norwegian: "Invitasjonen er endret eller allerede besvart. Oppdater Arena for å se siste status."
+            )
+        case .invalidRouteEvidence:
+            return ATHLTHLocalization.choose(
+                english: "This workout does not meet the route evidence requirements. Check GPS again.",
+                norwegian: "Økten oppfyller ikke kravene til rutebevis. Sjekk GPS på nytt."
             )
         case .evidenceNotFound:
             return ATHLTHLocalization.choose(
@@ -1251,13 +1257,16 @@ final class ATHLTHArenaCloudService: Sendable {
             throw ATHLTHArenaCloudError.signInRequired
         }
         guard workout.activity == .running,
+              workout.isIndoor != true,
               let distance = workout.distanceMeters,
-              distance.isFinite,
-              workout.duration.isFinite,
-              matchPercent.isFinite,
-              startGapMeters.isFinite,
-              endGapMeters.isFinite else {
-            throw ATHLTHArenaCloudError.needRounds
+              distance.isFinite, distance > 0,
+              workout.duration.isFinite, (0...86_400).contains(workout.duration),
+              workout.duration > 0,
+              distance <= workout.duration * 15,
+              matchPercent.isFinite, (90...100).contains(matchPercent),
+              startGapMeters.isFinite, (0...120).contains(startGapMeters),
+              endGapMeters.isFinite, (0...120).contains(endGapMeters) else {
+            throw ATHLTHArenaCloudError.invalidRouteEvidence
         }
         let _: UUID = try await client.rpc(
             "arena_share_route_evidence",
