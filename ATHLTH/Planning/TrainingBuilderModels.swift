@@ -442,3 +442,23 @@ struct CoachPlanAdaptationRecord: Identifiable, Codable, Hashable {
         self.revertedAt = revertedAt
     }
 }
+
+
+// Exercise-level warm-up is represented using the existing per-set targets.
+// This keeps saved plans, invites and Watch workouts backward compatible.
+extension PlannedExercise {
+    var isWarmUpExercise: Bool {
+        let targets = resolvedSetTargets
+        return !targets.isEmpty && targets.allSatisfy {
+            $0.isWarmUp == true || $0.setType == .warmUp
+        }
+    }
+
+    mutating func setEntireExerciseWarmUp(_ warmUp: Bool) {
+        setTargets = resolvedSetTargets.map { target in
+            var updated = target
+            updated.isWarmUp = warmUp
+            updated.setType = warmUp ? .warmUp : .work
+            return updated
+        }
+    }
