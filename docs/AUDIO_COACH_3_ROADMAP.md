@@ -75,7 +75,7 @@ Audio Coach skal være integrert i alle støttede økter fra planlegging til opp
 
 **Avgrensning:** 2A gir *lokal* duplikatkontroll for utvalgte typer, ikke global exactly-once-garanti på tvers av enheter. Markører inneholder kun type og intervall-/steg-ID, ikke selve talemeldingen eller brukerens helsehistorikk.
 
-### 3. Oppdagbarhet og premiumdesign — STEG 3A–3D KODE IMPLEMENTERT, VERIFISERING GJENSTÅR
+### 3. Oppdagbarhet og premiumdesign — STEG 3A–3E KODE IMPLEMENTERT, VERIFISERING GJENSTÅR
 
 - [x] Audio Coach kan åpnes fra **både enkel og avansert** styrkestart; den er ikke lenger skjult bak Avansert.
 - [x] Ved enkel styrkestart bevares valgt coach-konfigurasjon gjennom lokalt opptak, invitert treningsøkt og iPad-relay, uten automatisk å aktivere øvrige avanserte treningsvalg.
@@ -86,7 +86,7 @@ Audio Coach skal være integrert i alle støttede økter fra planlegging til opp
 - [ ] Verifiser komplett iOS/watchOS-bygg og automatiske tester på samlet commit.
 - [ ] Manuell QA: enkel styrke, avansert styrke, Watch-start, invitert økt, iPad-relay og eksisterende stemmevalg.
 - [ ] Gjennomført coach-status og samme premiumkontroller i **alle** støttede øktstarter og på Watch; de første skjermene er nå forbedret.
-- [ ] Separat talefrekvens og talestil (balansert, teknisk, motiverende, minimal).
+- [x] Separat talefrekvens og talestil (balansert, teknisk, motiverende, minimal). Talefrekvens styres fortsatt via uendrede avstands-/tidsintervaller; talemåte påvirker kun ordlyd.
 - [x] **Steg 3B:** iPhone live Audio Coach-panel har **Pause tale / Fortsett tale** og **Status nå**. Aktivitetens HealthKit/GPS-registrering, intervallterskler og øvrig varsling endres ikke av en midlertidig talepause.
 - [x] **Steg 3B:** Apple Watch-kontrollsiden har tilsvarende knapper. En manuelt ønsket status kan spilles av direkte på klokken, også når iPhone normalt eier automatiske coachmeldinger.
 - [x] Talepausen er eksplisitt avgrenset til **Audio Coach**: kritiske Route Guardian-/målvarsler og selvstendige Ghost-varsler beholder sine egne lydinnstillinger; haptikk påvirkes ikke.
@@ -107,7 +107,14 @@ Audio Coach skal være integrert i alle støttede økter fra planlegging til opp
 - [x] **Steg 3D:** ikke-løpe-trening på Watch (inkludert styrke) har rullbare coachknapper for talemute, fersk status og repetisjon, mens øktpause og øktslutt holdes separat.
 - [x] Regresjonstester for styrkestatus, settgrenser, utløpt hvile og uavhengige stemme-/vibrasjonskanaler.
 - [ ] Siste samlede Xcode-build og fysisk Apple Watch/iPhone-QA av styrketale, basic/advanced, pause/fortsett, tidsbaserte sett, rest-countdown og AirPods med Spotify.
-- [ ] Global talestil/frekvens, eventuelt forhåndslytt fra livepanelet og mer konsekvent coach-status i resterende strukturert plan / øvrige øktmotorer.
+- [x] **Steg 3E:** valgbare talemåter **Balansert, Motiverende, Teknisk og Minimal** i `ATHLTHCoachSpeechStyle`, uten AI-API, nettverkskall eller endringer i øktregistrering.
+- [x] Talemåten lagres som global standard og kan overstyres for løpeøkter og styrkeøkter; beholdes gjennom Quick Start, planlagt økt, iPhone, Apple Watch og eksisterende Watch-overføring.
+- [x] Valgt talemåte brukes ved faktisk AVSpeech-avspilling i **iPhone-løping, speilet Watch-løping, direkte Watch-coach og iPhone-styrke**, inkludert riktig tekst i kortvarig «Hør igjen»-historikk.
+- [x] Justerbar talemåte under løpeøkt på iPhone og Watch, og ved styrkeøktstart og Watch-styrke. Global forhåndslytt bruker **fiktive** treningsdata og valgt stemme, språk, volum og hastighet.
+- [x] **Kritiske Route Guardian-/mål- og Ghost-varsler endres ikke av talemåte**; motivasjon legges bare til nøytral treningsfremdrift, og minimalstil forkorter kun ord for måleenheter uten å droppe målinger.
+- [x] Nye tester for fire stiler, kritiske varsler, numeriske verdier, reprisering uten doble oppmuntringer, uendrede frekvenser og bakoverkompatibel serialisering.
+- [ ] Fullfør iOS-/watchOS-bygg og fysisk verifisering av gammel og ny Watch-paring, AirPods/Spotify, styrkeøkt, synkronisert duell og siste-beskjed-funksjon.
+- [ ] Neste: eventuelt egen forhåndslytt inne i livepanelet og mer naturtro kontekstuelle fraser i øktplaner, mens nøyaktige målsoner og sikkerhetsvarsler forblir urørt.
 
 **Omfang:** Innholdsnivåene gjenbruker eksisterende `WatchAudioCoachConfiguration` og krever ingen nye serverfelter eller databaseendringer. Nye avanserte treningsfunksjoner skal ikke aktiveres bare fordi et enkelt coach-nivå er valgt.
 
