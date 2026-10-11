@@ -11,6 +11,37 @@ struct WatchTrainingAlwaysOnDashboard: View {
     private let quiet = Color.white.opacity(0.47)
     private let accent = Color(red: 0.48, green: 0.77, blue: 0.78)
 
+    private var presentationPlan: ATHLTHLivePresentationPlan {
+        let state: WatchWorkoutMirrorState
+        switch workout.state {
+        case .idle, .preparing: state = .preparing
+        case .running: state = .running
+        case .paused: state = .paused
+        case .ending: state = .ending
+        case .completed: state = .completed
+        case .failed: state = .failed
+        }
+        return ATHLTHLivePresentationResolver.resolve(
+            .init(
+                kind: workout.kind,
+                state: state,
+                isStrengthResting: workout.strengthSession?.isResting ?? false,
+                isTimedStrengthSet:
+                    workout.strengthSession?.targetKindRaw == "time",
+                // Watch currently receives the time target, not an active
+                // countdown. Never label that target as elapsed/remaining.
+                hasStructuredRunningStep:
+                    workout.currentStructuredRunningStep != nil,
+                hasHeartRateTarget:
+                    workout.targetAlertConfiguration?.heartRateEnabled == true,
+                hasRoute: workout.plannedRoute != nil,
+                hasGhost: workout.ghostRaceTitle != nil,
+                hasAudioCoach: workout.audioCoachConfiguration.enabled,
+                hasTreadmillIncline: workout.treadmillInclinePercent != nil
+            )
+        )
+    }
+
     var body: some View {
         GeometryReader { geometry in
             let compact = geometry.size.width < 190 ||
@@ -82,6 +113,11 @@ struct WatchTrainingAlwaysOnDashboard: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 HStack(spacing: 9) {
+                    if current.isWarmUp == true {
+                        Text(ATHLTHLocalization.choose(
+                            english: "WARM-UP", norwegian: "OPPVARMING"
+                        ))
+                    }
                     Text(ATHLTHLocalization.format(
                         english: "EXERCISE %d/%d",
                         norwegian: "ØVELSE %d/%d",
@@ -107,14 +143,35 @@ struct WatchTrainingAlwaysOnDashboard: View {
                     ))
                     .font(.system(size: compact ? 10 : 11, weight: .bold))
                     .foregroundStyle(secondary)
+                    if let restEndsAt = current.restEndsAt {
+                        // AOD is throttled by watchOS; recompute from the
+                        // absolute end date instead of counting local ticks.
+                        TimelineView(.periodic(from: .now, by: 5)) { timeline in
+                            let seconds = restEndsAt.timeIntervalSince(timeline.date)
+                            Text(seconds > 0
+                                 ? timeString(seconds)
+                                 : ATHLTHLocalization.choose(
+                                    english: "READY", norwegian: "KLAR"
+                                 ))
+                                .font(.system(size: compact ? 30 : 36,
+                                              weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundStyle(primary)
+                        }
+                    } else {
+                        Text(ATHLTHLocalization.choose(
+                            english: "REST", norwegian: "PAUSE"
+                        ))
+                        .font(.system(size: compact ? 26 : 30,
+                                      weight: .bold, design: .rounded))
+                        .foregroundStyle(primary)
+                    }
                     Text(ATHLTHLocalization.choose(
-                        english: "Next set soon",
-                        norwegian: "Neste sett snart"
+                        english: "Next set when ready",
+                        norwegian: "Neste sett når du er klar"
                     ))
-                    .font(.system(size: compact ? 23 : 28,
-                                  weight: .bold, design: .rounded))
-                    .foregroundStyle(primary)
-                    .minimumScaleFactor(0.7)
+                    .font(.system(size: compact ? 9 : 10))
+                    .foregroundStyle(secondary)
                 } else {
                     HStack(alignment: .firstTextBaseline, spacing: 5) {
                         Text(current.targetKindRaw == "time"
@@ -130,7 +187,9 @@ struct WatchTrainingAlwaysOnDashboard: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
                         Text(current.targetKindRaw == "time"
-                             ? "SEC"
+                             ? ATHLTHLocalization.choose(
+                                 english: "TARGET", norwegian: "MÅL"
+                               )
                              : "REPS")
                             .font(.system(size: compact ? 11 : 12,
                                           weight: .bold))
@@ -179,48 +238,25 @@ struct WatchTrainingAlwaysOnDashboard: View {
     private func distanceDashboard(compact: Bool) -> some View {
         VStack(alignment: .leading, spacing: compact ? 3 : 5) {
             Text(currentWorkoutTitle)
-                .font(.system(size: compact ? 10 : 12,
-                              weight: .semibold))
+                .font(.system(size: compact ? 10 : 12, weight: .semibold))
                 .foregroundStyle(secondary)
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
 
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(paceString)
-                    .font(.system(
-                        size: compact ? 35 : 43,
-                        weight: .bold, design: .rounded
-                    ))
-                    .monospacedDigit()
-                    .foregroundStyle(primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                Text("/km")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(secondary)
-                Spacer(minLength: 0)
-            }
-
-            Text("PACE")
+            if presentationPlan.primary == .distance {
+                distanceMetric(fontSize: compact ? 37 : 44)
+                Text(ATHLTHLocalization.choose(
+                    english: "DISTANCE", norwegian: "DISTANSE"
+                ))
                 .font(.system(size: 8, weight: .bold))
-                .tracking(1)
                 .foregroundStyle(accent)
 
-            HStack(alignment: .firstTextBaseline, spacing: 5) {
-                Text(String(format: "%.2f",
-                    max(workout.distanceMeters, 0) / 1000))
-                    .font(.system(
-                        size: compact ? 30 : 37,
-                        weight: .bold, design: .rounded
-                    ))
-                    .monospacedDigit()
-                    .foregroundStyle(primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                Text("KM")
-                    .font(.system(size: 10, weight: .semibold))
+                paceMetric(fontSize: compact ? 25 : 30)
+            } else {
+                paceMetric(fontSize: compact ? 35 : 43)
+                Text("PACE")
+                    .font(.system(size: 8, weight: .bold))
                     .foregroundStyle(accent)
-                Spacer(minLength: 0)
+                distanceMetric(fontSize: compact ? 30 : 37)
             }
 
             Spacer(minLength: 0)
@@ -230,12 +266,53 @@ struct WatchTrainingAlwaysOnDashboard: View {
                alignment: .topLeading)
     }
 
+    private func distanceMetric(fontSize: CGFloat) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 5) {
+            Text(String(format: "%.2f", max(workout.distanceMeters, 0) / 1000))
+                .font(.system(size: fontSize, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+            Text("km")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(accent)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func paceMetric(fontSize: CGFloat) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text(paceString)
+                .font(.system(size: fontSize, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text("/km")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(secondary)
+            Spacer(minLength: 0)
+        }
+    }
+
     private func genericDashboard(compact: Bool) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(workout.kind.title)
-                .font(.system(size: compact ? 23 : 28,
+                .font(.system(size: compact ? 14 : 16,
+                              weight: .semibold, design: .rounded))
+                .foregroundStyle(secondary)
+            Text(timeString(workout.elapsedTime))
+                .font(.system(size: compact ? 38 : 45,
                               weight: .bold, design: .rounded))
+                .monospacedDigit()
                 .foregroundStyle(primary)
+                .minimumScaleFactor(0.7)
+            Text(ATHLTHLocalization.choose(
+                english: "ELAPSED TIME", norwegian: "MEDGÅTT TID"
+            ))
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(accent)
             Spacer(minLength: 0)
             footer()
         }
