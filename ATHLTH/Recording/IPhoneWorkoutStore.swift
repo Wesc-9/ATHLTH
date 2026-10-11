@@ -662,6 +662,53 @@ final class IPhoneWorkoutStore:
         persistActiveCheckpoint(force: true)
     }
 
+    /// Live overrides affect only the current iPhone workout.
+    /// Start at the next milestone, not a threshold already passed.
+    func updateAudioCoachDuringWorkout(
+        _ configuration: WatchAudioCoachConfiguration
+    ) {
+        guard var workout = active else { return }
+
+        let wasEnabled =
+            workout.audioCoachConfiguration?.enabled == true
+        let now = Date()
+        workout.audioCoachConfiguration = configuration
+        workout.lastCheckpoint = now
+        active = workout
+
+        if configuration.enabled {
+            nextDistanceAnnouncementMeters =
+                configuration.distanceIntervalMeters.flatMap { interval in
+                    guard interval > 0 else { return nil }
+                    return (floor(workout.distanceMeters / interval) + 1) * interval
+                }
+            nextTimeAnnouncementSeconds =
+                configuration.timeIntervalSeconds.flatMap { interval in
+                    guard interval > 0 else { return nil }
+                    return (floor(workout.elapsed(at: now) / interval) + 1) * interval
+                }
+        } else {
+            resetCoachThresholds(configuration: nil)
+            deactivateCoachAudioSession()
+            guidancePriorityGate.reset()
+        }
+
+        persistActiveCheckpoint(force: true)
+        syncLiveActivity()
+
+        if configuration.enabled && !wasEnabled {
+            speak(
+                localizedCoachPhrase(
+                    english: "Audio Coach is on.",
+                    norwegian: "Audio Coach er på.",
+                    configuration: configuration
+                ),
+                configuration: configuration,
+                priority: .structuredStep
+            )
+        }
+    }
+
     func setTreadmillInclinePercent(
         _ percent: Double
     ) {
@@ -3103,12 +3150,18 @@ final class IPhoneWorkoutStore:
         }
 
         var parts: [String] = []
+        let norwegian =
+            localizedCoachPhrase(
+                english: "en",
+                norwegian: "no",
+                configuration: configuration
+            ) == "no"
 
         if configuration.announceDistance {
             parts.append(
                 String(
                     format:
-                        "%.1f kilometers",
+                        norwegian ? "%.1f kilometer" : "%.1f kilometers",
                     workout.distanceMeters /
                         1_000
                 )
@@ -3117,7 +3170,7 @@ final class IPhoneWorkoutStore:
 
         if configuration.announceElapsedTime {
             parts.append(
-                durationPhrase(elapsed)
+                durationPhrase(elapsed, norwegian: norwegian)
             )
         }
 
@@ -3130,7 +3183,8 @@ final class IPhoneWorkoutStore:
                     1_000
                 )
             parts.append(
-                "average pace \(pacePhrase(pace))"
+                (norwegian ? "Gjennomsnittstempo " : "Average pace ") +
+                    pacePhrase(pace, norwegian: norwegian)
             )
         }
 
@@ -3140,10 +3194,14 @@ final class IPhoneWorkoutStore:
                 workout.routeRemainingMeters {
             parts.append(
                 remaining < 1_000
-                    ? "\(Int(remaining.rounded())) meters remaining"
+                    ? (norwegian
+                        ? "\(Int(remaining.rounded())) meter igjen"
+                        : "\(Int(remaining.rounded())) meters remaining")
                     : String(
                         format:
-                            "%.1f kilometers remaining",
+                            norwegian
+                                ? "%.1f kilometer igjen"
+                                : "%.1f kilometers remaining",
                         remaining / 1_000
                     )
             )
@@ -3158,7 +3216,9 @@ final class IPhoneWorkoutStore:
                     .currentPaceSecondsPerKilometer,
            pace > 0 {
             parts.append(
-                "about \(durationPhrase((remaining / 1_000) * pace)) remaining"
+                (norwegian
+                    ? "Omtrent \(durationPhrase((remaining / 1_000) * pace, norwegian: true)) igjen"
+                    : "About \(durationPhrase((remaining / 1_000) * pace)) remaining")
             )
         }
 
@@ -3322,41 +3382,39 @@ final class IPhoneWorkoutStore:
     }
 
     private func durationPhrase(
-        _ seconds: TimeInterval
+        _ seconds: TimeInterval,
+        norwegian: Bool = false
     ) -> String {
         let totalMinutes =
-            max(
-                Int(
-                    (seconds / 60)
-                        .rounded()
-                ),
-                0
-            )
-        let hours =
-            totalMinutes / 60
-        let minutes =
-            totalMinutes % 60
+            max(Int((seconds / 60).rounded()), 0)
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
 
         if hours > 0 {
+            if norwegian {
+                return minutes > 0
+                    ? "\(hours) timer \(minutes) minutter"
+                    : "\(hours) timer"
+            }
             return minutes > 0
                 ? "\(hours) hours \(minutes) minutes"
                 : "\(hours) hours"
         }
 
-        return "\(minutes) minutes"
+        return norwegian
+            ? "\(minutes) minutter"
+            : "\(minutes) minutes"
     }
 
     private func pacePhrase(
-        _ seconds: TimeInterval
+        _ seconds: TimeInterval,
+        norwegian: Bool = false
     ) -> String {
-        let total =
-            max(
-                Int(seconds.rounded()),
-                0
-            )
+        let total = max(Int(seconds.rounded()), 0)
         return String(
-            format:
-                "%d minutes %02d seconds per kilometer",
+            format: norwegian
+                ? "%d minutter %02d sekunder per kilometer"
+                : "%d minutes %02d seconds per kilometer",
             total / 60,
             total % 60
         )
