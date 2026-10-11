@@ -252,6 +252,31 @@ final class ATHLTHArenaSafetyTests: XCTestCase {
         ), 1)
     }
 
+    func testSeasonStandingsNeverPromoteMalformedScores() {
+        let valid = ATHLTHArenaSeasonStandingsRow(
+            userID: UUID(), points: 6, competitions: 1
+        )
+        let missing = ATHLTHArenaSeasonStandingsRow(
+            userID: UUID(), points: .nan, competitions: 1
+        )
+        let invalid = ATHLTHArenaSeasonStandingsRow(
+            userID: UUID(), points: -.infinity, competitions: 1
+        )
+        let negative = ATHLTHArenaSeasonStandingsRow(
+            userID: UUID(), points: -5, competitions: 1
+        )
+        let ordered = ATHLTHArenaSeasonPresentation.orderedStandings(
+            [missing, invalid, negative, valid]
+        )
+        XCTAssertEqual(ordered.first?.userID, valid.userID)
+        XCTAssertNil(ATHLTHArenaSeasonPresentation.competitiveRank(
+            of: missing, among: ordered
+        ))
+        XCTAssertNil(ATHLTHArenaSeasonPresentation.competitiveRank(
+            of: negative, among: ordered
+        ))
+    }
+
     func testSeasonProgressUsesWholeCalendarDaysIncludingLastDay() {
         let first = ATHLTHArenaSeasonPresentation.progress(
             startsOn: "2026-10-01", endsOn: "2026-10-31", today: "2026-10-01"
