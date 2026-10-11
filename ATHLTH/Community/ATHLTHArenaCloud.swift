@@ -180,6 +180,57 @@ private struct ATHLTHArenaOutcomeVoteParams: Encodable {
     }
 }
 
+struct ATHLTHArenaWorkoutEvidence: Decodable, Identifiable {
+    let id: UUID
+    let seriesID: UUID
+    let roundID: UUID
+    let slotID: UUID
+    let userID: UUID
+    let sourceWorkoutID: UUID
+    let source: String
+    let activityType: String
+    let startedAt: Date
+    let endedAt: Date
+    let metricType: String
+    let metricValue: Double
+
+    enum CodingKeys: String, CodingKey {
+        case id, source
+        case seriesID = "series_id"
+        case roundID = "round_id"
+        case slotID = "slot_id"
+        case userID = "user_id"
+        case sourceWorkoutID = "source_workout_id"
+        case activityType = "activity_type"
+        case startedAt = "started_at"
+        case endedAt = "ended_at"
+        case metricType = "metric_type"
+        case metricValue = "metric_value"
+    }
+}
+
+private struct ATHLTHArenaEvidenceParams: Encodable {
+    let roundID: UUID
+    let sourceWorkoutID: UUID
+    let source: String
+    let activity: String
+    let startedAt: Date
+    let endedAt: Date
+    let metricType: String
+    let metricValue: Double
+
+    enum CodingKeys: String, CodingKey {
+        case roundID = "p_round"
+        case sourceWorkoutID = "p_source_workout"
+        case source = "p_source"
+        case activity = "p_activity"
+        case startedAt = "p_started"
+        case endedAt = "p_ended"
+        case metricType = "p_metric_type"
+        case metricValue = "p_metric"
+    }
+}
+
 private struct ATHLTHArenaNewMessage: Encodable {
     let seriesID: UUID
     let senderID: UUID
@@ -452,6 +503,57 @@ final class ATHLTHArenaCloudService: Sendable {
         let _: String = try await client.rpc(
             "arena_vote_result",
             params: ATHLTHArenaOutcomeVoteParams(result: resultID, accept: accept)
+        ).execute().value
+    }
+
+    func loadWorkoutEvidence(seriesID: UUID) async throws -> [ATHLTHArenaWorkoutEvidence] {
+        try await client.from("arena_workout_evidence")
+            .select()
+            .eq("series_id", value: seriesID)
+            .order("started_at", ascending: false)
+            .limit(300)
+            .execute().value
+    }
+
+    /// Explicit user action only. Sends a workout UUID, time, source and
+    /// minimum relevant metric, never heart rate, GPS track or health profile.
+    func shareWorkoutEvidence(
+        roundID: UUID,
+        workout: SocialPublishableWorkout,
+        metricType: String,
+        metricValue: Double
+    ) async throws {
+        guard currentUserID != nil else {
+            throw ATHLTHArenaCloudError.signInRequired
+        }
+        let source: String
+        switch workout.source {
+        case "ATHLTH":
+            source = "athlth_strength"
+        case "iPhone":
+            source = "iphone"
+        default:
+            source = "apple_health"
+        }
+        let activity: String
+        switch workout.activity {
+        case .running: activity = "running"
+        case .walking: activity = "walking"
+        case .strength: activity = "strength"
+        default: activity = "other"
+        }
+        let _: UUID = try await client.rpc(
+            "arena_share_evidence",
+            params: ATHLTHArenaEvidenceParams(
+                roundID: roundID,
+                sourceWorkoutID: workout.id,
+                source: source,
+                activity: activity,
+                startedAt: workout.startDate,
+                endedAt: workout.endDate,
+                metricType: metricType,
+                metricValue: metricValue
+            )
         ).execute().value
     }
 
