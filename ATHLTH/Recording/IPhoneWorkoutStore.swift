@@ -171,6 +171,8 @@ final class IPhoneWorkoutStore:
     @Published private(set) var message: String?
     @Published private(set) var saving = false
     @Published private(set) var automaticPauseActive = false
+    /// Temporary voice mute: does not stop recording or critical haptics.
+    @Published private(set) var coachSpeechPaused = false
     @Published private(set) var completionStartedWorkout: PhoneWorkout?
     @Published private(set) var lastCompletedWorkout: PhoneWorkout?
     @Published private(set) var recoveredWorkoutLastCheckpoint:
@@ -534,6 +536,7 @@ final class IPhoneWorkoutStore:
         guidancePriorityGate.reset()
         coachEventLedger.reset()
         coachCueQueue.reset()
+        coachSpeechPaused = false
 
         let now = Date()
         recoveredWorkoutLastCheckpoint = nil
@@ -684,6 +687,9 @@ final class IPhoneWorkoutStore:
         workout.lastCheckpoint = now
         active = workout
 
+        if !configuration.enabled {
+            coachSpeechPaused = false
+        }
         if configuration.enabled {
             nextDistanceAnnouncementMeters =
                 configuration.distanceIntervalMeters.flatMap { interval in
@@ -716,6 +722,87 @@ final class IPhoneWorkoutStore:
                 priority: .structuredStep
             )
         }
+    }
+
+    /// Silences spoken coaching during this workout only, without changing
+    /// the persisted workout configuration, cadence, route or haptic alerts.
+    func setCoachSpeechPaused(_ paused: Bool) {
+        guard active?.audioCoachConfiguration?.enabled == true else {
+            coachSpeechPaused = false
+            return
+        }
+        guard coachSpeechPaused != paused else { return }
+        coachSpeechPaused = paused
+        coachCueQueue.reset()
+        guidancePriorityGate.reset()
+        if paused {
+            deactivateCoachAudioSession()
+        }
+    }
+
+    /// One-off status, read from the active recorder. No threshold reset.
+    func announceCoachStatusNow() {
+        guard !coachSpeechPaused,
+              let workout = active,
+              let configuration = workout.audioCoachConfiguration,
+              configuration.enabled
+        else { return }
+
+        let norwegian =
+            localizedCoachPhrase(
+                english: "en",
+                norwegian: "no",
+                configuration: configuration
+            ) == "no"
+        let elapsed = workout.elapsed(at: Date())
+        var parts: [String] = []
+
+        if configuration.announceDistance || configuration.announceAveragePace {
+            parts.append(
+                String(
+                    format: norwegian ? "Distanse %.2f kilometer" : "Distance %.2f kilometers",
+                    workout.distanceMeters / 1_000
+                )
+            )
+        }
+        if configuration.announceElapsedTime || parts.isEmpty {
+            parts.append(
+                (norwegian ? "Tid " : "Time ") +
+                durationPhrase(elapsed, norwegian: norwegian)
+            )
+        }
+        if configuration.announceAveragePace,
+           workout.distanceMeters >= 100,
+           elapsed > 0 {
+            let pace = elapsed / (workout.distanceMeters / 1_000)
+            parts.append(
+                (norwegian ? "Gjennomsnittstempo " : "Average pace ") +
+                pacePhrase(pace, norwegian: norwegian)
+            )
+        }
+        if configuration.announceRemainingRouteDistance,
+           let remaining = workout.routeRemainingMeters,
+           remaining.isFinite,
+           remaining >= 0 {
+            parts.append(
+                String(
+                    format: norwegian ? "%.1f kilometer igjen" : "%.1f kilometers remaining",
+                    remaining / 1_000
+                )
+            )
+        }
+        guard !parts.isEmpty else { return }
+        speak(
+            parts.joined(separator: ". "),
+            configuration: configuration,
+            priority: .structuredStep,
+            event: ATHLTHCoachEvent(
+                kind: .manualStatus,
+                key: UUID().uuidString,
+                priority: .structuredStep,
+                validFor: 8
+            )
+        )
     }
 
     func setTreadmillInclinePercent(
@@ -2023,6 +2110,7 @@ final class IPhoneWorkoutStore:
         guidancePriorityGate.reset()
         coachEventLedger.reset()
         coachCueQueue.reset()
+        coachSpeechPaused = false
         speechSynthesizer.stopSpeaking(
             at: .immediate
         )
@@ -3298,7 +3386,9 @@ final class IPhoneWorkoutStore:
                 .routineCoach,
         event: ATHLTHCoachEvent? = nil
     ) {
-        guard !phrase.isEmpty else {
+        guard !phrase.isEmpty,
+              !coachSpeechPaused
+        else {
             return
         }
         if let event,
