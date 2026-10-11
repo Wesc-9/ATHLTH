@@ -1555,6 +1555,11 @@ final class AppSessionStore: ObservableObject {
     func deleteTrainingPlan(
         _ planID: UUID
     ) {
+        if let plan = trainingPlan(withID: planID) {
+            for workout in plan.weeks.flatMap(\.days).flatMap(\.sessions) {
+                PlannedWorkoutReminderScheduler.cancel(workout.id)
+            }
+        }
         if activePlan?.id == planID {
             activePlan = nil
         }
@@ -3161,6 +3166,11 @@ final class AppSessionStore: ObservableObject {
             return
         }
 
+        for day in plan.weeks[index].days {
+            for workout in day.sessions {
+                PlannedWorkoutReminderScheduler.cancel(workout.id)
+            }
+        }
         plan.weeks.remove(at: index)
 
         for weekIndex in plan.weeks.indices {
@@ -3444,6 +3454,7 @@ final class AppSessionStore: ObservableObject {
                 .days[dayIndex]
                 .sessions
                 .append(session)
+            PlannedWorkoutReminderScheduler.sync(session)
             plan.updatedAt = Date()
             plan.version += 1
             replaceTrainingPlan(plan)
@@ -3554,6 +3565,7 @@ final class AppSessionStore: ObservableObject {
               ) else { return false }
         plan.weeks[location.week].days[location.day]
             .sessions.remove(at: workoutIndex)
+        PlannedWorkoutReminderScheduler.cancel(workoutID)
         plan.version += 1
         plan.updatedAt = Date()
         replaceTrainingPlan(plan)
@@ -3693,6 +3705,7 @@ final class AppSessionStore: ObservableObject {
                 .days[dayIndex]
                 .sessions
                 .removeAll { $0.id == sessionID }
+            PlannedWorkoutReminderScheduler.cancel(sessionID)
             plan.updatedAt = Date()
             plan.version += 1
             replaceTrainingPlan(plan)

@@ -3209,6 +3209,20 @@ struct DirectMessageThreadView: View {
                 savedFeedback ?? ""
             )
         }
+        .alert(
+            ATHLTHLocalization.choose(
+                english: "Could not respond to invitation",
+                norwegian: "Kunne ikke svare på invitasjonen"
+            ),
+            isPresented: Binding(
+                get: { plannedInviteError != nil },
+                set: { if !$0 { plannedInviteError = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(plannedInviteError ?? "")
+        }
         .task(id: friend.userID) {
             await openAndPoll()
         }
