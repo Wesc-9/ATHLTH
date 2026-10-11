@@ -207,6 +207,17 @@ final class MirroredWorkoutAudioCoach:
         }
     }
 
+    /// A Watch-originated attempt is not re-announced after a subsequent
+    /// speech handoff to iPhone. Only the mirror store validates the receipt
+    /// against its active workout before calling this method.
+    func recordWatchSpokenEvent(
+        _ receipt: ATHLTHCoachDeliveryReceipt
+    ) {
+        guard receipt.isValid(for: workoutStartedAt)
+        else { return }
+        eventLedger.noteCompanionDelivery(id: receipt.deliveryID)
+    }
+
     /// Stop audio immediately on expired ownership without discarding
     /// workout progress or queued configuration.
     func suspendForWatchFallback() {
