@@ -1609,6 +1609,13 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             }
         }
 
+        struct FinishReceipt: Decodable {
+            let challengeID: UUID
+            enum CodingKeys: String, CodingKey {
+                case challengeID = "challenge_id"
+            }
+        }
+
         // Capture the original completion instant once. If Supabase
         // committed the first request but its response was lost, the
         // immutable-finish trigger makes the next request idempotent.
@@ -1628,12 +1635,29 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                 }
             }
             do {
-                try await client
+                // A successful HTTP response can still update zero rows
+                // (for example after RLS revokes access or a duel is
+                // cancelled). Verify the exact race row was returned.
+                let receipts: [FinishReceipt] = try await client
                     .from("live_ghost_race_participants")
                     .update(finishPayload)
                     .eq("challenge_id", value: challengeID)
                     .eq("user_id", value: currentUserID)
+                    .select("challenge_id")
                     .execute()
+                    .value
+                guard receipts.contains(where: { $0.challengeID == challengeID }) else {
+                    throw NSError(
+                        domain: "ATHLTH.LiveGhost",
+                        code: 409,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: ATHLTHLocalization.choose(
+                                english: "The shared race did not confirm your finish. Your local workout remains saved.",
+                                norwegian: "Den delte duellen bekreftet ikke sluttiden. Din lokale treningsøkt er fortsatt lagret."
+                            )
+                        ]
+                    )
+                }
                 succeeded = true
                 errorMessage = nil
                 return
