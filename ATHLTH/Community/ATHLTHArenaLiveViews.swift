@@ -387,10 +387,14 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
             return nil
         }
 
-        let winner = winnerID == challenge.senderID ? sender : recipient
-        let runnerUp = winnerID == challenge.senderID ? recipient : sender
-        let slots = series.scoring == .winner
-            ? [winner.slotID] : [winner.slotID, runnerUp.slotID]
+        guard let slots = ATHLTHArenaLiveDuelReview.proposedSlots(
+            candidate: result,
+            senderID: challenge.senderID,
+            recipientID: challenge.recipientID,
+            senderSlotID: sender.slotID,
+            recipientSlotID: recipient.slotID,
+            scoring: series.scoring
+        ) else { return nil }
         let details = String(
             format: "Live Ghost %@. Rapporterte tider: %.1f s / %.1f s. Deltakerdata, ikke uavhengig GPS-verifisert; krever godkjenning.",
             challenge.id.uuidString,
