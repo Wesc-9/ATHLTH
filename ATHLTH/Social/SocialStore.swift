@@ -56,6 +56,27 @@ final class SocialStore: ObservableObject {
         incomingRequests.count + workoutInvites.count
     }
 
+    /// An invitation alone is not a workout. Restore a live social link
+    /// after relaunch only when this athlete actually started that session.
+    var recordingWorkoutSessionID: UUID? {
+        if let currentJoinedWorkoutSessionID {
+            return currentJoinedWorkoutSessionID
+        }
+        guard let currentUserID else { return nil }
+        return workoutSessions
+            .filter { $0.status == .active }
+            .sorted { $0.createdAt > $1.createdAt }
+            .first { session in
+                workoutParticipants.contains {
+                    $0.sessionID == session.id &&
+                    $0.userID == currentUserID &&
+                    $0.workoutStartedAt != nil &&
+                    $0.workoutFinishedAt == nil &&
+                    $0.launchFailedAt == nil
+                }
+            }?.id
+    }
+
     var followerCount: Int { followerIDs.count }
     var followingCount: Int { followingIDs.count }
 
@@ -1435,7 +1456,7 @@ final class SocialStore: ObservableObject {
     ) async {
         // Only an actually joined workout may be completed. A sent
         // invitation is not evidence that this recording belongs to it.
-        guard let sessionID = currentJoinedWorkoutSessionID,
+        guard let sessionID = recordingWorkoutSessionID,
               let currentUserID
         else {
             return
