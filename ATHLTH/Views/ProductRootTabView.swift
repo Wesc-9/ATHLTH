@@ -15944,8 +15944,6 @@ struct ATHLTHProfileView: View {
                 }
                 }
 
-                ProfileStrengthExerciseRecordsSection()
-                    .environmentObject(strengthWorkout)
             }
         }
     }
