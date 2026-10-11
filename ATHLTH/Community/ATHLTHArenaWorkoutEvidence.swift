@@ -26,6 +26,7 @@ enum ATHLTHArenaEvidenceMatcher {
     static func match(
         _ workout: SocialPublishableWorkout,
         template: ATHLTHArenaRoundTemplate,
+        targetDistanceMeters: Double? = nil,
         startsAt: Date?,
         endsAt: Date?
     ) -> Match? {
@@ -52,6 +53,19 @@ enum ATHLTHArenaEvidenceMatcher {
             else { return nil }
             return Match(metricType: "elapsed_seconds", metricValue: workout.duration)
 
+        case .fastestDistance:
+            guard let target = targetDistanceMeters,
+                  target.isFinite, (100...500_000).contains(target),
+                  workout.activity == .running,
+                  workout.isIndoor != true,
+                  let distance = workout.distanceMeters,
+                  distance.isFinite,
+                  abs(distance - target) <= target * 0.02,
+                  workout.duration >= max(10, target / 15),
+                  workout.duration <= min(86_400, max(1_800, target * 3.6))
+            else { return nil }
+            return Match(metricType: "elapsed_seconds", metricValue: workout.duration)
+
         case .mostDistance:
             guard (workout.activity == .running || workout.activity == .walking),
                   let distance = workout.distanceMeters,
@@ -70,7 +84,7 @@ enum ATHLTHArenaEvidenceMatcher {
 
         // Repetition challenges require a known exercise and actual
         // set-level evidence; generic total reps are not sufficient.
-        case .mostRepetitions, .custom:
+        case .mostRepetitions, .fastestRoute, .custom:
             return nil
         }
     }
@@ -277,6 +291,7 @@ struct ATHLTHArenaEvidenceSection: View {
                   let match = ATHLTHArenaEvidenceMatcher.match(
                     workout,
                     template: round.template,
+                    targetDistanceMeters: round.targetDistanceMeters,
                     startsAt: series.startsAt,
                     endsAt: series.endsAt
                   ) else {
