@@ -217,6 +217,7 @@ struct ATHLTHAudioCoachSettingsView: View {
                 ) {
                     VStack(spacing: 0) {
                         defaultsSection
+                        contentLevelSection
                         voiceSection
                         triggerSection
                         updateSection
@@ -300,6 +301,119 @@ struct ATHLTHAudioCoachSettingsView: View {
                     .labelsHidden()
                     .tint(ATHLTHTheme.accent)
                 }
+            }
+        }
+    }
+
+    private var currentContentLevel: ATHLTHCoachContentLevel? {
+        var draft = AudioCoachDraft()
+        draft.load(from: settings)
+        return ATHLTHCoachContentLevel.matching(
+            draft.configuration()
+        )
+    }
+
+    private func selectContentLevel(
+        _ level: ATHLTHCoachContentLevel
+    ) {
+        var draft = AudioCoachDraft()
+        draft.load(from: settings)
+        let preset = level.applying(to: draft.configuration())
+
+        // Intentionally keep distance/time triggers and speech frequency,
+        // selected voice, volume, ducking and enabled state unchanged.
+        settings.audioCoachAnnounceDistance = preset.announceDistance
+        settings.audioCoachAnnounceElapsedTime = preset.announceElapsedTime
+        settings.audioCoachAnnounceAveragePace = preset.announceAveragePace
+        settings.audioCoachAnnounceClockTime = preset.announceClockTime
+        settings.audioCoachAnnounceHeartRate = preset.announceHeartRate
+        settings.audioCoachAnnounceRemainingRouteDistance =
+            preset.announceRemainingRouteDistance
+        settings.audioCoachAnnounceEstimatedRemainingRouteTime =
+            preset.announceEstimatedRemainingRouteTime
+        settings.audioCoachAnnounceCurrentWorkoutStep =
+            preset.announceCurrentWorkoutStep
+        settings.audioCoachAnnounceRemainingStepTime =
+            preset.announceRemainingStepTime
+        settings.audioCoachAnnounceRemainingStepDistance =
+            preset.announceRemainingStepDistance
+        settings.audioCoachAnnounceWorkoutStart =
+            preset.shouldAnnounceWorkoutStart
+        settings.audioCoachAnnouncePauseResume =
+            preset.shouldAnnouncePauseResume
+        settings.audioCoachAnnounceWorkoutComplete =
+            preset.shouldAnnounceWorkoutComplete
+    }
+
+    private var contentLevelSection: some View {
+        premiumSection(
+            ATHLTHLocalization.choose(
+                english: "Guidance level",
+                norwegian: "Veiledningsnivå"
+            )
+        ) {
+            premiumCard {
+                VStack(alignment: .leading, spacing: 13) {
+                    HStack(spacing: 7) {
+                        Image(systemName: "waveform.path")
+                            .foregroundStyle(ATHLTHTheme.premiumGold)
+                        Text(ATHLTHLocalization.choose(
+                            english: "What should the coach say?",
+                            norwegian: "Hva skal coachen fortelle?"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                    }
+
+                    HStack(spacing: 8) {
+                        ForEach(ATHLTHCoachContentLevel.allCases) { level in
+                            Button {
+                                selectContentLevel(level)
+                            } label: {
+                                VStack(spacing: 5) {
+                                    Text(level.title)
+                                        .font(.subheadline.weight(.semibold))
+                                    Text(level.subtitle)
+                                        .font(.system(size: 10))
+                                        .lineLimit(2)
+                                        .minimumScaleFactor(0.85)
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 66)
+                                .foregroundStyle(
+                                    currentContentLevel == level
+                                        ? Color.white
+                                        : ATHLTHTheme.primaryText
+                                )
+                                .background(
+                                    currentContentLevel == level
+                                        ? ATHLTHTheme.accentDeep
+                                        : ATHLTHTheme.accentSoft,
+                                    in: RoundedRectangle(
+                                        cornerRadius: 15,
+                                        style: .continuous
+                                    )
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "These presets change content, not how often you hear it. Fine-tune individual options below.",
+                        norwegian: "Nivåene styrer innhold, ikke hyppighet. Du kan tilpasse enkeltvalg lenger ned."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    if currentContentLevel == nil {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Custom setup",
+                            norwegian: "Tilpasset oppsett"
+                        ))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+                }
+                .padding(16)
             }
         }
     }
