@@ -712,8 +712,10 @@ struct ChallengeCreationView: View {
     @State private var activeSelectionSheet:
         ChallengeCreationSelectionSheet?
 
-    @State private var visibility: ProfileVisibility = .publicProfile
-    @State private var shareToCommunity = true
+    // Direct challenges are participant-only until an athlete explicitly
+    // publishes a completed result to their own activity feed.
+    @State private var visibility: ProfileVisibility = .privateOnly
+    @State private var shareToCommunity = false
     @State private var creatingChallenge = false
     @State private var createError: String?
     @State private var showingInvitePicker = false
@@ -745,7 +747,6 @@ struct ChallengeCreationView: View {
                         creationChallengeSection
                         creationRulesSection
                         creationParticipantsSection
-                        creationCommunitySection
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
@@ -3639,6 +3640,7 @@ struct ChallengeCreationView: View {
                 ),
             icon: "person.2.fill"
         ) {
+            if preselectedFriends.count != 1 {
             Button {
                 showingInvitePicker =
                     true
@@ -3742,32 +3744,10 @@ struct ChallengeCreationView: View {
             }
             .buttonStyle(.plain)
 
-            creationDivider
-
-            Button {
-                activeSelectionSheet = .visibility
-            } label: {
-                creationSelectionRow(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Who can see it",
-                            norwegian:
-                                "Hvem kan se det"
-                        ),
-                    value:
-                        creationVisibilityTitle,
-                    icon:
-                        creationVisibilityIcon,
-                    subtitle:
-                        creationVisibilitySubtitle
-                )
             }
-            .buttonStyle(.plain)
         }
     }
 
-    @ViewBuilder
     private var creationInviteeAvatars:
         some View {
         if invitees.isEmpty {
@@ -3882,93 +3862,6 @@ struct ChallengeCreationView: View {
         }
     }
 
-    private var creationCommunitySection:
-        some View {
-        creationSection(
-            title:
-                ATHLTHLocalization.choose(
-                    english: "Community",
-                    norwegian: "Fellesskap"
-                ),
-            icon: "person.3.fill"
-        ) {
-            HStack(spacing: 12) {
-                Image(
-                    systemName:
-                        "megaphone.fill"
-                )
-                .font(
-                    .system(
-                        size: 17,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(
-                    clubForest
-                )
-                .frame(
-                    width: 38,
-                    height: 38
-                )
-                .background(
-                    clubMint,
-                    in: RoundedRectangle(
-                        cornerRadius: 12,
-                        style:
-                            .continuous
-                    )
-                )
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 3
-                ) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Share to Community activity",
-                            norwegian:
-                                "Del til Community-aktivitet"
-                        )
-                    )
-                    .font(
-                        .subheadline
-                            .weight(.semibold)
-                    )
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "People who can see the challenge can also discover it in Community.",
-                            norwegian:
-                                "Utfordringen kan vises i Community for dem som har tilgang."
-                        )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
-                        .secondary
-                    )
-                    .fixedSize(
-                        horizontal: false,
-                        vertical: true
-                    )
-                }
-
-                Spacer(
-                    minLength: 8
-                )
-
-                Toggle(
-                    "",
-                    isOn:
-                        $shareToCommunity
-                )
-                .labelsHidden()
-                .tint(clubForest)
-            }
-        }
-    }
-
     private var creationVisibilityTitle:
         String {
         switch visibility {
@@ -4034,11 +3927,7 @@ struct ChallengeCreationView: View {
             return false
         }
 
-        if ChallengeCreationPolicy
-            .requiresDirectInvite(
-                visibility: visibility
-            ) &&
-            invitees.isEmpty {
+        if invitees.isEmpty {
             return false
         }
 
@@ -6909,12 +6798,7 @@ struct ChallengeCreationView: View {
             challenge
         )
 
-        if shareToCommunity {
-            _ = await social
-                .shareChallengeToCommunity(
-                    challenge
-                )
-        }
+        // Never auto-post the challenge or its rules to Community.
 
         dismiss()
     }
