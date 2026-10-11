@@ -190,7 +190,14 @@ struct ATHLTHArenaScoringSection: View {
             ATHLTHArenaOutcomeEditor(
                 round: round,
                 series: series,
-                members: rankedMembers
+                members: rankedMembers,
+                suggestedSlots: ATHLTHArenaSuggestedRanking.eligibleSuggestion(
+                    template: round.template,
+                    scoring: series.scoring,
+                    roundID: round.id,
+                    requiredSlots: rankedMembers.map(\.slotID),
+                    evidence: linkedWorkouts
+                )
             ) { slots, note in
                 Task { await propose(round: round, slots: slots, evidence: note) }
             }
@@ -504,23 +511,30 @@ private struct ATHLTHArenaOutcomeEditor: View {
     let round: ATHLTHArenaRemoteProposal
     let series: ATHLTHArenaRemoteSeries
     let members: [ATHLTHArenaRemoteMember]
+    let suggestedSlots: [UUID]?
     let onPropose: ([UUID], String) -> Void
 
-    @State private var slots: [UUID]
+    @State private var slots: [UUID?]
     @State private var evidence = ""
 
     init(
         round: ATHLTHArenaRemoteProposal,
         series: ATHLTHArenaRemoteSeries,
         members: [ATHLTHArenaRemoteMember],
+        suggestedSlots: [UUID]?,
         onPropose: @escaping ([UUID], String) -> Void
     ) {
         self.round = round
         self.series = series
         self.members = members
+        self.suggestedSlots = suggestedSlots
         self.onPropose = onPropose
         let needed = series.scoring == .winner ? 1 : min(3, members.count)
-        _slots = State(initialValue: Array(members.prefix(needed).map(\.slotID)))
+        let suggestion = suggestedSlots ?? []
+        let initial: [UUID?] = (0..<needed).map { index in
+            index < suggestion.count ? suggestion[index] : nil
+        }
+        _slots = State(initialValue: initial)
     }
 
     private func memberLabel(_ member: ATHLTHArenaRemoteMember) -> String {
@@ -543,33 +557,59 @@ private struct ATHLTHArenaOutcomeEditor: View {
             english: "place", norwegian: "plass"
         )
         let caption = String(index + 1) + ". " + localizedPlace
-        let choice = Binding<UUID>(
+        let choice = Binding<UUID?>(
             get: { slots[index] },
             set: { slots[index] = $0 }
         )
         Picker(caption, selection: choice) {
+            Text(ATHLTHLocalization.choose(
+                english: "Choose athlete", norwegian: "Velg utøver"
+            ))
+            .tag(nil as UUID?)
             ForEach(members) { member in
                 Text(memberLabel(member))
-                    .tag(member.slotID)
+                    .tag(member.slotID as UUID?)
             }
         }
     }
 
     private var valid: Bool {
-        slots.count == (series.scoring == .winner ? 1 : min(3, members.count)) &&
-        Set(slots).count == slots.count &&
-        !evidence.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let selected = slots.compactMap { $0 }
+        return slots.count == (series.scoring == .winner ? 1 : min(3, members.count)) &&
+            selected.count == slots.count &&
+            Set(selected).count == slots.count &&
+            !evidence.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section(ATHLTHLocalization.choose(
-                    english: "Ranking", norwegian: "Plassering"
-                )) {
+                Section {
+                    if suggestedSlots != nil {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Suggested from complete shared workout results. Review before submitting.",
+                                norwegian: "Foreslått fra komplette delte øktresultater. Kontroller plasseringene før du sender."
+                            ),
+                            systemImage: "checkmark.shield"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    } else {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Select every place manually. Missing results or a tie prevent safe automatic suggestions.",
+                            norwegian: "Velg alle plasseringer manuelt. Manglende øktresultater eller uavgjort hindrer automatiske forslag."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
                     ForEach(slots.indices, id: \.self) { index in
                         rankingPicker(at: index)
                     }
+                } header: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Ranking", norwegian: "Plassering"
+                    ))
                 }
 
                 Section {
@@ -605,7 +645,8 @@ private struct ATHLTHArenaOutcomeEditor: View {
                     Button(ATHLTHLocalization.choose(
                         english: "Submit", norwegian: "Send forslag"
                     )) {
-                        onPropose(slots, evidence)
+                        guard valid else { return }
+                        onPropose(slots.compactMap { $0 }, evidence)
                         dismiss()
                     }
                     .disabled(!valid || evidence.count > 600)
