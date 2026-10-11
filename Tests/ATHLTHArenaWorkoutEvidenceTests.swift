@@ -3,7 +3,7 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHArenaWorkoutEvidenceTests: XCTestCase {
-    private let start = Date(timeIntervalSince1970: 1_800_000_000)
+    private let start = Date(timeIntervalSince1970: 1_790_000_000)
     private let duration: TimeInterval = 1_500
 
     private func recordedRun(distance: Double, duration: Double = 1_500) -> SocialPublishableWorkout {
