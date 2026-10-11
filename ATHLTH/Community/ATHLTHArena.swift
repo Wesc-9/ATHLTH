@@ -585,10 +585,18 @@ struct ATHLTHArenaCreateView: View {
                                 norwegian: "Velg en klubb for å se medlemmer."
                             )).foregroundStyle(.secondary)
                         }
+                        Text("\(selectedFriendIDs.count)/20 " +
+                            ATHLTHLocalization.choose(
+                                english: "selected", norwegian: "valgt"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                         ForEach(clubAthletes) { athlete in
                             Button {
-                                if !selectedFriendIDs.insert(athlete.id).inserted {
+                                if selectedFriendIDs.contains(athlete.id) {
                                     selectedFriendIDs.remove(athlete.id)
+                                } else if selectedFriendIDs.count < 20 {
+                                    selectedFriendIDs.insert(athlete.id)
                                 }
                             } label: {
                                 HStack {
