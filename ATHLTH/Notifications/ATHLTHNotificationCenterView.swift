@@ -2038,6 +2038,11 @@ struct ATHLTHNotificationCenterView: View {
     private func destinationActionTitle(
         _ item: ATHLTHNotificationItem
     ) -> String {
+        if item.socialEntityType?.lowercased() == "arena_series" {
+            return ATHLTHLocalization.choose(
+                english: "Open Arena", norwegian: "Åpne Arena"
+            )
+        }
         if item.challengeID != nil {
             return ATHLTHLocalization.choose(
                 english: "View challenge",
@@ -2149,6 +2154,10 @@ struct ATHLTHNotificationCenterView: View {
     private func hasDestination(
         _ item: ATHLTHNotificationItem
     ) -> Bool {
+        if item.socialEntityType?.lowercased() == "arena_series" &&
+            item.socialEntityID != nil {
+            return true
+        }
         if item.challengeID != nil {
             return true
         }
@@ -2194,7 +2203,10 @@ struct ATHLTHNotificationCenterView: View {
     private func notificationDestination(
         _ item: ATHLTHNotificationItem
     ) -> some View {
-        if let challengeID = item.challengeID {
+        if item.socialEntityType?.lowercased() == "arena_series",
+           let seriesID = item.socialEntityID {
+            ATHLTHArenaNotificationDestination(seriesID: seriesID)
+        } else if let challengeID = item.challengeID {
             ChallengeDetailView(
                 challengeID: challengeID
             )
