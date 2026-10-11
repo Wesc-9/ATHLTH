@@ -254,6 +254,13 @@ private struct ATHLTHArenaEvidenceParams: Encodable {
     }
 }
 
+private struct ATHLTHArenaUnshareParams: Encodable {
+    let evidenceID: UUID
+    enum CodingKeys: String, CodingKey {
+        case evidenceID = "p_evidence"
+    }
+}
+
 private struct ATHLTHArenaNewMessage: Encodable {
     let seriesID: UUID
     let senderID: UUID
@@ -336,6 +343,7 @@ enum ATHLTHArenaCloudError: LocalizedError {
     case needInvitees
     case needRounds
     case tooManyRounds
+    case evidenceNotFound
 
     var errorDescription: String? {
         switch self {
@@ -363,6 +371,11 @@ enum ATHLTHArenaCloudError: LocalizedError {
             return ATHLTHLocalization.choose(
                 english: "A series can contain up to 16 rounds.",
                 norwegian: "En serie kan inneholde maksimalt 16 runder."
+            )
+        case .evidenceNotFound:
+            return ATHLTHLocalization.choose(
+                english: "The workout link is no longer available.",
+                norwegian: "Øktkoblingen finnes ikke lenger."
             )
         }
     }
@@ -579,6 +592,19 @@ final class ATHLTHArenaCloudService: Sendable {
                 distanceMeters: workout.distanceMeters
             )
         ).execute().value
+    }
+
+    func withdrawWorkoutEvidence(id: UUID) async throws {
+        guard currentUserID != nil else {
+            throw ATHLTHArenaCloudError.signInRequired
+        }
+        let success: Bool = try await client.rpc(
+            "arena_unshare_evidence",
+            params: ATHLTHArenaUnshareParams(evidenceID: id)
+        ).execute().value
+        guard success else {
+            throw ATHLTHArenaCloudError.evidenceNotFound
+        }
     }
 
     /// All writes happen in one server-side transaction. If any invitee
