@@ -241,6 +241,7 @@ struct ATHLTHArenaScoringSection: View {
                 }
             }
             let roundEvidence = linkedWorkouts.filter { $0.roundID == round.id }
+            provisionalRanking(for: round, evidence: roundEvidence)
             if !roundEvidence.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(ATHLTHLocalization.choose(
@@ -323,6 +324,91 @@ struct ATHLTHArenaScoringSection: View {
         }
         .padding(14)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 17))
+    }
+
+    @ViewBuilder
+    private func provisionalRanking(
+        for round: ATHLTHArenaRemoteProposal,
+        evidence: [ATHLTHArenaWorkoutEvidence]
+    ) -> some View {
+        let standings = ATHLTHArenaSuggestedRanking.standings(
+            template: round.template,
+            roundID: round.id,
+            evidence: evidence
+        )
+        if !standings.isEmpty {
+            VStack(alignment: .leading, spacing: 7) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Provisional workout ranking",
+                        norwegian: "Foreløpig øktrangering"
+                    ),
+                    systemImage: "chart.bar.xaxis"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                ForEach(standings) { standing in
+                    let position = standings.firstIndex { $0.id == standing.id } ?? 0
+                    let athlete = rankedMembers.first { $0.slotID == standing.slotID }
+                    HStack(spacing: 8) {
+                        Text("\(position + 1).")
+                            .font(.caption.weight(.semibold))
+                            .frame(width: 22)
+                        Text(athlete.map(memberName) ??
+                             ATHLTHLocalization.choose(
+                                english: "Participant", norwegian: "Deltaker"
+                             ))
+                            .font(.caption)
+                        Spacer()
+                        Text(provisionalMetric(
+                            value: standing.result,
+                            template: round.template
+                        ))
+                        .font(.caption.weight(.semibold))
+                        .monospacedDigit()
+                    }
+                }
+                if ATHLTHArenaSuggestedRanking.hasTieAtTop(standings) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Equal result — group must resolve the ranking.",
+                        norwegian: "Lik verdi – gruppen må avklare plasseringen."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                Text(ATHLTHLocalization.choose(
+                    english: "Based only on shared device data; not an official or automatically verified result.",
+                    norwegian: "Kun basert på delte øktdata; ikke offisielt eller automatisk verifisert."
+                ))
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+            .padding(11)
+            .background(
+                ATHLTHTheme.accentDeep.opacity(0.05),
+                in: RoundedRectangle(cornerRadius: 14)
+            )
+        }
+    }
+
+    private func provisionalMetric(
+        value: Double,
+        template: ATHLTHArenaRoundTemplate
+    ) -> String {
+        switch template {
+        case .fastest5K, .fastest1K:
+            let seconds = Int(value.rounded())
+            return String(format: "%d:%02d", seconds / 60, seconds % 60)
+        case .mostDistance:
+            return String(format: "%.2f km", value / 1_000)
+        case .mostWorkouts:
+            return "\(Int(value)) " + ATHLTHLocalization.choose(
+                english: "workouts", norwegian: "økter"
+            )
+        case .mostRepetitions, .custom:
+            return ""
+        }
     }
 
     private func workoutMetricLabel(_ entry: ATHLTHArenaWorkoutEvidence) -> String {
