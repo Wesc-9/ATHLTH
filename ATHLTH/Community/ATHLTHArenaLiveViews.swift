@@ -448,6 +448,36 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
                                 .foregroundStyle(.orange)
                             }
 
+                            if let room,
+                               let review,
+                               let highlights = ATHLTHArenaLiveDuelReview.highlights(
+                                   senderPeakLeadMeters: room.senderMaxLeadMeters,
+                                   recipientPeakLeadMeters: room.recipientMaxLeadMeters,
+                                   leadChangeCount: room.leadChangeCount
+                               ) {
+                                HStack(spacing: 8) {
+                                    raceHighlight(
+                                        title: ATHLTHLocalization.choose(
+                                            english: "Time gap", norwegian: "Tidsforskjell"
+                                        ),
+                                        value: String(format: "%.1f s", review.marginSeconds)
+                                    )
+                                    raceHighlight(
+                                        title: ATHLTHLocalization.choose(
+                                            english: "Peak lead", norwegian: "Maks forsprang"
+                                        ),
+                                        value: String(format: "%.0f m", highlights.peakLeadMeters)
+                                    )
+                                    raceHighlight(
+                                        title: ATHLTHLocalization.choose(
+                                            english: "Lead changes", norwegian: "Lederskifter"
+                                        ),
+                                        value: String(highlights.leadChanges)
+                                    )
+                                }
+                                .accessibilityElement(children: .contain)
+                            }
+
                             Text(ATHLTHLocalization.choose(
                                 english: "Live results are participant-reported and not independently route-verified. Series points require a separate result proposal and unanimous approval.",
                                 norwegian: "Live-resultater er oppgitt av deltakerne og ikke uavhengig ruteverifisert. Seriepoeng krever et eget resultatforslag og enstemmig godkjenning."
@@ -589,6 +619,27 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
             rankedSlots: slots,
             evidenceNote: details
         )
+    }
+
+    private func raceHighlight(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(value)
+                .font(.subheadline.weight(.bold).monospacedDigit())
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+        .padding(9)
+        .background(
+            ATHLTHTheme.vitalitySoft.opacity(0.42),
+            in: RoundedRectangle(cornerRadius: 12)
+        )
+        .accessibilityElement(children: .combine)
     }
 
     private func userName(_ id: UUID) -> String {
