@@ -2745,7 +2745,8 @@ private struct ATHLTHArenaRelaySection: View {
         for team in 1...2 {
             let group = legs.filter { $0.teamIndex == team }
             let roster = assignments.filter { $0.teamIndex == team }
-            if Set(group.map(\.slotID)) != Set(roster.map(\.slotID)) ||
+            if roster.count < 2 ||
+                Set(group.map(\.slotID)) != Set(roster.map(\.slotID)) ||
                 Set(group.map(\.legOrder)) != Set(1...roster.count) {
                 return false
             }
