@@ -7998,6 +7998,7 @@ struct ChallengeDetailView: View {
     @State private var challengeDeleteError: String?
     @State private var showingChallengeTargetGhost = false
     @State private var showingChangeProposalEditor = false
+    @State private var showingChallengeWorkoutInvite = false
     @State private var showingChallengeCancellation = false
     @State private var cancellingChallenge = false
     @State private var challengeCancellationError: String?
@@ -8010,6 +8011,25 @@ struct ChallengeDetailView: View {
         challenge?.participants.first {
             $0.userID == session.profile.userID
         }
+    }
+
+    private var invitedWorkoutPartnerID: UUID? {
+        guard let challenge,
+              challenge.participants.contains(where: {
+                  $0.userID == session.profile.userID &&
+                  ($0.state == .creator || $0.state == .accepted ||
+                   $0.state == .invited)
+              }) else { return nil }
+        // Direct 1:1 Train Together only; group challenges keep their
+        // existing participant management and privacy protections.
+        let others = challenge.participants.compactMap { participant -> UUID? in
+            guard participant.userID != session.profile.userID,
+                  participant.state != .declined,
+                  participant.state != .withdrawn
+            else { return nil }
+            return participant.userID
+        }
+        return others.count == 1 ? others[0] : nil
     }
 
     var body: some View {
@@ -8084,6 +8104,52 @@ struct ChallengeDetailView: View {
 
                         if let meetup = challenge.rules.meetup {
                             meetupCard(challenge, meetup: meetup)
+                        }
+
+                        if let trainingMode = challenge.rules.trainTogetherMode,
+                           let partnerID = invitedWorkoutPartnerID,
+                           challenge.status != .cancelled,
+                           challenge.status != .completed {
+                            ATHLTHCard {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english: "Private Train Together",
+                                            norwegian: "Tren sammen – privat"
+                                        ),
+                                        systemImage: "person.2.wave.2"
+                                    )
+                                    .font(.headline)
+                                    Text(trainingMode == .physical
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Plan the workout and invite the other athlete to meet in person.",
+                                            norwegian: "Planlegg økten og inviter den andre til å møtes fysisk."
+                                        )
+                                        : ATHLTHLocalization.choose(
+                                            english: "Invite the other athlete to complete the same workout.",
+                                            norwegian: "Inviter den andre til å gjennomføre samme treningsøkt."
+                                        )
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                                    Button {
+                                        showingChallengeWorkoutInvite = true
+                                    } label: {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Invite to workout",
+                                                norwegian: "Inviter til treningsøkt"
+                                            ),
+                                            systemImage: "paperplane.fill"
+                                        )
+                                        .frame(maxWidth: .infinity)
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(ATHLTHTheme.accentDeep)
+                                    .disabled(!social.isMutualFollow(partnerID))
+                                }
+                            }
                         }
 
                         participantsCard(challenge)
@@ -8275,6 +8341,28 @@ struct ChallengeDetailView: View {
                 }
                 .sheet(isPresented: $showingChangeProposalEditor) {
                     ChallengeCreationView(changeProposalFor: challenge)
+                }
+                .sheet(isPresented: $showingChallengeWorkoutInvite) {
+                    if let partnerID = invitedWorkoutPartnerID {
+                        let meeting = challenge.rules.meetup
+                        SessionEditorView(
+                            standaloneDate: meeting?.scheduledAt ??
+                                challenge.rules.startsAt,
+                            partnerID: partnerID,
+                            physicalMeetup:
+                                challenge.rules.trainTogetherMode != .sameWorkout,
+                            initialWorkoutStart: meeting?.scheduledAt ??
+                                challenge.rules.startsAt,
+                            initialMeetingPoint: meeting.map {
+                                PlannedWorkoutMeetingPoint(
+                                    name: $0.placeName,
+                                    address: $0.placeName,
+                                    latitude: $0.latitude,
+                                    longitude: $0.longitude
+                                )
+                            }
+                        )
+                    }
                 }
                 .sheet(isPresented: $showingManualStrengthAttempt) {
                     if let currentParticipant {

@@ -4703,11 +4703,21 @@ struct SessionEditorView: View {
             )
     }
 
-    init(standaloneDate: Date, partnerID: UUID, physicalMeetup: Bool) {
+    init(
+        standaloneDate: Date,
+        partnerID: UUID,
+        physicalMeetup: Bool,
+        initialWorkoutStart: Date? = nil,
+        initialMeetingPoint: PlannedWorkoutMeetingPoint? = nil
+    ) {
         self.init(standaloneDate: standaloneDate)
         _selectedPartnerID = State(initialValue: partnerID)
         _directPartnerID = State(initialValue: partnerID)
         _physicalMeetup = State(initialValue: physicalMeetup)
+        if let initialWorkoutStart {
+            _scheduledTime = State(initialValue: initialWorkoutStart)
+        }
+        _meetingPoint = State(initialValue: initialMeetingPoint)
     }
 
     init(

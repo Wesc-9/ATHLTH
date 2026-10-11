@@ -18,6 +18,24 @@ final class PlannedWorkoutInviteTests: XCTestCase {
         )
     }
 
+    func testTrainTogetherModeIsPreservedAcrossInvitations() throws {
+        var session = makeWorkout()
+        session.trainTogetherMode = .sameWorkout
+        let decoded = try JSONDecoder().decode(
+            PlannedSession.self,
+            from: JSONEncoder().encode(session)
+        )
+        XCTAssertEqual(decoded.trainTogetherMode, .sameWorkout)
+        XCTAssertNil(decoded.meetingPoint)
+        var physical = makeWorkout()
+        physical.trainTogetherMode = .physical
+        let decodedPhysical = try JSONDecoder().decode(
+            PlannedSession.self,
+            from: JSONEncoder().encode(physical)
+        )
+        XCTAssertEqual(decodedPhysical.trainTogetherMode, .physical)
+    }
+
     func testMeetingPointAndReminderSurviveRoundTrip() throws {
         var workout = makeWorkout()
         workout.meetingPoint = PlannedWorkoutMeetingPoint(
