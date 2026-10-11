@@ -3459,6 +3459,7 @@ final class StrengthWorkoutStore: ObservableObject {
         draftRPE = 8
         draftRIR = 2
         draftWarmUp = false
+        timedSetCountdown = nil
         persistCheckpointNow()
     }
 
