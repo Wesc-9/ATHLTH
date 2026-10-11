@@ -16,6 +16,22 @@ final class MirroredWorkoutAudioCoach:
         ATHLTHGuidancePriorityGate()
     private var eventLedger = ATHLTHCoachEventLedger()
     private var cueQueue = ATHLTHCoachCueQueue()
+    private var coachReplayMemory = ATHLTHCoachReplayMemory()
+    var onLastSpokenCoachMessage: ((String?) -> Void)?
+
+    var canReplayLastCoachMessage: Bool {
+        configuration.enabled &&
+        !finished &&
+        coachReplayMemory.replayableText() != nil
+    }
+
+    func replayLastCoachMessage() {
+        guard canReplayLastCoachMessage,
+              let text = coachReplayMemory.replayableText()
+        else { return }
+        speak(text, priority: .structuredStep, rememberForReplay: false)
+    }
+
     var onSpokenEventAttempt: ((ATHLTHCoachEvent, Date) -> Void)?
     private var workoutStartedAt: Date?
 
@@ -47,6 +63,8 @@ final class MirroredWorkoutAudioCoach:
         guidanceGate.reset()
         eventLedger.reset()
         cueQueue.reset()
+        coachReplayMemory.reset()
+        onLastSpokenCoachMessage?(nil)
         lastState = nil
         lastStepIndex = nil
         announcedStart = false
@@ -236,6 +254,8 @@ final class MirroredWorkoutAudioCoach:
         guidanceGate.reset()
         eventLedger.reset()
         cueQueue.reset()
+        coachReplayMemory.reset()
+        onLastSpokenCoachMessage?(nil)
         configuration = .disabled
         nextDistanceMeters = nil
         nextTimeSeconds = nil
@@ -607,9 +627,12 @@ final class MirroredWorkoutAudioCoach:
         _ text: String,
         priority:
             ATHLTHGuidancePriority,
-        event: ATHLTHCoachEvent? = nil
+        event: ATHLTHCoachEvent? = nil,
+        rememberForReplay: Bool = true
     ) {
-        guard !text.isEmpty else {
+        guard !text.isEmpty,
+              configuration.enabled
+        else {
             return
         }
         if let event,
@@ -705,6 +728,11 @@ final class MirroredWorkoutAudioCoach:
         synthesizer.speak(
             utterance
         )
+        if rememberForReplay,
+           ATHLTHCoachReplayMemory.mayRemember(priority: priority) {
+            coachReplayMemory.remember(text, priority: priority)
+            onLastSpokenCoachMessage?(coachReplayMemory.text)
+        }
         if let event,
            let workoutStartedAt {
             onSpokenEventAttempt(event, workoutStartedAt)
