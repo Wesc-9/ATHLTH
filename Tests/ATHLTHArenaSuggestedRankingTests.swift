@@ -530,7 +530,8 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
         roundID: UUID,
         sender: UUID,
         recipient: UUID,
-        status: GhostFriendRaceStatus = .accepted
+        status: GhostFriendRaceStatus = .accepted,
+        sourceKind: String? = "planned_route"
     ) -> GhostFriendRaceChallengeRecord {
         GhostFriendRaceChallengeRecord(
             id: id,
@@ -541,7 +542,7 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
             distanceMeters: 5_000,
             routePoints: [],
             privacyTrimmed: true,
-            sourceKind: "planned_route",
+            sourceKind: sourceKind,
             arenaRoundID: roundID,
             status: status,
             createdAt: initialDate,
@@ -553,14 +554,15 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
     private func rivalryRoom(
         challengeID: UUID,
         winnerID: UUID?,
-        status: LiveGhostRaceRoomStatus = .finished
+        status: LiveGhostRaceRoomStatus = .finished,
+        finishOffset: TimeInterval = 1_600
     ) -> LiveGhostRaceRoomRecord {
         LiveGhostRaceRoomRecord(
             challengeID: challengeID,
             status: status,
             countdownStartedAt: initialDate,
             startsAt: initialDate.addingTimeInterval(5),
-            finishedAt: initialDate.addingTimeInterval(1_600),
+            finishedAt: initialDate.addingTimeInterval(finishOffset),
             winnerID: winnerID,
             senderMaxLeadMeters: 45,
             recipientMaxLeadMeters: 20,
@@ -653,6 +655,100 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
         )
         XCTAssertEqual(summary.finishedCount, 0)
         XCTAssertEqual(summary.excluded, 1)
+    }
+
+    func testLiveRouteTrendUsesOnlyLastTwoValidSameRoundAttempts() {
+        let me = UUID(), other = UUID(), earlier = UUID(), latest = UUID()
+        let foreign = UUID(), foreignRound = UUID()
+        let runs = [
+            rivalryChallenge(id: earlier, roundID: roundID, sender: me, recipient: other),
+            rivalryChallenge(id: latest, roundID: roundID, sender: me, recipient: other),
+            rivalryChallenge(id: foreign, roundID: foreignRound, sender: me, recipient: other)
+        ]
+        let rooms = [
+            rivalryRoom(challengeID: earlier, winnerID: me, finishOffset: 1_600),
+            rivalryRoom(challengeID: latest, winnerID: me, finishOffset: 2_500),
+            rivalryRoom(challengeID: foreign, winnerID: me, finishOffset: 3_000)
+        ]
+        let attempts = [
+            rivalryParticipant(challengeID: earlier, userID: me, seconds: 1_600),
+            rivalryParticipant(challengeID: earlier, userID: other, seconds: 1_750),
+            rivalryParticipant(challengeID: latest, userID: me, seconds: 1_450),
+            rivalryParticipant(challengeID: latest, userID: other, seconds: 1_590),
+            rivalryParticipant(challengeID: foreign, userID: me, seconds: 700),
+            rivalryParticipant(challengeID: foreign, userID: other, seconds: 950)
+        ]
+        let trends = ATHLTHArenaLiveTimeTrend.summaries(
+            challenges: runs + [runs[0]],
+            rooms: rooms,
+            participants: attempts,
+            eligibleRoundIDs: [roundID],
+            currentUserID: me
+        )
+        XCTAssertEqual(trends.count, 1)
+        XCTAssertEqual(trends.first?.roundID, roundID)
+        XCTAssertEqual(trends.first?.attempts, 2)
+        XCTAssertEqual(trends.first?.previousSeconds, 1_600)
+        XCTAssertEqual(trends.first?.latestSeconds, 1_450)
+        XCTAssertEqual(trends.first?.improvementSeconds, 150)
+    }
+
+    func testLiveRouteTrendRejectsMissingDisputedOrOtherOriginRace() {
+        let me = UUID(), other = UUID()
+        let past = UUID(), missing = UUID(), disputed = UUID(), otherOrigin = UUID()
+        let races = [
+            rivalryChallenge(id: past, roundID: roundID, sender: me, recipient: other),
+            rivalryChallenge(id: missing, roundID: roundID, sender: me, recipient: other),
+            rivalryChallenge(id: disputed, roundID: roundID, sender: me, recipient: other),
+            rivalryChallenge(id: otherOrigin, roundID: roundID, sender: me,
+                             recipient: other, sourceKind: "previous_workout")
+        ]
+        let rooms = [
+            rivalryRoom(challengeID: past, winnerID: me),
+            rivalryRoom(challengeID: missing, winnerID: me, finishOffset: 2_000),
+            rivalryRoom(challengeID: disputed, winnerID: other, finishOffset: 3_000),
+            rivalryRoom(challengeID: otherOrigin, winnerID: me, finishOffset: 4_000)
+        ]
+        let attempts = [
+            rivalryParticipant(challengeID: past, userID: me, seconds: 1_400),
+            rivalryParticipant(challengeID: past, userID: other, seconds: 1_500),
+            rivalryParticipant(challengeID: missing, userID: me, seconds: 1_300),
+            rivalryParticipant(challengeID: missing, userID: other, seconds: nil),
+            rivalryParticipant(challengeID: disputed, userID: me, seconds: 1_200),
+            rivalryParticipant(challengeID: disputed, userID: other, seconds: 1_600),
+            rivalryParticipant(challengeID: otherOrigin, userID: me, seconds: 1_100),
+            rivalryParticipant(challengeID: otherOrigin, userID: other, seconds: 1_400)
+        ]
+        XCTAssertTrue(ATHLTHArenaLiveTimeTrend.summaries(
+            challenges: races,
+            rooms: rooms,
+            participants: attempts,
+            eligibleRoundIDs: [roundID],
+            currentUserID: me
+        ).isEmpty)
+    }
+
+    func testLiveRouteTrendCanReportSlowerSecondAttemptWithoutAwardingPoints() {
+        let me = UUID(), other = UUID(), first = UUID(), next = UUID()
+        let changes = ATHLTHArenaLiveTimeTrend.summaries(
+            challenges: [
+                rivalryChallenge(id: first, roundID: roundID, sender: me, recipient: other),
+                rivalryChallenge(id: next, roundID: roundID, sender: me, recipient: other)
+            ],
+            rooms: [
+                rivalryRoom(challengeID: first, winnerID: me, finishOffset: 1_600),
+                rivalryRoom(challengeID: next, winnerID: me, finishOffset: 2_500)
+            ],
+            participants: [
+                rivalryParticipant(challengeID: first, userID: me, seconds: 1_200),
+                rivalryParticipant(challengeID: first, userID: other, seconds: 1_500),
+                rivalryParticipant(challengeID: next, userID: me, seconds: 1_280),
+                rivalryParticipant(challengeID: next, userID: other, seconds: 1_500)
+            ],
+            eligibleRoundIDs: [roundID],
+            currentUserID: me
+        )
+        XCTAssertEqual(changes.first?.improvementSeconds, -80)
     }
 
     private func roundResult(
