@@ -5472,28 +5472,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
-        // Both upgraded apps use an acknowledged short-lived lease.
-        // When paired with an older iPhone, preserve the legacy
-        // reachability behavior to avoid duplicate spoken updates.
-        let phoneOwnsRoutineSpeech: Bool
-        if audioCoachConfiguration.shouldUseAcknowledgedVoiceLease {
-            phoneOwnsRoutineSpeech =
-                mirroringActive && iPhoneVoiceLease.isActive()
-        } else {
-            phoneOwnsRoutineSpeech =
-                WCSession.isSupported() &&
-                WCSession.default.activationState == .activated &&
-                WCSession.default.isReachable
-        }
-
-        guard ATHLTHAudioCoachVoiceRouting
-            .shouldSpeakOnWatch(
-                configuration: audioCoachConfiguration,
-                workoutKind: kind,
-                priority: priority,
-                iPhoneVoiceLeaseActive: phoneOwnsRoutineSpeech
-            )
-        else {
+        guard shouldSpeakLocally(priority: priority) else {
             // iPhone handles routine and structured running commentary.
             // Critical route/target alerts, Ghost and strength cues remain
             // local because the mirrored iPhone coach does not reproduce them.
@@ -5538,10 +5517,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         case .deliver:
             break
-        }
-
-        if let event {
-            coachEventLedger.didDeliver(event)
         }
 
         let utterance = AVSpeechUtterance(
@@ -5616,9 +5591,73 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     return
                 }
 
-                self.speechSynthesizer
-                    .speak(utterance)
+                // The mirror owner may have changed while the audio route
+                // was activating. Re-check ownership and any phone receipt
+                // before beginning the utterance or marking it delivered.
+                guard self.audioCoachConfiguration.enabled,
+                      self.shouldSpeakLocally(priority: priority),
+                      event.map({ self.coachEventLedger.canDeliver($0) }) ?? true
+                else {
+                    self.guidancePriorityGate.voiceDidFinish()
+                    self.deactivateAudioCoachAudioSession()
+                    return
+                }
+
+                if let event {
+                    self.coachEventLedger.didDeliver(event)
+                }
+                self.speechSynthesizer.speak(utterance)
+                if let event {
+                    self.reportWatchSpokenEventAttempt(event)
+                }
             }
+    }
+
+    private func shouldSpeakLocally(
+        priority: ATHLTHGuidancePriority
+    ) -> Bool {
+        // Preserve legacy reachability routing with an older paired iPhone;
+        // upgraded peers use a short, explicitly acknowledged mirror lease.
+        let phoneOwnsRoutineSpeech: Bool
+        if audioCoachConfiguration.shouldUseAcknowledgedVoiceLease {
+            phoneOwnsRoutineSpeech =
+                mirroringActive && iPhoneVoiceLease.isActive()
+        } else {
+            phoneOwnsRoutineSpeech =
+                WCSession.isSupported() &&
+                WCSession.default.activationState == .activated &&
+                WCSession.default.isReachable
+        }
+        return ATHLTHAudioCoachVoiceRouting.shouldSpeakOnWatch(
+            configuration: audioCoachConfiguration,
+            workoutKind: kind,
+            priority: priority,
+            iPhoneVoiceLeaseActive: phoneOwnsRoutineSpeech
+        )
+    }
+
+    private func reportWatchSpokenEventAttempt(
+        _ event: ATHLTHCoachEvent
+    ) {
+        guard mirroringActive,
+              let startedAt,
+              let workoutSession
+        else { return }
+        let receipt = ATHLTHCoachDeliveryReceipt(
+            workoutStartedAt: startedAt,
+            eventKind: event.kind,
+            eventKey: event.key,
+            sentAt: Date()
+        )
+        guard receipt.isValid(for: startedAt),
+              let payload = try? JSONEncoder().encode(receipt)
+        else { return }
+
+        Task { @MainActor in
+            try? await workoutSession.sendToRemoteWorkoutSession(
+                data: payload
+            )
+        }
     }
 
     private func deliverNextQueuedCoachCue() {
