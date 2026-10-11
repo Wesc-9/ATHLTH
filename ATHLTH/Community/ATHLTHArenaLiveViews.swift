@@ -14,6 +14,23 @@ struct ATHLTHArenaOnlineSection: View {
     @State private var errorMessage: String?
 
     private let cloud = ATHLTHArenaCloudService()
+    @State private var showsAllCompleted = false
+
+    private var activeSeries: [ATHLTHArenaRemoteSeries] {
+        series.filter { $0.status == "active" }
+    }
+
+    private var awaitingSeries: [ATHLTHArenaRemoteSeries] {
+        series.filter { $0.status == "draft" }
+    }
+
+    private var finishedSeries: [ATHLTHArenaRemoteSeries] {
+        series.filter { $0.status == "completed" }
+    }
+
+    private var otherSeries: [ATHLTHArenaRemoteSeries] {
+        series.filter { !["active", "draft", "completed"].contains($0.status) }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 11) {
@@ -58,45 +75,79 @@ struct ATHLTHArenaOnlineSection: View {
                 .background(ATHLTHArenaLightStyle.card(17))
             }
 
-            ForEach(series) { item in
-                NavigationLink {
-                    ATHLTHArenaOnlineDetailView(series: item)
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "person.2.fill")
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                            .frame(width: 32)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(item.title)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ATHLTHTheme.primaryText)
-                                .lineLimit(1)
-                            Text(item.scope.title + " · " +
-                                 (item.status == "completed"
-                                    ? ATHLTHLocalization.choose(
-                                        english: "Completed", norwegian: "Fullført"
-                                      )
-                                    : item.status == "active"
-                                        ? ATHLTHLocalization.choose(
-                                            english: "Active", norwegian: "Aktiv"
-                                          )
-                                        : ATHLTHLocalization.choose(
-                                            english: "Awaiting agreement",
-                                            norwegian: "Avventer enighet"
-                                          )))
-                                .font(.caption)
-                                .foregroundStyle(ATHLTHTheme.mutedText)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                    }
-                    .padding(13)
-                    .background(.regularMaterial,
-                                in: RoundedRectangle(cornerRadius: 17))
+            if !activeSeries.isEmpty {
+                sectionHeading(
+                    title: ATHLTHLocalization.choose(
+                        english: "In progress", norwegian: "Pågår nå"
+                    ),
+                    count: activeSeries.count,
+                    icon: "bolt.fill"
+                )
+                ForEach(activeSeries) { item in
+                    seriesRow(item)
                 }
-                .buttonStyle(.plain)
+            }
+
+            if !awaitingSeries.isEmpty {
+                sectionHeading(
+                    title: ATHLTHLocalization.choose(
+                        english: "Awaiting agreement", norwegian: "Avventer godkjenning"
+                    ),
+                    count: awaitingSeries.count,
+                    icon: "checkmark.shield"
+                )
+                ForEach(awaitingSeries) { item in
+                    seriesRow(item)
+                }
+            }
+
+            if !finishedSeries.isEmpty {
+                HStack {
+                    sectionHeading(
+                        title: ATHLTHLocalization.choose(
+                            english: "Completed", norwegian: "Fullførte"
+                        ),
+                        count: finishedSeries.count,
+                        icon: "trophy.fill"
+                    )
+                    Spacer(minLength: 8)
+                    if finishedSeries.count > 2 {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showsAllCompleted.toggle()
+                            }
+                        } label: {
+                            Text(showsAllCompleted
+                                ? ATHLTHLocalization.choose(
+                                    english: "Show less", norwegian: "Vis færre"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "View all", norwegian: "Se alle"
+                                )
+                            )
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                        }
+                    }
+                }
+                ForEach(Array(finishedSeries.prefix(
+                    showsAllCompleted ? finishedSeries.count : 2
+                ))) { item in
+                    seriesRow(item)
+                }
+            }
+
+            if !otherSeries.isEmpty {
+                sectionHeading(
+                    title: ATHLTHLocalization.choose(
+                        english: "Other competitions", norwegian: "Andre konkurranser"
+                    ),
+                    count: otherSeries.count,
+                    icon: "list.bullet"
+                )
+                ForEach(otherSeries) { item in
+                    seriesRow(item)
+                }
             }
         }
         .task(id: session.profile.userID) {
@@ -112,6 +163,108 @@ struct ATHLTHArenaOnlineSection: View {
                 await refresh()
             }
         }
+    }
+
+    private func sectionHeading(
+        title: String,
+        count: Int,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+            Text("\(count)")
+                .font(.caption2.weight(.bold).monospacedDigit())
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(
+                    ATHLTHTheme.vitalitySoft.opacity(0.7),
+                    in: Capsule()
+                )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 5)
+    }
+
+    private func seriesRow(
+        _ item: ATHLTHArenaRemoteSeries
+    ) -> some View {
+        let isActive = item.status == "active"
+        let isCompleted = item.status == "completed"
+        let statusLabel: String = isActive
+            ? ATHLTHLocalization.choose(english: "ACTIVE", norwegian: "AKTIV")
+            : isCompleted
+                ? ATHLTHLocalization.choose(english: "FINISHED", norwegian: "FERDIG")
+                : item.status == "draft"
+                    ? ATHLTHLocalization.choose(english: "AGREEMENT", norwegian: "ENIGHET")
+                    : item.status.uppercased()
+        let accent: Color = isActive
+            ? ATHLTHTheme.accentDeep
+            : isCompleted ? .secondary : .orange
+
+        return NavigationLink {
+            ATHLTHArenaOnlineDetailView(series: item)
+        } label: {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: item.scope.symbol)
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(accent)
+                    .frame(width: 42, height: 42)
+                    .background(accent.opacity(0.10), in:
+                        RoundedRectangle(cornerRadius: 14))
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(item.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(2)
+
+                    HStack(spacing: 6) {
+                        Text(item.scope.title)
+                        if let date = isCompleted
+                            ? (item.completedAt ?? item.endsAt)
+                            : item.endsAt {
+                            Image(systemName: "calendar")
+                            Text(date.formatted(.dateTime.day().month(.abbreviated)))
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(1)
+                }
+
+                Spacer(minLength: 4)
+
+                VStack(alignment: .trailing, spacing: 8) {
+                    Text(statusLabel)
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .tracking(0.5)
+                        .foregroundStyle(accent)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(accent.opacity(0.09), in: Capsule())
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+            }
+            .padding(14)
+            .background(ATHLTHArenaLightStyle.card(18))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(
+                        isActive ? ATHLTHTheme.accentDeep.opacity(0.18)
+                                 : Color.clear,
+                        lineWidth: 1
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
     }
 
     @MainActor
