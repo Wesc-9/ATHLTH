@@ -9,6 +9,7 @@ struct ThreadWorkoutInvitationCard: View {
     let isResponding: Bool
     let onAccept: () -> Void
     let onDecline: () -> Void
+    let onProposeChanges: () -> Void
 
     @State private var showingDetails = false
 
@@ -163,6 +164,21 @@ struct ThreadWorkoutInvitationCard: View {
                     .buttonStyle(.borderedProminent)
                     .tint(ATHLTHTheme.accentDeep)
                 }
+                .disabled(isResponding)
+
+                Button(action: onProposeChanges) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Propose changes",
+                            norwegian: "Foreslå endringer"
+                        ),
+                        systemImage: "square.and.pencil"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(ATHLTHTheme.accentDeep)
                 .disabled(isResponding)
             }
 
