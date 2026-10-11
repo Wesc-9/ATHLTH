@@ -114,9 +114,8 @@ struct ATHLTHArenaGroupChatView: View {
             .background(.regularMaterial)
             }
         }
-        .background(ATHLTHPremiumCanvas(
-            accent: ATHLTHTheme.champagneSoft.opacity(0.13)
-        ))
+        .background(ATHLTHArenaLightStyle.canvasBackground)
+        .environment(\.colorScheme, .light)
         .navigationTitle(series.title)
         .navigationBarTitleDisplayMode(.inline)
         .task(id: series.id) { await reload() }
@@ -174,7 +173,7 @@ struct ATHLTHArenaGroupChatView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .background(ATHLTHArenaLightStyle.card(20))
     }
 
     private var invitationCard: some View {
@@ -216,7 +215,7 @@ struct ATHLTHArenaGroupChatView: View {
         .foregroundStyle(ATHLTHTheme.primaryText)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 21))
+        .background(ATHLTHArenaLightStyle.card(21))
     }
 
     private func messageBubble(_ item: ATHLTHArenaRemoteMessage) -> some View {
