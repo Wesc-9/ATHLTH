@@ -202,11 +202,15 @@ struct ATHLTHArenaHomeView: View {
     @State private var drafts: [ATHLTHArenaCompetitionDraft] = []
     @State private var showingCreate = false
     @State private var pendingDelete: UUID?
+    @State private var remoteRevision = UUID()
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 introduction
+
+                ATHLTHArenaOnlineSection()
+                    .id(remoteRevision)
 
                 HStack(spacing: 10) {
                     NavigationLink {
@@ -272,7 +276,15 @@ struct ATHLTHArenaHomeView: View {
                             NavigationLink {
                                 ATHLTHArenaDraftDetailView(
                                     draft: draft,
-                                    onSave: upsert
+                                    onSave: upsert,
+                                    onPublished: { id in
+                                        drafts.removeAll { $0.id == id }
+                                        ATHLTHArenaDraftStorage.save(
+                                            drafts,
+                                            for: session.profile.userID
+                                        )
+                                        remoteRevision = UUID()
+                                    }
                                 )
                             } label: {
                                 draftRow(draft)
@@ -610,13 +622,19 @@ struct ATHLTHArenaDraftDetailView: View {
     @State private var showingAddRound = false
 
     let onSave: (ATHLTHArenaCompetitionDraft) -> Void
+    let onPublished: (UUID) -> Void
+
+    @State private var publishing = false
+    @State private var publishError: String?
 
     init(
         draft: ATHLTHArenaCompetitionDraft,
-        onSave: @escaping (ATHLTHArenaCompetitionDraft) -> Void
+        onSave: @escaping (ATHLTHArenaCompetitionDraft) -> Void,
+        onPublished: @escaping (UUID) -> Void
     ) {
         _draft = State(initialValue: draft)
         self.onSave = onSave
+        self.onPublished = onPublished
     }
 
     var body: some View {
@@ -709,6 +727,52 @@ struct ATHLTHArenaDraftDetailView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(ATHLTHTheme.accentDeep)
 
+                VStack(alignment: .leading, spacing: 9) {
+                    if draft.scope == .club {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Club series stay as local drafts until Club membership is connected.",
+                            norwegian: "Club-serier forblir lokale utkast inntil Club-medlemskap er koblet til."
+                        ))
+                        .font(.footnote)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    } else {
+                        Button {
+                            Task { await publishDraft() }
+                        } label: {
+                            HStack {
+                                if publishing {
+                                    ProgressView().tint(.white)
+                                }
+                                Label(ATHLTHLocalization.choose(
+                                    english: "Send invitations",
+                                    norwegian: "Send invitasjoner"
+                                ), systemImage: "paperplane.fill")
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHTheme.accentDeep)
+                        .disabled(
+                            publishing ||
+                            draft.participantIDs.isEmpty ||
+                            draft.rounds.isEmpty
+                        )
+                    }
+
+                    if let publishError {
+                        Text(publishError)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                    }
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "A published series becomes a shared, pre-start lobby. It does not automatically begin a competition.",
+                        norwegian: "En publisert serie blir et delt lobby-utkast. Konkurransen starter ikke automatisk."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
                 VStack(alignment: .leading, spacing: 7) {
                     Label(ATHLTHLocalization.choose(
                         english: "Not started",
@@ -751,6 +815,22 @@ struct ATHLTHArenaDraftDetailView: View {
                     dismiss()
                 }
             }
+        }
+    }
+
+    @MainActor
+    private func publishDraft() async {
+        guard !publishing else { return }
+        publishing = true
+        publishError = nil
+        defer { publishing = false }
+
+        do {
+            _ = try await ATHLTHArenaCloudService().publish(draft)
+            onPublished(draft.id)
+            dismiss()
+        } catch {
+            publishError = error.localizedDescription
         }
     }
 }
