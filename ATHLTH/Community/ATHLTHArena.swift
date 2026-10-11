@@ -208,6 +208,39 @@ struct ATHLTHArenaHomeView: View {
             VStack(alignment: .leading, spacing: 18) {
                 introduction
 
+                HStack(spacing: 10) {
+                    NavigationLink {
+                        ATHLTHArenaSingleChallengesView()
+                    } label: {
+                        arenaDestination(
+                            title: ATHLTHLocalization.choose(
+                                english: "Challenges",
+                                norwegian: "Enkeltutfordringer"
+                            ),
+                            detail: ATHLTHLocalization.choose(
+                                english: "Invites, duels & results",
+                                norwegian: "Dueller, invitasjoner og resultater"
+                            ),
+                            icon: "flag.checkered"
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    NavigationLink {
+                        CommunityGroupsView()
+                    } label: {
+                        arenaDestination(
+                            title: "Clubs",
+                            detail: ATHLTHLocalization.choose(
+                                english: "Group competitions",
+                                norwegian: "Klubbkonkurranser"
+                            ),
+                            icon: "person.3.fill"
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 HStack {
                     Text(ATHLTHLocalization.choose(
                         english: "Your competition series",
@@ -310,6 +343,43 @@ struct ATHLTHArenaHomeView: View {
             Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt"), role: .cancel) {
                 pendingDelete = nil
             }
+        }
+    }
+
+    private func arenaDestination(
+        title: String,
+        detail: String,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(width: 38, height: 38)
+                .background(
+                    ATHLTHTheme.accentDeep.opacity(0.08),
+                    in: RoundedRectangle(cornerRadius: 12)
+                )
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                Text(detail)
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
+        .padding(.horizontal, 12)
+        .background(
+            .regularMaterial,
+            in: RoundedRectangle(cornerRadius: 19, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 19, style: .continuous)
+                .stroke(Color.white.opacity(0.6), lineWidth: 0.8)
         }
     }
 
@@ -746,6 +816,143 @@ struct ATHLTHArenaAddRoundView: View {
                     }
                     .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                               || rules.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
+}
+
+
+// MARK: - Existing competitive Challenges in Arena
+// Official Weekly Challenge keeps its independent editorial/admin workflows.
+struct ATHLTHArenaSingleChallengesView: View {
+    @EnvironmentObject private var challenges: ChallengeStore
+    @EnvironmentObject private var session: AppSessionStore
+    @State private var showingCreate = false
+
+    private var invitations: [ATHLTHChallenge] {
+        challenges.incomingInvitations(for: session.profile.userID)
+    }
+
+    private var activeChallenges: [ATHLTHChallenge] {
+        challenges.trainingChallenges(for: session.profile.userID)
+    }
+
+    private var history: [ATHLTHChallenge] {
+        challenges.visibleChallenges
+            .filter { $0.status == .completed || $0.status == .cancelled }
+            .filter {
+                $0.creatorID == session.profile.userID ||
+                $0.participants.contains { $0.userID == session.profile.userID }
+            }
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Single challenges",
+                        norwegian: "Enkeltutfordringer"
+                    ))
+                    .font(.title2.weight(.bold))
+                    Text(ATHLTHLocalization.choose(
+                        english: "One-off duels, routes and activity goals. Series are managed separately in Arena.",
+                        norwegian: "Enkeltdueller, ruter og aktivitetsmål. Konkurranseserier administreres separat i Arena."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    Button {
+                        showingCreate = true
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "New challenge", norwegian: "Ny utfordring"
+                        ), systemImage: "plus.circle.fill")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accentDeep)
+                }
+                .padding(17)
+                .background(.regularMaterial,
+                            in: RoundedRectangle(cornerRadius: 22))
+
+                challengeSection(
+                    ATHLTHLocalization.choose(english: "Invitations", norwegian: "Invitasjoner"),
+                    items: invitations
+                )
+                challengeSection(
+                    ATHLTHLocalization.choose(english: "Active challenges", norwegian: "Aktive utfordringer"),
+                    items: activeChallenges
+                )
+                challengeSection(
+                    ATHLTHLocalization.choose(english: "History", norwegian: "Historikk"),
+                    items: history
+                )
+            }
+            .padding(16)
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
+        }
+        .background(ATHLTHPremiumCanvas(
+            accent: ATHLTHTheme.champagneSoft.opacity(0.16)
+        ))
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Challenges", norwegian: "Utfordringer"
+        ))
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showingCreate) {
+            ChallengeCreationView()
+        }
+    }
+
+    private func challengeSection(
+        _ heading: String,
+        items: [ATHLTHChallenge]
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text(heading)
+                .font(.headline)
+                .foregroundStyle(ATHLTHTheme.primaryText)
+            if items.isEmpty {
+                Text(ATHLTHLocalization.choose(
+                    english: "Nothing here yet.",
+                    norwegian: "Ingenting her ennå."
+                ))
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(15)
+                .background(.regularMaterial,
+                            in: RoundedRectangle(cornerRadius: 17))
+            } else {
+                ForEach(items) { item in
+                    NavigationLink {
+                        ChallengeDetailView(challengeID: item.id)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: item.sport.systemImage)
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .frame(width: 32)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(item.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                                Text(item.sport.title)
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        .padding(14)
+                        .background(.regularMaterial,
+                                    in: RoundedRectangle(cornerRadius: 17))
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
