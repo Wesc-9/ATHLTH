@@ -16,12 +16,14 @@ struct ATHLTHArenaRemoteSeries: Decodable, Identifiable {
     let startsAt: Date?
     let endsAt: Date?
     let completedAt: Date?
+    let completionReason: String?
 
     enum CodingKeys: String, CodingKey {
         case id, title, scope, scoring, status
         case startsAt = "starts_at"
         case endsAt = "ends_at"
         case completedAt = "completed_at"
+        case completionReason = "completion_reason"
         case ownerID = "owner_id"
         case clubID = "club_id"
         case durationDays = "duration_days"
@@ -437,6 +439,11 @@ final class ATHLTHArenaCloudService: Sendable {
         guard currentUserID != nil else {
             return []
         }
+        // Idempotent deadline reconciliation as a foreground/reconnect
+        // fallback for the scheduled backend finalizer.
+        let _: Int = try await client.rpc(
+            "arena_refresh_my_deadlines"
+        ).execute().value
         return try await client
             .from("arena_series")
             .select()
