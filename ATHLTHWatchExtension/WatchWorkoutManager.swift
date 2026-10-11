@@ -5632,8 +5632,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             break
         }
 
+        let spokenText = (audioCoachConfiguration.speechStyle ?? .balanced).render(
+            text,
+            language: audioCoachConfiguration.language,
+            priority: priority,
+            eventKind: event?.kind
+        )
         let utterance = AVSpeechUtterance(
-            string: text
+            string: spokenText
         )
 
         if let voiceIdentifier =
@@ -5727,7 +5733,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 if rememberForReplay,
                    ATHLTHCoachReplayMemory.mayRemember(priority: priority) {
                     self.coachReplayMemory.remember(
-                        text,
+                        spokenText,
                         priority: priority
                     )
                     self.lastCoachMessage = self.coachReplayMemory.text
