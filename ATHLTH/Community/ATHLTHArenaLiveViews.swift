@@ -1,10 +1,10 @@
 import Foundation
 import SwiftUI
 
-/// Server-backed collaboration is a pre-start lobby, not a scored competition.
-/// Round results and series activation remain disabled until their verification
-/// and final-scoring backend has been implemented.
+/// Shared Arena series with live invitations, consensual scoring and
+/// deadline-based completion. Club and Weekly Challenges remain separate.
 struct ATHLTHArenaOnlineSection: View {
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
 
     @State private var series: [ATHLTHArenaRemoteSeries] = []
@@ -71,10 +71,18 @@ struct ATHLTHArenaOnlineSection: View {
                                 .foregroundStyle(ATHLTHTheme.primaryText)
                                 .lineLimit(1)
                             Text(item.scope.title + " · " +
-                                 ATHLTHLocalization.choose(
-                                    english: "Awaiting agreement",
-                                    norwegian: "Avventer enighet"
-                                 ))
+                                 (item.status == "completed"
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Completed", norwegian: "Fullført"
+                                      )
+                                    : item.status == "active"
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Active", norwegian: "Aktiv"
+                                          )
+                                        : ATHLTHLocalization.choose(
+                                            english: "Awaiting agreement",
+                                            norwegian: "Avventer enighet"
+                                          )))
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
                         }
@@ -92,6 +100,16 @@ struct ATHLTHArenaOnlineSection: View {
         }
         .task(id: session.profile.userID) {
             await refresh()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await refresh() } }
+        }
+        .task(id: session.profile.userID) {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 60_000_000_000)
+                if Task.isCancelled { break }
+                await refresh()
+            }
         }
     }
 
