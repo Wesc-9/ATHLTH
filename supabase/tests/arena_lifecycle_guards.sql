@@ -328,5 +328,44 @@ begin
  ) then
    raise exception 'Malformed Arena route was accepted';
  end if;
-end $$;
+ -- Relay correction history stays private, append-only from the app
+ -- and is populated only by the authenticated leg-report RPC trigger.
+ if to_regclass('public.arena_relay_leg_history') is null then
+   raise exception 'Relay report correction history table is missing';
+ end if;
+ if has_table_privilege('anon','public.arena_relay_leg_history','SELECT')
+   or has_table_privilege('authenticated','public.arena_relay_leg_history','INSERT')
+   or has_table_privilege('authenticated','public.arena_relay_leg_history','UPDATE')
+   or has_table_privilege('authenticated','public.arena_relay_leg_history','DELETE') then
+   raise exception 'Relay time history must be private and not client-editable';
+ end if;
+ if not (select relrowsecurity from pg_class
+         where oid='public.arena_relay_leg_history'::regclass) then
+   raise exception 'Relay time history RLS was disabled';
+ end if;
+ if not exists (
+   select 1 from pg_policies
+   where schemaname='public'
+     and tablename='arena_relay_leg_history'
+     and policyname='arena_relay_history_read'
+     and qual like '%arena_can_access%'
+ ) then
+   raise exception 'Relay time history must use the existing Arena membership check';
+ end if;
+ if not exists (
+   select 1 from pg_trigger
+   where tgrelid='public.arena_relay_leg_reports'::regclass
+     and tgname='arena_track_relay_leg_change'
+     and tgenabled='O'
+ ) then
+   raise exception 'Relay report changes are not being audited';
+ end if;
+ if has_function_privilege(
+   'authenticated',
+   'private.arena_append_relay_leg_history()'::regprocedure,
+   'EXECUTE'
+ ) then
+   raise exception 'Clients must not call the private relay history trigger';
+ end if;
+end $;
 rollback;
