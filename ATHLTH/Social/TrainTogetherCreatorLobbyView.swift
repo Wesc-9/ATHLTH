@@ -682,10 +682,13 @@ struct TrainTogetherCreatorLobbyView: View {
                     isStarting = true
                     startError = nil
                     Task {
-                        let isReady = creatorReady || await social.markCurrentUserReady(
-                            sessionID: sessionID,
-                            captureDevice: selectedCaptureDevice
-                        )
+                        var isReady = creatorReady
+                        if !isReady {
+                            isReady = await social.markCurrentUserReady(
+                                sessionID: sessionID,
+                                captureDevice: selectedCaptureDevice
+                            )
+                        }
                         guard isReady else {
                             startError = social.errorMessage ??
                                 ATHLTHLocalization.choose(
