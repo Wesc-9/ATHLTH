@@ -4,6 +4,7 @@ import Supabase
 /// One shared room per Arena series. Membership and posting authorization
 /// are enforced in the database; this is not a reusable public Club chat.
 struct ATHLTHArenaGroupChatView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
 
@@ -120,6 +121,16 @@ struct ATHLTHArenaGroupChatView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task(id: series.id) { await reload() }
         .task(id: series.id) { await listenForMessages() }
+        .task(id: series.id) {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 45_000_000_000)
+                if Task.isCancelled { break }
+                await reload()
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await reload() } }
+        }
         .refreshable { await reload() }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
