@@ -11,13 +11,15 @@ final class AudioCoachVoicePausePolicyTests: XCTestCase {
         XCTAssertTrue(
             ATHLTHCoachVoicePausePolicy.allowsSpeech(
                 coachEnabled: coach.enabled,
-                speechPaused: false
+                speechPaused: false,
+            priority: .routineCoach
             )
         )
         XCTAssertFalse(
             ATHLTHCoachVoicePausePolicy.allowsSpeech(
                 coachEnabled: coach.enabled,
-                speechPaused: true
+                speechPaused: true,
+            priority: .routineCoach
             )
         )
         XCTAssertEqual(coach.distanceIntervalMeters, 1_000)
@@ -29,13 +31,15 @@ final class AudioCoachVoicePausePolicyTests: XCTestCase {
         XCTAssertFalse(
             ATHLTHCoachVoicePausePolicy.allowsSpeech(
                 coachEnabled: false,
-                speechPaused: false
+                speechPaused: false,
+            priority: .routineCoach
             )
         )
         XCTAssertFalse(
             ATHLTHCoachVoicePausePolicy.allowsSpeech(
                 coachEnabled: false,
-                speechPaused: true
+                speechPaused: true,
+            priority: .routineCoach
             )
         )
     }
@@ -45,7 +49,8 @@ final class AudioCoachVoicePausePolicyTests: XCTestCase {
             delivery: .both,
             voiceEnabled: ATHLTHCoachVoicePausePolicy.allowsSpeech(
                 coachEnabled: true,
-                speechPaused: true
+                speechPaused: true,
+            priority: .routineCoach
             ),
             hapticsEnabled: true,
             hapticPermittedByPriority: true
@@ -65,17 +70,43 @@ final class AudioCoachVoicePausePolicyTests: XCTestCase {
         XCTAssertFalse(
             ATHLTHCoachVoicePausePolicy.allowsSpeech(
                 coachEnabled: configured.enabled,
-                speechPaused: paused
+                speechPaused: paused,
+            priority: .routineCoach
             )
         )
         paused = false
         XCTAssertTrue(
             ATHLTHCoachVoicePausePolicy.allowsSpeech(
                 coachEnabled: configured.enabled,
-                speechPaused: paused
+                speechPaused: paused,
+            priority: .routineCoach
             )
         )
         XCTAssertEqual(configured.distanceIntervalMeters, 500)
         XCTAssertEqual(configured.timeIntervalSeconds, 300)
     }
+    func testIndependentCriticalAndGhostAlertsRemainAllowedDuringCoachMute() {
+        for priority: ATHLTHGuidancePriority in [
+            .routeCritical, .targetCritical, .ghostPeriodic, .ghostImportant
+        ] {
+            XCTAssertTrue(
+                ATHLTHCoachVoicePausePolicy.allowsSpeech(
+                    coachEnabled: false,
+                    speechPaused: true,
+                    priority: priority
+                )
+            )
+        }
+    }
+
+    func testStructuredAudioCoachRespectsMute() {
+        XCTAssertFalse(
+            ATHLTHCoachVoicePausePolicy.allowsSpeech(
+                coachEnabled: true,
+                speechPaused: true,
+                priority: .structuredStep
+            )
+        )
+    }
+
 }
