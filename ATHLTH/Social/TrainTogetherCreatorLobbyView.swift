@@ -612,6 +612,38 @@ struct TrainTogetherCreatorLobbyView: View {
                 }
                 .buttonStyle(.bordered)
 
+                if session?.invitePayload != nil {
+                    Button {
+                        Task {
+                            _ = await social.enableIndependentWorkoutStart(
+                                sessionID: sessionID
+                            )
+                        }
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Start at your own pace",
+                                norwegian: "Start i eget tempo"
+                            ),
+                            systemImage: "person.2.wave.2"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 46)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(session?.invitePayload?.resolvedStartIndependently == true)
+
+                    if session?.invitePayload?.resolvedStartIndependently == true {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Individual start enabled. Each athlete starts when ready; your live progress remains shared.",
+                            norwegian: "Individuell start er aktiv. Hver deltaker starter når de er klare, men ser fortsatt hverandres fremdrift."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.vitality)
+                    }
+                }
+
                 Text(
                     allAcceptedGuestsReady
                         ? ATHLTHLocalization.choose(
