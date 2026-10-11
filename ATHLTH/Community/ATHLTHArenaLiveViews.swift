@@ -2871,7 +2871,9 @@ private struct ATHLTHArenaRelaySection: View {
                         assignments: assignments,
                         existing: legs,
                         rounds: availableRoutes,
-                        onSave: savePlan
+                        onSave: { routeID, first, second in
+                            await savePlan(routeID, first, second)
+                        }
                     )
                 }
                 .confirmationDialog(
@@ -3008,15 +3010,14 @@ private struct ATHLTHArenaRelayEditor: View {
     }
 
     private var valid: Bool {
-        let a = teamMembers(1), b = teamMembers(2)
-        guard a.count >= 2, a.count == b.count,
-              assignments.count == members.count,
-              let selectedRouteID,
-              rounds.contains(where: { $0.id == selectedRouteID })
-        else { return false }
-        return [a,b].allSatisfy { team in
-            Set(team.compactMap { orders[$0.slotID] }) == Set(1...team.count)
-        }
+        guard assignments.count == members.count else { return false }
+        return ATHLTHArenaRelayPlanning.isValid(
+            firstTeam: teamMembers(1).map(\.slotID),
+            secondTeam: teamMembers(2).map(\.slotID),
+            legOrders: orders,
+            routeRoundID: selectedRouteID,
+            availableRouteRoundIDs: Set(rounds.map(\.id))
+        )
     }
 
     private func displayName(_ member: ATHLTHArenaRemoteMember) -> String {
