@@ -130,4 +130,63 @@ final class HomeWeeklyProgressCalendarTests: XCTestCase {
             15
         )
     }
+    func testTappedWorkoutOpensItsOwnPlanOrStandaloneDetail() {
+        let scheduled = PlannedSession(
+            id: UUID(),
+            title: "Styrke bein",
+            kind: .strength,
+            scheduledStart: date(2026, 10, 14),
+            exercises: []
+        )
+        let standalone = PlannedSession(
+            id: UUID(),
+            title: "Ekstra løpetur",
+            kind: .running,
+            scheduledStart: date(2026, 10, 14),
+            exercises: []
+        )
+        let plan = TrainingPlan(
+            id: UUID(),
+            ownerID: UUID(),
+            title: "Aktiv treningsplan",
+            summary: "",
+            visibility: .privateOnly,
+            version: 1,
+            weeks: [
+                TrainingPlanWeek(
+                    id: UUID(),
+                    weekNumber: 1,
+                    title: "Uke 1",
+                    days: [
+                        TrainingPlanDay(
+                            id: UUID(),
+                            dayIndex: 1,
+                            title: "Onsdag",
+                            sessions: [scheduled]
+                        )
+                    ]
+                )
+            ],
+            tags: [],
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+
+        XCTAssertEqual(
+            HomeWeeklyProgressCalendar.containingPlanID(
+                for: scheduled, in: plan
+            ), plan.id
+        )
+        XCTAssertNil(
+            HomeWeeklyProgressCalendar.containingPlanID(
+                for: standalone, in: plan
+            )
+        )
+        XCTAssertNil(
+            HomeWeeklyProgressCalendar.containingPlanID(
+                for: scheduled, in: nil
+            )
+        )
+    }
+
 }
