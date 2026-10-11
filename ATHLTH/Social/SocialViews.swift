@@ -1633,7 +1633,9 @@ struct FriendProfileView: View {
         }
         .sheet(isPresented: $showingTrainingEditor) {
             SessionEditorView(
-                standaloneDate: Date(),
+                standaloneDate: Calendar.current.date(
+                    byAdding: .day, value: 1, to: Date()
+                ) ?? Date().addingTimeInterval(86_400),
                 partnerID: userID,
                 physicalMeetup: trainPhysically
             )
