@@ -929,7 +929,10 @@ enum WorkoutLaunchCoordinator {
         inviteAdvancedConfiguration.spotifyPlaylist = nil
         inviteAdvancedConfiguration.spotifyAutoplay = false
 
-        if !selectedFriends.isEmpty {
+        if selectedFriends.isEmpty {
+            // An unstarted social invitation must never claim this solo workout.
+            social.prepareForAnotherWorkout()
+        } else {
             guard await social.beginWorkoutWithFriends(
                 title: workout.title,
                 kind: .strength,
