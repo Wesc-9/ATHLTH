@@ -964,6 +964,8 @@ struct ATHLTHArenaCreateView: View {
                 }
             }
         }
+        .environment(\.colorScheme, .light)
+        .tint(ATHLTHArenaLightStyle.action)
     }
 
     @MainActor
@@ -985,8 +987,6 @@ struct ATHLTHArenaCreateView: View {
             clubError = nil
         } catch {
             clubError = error.localizedDescription
-        .environment(\.colorScheme, .light)
-        .tint(ATHLTHArenaLightStyle.action)
         }
     }
 }
