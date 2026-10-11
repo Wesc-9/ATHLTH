@@ -1962,8 +1962,12 @@ struct IPhoneWorkoutView: View {
                         Text(
                             workout.audioCoachConfiguration?.enabled == true
                                 ? ATHLTHLocalization.choose(
-                                    english: "On · adjust during workout",
-                                    norwegian: "På · juster under økten"
+                                    english: recorder.coachSpeechPaused
+                                        ? "Voice paused · tap to resume"
+                                        : "On · adjust during workout",
+                                    norwegian: recorder.coachSpeechPaused
+                                        ? "Tale pauset · trykk for å fortsette"
+                                        : "På · juster under økten"
                                 )
                                 : ATHLTHLocalization.choose(
                                     english: "Off · tap to enable",
@@ -3122,6 +3126,86 @@ private struct IPhoneAudioCoachLiveSheet: View {
                         }
 
                         if configuration.enabled {
+                            coachCard {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    HStack(spacing: 10) {
+                                        Image(systemName:
+                                            recorder.coachSpeechPaused
+                                                ? "speaker.slash.circle.fill"
+                                                : "waveform.circle.fill"
+                                        )
+                                        .foregroundStyle(
+                                            recorder.coachSpeechPaused
+                                                ? ATHLTHTheme.mutedText
+                                                : ATHLTHTheme.accentDeep
+                                        )
+                                        .font(.title2)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(ATHLTHLocalization.choose(
+                                                english: "Live voice control",
+                                                norwegian: "Talekontroll under økten"
+                                            ))
+                                            .font(.subheadline.weight(.semibold))
+                                            Text(ATHLTHLocalization.choose(
+                                                english: recorder.coachSpeechPaused
+                                                    ? "Voice paused · workout keeps recording"
+                                                    : "Voice on · workout keeps recording",
+                                                norwegian: recorder.coachSpeechPaused
+                                                    ? "Tale pauset · økten registreres videre"
+                                                    : "Tale aktiv · økten registreres videre"
+                                            ))
+                                            .font(.caption)
+                                            .foregroundStyle(ATHLTHTheme.mutedText)
+                                        }
+                                    }
+                                    HStack(spacing: 9) {
+                                        Button {
+                                            recorder.setCoachSpeechPaused(
+                                                !recorder.coachSpeechPaused
+                                            )
+                                        } label: {
+                                            Label(
+                                                recorder.coachSpeechPaused
+                                                    ? ATHLTHLocalization.choose(
+                                                        english: "Resume voice",
+                                                        norwegian: "Fortsett tale"
+                                                    )
+                                                    : ATHLTHLocalization.choose(
+                                                        english: "Pause voice",
+                                                        norwegian: "Pause tale"
+                                                    ),
+                                                systemImage: recorder.coachSpeechPaused
+                                                    ? "play.fill"
+                                                    : "pause.fill"
+                                            )
+                                            .frame(maxWidth: .infinity, minHeight: 45)
+                                        }
+                                        .buttonStyle(.bordered)
+                                        .accessibilityHint(ATHLTHLocalization.choose(
+                                            english: "Does not pause workout recording",
+                                            norwegian: "Pauser ikke treningsregistreringen"
+                                        ))
+
+                                        Button {
+                                            recorder.announceCoachStatusNow()
+                                        } label: {
+                                            Label(
+                                                ATHLTHLocalization.choose(
+                                                    english: "Status now",
+                                                    norwegian: "Status nå"
+                                                ),
+                                                systemImage: "waveform"
+                                            )
+                                            .frame(maxWidth: .infinity, minHeight: 45)
+                                        }
+                                        .buttonStyle(.borderedProminent)
+                                        .tint(ATHLTHTheme.accentDeep)
+                                        .disabled(recorder.coachSpeechPaused)
+                                    }
+                                    .font(.subheadline.weight(.semibold))
+                                }
+                            }
+
                             coachCard {
                                 VStack(alignment: .leading, spacing: 12) {
                                     HStack {
