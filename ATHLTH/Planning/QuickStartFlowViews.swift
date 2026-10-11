@@ -231,13 +231,13 @@ struct AudioCoachDraft {
                         1.0
                     )
                 ),
+            speechStyle: speechStyle,
             announceWorkoutStart:
                 announceWorkoutStart,
             announcePauseResume:
                 announcePauseResume,
             announceWorkoutComplete:
-                announceWorkoutComplete,
-            speechStyle: speechStyle
+                announceWorkoutComplete
         )
     }
 }
