@@ -90,6 +90,68 @@ enum ATHLTHArenaEvidenceMatcher {
     }
 }
 
+
+//// Local route eligibility is informational evidence, never server attestation.
+/// The same constraints guard discovery AND the final share action.
+enum ATHLTHArenaRouteEvidencePolicy {
+    static func eligibleWorkout(
+        _ workout: SocialPublishableWorkout,
+        plannedDistanceMeters: Double,
+        startsAt: Date?,
+        endsAt: Date?,
+        now: Date = Date()
+    ) -> Bool {
+        guard let startsAt, let endsAt,
+              startsAt < endsAt,
+              plannedDistanceMeters.isFinite,
+              (100...500_000).contains(plannedDistanceMeters),
+              workout.activity == .running,
+              workout.isIndoor != true,
+              workout.startDate >= startsAt,
+              workout.endDate > workout.startDate,
+              workout.endDate <= endsAt,
+              workout.endDate <= now,
+              let distance = workout.distanceMeters,
+              distance.isFinite,
+              distance > 0,
+              abs(distance - plannedDistanceMeters) <= plannedDistanceMeters * 0.05,
+              workout.duration.isFinite,
+              workout.duration > 0,
+              workout.duration <= 86_400,
+              distance <= workout.duration * 15
+        else { return false }
+        return true
+    }
+
+    static func eligibleProof(
+        matchPercent: Double,
+        startGapMeters: Double,
+        endGapMeters: Double,
+        measuredDistanceMeters: Double,
+        plannedDistanceMeters: Double,
+        elapsedSeconds: Double
+    ) -> Bool {
+        guard matchPercent.isFinite,
+              (90...100).contains(matchPercent),
+              startGapMeters.isFinite,
+              (0...120).contains(startGapMeters),
+              endGapMeters.isFinite,
+              (0...120).contains(endGapMeters),
+              plannedDistanceMeters.isFinite,
+              (100...500_000).contains(plannedDistanceMeters),
+              measuredDistanceMeters.isFinite,
+              measuredDistanceMeters > 0,
+              abs(measuredDistanceMeters - plannedDistanceMeters)
+                  <= plannedDistanceMeters * 0.05,
+              elapsedSeconds.isFinite,
+              elapsedSeconds > 0,
+              elapsedSeconds <= 86_400,
+              measuredDistanceMeters <= elapsedSeconds * 15
+        else { return false }
+        return true
+    }
+}
+
 struct ATHLTHArenaRouteProof {
     let matchPercent: Double
     let startGapMeters: Double
@@ -364,43 +426,34 @@ struct ATHLTHArenaEvidenceSection: View {
     /// Explicit on-demand comparison; never polls GPS history in the background.
     @MainActor
     private func searchRouteCandidates(for round: ATHLTHArenaRemoteProposal) async {
-        guard routeSearchingID == nil, let snapshot = round.routeSnapshot,
-              snapshot.coordinates.count >= 2,
-              snapshot.distanceKilometers.isFinite,
-              (0.1...500).contains(snapshot.distanceKilometers),
+        guard routeSearchingID == nil,
+              let snapshot = round.routeSnapshot,
+              let route = ATHLTHArenaCompetitionCourse.route(
+                from: snapshot, ownerID: session.profile.userID
+              ),
               let startsAt = series.startsAt,
-              let endsAt = series.endsAt else { return }
+              let endsAt = series.endsAt else {
+            errorMessage = ATHLTHLocalization.choose(
+                english: "This competition route or time window is unavailable.",
+                norwegian: "Konkurranseruten eller tidsvinduet er ikke gyldig."
+            )
+            return
+        }
 
         routeSearchingID = round.id
         defer { routeSearchingID = nil }
         errorMessage = nil
 
-        let route = TrainingRoute(
-            id: snapshot.routeID ?? UUID(),
-            ownerID: session.profile.userID,
-            title: snapshot.title,
-            visibility: .privateOnly,
-            coordinates: snapshot.coordinates,
-            distanceKilometers: snapshot.distanceKilometers,
-            elevationGainMeters: nil,
-            importedFilename: nil,
-            createdAt: Date(),
-            startName: nil,
-            endName: nil,
-            expectedTravelTimeSeconds: nil,
-            routeSource: "arena_competition"
-        )
-
         let targetMeters = snapshot.distanceKilometers * 1_000
         var matches: [ATHLTHArenaEvidenceCandidate] = []
         for summary in health.workouts
             .filter({
-                $0.activity == .running &&
-                $0.startDate >= startsAt &&
-                $0.endDate <= endsAt &&
-                $0.endDate <= Date() &&
-                ($0.distanceMeters ?? 0) > 0 &&
-                abs(($0.distanceMeters ?? 0) - targetMeters) <= targetMeters * 0.05
+                ATHLTHArenaRouteEvidencePolicy.eligibleWorkout(
+                    SocialPublishableWorkout(summary: $0),
+                    plannedDistanceMeters: targetMeters,
+                    startsAt: startsAt,
+                    endsAt: endsAt
+                )
             })
             .prefix(25) {
             if Task.isCancelled { break }
@@ -411,12 +464,14 @@ struct ATHLTHArenaEvidenceSection: View {
             ) else { continue }
 
             guard let analysis = await health.routePerformance(for: summary, against: route),
-                  analysis.routeMatchPercent >= 90,
-                  analysis.startDistanceMeters <= 120,
-                  analysis.endDistanceMeters <= 120,
-                  analysis.distanceMeters > 0,
-                  analysis.durationSeconds.isFinite,
-                  analysis.durationSeconds > 0 else { continue }
+                  ATHLTHArenaRouteEvidencePolicy.eligibleProof(
+                    matchPercent: analysis.routeMatchPercent,
+                    startGapMeters: analysis.startDistanceMeters,
+                    endGapMeters: analysis.endDistanceMeters,
+                    measuredDistanceMeters: analysis.distanceMeters,
+                    plannedDistanceMeters: targetMeters,
+                    elapsedSeconds: analysis.durationSeconds
+                  ) else { continue }
 
             let localCheck = ATHLTHArenaLocalEvidenceCheck.verify(
                 workout,
@@ -493,6 +548,37 @@ struct ATHLTHArenaEvidenceSection: View {
         )
         guard localCheck.isUsable else {
             errorMessage = localCheck.description
+            return
+        }
+        if round.template == .fastestRoute {
+            guard let snapshot = round.routeSnapshot,
+                  let proof = candidate.routeProof,
+                  ATHLTHArenaRouteEvidencePolicy.eligibleWorkout(
+                    candidate.workout,
+                    plannedDistanceMeters: snapshot.distanceKilometers * 1_000,
+                    startsAt: series.startsAt,
+                    endsAt: series.endsAt
+                  ),
+                  ATHLTHArenaRouteEvidencePolicy.eligibleProof(
+                    matchPercent: proof.matchPercent,
+                    startGapMeters: proof.startGapMeters,
+                    endGapMeters: proof.endGapMeters,
+                    measuredDistanceMeters: candidate.workout.distanceMeters ?? 0,
+                    plannedDistanceMeters: snapshot.distanceKilometers * 1_000,
+                    elapsedSeconds: candidate.match.metricValue
+                  ) else {
+                errorMessage = ATHLTHLocalization.choose(
+                    english: "This GPS result no longer meets the route requirements. Check GPS again.",
+                    norwegian: "GPS-resultatet oppfyller ikke lenger rutekravene. Sjekk GPS på nytt."
+                )
+                routeCandidates[round.id] = nil
+                return
+            }
+        } else if candidate.routeProof != nil {
+            errorMessage = ATHLTHLocalization.choose(
+                english: "The selected workout does not belong to this round.",
+                norwegian: "Den valgte økten tilhører ikke denne runden."
+            )
             return
         }
         submitting = true
