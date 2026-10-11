@@ -1415,12 +1415,16 @@ struct FriendProfileView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var messaging: MessagingStore
+    @EnvironmentObject private var session: AppSessionStore
 
     let userID: UUID
 
     @State private var profile: SocialFriendProfile?
     @State private var loading = true
     @State private var showingChallenge = false
+    @State private var showingArenaChoice = false
+    @State private var showingArenaCreate = false
+    @State private var arenaDraftSaved = false
     @State private var showingTrainingEditor = false
     @State private var trainPhysically = true
     @State private var showingReport = false
@@ -1603,6 +1607,61 @@ struct FriendProfileView: View {
                     preselectedFriends: [profile.card]
                 )
             }
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Choose a challenge",
+                norwegian: "Velg konkurranseform"
+            ),
+            isPresented: $showingArenaChoice,
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Single challenge",
+                norwegian: "Enkeltutfordring"
+            )) {
+                showingChallenge = true
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Competition series",
+                norwegian: "Konkurranseserie"
+            )) {
+                showingArenaCreate = true
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Cancel", norwegian: "Avbryt"
+            ), role: .cancel) {}
+        }
+        .sheet(isPresented: $showingArenaCreate) {
+            ATHLTHArenaCreateView(
+                ownerID: session.profile.userID,
+                friends: social.mutualFollows,
+                preselectedFriendID: userID
+            ) { draft in
+                var existing = ATHLTHArenaDraftStorage.load(
+                    for: session.profile.userID
+                )
+                existing.insert(draft, at: 0)
+                ATHLTHArenaDraftStorage.save(
+                    existing,
+                    for: session.profile.userID
+                )
+                arenaDraftSaved = true
+            }
+        }
+        .alert(
+            ATHLTHLocalization.choose(
+                english: "Saved in Arena",
+                norwegian: "Lagret i Arena"
+            ),
+            isPresented: $arenaDraftSaved
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "The competition draft is in Community → Arena. Add rounds before sending invitations.",
+                norwegian: "Konkurranseutkastet ligger i Community → Arena. Legg til runder før du sender invitasjoner."
+            ))
         }
         .sheet(isPresented: $showingTrainingEditor) {
             SessionEditorView(
@@ -2188,7 +2247,7 @@ struct FriendProfileView: View {
                         $0.userID == userID
                     }
                 ) {
-                    showingChallenge = true
+                    showingArenaChoice = true
                 } else {
                     followActionError =
                         ATHLTHLocalization.choose(
