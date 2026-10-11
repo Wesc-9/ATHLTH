@@ -5,6 +5,7 @@ import Supabase
 /// Arena scoring is confirmed by the whole group. Manual evidence is never
 /// labelled as HealthKit/GPS verified; there is no silent point allocation.
 struct ATHLTHArenaScoringSection: View {
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
 
@@ -241,6 +242,16 @@ struct ATHLTHArenaScoringSection: View {
         .task(id: series.id) { await reload() }
         .task(id: series.id) { await listenForScoring(table: "arena_round_results") }
         .task(id: series.id) { await listenForScoring(table: "arena_round_result_votes") }
+        .task(id: series.id) {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 60_000_000_000)
+                if Task.isCancelled { break }
+                await reload()
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await reload() } }
+        }
         .sheet(item: $roundToScore) { round in
             ATHLTHArenaOutcomeEditor(
                 round: round,
