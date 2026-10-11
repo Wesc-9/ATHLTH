@@ -5,6 +5,7 @@ import SwiftUI
 /// labelled as HealthKit/GPS verified; there is no silent point allocation.
 struct ATHLTHArenaScoringSection: View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var social: SocialStore
 
     let series: ATHLTHArenaRemoteSeries
     let members: [ATHLTHArenaRemoteMember]
@@ -66,7 +67,8 @@ struct ATHLTHArenaScoringSection: View {
                 if loading { ProgressView().controlSize(.small) }
             }
 
-            ForEach(Array(rankedMembers.enumerated()), id: \.element.id) { index, member in
+            ForEach(rankedMembers) { member in
+                let index = rankedMembers.firstIndex { $0.id == member.id } ?? 0
                 HStack(spacing: 12) {
                     Text("\(index + 1).")
                         .font(.headline.monospacedDigit())
@@ -282,9 +284,12 @@ struct ATHLTHArenaScoringSection: View {
         if member.isDeleted {
             return ATHLTHLocalization.choose(english: "Deleted user", norwegian: "Slettet bruker")
         }
-        return member.userID == session.profile.userID
-            ? ATHLTHLocalization.choose(english: "You", norwegian: "Du")
-            : ATHLTHLocalization.choose(english: "Participant", norwegian: "Deltaker")
+        if member.userID == session.profile.userID {
+            return ATHLTHLocalization.choose(english: "You", norwegian: "Du")
+        }
+        return (social.visibleProfiles + social.mutualFollows)
+            .first { $0.userID == member.userID }?.resolvedName ??
+            ATHLTHLocalization.choose(english: "Participant", norwegian: "Deltaker")
     }
 
     @MainActor
@@ -350,6 +355,8 @@ struct ATHLTHArenaScoringSection: View {
 
 private struct ATHLTHArenaOutcomeEditor: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var social: SocialStore
 
     let round: ATHLTHArenaRemoteProposal
     let series: ATHLTHArenaRemoteSeries
@@ -400,7 +407,11 @@ private struct ATHLTHArenaOutcomeEditor: View {
                                      ? ATHLTHLocalization.choose(
                                         english: "Deleted user", norwegian: "Slettet bruker"
                                        )
-                                     : "Plass \(members.firstIndex(where: { $0.slotID == member.slotID }).map { $0 + 1 } ?? 0)")
+                                     : member.userID == session.profile.userID
+                                        ? ATHLTHLocalization.choose(english: "You", norwegian: "Du")
+                                        : (social.visibleProfiles + social.mutualFollows)
+                                            .first { $0.userID == member.userID }?.resolvedName ??
+                                          ATHLTHLocalization.choose(english: "Participant", norwegian: "Deltaker"))
                                     .tag(member.slotID)
                             }
                         }
