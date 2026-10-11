@@ -677,6 +677,111 @@ private struct ATHLTHArenaSeasonCreateView: View {
     }
 }
 
+/// Presentation-only season agenda. Competition status is read from the
+/// server; this helper does not infer results, award points or expose
+/// competitions blocked by their normal access policy.
+enum ATHLTHArenaSeasonCompetitionTimeline {
+    enum Phase: Int {
+        case active = 0
+        case preparing = 1
+        case completed = 2
+        case unavailable = 3
+    }
+
+    static func phase(_ series: ATHLTHArenaRemoteSeries) -> Phase {
+        switch series.status {
+        case "active": return .active
+        case "draft": return .preparing
+        case "completed": return .completed
+        default: return .unavailable
+        }
+    }
+
+    static func ordered(
+        _ competitions: [ATHLTHArenaRemoteSeries]
+    ) -> [ATHLTHArenaRemoteSeries] {
+        competitions.sorted { a, b in
+            let left = phase(a).rawValue
+            let right = phase(b).rawValue
+            if left != right { return left < right }
+
+            if a.status == "completed" {
+                let aEnd = a.completedAt ?? a.endsAt ?? .distantPast
+                let bEnd = b.completedAt ?? b.endsAt ?? .distantPast
+                if aEnd != bEnd { return aEnd > bEnd }
+            } else {
+                let aStart = a.startsAt ?? .distantFuture
+                let bStart = b.startsAt ?? .distantFuture
+                if aStart != bStart { return aStart < bStart }
+            }
+
+            let names = a.title.localizedStandardCompare(b.title)
+            if names != .orderedSame { return names == .orderedAscending }
+            return a.id.uuidString < b.id.uuidString
+        }
+    }
+
+    static func status(_ series: ATHLTHArenaRemoteSeries) -> String {
+        switch phase(series) {
+        case .active:
+            return ATHLTHLocalization.choose(
+                english: "Active competition", norwegian: "Aktiv konkurranse"
+            )
+        case .preparing:
+            return ATHLTHLocalization.choose(
+                english: "Awaiting start", norwegian: "Avventer start"
+            )
+        case .completed:
+            return series.completionReason == "deadline_unresolved"
+                ? ATHLTHLocalization.choose(
+                    english: "Ended · unsettled rounds",
+                    norwegian: "Avsluttet · uavklarte runder"
+                )
+                : ATHLTHLocalization.choose(
+                    english: "Completed", norwegian: "Fullført"
+                )
+        case .unavailable:
+            return ATHLTHLocalization.choose(
+                english: "Status unavailable", norwegian: "Status utilgjengelig"
+            )
+        }
+    }
+
+    static func action(_ series: ATHLTHArenaRemoteSeries) -> String {
+        switch phase(series) {
+        case .active:
+            return ATHLTHLocalization.choose(
+                english: "Open rounds and results",
+                norwegian: "Åpne runder og resultater"
+            )
+        case .preparing:
+            return ATHLTHLocalization.choose(
+                english: "View invitations and rules",
+                norwegian: "Se invitasjoner og regler"
+            )
+        case .completed:
+            return ATHLTHLocalization.choose(
+                english: "Review completed results",
+                norwegian: "Se sluttresultater"
+            )
+        case .unavailable:
+            return ATHLTHLocalization.choose(
+                english: "Open competition",
+                norwegian: "Åpne konkurransen"
+            )
+        }
+    }
+
+    static func symbol(_ series: ATHLTHArenaRemoteSeries) -> String {
+        switch phase(series) {
+        case .active: return "bolt.fill"
+        case .preparing: return "clock"
+        case .completed: return "checkmark.seal.fill"
+        case .unavailable: return "questionmark.circle"
+        }
+    }
+}
+
 private struct ATHLTHArenaSeasonDetailView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
@@ -701,6 +806,17 @@ private struct ATHLTHArenaSeasonDetailView: View {
             $0.clubID == season.clubID &&
             !linked.contains($0.id)
         }
+    }
+
+    private var visibleSeasonCompetitions: [ATHLTHArenaRemoteSeries] {
+        let linked = Set(links.map(\.seriesID))
+        return ATHLTHArenaSeasonCompetitionTimeline.ordered(
+            competitionOptions.filter { linked.contains($0.id) }
+        )
+    }
+
+    private var inaccessibleCompetitionCount: Int {
+        max(0, links.count - visibleSeasonCompetitions.count)
     }
 
     private func name(_ id: UUID) -> String {
@@ -986,32 +1102,88 @@ private struct ATHLTHArenaSeasonDetailView: View {
                     }
                 }
 
-                ForEach(links) { link in
-                    if let item = competitionOptions.first(where: {
-                        $0.id == link.seriesID
-                    }) {
-                        NavigationLink {
-                            ATHLTHArenaOnlineDetailView(series: item)
-                        } label: {
-                            HStack {
-                                Image(systemName: "flag.checkered")
-                                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                                Text(item.title)
-                                    .foregroundStyle(ATHLTHTheme.primaryText)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                            }
-                            .padding(13)
-                            .background(ATHLTHArenaLightStyle.card(17))
-                        }
-                    } else {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Club competition (not visible to your account)",
-                            norwegian: "Klubbkonkurranse (ikke synlig for din konto)"
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                if !visibleSeasonCompetitions.isEmpty {
+                    HStack(spacing: 12) {
+                        Label(
+                            "\(visibleSeasonCompetitions.filter {
+                                ATHLTHArenaSeasonCompetitionTimeline.phase($0) == .active
+                            }.count) " + ATHLTHLocalization.choose(
+                                english: "active", norwegian: "aktive"
+                            ),
+                            systemImage: "bolt.fill"
+                        )
+                        Spacer(minLength: 0)
+                        Label(
+                            "\(visibleSeasonCompetitions.filter {
+                                ATHLTHArenaSeasonCompetitionTimeline.phase($0) == .completed
+                            }.count) " + ATHLTHLocalization.choose(
+                                english: "completed", norwegian: "fullførte"
+                            ),
+                            systemImage: "checkmark.seal"
+                        )
                     }
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+
+                ForEach(visibleSeasonCompetitions) { item in
+                    NavigationLink {
+                        ATHLTHArenaOnlineDetailView(series: item)
+                    } label: {
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: ATHLTHArenaSeasonCompetitionTimeline.symbol(item))
+                                .font(.title3)
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .frame(width: 38, height: 38)
+                                .background(
+                                    ATHLTHTheme.vitalitySoft.opacity(0.6),
+                                    in: RoundedRectangle(cornerRadius: 12)
+                                )
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(item.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Text(ATHLTHArenaSeasonCompetitionTimeline.status(item))
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                if let end = item.endsAt {
+                                    Label(
+                                        end.formatted(date: .abbreviated, time: .shortened),
+                                        systemImage: "calendar"
+                                    )
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+                                Text(ATHLTHArenaSeasonCompetitionTimeline.action(item))
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            Spacer(minLength: 5)
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                        }
+                        .padding(14)
+                        .background(ATHLTHArenaLightStyle.card(18))
+                        .accessibilityElement(children: .combine)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if inaccessibleCompetitionCount > 0 {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "\(inaccessibleCompetitionCount) season competition(s) are not visible to your account",
+                            norwegian: "\(inaccessibleCompetitionCount) sesongkonkurranse(r) er ikke synlige for din konto"
+                        ),
+                        systemImage: "lock"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(ATHLTHArenaLightStyle.card(16))
                 }
 
                 Text(ATHLTHLocalization.choose(
