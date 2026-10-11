@@ -276,6 +276,9 @@ final class LiveGhostRaceStore:
     @Published private(set)
     var isChangingReady = false
 
+    @Published private(set)
+    var isCancelling = false
+
     @Published var errorMessage: String?
 
     private let client: SupabaseClient
@@ -538,6 +541,37 @@ final class LiveGhostRaceStore:
         } catch {
             errorMessage =
                 error.localizedDescription
+        }
+    }
+
+    /// An explicit participant DNF cancels only the synchronized race.
+    /// The server verifies membership, preserves terminal state and stops
+    /// the shared session. Local HealthKit/Watch recording is left intact.
+    @discardableResult
+    func cancelDuel() async -> Bool {
+        guard let challengeID = activeChallengeID,
+              !isCancelling,
+              let room,
+              room.status != .finished,
+              room.status != .cancelled else {
+            return false
+        }
+        isCancelling = true
+        errorMessage = nil
+        defer { isCancelling = false }
+
+        do {
+            let changed: Bool = try await client
+                .rpc(
+                    "cancel_live_ghost_duel",
+                    params: ["p_challenge_id": challengeID.uuidString]
+                )
+                .execute().value
+            await refresh(challengeID: challengeID)
+            return changed
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
         }
     }
 
