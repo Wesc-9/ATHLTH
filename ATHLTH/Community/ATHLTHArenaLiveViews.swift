@@ -209,9 +209,16 @@ struct ATHLTHArenaOnlineDetailView: View {
                         GhostFriendRaceHubView(
                             preferredFriendID: opponentID,
                             preferredRoute: rounds
-                                .compactMap(\.routeSnapshot)
-                                .compactMap { arenaTrainingRoute(from: $0) }
-                                .first
+                                .first(where: {
+                                    $0.template == .fastestRoute &&
+                                    $0.routeSnapshot != nil
+                                })
+                                .flatMap(\.routeSnapshot)
+                                .flatMap { arenaTrainingRoute(from: $0) },
+                            arenaRoundID: rounds.first(where: {
+                                $0.template == .fastestRoute &&
+                                $0.routeSnapshot != nil
+                            })?.id
                         )
                     } label: {
                         HStack(spacing: 11) {
