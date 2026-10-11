@@ -16,6 +16,8 @@ final class MirroredWorkoutAudioCoach:
         ATHLTHGuidancePriorityGate()
     private var eventLedger = ATHLTHCoachEventLedger()
     private var cueQueue = ATHLTHCoachCueQueue()
+    var onSpokenEventAttempt: ((ATHLTHCoachEvent, Date) -> Void)?
+    private var workoutStartedAt: Date?
 
     private var nextDistanceMeters:
         Double?
@@ -49,6 +51,7 @@ final class MirroredWorkoutAudioCoach:
         lastStepIndex = nil
         announcedStart = false
         finished = false
+        workoutStartedAt = nil
 
         if let interval =
                 configuration
@@ -101,6 +104,7 @@ final class MirroredWorkoutAudioCoach:
 
         let previousState = lastState
         lastState = snapshot.state
+        workoutStartedAt = snapshot.startedAt
 
         if snapshot.state == .running,
            !announcedStart {
@@ -186,6 +190,7 @@ final class MirroredWorkoutAudioCoach:
         _ snapshot: WatchWorkoutLiveSnapshot
     ) {
         lastState = snapshot.state
+        workoutStartedAt = snapshot.startedAt
         announcedStart =
             snapshot.state != .preparing
         lastStepIndex = snapshot.runningStepIndex
@@ -227,6 +232,7 @@ final class MirroredWorkoutAudioCoach:
         lastStepIndex = nil
         announcedStart = false
         finished = false
+        workoutStartedAt = nil
     }
 
     private func announceStepIfNeeded(
@@ -688,6 +694,10 @@ final class MirroredWorkoutAudioCoach:
         synthesizer.speak(
             utterance
         )
+        if let event,
+           let workoutStartedAt {
+            onSpokenEventAttempt(event, workoutStartedAt)
+        }
     }
 
     private func deliverNextQueuedCue() {
