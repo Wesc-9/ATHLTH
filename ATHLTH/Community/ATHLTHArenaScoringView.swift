@@ -599,6 +599,9 @@ private struct ATHLTHArenaOutcomeEditor: View {
             index < suggestion.count ? suggestion[index] : nil
         }
         _slots = State(initialValue: initial)
+        _exerciseName = State(initialValue:
+            ATHLTHArenaRepetitionResult.agreedExercise(in: round.rules) ?? ""
+        )
         _repetitionValues = State(initialValue: Array(repeating: "", count: needed))
     }
 
@@ -717,6 +720,9 @@ private struct ATHLTHArenaOutcomeEditor: View {
                             ),
                             text: $exerciseName
                         )
+                        .disabled(ATHLTHArenaRepetitionResult.agreedExercise(
+                            in: round.rules
+                        ) != nil)
                         ForEach(repetitionValues.indices, id: \.self) { index in
                             repetitionsField(at: index)
                         }
