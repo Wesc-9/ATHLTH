@@ -14877,7 +14877,7 @@ extension View {
     }
 }
 
-private struct ATHLTHSwipeBackEnabler: UIViewControllerRepresentable {
+struct ATHLTHSwipeBackEnabler: UIViewControllerRepresentable {
     func makeUIViewController(
         context: Context
     ) -> UIViewController {
