@@ -1317,7 +1317,8 @@ struct WatchActiveWorkoutView: View {
     }
 
     private var nonRunningControlsPage: some View {
-        VStack(spacing: 10) {
+        ScrollView {
+            VStack(spacing: 10) {
             HStack(spacing: 6) {
                 Image(
                     systemName:
@@ -1380,6 +1381,104 @@ struct WatchActiveWorkoutView: View {
                     .ending
             )
 
+            if workoutManager.audioCoachConfigured,
+               workoutManager.audioCoachConfiguration.enabled {
+                VStack(spacing: 8) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "waveform")
+                            .foregroundStyle(WatchTheme.accent)
+                        Text("Audio Coach")
+                            .font(.system(size: 11, weight: .semibold))
+                        Spacer()
+                        Text(workoutManager.coachSpeechPaused
+                            ? ATHLTHLocalization.choose(
+                                english: "VOICE PAUSED",
+                                norwegian: "TALE PAUSET"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "VOICE ON",
+                                norwegian: "TALE PÅ"
+                            )
+                        )
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(WatchTheme.muted)
+                    }
+
+                    HStack(spacing: 6) {
+                        Button {
+                            workoutManager.setCoachSpeechPaused(
+                                !workoutManager.coachSpeechPaused
+                            )
+                        } label: {
+                            Label(
+                                workoutManager.coachSpeechPaused
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Resume voice",
+                                        norwegian: "Tale på"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Pause voice",
+                                        norwegian: "Pause tale"
+                                    ),
+                                systemImage: workoutManager.coachSpeechPaused
+                                    ? "play.fill"
+                                    : "speaker.slash.fill"
+                            )
+                        }
+                        .buttonStyle(.bordered)
+
+                        Button {
+                            workoutManager.announceCoachStatusNow()
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Status now",
+                                    norwegian: "Status nå"
+                                ),
+                                systemImage: "waveform"
+                            )
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(workoutManager.coachSpeechPaused)
+                    }
+                    .font(.system(size: 10, weight: .semibold))
+
+                    if let message = workoutManager.lastCoachMessage {
+                        Text(message)
+                            .font(.system(size: 10))
+                            .foregroundStyle(WatchTheme.muted)
+                            .lineLimit(2)
+                    }
+
+                    TimelineView(.periodic(from: .now, by: 5)) { _ in
+                        Button {
+                            workoutManager.replayLastCoachMessage()
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Listen again",
+                                    norwegian: "Hør igjen"
+                                ),
+                                systemImage: "arrow.counterclockwise"
+                            )
+                            .font(.system(size: 11, weight: .semibold))
+                            .frame(maxWidth: .infinity, minHeight: 36)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(!workoutManager.canReplayLastCoachMessage)
+                    }
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Audio only · training and rest timers continue",
+                        norwegian: "Kun tale · trening og hviletid fortsetter"
+                    ))
+                    .font(.system(size: 9))
+                    .foregroundStyle(WatchTheme.muted)
+                }
+                .padding(9)
+                .watchSurface(radius: 16)
+            }
+
             Button {
                 workoutManager.end()
             } label: {
@@ -1423,8 +1522,10 @@ struct WatchActiveWorkoutView: View {
                 .center
             )
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+        }
+        .scrollIndicators(.hidden)
     }
 
     @ViewBuilder
