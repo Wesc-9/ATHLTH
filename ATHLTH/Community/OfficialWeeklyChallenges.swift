@@ -741,6 +741,16 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
                     .execute()
 
                 didUpdate = true
+
+                if completedAt != nil {
+                    // Do not leave an ending alert queued while the next
+                    // participant refresh is still in flight.
+                    await OfficialWeeklyChallengeReminderScheduler.reconcile(
+                        challenge: nil,
+                        joined: false,
+                        completed: true
+                    )
+                }
             } catch {
                 errorMessage = error.localizedDescription
             }
