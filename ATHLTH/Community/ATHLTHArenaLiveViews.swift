@@ -2730,6 +2730,7 @@ private struct ATHLTHArenaRelaySection: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var health: HealthKitManager
 
     let series: ATHLTHArenaRemoteSeries
     let members: [ATHLTHArenaRemoteMember]
@@ -2741,6 +2742,8 @@ private struct ATHLTHArenaRelaySection: View {
     @State private var legs: [ATHLTHArenaRelayLeg] = []
     @State private var reports: [ATHLTHArenaRelayLegReport] = []
     @State private var legTimeText = ""
+    @State private var checkingOwnGPS = false
+    @State private var ownGPSNotice: String?
     @State private var pendingLegSeconds: Double?
     @State private var confirmLegTime = false
     @State private var nextNoticeStatus: String?
@@ -3113,6 +3116,49 @@ private struct ATHLTHArenaRelaySection: View {
                                     .foregroundStyle(ATHLTHTheme.mutedText)
                                 }
 
+                                if !ATHLTHDeviceRole.isIPad,
+                                   let snapshot = availableRoutes.first(where: {
+                                       $0.id == ownLeg.routeRoundID
+                                   })?.routeSnapshot,
+                                   let route = ATHLTHArenaCompetitionCourse.route(
+                                       from: snapshot,
+                                       ownerID: session.profile.userID
+                                   ) {
+                                    Button {
+                                        Task { await suggestOwnLegTime(from: route) }
+                                    } label: {
+                                        HStack {
+                                            Label(
+                                                ATHLTHLocalization.choose(
+                                                    english: "Find my GPS-matched run",
+                                                    norwegian: "Finn min GPS-matchede økt"
+                                                ),
+                                                systemImage: "location.magnifyingglass"
+                                            )
+                                            Spacer()
+                                            if checkingOwnGPS {
+                                                ProgressView().controlSize(.small)
+                                            }
+                                        }
+                                        .font(.subheadline.weight(.medium))
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .tint(ATHLTHTheme.accentDeep)
+                                    .disabled(writing || checkingOwnGPS)
+
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Checks your recent Apple Health routes on this device. Only a suggested time is filled in; no workout or GPS track is sent.",
+                                        norwegian: "Sjekker nylige GPS-ruter i Apple Health på denne enheten. Kun tiden foreslås; ingen økt eller GPS-spor sendes."
+                                    ))
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+                                if let ownGPSNotice {
+                                    Text(ownGPSNotice)
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                }
+
                                 Text(ATHLTHLocalization.choose(
                                     english: "Report your leg time",
                                     norwegian: "Registrer din etappetid"
@@ -3350,6 +3396,65 @@ private struct ATHLTHArenaRelaySection: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Explicit on-device scan for the user's own, completed GPS workouts.
+    /// It only pre-fills a proposed time and never sends a route or report.
+    @MainActor
+    private func suggestOwnLegTime(from route: TrainingRoute) async {
+        guard !checkingOwnGPS, !writing, reportWindowOpen,
+              ownLeg?.routeRoundID != nil,
+              let startsAt = series.startsAt,
+              let endsAt = series.endsAt,
+              startsAt <= endsAt else { return }
+
+        checkingOwnGPS = true
+        ownGPSNotice = nil
+        defer { checkingOwnGPS = false }
+
+        let targetMeters = route.distanceKilometers * 1_000
+        let recent = health.workouts
+            .filter { summary in
+                summary.activity == .running &&
+                summary.startDate >= startsAt &&
+                summary.endDate <= endsAt &&
+                summary.endDate <= Date() &&
+                (summary.distanceMeters ?? 0).isFinite &&
+                abs((summary.distanceMeters ?? 0) - targetMeters) <=
+                    targetMeters * 0.05
+            }
+            .sorted { $0.endDate > $1.endDate }
+            .prefix(20)
+
+        for summary in recent {
+            if Task.isCancelled { return }
+            guard let analysis = await health.routePerformance(
+                for: summary, against: route
+            ), ATHLTHArenaRelayGPSMatch.qualifies(
+                routeLengthMeters: targetMeters,
+                coveredMeters: analysis.distanceMeters,
+                elapsedSeconds: analysis.durationSeconds,
+                routeMatchPercent: analysis.routeMatchPercent,
+                startGapMeters: analysis.startDistanceMeters,
+                endGapMeters: analysis.endDistanceMeters
+            ) else {
+                continue
+            }
+
+            legTimeText = GhostTargetTimeFormatter.string(
+                analysis.durationSeconds
+            )
+            ownGPSNotice = ATHLTHLocalization.choose(
+                english: "A recent run matched the agreed course on your device. Review the suggested time and confirm it yourself. This is not server-verified.",
+                norwegian: "Fant en økt som matcher avtalt rute på enheten. Kontroller tiden og bekreft selv. Dette er ikke serververifisert."
+            )
+            return
+        }
+
+        ownGPSNotice = ATHLTHLocalization.choose(
+            english: "No eligible GPS run found for this course and competition window. You may report your time manually.",
+            norwegian: "Fant ingen passende GPS-økt på denne ruten i konkurranseperioden. Du kan registrere tiden manuelt."
+        )
     }
 
     @MainActor
