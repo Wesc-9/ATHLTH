@@ -119,6 +119,61 @@ final class ATHLTHArenaSafetyTests: XCTestCase {
         XCTAssertEqual(season.createdBy, userID)
     }
 
+    func testClubSeasonPhaseHasInclusiveFinalDay() {
+        XCTAssertEqual(
+            ATHLTHArenaSeasonPresentation.phase(
+                startsOn: "2026-10-01", endsOn: "2026-10-31",
+                today: "2026-09-30"
+            ), .upcoming
+        )
+        XCTAssertEqual(
+            ATHLTHArenaSeasonPresentation.phase(
+                startsOn: "2026-10-01", endsOn: "2026-10-31",
+                today: "2026-10-01"
+            ), .active
+        )
+        XCTAssertEqual(
+            ATHLTHArenaSeasonPresentation.phase(
+                startsOn: "2026-10-01", endsOn: "2026-10-31",
+                today: "2026-10-31"
+            ), .active
+        )
+        XCTAssertEqual(
+            ATHLTHArenaSeasonPresentation.phase(
+                startsOn: "2026-10-01", endsOn: "2026-10-31",
+                today: "2026-11-01"
+            ), .completed
+        )
+    }
+
+    func testClubSeasonLeadersPreserveJointFirstPlace() {
+        let first = ATHLTHArenaSeasonStandingsRow(
+            userID: UUID(), points: 12, competitions: 3
+        )
+        let second = ATHLTHArenaSeasonStandingsRow(
+            userID: UUID(), points: 12, competitions: 2
+        )
+        let third = ATHLTHArenaSeasonStandingsRow(
+            userID: UUID(), points: 8, competitions: 3
+        )
+        let leaders = ATHLTHArenaSeasonPresentation.leadingAthletes(
+            [third, second, first]
+        )
+        XCTAssertEqual(Set(leaders.map(\.userID)), Set([first.userID, second.userID]))
+    }
+
+    func testClubSeasonZeroPointsCannotProduceChampion() {
+        let rows = [
+            ATHLTHArenaSeasonStandingsRow(
+                userID: UUID(), points: 0, competitions: 1
+            ),
+            ATHLTHArenaSeasonStandingsRow(
+                userID: UUID(), points: 0, competitions: 0
+            )
+        ]
+        XCTAssertTrue(ATHLTHArenaSeasonPresentation.leadingAthletes(rows).isEmpty)
+    }
+
     func testDeletedChatAuthorHasNoProfileID() throws {
         let payload = """
         {
