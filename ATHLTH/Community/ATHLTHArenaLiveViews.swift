@@ -325,6 +325,28 @@ enum ATHLTHArenaSeasonPhase: Equatable {
 }
 
 enum ATHLTHArenaSeasonPresentation {
+    /// Competition ranking: equal scores share a position, and the next
+    /// position skips the tied places (1, 1, 3). A zero-point entry is
+    /// unranked, not a season champion.
+    static func competitiveRank(
+        of entry: ATHLTHArenaSeasonStandingsRow,
+        among rows: [ATHLTHArenaSeasonStandingsRow]
+    ) -> Int? {
+        guard entry.points.isFinite, entry.points > 0 else { return nil }
+        return 1 + rows.filter {
+            $0.points.isFinite && $0.points > entry.points + 0.001
+        }.count
+    }
+
+    static func orderedStandings(
+        _ rows: [ATHLTHArenaSeasonStandingsRow]
+    ) -> [ATHLTHArenaSeasonStandingsRow] {
+        rows.sorted {
+            if $0.points != $1.points { return $0.points > $1.points }
+            return $0.userID.uuidString < $1.userID.uuidString
+        }
+    }
+
     static func phase(startsOn: String, endsOn: String, today: String) -> ATHLTHArenaSeasonPhase {
         if today < startsOn { return .upcoming }
         if today > endsOn { return .completed }
@@ -676,6 +698,10 @@ private struct ATHLTHArenaSeasonDetailView: View {
             ATHLTHArenaSeasonPresentation.leadingAthletes(standings)
     }
 
+    private var rankedStandings: [ATHLTHArenaSeasonStandingsRow] {
+        ATHLTHArenaSeasonPresentation.orderedStandings(standings)
+    }
+
     private var seasonStatus: String {
         switch seasonPhase {
         case .upcoming:
@@ -820,13 +846,16 @@ private struct ATHLTHArenaSeasonDetailView: View {
                     .foregroundStyle(ATHLTHTheme.mutedText)
                 }
 
-                ForEach(Array(standings.enumerated()), id: \.element.userID) { index, entry in
+                ForEach(rankedStandings) { entry in
+                    let rank = ATHLTHArenaSeasonPresentation.competitiveRank(
+                        of: entry, among: rankedStandings
+                    )
+                    let isLeader = rank == 1
                     HStack(spacing: 12) {
-                        Image(systemName: index == 0 && entry.points > 0
-                            ? "trophy.fill" : "person.crop.circle")
+                        Image(systemName: isLeader ? "trophy.fill" : "person.crop.circle")
                             .foregroundStyle(ATHLTHTheme.accentDeep)
-                        Text("\(index + 1). " + name(entry.userID))
-                            .font(.subheadline.weight(index == 0 ? .semibold : .regular))
+                        Text((rank.map { "\($0)." } ?? "–") + " " + name(entry.userID))
+                            .font(.subheadline.weight(isLeader ? .semibold : .regular))
                         Spacer()
                         VStack(alignment: .trailing, spacing: 2) {
                             Text("\(entry.points.formatted()) p")
@@ -840,6 +869,11 @@ private struct ATHLTHArenaSeasonDetailView: View {
                     }
                     .padding(13)
                     .background(ATHLTHArenaLightStyle.card(17))
+                    .accessibilityLabel(
+                        (rank.map { "\($0). " } ?? "") + name(entry.userID) +
+                        ", \(entry.points.formatted()) " +
+                        ATHLTHLocalization.choose(english: "points", norwegian: "poeng")
+                    )
                 }
 
                 HStack {
