@@ -38,6 +38,8 @@ struct GhostFriendRaceChallengeRecord:
     let distanceMeters: Double
     let routePoints: [GhostFriendRacePoint]
     let privacyTrimmed: Bool
+    /// Earlier challenges are decoded as previous workouts.
+    let sourceKind: String?
     var status: GhostFriendRaceStatus
     let createdAt: Date
     var respondedAt: Date?
@@ -53,6 +55,7 @@ struct GhostFriendRaceChallengeRecord:
         case distanceMeters = "distance_meters"
         case routePoints = "route_points"
         case privacyTrimmed = "privacy_trimmed"
+        case sourceKind = "source_kind"
         case status
         case createdAt = "created_at"
         case respondedAt = "responded_at"
@@ -100,6 +103,7 @@ private struct GhostFriendRaceInsert: Encodable {
     let distanceMeters: Double
     let routePoints: [GhostFriendRacePoint]
     let privacyTrimmed: Bool
+    let sourceKind: String
     let status: String
 
     enum CodingKeys: String, CodingKey {
@@ -111,6 +115,7 @@ private struct GhostFriendRaceInsert: Encodable {
         case distanceMeters = "distance_meters"
         case routePoints = "route_points"
         case privacyTrimmed = "privacy_trimmed"
+        case sourceKind = "source_kind"
         case status
     }
 }
@@ -346,7 +351,8 @@ final class SupabaseGhostFriendRaceService {
         to recipientID: UUID,
         title: String,
         reference: GhostRaceReference,
-        hideStartAndEnd: Bool
+        hideStartAndEnd: Bool,
+        sourceKind: String = "previous_workout"
     ) async throws {
         guard let senderID =
                 currentUserID
@@ -400,6 +406,7 @@ final class SupabaseGhostFriendRaceService {
                 privacyTrimmed:
                     sanitized
                         .privacyTrimmed,
+                sourceKind: sourceKind,
                 status:
                     GhostFriendRaceStatus
                         .pending.rawValue
@@ -409,6 +416,45 @@ final class SupabaseGhostFriendRaceService {
             .from("ghost_race_challenges")
             .insert(payload)
             .execute()
+    }
+
+    /// A synthetic Ghost is generated from the planned route rather than
+    /// pretending it was a completed historical workout.
+    @MainActor
+    func sendPlannedRoute(
+        to recipientID: UUID,
+        route: TrainingRoute,
+        targetDurationSeconds: TimeInterval,
+        hideStartAndEnd: Bool
+    ) async throws {
+        guard route.distanceKilometers.isFinite,
+              (0.1...500).contains(route.distanceKilometers),
+              targetDurationSeconds.isFinite,
+              (60...86_400).contains(targetDurationSeconds),
+              (2...10_000).contains(route.coordinates.count),
+              route.coordinates.allSatisfy({
+                  $0.latitude.isFinite &&
+                  $0.longitude.isFinite &&
+                  (-90...90).contains($0.latitude) &&
+                  (-180...180).contains($0.longitude)
+              }) else {
+            throw GhostFriendRaceError.missingRoute
+        }
+        let builder = GhostRaceStore()
+        try builder.prepareTarget(
+            route: route,
+            targetDurationSeconds: targetDurationSeconds
+        )
+        guard let reference = builder.reference else {
+            throw GhostFriendRaceError.missingRoute
+        }
+        try await send(
+            to: recipientID,
+            title: "Live-duell · \(route.title)",
+            reference: reference,
+            hideStartAndEnd: hideStartAndEnd,
+            sourceKind: "planned_route"
+        )
     }
 
     func rematch(
@@ -453,6 +499,8 @@ final class SupabaseGhostFriendRaceService {
                     challenge.routePoints,
                 privacyTrimmed:
                     challenge.privacyTrimmed,
+                sourceKind: challenge.sourceKind == "planned_route"
+                    ? "planned_route" : "previous_workout",
                 status:
                     GhostFriendRaceStatus
                         .pending
@@ -627,6 +675,33 @@ final class GhostFriendRaceStore:
         } catch {
             errorMessage =
                 error.localizedDescription
+            return false
+        }
+    }
+
+    /// Sharing a planned route remains an explicit action and uses
+    /// the existing mutual-follow and route-privacy enforcement.
+    func sendPlannedRoute(
+        to friend: SocialProfileCard,
+        route: TrainingRoute,
+        targetDurationSeconds: TimeInterval,
+        settings: AppSettingsStore
+    ) async -> Bool {
+        guard !isSending else { return false }
+        isSending = true
+        errorMessage = nil
+        defer { isSending = false }
+        do {
+            try await service.sendPlannedRoute(
+                to: friend.userID,
+                route: route,
+                targetDurationSeconds: targetDurationSeconds,
+                hideStartAndEnd: settings.hideRouteStartAndEnd
+            )
+            await refresh()
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
             return false
         }
     }
