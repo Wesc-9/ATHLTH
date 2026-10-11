@@ -75,15 +75,22 @@ Audio Coach skal være integrert i alle støttede økter fra planlegging til opp
 
 **Avgrensning:** 2A gir *lokal* duplikatkontroll for utvalgte typer, ikke global exactly-once-garanti på tvers av enheter. Markører inneholder kun type og intervall-/steg-ID, ikke selve talemeldingen eller brukerens helsehistorikk.
 
-### 3. Oppdagbarhet og premiumdesign
+### 3. Oppdagbarhet og premiumdesign — STEG 3A KODE IMPLEMENTERT, VERIFISERING GJENSTÅR
 
-- [ ] Synlig, kompakt coach-status i *alle* støttede øktstarter; ikke gjemt under «Avansert».
-- [ ] Enkel / Standard / Avansert = **innholdsnivå**, uavhengig av talefrekvens.
+- [x] Audio Coach kan åpnes fra **både enkel og avansert** styrkestart; den er ikke lenger skjult bak Avansert.
+- [x] Ved enkel styrkestart bevares valgt coach-konfigurasjon gjennom lokalt opptak, invitert treningsøkt og iPad-relay, uten automatisk å aktivere øvrige avanserte treningsvalg.
+- [x] Ny **Enkel / Standard / Avansert** i `ATHLTHCoachContentLevel` endrer bare innholdet i tale; distanse-/tidsintervaller, stemme, lydnivå og Watch-lydansvar forblir uendret.
+- [x] Premium valg av innholdsnivå i løpingens **live Audio Coach-panel** med status for faktisk valgt nivå eller manuelt tilpasset oppsett.
+- [x] Samme innholdsnivå som **persistente standardinnstillinger** med eksisterende off-white / ghost-card design. Enkelttogglene beholdes for manuell overstyring.
+- [x] Enhetstester for nivåmapping og at kadens, stemme, enable-state og lydansvar ikke endres.
+- [ ] Verifiser komplett iOS/watchOS-bygg og automatiske tester på samlet commit.
+- [ ] Manuell QA: enkel styrke, avansert styrke, Watch-start, invitert økt, iPad-relay og eksisterende stemmevalg.
+- [ ] Gjennomført coach-status og samme premiumkontroller i **alle** støttede øktstarter og på Watch; de første skjermene er nå forbedret.
 - [ ] Separat talefrekvens og talestil (balansert, teknisk, motiverende, minimal).
-- [ ] Premium ghost/off-white visning for konfigurering, live og Watch; ikke skjul viktige treningstall.
-- [ ] Ettrykks lydpause, status nå, justering, forhåndslytt og valgt lydutgang.
-- [ ] Globalt standardvalg, per økt override og tydelig når hvilke innstillinger gjelder.
-- [ ] iPhone live er allerede introdusert på `release/v1.7.3`; utvid tilsvarende til styrke, strukturert plan og Watch uten regresjon.
+- [ ] Ettrykks lydpause, status nå, justering og forhåndslytt i aktiv trening; valgt lydutgang må vise faktisk tilgjengelig rute.
+- [ ] Utvid tilsvarende til styrke, strukturert plan og Watch uten regresjon.
+
+**Omfang:** Innholdsnivåene gjenbruker eksisterende `WatchAudioCoachConfiguration` og krever ingen nye serverfelter eller databaseendringer. Nye avanserte treningsfunksjoner skal ikke aktiveres bare fordi et enkelt coach-nivå er valgt.
 
 ### 4. Løping og treningsplaner
 
