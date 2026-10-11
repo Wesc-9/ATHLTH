@@ -215,6 +215,49 @@ begin
  ) then
    raise exception 'Arena relay leg report reads are not protected by series membership';
  end if;
+ -- Club seasons remain entirely separate from Weekly Challenges.
+ if not exists (
+   select 1 from information_schema.tables
+   where table_schema='public' and table_name='arena_club_seasons'
+ ) or not exists (
+   select 1 from information_schema.tables
+   where table_schema='public' and table_name='arena_club_season_series'
+ ) then
+   raise exception 'Arena Club season schema missing';
+ end if;
+ if not exists (
+   select 1 from pg_class
+   where oid='public.arena_club_seasons'::regclass and relrowsecurity
+ ) or not exists (
+   select 1 from pg_class
+   where oid='public.arena_club_season_series'::regclass and relrowsecurity
+ ) then
+   raise exception 'Club seasons require row-level security';
+ end if;
+ if has_table_privilege('anon','public.arena_club_seasons','SELECT')
+    or has_table_privilege('anon','public.arena_club_season_series','SELECT')
+    or has_table_privilege('authenticated','public.arena_club_seasons','INSERT')
+    or has_table_privilege('authenticated','public.arena_club_season_series','INSERT')
+ then
+   raise exception 'Club season permissions are too broad';
+ end if;
+ if has_function_privilege('anon','public.arena_create_club_season(uuid,text,date,date)'::regprocedure,'EXECUTE')
+    or has_function_privilege('anon','public.arena_attach_club_season_series(uuid,uuid)'::regprocedure,'EXECUTE')
+    or has_function_privilege('anon','public.arena_club_season_standings(uuid)'::regprocedure,'EXECUTE')
+ then
+   raise exception 'Anonymous season management or standings exposed';
+ end if;
+ if not has_function_privilege('authenticated','public.arena_club_season_standings(uuid)'::regprocedure,'EXECUTE')
+ then
+   raise exception 'Club season standings unavailable to authenticated members';
+ end if;
+ if not exists (
+   select 1 from pg_constraint
+   where conrelid='public.arena_club_season_series'::regclass
+   and contype='u'
+ ) then
+   raise exception 'A competition may be attached to multiple Club seasons';
+ end if;
  if not exists (
    select 1 from information_schema.columns
    where table_schema='public' and table_name='arena_series'
