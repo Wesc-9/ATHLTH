@@ -343,3 +343,34 @@ AS $$
 $$;
 REVOKE ALL ON FUNCTION private.arena_can_access(uuid) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION private.arena_can_access(uuid) TO authenticated;
+
+
+-- Keep privileged writes out of the exposed Data API schema. The public
+-- endpoints are SECURITY INVOKER wrappers; private implementations perform
+-- the full authorization checks and atomic mutation.
+ALTER FUNCTION public.arena_propose_replacement(uuid,uuid) SET SCHEMA private;
+ALTER FUNCTION public.arena_vote_replacement(uuid,boolean) SET SCHEMA private;
+REVOKE ALL ON FUNCTION private.arena_propose_replacement(uuid,uuid)
+  FROM public,anon;
+REVOKE ALL ON FUNCTION private.arena_vote_replacement(uuid,boolean)
+  FROM public,anon;
+GRANT EXECUTE ON FUNCTION private.arena_propose_replacement(uuid,uuid)
+  TO authenticated;
+GRANT EXECUTE ON FUNCTION private.arena_vote_replacement(uuid,boolean)
+  TO authenticated;
+
+CREATE FUNCTION public.arena_propose_replacement(
+ p_slot uuid,p_nominee uuid
+) RETURNS uuid LANGUAGE sql SECURITY INVOKER
+SET search_path = pg_catalog, public, private
+AS $$ SELECT private.arena_propose_replacement(p_slot,p_nominee); $$;
+
+CREATE FUNCTION public.arena_vote_replacement(
+ p_proposal uuid,p_accept boolean
+) RETURNS text LANGUAGE sql SECURITY INVOKER
+SET search_path = pg_catalog, public, private
+AS $$ SELECT private.arena_vote_replacement(p_proposal,p_accept); $$;
+REVOKE ALL ON FUNCTION public.arena_propose_replacement(uuid,uuid) FROM public,anon;
+REVOKE ALL ON FUNCTION public.arena_vote_replacement(uuid,boolean) FROM public,anon;
+GRANT EXECUTE ON FUNCTION public.arena_propose_replacement(uuid,uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.arena_vote_replacement(uuid,boolean) TO authenticated;
