@@ -128,6 +128,26 @@ final class GhostRacePrivacyTests: XCTestCase {
                           reference.points.first?.latitude)
     }
 
+    func testLiveGhostFinishSubmissionRejectsInvalidOrAlreadyRecordedTimes() {
+        XCTAssertTrue(LiveGhostFinishSubmissionRule.canSubmit(
+            elapsedSeconds: 900, alreadyFinished: false
+        ))
+        for value in [
+            TimeInterval.nan, .infinity, -.infinity,
+            -1, 0, 4.99, 86_401
+        ] {
+            XCTAssertFalse(LiveGhostFinishSubmissionRule.canSubmit(
+                elapsedSeconds: value, alreadyFinished: false
+            ))
+        }
+        XCTAssertFalse(LiveGhostFinishSubmissionRule.canSubmit(
+            elapsedSeconds: 900, alreadyFinished: true
+        ))
+        XCTAssertTrue(LiveGhostFinishSubmissionRule.canSubmit(
+            elapsedSeconds: 86_400, alreadyFinished: false
+        ))
+    }
+
     func testLiveGhostFinishGateRejectsDuplicatesAndInvalidTimes() {
         let challenge = UUID()
         var gate = ATHLTHLiveGhostFinishGate()
