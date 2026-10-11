@@ -5084,6 +5084,24 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             )?
         var hasEvaluableTarget = false
 
+        let missingHeartRateSample =
+            configuration.heartRateEnabled &&
+            configuration.heartRateMinimumBPM != nil &&
+            configuration.heartRateMaximumBPM != nil &&
+            !ATHLTHCoachSensorFreshness.validHeartRate(
+                heartRate,
+                sampledAt: coachHeartRateSampleAt
+            )
+        let stepPaceTarget = currentStructuredRunningStep
+        let missingPaceSample =
+            configuration.paceAlertsEnabled &&
+            (stepPaceTarget?.targetPaceMinSecondsPerKilometer != nil ||
+             stepPaceTarget?.targetPaceMaxSecondsPerKilometer != nil) &&
+            !ATHLTHCoachSensorFreshness.validPace(
+                currentPaceSecondsPerKilometer,
+                sampledAt: coachPaceSampleAt
+            )
+
         if configuration.heartRateEnabled,
            ATHLTHCoachSensorFreshness.validHeartRate(
                heartRate,
@@ -5171,6 +5189,16 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             publish {
                 self.liveTargetStatus = nil
             }
+            targetViolationStartedAt = nil
+            targetWasOutside = false
+            return
+        }
+
+        // A different sensor being on target does not prove a stale
+        // HR/pace signal has recovered. Avoid a false "back in target".
+        if violation == nil,
+           missingHeartRateSample || missingPaceSample {
+            publish { self.liveTargetStatus = nil }
             targetViolationStartedAt = nil
             targetWasOutside = false
             return
