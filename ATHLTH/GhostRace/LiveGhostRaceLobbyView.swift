@@ -346,81 +346,69 @@ struct LiveGhostRaceLobbyView: View {
     }
 
     private var headerCard: some View {
-        ATHLTHCard {
-            VStack(
-                alignment: .leading,
-                spacing: 12
-            ) {
-                HStack {
-                    Label(
-                        "LIVE GHOST",
-                        systemImage:
-                            "dot.radiowaves.left.and.right"
-                    )
-                    .font(.caption.bold())
-                    .foregroundStyle(
-                        ATHLTHTheme.vitality
-                    )
-
-                    Spacer()
-
-                    Text(
-                        String(
-                            format:
-                                "%.1f km",
-                            challenge
-                                .distanceMeters /
-                                1_000
-                        )
-                    )
-                    .font(
-                        .subheadline
-                            .weight(.semibold)
-                    )
-                    .monospacedDigit()
-                }
-
-                Text(challenge.title)
-                    .font(
-                        .title2.weight(.bold)
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 9) {
                 Label(
-                    challenge.sourceKind == "planned_route"
-                        ? ATHLTHLocalization.choose(
-                            english: "Planned route · shared start",
-                            norwegian: "Planlagt rute · felles start"
-                        )
-                        : ATHLTHLocalization.choose(
-                            english: "Previous GPS run · shared start",
-                            norwegian: "Tidligere GPS-økt · felles start"
-                        ),
-                    systemImage: challenge.sourceKind == "planned_route"
-                        ? "map.fill" : "figure.run"
+                    "LIVE GHOST",
+                    systemImage: "dot.radiowaves.left.and.right"
                 )
-                .font(.caption.weight(.medium))
-                .foregroundStyle(ATHLTHTheme.mutedText)
+                .font(.caption.weight(.bold))
+                .tracking(0.9)
+                .foregroundStyle(.white.opacity(0.94))
 
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Both athletes enter the same race room. When both are ready, ATHLTH starts one synchronized countdown.",
-                        norwegian:
-                            "Begge går inn i samme race-rom. Når begge er klare, starter ATHLTH én synkronisert nedtelling."
-                    )
-                )
-                .font(.subheadline)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-                .fixedSize(
-                    horizontal: false,
-                    vertical: true
-                )
+                Spacer(minLength: 5)
+
+                Text(String(format: "%.1f km", challenge.distanceMeters / 1_000))
+                    .font(.subheadline.weight(.bold))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 7)
+                    .background(.white.opacity(0.15), in: Capsule())
             }
+
+            Text(challenge.title)
+                .font(.system(.title2, design: .rounded, weight: .bold))
+                .foregroundStyle(.white)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Label(
+                challenge.sourceKind == "planned_route"
+                    ? ATHLTHLocalization.choose(
+                        english: "Planned route · synchronized start",
+                        norwegian: "Planlagt rute · synkronisert start"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Previous GPS run · synchronized start",
+                        norwegian: "Tidligere GPS-økt · synkronisert start"
+                    ),
+                systemImage: challenge.sourceKind == "planned_route"
+                    ? "map.fill" : "figure.run"
+            )
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.white.opacity(0.95))
+            .padding(.horizontal, 11)
+            .padding(.vertical, 8)
+            .background(.white.opacity(0.12), in: Capsule())
+
+            Rectangle()
+                .fill(.white.opacity(0.17))
+                .frame(height: 1)
+                .accessibilityHidden(true)
+
+            Text(
+                ATHLTHLocalization.choose(
+                    english: "Both athletes enter the same race lobby. Once both are ready, ATHLTH starts a single synchronized countdown.",
+                    norwegian: "Begge utøverne møtes i samme lobby. Når begge er klare, starter ATHLTH én felles nedtelling."
+                )
+            )
+            .font(.subheadline)
+            .foregroundStyle(.white.opacity(0.86))
+            .fixedSize(horizontal: false, vertical: true)
         }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ATHLTHArenaLightStyle.heroSurface(24))
     }
 
     private var participantCard: some View {
@@ -729,7 +717,7 @@ struct LiveGhostRaceLobbyView: View {
         TimelineView(
             .periodic(
                 from: Date(),
-                by: 0.25
+                by: 1
             )
         ) { context in
             let phase =
@@ -771,7 +759,8 @@ struct LiveGhostRaceLobbyView: View {
                 .frame(
                     maxWidth: .infinity
                 )
-                .padding(.vertical, 4)
+                .padding(.vertical, 12)
+                .accessibilityElement(children: .combine)
             }
         }
     }
