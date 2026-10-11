@@ -96,7 +96,7 @@ begin
  ) returning id into v_id;
  return v_id;
 end;
-$;
+$$;
 
 create or replace function public.arena_share_evidence_v2(
  p_round uuid,p_source_workout uuid,p_source text,p_activity text,
