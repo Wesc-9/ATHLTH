@@ -687,12 +687,14 @@ final class MirroredWorkoutAudioCoach:
             // Spoken coaching must never interfere with workout capture.
         }
 
-        let spokenText = (configuration.speechStyle ?? .balanced).render(
-            text,
-            language: configuration.language,
-            priority: priority,
-            eventKind: event?.kind
-        )
+        let spokenText = rememberForReplay
+            ? (configuration.speechStyle ?? .balanced).render(
+                text,
+                language: configuration.language,
+                priority: priority,
+                eventKind: event?.kind
+            )
+            : text
         let utterance =
             AVSpeechUtterance(
                 string: spokenText
