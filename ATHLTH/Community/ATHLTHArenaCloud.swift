@@ -866,6 +866,22 @@ final class ATHLTHArenaCloudService: Sendable {
         ).execute()
     }
 
+    /// The backend checks Club admin permission, season deadline and
+    /// draft-only competition status before detaching the link.
+    func detachSeasonSeries(
+        seasonID: UUID, seriesID: UUID
+    ) async throws {
+        guard currentUserID != nil else {
+            throw ATHLTHArenaCloudError.signInRequired
+        }
+        try await client.rpc(
+            "arena_detach_club_season_series",
+            params: ATHLTHArenaAttachSeasonParams(
+                seasonID: seasonID, seriesID: seriesID
+            )
+        ).execute()
+    }
+
     func loadMembers(seriesID: UUID) async throws -> [ATHLTHArenaRemoteMember] {
         try await client
             .from("arena_series_members")
