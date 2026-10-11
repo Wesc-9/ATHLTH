@@ -4254,6 +4254,13 @@ struct WorkoutInviteLaunchSheet: View {
         invite.session.invitePayload
     }
 
+    private var independentStartEnabled: Bool {
+        let currentPayload = social.workoutSessions.first {
+            $0.id == invite.session.id
+        }?.invitePayload ?? payload
+        return currentPayload?.startIndependently == true
+    }
+
     private var copiedWorkout:
         PlannedSession? {
         guard let payload else {
@@ -4327,6 +4334,35 @@ struct WorkoutInviteLaunchSheet: View {
                                 !appleWatchSelectable
                             )
                         )
+
+                        if independentStartEnabled {
+                            Button {
+                                // Independent start requires this athlete's own
+                                // explicit choice; Ready alone does not start it.
+                                social.requestParticipantIndependentStart(
+                                    sessionID: invite.session.id
+                                )
+                                if !isStarting {
+                                    readyAndWait(copiedWorkout)
+                                }
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Start my workout alone",
+                                        norwegian: "Start min økt alene"
+                                    ),
+                                    systemImage: "figure.run"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.large)
+                            .disabled(
+                                captureDevice == .appleWatch &&
+                                !appleWatchSelectable
+                            )
+                        }
                     } else {
                         ContentUnavailableView(
                             ATHLTHLocalization.choose(
@@ -4849,7 +4885,7 @@ struct WorkoutInviteLaunchSheet: View {
                 }
 
                 Text(
-                    payload?.startIndependently == true
+                    independentStartEnabled
                         ? ATHLTHLocalization.choose(
                             english: "Start when you are ready. Your friends' live progress remains available.",
                             norwegian: "Start når du er klar. Du kan fortsatt følge vennenes fremdrift direkte."
