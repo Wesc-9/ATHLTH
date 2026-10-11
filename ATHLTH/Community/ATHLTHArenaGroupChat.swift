@@ -9,6 +9,11 @@ struct ATHLTHArenaGroupChatView: View {
     let series: ATHLTHArenaRemoteSeries
 
     @State private var messages: [ATHLTHArenaRemoteMessage] = []
+    @State private var membership: ATHLTHArenaRemoteMember?
+    @State private var responding = false
+
+    private var isAccepted: Bool { membership?.response == "accepted" }
+    private var hasInvitation: Bool { membership?.response == "invited" }
     @State private var draft = ""
     @State private var isLoading = false
     @State private var isSending = false
@@ -17,7 +22,7 @@ struct ATHLTHArenaGroupChatView: View {
     private let cloud = ATHLTHArenaCloudService()
 
     private var canSend: Bool {
-        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        isAccepted && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !isSending && draft.count <= 2000
     }
 
@@ -28,9 +33,23 @@ struct ATHLTHArenaGroupChatView: View {
                     LazyVStack(alignment: .leading, spacing: 12) {
                         intro
 
-                        ForEach(messages) { item in
+                        if hasInvitation {
+                            invitationCard
+                        } else if !isAccepted {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Accept the invitation to join the conversation.",
+                                norwegian: "Godta invitasjonen for å delta i gruppesamtalen."
+                            ))
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .padding(12)
+                        }
+
+                        if isAccepted {
+                            ForEach(messages) { item in
                             messageBubble(item)
                                 .id(item.id)
+                            }
                         }
 
                         if let error {
@@ -52,7 +71,8 @@ struct ATHLTHArenaGroupChatView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            HStack(spacing: 10) {
+            if isAccepted {
+                HStack(spacing: 10) {
                 TextField(
                     ATHLTHLocalization.choose(
                         english: "Message the group...",
@@ -90,6 +110,7 @@ struct ATHLTHArenaGroupChatView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(.regularMaterial)
+            }
         }
         .background(ATHLTHPremiumCanvas(
             accent: ATHLTHTheme.champagneSoft.opacity(0.13)
@@ -143,6 +164,48 @@ struct ATHLTHArenaGroupChatView: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
     }
 
+    private var invitationCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(ATHLTHLocalization.choose(
+                english: "Competition invitation",
+                norwegian: "Invitasjon til konkurranse"
+            ), systemImage: "envelope.badge.fill")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+            Text(series.title)
+                .font(.title3.weight(.semibold))
+            Text(series.scoring.title)
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            Text(ATHLTHLocalization.choose(
+                english: "Accept to join the group chat and propose rounds. You can review the full competition before deciding.",
+                norwegian: "Godta for å bli med i gruppechatten og foreslå runder. Du kan se hele konkurransen før du bestemmer deg."
+            ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            HStack(spacing: 10) {
+                Button {
+                    Task { await respond(accept: true) }
+                } label: {
+                    Label(ATHLTHLocalization.choose(english: "Accept", norwegian: "Godta"), systemImage: "checkmark")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accentDeep)
+                Button {
+                    Task { await respond(accept: false) }
+                } label: {
+                    Text(ATHLTHLocalization.choose(english: "Decline", norwegian: "Avslå"))
+                }
+                .buttonStyle(.bordered)
+                .disabled(responding)
+            }
+        }
+        .foregroundStyle(ATHLTHTheme.primaryText)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(18)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 21))
+    }
+
     private func messageBubble(_ item: ATHLTHArenaRemoteMessage) -> some View {
         let mine = item.senderID == session.profile.userID
         let deleted = item.senderID == nil
@@ -185,9 +248,26 @@ struct ATHLTHArenaGroupChatView: View {
         isLoading = true
         defer { isLoading = false }
         do {
-            messages = try await cloud.loadGroupMessages(seriesID: series.id)
+            let allMembers = try await cloud.loadMembers(seriesID: series.id)
+            membership = allMembers.first { $0.userID == session.profile.userID }
+            messages = isAccepted
+                ? try await cloud.loadGroupMessages(seriesID: series.id)
+                : []
             error = nil
         } catch { self.error = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func respond(accept: Bool) async {
+        guard !responding else { return }
+        responding = true
+        defer { responding = false }
+        do {
+            try await cloud.respond(seriesID: series.id, accept: accept)
+            await reload()
+        } catch {
+            self.error = error.localizedDescription
         }
     }
 
