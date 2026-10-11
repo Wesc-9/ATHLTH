@@ -10,14 +10,16 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
         slot: UUID,
         value: Double,
         metric: String,
-        round: UUID? = nil
+        round: UUID? = nil,
+        user: UUID? = nil,
+        routeMatchPercent: Double? = nil
     ) -> ATHLTHArenaWorkoutEvidence {
         ATHLTHArenaWorkoutEvidence(
             id: UUID(),
             seriesID: UUID(),
             roundID: round ?? roundID,
             slotID: slot,
-            userID: UUID(),
+            userID: user ?? UUID(),
             sourceWorkoutID: UUID(),
             source: "iphone",
             activityType: "running",
@@ -26,7 +28,7 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
             metricType: metric,
             metricValue: value,
             reportedDistanceMeters: 5_000,
-            reportedRouteMatchPercent: nil,
+            reportedRouteMatchPercent: routeMatchPercent,
             verificationLevel: "participant_reported"
         )
     }
@@ -150,6 +152,44 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
             evidence: evidence
         )
         XCTAssertNil(suggestion)
+    }
+
+    func testRivalTargetUsesOnlyOtherParticipantsValidRouteReports() {
+        let me = UUID()
+        let other = UUID()
+        let anotherRound = UUID()
+        let report: [ATHLTHArenaWorkoutEvidence] = [
+            workout(slot: UUID(), value: 500, metric: "elapsed_seconds",
+                    user: me, routeMatchPercent: 98),
+            workout(slot: UUID(), value: 900, metric: "elapsed_seconds",
+                    user: other, routeMatchPercent: 92),
+            workout(slot: UUID(), value: 400, metric: "elapsed_seconds",
+                    round: anotherRound, user: other, routeMatchPercent: 99),
+            workout(slot: UUID(), value: 200, metric: "elapsed_seconds",
+                    user: other),
+            workout(slot: UUID(), value: 600, metric: "elapsed_seconds",
+                    user: other, routeMatchPercent: 75),
+            workout(slot: UUID(), value: 1, metric: "completed_workout",
+                    user: other, routeMatchPercent: 95)
+        ]
+        XCTAssertEqual(
+            ATHLTHArenaSuggestedRanking.fastestSharedRivalTime(
+                roundID: roundID,
+                currentUserID: me,
+                evidence: report
+            ),
+            900
+        )
+    }
+
+    func testRivalTargetMissingEvidenceDoesNotInventGhostTime() {
+        XCTAssertNil(
+            ATHLTHArenaSuggestedRanking.fastestSharedRivalTime(
+                roundID: roundID,
+                currentUserID: UUID(),
+                evidence: []
+            )
+        )
     }
 
     func testCustomRoundsDoNotInferUnsupportedResults() {
