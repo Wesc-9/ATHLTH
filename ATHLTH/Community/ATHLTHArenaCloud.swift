@@ -754,6 +754,7 @@ enum ATHLTHArenaCloudError: LocalizedError {
     case needInvitees
     case needRounds
     case tooManyRounds
+    case invalidDraft(String)
     case evidenceNotFound
 
     var errorDescription: String? {
@@ -783,6 +784,8 @@ enum ATHLTHArenaCloudError: LocalizedError {
                 english: "A series can contain up to 16 rounds.",
                 norwegian: "En serie kan inneholde maksimalt 16 runder."
             )
+        case .invalidDraft(let message):
+            return message
         case .evidenceNotFound:
             return ATHLTHLocalization.choose(
                 english: "The workout link is no longer available.",
@@ -1273,6 +1276,9 @@ final class ATHLTHArenaCloudService: Sendable {
         }
         guard draft.scope != .club || draft.clubID != nil else {
             throw ATHLTHArenaCloudError.unavailableScope
+        }
+        if let issue = ATHLTHArenaDraftValidation.issue(for: draft) {
+            throw ATHLTHArenaCloudError.invalidDraft(issue.message)
         }
         let invitees = Array(Set(draft.participantIDs))
             .filter { $0 != currentUserID }
