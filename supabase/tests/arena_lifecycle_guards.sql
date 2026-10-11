@@ -52,6 +52,35 @@ begin
     or has_table_privilege('anon','public.ghost_race_challenges','INSERT') then
    raise exception 'Anonymous actors cannot view or create Live Ghost challenges';
  end if;
+ -- The shared location session must not be opened before the
+ -- server has recorded a synchronized start for both accepted athletes.
+ if not exists (
+   select 1 from pg_proc p
+   join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname='private'
+     and p.proname='live_ghost_shared_start_allowed'
+ ) then
+   raise exception 'Live Ghost server start gate is missing';
+ end if;
+ if private.live_ghost_shared_start_allowed(gen_random_uuid()) then
+   raise exception 'Unknown Live Ghost duel bypassed synchronized start gate';
+ end if;
+ if has_function_privilege(
+   'authenticated',
+   'private.live_ghost_shared_start_allowed(uuid)'::regprocedure,
+   'EXECUTE'
+ ) or has_function_privilege(
+   'anon',
+   'private.live_ghost_shared_start_allowed(uuid)'::regprocedure,
+   'EXECUTE'
+ ) then
+   raise exception 'Live Ghost start helper must not be exposed as a client RPC';
+ end if;
+ if pg_get_functiondef(
+   'public.begin_ghost_live_session(uuid)'::regprocedure
+ ) not like '%private.live_ghost_shared_start_allowed(p_challenge_id)%' then
+   raise exception 'Live Ghost shared session RPC bypasses the start gate';
+ end if;
  -- Linked Live Ghost results must be restricted to accepted active
  -- 1v1 participants and may never bypass the existing friend policy.
  if not exists (
