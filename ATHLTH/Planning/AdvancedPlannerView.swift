@@ -8500,7 +8500,9 @@ struct SessionEditorView: View {
         if let workout = existingWorkout {
             context = "edit.\(workout.id.uuidString)"
         } else if isStandalone {
-            context = "standalone"
+            context = directPartnerID.map {
+                "standalone.partner.\($0.uuidString)"
+            } ?? "standalone"
         } else {
             context = "day.\(planID?.uuidString ?? "active").\(dayID?.uuidString ?? "unknown")"
         }
@@ -8546,7 +8548,9 @@ struct SessionEditorView: View {
         reminderMinutesBefore = draft.workout.reminderMinutesBefore ?? 0
         scheduledTimeEnabled = draft.scheduledTimeEnabled
         selectedPartnerID = directPartnerID ?? draft.selectedPartnerID
-        physicalMeetup = draft.physicalMeetup ?? physicalMeetup
+        if directPartnerID == nil {
+            physicalMeetup = draft.physicalMeetup ?? physicalMeetup
+        }
         editorMode = SessionEditorMode(rawValue: draft.editorModeRaw) ?? editorMode
         targetPaceEnabled = draft.targetPaceEnabled
         heartRateTargetEnabled = draft.heartRateTargetEnabled
