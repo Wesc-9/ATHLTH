@@ -288,6 +288,7 @@ struct ATHLTHArenaScoringSection: View {
                 Text(result.evidenceNote)
                     .font(.caption)
                     .foregroundStyle(ATHLTHTheme.mutedText)
+                evidenceConsistencyNotice(for: result, round: round)
                 if result.status == "pending" {
                     Text("\(votes.filter { $0.resultID == result.id && $0.accepted && acceptedIDs.contains($0.userID) }.count)/\(acceptedIDs.count) " +
                          ATHLTHLocalization.choose(english: "approvals", norwegian: "godkjenninger"))
@@ -331,6 +332,34 @@ struct ATHLTHArenaScoringSection: View {
         }
         .padding(14)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 17))
+    }
+
+    /// This only checks for a discrepancy in complete, unambiguous shared
+    /// results. Manual exceptions remain possible and need consensus.
+    @ViewBuilder
+    private func evidenceConsistencyNotice(
+        for result: ATHLTHArenaRoundResult,
+        round: ATHLTHArenaRemoteProposal
+    ) -> some View {
+        let expected = ATHLTHArenaSuggestedRanking.eligibleSuggestion(
+            template: round.template,
+            scoring: series.scoring,
+            roundID: round.id,
+            requiredSlots: rankedMembers.map(\.slotID),
+            evidence: linkedWorkouts
+        )
+        if let expected, expected != result.rankedSlots {
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "The proposed places differ from current shared workout results. Review the explanation before voting.",
+                    norwegian: "De foreslåtte plasseringene avviker fra delte øktresultater. Kontroller forklaringen før du stemmer."
+                ),
+                systemImage: "exclamationmark.triangle"
+            )
+            .font(.caption)
+            .foregroundStyle(.orange)
+            .padding(.vertical, 4)
+        }
     }
 
     @ViewBuilder
