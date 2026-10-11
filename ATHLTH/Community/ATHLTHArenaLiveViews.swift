@@ -187,12 +187,14 @@ struct ATHLTHArenaOnlineDetailView: View {
     }
 
     var body: some View {
+        ScrollViewReader { scrollProxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 summary
                 if ownMembership?.response == "invited" {
                     invitationActions
                 }
+                detailNavigator(scrollProxy)
 
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
@@ -264,6 +266,7 @@ struct ATHLTHArenaOnlineDetailView: View {
                                     in: RoundedRectangle(cornerRadius: 14))
                     }
                 }
+                .id("arena-participants")
 
                 ATHLTHArenaScoringSection(
                     series: currentSeries,
@@ -273,7 +276,7 @@ struct ATHLTHArenaOnlineDetailView: View {
                     onChanged: { await refresh() },
                     approvedRules: Dictionary(grouping: approvals, by: \.roundID)
                 )
-                .id(remoteRevision)
+                .id("arena-standings")
 
                 if currentSeries.status == "active" && canParticipate {
                     ATHLTHArenaEvidenceSection(
@@ -357,6 +360,7 @@ struct ATHLTHArenaOnlineDetailView: View {
                         roundCard(round)
                     }
                 }
+                .id("arena-rounds")
 
                 VStack(alignment: .leading, spacing: 7) {
                     Label(
@@ -478,6 +482,70 @@ struct ATHLTHArenaOnlineDetailView: View {
                 Task { await propose(round) }
             }
         }
+        }
+    }
+
+    private func detailNavigator(_ proxy: ScrollViewProxy) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                navigationButton(
+                    title: ATHLTHLocalization.choose(english: "Standings", norwegian: "Stilling"),
+                    icon: "chart.bar.fill",
+                    target: "arena-standings",
+                    proxy: proxy
+                )
+                navigationButton(
+                    title: ATHLTHLocalization.choose(english: "Rounds", norwegian: "Runder"),
+                    icon: "flag.checkered",
+                    target: "arena-rounds",
+                    proxy: proxy
+                )
+                navigationButton(
+                    title: ATHLTHLocalization.choose(english: "Athletes", norwegian: "Deltakere"),
+                    icon: "person.2.fill",
+                    target: "arena-participants",
+                    proxy: proxy
+                )
+                if isGroupSeries && canParticipate {
+                    NavigationLink {
+                        ATHLTHArenaGroupChatView(series: currentSeries)
+                    } label: {
+                        Label("Chat", systemImage: "bubble.left.and.bubble.right.fill")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 11)
+                            .background(ATHLTHArenaLightStyle.card(16))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .accessibilityLabel(ATHLTHLocalization.choose(
+            english: "Competition navigation",
+            norwegian: "Konkurransenavigasjon"
+        ))
+    }
+
+    private func navigationButton(
+        title: String,
+        icon: String,
+        target: String,
+        proxy: ScrollViewProxy
+    ) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.24)) {
+                proxy.scrollTo(target, anchor: .top)
+            }
+        } label: {
+            Label(title, systemImage: icon)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .background(ATHLTHArenaLightStyle.card(16))
+        }
+        .buttonStyle(.plain)
     }
 
     private var summary: some View {
@@ -485,25 +553,25 @@ struct ATHLTHArenaOnlineDetailView: View {
             Label("ATHLTH ARENA", systemImage: "trophy.fill")
                 .font(.caption.weight(.semibold))
                 .tracking(1.5)
-                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .foregroundStyle(.white.opacity(0.88))
             Text(series.title)
                 .font(.title2.weight(.bold))
-                .foregroundStyle(ATHLTHTheme.primaryText)
+                .foregroundStyle(.white)
             Text(series.scope.title + " · " +
                  "\(series.durationDays) " +
                  ATHLTHLocalization.choose(english: "days", norwegian: "dager"))
                 .font(.subheadline)
-                .foregroundStyle(ATHLTHTheme.mutedText)
+                .foregroundStyle(.white.opacity(0.74))
             Text(series.scoring.title)
                 .font(.caption)
-                .foregroundStyle(ATHLTHTheme.mutedText)
+                .foregroundStyle(.white.opacity(0.74))
             Text(currentSeries.status == "completed"
                 ? ATHLTHLocalization.choose(english: "Completed", norwegian: "Fullført")
                 : currentSeries.status == "active"
                     ? ATHLTHLocalization.choose(english: "Active", norwegian: "Aktiv")
                     : ATHLTHLocalization.choose(english: "Pending agreement", norwegian: "Avventer enighet"))
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .foregroundStyle(.white.opacity(0.90))
             if currentSeries.status == "active",
                let endsAt = currentSeries.endsAt {
                 if Date() >= endsAt {
@@ -515,10 +583,10 @@ struct ATHLTHArenaOnlineDetailView: View {
                         systemImage: "clock.badge.checkmark"
                     )
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .foregroundStyle(.white.opacity(0.90))
                     Text(endsAt.addingTimeInterval(48 * 3_600), style: .date)
                         .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .foregroundStyle(.white.opacity(0.74))
                 } else {
                     HStack(spacing: 6) {
                         Image(systemName: "calendar")
@@ -528,7 +596,7 @@ struct ATHLTHArenaOnlineDetailView: View {
                         Text(endsAt, style: .date)
                     }
                     .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .foregroundStyle(.white.opacity(0.74))
                 }
             } else if currentSeries.status == "completed",
                       currentSeries.completionReason == "deadline_unresolved" {
@@ -540,7 +608,7 @@ struct ATHLTHArenaOnlineDetailView: View {
                     systemImage: "exclamationmark.circle"
                 )
                 .font(.caption)
-                .foregroundStyle(ATHLTHTheme.mutedText)
+                .foregroundStyle(.white.opacity(0.74))
             }
             if outstandingInvitations > 0 {
                 Label(
@@ -552,13 +620,19 @@ struct ATHLTHArenaOnlineDetailView: View {
                     systemImage: "clock"
                 )
                 .font(.caption)
-                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .foregroundStyle(.white.opacity(0.90))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
-        .background(.regularMaterial,
-                    in: RoundedRectangle(cornerRadius: 22))
+        .background(
+            LinearGradient(
+                colors: [ATHLTHTheme.accentDeep, ATHLTHTheme.vitality],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+        )
     }
 
     private var invitationActions: some View {
