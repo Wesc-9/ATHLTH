@@ -41,6 +41,10 @@ create table if not exists public.arena_round_approvals (
 create index if not exists arena_members_user_idx on public.arena_series_members(user_id, response);
 create index if not exists arena_round_series_idx on public.arena_round_proposals(series_id, position, created_at);
 create index if not exists arena_series_owner_idx on public.arena_series(owner_id, created_at desc);
+create index if not exists arena_rounds_proposer_idx
+  on public.arena_round_proposals(proposed_by, created_at desc);
+create index if not exists arena_votes_user_idx
+  on public.arena_round_approvals(user_id, created_at desc);
 
 create schema if not exists private;
 
