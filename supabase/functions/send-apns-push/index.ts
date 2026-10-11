@@ -121,6 +121,12 @@ function preferenceAllows(
 
   const normalized = kind.toLowerCase();
 
+  if (normalized.startsWith("arena_")) {
+    return normalized === "arena_chat"
+      ? preferences.message_notifications_enabled
+      : preferences.challenge_notifications_enabled;
+  }
+
   if (
     normalized.includes("message") ||
     normalized.includes("dm") ||
@@ -137,6 +143,10 @@ function preferenceAllows(
 }
 
 function threadID(event: InboxEvent): string {
+  if (event.entity_type === "arena_series" && event.entity_id) {
+    return `arena:${event.entity_id}`;
+  }
+
   if (event.entity_type === "train_together_post" && event.entity_id) {
     return `train_together:${event.entity_id}`;
   }
