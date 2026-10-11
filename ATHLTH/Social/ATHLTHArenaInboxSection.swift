@@ -65,7 +65,7 @@ struct ATHLTHArenaInboxSection: View {
             }
             ForEach(visible) { entry in
                 NavigationLink {
-                    if entry.isGroup && entry.membership?.response == "accepted" {
+                    if entry.isGroup && entry.membership != nil {
                         ATHLTHArenaGroupChatView(series: entry.series)
                     } else {
                         ATHLTHArenaOnlineDetailView(series: entry.series)
