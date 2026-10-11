@@ -187,8 +187,7 @@ struct ATHLTHArenaGroupChatView: View {
         do {
             messages = try await cloud.loadGroupMessages(seriesID: series.id)
             error = nil
-        } catch {
-            error = error.localizedDescription
+        } catch { self.error = error.localizedDescription
         }
     }
 
@@ -201,8 +200,7 @@ struct ATHLTHArenaGroupChatView: View {
             try await cloud.sendGroupMessage(seriesID: series.id, body: draft)
             draft = ""
             await reload()
-        } catch {
-            error = error.localizedDescription
+        } catch { self.error = error.localizedDescription
         }
     }
 }
