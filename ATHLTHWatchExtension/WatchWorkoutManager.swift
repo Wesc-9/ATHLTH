@@ -5379,15 +5379,22 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     ) {
         guard !text.isEmpty else { return }
 
-        if audioCoachConfiguration
-                .shouldPreferIPhoneAudioWhenReachable,
-           WCSession.isSupported(),
-           WCSession.default.activationState ==
-                .activated,
-           WCSession.default.isReachable {
-            // iPhone is actively mirroring this workout and owns spoken
-            // guidance while reachable. If reachability drops, Watch resumes
-            // Audio Coach automatically on the next cue.
+        let iPhoneReachable =
+            WCSession.isSupported() &&
+            WCSession.default.activationState == .activated &&
+            WCSession.default.isReachable
+
+        guard ATHLTHAudioCoachVoiceRouting
+            .shouldSpeakOnWatch(
+                configuration: audioCoachConfiguration,
+                workoutKind: kind,
+                priority: priority,
+                iPhoneReachable: iPhoneReachable
+            )
+        else {
+            // iPhone handles routine and structured running commentary.
+            // Critical route/target alerts, Ghost and strength cues remain
+            // local because the mirrored iPhone coach does not reproduce them.
             return
         }
 
