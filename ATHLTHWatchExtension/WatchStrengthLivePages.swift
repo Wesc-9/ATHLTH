@@ -62,8 +62,7 @@ struct WatchStrengthSessionStatusPage: View {
                             title: ATHLTHLocalization.choose(
                                 english: "EXERCISES", norwegian: "ØVELSER"
                             ),
-                            value: "\(min(snapshot.exerciseIndex + 1,
-                                           snapshot.exerciseCount))/\(snapshot.exerciseCount)",
+                            value: "\(min(snapshot.exerciseIndex + 1, snapshot.exerciseCount))/\(snapshot.exerciseCount)",
                             symbol: "dumbbell.fill"
                         )
                     }
