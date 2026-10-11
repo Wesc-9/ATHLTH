@@ -234,6 +234,99 @@ struct ATHLTHArenaRivalrySummary: Equatable {
     }
 }
 
+/// Compare the user's last two *reported* Live Ghost times within the
+/// very same approved Arena route round. Never compare times across different
+/// courses, infer GPS verification, or award points.
+struct ATHLTHArenaLiveTimeTrend: Identifiable, Equatable {
+    let roundID: UUID
+    let previousSeconds: TimeInterval
+    let latestSeconds: TimeInterval
+    let finishedAt: Date
+    let attempts: Int
+
+    var id: UUID { roundID }
+    /// Positive: improved (faster). Negative: slower. No ranking impact.
+    var improvementSeconds: TimeInterval { previousSeconds - latestSeconds }
+
+    static func summaries(
+        challenges: [GhostFriendRaceChallengeRecord],
+        rooms: [LiveGhostRaceRoomRecord],
+        participants: [LiveGhostRaceParticipantRecord],
+        eligibleRoundIDs: Set<UUID>,
+        currentUserID: UUID
+    ) -> [ATHLTHArenaLiveTimeTrend] {
+        let roomByID = Dictionary(
+            rooms.map { ($0.challengeID, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        let participantsByChallenge = Dictionary(
+            grouping: participants, by: \.challengeID
+        )
+        var seen = Set<UUID>()
+        var byRound: [UUID: [(Date, UUID, TimeInterval)]] = [:]
+
+        for challenge in challenges {
+            guard let roundID = challenge.arenaRoundID,
+                  eligibleRoundIDs.contains(roundID),
+                  challenge.sourceKind == "planned_route",
+                  challenge.status == .accepted,
+                  currentUserID == challenge.senderID ||
+                      currentUserID == challenge.recipientID,
+                  seen.insert(challenge.id).inserted,
+                  let room = roomByID[challenge.id],
+                  room.status == .finished,
+                  let finishedAt = room.finishedAt else {
+                continue
+            }
+
+            let submissions = participantsByChallenge[challenge.id] ?? []
+            let senderTime = submissions.first {
+                $0.userID == challenge.senderID
+            }?.elapsedSeconds
+            let recipientTime = submissions.first {
+                $0.userID == challenge.recipientID
+            }?.elapsedSeconds
+            guard let candidate = ATHLTHArenaLiveDuelReview.candidate(
+                senderID: challenge.senderID,
+                recipientID: challenge.recipientID,
+                senderSeconds: senderTime,
+                recipientSeconds: recipientTime,
+                reportedWinnerID: room.winnerID,
+                isFinished: true
+            ) else { continue }
+
+            let ownTime = currentUserID == challenge.senderID
+                ? candidate.senderSeconds : candidate.recipientSeconds
+            byRound[roundID, default: []].append(
+                (finishedAt, challenge.id, ownTime)
+            )
+        }
+
+        return byRound.compactMap { roundID, attempts in
+            guard attempts.count >= 2 else { return nil }
+            let chronological = attempts.sorted {
+                if $0.0 != $1.0 { return $0.0 < $1.0 }
+                return $0.1.uuidString < $1.1.uuidString
+            }
+            let previous = chronological[chronological.count - 2]
+            let latest = chronological[chronological.count - 1]
+            return ATHLTHArenaLiveTimeTrend(
+                roundID: roundID,
+                previousSeconds: previous.2,
+                latestSeconds: latest.2,
+                finishedAt: latest.0,
+                attempts: attempts.count
+            )
+        }
+        .sorted {
+            if $0.finishedAt != $1.finishedAt {
+                return $0.finishedAt > $1.finishedAt
+            }
+            return $0.roundID.uuidString < $1.roundID.uuidString
+        }
+    }
+}
+
 /// Progress represents server-reviewed Arena rounds, not completed
 /// workouts. Rejected and expired proposals never count as approved.
 struct ATHLTHArenaRoundProgress: Equatable {
