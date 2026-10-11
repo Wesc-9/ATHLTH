@@ -77,6 +77,39 @@ private struct ATHLTHArenaTeamLineupParams: Encodable {
     }
 }
 
+/// A server-frozen planning order for a same-route team relay.
+/// Does not independently record a handoff or award any points.
+struct ATHLTHArenaRelayLeg: Decodable, Identifiable {
+    let slotID: UUID
+    let seriesID: UUID
+    let teamIndex: Int
+    let legOrder: Int
+    let routeRoundID: UUID
+    var id: UUID { slotID }
+
+    enum CodingKeys: String, CodingKey {
+        case slotID = "slot_id"
+        case seriesID = "series_id"
+        case teamIndex = "team_index"
+        case legOrder = "leg_order"
+        case routeRoundID = "route_round_id"
+    }
+}
+
+private struct ATHLTHArenaRelayLineupParams: Encodable {
+    let seriesID: UUID
+    let routeRoundID: UUID?
+    let firstTeamSlots: [UUID]
+    let secondTeamSlots: [UUID]
+
+    enum CodingKeys: String, CodingKey {
+        case seriesID = "p_series_id"
+        case routeRoundID = "p_route_round_id"
+        case firstTeamSlots = "p_first_team_slots"
+        case secondTeamSlots = "p_second_team_slots"
+    }
+}
+
 struct ATHLTHArenaRemoteProposal: Decodable, Identifiable {
     let id: UUID
     let seriesID: UUID
@@ -555,6 +588,37 @@ final class ATHLTHArenaCloudService: Sendable {
             "arena_save_team_lineup",
             params: ATHLTHArenaTeamLineupParams(
                 seriesID: seriesID,
+                firstTeamSlots: first,
+                secondTeamSlots: second
+            )
+        ).execute()
+    }
+
+    func loadRelayLegs(seriesID: UUID) async throws -> [ATHLTHArenaRelayLeg] {
+        try await client
+            .from("arena_series_relay_legs")
+            .select("slot_id,series_id,team_index,leg_order,route_round_id")
+            .eq("series_id", value: seriesID)
+            .order("leg_order")
+            .execute().value
+    }
+
+    /// Only the organizer may configure an equal-size, single-route draft
+    /// relay. The server validates every slot and freezes it at series start.
+    func saveRelayLineup(
+        seriesID: UUID,
+        routeRoundID: UUID?,
+        first: [UUID],
+        second: [UUID]
+    ) async throws {
+        guard currentUserID != nil else {
+            throw ATHLTHArenaCloudError.signInRequired
+        }
+        try await client.rpc(
+            "arena_save_relay_lineup",
+            params: ATHLTHArenaRelayLineupParams(
+                seriesID: seriesID,
+                routeRoundID: routeRoundID,
                 firstTeamSlots: first,
                 secondTeamSlots: second
             )
