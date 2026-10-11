@@ -419,6 +419,36 @@ enum ATHLTHArenaSeasonPresentation {
         return .active
     }
 
+    /// Active seasons should never disappear behind a longer list of
+    /// historical seasons. For tied phases, show approaching deadlines
+    /// first; keep history newest first and use a stable UUID tie-break.
+    static func prioritizedSeasons(
+        _ seasons: [ATHLTHArenaClubSeason],
+        today: String
+    ) -> [ATHLTHArenaClubSeason] {
+        func rank(_ season: ATHLTHArenaClubSeason) -> Int {
+            switch phase(startsOn: season.startsOn, endsOn: season.endsOn, today: today) {
+            case .active: return 0
+            case .upcoming: return 1
+            case .completed: return 2
+            }
+        }
+        return seasons.sorted { lhs, rhs in
+            let lhsRank = rank(lhs)
+            let rhsRank = rank(rhs)
+            if lhsRank != rhsRank { return lhsRank < rhsRank }
+            if lhsRank == 0 {
+                if lhs.endsOn != rhs.endsOn { return lhs.endsOn < rhs.endsOn }
+                if lhs.startsOn != rhs.startsOn { return lhs.startsOn < rhs.startsOn }
+            } else if lhsRank == 1 {
+                if lhs.startsOn != rhs.startsOn { return lhs.startsOn < rhs.startsOn }
+            } else {
+                if lhs.endsOn != rhs.endsOn { return lhs.endsOn > rhs.endsOn }
+            }
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
+    }
+
     static func leadingAthletes(
         _ standings: [ATHLTHArenaSeasonStandingsRow]
     ) -> [ATHLTHArenaSeasonStandingsRow] {
@@ -459,6 +489,33 @@ struct ATHLTHArenaSeasonsSection: View {
     @State private var adminClubs: [ATHLTHArenaClubChoice] = []
     private let cloud = ATHLTHArenaCloudService()
     private let directory = ATHLTHArenaClubDirectory()
+
+    private var prioritizedSeasons: [ATHLTHArenaClubSeason] {
+        ATHLTHArenaSeasonPresentation.prioritizedSeasons(
+            seasons, today: ATHLTHArenaSeasonDate.sql(Date())
+        )
+    }
+
+    private func seasonState(_ season: ATHLTHArenaClubSeason) -> String {
+        switch ATHLTHArenaSeasonPresentation.phase(
+            startsOn: season.startsOn,
+            endsOn: season.endsOn,
+            today: ATHLTHArenaSeasonDate.sql(Date())
+        ) {
+        case .active:
+            return ATHLTHLocalization.choose(
+                english: "In progress", norwegian: "Pågår"
+            )
+        case .upcoming:
+            return ATHLTHLocalization.choose(
+                english: "Coming up", norwegian: "Kommende"
+            )
+        case .completed:
+            return ATHLTHLocalization.choose(
+                english: "Completed", norwegian: "Fullført"
+            )
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 11) {
@@ -515,7 +572,7 @@ struct ATHLTHArenaSeasonsSection: View {
                 .background(ATHLTHArenaLightStyle.card(18))
             }
 
-            ForEach(seasons.prefix(4)) { season in
+            ForEach(prioritizedSeasons.prefix(4)) { season in
                 NavigationLink {
                     ATHLTHArenaSeasonDetailView(
                         season: season,
@@ -542,6 +599,9 @@ struct ATHLTHArenaSeasonsSection: View {
                                  ATHLTHArenaSeasonDate.label(season.endsOn))
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
+                            Label(seasonState(season), systemImage: "calendar.badge.clock")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
                         }
                         Spacer(minLength: 3)
                         Image(systemName: "chevron.right")
@@ -553,9 +613,9 @@ struct ATHLTHArenaSeasonsSection: View {
                 }
                 .buttonStyle(.plain)
             }
-            if seasons.count > 4 {
+            if prioritizedSeasons.count > 4 {
                 NavigationLink {
-                    List(seasons) { season in
+                    List(prioritizedSeasons) { season in
                         NavigationLink(season.title) {
                             ATHLTHArenaSeasonDetailView(
                                 season: season,
