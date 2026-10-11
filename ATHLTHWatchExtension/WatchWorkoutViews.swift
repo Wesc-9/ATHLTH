@@ -1479,6 +1479,30 @@ struct WatchActiveWorkoutView: View {
                 .watchSurface(radius: 16)
             }
 
+            if workoutManager.audioCoachConfigured {
+                NavigationLink {
+                    WatchAudioCoachLiveSettingsView(
+                        workoutManager: workoutManager
+                    )
+                } label: {
+                    HStack {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Coach voice & style",
+                                norwegian: "Coachstemme og talemåte"
+                            ),
+                            systemImage: "slider.horizontal.3"
+                        )
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                    .padding(10)
+                    .watchSurface(radius: 14)
+                }
+                .buttonStyle(.plain)
+            }
+
             Button {
                 workoutManager.end()
             } label: {
