@@ -976,13 +976,43 @@ struct ATHLTHArenaOnlineDetailView: View {
         members.count > 2
     }
 
+    private var nextAction: ATHLTHArenaNextAction? {
+        let activeIDs = Set(acceptedMembers.compactMap(\.userID))
+        let ownApprovals = Set(approvals.filter {
+            $0.userID == session.profile.userID
+        }.map(\.roundID))
+        let allApproved = !rounds.isEmpty && activeIDs.count >= 2 &&
+            rounds.allSatisfy { round in
+                let approved = Set(approvals.filter {
+                    $0.roundID == round.id
+                }.map(\.userID))
+                return activeIDs.isSubset(of: approved)
+            }
+        return ATHLTHArenaNextAction.resolve(
+            status: currentSeries.status,
+            response: ownMembership?.response,
+            isOrganizer: isOrganizer,
+            roundIDs: rounds.map(\.id),
+            personallyApproved: ownApprovals,
+            allRulesApproved: allApproved,
+            pendingInvites: outstandingInvitations,
+            acceptedCount: activeIDs.count,
+            hasRoute: rounds.contains(where: {
+                $0.template == .fastestRoute && $0.routeSnapshot != nil
+            }),
+            deadlinePassed: currentSeries.endsAt.map { $0 <= Date() } ?? false
+        )
+    }
+
     var body: some View {
         ScrollViewReader { scrollProxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 summary
+                nextActionCard(scrollProxy)
                 if ownMembership?.response == "invited" {
                     invitationActions
+                        .id("arena-invitation")
                 }
                 detailNavigator(scrollProxy)
 
@@ -1244,6 +1274,7 @@ struct ATHLTHArenaOnlineDetailView: View {
 
                     ForEach(rounds) { round in
                         roundCard(round)
+                            .id("arena-rule-\(round.id.uuidString)")
                     }
                 }
                 .id("arena-rounds")
@@ -1368,6 +1399,242 @@ struct ATHLTHArenaOnlineDetailView: View {
                 Task { await propose(round) }
             }
         }
+        }
+    }
+
+    /// One small, premium context card instead of another long menu.
+    /// The button only navigates to existing flows; it never approves
+    /// rules, starts workouts or grants points without explicit action.
+    @ViewBuilder
+    private func nextActionCard(_ proxy: ScrollViewProxy) -> some View {
+        if let action = nextAction {
+            let info = nextActionCopy(action)
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 11) {
+                    Image(systemName: info.symbol)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 41, height: 41)
+                        .background(
+                            ATHLTHTheme.vitalitySoft.opacity(0.75),
+                            in: RoundedRectangle(cornerRadius: 13)
+                        )
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "YOUR NEXT STEP",
+                            norwegian: "DITT NESTE STEG"
+                        ))
+                        .font(.caption2.weight(.bold))
+                        .tracking(1)
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        Text(info.title)
+                            .font(.headline.weight(.bold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                        Text(info.detail)
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                }
+
+                Button {
+                    switch action {
+                    case .addRound:
+                        showingRoundCreator = true
+                    default:
+                        let target: String
+                        switch action {
+                        case .respondToInvite: target = "arena-invitation"
+                        case .approveRule(let roundID):
+                            target = "arena-rule-\(roundID.uuidString)"
+                        case .waitingForInvites, .waitingForPlayers:
+                            target = "arena-participants"
+                        case .waitingForRules, .runRoute, .compete:
+                            target = "arena-rounds"
+                        case .startSeries, .reviewScores, .finalStandings:
+                            target = "arena-standings"
+                        case .addRound: target = "arena-rounds"
+                        }
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            proxy.scrollTo(target, anchor: .top)
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Text(info.buttonTitle)
+                        Spacer()
+                        Image(systemName: "arrow.right")
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .padding(.horizontal, 13)
+                    .frame(minHeight: 44)
+                    .background(
+                        ATHLTHTheme.vitalitySoft.opacity(0.55),
+                        in: RoundedRectangle(cornerRadius: 12)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(15)
+            .background(ATHLTHArenaLightStyle.card(20))
+            .accessibilityElement(children: .contain)
+        }
+    }
+
+    private func nextActionCopy(
+        _ action: ATHLTHArenaNextAction
+    ) -> (title: String, detail: String, buttonTitle: String, symbol: String) {
+        switch action {
+        case .respondToInvite:
+            return (
+                ATHLTHLocalization.choose(
+                    english: "An invitation is waiting", norwegian: "Du har en invitasjon"
+                ),
+                ATHLTHLocalization.choose(
+                    english: "Review the competition before you decide.",
+                    norwegian: "Se over konkurransen før du bestemmer deg."
+                ),
+                ATHLTHLocalization.choose(
+                    english: "Review invitation", norwegian: "Se invitasjonen"
+                ),
+                "envelope.open"
+            )
+        case .addRound:
+            return (
+                ATHLTHLocalization.choose(
+                    english: "Add the first round", norwegian: "Legg til første runde"
+                ),
+                ATHLTHLocalization.choose(
+                    english: "Choose a route, distance, strength or workout goal.",
+                    norwegian: "Velg rute, distanse, styrke eller øktmål."
+                ),
+                ATHLTHLocalization.choose(english: "Add round", norwegian: "Legg til runde"),
+                "plus.circle.fill"
+            )
+        case .approveRule:
+            return (
+                ATHLTHLocalization.choose(
+                    english: "A round needs your approval",
+                    norwegian: "En runde trenger din godkjenning"
+                ),
+                ATHLTHLocalization.choose(
+                    english: "Review the agreed route and rules before accepting.",
+                    norwegian: "Kontroller rute og regler før du godkjenner."
+                ),
+                ATHLTHLocalization.choose(
+                    english: "Review round", norwegian: "Se runden"
+                ),
+                "checkmark.shield"
+            )
+        case .waitingForInvites:
+            return (
+                ATHLTHLocalization.choose(
+                    english: "Waiting for invited athletes",
+                    norwegian: "Venter på inviterte deltakere"
+                ),
+                ATHLTHLocalization.choose(
+                    english: "The competition starts after invitations and rules are approved.",
+                    norwegian: "Konkurransen starter når invitasjoner og regler er godkjent."
+                ),
+                ATHLTHLocalization.choose(english: "View athletes", norwegian: "Se deltakere"),
+                "person.2.badge.clock"
+            )
+        case .waitingForPlayers:
+            return (
+                ATHLTHLocalization.choose(
+                    english: "More athletes are needed",
+                    norwegian: "Trenger flere deltakere"
+                ),
+                ATHLTHLocalization.choose(
+                    english: "At least two accepted athletes must participate.",
+                    norwegian: "Minst to deltakere må ha takket ja."
+                ),
+                ATHLTHLocalization.choose(english: "View athletes", norwegian: "Se deltakere"),
+                "person.2"
+            )
+        case .waitingForRules:
+            return (
+                ATHLTHLocalization.choose(
+                    english: "Awaiting final rule approvals",
+                    norwegian: "Avventer siste regelgodkjenninger"
+                ),
+                ATHLTHLocalization.choose(
+                    english: "Everyone must agree before the competition can begin.",
+                    norwegian: "Alle må godkjenne reglene før konkurransen starter."
+                ),
+                ATHLTHLocalization.choose(english: "View rounds", norwegian: "Se rundene"),
+                "clock"
+            )
+        case .startSeries:
+            return (
+                ATHLTHLocalization.choose(
+                    english: "The competition can start",
+                    norwegian: "Konkurransen kan starte"
+                ),
+                ATHLTHLocalization.choose(
+                    english: "All eligible athletes have agreed. Start when ready.",
+                    norwegian: "Alle deltakere har godkjent. Start når dere er klare."
+                ),
+                ATHLTHLocalization.choose(
+                    english: "Go to start", norwegian: "Gå til start"
+                ),
+                "flag.checkered"
+            )
+        case .runRoute:
+            return (
+                ATHLTHLocalization.choose(
+                    english: "Your route is ready", norwegian: "Ruten din er klar"
+                ),
+                ATHLTHLocalization.choose(
+                    english: "Open a route round to start Ghost or record a qualifying run.",
+                    norwegian: "Åpne en ruterunde for Ghost eller registrer et gyldig løp."
+                ),
+                ATHLTHLocalization.choose(english: "Open rounds", norwegian: "Åpne runder"),
+                "point.topleft.down.to.point.bottomright.curvepath"
+            )
+        case .compete:
+            return (
+                ATHLTHLocalization.choose(
+                    english: "Your competition is active", norwegian: "Konkurransen pågår"
+                ),
+                ATHLTHLocalization.choose(
+                    english: "Check the current round goals and shared results.",
+                    norwegian: "Se rundemålene og resultatene som er delt."
+                ),
+                ATHLTHLocalization.choose(english: "See rounds", norwegian: "Se rundene"),
+                "figure.run"
+            )
+        case .reviewScores:
+            return (
+                ATHLTHLocalization.choose(
+                    english: "Time to review results",
+                    norwegian: "Tid for resultatgodkjenning"
+                ),
+                ATHLTHLocalization.choose(
+                    english: "The training period has ended. Only approved results award points.",
+                    norwegian: "Treningsperioden er over. Kun godkjente resultater gir poeng."
+                ),
+                ATHLTHLocalization.choose(
+                    english: "Review standings", norwegian: "Kontroller stillingen"
+                ),
+                "checkmark.seal"
+            )
+        case .finalStandings:
+            return (
+                ATHLTHLocalization.choose(
+                    english: "The final table is ready", norwegian: "Sluttstillingen er klar"
+                ),
+                ATHLTHLocalization.choose(
+                    english: "See the approved scores and competition history.",
+                    norwegian: "Se godkjente poeng og konkurransehistorikk."
+                ),
+                ATHLTHLocalization.choose(
+                    english: "Final standings", norwegian: "Sluttstilling"
+                ),
+                "trophy"
+            )
         }
     }
 
