@@ -3,6 +3,17 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHArenaRepetitionResultTests: XCTestCase {
+    func testAgreedExerciseUsesExplicitRoundRule() {
+        let rules = "Øvelse: Knebøy\nKun godkjente løft telles."
+        XCTAssertEqual(
+            ATHLTHArenaRepetitionResult.agreedExercise(in: rules),
+            "Knebøy"
+        )
+        XCTAssertNil(ATHLTHArenaRepetitionResult.agreedExercise(
+            in: "Flest repetisjoner i valgfri øvelse."
+        ))
+    }
+
     func testManualRepetitionResultIncludesExerciseAndEachPlace() {
         let result = ATHLTHArenaRepetitionResult.explanation(
             exercise: "Knebøy",
