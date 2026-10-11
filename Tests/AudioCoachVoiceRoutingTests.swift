@@ -240,6 +240,33 @@ final class AudioCoachVoiceRoutingTests: XCTestCase {
         XCTAssertEqual(decodedAck.requestID, offer.requestID)
     }
 
+    func testLeaseFeatureFlagIsBackwardCompatibleForOldWatchSnapshots() throws {
+        var snapshot = WatchWorkoutLiveSnapshot(
+            kind: .running,
+            state: .running,
+            startedAt: Date(timeIntervalSince1970: 1_000),
+            capturedAt: Date(timeIntervalSince1970: 1_010),
+            elapsedTime: 10,
+            heartRate: 125,
+            activeCalories: 12,
+            distanceMeters: 35,
+            averageHeartRate: nil,
+            maxHeartRate: nil,
+            routePointCount: 1
+        )
+        let legacy = try JSONDecoder().decode(
+            WatchWorkoutLiveSnapshot.self,
+            from: JSONEncoder().encode(snapshot)
+        )
+        XCTAssertNil(legacy.supportsAudioCoachVoiceLease)
+        snapshot.supportsAudioCoachVoiceLease = true
+        let newSnapshot = try JSONDecoder().decode(
+            WatchWorkoutLiveSnapshot.self,
+            from: JSONEncoder().encode(snapshot)
+        )
+        XCTAssertEqual(newSnapshot.supportsAudioCoachVoiceLease, true)
+    }
+
     func testPriorityGateDoesNotOverrideCriticalWithRoutine() {
         var gate = ATHLTHGuidancePriorityGate()
         let now = Date(timeIntervalSince1970: 100)
