@@ -265,6 +265,45 @@ struct ATHLTHArenaRoundProgress: Equatable {
     }
 }
 
+struct ATHLTHArenaTeamStanding: Identifiable, Equatable {
+    let teamIndex: Int
+    let points: Double
+    let athleteCount: Int
+    var id: Int { teamIndex }
+}
+
+/// Uses ONLY settled member points from Arena's server-side score engine.
+/// Does not infer wins, add bonus points or re-score previous workouts.
+enum ATHLTHArenaTeamStandings {
+    static func calculate(
+        members: [ATHLTHArenaRemoteMember],
+        assignments: [ATHLTHArenaTeamAssignment]
+    ) -> [ATHLTHArenaTeamStanding] {
+        guard !assignments.isEmpty else { return [] }
+        let memberBySlot = Dictionary(
+            uniqueKeysWithValues: members.map { ($0.slotID, $0) }
+        )
+        var seen = Set<UUID>()
+        let valid = assignments.filter {
+            (1...2).contains($0.teamIndex) &&
+            memberBySlot[$0.slotID] != nil &&
+            seen.insert($0.slotID).inserted
+        }
+        return (1...2).map { team in
+            let slots = valid.filter { $0.teamIndex == team }
+            let points = slots.reduce(0.0) { total, assignment in
+                let settled = memberBySlot[assignment.slotID]?.points ?? 0
+                return total + (settled.isFinite ? max(0, settled) : 0)
+            }
+            return ATHLTHArenaTeamStanding(
+                teamIndex: team,
+                points: points,
+                athleteCount: slots.count
+            )
+        }
+    }
+}
+
 enum ATHLTHArenaSuggestedRanking {
     /// A suggested pace target only, never a verified result or a replay of
     /// someone else's private GPS trace. Based on an explicitly shared round
