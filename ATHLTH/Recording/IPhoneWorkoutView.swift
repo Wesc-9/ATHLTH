@@ -1,5 +1,6 @@
 import SwiftUI
 import MapKit
+import AVFoundation
 
 struct IPhoneWorkoutLiveSplit: Identifiable, Equatable {
     let index: Int
@@ -3084,6 +3085,7 @@ struct IPhoneWorkoutView: View {
 
 
 private struct IPhoneAudioCoachLiveSheet: View {
+    @State private var audioOutputName: String?
     @EnvironmentObject private var recorder: IPhoneWorkoutStore
     @EnvironmentObject private var settings: AppSettingsStore
     @Environment(\.dismiss) private var dismiss
@@ -3126,6 +3128,90 @@ private struct IPhoneAudioCoachLiveSheet: View {
                         }
 
                         if configuration.enabled {
+                            coachCard {
+                                HStack(spacing: 11) {
+                                    Image(systemName: "airpodspro")
+                                        .font(.title2)
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(ATHLTHLocalization.choose(
+                                            english: "Audio output",
+                                            norwegian: "Lydutgang"
+                                        ))
+                                        .font(.subheadline.weight(.semibold))
+                                        Text(audioOutputName ??
+                                            ATHLTHLocalization.choose(
+                                                english: "System output",
+                                                norwegian: "Systemets lydutgang"
+                                            )
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                        .lineLimit(1)
+                                    }
+                                    Spacer(minLength: 5)
+                                    ATHLTHAudioRouteControl(compact: true)
+                                }
+                                .accessibilityElement(children: .contain)
+                            }
+
+                            coachCard {
+                                VStack(alignment: .leading, spacing: 11) {
+                                    HStack {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Last coach message",
+                                                norwegian: "Siste coachbeskjed"
+                                            ),
+                                            systemImage: "text.bubble"
+                                        )
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(ATHLTHTheme.primaryText)
+                                        Spacer()
+                                        Text(ATHLTHLocalization.choose(
+                                            english: "This workout only",
+                                            norwegian: "Kun denne økten"
+                                        ))
+                                        .font(.caption2)
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                    }
+
+                                    Text(recorder.lastCoachMessage ??
+                                        ATHLTHLocalization.choose(
+                                            english: "No spoken message yet",
+                                            norwegian: "Ingen beskjed ennå"
+                                        )
+                                    )
+                                    .font(.subheadline)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                    .lineLimit(3)
+
+                                    TimelineView(.periodic(from: .now, by: 5)) { _ in
+                                        Button {
+                                            recorder.replayLastCoachMessage()
+                                        } label: {
+                                            Label(
+                                                ATHLTHLocalization.choose(
+                                                    english: "Listen again",
+                                                    norwegian: "Hør igjen"
+                                                ),
+                                                systemImage: "arrow.counterclockwise"
+                                            )
+                                            .font(.subheadline.weight(.semibold))
+                                            .frame(maxWidth: .infinity, minHeight: 43)
+                                        }
+                                        .buttonStyle(.bordered)
+                                        .disabled(!recorder.canReplayLastCoachMessage)
+                                    }
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Recent messages can be replayed for 45 seconds. Never stored.",
+                                        norwegian: "Nylige beskjeder kan høres igjen i 45 sekunder. Lagres ikke."
+                                    ))
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+                            }
+
                             coachCard {
                                 VStack(alignment: .leading, spacing: 12) {
                                     HStack(spacing: 10) {
@@ -3377,6 +3463,18 @@ private struct IPhoneAudioCoachLiveSheet: View {
             .background(ATHLTHTheme.canvasBottom.ignoresSafeArea())
             .navigationTitle("Audio Coach")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                audioOutputName = AVAudioSession.sharedInstance()
+                    .currentRoute.outputs.first?.portName
+            }
+            .onReceive(
+                NotificationCenter.default.publisher(
+                    for: AVAudioSession.routeChangeNotification
+                )
+            ) { _ in
+                audioOutputName = AVAudioSession.sharedInstance()
+                    .currentRoute.outputs.first?.portName
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(ATHLTHLocalization.choose(
