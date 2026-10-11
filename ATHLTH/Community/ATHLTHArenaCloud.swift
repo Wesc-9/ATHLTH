@@ -4,6 +4,75 @@ import Supabase
 // Arena multiplayer uses separate tables from existing single Challenges,
 // Club Challenges and the editorial Weekly Challenge. The database owns
 // privacy checks, atomic invitations and approval permissions.
+/// Club Arena seasons are separate from editorial Weekly Challenges.
+/// Member points are already awarded through participant-approved series.
+struct ATHLTHArenaClubSeason: Decodable, Identifiable {
+    let id: UUID
+    let clubID: UUID
+    let title: String
+    let startsOn: String
+    let endsOn: String
+    let createdBy: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case id, title
+        case clubID = "club_id"
+        case startsOn = "starts_on"
+        case endsOn = "ends_on"
+        case createdBy = "created_by"
+    }
+}
+
+struct ATHLTHArenaSeasonStandingsRow: Decodable, Identifiable {
+    let userID: UUID
+    let points: Double
+    let competitions: Int64
+    var id: UUID { userID }
+    enum CodingKeys: String, CodingKey {
+        case points, competitions
+        case userID = "user_id"
+    }
+}
+
+struct ATHLTHArenaSeasonSeriesLink: Decodable, Identifiable {
+    let seasonID: UUID
+    let seriesID: UUID
+    var id: UUID { seriesID }
+    enum CodingKeys: String, CodingKey {
+        case seasonID = "season_id"
+        case seriesID = "series_id"
+    }
+}
+
+private struct ATHLTHArenaCreateSeasonParams: Encodable {
+    let clubID: UUID
+    let title: String
+    let startsOn: String
+    let endsOn: String
+    enum CodingKeys: String, CodingKey {
+        case clubID = "p_club"
+        case title = "p_title"
+        case startsOn = "p_starts_on"
+        case endsOn = "p_ends_on"
+    }
+}
+
+private struct ATHLTHArenaAttachSeasonParams: Encodable {
+    let seasonID: UUID
+    let seriesID: UUID
+    enum CodingKeys: String, CodingKey {
+        case seasonID = "p_season"
+        case seriesID = "p_series"
+    }
+}
+
+private struct ATHLTHArenaSeasonIDParams: Encodable {
+    let seasonID: UUID
+    enum CodingKeys: String, CodingKey {
+        case seasonID = "p_season"
+    }
+}
+
 struct ATHLTHArenaRemoteSeries: Decodable, Identifiable {
     let id: UUID
     let ownerID: UUID?
@@ -736,6 +805,64 @@ final class ATHLTHArenaCloudService: Sendable {
             .limit(100)
             .execute()
             .value
+    }
+
+    func loadClubSeasons() async throws -> [ATHLTHArenaClubSeason] {
+        guard currentUserID != nil else { return [] }
+        return try await client.from("arena_club_seasons")
+            .select()
+            .order("starts_on", ascending: false)
+            .limit(50)
+            .execute().value
+    }
+
+    func loadSeasonStandings(
+        seasonID: UUID
+    ) async throws -> [ATHLTHArenaSeasonStandingsRow] {
+        guard currentUserID != nil else { return [] }
+        return try await client.rpc(
+            "arena_club_season_standings",
+            params: ATHLTHArenaSeasonIDParams(seasonID: seasonID)
+        ).execute().value
+    }
+
+    func loadSeasonSeriesLinks(
+        seasonID: UUID
+    ) async throws -> [ATHLTHArenaSeasonSeriesLink] {
+        guard currentUserID != nil else { return [] }
+        return try await client.from("arena_club_season_series")
+            .select("season_id,series_id")
+            .eq("season_id", value: seasonID)
+            .execute().value
+    }
+
+    func createClubSeason(
+        clubID: UUID, title: String, startsOn: String, endsOn: String
+    ) async throws -> UUID {
+        guard currentUserID != nil else {
+            throw ATHLTHArenaCloudError.signInRequired
+        }
+        return try await client.rpc(
+            "arena_create_club_season",
+            params: ATHLTHArenaCreateSeasonParams(
+                clubID: clubID, title: title,
+                startsOn: startsOn, endsOn: endsOn
+            )
+        ).execute().value
+    }
+
+    func attachSeasonSeries(
+        seasonID: UUID, seriesID: UUID
+    ) async throws {
+        guard currentUserID != nil else {
+            throw ATHLTHArenaCloudError.signInRequired
+        }
+        try await client.rpc(
+            "arena_attach_club_season_series",
+            params: ATHLTHArenaAttachSeasonParams(
+                seasonID: seasonID, seriesID: seriesID
+            )
+        ).execute()
     }
 
     func loadMembers(seriesID: UUID) async throws -> [ATHLTHArenaRemoteMember] {
