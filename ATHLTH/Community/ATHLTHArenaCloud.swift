@@ -96,6 +96,35 @@ struct ATHLTHArenaRelayLeg: Decodable, Identifiable {
     }
 }
 
+/// One voluntarily reported elapsed time for the assigned relay leg.
+/// This is neither GPS evidence nor an independently verified result.
+struct ATHLTHArenaRelayLegReport: Decodable, Identifiable {
+    let slotID: UUID
+    let seriesID: UUID
+    let elapsedSeconds: Double
+    let submittedAt: Date
+    var id: UUID { slotID }
+
+    enum CodingKeys: String, CodingKey {
+        case slotID = "slot_id"
+        case seriesID = "series_id"
+        case elapsedSeconds = "elapsed_seconds"
+        case submittedAt = "submitted_at"
+    }
+}
+
+private struct ATHLTHArenaReportRelayLegParams: Encodable {
+    let seriesID: UUID
+    let slotID: UUID
+    let elapsedSeconds: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case seriesID = "p_series_id"
+        case slotID = "p_slot_id"
+        case elapsedSeconds = "p_elapsed_seconds"
+    }
+}
+
 private struct ATHLTHArenaRelayLineupParams: Encodable {
     let seriesID: UUID
     let routeRoundID: UUID?
@@ -590,6 +619,39 @@ final class ATHLTHArenaCloudService: Sendable {
                 seriesID: seriesID,
                 firstTeamSlots: first,
                 secondTeamSlots: second
+            )
+        ).execute()
+    }
+
+    func loadRelayReports(
+        seriesID: UUID
+    ) async throws -> [ATHLTHArenaRelayLegReport] {
+        try await client
+            .from("arena_relay_leg_reports")
+            .select("slot_id,series_id,elapsed_seconds,submitted_at")
+            .eq("series_id", value: seriesID)
+            .execute().value
+    }
+
+    /// The server checks actor identity, assigned slot and active window.
+    /// Passing nil withdraws an athlete's own report.
+    func reportRelayLeg(
+        seriesID: UUID,
+        slotID: UUID,
+        seconds: Double?
+    ) async throws {
+        guard currentUserID != nil else {
+            throw ATHLTHArenaCloudError.signInRequired
+        }
+        if let seconds, (!seconds.isFinite || !(10...86_400).contains(seconds)) {
+            throw ATHLTHArenaCloudError.signInRequired
+        }
+        try await client.rpc(
+            "arena_report_relay_leg",
+            params: ATHLTHArenaReportRelayLegParams(
+                seriesID: seriesID,
+                slotID: slotID,
+                elapsedSeconds: seconds
             )
         ).execute()
     }
