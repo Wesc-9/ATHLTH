@@ -75,7 +75,7 @@ Audio Coach skal være integrert i alle støttede økter fra planlegging til opp
 
 **Avgrensning:** 2A gir *lokal* duplikatkontroll for utvalgte typer, ikke global exactly-once-garanti på tvers av enheter. Markører inneholder kun type og intervall-/steg-ID, ikke selve talemeldingen eller brukerens helsehistorikk.
 
-### 3. Oppdagbarhet og premiumdesign — STEG 3A KODE IMPLEMENTERT, VERIFISERING GJENSTÅR
+### 3. Oppdagbarhet og premiumdesign — STEG 3A/3B KODE IMPLEMENTERT, VERIFISERING GJENSTÅR
 
 - [x] Audio Coach kan åpnes fra **både enkel og avansert** styrkestart; den er ikke lenger skjult bak Avansert.
 - [x] Ved enkel styrkestart bevares valgt coach-konfigurasjon gjennom lokalt opptak, invitert treningsøkt og iPad-relay, uten automatisk å aktivere øvrige avanserte treningsvalg.
@@ -87,7 +87,13 @@ Audio Coach skal være integrert i alle støttede økter fra planlegging til opp
 - [ ] Manuell QA: enkel styrke, avansert styrke, Watch-start, invitert økt, iPad-relay og eksisterende stemmevalg.
 - [ ] Gjennomført coach-status og samme premiumkontroller i **alle** støttede øktstarter og på Watch; de første skjermene er nå forbedret.
 - [ ] Separat talefrekvens og talestil (balansert, teknisk, motiverende, minimal).
-- [ ] Ettrykks lydpause, status nå, justering og forhåndslytt i aktiv trening; valgt lydutgang må vise faktisk tilgjengelig rute.
+- [x] **Steg 3B:** iPhone live Audio Coach-panel har **Pause tale / Fortsett tale** og **Status nå**. Aktivitetens HealthKit/GPS-registrering, intervallterskler og øvrig varsling endres ikke av en midlertidig talepause.
+- [x] **Steg 3B:** Apple Watch-kontrollsiden har tilsvarende knapper. En manuelt ønsket status kan spilles av direkte på klokken, også når iPhone normalt eier automatiske coachmeldinger.
+- [x] Talepausen er eksplisitt avgrenset til **Audio Coach**: kritiske Route Guardian-/målvarsler og selvstendige Ghost-varsler beholder sine egne lydinnstillinger; haptikk påvirkes ikke.
+- [x] «Status nå» bruker oppdatert øktinformasjon uten å flytte varslingsterskler eller endre øktplan; klokken avviser gammel puls.
+- [x] Automatiske tester for talemute/på, uendrede intervaller og uavhengig kritisk haptikk/lyd.
+- [ ] Fysisk QA av «Status nå» via AirPods/Watch, audio interruptions, Spotify, gjentatt trykk og rute-/Ghost-varsler.
+- [ ] Resten av 3B: systematisk siste coach-beskjed, status i alle aktive økttyper, forhåndslytt fra livevisning, og virkelig lydutgangsrute.
 - [ ] Utvid tilsvarende til styrke, strukturert plan og Watch uten regresjon.
 
 **Omfang:** Innholdsnivåene gjenbruker eksisterende `WatchAudioCoachConfiguration` og krever ingen nye serverfelter eller databaseendringer. Nye avanserte treningsfunksjoner skal ikke aktiveres bare fordi et enkelt coach-nivå er valgt.
@@ -100,7 +106,8 @@ Audio Coach skal være integrert i alle støttede økter fra planlegging til opp
 - [ ] Pulssoneinstruksjoner bare ved valide, ferske sensordata + aktivt mål.
 - [ ] Innendørs tredemølle uten falsk GPS-rute; høydedata bare når støttet.
 - [ ] Bruker skal kunne legge inn coach-mål i en planlagt økt og endre det underveis.
-- [ ] Manuell «Gi meg status nå» iPhone + Watch, samt seneste beskjed.
+- [x] Manuell «Gi meg status nå» for iPhone-registrert løping og Apple Watch-økter.
+- [ ] «Siste coach-beskjed» / replay med riktig historikk og lydutgang.
 
 ### 5. Styrke, pauser og tidsbaserte sett
 
