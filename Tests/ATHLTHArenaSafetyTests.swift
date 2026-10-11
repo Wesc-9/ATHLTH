@@ -174,6 +174,57 @@ final class ATHLTHArenaSafetyTests: XCTestCase {
         XCTAssertTrue(ATHLTHArenaSeasonPresentation.leadingAthletes(rows).isEmpty)
     }
 
+    func testSeasonCompetitionRanksPreserveTiesAndSkipPositions() {
+        let a = ATHLTHArenaSeasonStandingsRow(
+            userID: UUID(), points: 12, competitions: 3
+        )
+        let b = ATHLTHArenaSeasonStandingsRow(
+            userID: UUID(), points: 12, competitions: 2
+        )
+        let c = ATHLTHArenaSeasonStandingsRow(
+            userID: UUID(), points: 8, competitions: 1
+        )
+        let d = ATHLTHArenaSeasonStandingsRow(
+            userID: UUID(), points: 0, competitions: 0
+        )
+        let input = [c, d, b, a]
+        let ordered = ATHLTHArenaSeasonPresentation.orderedStandings(input)
+        XCTAssertEqual(ordered.map(\.points), [12, 12, 8, 0])
+        XCTAssertEqual(ATHLTHArenaSeasonPresentation.competitiveRank(
+            of: a, among: ordered
+        ), 1)
+        XCTAssertEqual(ATHLTHArenaSeasonPresentation.competitiveRank(
+            of: b, among: ordered
+        ), 1)
+        XCTAssertEqual(ATHLTHArenaSeasonPresentation.competitiveRank(
+            of: c, among: ordered
+        ), 3)
+        XCTAssertNil(ATHLTHArenaSeasonPresentation.competitiveRank(
+            of: d, among: ordered
+        ))
+    }
+
+    func testSeasonRankingDoesNotAssignFirstPlaceToInvalidPoints() {
+        let invalid = ATHLTHArenaSeasonStandingsRow(
+            userID: UUID(), points: .nan, competitions: 1
+        )
+        let zero = ATHLTHArenaSeasonStandingsRow(
+            userID: UUID(), points: 0, competitions: 1
+        )
+        let valid = ATHLTHArenaSeasonStandingsRow(
+            userID: UUID(), points: 3, competitions: 1
+        )
+        XCTAssertNil(ATHLTHArenaSeasonPresentation.competitiveRank(
+            of: invalid, among: [invalid, zero, valid]
+        ))
+        XCTAssertNil(ATHLTHArenaSeasonPresentation.competitiveRank(
+            of: zero, among: [invalid, zero, valid]
+        ))
+        XCTAssertEqual(ATHLTHArenaSeasonPresentation.competitiveRank(
+            of: valid, among: [invalid, zero, valid]
+        ), 1)
+    }
+
     func testDeletedChatAuthorHasNoProfileID() throws {
         let payload = """
         {
