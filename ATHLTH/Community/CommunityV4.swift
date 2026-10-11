@@ -1410,19 +1410,6 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
         }
     }
 
-    private var daysRemaining: Int {
-        max(
-            Calendar.current
-                .dateComponents(
-                    [.day],
-                    from: Date(),
-                    to: challenge.endsAt
-                )
-                .day ?? 0,
-            0
-        )
-    }
-
     private var targetText: String {
         challenge.kind
             .targetText(
@@ -1528,14 +1515,15 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
 
                 HStack(alignment: .center, spacing: 10) {
                     if appearance.showMetadata {
-                        Label(
-                            ATHLTHLocalization.format(
-                                english: "%d days left",
-                                norwegian: "%d dager igjen",
-                                daysRemaining
-                            ),
-                            systemImage: "clock.fill"
-                        )
+                        TimelineView(.periodic(from: .now, by: 60)) { context in
+                            Label(
+                                OfficialWeeklyChallengeCountdown.remaining(
+                                    until: challenge.endsAt,
+                                    now: context.date
+                                ),
+                                systemImage: "clock.fill"
+                            )
+                        }
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.white.opacity(0.98))
                         .shadow(color: .black.opacity(0.40), radius: 4, y: 1)
