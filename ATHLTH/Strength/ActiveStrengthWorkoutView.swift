@@ -614,7 +614,8 @@ struct ActiveStrengthWorkoutView: View {
                 norwegian:
                     "Audio Coach er klar for styrkeøkten din.",
                 configuration:
-                    configuration.audioCoach
+                    configuration.audioCoach,
+                cueKind: .workoutStart
             )
         }
     }
@@ -1134,7 +1135,8 @@ struct ActiveStrengthWorkoutView: View {
                 norwegian:
                     "Hvile startet. \(initialRemaining) sekunder.",
                 configuration:
-                    coachConfiguration
+                    coachConfiguration,
+                cueKind: .strengthRest
             )
         }
 
@@ -1172,7 +1174,8 @@ struct ActiveStrengthWorkoutView: View {
                         norwegian:
                             "\(countdownSeconds) sekunder igjen.",
                         configuration:
-                            coachConfiguration
+                            coachConfiguration,
+                        cueKind: .strengthRest
                     )
                 }
 
@@ -1265,7 +1268,8 @@ struct ActiveStrengthWorkoutView: View {
                                             " "
                                     ),
                             configuration:
-                                coachConfiguration
+                                coachConfiguration,
+                            cueKind: .strengthRest
                         )
                     }
                 }
