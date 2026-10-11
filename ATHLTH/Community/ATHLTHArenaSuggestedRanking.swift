@@ -277,6 +277,38 @@ struct ATHLTHArenaTeamStanding: Identifiable, Equatable {
 /// A *draft-only* starting suggestion: balances the number of accepted
 /// athletes, not their ability or predicted outcome. Users can adjust the
 /// choices before the organizer confirms them through the server RPC.
+/// Pure relay draft validation, used by the editor before server-side
+/// checks. Never treats a leg order as evidence of a completed workout.
+enum ATHLTHArenaRelayPlanning {
+    static func isValid(
+        firstTeam: [UUID],
+        secondTeam: [UUID],
+        legOrders: [UUID: Int],
+        routeRoundID: UUID?,
+        availableRouteRoundIDs: Set<UUID>
+    ) -> Bool {
+        guard let routeRoundID,
+              availableRouteRoundIDs.contains(routeRoundID),
+              (2...25).contains(firstTeam.count),
+              firstTeam.count == secondTeam.count else {
+            return false
+        }
+        let combined = firstTeam + secondTeam
+        guard Set(combined).count == combined.count,
+              Set(legOrders.keys) == Set(combined) else {
+            return false
+        }
+        for team in [firstTeam, secondTeam] {
+            let positions = team.compactMap { legOrders[$0] }
+            guard positions.count == team.count,
+                  Set(positions) == Set(1...team.count) else {
+                return false
+            }
+        }
+        return true
+    }
+}
+
 enum ATHLTHArenaTeamBalancer {
     static func suggestedAssignments(
         members: [ATHLTHArenaRemoteMember]
