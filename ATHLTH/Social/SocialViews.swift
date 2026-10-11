@@ -2139,151 +2139,130 @@ struct FriendProfileView: View {
         .contentShape(Rectangle())
     }
 
-    /// A balanced 2-by-2 action grid keeps full Norwegian labels readable
-    /// on compact iPhones. Challenge and Train Together always sit together.
+    /// Ultra-minimal profile actions: one low, four-column icon strip.
+    /// Preserve the full 56pt touch area without visible button backgrounds.
+    /// Challenge and Train Together remain adjacent.
     private func actionBar(
         _ profile: SocialFriendProfile
     ) -> some View {
-        LazyVGrid(
-            columns: [
-                GridItem(.flexible(minimum: 0), spacing: 8),
-                GridItem(.flexible(minimum: 0), spacing: 8)
-            ],
-            spacing: 8
-        ) {
-            mainFollowButton(profile)
+        VStack(spacing: 10) {
+            HStack(spacing: 0) {
+                mainFollowButton(profile)
+                    .frame(maxWidth: .infinity)
 
-            NavigationLink {
-                DirectMessageThreadView(
-                    friend: profile.card
-                )
-            } label: {
-                profileActionLabel(
-                    title: ATHLTHLocalization.choose(
-                        english: "Message",
-                        norwegian: "Melding"
-                    ),
-                    icon: "bubble.left.fill",
-                    tint: ATHLTHTheme.accentDeep,
-                    emphasized: false
-                )
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                if social.mutualFollows.contains(
-                    where: { $0.userID == userID }
-                ) {
-                    showingArenaChoice = true
-                } else {
-                    followActionError = ATHLTHLocalization.choose(
-                        english: "Follow each other before sending a challenge.",
-                        norwegian: "Dere må følge hverandre før du kan sende en utfordring."
+                NavigationLink {
+                    DirectMessageThreadView(
+                        friend: profile.card
+                    )
+                } label: {
+                    profileActionLabel(
+                        title: ATHLTHLocalization.choose(
+                            english: "Message",
+                            norwegian: "Melding"
+                        ),
+                        icon: "bubble.left",
+                        tint: ATHLTHTheme.accentDeep,
+                        emphasized: false
                     )
                 }
-            } label: {
-                profileActionLabel(
-                    title: ATHLTHLocalization.choose(
-                        english: "Challenge",
-                        norwegian: "Utfordre"
-                    ),
-                    icon: "trophy.fill",
-                    tint: ATHLTHTheme.premiumGold,
-                    emphasized: false
-                )
-            }
-            .buttonStyle(.plain)
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
 
-            Button {
-                if social.mutualFollows.contains(
-                    where: { $0.userID == userID }
-                ) {
-                    showingTrainingEditor = true
-                } else {
-                    followActionError = ATHLTHLocalization.choose(
-                        english: "Follow each other before sending a workout invitation.",
-                        norwegian: "Dere må følge hverandre før du kan sende en treningsinvitasjon."
+                Button {
+                    if social.mutualFollows.contains(
+                        where: { $0.userID == userID }
+                    ) {
+                        showingArenaChoice = true
+                    } else {
+                        followActionError = ATHLTHLocalization.choose(
+                            english: "Follow each other before sending a challenge.",
+                            norwegian: "Dere må følge hverandre før du kan sende en utfordring."
+                        )
+                    }
+                } label: {
+                    profileActionLabel(
+                        title: ATHLTHLocalization.choose(
+                            english: "Challenge",
+                            norwegian: "Utfordre"
+                        ),
+                        icon: "trophy",
+                        tint: ATHLTHTheme.accentDeep,
+                        emphasized: false
                     )
                 }
-            } label: {
-                profileActionLabel(
-                    title: ATHLTHLocalization.choose(
-                        english: "Train Together",
-                        norwegian: "Tren sammen"
-                    ),
-                    icon: "figure.run",
-                    tint: ATHLTHTheme.vitality,
-                    emphasized: false
-                )
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+
+                Button {
+                    if social.mutualFollows.contains(
+                        where: { $0.userID == userID }
+                    ) {
+                        showingTrainingEditor = true
+                    } else {
+                        followActionError = ATHLTHLocalization.choose(
+                            english: "Follow each other before sending a workout invitation.",
+                            norwegian: "Dere må følge hverandre før du kan sende en treningsinvitasjon."
+                        )
+                    }
+                } label: {
+                    profileActionLabel(
+                        title: ATHLTHLocalization.choose(
+                            english: "Train Together",
+                            norwegian: "Tren sammen"
+                        ),
+                        icon: "figure.run",
+                        tint: ATHLTHTheme.accentDeep,
+                        emphasized: false
+                    )
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity)
+
+            Rectangle()
+                .fill(ATHLTHTheme.accentDeep.opacity(0.10))
+                .frame(height: 0.5)
+                .padding(.horizontal, 6)
+                .accessibilityHidden(true)
         }
+        .padding(.top, 1)
+        .padding(.bottom, 1)
     }
 
+    /// A readable small caption sits below a restrained icon. The invisible
+    /// hit region stays comfortable even on narrow phones and with VoiceOver.
     private func profileActionLabel(
         title: String,
         icon: String,
         tint: Color,
         emphasized: Bool
     ) -> some View {
-        HStack(spacing: 7) {
+        VStack(spacing: 5) {
             Image(systemName: icon)
-                .font(
-                    .system(
-                        size: 15,
-                        weight: .semibold
-                    )
+                .font(.system(size: 20, weight: .medium))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(
+                    emphasized ? ATHLTHTheme.accentDeep : tint
                 )
-                .foregroundStyle(emphasized ? Color.white : tint)
+                .frame(height: 25)
 
             Text(title)
-                .font(
-                    .system(
-                        size: 12,
-                        weight: .semibold
-                    )
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(
+                    emphasized
+                        ? ATHLTHTheme.primaryText
+                        : ATHLTHTheme.mutedText
                 )
                 .lineLimit(1)
-                .minimumScaleFactor(0.80)
+                .minimumScaleFactor(0.76)
+                .frame(maxWidth: .infinity)
         }
-        .foregroundStyle(
-            emphasized
-                ? Color.white
-                : ATHLTHTheme
-                    .primaryText
-        )
         .frame(maxWidth: .infinity)
-        .frame(height: 49)
-        .background(
-            emphasized
-                ? ATHLTHTheme
-                    .accentDeep
-                : Color.white
-                    .opacity(0.90),
-            in: RoundedRectangle(
-                cornerRadius: 17,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 17,
-                style: .continuous
-            )
-            .stroke(
-                emphasized
-                    ? Color.white
-                        .opacity(0.10)
-                    : tint.opacity(0.14),
-                lineWidth: 0.8
-            )
-        }
-        .shadow(
-            color:
-                Color.black.opacity(0.035),
-            radius: 8,
-            y: 3
-        )
+        .frame(minHeight: 56)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title)
     }
 
     @ViewBuilder
@@ -2317,73 +2296,22 @@ struct FriendProfileView: View {
                         followActionInProgress = false
                     }
                 } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Unfollow",
-                            norwegian: "Slutt å følge"
-                        ),
-                        systemImage: "person.fill.xmark"
-                    )
-                }
-            } label: {
-                HStack(spacing: 7) {
-                    Image(systemName: "person.crop.circle.badge.checkmark")
-                        .font(
-                            .system(
-                                size: 16,
-                                weight: .semibold
-                            )
-                        )
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Following",
-                            norwegian: "Følger"
-                        )
-                    )
-                    .font(
-                        .system(
-                            size: 12,
-                            weight: .semibold
-                        )
-                    )
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.76)
-
-                    Image(systemName: "chevron.down")
-                        .font(
-                            .system(
-                                size: 9,
-                                weight: .bold
-                            )
-                        )
-                }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 49)
-                .background(
-                    ATHLTHTheme.accentDeep,
-                    in: RoundedRectangle(
-                        cornerRadius: 17,
-                        style: .continuous
-                    )
-                )
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: 17,
-                        style: .continuous
-                    )
-                    .stroke(
-                        Color.white.opacity(0.10),
-                        lineWidth: 0.8
-                    )
-                }
-                .shadow(
-                    color: Color.black.opacity(0.035),
-                    radius: 8,
-                    y: 3
+                profileActionLabel(
+                    title: ATHLTHLocalization.choose(
+                        english: "Following",
+                        norwegian: "Følger"
+                    ),
+                    icon: "person.crop.circle.badge.checkmark",
+                    tint: ATHLTHTheme.accentDeep,
+                    emphasized: true
                 )
             }
+            .accessibilityHint(
+                ATHLTHLocalization.choose(
+                    english: "Opens follow options",
+                    norwegian: "Åpner valg for å slutte å følge"
+                )
+            )
             .disabled(followActionInProgress)
         } else if relationship == .outgoingPending {
             profileActionLabel(
