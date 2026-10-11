@@ -5278,6 +5278,11 @@ struct SessionEditorView: View {
             .sheet(isPresented: $showingSavedWorkoutPicker) {
                 PlanWorkoutPickerView { workout in
                     applySavedWorkout(workout)
+                    // A template supplies the structure, not the new session name.
+                    // The athlete must explicitly name any newly planned session.
+                    if existingWorkout == nil {
+                        title = ""
+                    }
                     showingSavedWorkoutPicker = false
                 }
             }
