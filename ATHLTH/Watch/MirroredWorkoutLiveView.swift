@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 struct MirroredWorkoutLiveView: View {
     @EnvironmentObject private var mirroring: WorkoutMirroringStore
@@ -8,6 +9,7 @@ struct MirroredWorkoutLiveView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var showingTreadmillInclineEditor = false
     @State private var treadmillInclineDraft = 0.0
+    @State private var coachOutputName: String?
 
     var body: some View {
         NavigationStack {
@@ -90,6 +92,10 @@ struct MirroredWorkoutLiveView: View {
                                     )
                                 }
                             }
+                        }
+
+                        if mirroring.mirroredIPhoneCoachAvailable {
+                            mirroredAudioCoachCard
                         }
 
                         if let liveSession =
@@ -290,7 +296,17 @@ struct MirroredWorkoutLiveView: View {
         }
         .onAppear {
             mirroring.liveViewDidAppear()
+            coachOutputName = AVAudioSession.sharedInstance()
+                .currentRoute.outputs.first?.portName
             updateScreenAwakeState()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: AVAudioSession.routeChangeNotification
+            )
+        ) { _ in
+            coachOutputName = AVAudioSession.sharedInstance()
+                .currentRoute.outputs.first?.portName
         }
         .onDisappear {
             mirroring.liveViewDidDisappear()
@@ -310,6 +326,83 @@ struct MirroredWorkoutLiveView: View {
             of: scenePhase
         ) { _, _ in
             updateScreenAwakeState()
+        }
+    }
+
+    private var mirroredAudioCoachCard: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    Image(systemName: "waveform.circle.fill")
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .font(.title2)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Audio Coach")
+                            .font(.subheadline.weight(.semibold))
+                        Text(
+                            mirroring.isIPhoneCoachVoiceOwner
+                                ? ATHLTHLocalization.choose(
+                                    english: "Voice on iPhone",
+                                    norwegian: "Tale på iPhone"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Voice on Apple Watch",
+                                    norwegian: "Tale på Apple Watch"
+                                )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    Spacer(minLength: 4)
+
+                    if mirroring.isIPhoneCoachVoiceOwner {
+                        ATHLTHAudioRouteControl(compact: true)
+                    }
+                }
+
+                if mirroring.isIPhoneCoachVoiceOwner {
+                    HStack(spacing: 6) {
+                        Image(systemName: "speaker.wave.2")
+                        Text(coachOutputName ??
+                            ATHLTHLocalization.choose(
+                                english: "System audio output",
+                                norwegian: "Systemets lydutgang"
+                            )
+                        )
+                        .lineLimit(1)
+                    }
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                Text(mirroring.lastCoachMessage ??
+                    ATHLTHLocalization.choose(
+                        english: "No iPhone coach message yet",
+                        norwegian: "Ingen coachbeskjed på iPhone ennå"
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .lineLimit(2)
+
+                TimelineView(.periodic(from: .now, by: 5)) { _ in
+                    Button {
+                        mirroring.replayMirroredCoachMessage()
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Listen again on iPhone",
+                                norwegian: "Hør igjen på iPhone"
+                            ),
+                            systemImage: "arrow.counterclockwise"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 40)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!mirroring.canReplayMirroredCoachMessage)
+                }
+            }
         }
     }
 
