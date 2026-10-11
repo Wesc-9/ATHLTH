@@ -4585,6 +4585,7 @@ struct SessionEditorView: View {
     /// for Train Together without creating a separate calendar entry.
     let onPreparedWorkout: ((PlannedSession) -> Void)?
     let initialSourceWorkout: PlannedSession?
+    let preserveSourceID: Bool
 
     @State private var hasSelectedWorkoutSource = false
     @State private var title = ""
@@ -4667,6 +4668,7 @@ struct SessionEditorView: View {
         self.isStandalone = false
         self.onPreparedWorkout = nil
         self.initialSourceWorkout = nil
+        self.preserveSourceID = false
     }
 
     init(
@@ -4679,11 +4681,13 @@ struct SessionEditorView: View {
         self.isStandalone = false
         self.onPreparedWorkout = nil
         self.initialSourceWorkout = nil
+        self.preserveSourceID = false
     }
 
     init(
         standaloneDate: Date,
         initialSourceWorkout: PlannedSession? = nil,
+        preserveSourceID: Bool = false,
         onPreparedWorkout: ((PlannedSession) -> Void)? = nil
     ) {
         self.dayID = nil
@@ -4692,6 +4696,7 @@ struct SessionEditorView: View {
         self.isStandalone = true
         self.onPreparedWorkout = onPreparedWorkout
         self.initialSourceWorkout = initialSourceWorkout
+        self.preserveSourceID = preserveSourceID
 
         let calendar =
             Calendar.current
@@ -4743,6 +4748,7 @@ struct SessionEditorView: View {
         self.isStandalone = false
         self.onPreparedWorkout = nil
         self.initialSourceWorkout = nil
+        self.preserveSourceID = false
         _hasSelectedWorkoutSource = State(initialValue: true)
 
         _title = State(initialValue: workout.title)
@@ -5435,7 +5441,7 @@ struct SessionEditorView: View {
                 if isStandalone && existingWorkout == nil {
                     if !existingDraft, let initialSourceWorkout {
                         applySavedWorkout(initialSourceWorkout)
-                        title = ""
+                        if !preserveSourceID { title = "" }
                     }
                     hasSelectedWorkoutSource = existingDraft ||
                         initialSourceWorkout != nil
@@ -8371,7 +8377,8 @@ struct SessionEditorView: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         return PlannedSession(
-            id: existingWorkout?.id ?? UUID(),
+            id: existingWorkout?.id ??
+                (preserveSourceID ? initialSourceWorkout?.id ?? UUID() : UUID()),
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
             kind: kind,
             scheduledStart:
@@ -8569,7 +8576,9 @@ struct SessionEditorView: View {
     private var draftStorageKey: String {
         let context: String
         if onPreparedWorkout != nil {
-            context = "together.marketplace"
+            context = preserveSourceID
+                ? "together.proposal.\(initialSourceWorkout?.id.uuidString ?? "new")"
+                : "together.marketplace"
         } else if let workout = existingWorkout {
             context = "edit.\(workout.id.uuidString)"
         } else if isStandalone {
