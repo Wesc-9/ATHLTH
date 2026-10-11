@@ -300,6 +300,32 @@ private struct ATHLTHLiveWorkoutLocationWrite: Encodable {
 }
 
 
+/// Prevents duplicate iPhone/Apple Watch completion events from racing
+/// to submit the same Live Ghost result. The database remains authoritative.
+struct ATHLTHLiveGhostFinishGate {
+    private var inFlight: Set<UUID> = []
+    private var submitted: Set<UUID> = []
+
+    mutating func begin(challengeID: UUID, seconds: TimeInterval) -> Bool {
+        guard seconds.isFinite,
+              (5...86_400).contains(seconds),
+              !inFlight.contains(challengeID),
+              !submitted.contains(challengeID)
+        else {
+            return false
+        }
+        inFlight.insert(challengeID)
+        return true
+    }
+
+    mutating func end(challengeID: UUID, succeeded: Bool) {
+        inFlight.remove(challengeID)
+        if succeeded {
+            submitted.insert(challengeID)
+        }
+    }
+}
+
 private struct BeginGhostLiveSessionParams: Encodable {
     let challengeID: UUID
 
@@ -313,6 +339,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
     @Published private(set) var onlineUserIDs: Set<UUID> = []
     @Published private(set) var visibleLiveSessions: [ATHLTHLiveWorkoutSession] = []
     @Published private(set) var currentSession: ATHLTHLiveWorkoutSession?
+    private var liveGhostFinishGate = ATHLTHLiveGhostFinishGate()
     @Published private(set) var liveLocations: [ATHLTHLiveWorkoutLocation] = []
     // Viewer-only trail. Nothing here is persisted; it is rebuilt from fresh
     // latest-position samples while the live map is open.
@@ -1522,11 +1549,23 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
     ) async {
         guard
             let session = currentSession,
-            let challengeID =
-                session.ghostChallengeID,
-            let currentUserID
+            session.isActive,
+            let challengeID = session.ghostChallengeID,
+            let currentUserID,
+            liveGhostFinishGate.begin(
+                challengeID: challengeID,
+                seconds: elapsedSeconds
+            )
         else {
             return
+        }
+
+        var succeeded = false
+        defer {
+            liveGhostFinishGate.end(
+                challengeID: challengeID,
+                succeeded: succeeded
+            )
         }
 
         struct FinishWrite: Encodable {
@@ -1575,6 +1614,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                         currentUserID
                 )
                 .execute()
+            succeeded = true
         } catch is CancellationError {
             return
         } catch {
