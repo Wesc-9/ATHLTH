@@ -190,12 +190,22 @@ struct ATHLTHArenaEntryCard: View {
     }
 }
 
+private enum ATHLTHArenaCreationMode: String, Identifiable {
+    case challenge
+    case route
+    case distance
+    case strength
+    case series
+
+    var id: String { rawValue }
+}
+
 struct ATHLTHArenaHomeView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
 
     @State private var drafts: [ATHLTHArenaCompetitionDraft] = []
-    @State private var showingCreate = false
+    @State private var creationMode: ATHLTHArenaCreationMode?
     @State private var pendingDelete: UUID?
     @State private var remoteRevision = UUID()
 
@@ -203,6 +213,7 @@ struct ATHLTHArenaHomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 introduction
+                quickStart
 
                 ATHLTHArenaOnlineSection()
                     .id(remoteRevision)
@@ -302,8 +313,8 @@ struct ATHLTHArenaHomeView: View {
                 }
 
                 Text(ATHLTHLocalization.choose(
-                    english: "Drafts are saved only on this device. Invites, shared approvals and verified scoring will be enabled in the multiplayer phase.",
-                    norwegian: "Utkast lagres foreløpig bare på denne enheten. Invitasjoner, felles godkjenning og verifiserte poeng kobles på i flerspillerfasen."
+                    english: "Drafts stay on this device until you publish. Publishing sends invitations and opens a shared lobby. Results are approved by the participants.",
+                    norwegian: "Utkast lagres på denne enheten til du publiserer. Publisering sender invitasjoner og åpner en felles lobby. Resultatene godkjennes av deltakerne."
                 ))
                 .font(.footnote)
                 .foregroundStyle(ATHLTHTheme.mutedText)
@@ -319,12 +330,23 @@ struct ATHLTHArenaHomeView: View {
         .task(id: session.profile.userID) {
             drafts = ATHLTHArenaDraftStorage.load(for: session.profile.userID)
         }
-        .sheet(isPresented: $showingCreate) {
-            ATHLTHArenaCreateView(
-                ownerID: session.profile.userID,
-                friends: social.mutualFollows,
-                onCreate: upsert
-            )
+        .sheet(item: $creationMode) { mode in
+            switch mode {
+            case .challenge:
+                ChallengeCreationView()
+            case .route:
+                ATHLTHArenaRouteStarter()
+            case .distance:
+                ATHLTHArenaDistanceStarter()
+            case .strength:
+                ChallengeCreationView(preselectedSport: .strength)
+            case .series:
+                ATHLTHArenaCreateView(
+                    ownerID: session.profile.userID,
+                    friends: social.mutualFollows,
+                    onCreate: upsert
+                )
+            }
         }
         .confirmationDialog(
             ATHLTHLocalization.choose(
@@ -390,46 +412,143 @@ struct ATHLTHArenaHomeView: View {
     }
 
     private var introduction: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            HStack(spacing: 10) {
-                Image(systemName: "trophy.fill")
-                    .font(.system(size: 30, weight: .light))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("ATHLTH ARENA")
-                        .font(.caption.weight(.heavy))
-                        .tracking(2)
-                    Text(ATHLTHLocalization.choose(
-                        english: "Compete together",
-                        norwegian: "Utfordre hverandre"
-                    ))
-                    .font(.title2.weight(.bold))
-                }
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Label("ATHLTH ARENA", systemImage: "trophy.fill")
+                    .font(.caption.weight(.bold))
+                    .tracking(1.2)
                 Spacer()
+                Text("2.0")
+                    .font(.caption2.weight(.bold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(.white.opacity(0.13), in: Capsule())
             }
-            .foregroundStyle(ATHLTHTheme.primaryText)
+            .foregroundStyle(.white.opacity(0.88))
 
             Text(ATHLTHLocalization.choose(
-                english: "Create a series for two people, friends or a Club. Add several rounds and agree on the rules before competing.",
-                norwegian: "Lag en serie for to personer, venner eller en Club. Legg til flere runder og bli enige om reglene før dere konkurrerer."
+                english: "Make every session a challenge.",
+                norwegian: "Gjør hver økt til en utfordring."
+            ))
+            .font(.system(size: 29, weight: .bold, design: .rounded))
+            .foregroundStyle(.white)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Text(ATHLTHLocalization.choose(
+                english: "Build routes, challenge friends and compete across multiple rounds.",
+                norwegian: "Lag ruter, utfordre venner og konkurrer over flere runder."
             ))
             .font(.subheadline)
-            .foregroundStyle(ATHLTHTheme.mutedText)
+            .foregroundStyle(.white.opacity(0.84))
+            .fixedSize(horizontal: false, vertical: true)
 
             Button {
-                showingCreate = true
+                creationMode = .challenge
             } label: {
-                Label(ATHLTHLocalization.choose(
-                    english: "Create competition series",
-                    norwegian: "Opprett konkurranseserie"
-                ), systemImage: "plus.circle.fill")
+                HStack(spacing: 10) {
+                    Image(systemName: "plus.circle.fill")
+                    Text(ATHLTHLocalization.choose(
+                        english: "New challenge",
+                        norwegian: "Ny utfordring"
+                    ))
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                }
                 .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity, minHeight: 48)
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .padding(.horizontal, 16)
+                .frame(minHeight: 48)
+                .background(.white.opacity(0.95), in: RoundedRectangle(cornerRadius: 15))
             }
-            .buttonStyle(.borderedProminent)
-            .tint(ATHLTHTheme.accentDeep)
+            .buttonStyle(.plain)
         }
-        .padding(20)
-        .background(ATHLTHArenaLightStyle.card(24))
+        .padding(21)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [ATHLTHTheme.accentDeep, ATHLTHTheme.vitality],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 25, style: .continuous)
+        )
+        .accessibilityElement(children: .contain)
+    }
+
+    private var quickStart: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack {
+                Text(ATHLTHLocalization.choose(
+                    english: "Choose your competition",
+                    norwegian: "Velg konkurranse"
+                ))
+                .font(.headline)
+                Spacer()
+                Text(ATHLTHLocalization.choose(english: "Quick start", norwegian: "Hurtigstart"))
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                Button { creationMode = .route } label: {
+                    quickStartCard(
+                        title: ATHLTHLocalization.choose(english: "Route", norwegian: "Rute"),
+                        detail: ATHLTHLocalization.choose(english: "Choose or create a route", norwegian: "Velg eller lag en rute"),
+                        icon: "point.topleft.down.to.point.bottomright.curvepath"
+                    )
+                }
+                Button { creationMode = .distance } label: {
+                    quickStartCard(
+                        title: ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse"),
+                        detail: ATHLTHLocalization.choose(english: "Set your own length", norwegian: "Velg din egen lengde"),
+                        icon: "timer"
+                    )
+                }
+                Button { creationMode = .strength } label: {
+                    quickStartCard(
+                        title: ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke"),
+                        detail: ATHLTHLocalization.choose(english: "Weight, reps or volume", norwegian: "Vekt, reps eller volum"),
+                        icon: "dumbbell.fill"
+                    )
+                }
+                Button { creationMode = .series } label: {
+                    quickStartCard(
+                        title: ATHLTHLocalization.choose(english: "Competition series", norwegian: "Konkurranseserie"),
+                        detail: ATHLTHLocalization.choose(english: "Multiple rounds and points", norwegian: "Flere runder og poeng"),
+                        icon: "trophy.fill"
+                    )
+                }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func quickStartCard(title: String, detail: String, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                Image(systemName: icon)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 37, height: 37)
+                    .background(ATHLTHTheme.vitalitySoft.opacity(0.68), in: Circle())
+                Spacer()
+                Image(systemName: "arrow.up.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+            Text(title)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+            Text(detail)
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, minHeight: 116, alignment: .topLeading)
+        .padding(13)
+        .background(ATHLTHArenaLightStyle.card(19))
+        .accessibilityElement(children: .combine)
     }
 
     private func draftRow(_ draft: ATHLTHArenaCompetitionDraft) -> some View {
@@ -468,6 +587,144 @@ struct ATHLTHArenaHomeView: View {
 }
 
 // MARK: - Creating a series
+
+/// Reuses the established Challenge engine, including invitations and GPS rules.
+private struct ATHLTHArenaRouteStarter: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedRoute: TrainingRoute?
+    @State private var showingChallenge = false
+
+    var body: some View {
+        NavigationStack {
+            SavedRoutesView(
+                selectionTitle: ATHLTHLocalization.choose(
+                    english: "Choose a competition route",
+                    norwegian: "Velg konkurranserute"
+                ),
+                onSelect: { route in
+                    selectedRoute = route
+                    showingChallenge = true
+                }
+            )
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Close", norwegian: "Lukk")) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingChallenge) {
+            if let selectedRoute {
+                ChallengeCreationView(preselectedRouteID: selectedRoute.id)
+            }
+        }
+    }
+}
+
+/// Only configures the requested distance; Challenge owns scoring and validation.
+private struct ATHLTHArenaDistanceStarter: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var distanceText = "5"
+    @State private var showingChallenge = false
+
+    private var distanceKilometers: Double? {
+        guard let distance = Double(
+            distanceText.trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: ",", with: ".")
+        ), distance.isFinite, (0.1...500).contains(distance) else {
+            return nil
+        }
+        return distance
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 18) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Choose any distance",
+                        norwegian: "Bestem distansen selv"
+                    ),
+                    systemImage: "figure.run"
+                )
+                .font(.title2.weight(.bold))
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Compete on any route over the chosen distance.",
+                    norwegian: "Konkurrer hvor som helst på distansen du bestemmer."
+                ))
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+
+                HStack(spacing: 8) {
+                    ForEach([1.0, 3.0, 5.0, 10.0], id: \.self) { km in
+                        Button("\(Int(km)) km") {
+                            distanceText = String(Int(km))
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(ATHLTHTheme.accentDeep)
+                    }
+                }
+
+                HStack(spacing: 10) {
+                    TextField(
+                        ATHLTHLocalization.choose(english: "Kilometers", norwegian: "Kilometer"),
+                        text: $distanceText
+                    )
+                    .keyboardType(.decimalPad)
+                    .font(.title2.weight(.semibold))
+                    .padding(13)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 14))
+                    Text("km")
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                if distanceKilometers == nil {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Enter a distance between 0.1 and 500 km.",
+                        norwegian: "Angi en distanse fra 0,1 til 500 km."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                }
+                Button {
+                    showingChallenge = true
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Continue to challenge",
+                            norwegian: "Fortsett til utfordring"
+                        ),
+                        systemImage: "arrow.right"
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accentDeep)
+                .disabled(distanceKilometers == nil)
+                Spacer()
+            }
+            .padding(20)
+            .background(ATHLTHArenaLightStyle.canvasBackground)
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Distance challenge", norwegian: "Distanseutfordring"
+            ))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Close", norwegian: "Lukk")) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingChallenge) {
+            if let distanceKilometers {
+                ChallengeCreationView(preselectedDistanceKm: distanceKilometers)
+            }
+        }
+    }
+}
 
 struct ATHLTHArenaCreateView: View {
     @Environment(\.dismiss) private var dismiss
