@@ -137,6 +137,7 @@ struct ATHLTHArenaOnlineDetailView: View {
     @State private var members: [ATHLTHArenaRemoteMember] = []
     @State private var rounds: [ATHLTHArenaRemoteProposal] = []
     @State private var approvals: [ATHLTHArenaRemoteApproval] = []
+    @State private var sharedWorkoutEvidence: [ATHLTHArenaWorkoutEvidence] = []
     @State private var loading = false
     @State private var writing = false
     @State private var message: String?
@@ -787,6 +788,20 @@ struct ATHLTHArenaOnlineDetailView: View {
             acceptedIDs.isSubset(of: approvedIDs)
         let alreadyVoted = approvedIDs.contains(session.profile.userID)
 
+        // The comparison uses a reported time for this exact round, not
+        // a competitor's private GPS trace or a server-verified result.
+        let rivalSeconds = sharedWorkoutEvidence
+            .filter {
+                $0.roundID == round.id &&
+                $0.userID != session.profile.userID &&
+                $0.metricType == "elapsed_seconds" &&
+                $0.reportedRouteMatchPercent != nil &&
+                $0.metricValue.isFinite &&
+                (60...86_400).contains($0.metricValue)
+            }
+            .map(\.metricValue)
+            .min()
+
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Image(systemName: "flag.checkered")
@@ -820,24 +835,42 @@ struct ATHLTHArenaOnlineDetailView: View {
                     NavigationLink {
                         TargetGhostSetupView(
                             route: route,
-                            challengeTitle: currentSeries.title
+                            challengeTitle: currentSeries.title,
+                            suggestedDurationSeconds: rivalSeconds
                         )
                     } label: {
                         HStack(spacing: 9) {
                             Image(systemName: "figure.run.circle.fill")
                                 .font(.title3)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(ATHLTHLocalization.choose(
-                                    english: "Train with a target Ghost",
-                                    norwegian: "Tren med mål-Ghost"
-                                ))
+                                Text(rivalSeconds == nil
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Train with a target Ghost",
+                                        norwegian: "Tren med mål-Ghost"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Chase a shared rival time",
+                                        norwegian: "Jakt på en delt rivaltid"
+                                    ))
                                 .font(.subheadline.weight(.semibold))
-                                Text(ATHLTHLocalization.choose(
-                                    english: "Choose a pace or finish time on this route.",
-                                    norwegian: "Velg tempo eller sluttid på denne ruten."
-                                ))
-                                .font(.caption)
-                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                if let rivalSeconds {
+                                    Text(
+                                        GhostTargetTimeFormatter.string(rivalSeconds) + " · " +
+                                        ATHLTHLocalization.choose(
+                                            english: "Reported time, awaiting group approval",
+                                            norwegian: "Oppgitt tid, avventer gruppegodkjenning"
+                                        )
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                } else {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Choose a pace or finish time on this route.",
+                                        norwegian: "Velg tempo eller sluttid på denne ruten."
+                                    ))
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                }
                             }
                             Spacer()
                             Image(systemName: "arrow.right")
@@ -932,6 +965,14 @@ struct ATHLTHArenaOnlineDetailView: View {
             members = memberRows
             rounds = roundRows
             approvals = approvalRows
+            if memberRows.contains(where: {
+                $0.userID == session.profile.userID && $0.response == "accepted"
+            }) {
+                sharedWorkoutEvidence =
+                    (try? await cloud.loadWorkoutEvidence(seriesID: series.id)) ?? []
+            } else {
+                sharedWorkoutEvidence = []
+            }
             remoteRevision = UUID()
             message = nil
         } catch {
