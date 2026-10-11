@@ -14,6 +14,19 @@ enum LiveGhostRaceRoomStatus:
     case cancelled
 }
 
+/// An invitation's expiry prevents *new* duels, but must not eject
+/// athletes from a countdown or a race that was already started.
+enum LiveGhostRaceReentry {
+    static func allowed(
+        expiresAt: Date,
+        roomStatus: LiveGhostRaceRoomStatus?,
+        now: Date = Date()
+    ) -> Bool {
+        if expiresAt > now { return true }
+        return roomStatus == .countdown || roomStatus == .racing
+    }
+}
+
 enum LiveGhostRacePhase:
     Equatable
 {
@@ -305,25 +318,45 @@ final class LiveGhostRaceStore:
         challenge:
             GhostFriendRaceChallengeRecord
     ) async {
-        guard challenge.status ==
-                .accepted,
-              challenge.expiresAt >
-                Date(),
-              let userID =
-                currentUserID,
-              userID ==
-                challenge.senderID ||
-              userID ==
-                challenge.recipientID
+        guard challenge.status == .accepted,
+              let userID = currentUserID,
+              userID == challenge.senderID ||
+                userID == challenge.recipientID
         else {
-            errorMessage =
-                ATHLTHLocalization.choose(
-                    english:
-                        "This Live Ghost room is no longer available.",
-                    norwegian:
-                        "Dette Live Ghost-rommet er ikke lenger tilgjengelig."
-                )
+            errorMessage = ATHLTHLocalization.choose(
+                english: "This Live Ghost room is no longer available.",
+                norwegian: "Dette Live Ghost-rommet er ikke lenger tilgjengelig."
+            )
             return
+        }
+
+        // Invitation expiry is a creation deadline, not a forced stop for
+        // a synchronized duel already in countdown or racing. Check the
+        // authoritative room on the server before allowing late reentry;
+        // absent, finished or cancelled rooms are never reopened by expiry.
+        if challenge.expiresAt <= Date() {
+            do {
+                let currentRooms: [LiveGhostRaceRoomRecord] =
+                    try await client
+                        .from("live_ghost_race_rooms")
+                        .select()
+                        .eq("challenge_id", value: challenge.id)
+                        .limit(1)
+                        .execute().value
+                guard LiveGhostRaceReentry.allowed(
+                    expiresAt: challenge.expiresAt,
+                    roomStatus: currentRooms.first?.status
+                ) else {
+                    errorMessage = ATHLTHLocalization.choose(
+                        english: "This Live Ghost invitation expired before the race started.",
+                        norwegian: "Invitasjonen til Live Ghost utløp før løpet startet."
+                    )
+                    return
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+                return
+            }
         }
 
         activeChallengeID =
