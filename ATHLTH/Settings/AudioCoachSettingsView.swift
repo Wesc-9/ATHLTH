@@ -65,7 +65,8 @@ private final class ATHLTHAudioCoachPreviewSpeaker:
         voiceIdentifier: String?,
         speechRate: Double,
         speechVolume: Double,
-        duckOtherAudio: Bool
+        duckOtherAudio: Bool,
+        speechStyle: ATHLTHCoachSpeechStyle
     ) {
         synthesizer.stopSpeaking(
             at: .immediate
@@ -108,13 +109,18 @@ private final class ATHLTHAudioCoachPreviewSpeaker:
                 code == "no"
         }
 
-        let utterance =
-            AVSpeechUtterance(
-                string:
-                    useNorwegian
-                        ? "Audio Coach er klar. Ha en god økt."
-                        : "Audio Coach is ready. Have a great workout."
-            )
+        // Sample data only: preview exactly how the chosen wording
+        // sounds without reading personal HealthKit workout measurements.
+        let sample = useNorwegian
+            ? "Distanse 2 kilometer. Tid 12 minutter."
+            : "Distance 2 kilometers. Time 12 minutes."
+        let preview = speechStyle.render(
+            sample,
+            language: language,
+            priority: .routineCoach,
+            eventKind: .routineMilestone
+        )
+        let utterance = AVSpeechUtterance(string: preview)
 
         if let voiceIdentifier,
            let selectedVoice =
@@ -563,7 +569,10 @@ struct ATHLTHAudioCoachSettingsView: View {
                                         .audioCoachSpeechVolume,
                                 duckOtherAudio:
                                     settings
-                                        .audioCoachDuckOtherAudio
+                                        .audioCoachDuckOtherAudio,
+                                speechStyle:
+                                    settings
+                                        .audioCoachSpeechStyle
                             )
                     } label: {
                         HStack(spacing: 10) {
@@ -579,9 +588,9 @@ struct ATHLTHAudioCoachSettingsView: View {
                             Text(
                                 ATHLTHLocalization.choose(
                                     english:
-                                        "Play test voice",
+                                        "Preview voice & style",
                                     norwegian:
-                                        "Spill av teststemme"
+                                        "Forhåndslytt på stemme og talemåte"
                                 )
                             )
                             .foregroundStyle(
