@@ -3664,7 +3664,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             priority: .structuredStep,
             event: ATHLTHCoachEvent(
                 kind: .runningStep,
-                key: "\(structuredStepIndex)-\(prefix)",
+                // Shared with the mirrored iPhone cue key for this step.
+                key: String(structuredStepIndex),
                 priority: .structuredStep,
                 validFor: 15
             )
