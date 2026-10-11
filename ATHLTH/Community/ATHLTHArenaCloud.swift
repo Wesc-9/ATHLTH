@@ -12,7 +12,8 @@ struct ATHLTHArenaClubSeason: Decodable, Identifiable {
     let title: String
     let startsOn: String
     let endsOn: String
-    let createdBy: UUID
+    /// A deleted creator is anonymized server-side; season results remain.
+    let createdBy: UUID?
 
     enum CodingKeys: String, CodingKey {
         case id, title
