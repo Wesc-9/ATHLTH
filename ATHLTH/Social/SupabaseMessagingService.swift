@@ -106,6 +106,23 @@ final class SupabaseMessagingService: Sendable {
             .value
     }
 
+    /// Fetch the complete visible invitation conversation for one planned
+    /// session. This intentionally queries by source ID instead of relying
+    /// on the general inbox's limited recent-message cache.
+    func loadPlannedWorkoutInvitationMessages(
+        sourceWorkoutID: UUID
+    ) async throws -> [DirectMessageRecord] {
+        try await client
+            .from("direct_messages")
+            .select()
+            .eq("source_object_id", value: sourceWorkoutID)
+            .eq("attachment_kind", value: MessageShareKind.workout.rawValue)
+            .order("created_at", ascending: false)
+            .limit(200)
+            .execute()
+            .value
+    }
+
     func loadMessages(
         conversationID: UUID,
         limit: Int = 300
