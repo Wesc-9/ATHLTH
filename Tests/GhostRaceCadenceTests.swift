@@ -47,6 +47,27 @@ final class GhostRaceCadenceTests:
         ))
     }
 
+    func testLiveGhostSharedReconnectStopsAfterRaceSettles() {
+        XCTAssertTrue(LiveGhostRaceReentry.canReconnectSharedSession(
+            roomStatus: nil
+        ))
+        XCTAssertTrue(LiveGhostRaceReentry.canReconnectSharedSession(
+            roomStatus: .lobby
+        ))
+        XCTAssertTrue(LiveGhostRaceReentry.canReconnectSharedSession(
+            roomStatus: .countdown
+        ))
+        XCTAssertTrue(LiveGhostRaceReentry.canReconnectSharedSession(
+            roomStatus: .racing
+        ))
+        XCTAssertFalse(LiveGhostRaceReentry.canReconnectSharedSession(
+            roomStatus: .finished
+        ))
+        XCTAssertFalse(LiveGhostRaceReentry.canReconnectSharedSession(
+            roomStatus: .cancelled
+        ))
+    }
+
     func testLiveGhostReconnectionNeverUsesUnrelatedPhoneWorkout() {
         let duel = UUID()
         XCTAssertTrue(LiveGhostRaceReentry.canReconnectPhoneWorkout(
