@@ -481,6 +481,7 @@ private enum ATHLTHArenaSeasonDate {
 }
 
 struct ATHLTHArenaSeasonsSection: View {
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
     @State private var seasons: [ATHLTHArenaClubSeason] = []
     @State private var isLoading = false
@@ -638,6 +639,9 @@ struct ATHLTHArenaSeasonsSection: View {
             }
         }
         .task(id: session.profile.userID) { await reload() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await reload() } }
+        }
         .sheet(isPresented: $showingCreate) {
             ATHLTHArenaSeasonCreateView(clubs: adminClubs) {
                 Task { await reload() }
