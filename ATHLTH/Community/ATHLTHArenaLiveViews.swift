@@ -301,6 +301,8 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
     @State private var participants: [LiveGhostRaceParticipantRecord] = []
     @State private var roundResults: [ATHLTHArenaRoundResult] = []
     @State private var roundResultsLoaded = false
+    @State private var showHistoricalDuels = false
+    @State private var showAllDuels = false
     @State private var loading = false
     @State private var errorMessage: String?
     private let arenaCloud = ATHLTHArenaCloudService()
@@ -313,6 +315,16 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
                 $0.status == .accepted
         }
         .sorted { $0.createdAt > $1.createdAt }
+    }
+
+    private var shownDuels: [GhostFriendRaceChallengeRecord] {
+        linked.filter { challenge in
+            let status = rooms.first(where: { $0.challengeID == challenge.id })?.status
+            return ATHLTHArenaLiveDuelBrowsing.isHistorical(
+                roomStatus: status,
+                expiresAt: challenge.expiresAt
+            ) == showHistoricalDuels
+        }
     }
 
     var body: some View {
@@ -350,16 +362,41 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
                         .foregroundStyle(.red)
                 }
 
-                if linked.isEmpty && !loading {
+                Picker(
+                    ATHLTHLocalization.choose(
+                        english: "Duel status", norwegian: "Duellstatus"
+                    ),
+                    selection: $showHistoricalDuels
+                ) {
                     Text(ATHLTHLocalization.choose(
-                        english: "Live duels started from a specific Arena round will appear here. The group still approves any series points.",
-                        norwegian: "Live-dueller startet fra en bestemt Arena-runde vises her. Gruppen må fortsatt godkjenne eventuelle seriepoeng."
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+                        english: "Active", norwegian: "Pågående"
+                    )).tag(false)
+                    Text(ATHLTHLocalization.choose(
+                        english: "History", norwegian: "Historikk"
+                    )).tag(true)
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: showHistoricalDuels) { _, _ in
+                    showAllDuels = false
                 }
 
-                ForEach(Array(linked.prefix(8))) { challenge in
+                if shownDuels.isEmpty && !loading {
+                    Text(showHistoricalDuels
+                        ? ATHLTHLocalization.choose(
+                            english: "Completed and expired duels will be kept here as competition history.",
+                            norwegian: "Fullførte og utløpte dueller blir liggende her i konkurransehistorikken."
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "No active linked duel. Invite the opponent from the 1v1 competition above.",
+                            norwegian: "Ingen pågående tilknyttet duell. Inviter motstanderen fra 1-mot-1-konkurransen over."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                ForEach(Array(shownDuels.prefix(showAllDuels ? 150 : 5))) { challenge in
                     let room = rooms.first { $0.challengeID == challenge.id }
                     let senderTime = participants.first {
                         $0.challengeID == challenge.id &&
@@ -552,6 +589,31 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
                     .padding(13)
                     .background(ATHLTHArenaLightStyle.card(17))
                 }
+
+                if shownDuels.count > 5 {
+                    Button {
+                        showAllDuels.toggle()
+                    } label: {
+                        HStack {
+                            Text(showAllDuels
+                                ? ATHLTHLocalization.choose(
+                                    english: "Show fewer duels", norwegian: "Vis færre dueller"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Show all duels", norwegian: "Se alle dueller"
+                                )
+                            )
+                            Spacer()
+                            Image(systemName: showAllDuels
+                                ? "chevron.up" : "chevron.down"
+                            )
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .padding(.vertical, 8)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .task(id: series.id) {
                 await refresh()
@@ -650,7 +712,9 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
         case .countdown:
             return ATHLTHLocalization.choose(english: "Countdown", norwegian: "Nedtelling")
         case .lobby:
-            return ATHLTHLocalization.choose(english: "Waiting in lobby", norwegian: "Venter i lobby")
+            return expiresAt <= Date()
+                ? ATHLTHLocalization.choose(english: "Expired", norwegian: "Utløpt")
+                : ATHLTHLocalization.choose(english: "Waiting in lobby", norwegian: "Venter i lobby")
         case nil:
             return expiresAt <= Date()
                 ? ATHLTHLocalization.choose(english: "Expired", norwegian: "Utløpt")
