@@ -213,6 +213,19 @@ private struct LiveGhostParticipantFinishWrite:
     }
 }
 
+/// A second client-side guard complementing the immutable finish time
+/// enforced by the Live Ghost database trigger.
+enum LiveGhostFinishSubmissionRule {
+    static func canSubmit(
+        elapsedSeconds: TimeInterval,
+        alreadyFinished: Bool
+    ) -> Bool {
+        !alreadyFinished &&
+        elapsedSeconds.isFinite &&
+        (5...86_400).contains(elapsedSeconds)
+    }
+}
+
 @MainActor
 final class LiveGhostRaceStore:
     ObservableObject
@@ -242,6 +255,7 @@ final class LiveGhostRaceStore:
         Task<Void, Never>?
     private var activeChallengeID:
         UUID?
+    private var isSubmittingFinish = false
 
     init(
         client:
@@ -479,50 +493,40 @@ final class LiveGhostRaceStore:
         elapsedSeconds:
             TimeInterval
     ) async {
-        guard
-            let challengeID =
-                activeChallengeID,
-            let userID =
-                currentUserID
-        else {
+        guard let challengeID = activeChallengeID,
+              let userID = currentUserID,
+              !isSubmittingFinish,
+              LiveGhostFinishSubmissionRule.canSubmit(
+                  elapsedSeconds: elapsedSeconds,
+                  alreadyFinished: currentParticipant?.finishedAt != nil
+              ) else {
             return
         }
 
+        isSubmittingFinish = true
+        defer { isSubmittingFinish = false }
+
         do {
+            let now = Date()
             try await client
-                .from(
-                    "live_ghost_race_participants"
-                )
+                .from("live_ghost_race_participants")
                 .update(
                     LiveGhostParticipantFinishWrite(
-                        finishedAt: Date(),
-                        elapsedSeconds:
-                            max(
-                                elapsedSeconds,
-                                0
-                            ),
-                        updatedAt: Date()
+                        finishedAt: now,
+                        elapsedSeconds: elapsedSeconds,
+                        updatedAt: now
                     )
                 )
-                .eq(
-                    "challenge_id",
-                    value:
-                        challengeID
-                )
-                .eq(
-                    "user_id",
-                    value:
-                        userID
-                )
+                .eq("challenge_id", value: challengeID)
+                .eq("user_id", value: userID)
                 .execute()
 
-            await refresh(
-                challengeID:
-                    challengeID
-            )
+            // The server preserves the first finish and is authoritative.
+            await refresh(challengeID: challengeID)
         } catch {
-            errorMessage =
-                error.localizedDescription
+            // An unsuccessful network call is retryable; never mark the
+            // participant finished locally before the server accepts it.
+            errorMessage = error.localizedDescription
         }
     }
 
