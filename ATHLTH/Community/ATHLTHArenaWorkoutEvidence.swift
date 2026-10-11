@@ -90,10 +90,19 @@ enum ATHLTHArenaEvidenceMatcher {
     }
 }
 
+struct ATHLTHArenaRouteProof {
+    let matchPercent: Double
+    let startGapMeters: Double
+    let endGapMeters: Double
+}
+
+/// The route proof is evaluated locally from HealthKit GPS data.
+/// Only summary metrics are shared after an explicit user action.
 struct ATHLTHArenaEvidenceCandidate: Identifiable {
     let workout: SocialPublishableWorkout
     let match: ATHLTHArenaEvidenceMatcher.Match
     let sourceCheck: ATHLTHArenaLocalSourceCheck
+    var routeProof: ATHLTHArenaRouteProof? = nil
 
     var id: UUID { workout.id }
 }
@@ -109,6 +118,8 @@ struct ATHLTHArenaEvidenceSection: View {
 
     @State private var entries: [ATHLTHArenaWorkoutEvidence] = []
     @State private var selectedRound: ATHLTHArenaRemoteProposal?
+    @State private var routeCandidates: [UUID: [ATHLTHArenaEvidenceCandidate]] = [:]
+    @State private var routeSearchingID: UUID?
     @State private var pendingWithdrawal: ATHLTHArenaWorkoutEvidence?
     @State private var submitting = false
     @State private var errorMessage: String?
@@ -155,6 +166,8 @@ struct ATHLTHArenaEvidenceSection: View {
             if series.status == "active" {
                 ForEach(rounds) { round in
                     let available = candidates(for: round).count
+                    let needsRouteSearch = round.template == .fastestRoute &&
+                        routeCandidates[round.id] == nil
                     HStack(spacing: 9) {
                         Image(systemName: "figure.run.circle")
                             .foregroundStyle(ATHLTHTheme.accentDeep)
@@ -168,19 +181,41 @@ struct ATHLTHArenaEvidenceSection: View {
                             .foregroundStyle(ATHLTHTheme.mutedText)
                         }
                         Spacer()
-                        Button {
-                            selectedRound = round
-                        } label: {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Select", norwegian: "Velg"
-                            ))
+                        if routeSearchingID == round.id {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Button {
+                                if round.template == .fastestRoute &&
+                                   (needsRouteSearch || available == 0) {
+                                    Task { await searchRouteCandidates(for: round) }
+                                } else {
+                                    selectedRound = round
+                                }
+                            } label: {
+                                Text(needsRouteSearch || (round.template == .fastestRoute && available == 0)
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Check GPS", norwegian: "Sjekk GPS"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Select", norwegian: "Velg"
+                                    ))
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(ATHLTHTheme.accentDeep)
+                            .disabled((available == 0 && round.template != .fastestRoute)
+                                      || submitting || routeSearchingID != nil)
                         }
-                        .buttonStyle(.bordered)
-                        .tint(ATHLTHTheme.accentDeep)
-                        .disabled(available == 0 || submitting)
                     }
                     .padding(12)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                }
+                if rounds.contains(where: { $0.template == .fastestRoute }) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Route comparisons happen on your device using HealthKit GPS data. Only matching time, distance and percentage are shared if you choose a workout.",
+                        norwegian: "Rutesammenligning skjer på enheten med GPS-data fra Apple Health. Bare tid, distanse og treffprosent deles dersom du selv velger en økt."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
                 }
             }
 
@@ -282,7 +317,10 @@ struct ATHLTHArenaEvidenceSection: View {
     private func candidates(
         for round: ATHLTHArenaRemoteProposal
     ) -> [ATHLTHArenaEvidenceCandidate] {
-        workouts.compactMap { workout in
+        if round.template == .fastestRoute {
+            return routeCandidates[round.id] ?? []
+        }
+        return workouts.compactMap { workout in
             guard !ATHLTHArenaWorkoutIdentity.alreadyShared(
                     workout,
                     entries: entries,
@@ -312,6 +350,97 @@ struct ATHLTHArenaEvidenceSection: View {
         }
         .prefix(30)
         .map { $0 }
+    }
+
+    /// Explicit on-demand comparison; never polls GPS history in the background.
+    @MainActor
+    private func searchRouteCandidates(for round: ATHLTHArenaRemoteProposal) async {
+        guard routeSearchingID == nil, let snapshot = round.routeSnapshot,
+              snapshot.coordinates.count >= 2,
+              snapshot.distanceKilometers.isFinite,
+              (0.1...500).contains(snapshot.distanceKilometers),
+              let startsAt = series.startsAt,
+              let endsAt = series.endsAt else { return }
+
+        routeSearchingID = round.id
+        defer { routeSearchingID = nil }
+        errorMessage = nil
+
+        let route = TrainingRoute(
+            id: snapshot.routeID ?? UUID(),
+            ownerID: session.profile.userID,
+            title: snapshot.title,
+            visibility: .privateOnly,
+            coordinates: snapshot.coordinates,
+            distanceKilometers: snapshot.distanceKilometers,
+            elevationGainMeters: nil,
+            importedFilename: nil,
+            createdAt: Date(),
+            startName: nil,
+            endName: nil,
+            expectedTravelTimeSeconds: nil,
+            routeSource: "arena_competition"
+        )
+
+        let targetMeters = snapshot.distanceKilometers * 1_000
+        var matches: [ATHLTHArenaEvidenceCandidate] = []
+        for summary in health.workouts
+            .filter({
+                $0.activity == .running &&
+                $0.startDate >= startsAt &&
+                $0.endDate <= endsAt &&
+                $0.endDate <= Date() &&
+                ($0.distanceMeters ?? 0) > 0 &&
+                abs(($0.distanceMeters ?? 0) - targetMeters) <= targetMeters * 0.05
+            })
+            .prefix(25) {
+            if Task.isCancelled { break }
+
+            let workout = SocialPublishableWorkout(summary: summary)
+            guard !ATHLTHArenaWorkoutIdentity.alreadyShared(
+                workout, entries: entries, userID: session.profile.userID
+            ) else { continue }
+
+            guard let analysis = await health.routePerformance(for: summary, against: route),
+                  analysis.routeMatchPercent >= 90,
+                  analysis.startDistanceMeters <= 120,
+                  analysis.endDistanceMeters <= 120,
+                  analysis.distanceMeters > 0,
+                  analysis.durationSeconds.isFinite,
+                  analysis.durationSeconds > 0 else { continue }
+
+            let localCheck = ATHLTHArenaLocalEvidenceCheck.verify(
+                workout,
+                health: health.workouts,
+                phone: phone.history,
+                strength: strength.workoutHistory
+            )
+            guard localCheck.isUsable else { continue }
+
+            matches.append(ATHLTHArenaEvidenceCandidate(
+                workout: workout,
+                match: ATHLTHArenaEvidenceMatcher.Match(
+                    metricType: "elapsed_seconds",
+                    metricValue: analysis.durationSeconds
+                ),
+                sourceCheck: localCheck,
+                routeProof: ATHLTHArenaRouteProof(
+                    matchPercent: analysis.routeMatchPercent,
+                    startGapMeters: analysis.startDistanceMeters,
+                    endGapMeters: analysis.endDistanceMeters
+                )
+            ))
+        }
+        routeCandidates[round.id] = matches
+        if matches.isEmpty {
+            notice = ATHLTHLocalization.choose(
+                english: "No matching GPS workouts found in Apple Health for this route and competition window. You can retry after importing a workout.",
+                norwegian: "Fant ingen GPS-økter i Apple Health som matcher ruten og konkurranseperioden. Du kan prøve igjen etter import."
+            )
+        } else {
+            notice = nil
+            selectedRound = round
+        }
     }
 
     @MainActor
@@ -360,16 +489,27 @@ struct ATHLTHArenaEvidenceSection: View {
         submitting = true
         defer { submitting = false }
         do {
-            try await cloud.shareWorkoutEvidence(
-                roundID: round.id,
-                workout: candidate.workout,
-                metricType: candidate.match.metricType,
-                metricValue: candidate.match.metricValue
-            )
+            if let proof = candidate.routeProof {
+                try await cloud.shareRouteWorkoutEvidence(
+                    roundID: round.id,
+                    workout: candidate.workout,
+                    matchPercent: proof.matchPercent,
+                    startGapMeters: proof.startGapMeters,
+                    endGapMeters: proof.endGapMeters
+                )
+            } else {
+                try await cloud.shareWorkoutEvidence(
+                    roundID: round.id,
+                    workout: candidate.workout,
+                    metricType: candidate.match.metricType,
+                    metricValue: candidate.match.metricValue
+                )
+            }
             notice = ATHLTHLocalization.choose(
                 english: "Workout added for group review.",
                 norwegian: "Økten er delt til vurdering i gruppen."
             )
+            routeCandidates[round.id] = nil
             await refresh()
         } catch {
             errorMessage = error.localizedDescription
