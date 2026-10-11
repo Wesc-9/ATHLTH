@@ -953,6 +953,22 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    /// Leave an invitation pending while starting a different workout.
+    /// This only detaches the local launch; it never cancels the sent invites.
+    func prepareForAnotherWorkout() {
+        coordinatedLobbySessionID = nil
+        isCoordinatedLobbyMinimized = false
+
+        if let sessionID = currentJoinedWorkoutSessionID,
+           !workoutParticipants.contains(where: {
+               $0.sessionID == sessionID &&
+               $0.userID == currentUserID &&
+               $0.workoutStartedAt != nil
+           }) {
+            currentJoinedWorkoutSessionID = nil
+        }
+    }
+
     @discardableResult
     func beginWorkoutWithFriends(
         title: String,
@@ -964,33 +980,17 @@ final class SocialStore: ObservableObject {
         creatorCaptureDevice: WorkoutCaptureDevice? = nil
     ) async -> Bool {
         guard !friends.isEmpty else {
-            activeWorkoutSession = nil
-            activeWorkoutParticipants = []
-            coordinatedLobbySessionID = nil
-            isCoordinatedLobbyMinimized = false
-            currentJoinedWorkoutSessionID = nil
+            prepareForAnotherWorkout()
             return true
         }
 
         errorMessage = nil
 
+        // Existing invitations are pending plans, not workouts to cancel.
+        // Starting a new invitation only detaches a previous local wait.
+        prepareForAnotherWorkout()
+
         do {
-            if let activeWorkoutSession,
-               activeWorkoutSession.status == .active,
-               activeWorkoutSession.creatorID == currentUserID {
-                let ownParticipant =
-                    activeWorkoutParticipants.first {
-                        $0.userID == currentUserID
-                    }
-
-                if ownParticipant?.workoutFinishedAt == nil &&
-                    ownParticipant?.launchFailedAt == nil {
-                    try? await service.cancelWorkoutSession(
-                        activeWorkoutSession.id
-                    )
-                }
-            }
-
             let session = try await service.createWorkoutSession(
                 title: title,
                 workoutKind: kind,
@@ -1186,15 +1186,37 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    /// Invited participants wait independently; a creator's local wait
+    /// stops when they choose to train separately, without withdrawing
+    /// anyone's invitation from the server.
+    private func canContinueCreatorWorkoutWait(
+        sessionID: UUID
+    ) -> Bool {
+        guard workoutSessions.first(where: { $0.id == sessionID })?
+            .creatorID == currentUserID
+        else {
+            return true
+        }
+        return coordinatedLobbySessionID == sessionID
+    }
+
     @discardableResult
     func waitForCoordinatedWorkoutStart(
         sessionID: UUID
     ) async -> Bool {
         while !Task.isCancelled {
+            guard canContinueCreatorWorkoutWait(sessionID: sessionID) else {
+                return false
+            }
+
             do {
                 try await refreshWorkoutLobby(
                     sessionID: sessionID
                 )
+
+                guard canContinueCreatorWorkoutWait(sessionID: sessionID) else {
+                    return false
+                }
 
                 guard let session = workoutSessions.first(
                     where: { $0.id == sessionID }
@@ -1252,7 +1274,8 @@ final class SocialStore: ObservableObject {
                         )
                     }
 
-                    guard currentParticipant.readyAt != nil
+                    guard canContinueCreatorWorkoutWait(sessionID: sessionID),
+                          currentParticipant.readyAt != nil
                     else {
                         return false
                     }
@@ -1375,28 +1398,32 @@ final class SocialStore: ObservableObject {
         currentJoinedWorkoutSessionID = nil
     }
 
-    func cancelActiveWorkout() async {
-        guard let activeWorkoutSession,
-              activeWorkoutSession.creatorID == currentUserID,
-              activeWorkoutSession.status == .active
+    func cancelActiveWorkout(sessionID: UUID? = nil) async {
+        guard let targetID = sessionID ?? activeWorkoutSession?.id,
+              let target = workoutSessions.first(where: { $0.id == targetID })
+                  ?? (activeWorkoutSession?.id == targetID
+                      ? activeWorkoutSession : nil),
+              target.creatorID == currentUserID,
+              target.status == .active
         else {
             return
         }
 
         do {
-            try await service.cancelWorkoutSession(
-                activeWorkoutSession.id
-            )
-            self.activeWorkoutSession = nil
-            activeWorkoutParticipants = []
-            coordinatedLobbySessionID = nil
-            isCoordinatedLobbyMinimized = false
-            workoutSessions.removeAll {
-                $0.id == activeWorkoutSession.id
+            try await service.cancelWorkoutSession(target.id)
+            if activeWorkoutSession?.id == target.id {
+                activeWorkoutSession = nil
+                activeWorkoutParticipants = []
             }
-            workoutParticipants.removeAll {
-                $0.sessionID == activeWorkoutSession.id
+            if coordinatedLobbySessionID == target.id {
+                coordinatedLobbySessionID = nil
+                isCoordinatedLobbyMinimized = false
             }
+            if currentJoinedWorkoutSessionID == target.id {
+                currentJoinedWorkoutSessionID = nil
+            }
+            workoutSessions.removeAll { $0.id == target.id }
+            workoutParticipants.removeAll { $0.sessionID == target.id }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -1406,11 +1433,9 @@ final class SocialStore: ObservableObject {
         sourceWorkoutID: UUID,
         endedAt: Date
     ) async {
-        let sessionID =
-            currentJoinedWorkoutSessionID ??
-            activeWorkoutSession?.id
-
-        guard let sessionID,
+        // Only an actually joined workout may be completed. A sent
+        // invitation is not evidence that this recording belongs to it.
+        guard let sessionID = currentJoinedWorkoutSessionID,
               let currentUserID
         else {
             return
