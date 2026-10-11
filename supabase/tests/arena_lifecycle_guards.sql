@@ -258,6 +258,21 @@ begin
  ) then
    raise exception 'A competition may be attached to multiple Club seasons';
  end if;
+ -- Season audit history must not block account deletion. Creator/linker
+ -- references are nullable and cascade to NULL, not to deleted history.
+ if not exists (
+   select 1 from pg_constraint
+   where conrelid='public.arena_club_seasons'::regclass
+     and conname='arena_club_seasons_created_by_fkey'
+     and confdeltype='n'
+ ) or not exists (
+   select 1 from pg_constraint
+   where conrelid='public.arena_club_season_series'::regclass
+     and conname='arena_club_season_series_linked_by_fkey'
+     and confdeltype='n'
+ ) then
+   raise exception 'Arena seasons must preserve history without blocking account deletion';
+ end if;
  if not exists (
    select 1 from information_schema.columns
    where table_schema='public' and table_name='arena_series'
