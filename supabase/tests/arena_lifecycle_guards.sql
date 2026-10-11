@@ -379,5 +379,5 @@ begin
    raise exception 'Clients must not circumvent relay vote freeze using direct updates';
  end if;
 
-end $;
+end $$;
 rollback;
