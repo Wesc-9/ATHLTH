@@ -83,10 +83,12 @@ begin
 
   for v_rec in select value from jsonb_array_elements(p_rounds) loop
     insert into public.arena_round_proposals(
-      series_id,proposed_by,template,title,rules,position,\n      target_distance_meters,route_snapshot
+      series_id,proposed_by,template,title,rules,position,
+      target_distance_meters,route_snapshot
     ) values (
       v_id,v_actor,v_rec->>'template',v_rec->>'title',
-      v_rec->>'rules',v_order,\n      (v_rec->>'target_distance_meters')::numeric,v_rec->'route_snapshot'
+      v_rec->>'rules',v_order,
+      (v_rec->>'target_distance_meters')::numeric,v_rec->'route_snapshot'
     );
     v_order := v_order + 1;
   end loop;
@@ -143,10 +145,12 @@ begin
  end loop;
  for v_round in select value from jsonb_array_elements(p_rounds) loop
    insert into public.arena_round_proposals(
-    series_id,proposed_by,template,title,rules,position,\n      target_distance_meters,route_snapshot
+    series_id,proposed_by,template,title,rules,position,
+      target_distance_meters,route_snapshot
    ) values(
     v_series,v_actor,v_round->>'template',v_round->>'title',
-    v_round->>'rules',v_position,\n    (v_round->>'target_distance_meters')::numeric,v_round->'route_snapshot'
+    v_round->>'rules',v_position,
+    (v_round->>'target_distance_meters')::numeric,v_round->'route_snapshot'
    );
    v_position := v_position+1;
  end loop;
@@ -248,4 +252,5 @@ begin
   p_metric_type,p_metric,p_distance,'participant_reported'
  ) returning id into v_id;
  return v_id;
-end;\n$$;
+end;
+$$;
