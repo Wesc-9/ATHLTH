@@ -957,6 +957,7 @@ struct ATHLTHArenaAddRoundView: View {
     @State private var template: ATHLTHArenaRoundTemplate = .fastest5K
     @State private var title = ATHLTHArenaRoundTemplate.fastest5K.title
     @State private var rules = ATHLTHArenaRoundTemplate.fastest5K.explanation
+    @State private var exerciseName = ""
 
     var body: some View {
         NavigationStack {
@@ -972,6 +973,12 @@ struct ATHLTHArenaAddRoundView: View {
                     TextField(ATHLTHLocalization.choose(
                         english: "Round name", norwegian: "Navn på runden"
                     ), text: $title)
+                    if template == .mostRepetitions {
+                        TextField(ATHLTHLocalization.choose(
+                            english: "Exercise to compete in (required)",
+                            norwegian: "Øvelsen dere konkurrerer i (påkrevd)"
+                        ), text: $exerciseName)
+                    }
                     TextField(ATHLTHLocalization.choose(
                         english: "Rules and verification",
                         norwegian: "Regler og verifisering"
@@ -1004,13 +1011,23 @@ struct ATHLTHArenaAddRoundView: View {
                             template: template,
                             title: String(title.trimmingCharacters(
                                 in: .whitespacesAndNewlines).prefix(80)),
-                            rules: String(rules.trimmingCharacters(
-                                in: .whitespacesAndNewlines).prefix(600))
+                            rules: String((
+                                (template == .mostRepetitions
+                                    ? "Øvelse: " + exerciseName.trimmingCharacters(
+                                        in: .whitespacesAndNewlines
+                                      ) + "\n"
+                                    : "") +
+                                rules.trimmingCharacters(in: .whitespacesAndNewlines)
+                            ).prefix(600))
                         ))
                         dismiss()
                     }
-                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                              || rules.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(
+                        title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                        rules.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                        (template == .mostRepetitions &&
+                         exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    )
                 }
             }
         }
