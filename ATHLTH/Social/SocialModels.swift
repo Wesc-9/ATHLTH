@@ -1299,6 +1299,11 @@ struct SocialWorkoutParticipantRecord: Identifiable, Codable, Hashable {
         case usernameSnapshot = "username_snapshot"
         case invitedAt = "invited_at"
         case respondedAt = "responded_at"
+        case readyAt = "ready_at"
+        case captureDevice = "capture_device"
+        case workoutStartedAt = "workout_started_at"
+        case workoutFinishedAt = "workout_finished_at"
+        case launchFailedAt = "launch_failed_at"
     }
 }
 
