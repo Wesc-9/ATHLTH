@@ -75,7 +75,7 @@ Audio Coach skal være integrert i alle støttede økter fra planlegging til opp
 
 **Avgrensning:** 2A gir *lokal* duplikatkontroll for utvalgte typer, ikke global exactly-once-garanti på tvers av enheter. Markører inneholder kun type og intervall-/steg-ID, ikke selve talemeldingen eller brukerens helsehistorikk.
 
-### 3. Oppdagbarhet og premiumdesign — STEG 3A/3B/3C KODE IMPLEMENTERT, VERIFISERING GJENSTÅR
+### 3. Oppdagbarhet og premiumdesign — STEG 3A–3D KODE IMPLEMENTERT, VERIFISERING GJENSTÅR
 
 - [x] Audio Coach kan åpnes fra **både enkel og avansert** styrkestart; den er ikke lenger skjult bak Avansert.
 - [x] Ved enkel styrkestart bevares valgt coach-konfigurasjon gjennom lokalt opptak, invitert treningsøkt og iPad-relay, uten automatisk å aktivere øvrige avanserte treningsvalg.
@@ -100,8 +100,14 @@ Audio Coach skal være integrert i alle støttede økter fra planlegging til opp
 - [x] Repetisjon endrer **ikke** automatiske distanse-/tidsintervaller og forlenger ikke utløpstiden for siste beskjed.
 - [x] Tester for 45-sekundersgrense, ugyldig/fremtidig melding, nullstilling og at kritiske/Ghost-varsler ikke legges i replay-historikk.
 - [ ] Manuell gjennomgang av lydutgang under Spotify/AirPods, bluetooth fra/til, bakgrunn, Live Ghost, variasjoner i Watch voice lease og lange talemeldinger. Systemrapportert lydrute er ikke en garanti for hørbar avspilling.
-- [ ] Resten: coach-status og live-replay i **styrketrening**, global talestil/frekvens, og eventuelt forhåndslytt fra livepanelet.
-- [ ] Utvid tilsvarende til styrke, strukturert plan og Watch uten regresjon.
+- [x] **Steg 3D:** egen off-white Audio Coach-kontroll i aktiv styrketrening på iPhone, med **Pause tale, Fortsett tale, Status nå og Hør igjen**; vises både ved tomt freestylebibliotek og når øvelser er valgt.
+- [x] **Steg 3D:** styrkens `StrengthAudioCoachSpeaker` bruker samme tidsbegrensede `ATHLTHCoachReplayMemory` (45 sekunder), og talemute stopper ikke settføring, hviletid, HealthKit eller vibrasjoner.
+- [x] **Steg 3D:** iPhone-styrkestatus sier antall fullførte sett, aktiv øvelse og fersk gjenværende hviletid. Den deles med Watch via `ATHLTHStrengthCoachStatusMessage`, med bokmål/engelsk og beskyttelse mot negative/utdaterte verdier.
+- [x] **Steg 3D:** styrkecoachens oppstart aktiveres også for **enkel** styrkemodus når coachen eksplisitt er valgt; loggingen trenger ikke endres til avansert modus.
+- [x] **Steg 3D:** ikke-løpe-trening på Watch (inkludert styrke) har rullbare coachknapper for talemute, fersk status og repetisjon, mens øktpause og øktslutt holdes separat.
+- [x] Regresjonstester for styrkestatus, settgrenser, utløpt hvile og uavhengige stemme-/vibrasjonskanaler.
+- [ ] Siste samlede Xcode-build og fysisk Apple Watch/iPhone-QA av styrketale, basic/advanced, pause/fortsett, tidsbaserte sett, rest-countdown og AirPods med Spotify.
+- [ ] Global talestil/frekvens, eventuelt forhåndslytt fra livepanelet og mer konsekvent coach-status i resterende strukturert plan / øvrige øktmotorer.
 
 **Omfang:** Innholdsnivåene gjenbruker eksisterende `WatchAudioCoachConfiguration` og krever ingen nye serverfelter eller databaseendringer. Nye avanserte treningsfunksjoner skal ikke aktiveres bare fordi et enkelt coach-nivå er valgt.
 
