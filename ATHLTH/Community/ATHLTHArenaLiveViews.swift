@@ -139,6 +139,7 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
 
     let series: ATHLTHArenaRemoteSeries
     let rounds: [ATHLTHArenaRemoteProposal]
+    let onReview: () -> Void
 
     @State private var rooms: [LiveGhostRaceRoomRecord] = []
     @State private var participants: [LiveGhostRaceParticipantRecord] = []
@@ -201,6 +202,22 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
 
                 ForEach(Array(linked.prefix(8))) { challenge in
                     let room = rooms.first { $0.challengeID == challenge.id }
+                    let senderTime = participants.first {
+                        $0.challengeID == challenge.id &&
+                        $0.userID == challenge.senderID
+                    }?.elapsedSeconds
+                    let recipientTime = participants.first {
+                        $0.challengeID == challenge.id &&
+                        $0.userID == challenge.recipientID
+                    }?.elapsedSeconds
+                    let review = ATHLTHArenaLiveDuelReview.candidate(
+                        senderID: challenge.senderID,
+                        recipientID: challenge.recipientID,
+                        senderSeconds: senderTime,
+                        recipientSeconds: recipientTime,
+                        reportedWinnerID: room?.winnerID,
+                        isFinished: room?.status == .finished
+                    )
                     VStack(alignment: .leading, spacing: 9) {
                         HStack {
                             Text(rounds.first { $0.id == challenge.arenaRoundID }?.title ??
@@ -226,21 +243,66 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
                                     Text(userName(userID))
                                         .font(.caption)
                                     Spacer()
-                                    let time = participants.first {
-                                        $0.challengeID == challenge.id &&
-                                        $0.userID == userID
-                                    }?.elapsedSeconds
+                                    let time = userID == challenge.senderID
+                                        ? senderTime : recipientTime
                                     Text(time.map(GhostTargetTimeFormatter.string) ?? "—")
                                         .font(.caption.weight(.semibold))
                                         .monospacedDigit()
                                 }
                             }
+
+                            if let review {
+                                Label(
+                                    review.winnerID.map { userName($0) } ??
+                                        ATHLTHLocalization.choose(
+                                            english: "Provisional tie", norwegian: "Foreløpig uavgjort"
+                                        ),
+                                    systemImage: review.winnerID == nil
+                                        ? "equal.circle" : "trophy"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                if review.winnerID != nil {
+                                    Text(
+                                        ATHLTHLocalization.choose(
+                                            english: "Reported time difference",
+                                            norwegian: "Oppgitt tidsforskjell"
+                                        ) + ": " +
+                                        String(format: "%.1f s", review.marginSeconds)
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+                            } else {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Incomplete or inconsistent times – review required",
+                                        norwegian: "Manglende eller motstridende tider – må kontrolleres"
+                                    ),
+                                    systemImage: "exclamationmark.triangle"
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                            }
+
                             Text(ATHLTHLocalization.choose(
-                                english: "These are reported live times, not verified Arena round results. Use 'Propose result' in the standings and obtain all approvals before points are awarded.",
-                                norwegian: "Dette er oppgitte live-tider, ikke verifiserte Arena-runderesultater. Bruk «Foreslå resultat» i sammenlagtstillingen og få alle godkjenninger før poeng tildeles."
+                                english: "Live results are participant-reported and not independently route-verified. Series points require a separate result proposal and unanimous approval.",
+                                norwegian: "Live-resultater er oppgitt av deltakerne og ikke uavhengig ruteverifisert. Seriepoeng krever et eget resultatforslag og enstemmig godkjenning."
                             ))
                             .font(.caption2)
                             .foregroundStyle(ATHLTHTheme.mutedText)
+
+                            Button(action: onReview) {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Go to result review",
+                                        norwegian: "Gå til resultatgodkjenning"
+                                    ),
+                                    systemImage: "checkmark.shield"
+                                )
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(ATHLTHTheme.accentDeep)
                         } else if challenge.expiresAt > Date() {
                             NavigationLink {
                                 LiveGhostRaceLobbyView(challenge: challenge)
@@ -261,7 +323,20 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
                     .background(ATHLTHArenaLightStyle.card(17))
                 }
             }
-            .task(id: series.id) { await refresh() }
+            .task(id: series.id) {
+                await refresh()
+                // Refresh only while the active duel screen is visible.
+                // Avoid an always-on realtime connection for past results.
+                while !Task.isCancelled && series.status == "active" {
+                    do {
+                        try await Task.sleep(for: .seconds(25))
+                    } catch {
+                        break
+                    }
+                    guard !Task.isCancelled else { break }
+                    await refresh()
+                }
+            }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { Task { await refresh() } }
             }
@@ -539,7 +614,14 @@ struct ATHLTHArenaOnlineDetailView: View {
                 if canParticipate && currentSeries.scope == .duel {
                     ATHLTHArenaLinkedLiveDuelsSection(
                         series: currentSeries,
-                        rounds: rounds
+                        rounds: rounds,
+                        onReview: {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                scrollProxy.scrollTo(
+                                    "arena-standings", anchor: .top
+                                )
+                            }
+                        }
                     )
                 }
 
