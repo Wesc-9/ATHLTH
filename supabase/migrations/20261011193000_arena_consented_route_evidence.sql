@@ -3,6 +3,8 @@
 alter table public.arena_workout_evidence
   add column if not exists reported_route_match_percent numeric(5,2);
 alter table public.arena_workout_evidence
+  drop constraint if exists arena_route_match_reported_percent_check;
+alter table public.arena_workout_evidence
   add constraint arena_route_match_reported_percent_check
   check (reported_route_match_percent is null or
          reported_route_match_percent between 0 and 100);
