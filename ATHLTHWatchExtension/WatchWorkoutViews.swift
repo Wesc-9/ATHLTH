@@ -4284,6 +4284,34 @@ private struct WatchAudioCoachLiveSettingsView: View {
             }
 
             if configuration.enabled {
+                Section {
+                    Picker(
+                        ATHLTHLocalization.choose(
+                            english: "Speaking style", norwegian: "Talemåte"
+                        ),
+                        selection: Binding(
+                            get: { configuration.speechStyle ?? .balanced },
+                            set: { selected in
+                                update { $0.speechStyle = selected }
+                            }
+                        )
+                    ) {
+                        ForEach(ATHLTHCoachSpeechStyle.allCases) { style in
+                            Text(style.title).tag(style)
+                        }
+                    }
+                    Text(ATHLTHLocalization.choose(
+                        english: "Only this workout. Timing and safety alerts are unchanged.",
+                        norwegian: "Kun denne økten. Hyppighet og sikkerhetsvarsler er uendret."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                } header: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Speaking style", norwegian: "Talemåte"
+                    ))
+                }
+
                 Section("When to speak") {
                     Toggle(
                         "Distance",
