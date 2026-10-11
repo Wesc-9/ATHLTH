@@ -1221,6 +1221,10 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
         ATHLTHLiveWorkoutSurfaceConfiguration? = nil
     var liveSurfaceContext:
         ATHLTHLiveWorkoutContext? = nil
+
+    // Old Watch builds omit this marker. New iPhone builds can retain the
+    // legacy phone-voice path for mixed-version Watch/iPhone installations.
+    var supportsAudioCoachVoiceLease: Bool? = nil
 }
 
 struct WatchGhostRaceTimingPoint: Codable, Hashable {
