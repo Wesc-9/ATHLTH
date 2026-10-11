@@ -2597,8 +2597,9 @@ private struct ATHLTHArenaTeamsSection: View {
     }
 
     private var isVisible: Bool {
-        !assignments.isEmpty ||
-            (isOrganizer && series.status == "draft" && series.scope != .duel)
+        // A competition shortcut should never scroll to an empty target.
+        // Show the team setup status even when the organizer did not enable teams.
+        series.scope != .duel
     }
 
     var body: some View {
@@ -2639,10 +2640,16 @@ private struct ATHLTHArenaTeamsSection: View {
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHTheme.mutedText)
                     if !canEdit {
-                        Text(ATHLTHLocalization.choose(
-                            english: "At least four accepted athletes and resolved invitations are needed.",
-                            norwegian: "Du trenger minst fire deltakere som har takket ja, og alle invitasjonene må være avklart."
-                        ))
+                        Text(series.status == "draft"
+                            ? ATHLTHLocalization.choose(
+                                english: "The organizer can set up teams after at least four athletes have accepted and invitations are resolved.",
+                                norwegian: "Arrangøren kan sette opp lag når minst fire deltakere har takket ja og invitasjonene er avklart."
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Team mode was not configured before this competition started. Individual standings remain available.",
+                                norwegian: "Lagmodus ble ikke satt opp før konkurransen startet. Den individuelle stillingen er fortsatt tilgjengelig."
+                            )
+                        )
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
                     }
@@ -5105,6 +5112,38 @@ private struct ATHLTHArenaRelaySection: View {
                         Task { _ = await savePlan(nil, [], []) }
                     }
                 }
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Relay", norwegian: "Stafett"
+                        ),
+                        systemImage: "figure.run.circle.fill"
+                    )
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    Text(series.status == "draft"
+                        ? ATHLTHLocalization.choose(
+                            english: "First divide the accepted athletes into teams. Then the organizer can select an agreed route and set the leg order.",
+                            norwegian: "Fordel først de godkjente deltakerne i lag. Deretter kan arrangøren velge en godkjent rute og bestemme etapperekkefølgen."
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "This competition has no relay plan. Individual rounds and approved scores are still available.",
+                            norwegian: "Konkurransen har ingen stafettplan. Individuelle runder og godkjente poeng er fortsatt tilgjengelige."
+                        )
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    if loading { ProgressView().controlSize(.small) }
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(15)
+                .background(ATHLTHArenaLightStyle.card(20))
             }
         }
         .task(id: series.id) {
