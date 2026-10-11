@@ -480,6 +480,11 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
         guard client.auth.currentUser != nil else {
             challenges = []
             participants = []
+            await OfficialWeeklyChallengeReminderScheduler.reconcile(
+                challenge: nil,
+                joined: false,
+                completed: true
+            )
             return
         }
 
@@ -562,6 +567,16 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
             participants = resolvedParticipants
             lastRefreshAt = Date()
             errorMessage = autoEnrollmentError
+
+            // Reconcile one ending reminder against the user's actual weekly
+            // completion row. Repeated refreshes reuse the same identifier.
+            let active = activeChallenge
+            let ownEntry = active.flatMap { currentParticipant(for: $0.id) }
+            await OfficialWeeklyChallengeReminderScheduler.reconcile(
+                challenge: active,
+                joined: ownEntry != nil,
+                completed: ownEntry?.completedAt != nil
+            )
         } catch is CancellationError {
             return
         } catch {
