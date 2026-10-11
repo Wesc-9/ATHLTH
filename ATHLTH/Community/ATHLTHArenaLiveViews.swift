@@ -315,6 +315,506 @@ struct ATHLTHArenaOnlineSection: View {
     }
 }
 
+// MARK: - Club Arena seasons
+// A premium summary for server-enforced seasons. This intentionally does not
+// touch the separate Club Weekly Challenge or award points on the device.
+private enum ATHLTHArenaSeasonDate {
+    static func sql(_ date: Date) -> String {
+        let components = Calendar.current.dateComponents(
+            [.year, .month, .day], from: date
+        )
+        return String(format: "%04d-%02d-%02d",
+            components.year ?? 2000,
+            components.month ?? 1,
+            components.day ?? 1)
+    }
+
+    static func label(_ raw: String) -> String {
+        let chunks = raw.split(separator: "-")
+        guard chunks.count == 3 else { return raw }
+        return "\(chunks[2]).\(chunks[1]).\(chunks[0])"
+    }
+}
+
+struct ATHLTHArenaSeasonsSection: View {
+    @EnvironmentObject private var session: AppSessionStore
+    @State private var seasons: [ATHLTHArenaClubSeason] = []
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+    @State private var showingCreate = false
+    @State private var adminClubs: [ATHLTHArenaClubChoice] = []
+    private let cloud = ATHLTHArenaCloudService()
+    private let directory = ATHLTHArenaClubDirectory()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(spacing: 8) {
+                Image(systemName: "medal.star.fill")
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                Text(ATHLTHLocalization.choose(
+                    english: "Club seasons", norwegian: "Klubbsesonger"
+                ))
+                .font(.headline)
+                Spacer()
+                if isLoading {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Button {
+                        Task { await reload() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Refresh Club seasons",
+                        norwegian: "Oppdater klubbsesonger"
+                    ))
+                }
+                if !adminClubs.isEmpty {
+                    Button {
+                        showingCreate = true
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "New", norwegian: "Ny"
+                        ), systemImage: "plus")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .buttonStyle(.bordered)
+                    .tint(ATHLTHTheme.accentDeep)
+                }
+            }
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            if seasons.isEmpty {
+                Text(ATHLTHLocalization.choose(
+                    english: "Club seasons bring together approved points from several Arena competitions. Club admins can start a season here.",
+                    norwegian: "Klubbsesonger samler godkjente poeng fra flere Arena-konkurranser. Klubbadministratorer kan opprette en sesong her."
+                ))
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .padding(14)
+                .background(ATHLTHArenaLightStyle.card(18))
+            }
+
+            ForEach(seasons.prefix(4)) { season in
+                NavigationLink {
+                    ATHLTHArenaSeasonDetailView(
+                        season: season,
+                        canManage: adminClubs.contains {
+                            $0.id == season.clubID
+                        }
+                    )
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "trophy.fill")
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .font(.title3)
+                            .frame(width: 42, height: 42)
+                            .background(
+                                ATHLTHTheme.vitalitySoft.opacity(0.72),
+                                in: RoundedRectangle(cornerRadius: 14)
+                            )
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(season.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                            Text(ATHLTHArenaSeasonDate.label(season.startsOn) +
+                                 " – " +
+                                 ATHLTHArenaSeasonDate.label(season.endsOn))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        Spacer(minLength: 3)
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+                    .padding(13)
+                    .background(ATHLTHArenaLightStyle.card(18))
+                }
+                .buttonStyle(.plain)
+            }
+            if seasons.count > 4 {
+                NavigationLink {
+                    List(seasons) { season in
+                        NavigationLink(season.title) {
+                            ATHLTHArenaSeasonDetailView(
+                                season: season,
+                                canManage: adminClubs.contains {
+                                    $0.id == season.clubID
+                                }
+                            )
+                        }
+                    }
+                    .navigationTitle(ATHLTHLocalization.choose(
+                        english: "Club seasons", norwegian: "Klubbsesonger"
+                    ))
+                } label: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "All seasons", norwegian: "Alle sesonger"
+                    ))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+            }
+        }
+        .task(id: session.profile.userID) { await reload() }
+        .sheet(isPresented: $showingCreate) {
+            ATHLTHArenaSeasonCreateView(clubs: adminClubs) {
+                Task { await reload() }
+            }
+        }
+    }
+
+    @MainActor
+    private func reload() async {
+        guard !isLoading else { return }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            async let s = cloud.loadClubSeasons()
+            async let clubs = directory.manageableClubs()
+            seasons = try await s
+            adminClubs = try await clubs
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct ATHLTHArenaSeasonCreateView: View {
+    @Environment(\.dismiss) private var dismiss
+    let clubs: [ATHLTHArenaClubChoice]
+    let onCreated: () -> Void
+
+    @State private var clubID: UUID?
+    @State private var title = ""
+    @State private var startsOn = Date()
+    @State private var endsOn = Calendar.current.date(
+        byAdding: .day, value: 30, to: Date()
+    ) ?? Date()
+    @State private var saving = false
+    @State private var errorMessage: String?
+    private let cloud = ATHLTHArenaCloudService()
+
+    private var valid: Bool {
+        let days = Calendar.current.dateComponents(
+            [.day],
+            from: Calendar.current.startOfDay(for: startsOn),
+            to: Calendar.current.startOfDay(for: endsOn)
+        ).day ?? 0
+        return clubID != nil &&
+            (3...80).contains(title.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ).count) &&
+            (7...366).contains(days)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Picker(ATHLTHLocalization.choose(
+                        english: "Club", norwegian: "Klubb"
+                    ), selection: $clubID) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Choose Club", norwegian: "Velg klubb"
+                        )).tag(nil as UUID?)
+                        ForEach(clubs) { club in
+                            Text(club.name).tag(club.id as UUID?)
+                        }
+                    }
+                    TextField(ATHLTHLocalization.choose(
+                        english: "Season title", norwegian: "Sesongnavn"
+                    ), text: $title)
+                }
+                Section {
+                    DatePicker(
+                        ATHLTHLocalization.choose(
+                            english: "Starts", norwegian: "Starter"
+                        ),
+                        selection: $startsOn, displayedComponents: .date
+                    )
+                    DatePicker(
+                        ATHLTHLocalization.choose(
+                            english: "Ends", norwegian: "Avsluttes"
+                        ),
+                        selection: $endsOn, displayedComponents: .date
+                    )
+                } footer: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "A season lasts 7–366 days. Only approved Arena points count. Weekly Challenge remains separate.",
+                        norwegian: "En sesong varer 7–366 dager. Bare godkjente Arena-poeng teller. Ukens challenge forblir separat."
+                    ))
+                }
+                if let errorMessage {
+                    Text(errorMessage).foregroundStyle(.red)
+                }
+            }
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "New Club season", norwegian: "Ny klubbsesong"
+            ))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Cancel", norwegian: "Avbryt"
+                    )) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Create", norwegian: "Opprett"
+                    )) { Task { await save() } }
+                    .disabled(!valid || saving)
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func save() async {
+        guard !saving, valid, let clubID else { return }
+        saving = true
+        defer { saving = false }
+        do {
+            _ = try await cloud.createClubSeason(
+                clubID: clubID,
+                title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+                startsOn: ATHLTHArenaSeasonDate.sql(startsOn),
+                endsOn: ATHLTHArenaSeasonDate.sql(endsOn)
+            )
+            onCreated()
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct ATHLTHArenaSeasonDetailView: View {
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var social: SocialStore
+    let season: ATHLTHArenaClubSeason
+    let canManage: Bool
+
+    @State private var standings: [ATHLTHArenaSeasonStandingsRow] = []
+    @State private var links: [ATHLTHArenaSeasonSeriesLink] = []
+    @State private var competitionOptions: [ATHLTHArenaRemoteSeries] = []
+    @State private var loading = false
+    @State private var adding = false
+    @State private var errorMessage: String?
+    private let cloud = ATHLTHArenaCloudService()
+
+    private var candidates: [ATHLTHArenaRemoteSeries] {
+        let linked = Set(links.map(\.seriesID))
+        return competitionOptions.filter {
+            $0.scope == .club &&
+            $0.clubID == season.clubID &&
+            !linked.contains($0.id) &&
+            // The server applies the authoritative dates and status checks.
+            ($0.startsAt ?? Date.distantPast) <= Date.distantFuture
+        }
+    }
+
+    private func name(_ id: UUID) -> String {
+        if id == session.profile.userID {
+            return ATHLTHLocalization.choose(
+                english: "You", norwegian: "Du"
+            )
+        }
+        return (social.visibleProfiles + social.mutualFollows)
+            .first(where: { $0.userID == id })?.resolvedName ??
+            ATHLTHLocalization.choose(
+                english: "Club member", norwegian: "Klubbmedlem"
+            )
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 15) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Label("ATHLTH / ARENA SEASON", systemImage: "trophy.fill")
+                        .font(.caption.weight(.semibold))
+                        .tracking(1)
+                    Text(season.title)
+                        .font(.title2.weight(.bold))
+                    Text(ATHLTHArenaSeasonDate.label(season.startsOn) +
+                         " – " + ATHLTHArenaSeasonDate.label(season.endsOn))
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(20)
+                .background(
+                    LinearGradient(
+                        colors: [ATHLTHTheme.accentDeep, ATHLTHTheme.vitality],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ),
+                    in: RoundedRectangle(cornerRadius: 23)
+                )
+
+                HStack {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Season standings", norwegian: "Sesongstilling"
+                    ))
+                    .font(.headline)
+                    Spacer()
+                    if loading { ProgressView().controlSize(.small) }
+                }
+
+                if standings.isEmpty && !loading {
+                    Text(ATHLTHLocalization.choose(
+                        english: "No approved Arena points yet. Add a Club competition and finish its rounds to start the table.",
+                        norwegian: "Ingen godkjente Arena-poeng ennå. Legg til en klubbkonkurranse og fullfør rundene for å starte tabellen."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                ForEach(Array(standings.enumerated()), id: \.element.userID) { index, entry in
+                    HStack(spacing: 12) {
+                        Image(systemName: index == 0 && entry.points > 0
+                            ? "trophy.fill" : "person.crop.circle")
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                        Text("\(index + 1). " + name(entry.userID))
+                            .font(.subheadline.weight(index == 0 ? .semibold : .regular))
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("\(entry.points.formatted()) p")
+                                .font(.subheadline.weight(.bold).monospacedDigit())
+                            Text("\(entry.competitions) " + ATHLTHLocalization.choose(
+                                english: "competitions", norwegian: "konkurranser"
+                            ))
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                    }
+                    .padding(13)
+                    .background(ATHLTHArenaLightStyle.card(17))
+                }
+
+                HStack {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Season competitions", norwegian: "Sesongkonkurranser"
+                    ))
+                    .font(.headline)
+                    Spacer()
+                    Text("\(links.count)")
+                        .font(.caption.weight(.semibold))
+                    if canManage && season.endsOn >= ATHLTHArenaSeasonDate.sql(Date()) {
+                        Menu {
+                            if candidates.isEmpty {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "No eligible competitions", norwegian: "Ingen aktuelle konkurranser"
+                                ))
+                            }
+                            ForEach(candidates) { item in
+                                Button(item.title) {
+                                    Task { await attach(item.id) }
+                                }
+                            }
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Add", norwegian: "Legg til"
+                            ), systemImage: "plus")
+                        }
+                        .font(.caption.weight(.semibold))
+                        .disabled(adding || loading)
+                    }
+                }
+
+                ForEach(links) { link in
+                    if let item = competitionOptions.first(where: {
+                        $0.id == link.seriesID
+                    }) {
+                        NavigationLink {
+                            ATHLTHArenaOnlineDetailView(series: item)
+                        } label: {
+                            HStack {
+                                Image(systemName: "flag.checkered")
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                Text(item.title)
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                            }
+                            .padding(13)
+                            .background(ATHLTHArenaLightStyle.card(17))
+                        }
+                    } else {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Club competition (not visible to your account)",
+                            norwegian: "Klubbkonkurranse (ikke synlig for din konto)"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                }
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Only the server's participant-approved Arena points are added to the season. Live Ghost times and relay reports do not award points automatically.",
+                    norwegian: "Bare godkjente Arena-poeng fra serveren legges til sesongen. Live Ghost-tider og stafettetapper gir ikke poeng automatisk."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
+            .padding(16)
+        }
+        .background(ATHLTHArenaLightStyle.canvasBackground)
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Club season", norwegian: "Klubbsesong"
+        ))
+        .navigationBarTitleDisplayMode(.inline)
+        .task(id: season.id) { await refresh() }
+    }
+
+    @MainActor
+    private func attach(_ id: UUID) async {
+        guard canManage, !adding else { return }
+        adding = true
+        defer { adding = false }
+        do {
+            try await cloud.attachSeasonSeries(
+                seasonID: season.id, seriesID: id
+            )
+            await refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func refresh() async {
+        guard !loading else { return }
+        loading = true
+        defer { loading = false }
+        do {
+            async let rank = cloud.loadSeasonStandings(seasonID: season.id)
+            async let linkRows = cloud.loadSeasonSeriesLinks(seasonID: season.id)
+            async let allSeries = cloud.loadSeries()
+            standings = try await rank
+            links = try await linkRows
+            competitionOptions = try await allSeries
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
 /// Results here are informational. Arena's normal result proposal and
 /// unanimous participant voting remain the ONLY path to award round points.
 /// The DB-authenticated round link prevents unrelated races showing here.
