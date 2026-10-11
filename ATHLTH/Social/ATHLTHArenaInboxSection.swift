@@ -12,8 +12,9 @@ struct ATHLTHArenaInboxSection: View {
 
     private struct Entry: Identifiable {
         let series: ATHLTHArenaRemoteSeries
-        let membership: ATHLTHArenaRemoteMember
+        let membership: ATHLTHArenaRemoteMember?
         let isGroup: Bool
+        let isReplacement: Bool
         var id: UUID { series.id }
     }
 
@@ -27,8 +28,9 @@ struct ATHLTHArenaInboxSection: View {
         entries.filter { entry in
             switch filterKey {
             case "priority":
-                return entry.membership.response == "invited" ||
-                    (entry.isGroup && entry.membership.response == "accepted")
+                return entry.isReplacement ||
+                    entry.membership?.response == "invited" ||
+                    (entry.isGroup && entry.membership?.response == "accepted")
             case "direct":
                 return !entry.isGroup
             case "groups":
@@ -63,7 +65,7 @@ struct ATHLTHArenaInboxSection: View {
             }
             ForEach(visible) { entry in
                 NavigationLink {
-                    if entry.isGroup && entry.membership.response == "accepted" {
+                    if entry.isGroup && entry.membership?.response == "accepted" {
                         ATHLTHArenaGroupChatView(series: entry.series)
                     } else {
                         ATHLTHArenaOnlineDetailView(series: entry.series)
@@ -84,15 +86,20 @@ struct ATHLTHArenaInboxSection: View {
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(ATHLTHTheme.primaryText)
                                 .lineLimit(1)
-                            Text(entry.membership.response == "invited"
+                            Text(entry.isReplacement
                                 ? ATHLTHLocalization.choose(
-                                    english: "Competition invitation — tap to respond",
-                                    norwegian: "Konkurranseinvitasjon – trykk for å svare"
+                                    english: "Replacement proposal — your approval needed",
+                                    norwegian: "Forslag om erstatter – ditt svar trengs"
                                   )
-                                : ATHLTHLocalization.choose(
-                                    english: "Competition group chat",
-                                    norwegian: "Konkurransens gruppechat"
-                                  ))
+                                : entry.membership?.response == "invited"
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Competition invitation — tap to respond",
+                                        norwegian: "Konkurranseinvitasjon – trykk for å svare"
+                                      )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Competition group chat",
+                                        norwegian: "Konkurransens gruppechat"
+                                      ))
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
                         }
@@ -137,11 +144,25 @@ struct ATHLTHArenaInboxSection: View {
             var next: [Entry] = []
             for item in series {
                 let members = try await cloud.loadMembers(seriesID: item.id)
-                guard let mine = members.first(where: {
+                let mine = members.first(where: {
                     $0.userID == session.profile.userID
-                }) else { continue }
+                })
+                var nominated = false
+                if mine == nil {
+                    let proposals = try await cloud.loadReplacements(seriesID: item.id)
+                    nominated = proposals.contains {
+                        $0.nomineeID == session.profile.userID &&
+                        $0.status == "pending"
+                    }
+                }
+                guard mine != nil || nominated else { continue }
                 let group = members.count > 2
-                next.append(Entry(series: item, membership: mine, isGroup: group))
+                next.append(Entry(
+                    series: item,
+                    membership: mine,
+                    isGroup: group,
+                    isReplacement: nominated
+                ))
             }
             entries = next
             onVisibleCountChanged(visible.count)
