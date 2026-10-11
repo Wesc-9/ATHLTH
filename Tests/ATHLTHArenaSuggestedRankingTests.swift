@@ -887,6 +887,55 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
         ))
     }
 
+    func testRelayGPSCandidateSelectionRequiresSameParticipantAndFrozenRoute() {
+        let slot = UUID()
+        let round = UUID()
+        let candidate = ATHLTHArenaRelayGPSCandidate(
+            id: UUID(),
+            slotID: slot,
+            routeRoundID: round,
+            startedAt: Date(),
+            elapsedSeconds: 1_650,
+            routeMatchPercent: 96
+        )
+        XCTAssertTrue(candidate.canPrefill(
+            for: slot, routeRoundID: round, reportWindowOpen: true
+        ))
+        XCTAssertFalse(candidate.canPrefill(
+            for: UUID(), routeRoundID: round, reportWindowOpen: true
+        ))
+        XCTAssertFalse(candidate.canPrefill(
+            for: slot, routeRoundID: UUID(), reportWindowOpen: true
+        ))
+        XCTAssertFalse(candidate.canPrefill(
+            for: slot, routeRoundID: round, reportWindowOpen: false
+        ))
+    }
+
+    func testRelayGPSCandidateSelectionRejectsStaleOrInvalidResult() {
+        let slot = UUID()
+        let round = UUID()
+        for (duration, match) in [
+            (Double.infinity, 98.0),
+            (8.0, 96.0),
+            (1_650.0, Double.nan),
+            (1_650.0, 82.0),
+            (1_650.0, 105.0)
+        ] {
+            let candidate = ATHLTHArenaRelayGPSCandidate(
+                id: UUID(),
+                slotID: slot,
+                routeRoundID: round,
+                startedAt: Date(),
+                elapsedSeconds: duration,
+                routeMatchPercent: match
+            )
+            XCTAssertFalse(candidate.canPrefill(
+                for: slot, routeRoundID: round, reportWindowOpen: true
+            ))
+        }
+    }
+
     func testRelayOwnGPSSuggestionRequiresAgreedRouteMatch() {
         XCTAssertTrue(ATHLTHArenaRelayGPSMatch.qualifies(
             routeLengthMeters: 7_500,
