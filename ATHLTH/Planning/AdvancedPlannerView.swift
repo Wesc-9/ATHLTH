@@ -4547,6 +4547,7 @@ private enum HeartRateTargetMode: String, CaseIterable, Identifiable {
 private struct SessionEditorStoredDraft: Codable {
     let workout: PlannedSession
     let selectedPartnerID: UUID?
+    let physicalMeetup: Bool?
     let scheduledTimeEnabled: Bool
     let editorModeRaw: String
     let targetPaceEnabled: Bool
@@ -4591,6 +4592,8 @@ struct SessionEditorView: View {
     @State private var workoutCategory: String?
     @State private var showingSavedWorkoutPicker = false
     @State private var selectedPartnerID: UUID?
+    @State private var directPartnerID: UUID?
+    @State private var physicalMeetup = true
     @State private var meetingPoint: PlannedWorkoutMeetingPoint?
     @State private var reminderMinutesBefore = 30
     @State private var showingMeetingPointPicker = false
@@ -4698,6 +4701,13 @@ struct SessionEditorView: View {
                 initialValue:
                     defaultTime
             )
+    }
+
+    init(standaloneDate: Date, partnerID: UUID, physicalMeetup: Bool) {
+        self.init(standaloneDate: standaloneDate)
+        _selectedPartnerID = State(initialValue: partnerID)
+        _directPartnerID = State(initialValue: partnerID)
+        _physicalMeetup = State(initialValue: physicalMeetup)
     }
 
     init(
@@ -6332,6 +6342,24 @@ struct SessionEditorView: View {
                             .tag(friend.userID as UUID?)
                     }
                 }
+                .disabled(directPartnerID != nil)
+            }
+
+            if selectedPartnerID != nil {
+                Picker(
+                    ATHLTHLocalization.choose(
+                        english: "Training mode", norwegian: "Hvordan trener dere?"
+                    ),
+                    selection: $physicalMeetup
+                ) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Meet in person", norwegian: "Trene fysisk sammen"
+                    )).tag(true)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Same workout", norwegian: "Trene samme økt"
+                    )).tag(false)
+                }
+                .pickerStyle(.segmented)
             }
 
             Text(
@@ -6363,7 +6391,7 @@ struct SessionEditorView: View {
 
     private var plannedWorkoutLogisticsSection: some View {
         Section {
-            if selectedPartnerID != nil || meetingPoint != nil {
+            if selectedPartnerID != nil && physicalMeetup {
                 Button {
                     showingMeetingPointPicker = true
                 } label: {
@@ -8362,7 +8390,7 @@ struct SessionEditorView: View {
                     : workoutBlocks,
             workoutCategory:
                 workoutCategory,
-            meetingPoint: meetingPoint,
+            meetingPoint: physicalMeetup ? meetingPoint : nil,
             reminderMinutesBefore: scheduledTimeEnabled && reminderMinutesBefore > 0
                 ? reminderMinutesBefore : nil
         )
@@ -8407,8 +8435,8 @@ struct SessionEditorView: View {
                     shareVersion: 2
                 )
                 let body = ATHLTHLocalization.choose(
-                    english: "Would you like to train together? \(workout.title) · \(scheduled). The session is attached.",
-                    norwegian: "Vil du trene sammen? \(workout.title) · \(scheduled). Økten er vedlagt."
+                    english: (physicalMeetup ? "Let's meet and train! " : "Let's do the same workout! ") + "\(workout.title) · \(scheduled). The session is attached.",
+                    norwegian: (physicalMeetup ? "Vil du trene fysisk sammen? " : "Vil du trene samme økt? ") + "\(workout.title) · \(scheduled). Økten er vedlagt."
                 )
                 let sent = await messaging.send(
                     to: partnerID,
@@ -8484,6 +8512,7 @@ struct SessionEditorView: View {
         let draft = SessionEditorStoredDraft(
             workout: composeSession(),
             selectedPartnerID: selectedPartnerID,
+            physicalMeetup: physicalMeetup,
             scheduledTimeEnabled: scheduledTimeEnabled,
             editorModeRaw: editorMode.rawValue,
             targetPaceEnabled: targetPaceEnabled,
@@ -8516,7 +8545,8 @@ struct SessionEditorView: View {
         meetingPoint = draft.workout.meetingPoint
         reminderMinutesBefore = draft.workout.reminderMinutesBefore ?? 0
         scheduledTimeEnabled = draft.scheduledTimeEnabled
-        selectedPartnerID = draft.selectedPartnerID
+        selectedPartnerID = directPartnerID ?? draft.selectedPartnerID
+        physicalMeetup = draft.physicalMeetup ?? physicalMeetup
         editorMode = SessionEditorMode(rawValue: draft.editorModeRaw) ?? editorMode
         targetPaceEnabled = draft.targetPaceEnabled
         heartRateTargetEnabled = draft.heartRateTargetEnabled
