@@ -12,9 +12,15 @@ struct ATHLTHArenaRemoteSeries: Decodable, Identifiable {
     let scoring: ATHLTHArenaScoring
     let durationDays: Int
     let status: String
+    let startsAt: Date?
+    let endsAt: Date?
+    let completedAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case id, title, scope, scoring, status
+        case startsAt = "starts_at"
+        case endsAt = "ends_at"
+        case completedAt = "completed_at"
         case ownerID = "owner_id"
         case durationDays = "duration_days"
     }
@@ -103,6 +109,74 @@ struct ATHLTHArenaReplacementVote: Decodable {
         case accepted
         case proposalID = "proposal_id"
         case voterID = "voter_id"
+    }
+}
+
+struct ATHLTHArenaRoundResult: Decodable, Identifiable {
+    let id: UUID
+    let seriesID: UUID
+    let roundID: UUID
+    let proposedBy: UUID?
+    let rankedSlots: [UUID]
+    let evidenceNote: String
+    let status: String
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id, status
+        case seriesID = "series_id"
+        case roundID = "round_id"
+        case proposedBy = "proposed_by"
+        case rankedSlots = "ranked_slots"
+        case evidenceNote = "evidence_note"
+        case createdAt = "created_at"
+    }
+}
+
+struct ATHLTHArenaRoundResultVote: Decodable {
+    let resultID: UUID
+    let userID: UUID
+    let accepted: Bool
+    enum CodingKeys: String, CodingKey {
+        case accepted
+        case resultID = "result_id"
+        case userID = "user_id"
+    }
+}
+
+struct ATHLTHArenaRoundPoints: Decodable {
+    let roundID: UUID
+    let slotID: UUID
+    let points: Double
+    enum CodingKeys: String, CodingKey {
+        case points
+        case roundID = "round_id"
+        case slotID = "slot_id"
+    }
+}
+
+private struct ATHLTHArenaStartParams: Encodable {
+    let series: UUID
+    enum CodingKeys: String, CodingKey { case series = "p_series" }
+}
+
+private struct ATHLTHArenaOutcomeParams: Encodable {
+    let round: UUID
+    let slots: [UUID]
+    let evidence: String
+    enum CodingKeys: String, CodingKey {
+        case round = "p_round"
+        case slots = "p_slots"
+        case evidence = "p_evidence"
+    }
+}
+
+private struct ATHLTHArenaOutcomeVoteParams: Encodable {
+    let result: UUID
+    let accept: Bool
+    enum CodingKeys: String, CodingKey {
+        case result = "p_result"
+        case accept = "p_accept"
     }
 }
 
@@ -323,6 +397,61 @@ final class ATHLTHArenaCloudService: Sendable {
         let _: String = try await client.rpc(
             "arena_vote_replacement",
             params: ATHLTHArenaVoteReplacementParams(proposal: proposalID, accept: approve)
+        ).execute().value
+    }
+
+    func loadRoundResults(seriesID: UUID) async throws -> [ATHLTHArenaRoundResult] {
+        try await client.from("arena_round_results")
+            .select()
+            .eq("series_id", value: seriesID)
+            .order("created_at", ascending: false)
+            .execute().value
+    }
+
+    func loadResultVotes(resultIDs: [UUID]) async throws -> [ATHLTHArenaRoundResultVote] {
+        guard !resultIDs.isEmpty else { return [] }
+        return try await client.from("arena_round_result_votes")
+            .select()
+            .in("result_id", values: resultIDs)
+            .execute().value
+    }
+
+    func loadAwardedPoints(seriesID: UUID) async throws -> [ATHLTHArenaRoundPoints] {
+        let rounds = try await loadProposals(seriesID: seriesID)
+        guard !rounds.isEmpty else { return [] }
+        return try await client.from("arena_round_points")
+            .select()
+            .in("round_id", values: rounds.map(\.id))
+            .execute().value
+    }
+
+    func startSeries(seriesID: UUID) async throws {
+        guard currentUserID != nil else { throw ATHLTHArenaCloudError.signInRequired }
+        let _: String = try await client.rpc(
+            "arena_start_series",
+            params: ATHLTHArenaStartParams(series: seriesID)
+        ).execute().value
+    }
+
+    func proposeRoundOutcome(
+        roundID: UUID,
+        rankedSlots: [UUID],
+        evidence: String
+    ) async throws {
+        guard currentUserID != nil else { throw ATHLTHArenaCloudError.signInRequired }
+        let _: UUID = try await client.rpc(
+            "arena_propose_result",
+            params: ATHLTHArenaOutcomeParams(
+                round: roundID, slots: rankedSlots, evidence: evidence
+            )
+        ).execute().value
+    }
+
+    func voteRoundOutcome(resultID: UUID, accept: Bool) async throws {
+        guard currentUserID != nil else { throw ATHLTHArenaCloudError.signInRequired }
+        let _: String = try await client.rpc(
+            "arena_vote_result",
+            params: ATHLTHArenaOutcomeVoteParams(result: resultID, accept: accept)
         ).execute().value
     }
 
