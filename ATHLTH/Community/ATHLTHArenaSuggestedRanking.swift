@@ -1,5 +1,25 @@
 import Foundation
 
+/// Whether a linked Arena Live Ghost room may be reopened. A started
+/// race remains recoverable after invite expiry; an unstarted or finished
+/// race may never start a new workout from a stale invitation.
+enum ATHLTHArenaLinkedRaceAccess {
+    static func canOpen(
+        roomStatus: LiveGhostRaceRoomStatus?,
+        expiresAt: Date,
+        now: Date = Date()
+    ) -> Bool {
+        switch roomStatus {
+        case .finished, .cancelled:
+            return false
+        case .racing, .countdown:
+            return true
+        case .lobby, nil:
+            return expiresAt > now
+        }
+    }
+}
+
 /// Provisional, participant-shared workout leaderboard. These values are
 /// not independently attested and never grant points by themselves.
 struct ATHLTHArenaSuggestedStanding: Identifiable, Equatable {
