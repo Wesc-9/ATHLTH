@@ -200,6 +200,102 @@ private enum ATHLTHArenaCreationMode: String, Identifiable {
     var id: String { rawValue }
 }
 
+/// Shows existing Challenge activity in Arena without copying its rules or data.
+private struct ATHLTHArenaChallengeOverviewSection: View {
+    @EnvironmentObject private var challenges: ChallengeStore
+    @EnvironmentObject private var session: AppSessionStore
+
+    private var incoming: [ATHLTHChallenge] {
+        challenges.incomingInvitations(for: session.profile.userID)
+    }
+
+    private var active: [ATHLTHChallenge] {
+        challenges.trainingChallenges(for: session.profile.userID)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: "flag.checkered.circle.fill")
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                Text(ATHLTHLocalization.choose(
+                    english: "Challenges right now",
+                    norwegian: "Aktuelle utfordringer"
+                ))
+                .font(.headline)
+                Spacer()
+                NavigationLink {
+                    ATHLTHArenaSingleChallengesView()
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(ATHLTHLocalization.choose(english: "View all", norwegian: "Se alle"))
+                        Image(systemName: "chevron.right")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+            }
+
+            if incoming.isEmpty && active.isEmpty {
+                HStack(spacing: 10) {
+                    Image(systemName: "sportscourt")
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Your new duels and invitations will appear here.",
+                        norwegian: "Nye dueller og invitasjoner vises her."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(ATHLTHArenaLightStyle.card(17))
+            }
+
+            ForEach(Array(incoming.prefix(2))) { challenge in
+                challengeRow(challenge, invitation: true)
+            }
+
+            ForEach(Array(active.prefix(3))) { challenge in
+                challengeRow(challenge, invitation: false)
+            }
+        }
+    }
+
+    private func challengeRow(_ challenge: ATHLTHChallenge, invitation: Bool) -> some View {
+        NavigationLink {
+            ChallengeDetailView(challengeID: challenge.id)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: challenge.sport.systemImage)
+                    .font(.title3)
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 40, height: 40)
+                    .background(ATHLTHTheme.vitalitySoft.opacity(0.66), in: Circle())
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(challenge.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(1)
+                    Text(invitation
+                        ? ATHLTHLocalization.choose(english: "Invitation to review", norwegian: "Invitasjon til vurdering")
+                        : challenge.sport.title
+                    )
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+            .padding(13)
+            .background(ATHLTHArenaLightStyle.card(17))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 struct ATHLTHArenaHomeView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
@@ -217,6 +313,8 @@ struct ATHLTHArenaHomeView: View {
 
                 ATHLTHArenaOnlineSection()
                     .id(remoteRevision)
+
+                ATHLTHArenaChallengeOverviewSection()
 
                 HStack(spacing: 10) {
                     NavigationLink {
@@ -726,6 +824,48 @@ private struct ATHLTHArenaDistanceStarter: View {
     }
 }
 
+private enum ATHLTHArenaSeriesPreset: String, CaseIterable, Identifiable {
+    case custom
+    case running
+    case consistency
+
+    var id: String { rawValue }
+
+    var name: String {
+        switch self {
+        case .custom:
+            return ATHLTHLocalization.choose(english: "From scratch", norwegian: "Fra bunnen")
+        case .running:
+            return ATHLTHLocalization.choose(english: "Running trio", norwegian: "Løpetrio")
+        case .consistency:
+            return ATHLTHLocalization.choose(english: "Consistency cup", norwegian: "Treningscup")
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .custom:
+            return ATHLTHLocalization.choose(english: "Choose your own rounds", norwegian: "Velg egne runder")
+        case .running:
+            return ATHLTHLocalization.choose(english: "1 km, 5 km and distance", norwegian: "1 km, 5 km og distanse")
+        case .consistency:
+            return ATHLTHLocalization.choose(english: "Workout count and distance", norwegian: "Antall økter og distanse")
+        }
+    }
+
+    var rounds: [ATHLTHArenaRoundDraft] {
+        let templates: [ATHLTHArenaRoundTemplate]
+        switch self {
+        case .custom: templates = []
+        case .running: templates = [.fastest1K, .fastest5K, .mostDistance]
+        case .consistency: templates = [.mostWorkouts, .mostDistance]
+        }
+        return templates.map {
+            ATHLTHArenaRoundDraft(template: $0, title: $0.title, rules: $0.explanation)
+        }
+    }
+}
+
 struct ATHLTHArenaCreateView: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -737,6 +877,7 @@ struct ATHLTHArenaCreateView: View {
     @State private var scope: ATHLTHArenaScope = .duel
     @State private var scoring: ATHLTHArenaScoring = .winner
     @State private var durationDays = 14
+    @State private var selectedPreset: ATHLTHArenaSeriesPreset = .custom
     @State private var selectedFriendIDs: Set<UUID> = []
     @State private var clubChoices: [ATHLTHArenaClubChoice] = []
     @State private var selectedClubID: UUID?
@@ -761,6 +902,40 @@ struct ATHLTHArenaCreateView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    ForEach(ATHLTHArenaSeriesPreset.allCases) { preset in
+                        Button {
+                            selectedPreset = preset
+                        } label: {
+                            HStack(spacing: 11) {
+                                Image(systemName: preset == selectedPreset
+                                    ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(preset.name)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(ATHLTHTheme.primaryText)
+                                    Text(preset.detail)
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } header: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose a starting point",
+                        norwegian: "Velg utgangspunkt"
+                    ))
+                } footer: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "You can change or remove rounds in the draft before sending invitations.",
+                        norwegian: "Du kan endre eller fjerne runder i utkastet før du inviterer."
+                    ))
+                }
+
                 Section {
                     TextField(
                         ATHLTHLocalization.choose(
@@ -944,7 +1119,8 @@ struct ATHLTHArenaCreateView: View {
                             participantIDs: Array(selectedFriendIDs).sorted {
                                 $0.uuidString < $1.uuidString
                             },
-                            clubID: scope == .club ? selectedClubID : nil
+                            clubID: scope == .club ? selectedClubID : nil,
+                            rounds: selectedPreset.rounds
                         )
                         onCreate(draft)
                         dismiss()
