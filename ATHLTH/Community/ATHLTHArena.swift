@@ -566,6 +566,8 @@ struct ATHLTHArenaHomeView: View {
                 ATHLTHArenaOnlineSection()
                     .id(remoteRevision)
 
+                ATHLTHArenaSeasonsSection()
+
                 ATHLTHArenaChallengeOverviewSection()
 
                 ATHLTHArenaLiveDuelsSection()
