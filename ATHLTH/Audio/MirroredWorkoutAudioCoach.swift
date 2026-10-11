@@ -83,6 +83,18 @@ final class MirroredWorkoutAudioCoach:
             return
         }
 
+        // Strength's detailed set, exercise and rest cues are generated
+        // by Watch. The mirrored iPhone coach only has a generic start,
+        // pause and completion vocabulary for strength, so speaking here
+        // would duplicate the Watch-owned strength coaching.
+        if snapshot.kind == .strength {
+            if snapshot.state == .completed ||
+                snapshot.state == .failed {
+                finished = true
+            }
+            return
+        }
+
         let previousState = lastState
         lastState = snapshot.state
 
