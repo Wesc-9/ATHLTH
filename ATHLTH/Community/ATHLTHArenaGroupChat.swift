@@ -250,9 +250,11 @@ struct ATHLTHArenaGroupChatView: View {
         do {
             let allMembers = try await cloud.loadMembers(seriesID: series.id)
             membership = allMembers.first { $0.userID == session.profile.userID }
-            messages = isAccepted
-                ? try await cloud.loadGroupMessages(seriesID: series.id)
-                : []
+            if isAccepted {
+                messages = try await cloud.loadGroupMessages(seriesID: series.id)
+            } else {
+                messages = []
+            }
             error = nil
         } catch { self.error = error.localizedDescription
         }
