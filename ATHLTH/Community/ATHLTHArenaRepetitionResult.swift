@@ -3,6 +3,17 @@ import Foundation
 /// Structured manual repetition results. These are descriptions submitted
 /// for participant consensus, never independently attested workout metrics.
 enum ATHLTHArenaRepetitionResult {
+    static func agreedExercise(in rules: String) -> String? {
+        guard let first = rules.components(separatedBy: .newlines).first else {
+            return nil
+        }
+        let prefix = "Øvelse:"
+        guard first.hasPrefix(prefix) else { return nil }
+        let name = String(first.dropFirst(prefix.count))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? nil : name
+    }
+
     static func explanation(
         exercise: String,
         repetitions: [String],
