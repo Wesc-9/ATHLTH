@@ -1421,6 +1421,9 @@ struct FriendProfileView: View {
     @State private var profile: SocialFriendProfile?
     @State private var loading = true
     @State private var showingChallenge = false
+    @State private var showingTrainingMode = false
+    @State private var showingTrainingEditor = false
+    @State private var trainPhysically = true
     @State private var showingReport = false
     @State private var confirmBlock = false
     @State private var followOverview = SocialFollowOverview.empty
@@ -1601,6 +1604,39 @@ struct FriendProfileView: View {
                     preselectedFriends: [profile.card]
                 )
             }
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "How would you like to train?",
+                norwegian: "Hvordan vil dere trene?"
+            ),
+            isPresented: $showingTrainingMode,
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Train together in person",
+                norwegian: "Trene fysisk sammen"
+            )) {
+                trainPhysically = true
+                showingTrainingEditor = true
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Train the same workout",
+                norwegian: "Trene samme økt"
+            )) {
+                trainPhysically = false
+                showingTrainingEditor = true
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Cancel", norwegian: "Avbryt"
+            ), role: .cancel) {}
+        }
+        .sheet(isPresented: $showingTrainingEditor) {
+            SessionEditorView(
+                standaloneDate: Date(),
+                partnerID: userID,
+                physicalMeetup: trainPhysically
+            )
         }
         .sheet(isPresented: $showingReport) {
             if let profile {
@@ -2197,6 +2233,27 @@ struct FriendProfileView: View {
                     tint:
                         ATHLTHTheme
                             .premiumGold,
+                    emphasized: false
+                )
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                if social.mutualFollows.contains(where: { $0.userID == userID }) {
+                    showingTrainingMode = true
+                } else {
+                    followActionError = ATHLTHLocalization.choose(
+                        english: "Follow each other to invite someone to train.",
+                        norwegian: "Dere må følge hverandre for å invitere til trening."
+                    )
+                }
+            } label: {
+                profileActionLabel(
+                    title: ATHLTHLocalization.choose(
+                        english: "Train together", norwegian: "Tren sammen"
+                    ),
+                    icon: "figure.run.circle",
+                    tint: ATHLTHTheme.vitality,
                     emphasized: false
                 )
             }
