@@ -1,5 +1,13 @@
 import SwiftUI
 
+/// A countdown can arrive before a participant's READY update; re-arm
+/// the launch task whenever either readiness state changes.
+private struct LiveGhostStartTrigger: Equatable {
+    let startsAt: Date?
+    let ownReady: Bool
+    let opponentReady: Bool
+}
+
 struct LiveGhostRaceLobbyView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
@@ -101,7 +109,11 @@ struct LiveGhostRaceLobbyView: View {
                 challenge: challenge
             )
         }
-        .task(id: liveRace.room?.startsAt) {
+        .task(id: LiveGhostStartTrigger(
+            startsAt: liveRace.room?.startsAt,
+            ownReady: ownParticipant?.ready == true,
+            opponentReady: opponentParticipant?.ready == true
+        )) {
             await waitForSynchronizedStart()
         }
         .onDisappear {
@@ -866,6 +878,15 @@ struct LiveGhostRaceLobbyView: View {
             startsAt.timeIntervalSince(
                 Date()
             )
+
+        // Do not silently launch a stale race after the app resumes late.
+        if delay < -15 {
+            launchError = ATHLTHLocalization.choose(
+                english: "This countdown has already passed. Rejoin the live duel instead of starting late.",
+                norwegian: "Nedtellingen er allerede passert. Gå tilbake til live-duellen i stedet for å starte for sent."
+            )
+            return
+        }
 
         if delay > 0 {
             try? await Task.sleep(
