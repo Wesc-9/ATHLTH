@@ -624,6 +624,7 @@ private struct ATHLTHArenaSeasonCreateView: View {
 }
 
 private struct ATHLTHArenaSeasonDetailView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
     let season: ATHLTHArenaClubSeason
@@ -726,7 +727,20 @@ private struct ATHLTHArenaSeasonDetailView: View {
                     ))
                     .font(.headline)
                     Spacer()
-                    if loading { ProgressView().controlSize(.small) }
+                    if loading {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Button {
+                            Task { await refresh() }
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Refresh season standings",
+                            norwegian: "Oppdater sesongstillingen"
+                        ))
+                    }
                 }
 
                 if !leaders.isEmpty && !loading {
@@ -902,11 +916,15 @@ private struct ATHLTHArenaSeasonDetailView: View {
             .padding(16)
         }
         .background(ATHLTHArenaLightStyle.canvasBackground)
+        .refreshable { await refresh() }
         .navigationTitle(ATHLTHLocalization.choose(
             english: "Club season", norwegian: "Klubbsesong"
         ))
         .navigationBarTitleDisplayMode(.inline)
         .task(id: season.id) { await refresh() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await refresh() } }
+        }
     }
 
     @MainActor
