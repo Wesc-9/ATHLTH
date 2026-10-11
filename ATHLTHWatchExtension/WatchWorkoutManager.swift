@@ -208,6 +208,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var guidancePriorityGate =
         ATHLTHGuidancePriorityGate()
     private var coachEventLedger = ATHLTHCoachEventLedger()
+    private var coachCueQueue = ATHLTHCoachCueQueue()
     private var nextDistanceAnnouncementMeters: Double?
     private var nextTimeAnnouncementSeconds: TimeInterval?
     private var structuredStepStartElapsedTime: TimeInterval = 0
@@ -313,6 +314,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             audioCoachActivationTask?.cancel()
             audioCoachActivationTask = nil
             speechSynthesizer.stopSpeaking(at: .immediate)
+            coachCueQueue.reset()
             deactivateAudioCoachAudioSession()
             return
         }
@@ -364,6 +366,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             strengthStatusCoachTask?.cancel()
             strengthStatusCoachTask = nil
             speechSynthesizer.stopSpeaking(at: .immediate)
+            coachCueQueue.reset()
             deactivateAudioCoachAudioSession()
         } else {
             if !wasEnabled {
@@ -3058,6 +3061,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         strengthCommandJournal = []
         guidancePriorityGate.reset()
         coachEventLedger.reset()
+        coachCueQueue.reset()
         publish {
             self.state = .idle
             self.elapsedTime = 0
@@ -3190,6 +3194,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         audioCoachReadyAnnouncedForWorkout = false
         guidancePriorityGate.reset()
         coachEventLedger.reset()
+        coachCueQueue.reset()
         resetAudioCoachThresholds()
 
         do {
@@ -5464,6 +5469,16 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         switch decision {
         case .drop:
+            if priority >= .structuredStep {
+                let queuedEvent = event ??
+                    ATHLTHCoachEventFallback.event(for: priority)
+                coachCueQueue.enqueue(
+                    ATHLTHCoachQueuedCue(
+                        event: queuedEvent,
+                        text: text
+                    )
+                )
+            }
             return
 
         case .interruptAndDeliver:
@@ -5557,6 +5572,22 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 self.speechSynthesizer
                     .speak(utterance)
             }
+    }
+
+    private func deliverNextQueuedCoachCue() {
+        guard audioCoachConfiguration.enabled,
+              isActive,
+              !speechSynthesizer.isSpeaking,
+              audioCoachActivationTask == nil,
+              let next = coachCueQueue.popNext()
+        else { return }
+
+        // speak() rechecks the iPhone voice lease and existing priority gate.
+        speak(
+            next.text,
+            priority: next.event.priority,
+            event: next.event
+        )
     }
 
     private func activateAudioCoachAudioSession()
@@ -6497,6 +6528,7 @@ extension WatchWorkoutManager:
             self.guidancePriorityGate
                 .voiceDidFinish()
             self.deactivateAudioCoachAudioSession()
+            self.deliverNextQueuedCoachCue()
         }
     }
 
@@ -6514,6 +6546,7 @@ extension WatchWorkoutManager:
             self.guidancePriorityGate
                 .voiceDidFinish()
             self.deactivateAudioCoachAudioSession()
+            self.deliverNextQueuedCoachCue()
         }
     }
 }
