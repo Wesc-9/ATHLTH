@@ -113,6 +113,52 @@ struct ATHLTHArenaRelayLegReport: Decodable, Identifiable {
     }
 }
 
+struct ATHLTHArenaRelayTeamProgress: Equatable {
+    let team: Int
+    let completedLegs: Int
+    let totalLegs: Int
+    /// Only present when every stage has a single valid reported time.
+    let completeTotalSeconds: Double?
+}
+
+/// Pure, defensive display calculations only; never decides official scores.
+enum ATHLTHArenaRelayProgress {
+    static func team(
+        _ team: Int,
+        legs: [ATHLTHArenaRelayLeg],
+        reports: [ATHLTHArenaRelayLegReport]
+    ) -> ATHLTHArenaRelayTeamProgress? {
+        guard team == 1 || team == 2 else { return nil }
+        let stages = legs.filter { $0.teamIndex == team }
+        guard stages.count >= 2,
+              Set(stages.map(\.slotID)).count == stages.count,
+              Set(stages.map(\.legOrder)) == Set(1...stages.count),
+              Set(stages.map(\.seriesID)).count == 1,
+              Set(stages.map(\.routeRoundID)).count == 1
+        else { return nil }
+
+        let bySlot = Dictionary(grouping: reports, by: \.slotID)
+        let validTimes = stages.compactMap { leg -> Double? in
+            guard let matches = bySlot[leg.slotID],
+                  matches.count == 1,
+                  let report = matches.first,
+                  report.seriesID == leg.seriesID,
+                  report.elapsedSeconds.isFinite,
+                  (10...86_400).contains(report.elapsedSeconds)
+            else { return nil }
+            return report.elapsedSeconds
+        }
+
+        return ATHLTHArenaRelayTeamProgress(
+            team: team,
+            completedLegs: validTimes.count,
+            totalLegs: stages.count,
+            completeTotalSeconds: validTimes.count == stages.count
+                ? validTimes.reduce(0,+) : nil
+        )
+    }
+}
+
 private struct ATHLTHArenaReportRelayLegParams: Encodable {
     let seriesID: UUID
     let slotID: UUID
@@ -641,9 +687,6 @@ final class ATHLTHArenaCloudService: Sendable {
         seconds: Double?
     ) async throws {
         guard currentUserID != nil else {
-            throw ATHLTHArenaCloudError.signInRequired
-        }
-        if let seconds, (!seconds.isFinite || !(10...86_400).contains(seconds)) {
             throw ATHLTHArenaCloudError.signInRequired
         }
         try await client.rpc(
