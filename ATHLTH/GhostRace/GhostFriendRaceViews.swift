@@ -46,13 +46,16 @@ struct GhostFriendRaceHubView: View {
     @State private var localError: String?
     @State private var captureDevice:
         WorkoutCaptureDevice = .iPhone
+    private let arenaRoundID: UUID?
 
     /// Opening a duel from an active Arena 1v1 series can suggest its
     /// opponent; the existing mutual-follow and permission checks remain.
     init(
         preferredFriendID: UUID? = nil,
-        preferredRoute: TrainingRoute? = nil
+        preferredRoute: TrainingRoute? = nil,
+        arenaRoundID: UUID? = nil
     ) {
+        self.arenaRoundID = arenaRoundID
         _selectedFriendID = State(initialValue: preferredFriendID)
         _selectedPlannedRoute = State(initialValue: preferredRoute)
         _courseMode = State(initialValue: preferredRoute == nil
@@ -677,7 +680,8 @@ struct GhostFriendRaceHubView: View {
                 to: friend,
                 route: route,
                 targetDurationSeconds: seconds,
-                settings: settings
+                settings: settings,
+                arenaRoundID: arenaRoundID
             )
         case .previousWorkout:
             guard let workoutID = selectedWorkoutID,
@@ -689,7 +693,8 @@ struct GhostFriendRaceHubView: View {
                 to: friend,
                 workout: workout,
                 detail: detail,
-                settings: settings
+                settings: settings,
+                arenaRoundID: arenaRoundID
             )
         }
 
