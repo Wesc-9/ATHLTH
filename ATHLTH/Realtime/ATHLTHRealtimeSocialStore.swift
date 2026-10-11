@@ -1551,6 +1551,12 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         liveTrails[currentUserID] = nil
     }
 
+    /// A first finish is immutable on the server. Retries repeat the exact
+    /// same payload after transient network errors, never another recording.
+    /// A bounded schedule avoids indefinitely running network work after
+    /// HealthKit/Watch ends or the user closes the app.
+    private static let liveGhostFinishRetryDelays: [TimeInterval] = [0, 1, 3]
+
     func finishCurrentLiveGhostRace(
         elapsedSeconds: TimeInterval,
         completedRouteID: UUID?
@@ -1603,39 +1609,41 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             }
         }
 
-        do {
-            try await client
-                .from(
-                    "live_ghost_race_participants"
-                )
-                .update(
-                    FinishWrite(
-                        finishedAt: Date(),
-                        elapsedSeconds:
-                            max(
-                                elapsedSeconds,
-                                0
-                            ),
-                        updatedAt: Date()
-                    )
-                )
-                .eq(
-                    "challenge_id",
-                    value:
-                        challengeID
-                )
-                .eq(
-                    "user_id",
-                    value:
-                        currentUserID
-                )
-                .execute()
-            succeeded = true
-        } catch is CancellationError {
-            return
-        } catch {
-            errorMessage =
-                error.localizedDescription
+        // Capture the original completion instant once. If Supabase
+        // committed the first request but its response was lost, the
+        // immutable-finish trigger makes the next request idempotent.
+        let finishedAt = Date()
+        let finishPayload = FinishWrite(
+            finishedAt: finishedAt,
+            elapsedSeconds: elapsedSeconds,
+            updatedAt: finishedAt
+        )
+        for delay in Self.liveGhostFinishRetryDelays {
+            guard !Task.isCancelled else { return }
+            if delay > 0 {
+                do {
+                    try await Task.sleep(for: .seconds(delay))
+                } catch {
+                    return
+                }
+            }
+            do {
+                try await client
+                    .from("live_ghost_race_participants")
+                    .update(finishPayload)
+                    .eq("challenge_id", value: challengeID)
+                    .eq("user_id", value: currentUserID)
+                    .execute()
+                succeeded = true
+                errorMessage = nil
+                return
+            } catch is CancellationError {
+                return
+            } catch {
+                // Keep the last server error visible if every attempt fails.
+                // Do not report success or award Arena points locally.
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
