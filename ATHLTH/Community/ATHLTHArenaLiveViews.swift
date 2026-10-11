@@ -2726,13 +2726,29 @@ struct ATHLTHArenaOnlineDetailView: View {
 
 /// A recent, locally matched HealthKit run. Only the suggested time is copied
 /// into the relay form after the user explicitly chooses this run.
-private struct ATHLTHArenaRelayGPSCandidate: Identifiable {
+struct ATHLTHArenaRelayGPSCandidate: Identifiable {
     let id: UUID
     let slotID: UUID
     let routeRoundID: UUID
     let startedAt: Date
     let elapsedSeconds: TimeInterval
     let routeMatchPercent: Double
+
+    /// Prevent choosing a stale candidate after a lineup/route change.
+    /// GPS qualification is performed separately on the device.
+    func canPrefill(
+        for slotID: UUID?,
+        routeRoundID: UUID?,
+        reportWindowOpen: Bool
+    ) -> Bool {
+        reportWindowOpen &&
+        slotID == self.slotID &&
+        routeRoundID == self.routeRoundID &&
+        elapsedSeconds.isFinite &&
+        (10...86_400).contains(elapsedSeconds) &&
+        routeMatchPercent.isFinite &&
+        (90...100).contains(routeMatchPercent)
+    }
 }
 
 /// Optional stafettplan on an accepted two-team Arena roster.
@@ -3471,11 +3487,11 @@ private struct ATHLTHArenaRelaySection: View {
             showingOwnGPSCandidates = false
             ownGPSCandidates = []
         }
-        guard reportWindowOpen,
-              ownLeg?.slotID == candidate.slotID,
-              ownLeg?.routeRoundID == candidate.routeRoundID,
-              candidate.elapsedSeconds.isFinite,
-              (10...86_400).contains(candidate.elapsedSeconds) else {
+        guard candidate.canPrefill(
+            for: ownLeg?.slotID,
+            routeRoundID: ownLeg?.routeRoundID,
+            reportWindowOpen: reportWindowOpen
+        ) else {
             ownGPSNotice = ATHLTHLocalization.choose(
                 english: "The agreed stage or competition window changed. Find a matching run again.",
                 norwegian: "Avtalt etappe eller konkurranseperiode ble endret. Søk etter økt på nytt."
