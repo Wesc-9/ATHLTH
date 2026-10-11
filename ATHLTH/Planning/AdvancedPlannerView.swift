@@ -4535,9 +4535,9 @@ struct SessionEditorView: View {
     let existingWorkout: PlannedSession?
     let isStandalone: Bool
 
-    @State private var title = "New Workout"
+    @State private var title = ""
     @State private var kind: WorkoutKind = .strength
-    @State private var durationMinutes = 45
+    @State private var durationMinutes = 0
     @State private var distanceKilometers = 5.0
     @State private var notes = ""
     @State private var workoutTemplateID: UUID?
@@ -4840,6 +4840,13 @@ struct SessionEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    workoutBuilderOverview
+                }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+
                 if !workoutBlocks.isEmpty {
                     Section("Workout Structure") {
                         HStack {
@@ -4907,7 +4914,13 @@ struct SessionEditorView: View {
                 }
 
                 Section {
-                    TextField("Title", text: $title)
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english: "Workout name (required)",
+                            norwegian: "Øktnavn (obligatorisk)"
+                        ),
+                        text: $title
+                    )
 
                     Picker("Type", selection: $kind) {
                         ForEach(WorkoutKind.allCases) { kind in
@@ -4978,9 +4991,13 @@ struct SessionEditorView: View {
                     }
 
                     Stepper(
-                        "Duration: \(durationMinutes) min",
+                        ATHLTHLocalization.choose(
+                            english: "Duration",
+                            norwegian: "Varighet"
+                        ) + ": " +
+                        (durationMinutes == 0 ? "–" : "\(durationMinutes) min"),
                         value: $durationMinutes,
-                        in: 5...300,
+                        in: 0...300,
                         step: 5
                     )
 
@@ -5044,16 +5061,6 @@ struct SessionEditorView: View {
                     ATHLTHTheme.border
                 )
 
-
-                Section {
-                    workoutBuilderOverview
-                }
-                .listRowBackground(
-                    ATHLTHTheme.card
-                )
-                .listRowSeparatorTint(
-                    ATHLTHTheme.border
-                )
 
                 if existingWorkout == nil ||
                     kind == .strength {
@@ -5266,17 +5273,6 @@ struct SessionEditorView: View {
                     selection:
                         spotifyWorkoutPlaylistSelection
                 )
-            }
-            .onChange(of: kind) { _, newKind in
-                guard existingWorkout == nil else { return }
-
-                if newKind == .strength && title == "New Workout" {
-                    title = "Strength Workout"
-                } else if newKind == .running && title == "New Workout" {
-                    title = "Running Workout"
-                } else if newKind == .walking && title == "New Workout" {
-                    title = "Walk"
-                }
             }
             .onChange(of: selectedRouteID) { oldRouteID, newRouteID in
                 syncMetricsFromRouteChange(
@@ -6348,7 +6344,33 @@ struct SessionEditorView: View {
                 }
             }
         }
-        .padding(.vertical, 2)
+        .padding(16)
+        .background {
+            RoundedRectangle(cornerRadius: 23, style: .continuous)
+                .fill(LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.86),
+                        ATHLTHTheme.surfaceStone.opacity(0.77),
+                        Color.white.opacity(0.76)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 23, style: .continuous)
+                .stroke(LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.98),
+                        ATHLTHTheme.accent.opacity(0.15),
+                        Color.white.opacity(0.92)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ), lineWidth: 1)
+        }
+        .shadow(color: ATHLTHTheme.accentDeep.opacity(0.065),
+                radius: 14, x: 0, y: 7)
     }
 
     private func workoutOverviewMetric(
@@ -6388,13 +6410,13 @@ struct SessionEditorView: View {
             alignment: .leading
         )
         .background(
-            ATHLTHTheme.accentSoft
-                .opacity(0.40),
-            in: RoundedRectangle(
-                cornerRadius: 12,
-                style: .continuous
-            )
+            Color.white.opacity(0.57),
+            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
         )
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.white.opacity(0.78), lineWidth: 0.7)
+        }
     }
 
     private var workoutOverviewDuration:
@@ -6471,7 +6493,7 @@ struct SessionEditorView: View {
             return "~\(estimated)m"
         }
 
-        return "\(durationMinutes)m"
+        return durationMinutes > 0 ? "\(durationMinutes)m" : "–"
     }
 
     private var workoutOverviewPrimaryCount:
@@ -8013,7 +8035,7 @@ struct SessionEditorView: View {
                     : scheduledTimeEnabled
                         ? scheduledTime
                         : nil,
-            durationMinutes: durationMinutes,
+            durationMinutes: durationMinutes > 0 ? durationMinutes : nil,
             targetDistanceKilometers:
                 (kind == .walking || kind == .running)
                     ? distanceKilometers
