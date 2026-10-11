@@ -1194,6 +1194,13 @@ struct SocialWorkoutInvitePayload: Codable, Hashable {
     var participationMode:
         SocialWorkoutParticipationMode? = nil
     var maxParticipants: Int? = nil
+    // In-person friends can choose an independent start without losing
+    // their shared lobby or live workout progress.
+    var startIndependently: Bool? = nil
+
+    var resolvedStartIndependently: Bool {
+        startIndependently == true || resolvedParticipationMode == .remote
+    }
 
     var resolvedParticipationMode:
         SocialWorkoutParticipationMode {
