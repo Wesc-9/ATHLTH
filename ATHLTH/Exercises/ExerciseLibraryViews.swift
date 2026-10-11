@@ -25,6 +25,7 @@ struct ExerciseLibraryView: View {
 
     let source: ExerciseLibrarySection?
     let selectionTitle: String?
+    let selectedExerciseCounts: [UUID: Int]
     let onSelect: ((ExerciseLibraryEntry) -> Void)?
 
     @State private var query = ""
@@ -38,11 +39,13 @@ struct ExerciseLibraryView: View {
         source: ExerciseLibrarySection? = nil,
         initialBodyPart: String = "All",
         selectionTitle: String? = nil,
+        selectedExerciseCounts: [UUID: Int] = [:],
         onSelect: ((ExerciseLibraryEntry) -> Void)? = nil
     ) {
         self.source = source
         _selectedSection = State(initialValue: source ?? .library)
         self.selectionTitle = selectionTitle
+        self.selectedExerciseCounts = selectedExerciseCounts
         self.onSelect = onSelect
         _selectedBodyPart = State(initialValue: initialBodyPart)
     }
@@ -242,61 +245,61 @@ struct ExerciseLibraryView: View {
                                     }
                                     .buttonStyle(.plain)
                                     .simultaneousGesture(
-                                        TapGesture()
-                                            .onEnded {
-                                                recents
-                                                    .markUsed(
-                                                        .exercise,
-                                                        itemID:
-                                                            entry.id
-                                                                .uuidString,
-                                                        title:
-                                                            entry.name,
-                                                        subtitle:
-                                                            [
-                                                                entry.bodyPart,
-                                                                entry.exercise
-                                                                    .equipment
-                                                                    .first
-                                                            ]
-                                                            .compactMap {
-                                                                $0
-                                                            }
-                                                            .joined(
-                                                                separator:
-                                                                    " · "
-                                                            ),
-                                                        icon:
-                                                            "dumbbell.fill"
-                                                    )
-                                            }
+                                        TapGesture().onEnded {
+                                            recordExerciseSelection(entry)
+                                        }
                                     )
 
-                                    LibraryFavoriteButton(
-                                        kind: .exercise,
-                                        itemID:
-                                            entry.id
-                                                .uuidString,
-                                        title:
-                                            entry.name,
-                                        subtitle:
-                                            [
-                                                entry.bodyPart,
-                                                entry.exercise
-                                                    .equipment
-                                                    .first
-                                            ]
-                                            .compactMap {
-                                                $0
+                                    if let onSelect {
+                                        Button {
+                                            recordExerciseSelection(entry)
+                                            onSelect(entry)
+                                        } label: {
+                                            VStack(spacing: 3) {
+                                                Image(systemName: "plus")
+                                                    .font(.system(size: 18, weight: .bold))
+                                                Text(
+                                                    ATHLTHLocalization.choose(
+                                                        english: "Add",
+                                                        norwegian: "Legg til"
+                                                    )
+                                                )
+                                                .font(.system(size: 10, weight: .semibold))
                                             }
-                                            .joined(
-                                                separator:
-                                                    " · "
-                                            ),
-                                        icon:
-                                            "dumbbell.fill"
-                                    )
-                                    .padding(8)
+                                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                                            .frame(width: 62, height: 53)
+                                            .background(
+                                                Color.white.opacity(0.90),
+                                                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                            )
+                                            .overlay {
+                                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                                    .stroke(ATHLTHTheme.accent.opacity(0.20), lineWidth: 0.8)
+                                            }
+                                        }
+                                        .buttonStyle(.plain)
+                                        .accessibilityLabel(
+                                            ATHLTHLocalization.choose(
+                                                english: "Add " + library.localizedExerciseName(entry) + " to workout",
+                                                norwegian: "Legg til " + library.localizedExerciseName(entry) + " i økten"
+                                            )
+                                        )
+                                        .padding(8)
+                                    } else {
+                                        LibraryFavoriteButton(
+                                            kind: .exercise,
+                                            itemID: entry.id.uuidString,
+                                            title: entry.name,
+                                            subtitle: [
+                                                entry.bodyPart,
+                                                entry.exercise.equipment.first
+                                            ]
+                                            .compactMap { $0 }
+                                            .joined(separator: " · "),
+                                            icon: "dumbbell.fill"
+                                        )
+                                        .padding(8)
+                                    }
                                 }
                                 .id(entry.id)
                             }
@@ -551,6 +554,7 @@ struct ExerciseLibraryView: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
+                    if onSelect == nil {
                     Button {
                         favoritesOnly.toggle()
                     } label: {
@@ -580,6 +584,7 @@ struct ExerciseLibraryView: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    }
 
                     Menu {
                         Button(
@@ -785,6 +790,18 @@ struct ExerciseLibraryView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private func recordExerciseSelection(_ entry: ExerciseLibraryEntry) {
+        recents.markUsed(
+            .exercise,
+            itemID: entry.id.uuidString,
+            title: entry.name,
+            subtitle: [entry.bodyPart, entry.exercise.equipment.first]
+                .compactMap { $0 }
+                .joined(separator: " · "),
+            icon: "dumbbell.fill"
+        )
+    }
+
     private func exerciseRow(_ entry: ExerciseLibraryEntry) -> some View {
         HStack(spacing: 13) {
             ExerciseArtwork(entry: entry, size: 68)
@@ -823,13 +840,34 @@ struct ExerciseLibraryView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
+
+                if onSelect != nil, let count = selectedExerciseCounts[entry.id], count > 0 {
+                    Label(
+                        count == 1
+                            ? ATHLTHLocalization.choose(english: "In workout", norwegian: "I økten")
+                            : ATHLTHLocalization.choose(
+                                english: "In workout · " + String(count),
+                                norwegian: "I økten · " + String(count)
+                            ),
+                        systemImage: "checkmark.circle.fill"
+                    )
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(ATHLTHTheme.accent.opacity(0.09), in: Capsule())
+                }
             }
 
-            Spacer()
+            Spacer(minLength: 4)
 
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+            if onSelect == nil {
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            } else {
+                Color.clear.frame(width: 70, height: 1)
+            }
         }
         .padding(12)
         .background(
