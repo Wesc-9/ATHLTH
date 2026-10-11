@@ -79,4 +79,27 @@ final class PlannedWorkoutInviteTests: XCTestCase {
         XCTAssertEqual(restored.sourceWorkoutID, id)
         XCTAssertEqual(restored.decision, .accepted)
     }
+    func testInPersonLobbyCanSwitchToIndependentStart() throws {
+        var payload = SocialWorkoutInvitePayload(workout: makeWorkout())
+        XCTAssertEqual(payload.resolvedParticipationMode, .physical)
+        XCTAssertFalse(payload.resolvedStartIndependently)
+        payload.startIndependently = true
+
+        let restored = try JSONDecoder().decode(
+            SocialWorkoutInvitePayload.self,
+            from: JSONEncoder().encode(payload)
+        )
+        XCTAssertEqual(restored.resolvedParticipationMode, .physical)
+        XCTAssertTrue(restored.resolvedStartIndependently)
+    }
+
+    func testLegacySocialInviteDefaultsToSynchronizedStart() throws {
+        let payload = SocialWorkoutInvitePayload(workout: makeWorkout())
+        let restored = try JSONDecoder().decode(
+            SocialWorkoutInvitePayload.self,
+            from: JSONEncoder().encode(payload)
+        )
+        XCTAssertFalse(restored.resolvedStartIndependently)
+    }
+
 }
