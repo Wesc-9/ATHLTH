@@ -534,7 +534,8 @@ struct ATHLTHArenaOnlineDetailView: View {
             let approvalRows = try await cloud.loadApprovals(
                 roundIDs: roundRows.map(\.id)
             )
-            latestSeries = try await loadedSeries.first { $0.id == series.id }
+            let seriesRows = try await loadedSeries
+            latestSeries = seriesRows.first { $0.id == series.id }
             members = memberRows
             rounds = roundRows
             approvals = approvalRows
