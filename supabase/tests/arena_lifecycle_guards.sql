@@ -112,6 +112,38 @@ begin
  ) then
    raise exception 'Live Ghost finish validation function missing';
  end if;
+ -- Team mode is an optional read-only overlay. Only the organizer
+ -- can replace all assignments through the draft-only RPC.
+ if not (select relrowsecurity from pg_class
+         where oid='public.arena_series_team_assignments'::regclass) then
+   raise exception 'Arena team rosters must have RLS enabled';
+ end if;
+ if has_table_privilege('anon','public.arena_series_team_assignments','SELECT')
+    or has_table_privilege('anon','public.arena_series_team_assignments','INSERT')
+    or has_table_privilege('authenticated','public.arena_series_team_assignments','INSERT')
+    or has_table_privilege('authenticated','public.arena_series_team_assignments','UPDATE')
+    or has_table_privilege('authenticated','public.arena_series_team_assignments','DELETE') then
+   raise exception 'Arena team assignments allow unsafe direct writes';
+ end if;
+ if not exists (
+   select 1 from pg_policies where schemaname='public'
+     and tablename='arena_series_team_assignments'
+     and policyname='arena_team_roster_read'
+     and qual like '%arena_can_access%'
+ ) then
+   raise exception 'Arena team rosters have no participant-only read policy';
+ end if;
+ if not has_function_privilege(
+   'authenticated',
+   'public.arena_save_team_lineup(uuid,uuid[],uuid[])'::regprocedure,
+   'EXECUTE'
+ ) or has_function_privilege(
+   'anon',
+   'public.arena_save_team_lineup(uuid,uuid[],uuid[])'::regprocedure,
+   'EXECUTE'
+ ) then
+   raise exception 'Arena team setup RPC privileges are incorrect';
+ end if;
  if not exists (
    select 1 from information_schema.columns
    where table_schema='public' and table_name='arena_series'
