@@ -3350,6 +3350,65 @@ private struct IPhoneAudioCoachLiveSheet: View {
 
                             coachCard {
                                 VStack(alignment: .leading, spacing: 12) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "quote.bubble")
+                                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                                        Text(ATHLTHLocalization.choose(
+                                            english: "Speaking style",
+                                            norwegian: "Talemåte"
+                                        ))
+                                        .font(.headline)
+                                    }
+                                    LazyVGrid(
+                                        columns: [
+                                            GridItem(.flexible(), spacing: 8),
+                                            GridItem(.flexible(), spacing: 8)
+                                        ],
+                                        spacing: 8
+                                    ) {
+                                        ForEach(ATHLTHCoachSpeechStyle.allCases) { style in
+                                            Button {
+                                                update { $0.speechStyle = style }
+                                            } label: {
+                                                VStack(alignment: .leading, spacing: 4) {
+                                                    Text(style.title)
+                                                        .font(.subheadline.weight(.semibold))
+                                                    Text(style.subtitle)
+                                                        .font(.caption2)
+                                                        .lineLimit(2)
+                                                        .frame(
+                                                            maxWidth: .infinity,
+                                                            alignment: .leading
+                                                        )
+                                                }
+                                                .foregroundStyle(
+                                                    (configuration.speechStyle ?? .balanced) == style
+                                                        ? Color.white
+                                                        : ATHLTHTheme.primaryText
+                                                )
+                                                .frame(maxWidth: .infinity, minHeight: 54)
+                                                .padding(10)
+                                                .background(
+                                                    (configuration.speechStyle ?? .balanced) == style
+                                                        ? ATHLTHTheme.accentDeep
+                                                        : ATHLTHTheme.canvasBottom,
+                                                    in: RoundedRectangle(cornerRadius: 13)
+                                                )
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                    }
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Only for this workout. Does not affect message frequency.",
+                                        norwegian: "Kun denne økten. Påvirker ikke talefrekvensen."
+                                    ))
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+                            }
+
+                            coachCard {
+                                VStack(alignment: .leading, spacing: 12) {
                                     Text(ATHLTHLocalization.choose(
                                         english: "Frequency", norwegian: "Hvor ofte?"
                                     ))
