@@ -439,8 +439,11 @@ struct ActiveStrengthWorkoutView: View {
             }
             .onChange(
                 of: scenePhase
-            ) { _, _ in
+            ) { _, phase in
                 updateScreenAwakeState()
+                if phase == .background {
+                    strength.checkpoint()
+                }
             }
             .onChange(
                 of:
@@ -4590,6 +4593,10 @@ struct ActiveStrengthWorkoutView: View {
                     }
                 }
 
+                if currentStrengthTargetKind == .time {
+                    timedSetCountdownCard
+                }
+
                 HStack(spacing: 10) {
                     Image(
                         systemName: "timer"
@@ -5019,6 +5026,176 @@ struct ActiveStrengthWorkoutView: View {
                 )
             }
         )
+    }
+
+    /// One shared timer surface in both focused and legacy strength set layouts.
+    /// The absolute start date lives in StrengthWorkoutStore, so a locked phone
+    /// or a temporarily backgrounded app cannot make the countdown drift.
+    private var timedSetCountdownCard: some View {
+        TimelineView(.periodic(from: .now, by: 0.5)) { context in
+            let countdown = strength.currentTimedSetCountdown
+            let target = countdown?.targetSeconds ?? strength.draftDurationSeconds
+            let remaining = countdown?.secondsRemaining(at: context.date) ?? target
+            let isRunning = countdown?.isRunning == true
+            let finished = countdown?.isFinished(at: context.date) == true
+            let hasStarted = countdown != nil
+
+            VStack(alignment: .leading, spacing: 13) {
+                HStack(spacing: 12) {
+                    Image(systemName: finished ? "checkmark.circle.fill" : "timer")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.premiumGold)
+                        .frame(width: 40, height: 40)
+                        .background(
+                            ATHLTHTheme.premiumGoldSoft,
+                            in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        )
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "SET COUNTDOWN",
+                                norwegian: "NEDTELLING FOR SETT"
+                            )
+                        )
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .tracking(1)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                        Text(
+                            finished
+                                ? ATHLTHLocalization.choose(
+                                    english: "Time complete",
+                                    norwegian: "Tiden er ute"
+                                )
+                                : isRunning
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Counting down",
+                                        norwegian: "Nedtelling pågår"
+                                    )
+                                    : hasStarted
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Paused",
+                                            norwegian: "På pause"
+                                        )
+                                        : ATHLTHLocalization.choose(
+                                            english: "Ready when you are",
+                                            norwegian: "Klar når du er det"
+                                        )
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    Text(TimeInterval(remaining).clockDuration)
+                        .font(.system(size: 37, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .contentTransition(.numericText(countsDown: true))
+                        .minimumScaleFactor(0.8)
+                        .lineLimit(1)
+                }
+
+                ProgressView(
+                    value: Double(max(target - remaining, 0)),
+                    total: Double(max(target, 1))
+                )
+                .tint(ATHLTHTheme.premiumGold)
+
+                HStack(spacing: 10) {
+                    if !finished {
+                        Button {
+                            if isRunning {
+                                strength.pauseTimedSet()
+                            } else {
+                                strength.startOrResumeTimedSet()
+                            }
+                        } label: {
+                            Label(
+                                isRunning
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Pause",
+                                        norwegian: "Pause"
+                                    )
+                                    : hasStarted
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Resume",
+                                            norwegian: "Fortsett"
+                                        )
+                                        : ATHLTHLocalization.choose(
+                                            english: "Start  timer",
+                                            norwegian: "Start nedtelling"
+                                        ),
+                                systemImage: isRunning ? "pause.fill" : "play.fill"
+                            )
+                            .font(.subheadline.weight(.bold))
+                            .frame(maxWidth: .infinity, minHeight: 42)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHTheme.accentDeep)
+                    } else {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Complete the set when ready",
+                                norwegian: "Fullfør settet når du er klar"
+                            ),
+                            systemImage: "checkmark.circle.fill"
+                        )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    if hasStarted {
+                        Button {
+                            strength.resetTimedSet()
+                        } label: {
+                            Image(systemName: "arrow.counterclockwise")
+                                .font(.system(size: 17, weight: .semibold))
+                                .frame(width: 42, height: 42)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(ATHLTHTheme.accentDeep)
+                        .accessibilityLabel(
+                            ATHLTHLocalization.choose(
+                                english: "Reset countdown",
+                                norwegian: "Nullstill nedtelling"
+                            )
+                        )
+                    }
+                }
+
+                if !hasStarted {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Start the clock when you begin. You still finish the set manually.",
+                            norwegian: "Start klokken når du begynner. Du fullfører fortsatt settet manuelt."
+                        )
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+            }
+            .padding(14)
+            .background(
+                LinearGradient(
+                    colors: [
+                        ATHLTHTheme.cardWarm,
+                        ATHLTHTheme.card.opacity(0.92)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: RoundedRectangle(cornerRadius: 21, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 21, style: .continuous)
+                    .stroke(ATHLTHTheme.premiumGold.opacity(0.28), lineWidth: 0.8)
+            }
+            .sensoryFeedback(.success, trigger: finished)
+        }
     }
 
     private var focusedDurationField:
@@ -7073,6 +7250,11 @@ struct ActiveStrengthWorkoutView: View {
                 }
             }
             .padding(.top, 12)
+
+            if currentStrengthTargetKind == .time {
+                timedSetCountdownCard
+                    .padding(.top, 12)
+            }
 
             HStack(spacing: 12) {
                 Label(
