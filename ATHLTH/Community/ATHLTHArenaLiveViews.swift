@@ -1083,7 +1083,7 @@ private struct ATHLTHArenaSeasonDetailView: View {
                             )
                             .font(.caption)
                             .foregroundStyle(ATHLTHTheme.mutedText)
-                         else if seasonPhase == .completed && !championsAreFinal {
+                        } else if seasonPhase == .completed && !championsAreFinal {
                             Label(
                                 ATHLTHLocalization.choose(
                                     english: "Standings remain provisional: at least one linked competition is ongoing, unresolved or not accessible for review. Only approved points count.",
