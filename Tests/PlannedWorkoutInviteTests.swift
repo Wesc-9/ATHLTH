@@ -67,6 +67,34 @@ final class PlannedWorkoutInviteTests: XCTestCase {
         XCTAssertNil(restored.reminderMinutesBefore)
     }
 
+    func testInviteeExercisePermissionAndPartnerSurviveRoundTrip() throws {
+        let partnerID = UUID()
+        var workout = makeWorkout()
+        workout.invitedPartnerID = partnerID
+        workout.allowInviteeExercises = true
+        let restored = try JSONDecoder().decode(
+            PlannedSession.self,
+            from: JSONEncoder().encode(workout)
+        )
+        XCTAssertEqual(restored.invitedPartnerID, partnerID)
+        XCTAssertEqual(restored.allowInviteeExercises, true)
+        XCTAssertTrue(
+            WorkoutInviteExercisePolicy.canPropose(
+                original: workout, proposed: restored
+            )
+        )
+    }
+
+    func testOldWorkoutDefaultsToNoExerciseAdditionPermission() throws {
+        let source = makeWorkout()
+        let restored = try JSONDecoder().decode(
+            PlannedSession.self,
+            from: JSONEncoder().encode(source)
+        )
+        XCTAssertNil(restored.invitedPartnerID)
+        XCTAssertNil(restored.allowInviteeExercises)
+    }
+
     func testInvitationResponseIsPreserved() throws {
         let id = UUID()
         let answer = PlannedWorkoutInviteResponse(
