@@ -383,18 +383,18 @@ struct ATHLTHArenaOnlineSection: View {
             )
         case .minutes(let value):
             return ATHLTHLocalization.choose(
-                english: "Ends in \\(value) min",
-                norwegian: "Frist om \\(value) min"
+                english: "Ends in \(value) min",
+                norwegian: "Frist om \(value) min"
             )
         case .hours(let value):
             return ATHLTHLocalization.choose(
-                english: "Ends in \\(value) h",
-                norwegian: "Frist om \\(value) t"
+                english: "Ends in \(value) h",
+                norwegian: "Frist om \(value) t"
             )
         case .days(let value):
             return ATHLTHLocalization.choose(
-                english: "Ends in \\(value) d",
-                norwegian: "Frist om \\(value) d"
+                english: "Ends in \(value) d",
+                norwegian: "Frist om \(value) d"
             )
         }
     }
