@@ -308,12 +308,19 @@ struct TargetGhostSetupView: View {
 
     init(
         route: TrainingRoute,
-        challengeTitle: String? = nil
+        challengeTitle: String? = nil,
+        suggestedDurationSeconds: TimeInterval? = nil
     ) {
         self.route = route
         self.challengeTitle = challengeTitle
 
+        // Arena can prefill a rival's voluntarily shared time. The user
+        // may edit the target before starting; no opponent GPS is replayed.
+        let sharedTime = suggestedDurationSeconds.flatMap { seconds -> Double? in
+            seconds.isFinite && (60...86_400).contains(seconds) ? seconds : nil
+        }
         let suggested =
+            sharedTime ??
             route.expectedTravelTimeSeconds ??
             max(
                 route.distanceKilometers * 330,
