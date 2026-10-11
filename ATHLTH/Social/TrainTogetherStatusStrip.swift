@@ -6,7 +6,7 @@ struct TrainTogetherStatusStrip: View {
     @State private var showingCompanion = false
 
     private var sessionID: UUID? {
-        guard let joinedID = social.currentJoinedWorkoutSessionID,
+        guard let joinedID = social.recordingWorkoutSessionID,
               let userID = social.currentUserID,
               social.workoutParticipants.contains(where: {
                   $0.sessionID == joinedID &&
