@@ -58,9 +58,13 @@ struct ATHLTHArenaRemoteProposal: Decodable, Identifiable {
     let title: String
     let rules: String
     let position: Int
+    let targetDistanceMeters: Double?
+    let routeSnapshot: ChallengeRouteSnapshot?
 
     enum CodingKeys: String, CodingKey {
         case id, template, title, rules, position
+        case targetDistanceMeters = "target_distance_meters"
+        case routeSnapshot = "route_snapshot"
         case seriesID = "series_id"
         case proposedBy = "proposed_by"
     }
@@ -317,6 +321,14 @@ private struct ATHLTHArenaPublishRound: Encodable {
     let template: String
     let title: String
     let rules: String
+    let targetDistanceMeters: Double?
+    let routeSnapshot: ChallengeRouteSnapshot?
+
+    enum CodingKeys: String, CodingKey {
+        case template, title, rules
+        case targetDistanceMeters = "target_distance_meters"
+        case routeSnapshot = "route_snapshot"
+    }
 }
 
 private struct ATHLTHArenaPublishRequest: Encodable {
@@ -362,9 +374,13 @@ private struct ATHLTHArenaNewRound: Encodable {
     let title: String
     let rules: String
     let position: Int
+    let targetDistanceMeters: Double?
+    let routeSnapshot: ChallengeRouteSnapshot?
 
     enum CodingKeys: String, CodingKey {
         case template, title, rules, position
+        case targetDistanceMeters = "target_distance_meters"
+        case routeSnapshot = "route_snapshot"
         case seriesID = "series_id"
         case proposedBy = "proposed_by"
     }
@@ -688,7 +704,9 @@ final class ATHLTHArenaCloudService: Sendable {
                 ATHLTHArenaPublishRound(
                     template: $0.template.rawValue,
                     title: $0.title,
-                    rules: $0.rules
+                    rules: $0.rules,
+                    targetDistanceMeters: $0.targetDistanceMeters,
+                    routeSnapshot: $0.routeSnapshot
                 )
             }
         )
@@ -761,7 +779,9 @@ final class ATHLTHArenaCloudService: Sendable {
                 template: round.template.rawValue,
                 title: round.title,
                 rules: round.rules,
-                position: min(max(position, 0), 100)
+                position: min(max(position, 0), 100),
+                targetDistanceMeters: round.targetDistanceMeters,
+                routeSnapshot: round.routeSnapshot
             ))
             .execute()
     }
