@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import Supabase
 
 /// Arena scoring is confirmed by the whole group. Manual evidence is never
 /// labelled as HealthKit/GPS verified; there is no silent point allocation.
@@ -186,6 +187,8 @@ struct ATHLTHArenaScoringSection: View {
             }
         }
         .task(id: series.id) { await reload() }
+        .task(id: series.id) { await listenForScoring(table: "arena_round_results") }
+        .task(id: series.id) { await listenForScoring(table: "arena_round_result_votes") }
         .sheet(item: $roundToScore) { round in
             ATHLTHArenaOutcomeEditor(
                 round: round,
@@ -480,6 +483,24 @@ struct ATHLTHArenaScoringSection: View {
         return (social.visibleProfiles + social.mutualFollows)
             .first { $0.userID == member.userID }?.resolvedName ??
             ATHLTHLocalization.choose(english: "Participant", norwegian: "Deltaker")
+    }
+
+    /// Keep the approval counter and standings current without requiring
+    /// manual refresh. Subscriptions use the competition RLS policies.
+    @MainActor
+    private func listenForScoring(table: String) async {
+        let channel = await SupabaseEnvironment.client.channel(
+            "arena-scoring-\(table)-\(series.id.uuidString.lowercased())"
+        )
+        let changes = await channel.postgresChange(
+            AnyAction.self, schema: "public", table: table
+        )
+        await channel.subscribe()
+        for await _ in changes {
+            if Task.isCancelled { break }
+            await reload()
+        }
+        await channel.unsubscribe()
     }
 
     @MainActor
