@@ -2724,6 +2724,17 @@ struct ATHLTHArenaOnlineDetailView: View {
 }
 
 
+/// A recent, locally matched HealthKit run. Only the suggested time is copied
+/// into the relay form after the user explicitly chooses this run.
+private struct ATHLTHArenaRelayGPSCandidate: Identifiable {
+    let id: UUID
+    let slotID: UUID
+    let routeRoundID: UUID
+    let startedAt: Date
+    let elapsedSeconds: TimeInterval
+    let routeMatchPercent: Double
+}
+
 /// Optional stafettplan on an accepted two-team Arena roster.
 /// Deliberately planning-only: no live baton exchange or independent points.
 private struct ATHLTHArenaRelaySection: View {
@@ -2743,6 +2754,8 @@ private struct ATHLTHArenaRelaySection: View {
     @State private var reports: [ATHLTHArenaRelayLegReport] = []
     @State private var legTimeText = ""
     @State private var checkingOwnGPS = false
+    @State private var ownGPSCandidates: [ATHLTHArenaRelayGPSCandidate] = []
+    @State private var showingOwnGPSCandidates = false
     @State private var ownGPSNotice: String?
     @State private var pendingLegSeconds: Double?
     @State private var confirmLegTime = false
@@ -3286,6 +3299,56 @@ private struct ATHLTHArenaRelaySection: View {
                 }
                 .padding(15)
                 .background(ATHLTHArenaLightStyle.card(20))
+                .sheet(isPresented: $showingOwnGPSCandidates) {
+                    NavigationStack {
+                        List(ownGPSCandidates) { candidate in
+                            Button {
+                                chooseOwnGPSCandidate(candidate)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(candidate.startedAt.formatted(
+                                            date: .abbreviated, time: .shortened
+                                        ))
+                                        .font(.subheadline.weight(.semibold))
+                                        Text(ATHLTHLocalization.choose(
+                                            english: "Local GPS route match",
+                                            norwegian: "Lokalt GPS-rutesamsvar"
+                                        ) + String(format: " · %.0f%%",
+                                                   candidate.routeMatchPercent))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Text(GhostTargetTimeFormatter.string(
+                                        candidate.elapsedSeconds
+                                    ))
+                                    .font(.headline.monospacedDigit())
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .navigationTitle(ATHLTHLocalization.choose(
+                            english: "Choose matched run",
+                            norwegian: "Velg GPS-økt"
+                        ))
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button(ATHLTHLocalization.choose(
+                                    english: "Cancel", norwegian: "Avbryt"
+                                )) {
+                                    showingOwnGPSCandidates = false
+                                }
+                            }
+                        }
+                    }
+                    .presentationDetents([.medium, .large])
+                }
                 .sheet(isPresented: $editing) {
                     ATHLTHArenaRelayEditor(
                         members: members,
@@ -3398,18 +3461,51 @@ private struct ATHLTHArenaRelaySection: View {
         }
     }
 
-    /// Explicit on-device scan for the user's own, completed GPS workouts.
-    /// It only pre-fills a proposed time and never sends a route or report.
+    /// Only copies one time after an explicit selection. A stale picker from
+    /// a replaced lineup or an ended competition may not populate the form.
+    @MainActor
+    private func chooseOwnGPSCandidate(
+        _ candidate: ATHLTHArenaRelayGPSCandidate
+    ) {
+        defer {
+            showingOwnGPSCandidates = false
+            ownGPSCandidates = []
+        }
+        guard reportWindowOpen,
+              ownLeg?.slotID == candidate.slotID,
+              ownLeg?.routeRoundID == candidate.routeRoundID,
+              candidate.elapsedSeconds.isFinite,
+              (10...86_400).contains(candidate.elapsedSeconds) else {
+            ownGPSNotice = ATHLTHLocalization.choose(
+                english: "The agreed stage or competition window changed. Find a matching run again.",
+                norwegian: "Avtalt etappe eller konkurranseperiode ble endret. Søk etter økt på nytt."
+            )
+            return
+        }
+
+        legTimeText = GhostTargetTimeFormatter.string(
+            candidate.elapsedSeconds
+        )
+        ownGPSNotice = ATHLTHLocalization.choose(
+            english: "Chosen run matches the course locally. Review the suggested time before confirming; this is not server-verified.",
+            norwegian: "Valgt økt matcher løypen lokalt. Kontroller tiden før du bekrefter; resultatet er ikke serververifisert."
+        )
+    }
+
+    /// Explicit on-device scan for the user's own completed GPS workouts.
+    /// All suitable runs are presented for the athlete to select; none is
+    /// automatically reported, and no GPS data leaves this screen.
     @MainActor
     private func suggestOwnLegTime(from route: TrainingRoute) async {
         guard !checkingOwnGPS, !writing, reportWindowOpen,
-              ownLeg?.routeRoundID != nil,
+              let ownLeg, let routeRoundID = ownLeg.routeRoundID,
               let startsAt = series.startsAt,
               let endsAt = series.endsAt,
               startsAt <= endsAt else { return }
 
         checkingOwnGPS = true
         ownGPSNotice = nil
+        ownGPSCandidates = []
         defer { checkingOwnGPS = false }
 
         let targetMeters = route.distanceKilometers * 1_000
@@ -3426,6 +3522,7 @@ private struct ATHLTHArenaRelaySection: View {
             .sorted { $0.endDate > $1.endDate }
             .prefix(20)
 
+        var matches: [ATHLTHArenaRelayGPSCandidate] = []
         for summary in recent {
             if Task.isCancelled { return }
             guard let analysis = await health.routePerformance(
@@ -3440,21 +3537,34 @@ private struct ATHLTHArenaRelaySection: View {
             ) else {
                 continue
             }
-
-            legTimeText = GhostTargetTimeFormatter.string(
-                analysis.durationSeconds
-            )
-            ownGPSNotice = ATHLTHLocalization.choose(
-                english: "A recent run matched the agreed course on your device. Review the suggested time and confirm it yourself. This is not server-verified.",
-                norwegian: "Fant en økt som matcher avtalt rute på enheten. Kontroller tiden og bekreft selv. Dette er ikke serververifisert."
-            )
-            return
+            matches.append(ATHLTHArenaRelayGPSCandidate(
+                id: summary.id,
+                slotID: ownLeg.slotID,
+                routeRoundID: routeRoundID,
+                startedAt: summary.startDate,
+                elapsedSeconds: analysis.durationSeconds,
+                routeMatchPercent: analysis.routeMatchPercent
+            ))
         }
 
-        ownGPSNotice = ATHLTHLocalization.choose(
-            english: "No eligible GPS run found for this course and competition window. You may report your time manually.",
-            norwegian: "Fant ingen passende GPS-økt på denne ruten i konkurranseperioden. Du kan registrere tiden manuelt."
-        )
+        guard !Task.isCancelled,
+              reportWindowOpen,
+              self.ownLeg?.slotID == ownLeg.slotID,
+              self.ownLeg?.routeRoundID == routeRoundID else { return }
+
+        if matches.isEmpty {
+            ownGPSNotice = ATHLTHLocalization.choose(
+                english: "No eligible GPS run found for this course and competition window. You may report your time manually.",
+                norwegian: "Fant ingen passende GPS-økt på denne ruten i konkurranseperioden. Du kan registrere tiden manuelt."
+            )
+        } else {
+            ownGPSCandidates = matches
+            showingOwnGPSCandidates = true
+            ownGPSNotice = ATHLTHLocalization.choose(
+                english: "Choose which matched run to use. Only the suggested time will be copied to the form.",
+                norwegian: "Velg hvilken økt som skal brukes. Kun den foreslåtte tiden kopieres til skjemaet."
+            )
+        }
     }
 
     @MainActor
