@@ -365,6 +365,33 @@ enum ATHLTHArenaTeamStandings {
     }
 }
 
+/// Only used as an on-device suggestion for a runner's OWN relay leg.
+/// It does not attest a workout on the server or award team points.
+enum ATHLTHArenaRelayGPSMatch {
+    static func qualifies(
+        routeLengthMeters: Double,
+        coveredMeters: Double,
+        elapsedSeconds: Double,
+        routeMatchPercent: Double,
+        startGapMeters: Double,
+        endGapMeters: Double
+    ) -> Bool {
+        guard routeLengthMeters.isFinite, coveredMeters.isFinite,
+              elapsedSeconds.isFinite, routeMatchPercent.isFinite,
+              startGapMeters.isFinite, endGapMeters.isFinite,
+              (100...500_000).contains(routeLengthMeters),
+              (10...86_400).contains(elapsedSeconds),
+              coveredMeters > 0,
+              abs(coveredMeters - routeLengthMeters) <= routeLengthMeters * 0.05,
+              (90...100).contains(routeMatchPercent),
+              (0...120).contains(startGapMeters),
+              (0...120).contains(endGapMeters) else {
+            return false
+        }
+        return true
+    }
+}
+
 enum ATHLTHArenaSuggestedRanking {
     /// A suggested pace target only, never a verified result or a replay of
     /// someone else's private GPS trace. Based on an explicitly shared round
