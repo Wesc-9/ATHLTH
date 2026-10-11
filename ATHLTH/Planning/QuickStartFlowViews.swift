@@ -3489,10 +3489,16 @@ struct StrengthQuickBuilderView: View {
         .sheet(isPresented: $showingExerciseLibrary) {
             NavigationStack {
                 ExerciseLibraryView(
-                    selectionTitle: "Add to Workout"
+                    selectionTitle: ATHLTHLocalization.choose(
+                        english: "Add to Workout",
+                        norwegian: "Legg til i økten"
+                    ),
+                    selectedExerciseCounts: Dictionary(
+                        exercises.compactMap(\.exerciseID).map { ($0, 1) },
+                        uniquingKeysWith: +
+                    )
                 ) { entry in
                     addExercise(entry.exercise)
-                    showingExerciseLibrary = false
                 }
             }
         }
