@@ -47,6 +47,7 @@ struct GhostFriendRaceHubView: View {
     @State private var captureDevice:
         WorkoutCaptureDevice = .iPhone
     private let arenaRoundID: UUID?
+    private let agreedArenaRouteID: UUID?
 
     /// Opening a duel from an active Arena 1v1 series can suggest its
     /// opponent; the existing mutual-follow and permission checks remain.
@@ -56,6 +57,7 @@ struct GhostFriendRaceHubView: View {
         arenaRoundID: UUID? = nil
     ) {
         self.arenaRoundID = arenaRoundID
+        self.agreedArenaRouteID = arenaRoundID == nil ? nil : preferredRoute?.id
         _selectedFriendID = State(initialValue: preferredFriendID)
         _selectedPlannedRoute = State(initialValue: preferredRoute)
         _courseMode = State(initialValue: preferredRoute == nil
@@ -81,6 +83,18 @@ struct GhostFriendRaceHubView: View {
         case .previousWorkout: return selectedWorkoutID != nil
         case .plannedRoute: return selectedPlannedRoute != nil && targetTime != nil
         }
+    }
+
+    /// Only a matching planned course is linked to the existing Arena round.
+    /// A prior GPS run is a valid standalone duel, not automatically the
+    /// same course as the one agreed in the competition.
+    private var eligibleArenaRoundID: UUID? {
+        GhostFriendRaceArenaLinkPolicy.eligibleRoundID(
+            roundID: arenaRoundID,
+            agreedRouteID: agreedArenaRouteID,
+            selectedRouteID: selectedPlannedRoute?.id,
+            isPlannedRoute: courseMode == .plannedRoute
+        )
     }
 
     var body: some View {
@@ -168,6 +182,18 @@ struct GhostFriendRaceHubView: View {
                         ))
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                        if arenaRoundID != nil {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "A previous run starts a separate Live Ghost duel. It is not automatically treated as the agreed Arena route.",
+                                    norwegian: "En tidligere økt starter en egen Live Ghost-duell. Den blir ikke automatisk regnet som den avtalte Arena-ruten."
+                                ),
+                                systemImage: "info.circle"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
                     } else {
                         Button {
                             showingRoutePicker = true
@@ -185,6 +211,19 @@ struct GhostFriendRaceHubView: View {
                         }
                         .buttonStyle(.bordered)
                         .tint(ATHLTHTheme.accentDeep)
+                        .disabled(agreedArenaRouteID != nil)
+
+                        if agreedArenaRouteID != nil {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "The agreed Arena course is locked for this round.",
+                                    norwegian: "Den avtalte Arena-ruten er låst for denne runden."
+                                ),
+                                systemImage: "lock.shield"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                        }
 
                         if let route = selectedPlannedRoute {
                             Label(
@@ -681,7 +720,7 @@ struct GhostFriendRaceHubView: View {
                 route: route,
                 targetDurationSeconds: seconds,
                 settings: settings,
-                arenaRoundID: arenaRoundID
+                arenaRoundID: eligibleArenaRoundID
             )
         case .previousWorkout:
             guard let workoutID = selectedWorkoutID,
@@ -694,7 +733,7 @@ struct GhostFriendRaceHubView: View {
                 workout: workout,
                 detail: detail,
                 settings: settings,
-                arenaRoundID: arenaRoundID
+                arenaRoundID: eligibleArenaRoundID
             )
         }
 
