@@ -325,6 +325,38 @@ enum ATHLTHArenaSeasonPhase: Equatable {
 }
 
 enum ATHLTHArenaSeasonPresentation {
+    /// Calendar-day progress, including both the first and final day. Never
+    /// infer season progress from device time intervals or elapsed hours.
+    static func progress(
+        startsOn: String,
+        endsOn: String,
+        today: String
+    ) -> (fraction: Double, daysToStart: Int, daysRemaining: Int)? {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)!
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.isLenient = false
+        guard let start = formatter.date(from: startsOn),
+              let end = formatter.date(from: endsOn),
+              let current = formatter.date(from: today),
+              end >= start else { return nil }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let duration = calendar.dateComponents([.day], from: start, to: end).day ?? 0
+        let elapsed = calendar.dateComponents([.day], from: start, to: current).day ?? 0
+        let remaining = calendar.dateComponents([.day], from: current, to: end).day ?? 0
+        let fraction = Double(min(max(elapsed + 1, 0), duration + 1)) /
+            Double(max(duration + 1, 1))
+        return (
+            fraction: fraction,
+            daysToStart: max(-elapsed, 0),
+            daysRemaining: max(remaining, 0)
+        )
+    }
+
     /// Competition ranking: equal scores share a position, and the next
     /// position skips the tied places (1, 1, 3). A zero-point entry is
     /// unranked, not a season champion.
@@ -702,6 +734,14 @@ private struct ATHLTHArenaSeasonDetailView: View {
         ATHLTHArenaSeasonPresentation.orderedStandings(standings)
     }
 
+    private var seasonProgress: (fraction: Double, daysToStart: Int, daysRemaining: Int)? {
+        ATHLTHArenaSeasonPresentation.progress(
+            startsOn: season.startsOn,
+            endsOn: season.endsOn,
+            today: ATHLTHArenaSeasonDate.sql(Date())
+        )
+    }
+
     private var seasonStatus: String {
         switch seasonPhase {
         case .upcoming:
@@ -735,6 +775,46 @@ private struct ATHLTHArenaSeasonDetailView: View {
                          " – " + ATHLTHArenaSeasonDate.label(season.endsOn))
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.85))
+                    if let progress = seasonProgress {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Season progress",
+                                    norwegian: "Sesongfremdrift"
+                                ))
+                                Spacer()
+                                Text(seasonPhase == .upcoming
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Starts in \(progress.daysToStart) days",
+                                        norwegian: "Starter om \(progress.daysToStart) dager"
+                                    )
+                                    : seasonPhase == .completed
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Finished", norwegian: "Fullført"
+                                        )
+                                        : progress.daysRemaining == 0
+                                            ? ATHLTHLocalization.choose(
+                                                english: "Final day", norwegian: "Siste dag"
+                                            )
+                                            : ATHLTHLocalization.choose(
+                                                english: "\(progress.daysRemaining) days left",
+                                                norwegian: "\(progress.daysRemaining) dager igjen"
+                                            )
+                                )
+                            }
+                            .font(.caption.weight(.semibold))
+                            ProgressView(value: progress.fraction)
+                                .tint(.white)
+                                .accessibilityLabel(ATHLTHLocalization.choose(
+                                    english: "Season progress",
+                                    norwegian: "Sesongfremdrift"
+                                ))
+                                .accessibilityValue(
+                                    "\(Int((progress.fraction * 100).rounded())) %"
+                                )
+                        }
+                        .padding(.top, 8)
+                    }
                 }
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, alignment: .leading)
