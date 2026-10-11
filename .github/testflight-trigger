@@ -83,3 +83,4 @@ ATHLTH 1.6.8 build 74 TestFlight upload after Swift 6 APNs compile fix and nativ
 ATHLTH 1.6.9 build 75 TestFlight upload after four green CI checks for d96ea1b724a6194fefb44ac8acce6b3b4dfcf97e (2026-10-09)
 ATHLTH 1.7.0 build 76 TestFlight upload 2026-10-10 — user authorized; green iOS, iPhone, backend; previous iPad passed
 ATHLTH 1.7.1 build 77 TestFlight requested 2026-10-11 01:18 CEST — latest release/v1.7.1 Train Together + Club + Insight updates; upload only after workflow signing/validation passes
+ATHLTH 1.7.2 build 78 TestFlight upload user-authorized 2026-10-11 after Arena fixes e64909e5
