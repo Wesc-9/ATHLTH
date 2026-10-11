@@ -48,6 +48,7 @@ struct ActiveStrengthWorkoutView: View {
                         ScrollView {
                             VStack(spacing: 18) {
                                 workoutHeader(workout)
+                                strengthCoachPanel(workout)
                                 TrainTogetherStatusStrip()
                                 addExerciseCard(workout)
                                 simpleTrackingContent(
@@ -597,8 +598,6 @@ struct ActiveStrengthWorkoutView: View {
     private func configureAdvancedRuntime() {
         guard let workout =
                 strength.activeWorkout,
-              workout.trackingMode ==
-                .advanced,
               let configuration =
                 workout
                     .advancedConfiguration
@@ -617,6 +616,160 @@ struct ActiveStrengthWorkoutView: View {
                     configuration.audioCoach,
                 cueKind: .workoutStart
             )
+        }
+    }
+
+    /// Speaks a fresh summary using the same set/exercise state displayed
+    /// on screen. Never advances the session or changes rest deadlines.
+    @MainActor
+    private func announceStrengthCoachStatusNow() {
+        guard let workout = strength.activeWorkout,
+              workout.captureDevice == .iPhone,
+              let configuration = workout.advancedConfiguration?.audioCoach,
+              configuration.enabled,
+              !strengthCoach.speechPaused
+        else { return }
+
+        let totalSets = workout.exercises.flatMap(\.sets).count
+        let completed = workout.totalCompletedSets
+        let exerciseName =
+            strength.currentExercise?.exercise.displayName ??
+            workout.title
+        var english = "\(completed) of \(totalSets) sets complete. Current exercise: \(exerciseName)."
+        var norwegian = "\(completed) av \(totalSets) sett fullført. Nåværende øvelse: \(exerciseName)."
+
+        if let restEndsAt = strength.restEndsAt {
+            let seconds = max(Int(restEndsAt.timeIntervalSinceNow.rounded()), 0)
+            if seconds > 0 {
+                english += " \(seconds) seconds of rest remaining."
+                norwegian += " \(seconds) sekunder igjen av hvilen."
+            }
+        }
+        strengthCoach.speak(
+            english: english,
+            norwegian: norwegian,
+            configuration: configuration,
+            cueKind: .manualStatus
+        )
+    }
+
+    @ViewBuilder
+    private func strengthCoachPanel(
+        _ workout: StrengthWorkoutLog
+    ) -> some View {
+        if let configuration = workout.advancedConfiguration?.audioCoach,
+           configuration.enabled {
+            ATHLTHCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "waveform.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Audio Coach")
+                                .font(.subheadline.weight(.semibold))
+                            Text(
+                                workout.captureDevice == .appleWatch
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Voice controlled on Apple Watch",
+                                        norwegian: "Talen styres på Apple Watch"
+                                    )
+                                    : strengthCoach.speechPaused
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Voice paused · workout continues",
+                                            norwegian: "Tale pauset · økten fortsetter"
+                                        )
+                                        : ATHLTHLocalization.choose(
+                                            english: "Voice on · workout continues",
+                                            norwegian: "Tale aktiv · økten fortsetter"
+                                        )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        Spacer(minLength: 4)
+                        if workout.captureDevice == .iPhone {
+                            ATHLTHAudioRouteControl(compact: true)
+                        }
+                    }
+
+                    if workout.captureDevice == .iPhone {
+                        HStack(spacing: 9) {
+                            Button {
+                                strengthCoach.setSpeechPaused(
+                                    !strengthCoach.speechPaused
+                                )
+                            } label: {
+                                Label(
+                                    strengthCoach.speechPaused
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Resume voice",
+                                            norwegian: "Fortsett tale"
+                                        )
+                                        : ATHLTHLocalization.choose(
+                                            english: "Pause voice",
+                                            norwegian: "Pause tale"
+                                        ),
+                                    systemImage: strengthCoach.speechPaused
+                                        ? "play.fill"
+                                        : "pause.fill"
+                                )
+                                .frame(maxWidth: .infinity, minHeight: 42)
+                            }
+                            .buttonStyle(.bordered)
+
+                            Button {
+                                announceStrengthCoachStatusNow()
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Status now",
+                                        norwegian: "Status nå"
+                                    ),
+                                    systemImage: "waveform"
+                                )
+                                .frame(maxWidth: .infinity, minHeight: 42)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(ATHLTHTheme.accentDeep)
+                            .disabled(strengthCoach.speechPaused)
+                        }
+                        .font(.subheadline.weight(.semibold))
+
+                        if let last = strengthCoach.lastCoachMessage {
+                            Text(last)
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                .lineLimit(2)
+                        }
+
+                        TimelineView(.periodic(from: .now, by: 5)) { _ in
+                            Button {
+                                strengthCoach.replayLastMessage()
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Listen again",
+                                        norwegian: "Hør igjen"
+                                    ),
+                                    systemImage: "arrow.counterclockwise"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity, minHeight: 40)
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(!strengthCoach.canReplayLastMessage)
+                        }
+
+                        Text(ATHLTHLocalization.choose(
+                            english: "Voice controls never pause sets or rest timers. Recent messages expire after 45 seconds.",
+                            norwegian: "Talekontroller pauser ikke sett eller hviletid. Siste beskjed utløper etter 45 sekunder."
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                }
+            }
         }
     }
 
@@ -1618,6 +1771,8 @@ struct ActiveStrengthWorkoutView: View {
             focusedWorkoutStatus(
                 workout
             )
+
+            strengthCoachPanel(workout)
 
             Button {
                 showingExerciseQueue = true
