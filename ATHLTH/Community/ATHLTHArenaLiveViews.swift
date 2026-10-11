@@ -2865,6 +2865,31 @@ private struct ATHLTHArenaRelaySection: View {
                                 if let progress = ATHLTHArenaRelayProgress.team(
                                     team, legs: legs, reports: reports
                                 ) {
+                                    ProgressView(
+                                        value: Double(progress.completedLegs),
+                                        total: Double(max(progress.totalLegs, 1))
+                                    )
+                                    .tint(ATHLTHTheme.accentDeep)
+                                    .accessibilityLabel(ATHLTHLocalization.choose(
+                                        english: "Reported relay legs",
+                                        norwegian: "Registrerte stafettetapper"
+                                    ))
+                                    .accessibilityValue("\(progress.completedLegs) / \(progress.totalLegs)")
+
+                                    if let pendingLeg = ATHLTHArenaRelayProgress.nextUnreportedLeg(
+                                        for: team, legs: legs, reports: reports
+                                    ) {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Next unreported stage",
+                                                norwegian: "Neste uregistrerte etappe"
+                                            ) + " \(pendingLeg.legOrder): " +
+                                                athleteName(for: pendingLeg.slotID),
+                                            systemImage: "clock.arrow.circlepath"
+                                        )
+                                        .font(.caption.weight(.medium))
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                    }
                                     HStack {
                                         Text("\(progress.completedLegs)/\(progress.totalLegs) " +
                                             ATHLTHLocalization.choose(
