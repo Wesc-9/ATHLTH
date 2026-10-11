@@ -2217,11 +2217,17 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
                                    routeDistanceKilometers: round.routeSnapshot?.distanceKilometers,
                                    sharedCourseDistanceMeters: challenge.distanceMeters,
                                    sourceKind: challenge.sourceKind
-                               ) {
+                               ) ||
+                               (round.template == .fastestRoute &&
+                                !ATHLTHArenaLiveRoundCompatibility.matchesFrozenRoute(
+                                    snapshot: round.routeSnapshot,
+                                    sharedPoints: challenge.routePoints,
+                                    privacyTrimmed: challenge.privacyTrimmed
+                                )) {
                                 Label(
                                     ATHLTHLocalization.choose(
-                                        english: "Course not comparable to this round. A privacy-trimmed or different-distance race needs manual review.",
-                                        norwegian: "Løypen samsvarer ikke med runden. En forkortet eller annerledes løype må vurderes manuelt."
+                                        english: "This live race does not match the full agreed route (distance, geometry or hidden start/end). Review manually.",
+                                        norwegian: "Duellen samsvarer ikke med hele ruten (distanse, GPS-form eller skjult start/mål). Kontroller manuelt."
                                     ),
                                     systemImage: "exclamationmark.triangle"
                                 )
@@ -2371,6 +2377,12 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
                   sharedCourseDistanceMeters: challenge.distanceMeters,
                   sourceKind: challenge.sourceKind
               ),
+              (round.template != .fastestRoute ||
+               ATHLTHArenaLiveRoundCompatibility.matchesFrozenRoute(
+                   snapshot: round.routeSnapshot,
+                   sharedPoints: challenge.routePoints,
+                   privacyTrimmed: challenge.privacyTrimmed
+               )),
               let winnerID = result.winnerID,
               winnerID == challenge.senderID || winnerID == challenge.recipientID,
               let sender = members.first(where: {
