@@ -5,6 +5,35 @@ enum StrengthDraftMutationOrigin {
     case watch
 }
 
+/// Date-anchored and checkpointed; the displayed seconds do not depend on a
+/// foreground Timer continuing to run while the phone is locked.
+struct StrengthTimedSetCountdown: Codable, Equatable {
+    let workoutID: UUID
+    let exerciseID: UUID
+    let setID: UUID
+    let targetSeconds: Int
+    var secondsAtPause: TimeInterval
+    var resumedAt: Date?
+
+    func remaining(at date: Date = Date()) -> TimeInterval {
+        max(secondsAtPause - (resumedAt.map { max(date.timeIntervalSince($0), 0) } ?? 0), 0)
+    }
+
+    func secondsRemaining(at date: Date = Date()) -> Int {
+        Int(ceil(remaining(at: date)))
+    }
+
+    func secondsCompleted(at date: Date = Date()) -> Int {
+        min(max(targetSeconds - secondsRemaining(at: date), 0), targetSeconds)
+    }
+
+    func isFinished(at date: Date = Date()) -> Bool {
+        remaining(at: date) <= 0
+    }
+
+    var isRunning: Bool { resumedAt != nil }
+}
+
 @MainActor
 final class StrengthWorkoutStore: ObservableObject {
     @Published private(set) var activeWorkout: StrengthWorkoutLog? { didSet { scheduleCheckpointPersist() } }
@@ -20,6 +49,9 @@ final class StrengthWorkoutStore: ObservableObject {
     @Published private(set) var draftRPE = 8.0 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var draftRIR = 2.0 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var draftWarmUp = false { didSet { scheduleCheckpointPersist() } }
+    @Published private(set) var timedSetCountdown: StrengthTimedSetCountdown? {
+        didSet { scheduleCheckpointPersist() }
+    }
     @Published private(set) var completedWorkout: StrengthWorkoutLog?
     @Published private(set) var workoutHistory: [StrengthWorkoutLog] = []
     @Published private(set) var lastPhoneDraftMutationAt:
@@ -71,6 +103,7 @@ final class StrengthWorkoutStore: ObservableObject {
         var rpe: Double
         var rir: Double? = nil
         var warmUp: Bool? = nil
+        var timedSetCountdown: StrengthTimedSetCountdown? = nil
         var savedAt: Date? = nil
     }
 
@@ -134,6 +167,8 @@ final class StrengthWorkoutStore: ObservableObject {
         draftRPE = checkpoint?.rpe ?? 8
         draftRIR = checkpoint?.rir ?? 2
         draftWarmUp = checkpoint?.warmUp ?? false
+        timedSetCountdown = checkpoint?.timedSetCountdown
+        discardStaleTimedSetCountdown()
         hasLegacyHistory = userID != nil && UserDefaults.standard.string(forKey: "legacy.strengthClaimedBy") == nil && !Self.loadWorkoutHistory().isEmpty
     }
 
@@ -180,6 +215,7 @@ final class StrengthWorkoutStore: ObservableObject {
                 rpe: draftRPE,
                 rir: draftRIR,
                 warmUp: draftWarmUp,
+                timedSetCountdown: timedSetCountdown,
                 savedAt: Date()
             ),
             name: "strengthActive",
@@ -1059,6 +1095,70 @@ final class StrengthWorkoutStore: ObservableObject {
         persistCheckpointNow()
     }
 
+    /// Current-set-only timer; never changes the workout or advances sets by itself.
+    var currentTimedSetCountdown: StrengthTimedSetCountdown? {
+        guard let timedSetCountdown,
+              let workout = activeWorkout,
+              let exercise = currentExercise,
+              let set = currentSet,
+              set.resolvedTargetKind == .time,
+              !set.isCompleted,
+              timedSetCountdown.workoutID == workout.id,
+              timedSetCountdown.exerciseID == exercise.id,
+              timedSetCountdown.setID == set.id
+        else { return nil }
+        return timedSetCountdown
+    }
+
+    private func discardStaleTimedSetCountdown() {
+        if timedSetCountdown != nil && currentTimedSetCountdown == nil {
+            timedSetCountdown = nil
+        }
+    }
+
+    func startOrResumeTimedSet() {
+        guard let workout = activeWorkout,
+              let exercise = currentExercise,
+              let set = currentSet,
+              set.resolvedTargetKind == .time,
+              !set.isCompleted
+        else { return }
+
+        let now = Date()
+        if var countdown = currentTimedSetCountdown {
+            guard !countdown.isRunning && !countdown.isFinished(at: now) else { return }
+            countdown.resumedAt = now
+            timedSetCountdown = countdown
+        } else {
+            let seconds = min(max(draftDurationSeconds, 15), 7_200)
+            timedSetCountdown = StrengthTimedSetCountdown(
+                workoutID: workout.id,
+                exerciseID: exercise.id,
+                setID: set.id,
+                targetSeconds: seconds,
+                secondsAtPause: TimeInterval(seconds),
+                resumedAt: now
+            )
+        }
+        persistCheckpointNow()
+    }
+
+    func pauseTimedSet() {
+        guard var countdown = currentTimedSetCountdown,
+              countdown.isRunning else { return }
+        let now = Date()
+        countdown.secondsAtPause = countdown.remaining(at: now)
+        countdown.resumedAt = nil
+        timedSetCountdown = countdown
+        persistCheckpointNow()
+    }
+
+    func resetTimedSet() {
+        guard currentTimedSetCountdown != nil else { return }
+        timedSetCountdown = nil
+        persistCheckpointNow()
+    }
+
     func setDraft(
         reps: Int? = nil,
         durationSeconds: Int? = nil,
@@ -1077,11 +1177,12 @@ final class StrengthWorkoutStore: ObservableObject {
         }
 
         if let durationSeconds {
-            draftDurationSeconds =
-                min(
-                    max(durationSeconds, 15),
-                    7_200
-                )
+            let updatedDuration = min(max(durationSeconds, 15), 7_200)
+            if updatedDuration != draftDurationSeconds {
+                // A changed target always starts a fresh countdown.
+                timedSetCountdown = nil
+            }
+            draftDurationSeconds = updatedDuration
         }
 
         if let weightKilograms {
@@ -1128,6 +1229,7 @@ final class StrengthWorkoutStore: ObservableObject {
     }
 
     func reloadDraftFromCurrentSet() {
+        discardStaleTimedSetCountdown()
         guard let set = currentSet else {
             draftReps = 8
             draftDurationSeconds = 60
@@ -1941,6 +2043,11 @@ final class StrengthWorkoutStore: ObservableObject {
         }
 
         var set = workout.exercises[currentExerciseIndex].sets[currentSetIndex]
+        // The timer is an optional aid. It does not own set completion;
+        // completion from iPhone or Watch always clears it if it targets this set.
+        if currentTimedSetCountdown != nil {
+            timedSetCountdown = nil
+        }
         set.completedReps =
             set.resolvedTargetKind == .reps
                 ? reps.map { max($0, 0) }
@@ -2131,7 +2238,7 @@ final class StrengthWorkoutStore: ObservableObject {
                     : nil,
             durationSeconds:
                 targetKind == .time
-                    ? draftDurationSeconds
+                    ? (currentTimedSetCountdown?.secondsCompleted() ?? draftDurationSeconds)
                     : nil,
             weightKilograms:
                 loadKind == .weightKilograms
@@ -3316,6 +3423,7 @@ final class StrengthWorkoutStore: ObservableObject {
         draftRPE = 8
         draftRIR = 2
         draftWarmUp = false
+        timedSetCountdown = nil
         persistCheckpointNow()
     }
 
