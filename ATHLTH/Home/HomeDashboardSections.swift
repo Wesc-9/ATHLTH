@@ -4019,6 +4019,8 @@ private struct HomeWeeklyProgressDaySheet:
     let onOpenWorkout: () -> Void
 
     @State private var showingStandaloneSessionEditor = false
+    @State private var selectedInvitationLobby: PlannedSession?
+    @EnvironmentObject private var messaging: MessagingStore
 
     private var currentPlanned: [PlannedSession] {
         // selection.planned is a snapshot from when the sheet opened.
@@ -4115,12 +4117,23 @@ private struct HomeWeeklyProgressDaySheet:
                             )
                         )
 
-                        ForEach(
-                            currentPlanned
-                        ) { workout in
-                            plannedRow(
-                                workout
-                            )
+                        ForEach(currentPlanned) { workout in
+                            if workout.trainTogetherMode != nil {
+                                Button {
+                                    selectedInvitationLobby = workout
+                                } label: {
+                                    plannedRow(workout)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityHint(
+                                    ATHLTHLocalization.choose(
+                                        english: "Open training lobby and invitation status",
+                                        norwegian: "Åpne treningslobby og invitasjonsstatus"
+                                    )
+                                )
+                            } else {
+                                plannedRow(workout)
+                            }
                         }
                     }
 
@@ -4199,6 +4212,14 @@ private struct HomeWeeklyProgressDaySheet:
             .sheet(isPresented: $showingStandaloneSessionEditor) {
                 SessionEditorView(standaloneDate: selection.date)
                     .presentationDetents([.large])
+            }
+            .sheet(item: $selectedInvitationLobby) { workout in
+                PlannedWorkoutInvitationLobby(workout: workout)
+                    .presentationDetents([.medium, .large])
+            }
+            .task {
+                await messaging.refresh(force: true)
+                session.syncApprovedSharedWorkouts(from: messaging.recentMessages)
             }
         }
     }
@@ -4994,5 +5015,277 @@ struct HomeWeeklySummaryCard:
 
         return
             "\(hours)t \(minutes)m"
+    }
+}
+
+
+private struct PlannedWorkoutInvitationLobby: View {
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var messaging: MessagingStore
+    @EnvironmentObject private var social: SocialStore
+    @Environment(\.dismiss) private var dismiss
+
+    let workout: PlannedSession
+    @State private var isRefreshing = false
+
+    private var sourceID: UUID {
+        workout.sharedSourceSessionID ?? workout.id
+    }
+
+    private var isGuest: Bool {
+        workout.sharedSourceOwnerID != nil
+    }
+
+    private var otherUserID: UUID? {
+        workout.sharedSourceOwnerID ?? workout.invitedPartnerID
+    }
+
+    private var invitationMessages: [DirectMessageRecord] {
+        guard let otherUserID,
+              let conversation = messaging.conversation(with: otherUserID)
+        else { return messaging.recentMessages }
+        return messaging.messages(in: conversation.id).isEmpty
+            ? messaging.recentMessages.filter {
+                $0.conversationID == conversation.id
+            }
+            : messaging.messages(in: conversation.id)
+    }
+
+    private var wasSent: Bool {
+        invitationMessages.contains {
+            $0.attachmentKind == .workout &&
+            $0.shareVersion == 2 &&
+            $0.sourceObjectID == sourceID &&
+            $0.deletedAt == nil
+        }
+    }
+
+    private var response: PlannedWorkoutInviteDecision? {
+        guard let replyingUserID = isGuest
+            ? Optional(session.profile.userID) : workout.invitedPartnerID
+        else { return nil }
+
+        return invitationMessages
+            .filter {
+                $0.attachmentKind == .workout &&
+                $0.shareVersion == 3 &&
+                $0.sourceObjectID == sourceID &&
+                $0.senderID == replyingUserID &&
+                $0.deletedAt == nil
+            }
+            .sorted { $0.createdAt > $1.createdAt }
+            .compactMap {
+                $0.decodeSnapshot(PlannedWorkoutInviteResponse.self)
+            }
+            .first { $0.sourceWorkoutID == sourceID }?
+            .decision
+    }
+
+    private var status: (title: String, detail: String, icon: String, tint: Color) {
+        if isGuest || response == .accepted {
+            return (
+                "Godtatt", "Økten er lagt i deltakerens kalender.",
+                "checkmark.circle.fill", ATHLTHTheme.vitality
+            )
+        }
+        if response == .declined {
+            return (
+                "Avslått", "Du kan fortsatt gjennomføre økten alene.",
+                "xmark.circle.fill", ATHLTHTheme.mutedText
+            )
+        }
+        if wasSent {
+            return (
+                "Venter på svar", "Økten blir stående i kalenderen uansett svar.",
+                "clock.fill", ATHLTHTheme.accentDeep
+            )
+        }
+        return (
+            "Invitasjon ikke bekreftet sendt",
+            "Din egen økt er lagret. Kontroller invitasjonen i innboksen.",
+            "exclamationmark.circle.fill", ATHLTHTheme.accentDeep
+        )
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "TRAINING LOBBY",
+                                norwegian: "TRENINGSLOBBY"
+                            ),
+                            systemImage: "person.2.wave.2.fill"
+                        )
+                        .font(.caption.weight(.bold))
+                        .tracking(1.1)
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                        Text(workout.title)
+                            .font(.system(size: 27, weight: .bold, design: .rounded))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                        HStack(spacing: 14) {
+                            if let start = workout.scheduledStart {
+                                Label(
+                                    start.formatted(date: .abbreviated, time: .shortened),
+                                    systemImage: "calendar"
+                                )
+                            }
+                            if let duration = workout.durationMinutes {
+                                Label("\(duration) min", systemImage: "clock")
+                            }
+                        }
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Deltakere")
+                            .font(.headline)
+
+                        participantRow(
+                            name: session.profile.displayName,
+                            icon: "person.crop.circle.fill",
+                            status: "Deg",
+                            tint: ATHLTHTheme.vitality
+                        )
+                        if let otherUserID {
+                            Divider()
+                            HStack(spacing: 12) {
+                                if let profile = social.profile(for: otherUserID) {
+                                    SocialAvatar(profile: profile, size: 44)
+                                } else {
+                                    Image(systemName: "person.crop.circle")
+                                        .font(.system(size: 32))
+                                        .frame(width: 44, height: 44)
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(
+                                        social.profile(for: otherUserID)?.resolvedName ??
+                                        (isGuest ? "Arrangør" : "Invitert deltaker")
+                                    )
+                                    .font(.subheadline.weight(.semibold))
+                                    HStack(spacing: 5) {
+                                        Image(systemName: status.icon)
+                                        Text(status.title)
+                                    }
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(status.tint)
+                                }
+                                Spacer()
+                            }
+                        }
+                    }
+                    .padding(17)
+                    .background(
+                        Color.white.opacity(0.82),
+                        in: RoundedRectangle(cornerRadius: 22)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 22)
+                            .stroke(Color.white.opacity(0.95))
+                    }
+
+                    Label(status.detail, systemImage: status.icon)
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .padding(14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            status.tint.opacity(0.09),
+                            in: RoundedRectangle(cornerRadius: 15)
+                        )
+
+                    if let point = workout.meetingPoint {
+                        Label(point.name, systemImage: "mappin.and.ellipse")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+
+                    if isGuest {
+                        Text("Økten er allerede i kalenderen din. Du kan foreslå endringer via invitasjonen i innboksen; arrangøren må godkjenne dem.")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    } else {
+                        Text("Du kan starte og gjennomføre økten selv om den inviterte ikke har svart eller har avslått.")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+
+                    if workout.allowInviteeExercises == true {
+                        Label(
+                            "Invitert deltaker kan foreslå nye øvelser",
+                            systemImage: "checkmark.shield.fill"
+                        )
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+
+                    Button {
+                        Task { await refresh() }
+                    } label: {
+                        HStack {
+                            if isRefreshing { ProgressView().controlSize(.small) }
+                            Label("Oppdater status", systemImage: "arrow.clockwise")
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isRefreshing)
+                }
+                .padding(18)
+            }
+            .scrollIndicators(.hidden)
+            .background(ATHLTHPremiumCanvas().ignoresSafeArea())
+            .navigationTitle("Tren sammen")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Ferdig") { dismiss() }
+                }
+            }
+        }
+        .task(id: workout.id) { await refresh() }
+    }
+
+    private func participantRow(
+        name: String,
+        icon: String,
+        status: String,
+        tint: Color
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 31))
+                .foregroundStyle(tint)
+                .frame(width: 44, height: 44)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(name).font(.subheadline.weight(.semibold))
+                Text(status)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+            Spacer()
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(tint)
+        }
+    }
+
+    private func refresh() async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
+        await messaging.refresh(force: true)
+        if let otherUserID,
+           let conversation = messaging.conversation(with: otherUserID) {
+            await messaging.refreshConversation(conversation.id)
+            session.syncApprovedSharedWorkouts(
+                from: messaging.messages(in: conversation.id)
+            )
+        }
     }
 }
