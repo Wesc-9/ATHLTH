@@ -58,6 +58,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     ) {
         guard iPhoneAudioCoachAttached,
               iPhoneAudioCoach.isEnabled,
+              snapshot.supportsAudioCoachVoiceLease == true,
               snapshot.kind == .running ||
                 snapshot.kind == .walking,
               snapshot.state == .running ||
@@ -109,6 +110,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
               acknowledgement.requestID ==
                 latestVoiceLeaseRequestID,
               let current = snapshot,
+              current.supportsAudioCoachVoiceLease == true,
               let startedAt = current.startedAt,
               abs(startedAt.timeIntervalSince(
                   acknowledgement.workoutStartedAt
@@ -408,16 +410,18 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         guard let latestSnapshot else { return }
 
         if iPhoneAudioCoachAttached {
-            if hasAcknowledgedVoiceLease {
-                iPhoneAudioCoach.handle(
-                    latestSnapshot
-                )
+            if latestSnapshot.supportsAudioCoachVoiceLease != true {
+                // Preserve the pre-lease phone speech path while the
+                // paired Watch app is still on an older build.
+                iPhoneAudioCoach.handle(latestSnapshot)
             } else {
-                iPhoneAudioCoach.suspendForWatchFallback()
+                if hasAcknowledgedVoiceLease {
+                    iPhoneAudioCoach.handle(latestSnapshot)
+                } else {
+                    iPhoneAudioCoach.suspendForWatchFallback()
+                }
+                offerVoiceLeaseIfNeeded(for: latestSnapshot)
             }
-            offerVoiceLeaseIfNeeded(
-                for: latestSnapshot
-            )
         }
 
         publish {
@@ -515,7 +519,8 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
             )
 
         if iPhoneAudioCoachAttached {
-            if hasAcknowledgedVoiceLease {
+            if snapshot.supportsAudioCoachVoiceLease != true ||
+                hasAcknowledgedVoiceLease {
                 iPhoneAudioCoach.handle(snapshot)
             }
             resetVoiceLease()
@@ -632,10 +637,9 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
             self.snapshot = snapshot
 
             if self.iPhoneAudioCoachAttached {
-                if self.hasAcknowledgedVoiceLease {
-                    self.iPhoneAudioCoach.handle(
-                        snapshot
-                    )
+                if snapshot.supportsAudioCoachVoiceLease != true ||
+                    self.hasAcknowledgedVoiceLease {
+                    self.iPhoneAudioCoach.handle(snapshot)
                 }
                 self.offerVoiceLeaseIfNeeded(for: snapshot)
             }
