@@ -775,6 +775,33 @@ final class ATHLTHArenaSafetyTests: XCTestCase {
         )
     }
 
+    func testClubSeasonDetachOnlyAllowsDraftsForAdminsBeforeDeadline() {
+        let draft = seasonSeries(status: "draft")
+        let active = seasonSeries(status: "active")
+        let complete = seasonSeries(status: "completed")
+        let eligible = ATHLTHArenaSeasonCompetitionTimeline.canDetach(
+            draft, endsOn: "2026-12-31", today: "2026-11-01",
+            canManage: true
+        )
+        XCTAssertTrue(eligible)
+        XCTAssertFalse(ATHLTHArenaSeasonCompetitionTimeline.canDetach(
+            draft, endsOn: "2026-12-31", today: "2026-11-01",
+            canManage: false
+        ))
+        XCTAssertFalse(ATHLTHArenaSeasonCompetitionTimeline.canDetach(
+            active, endsOn: "2026-12-31", today: "2026-11-01",
+            canManage: true
+        ))
+        XCTAssertFalse(ATHLTHArenaSeasonCompetitionTimeline.canDetach(
+            complete, endsOn: "2026-12-31", today: "2026-11-01",
+            canManage: true
+        ))
+        XCTAssertFalse(ATHLTHArenaSeasonCompetitionTimeline.canDetach(
+            draft, endsOn: "2026-10-30", today: "2026-11-01",
+            canManage: true
+        ))
+    }
+
     func testUnresolvedSeasonCompetitionHasDistinctStatus() {
         let unresolved = seasonSeries(
             status: "completed", completionReason: "deadline_unresolved"
