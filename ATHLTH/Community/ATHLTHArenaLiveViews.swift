@@ -379,22 +379,18 @@ enum ATHLTHArenaSeasonPresentation {
         }
     }
 
-    /// No season winner until all linked competitions are visible,
-    /// finished and resolved. Calendar expiry alone is insufficient.
+    /// Summary is computed by the server for authorized Club members,
+    /// including linked competitions the current member cannot open.
     static func canDeclareChampion(
         phase: ATHLTHArenaSeasonPhase,
         linkedCompetitionCount: Int,
-        visibleCompetitions: [ATHLTHArenaRemoteSeries]
+        incompleteCompetitionCount: Int,
+        unresolvedCompetitionCount: Int
     ) -> Bool {
-        guard phase == .completed,
-              linkedCompetitionCount > 0,
-              visibleCompetitions.count == linkedCompetitionCount else {
-            return false
-        }
-        return visibleCompetitions.allSatisfy {
-            $0.status == "completed" &&
-            $0.completionReason != "deadline_unresolved"
-        }
+        phase == .completed &&
+            linkedCompetitionCount > 0 &&
+            incompleteCompetitionCount == 0 &&
+            unresolvedCompetitionCount == 0
     }
 
     static func phase(startsOn: String, endsOn: String, today: String) -> ATHLTHArenaSeasonPhase {
@@ -822,6 +818,7 @@ private struct ATHLTHArenaSeasonDetailView: View {
 
     @State private var standings: [ATHLTHArenaSeasonStandingsRow] = []
     @State private var links: [ATHLTHArenaSeasonSeriesLink] = []
+    @State private var closeout: ATHLTHArenaSeasonCloseout?
     @State private var competitionOptions: [ATHLTHArenaRemoteSeries] = []
     @State private var clubDisplayNames: [UUID: String] = [:]
     @State private var loading = false
@@ -874,10 +871,12 @@ private struct ATHLTHArenaSeasonDetailView: View {
     }
 
     private var championsAreFinal: Bool {
-        ATHLTHArenaSeasonPresentation.canDeclareChampion(
+        guard let closeout else { return false }
+        return ATHLTHArenaSeasonPresentation.canDeclareChampion(
             phase: seasonPhase,
-            linkedCompetitionCount: links.count,
-            visibleCompetitions: visibleSeasonCompetitions
+            linkedCompetitionCount: closeout.linkedCompetitions,
+            incompleteCompetitionCount: closeout.incompleteCompetitions,
+            unresolvedCompetitionCount: closeout.unresolvedCompetitions
         )
     }
 
@@ -1385,6 +1384,9 @@ private struct ATHLTHArenaSeasonDetailView: View {
             standings = try await rank
             links = try await linkRows
             competitionOptions = try await allSeries
+            // A failed summary call never hides the approved standings.
+            // It only prevents an unverified champion announcement.
+            closeout = try? await cloud.loadSeasonCloseout(seasonID: season.id)
             // Resolve permitted Club member display names without exposing
             // private profile details or breaking the scoreboard on RLS errors.
             let athletes = (try? await directory.athletes(in: season.clubID)) ?? []

@@ -35,6 +35,19 @@ struct ATHLTHArenaSeasonStandingsRow: Decodable, Identifiable {
     }
 }
 
+/// Server-only aggregate: never reveals inaccessible competitions or GPS data.
+struct ATHLTHArenaSeasonCloseout: Decodable {
+    let linkedCompetitions: Int
+    let incompleteCompetitions: Int
+    let unresolvedCompetitions: Int
+
+    enum CodingKeys: String, CodingKey {
+        case linkedCompetitions = "linked_competitions"
+        case incompleteCompetitions = "incomplete_competitions"
+        case unresolvedCompetitions = "unresolved_competitions"
+    }
+}
+
 struct ATHLTHArenaSeasonSeriesLink: Decodable, Identifiable {
     let seasonID: UUID
     let seriesID: UUID
@@ -825,6 +838,17 @@ final class ATHLTHArenaCloudService: Sendable {
             "arena_club_season_standings",
             params: ATHLTHArenaSeasonIDParams(seasonID: seasonID)
         ).execute().value
+    }
+
+    func loadSeasonCloseout(
+        seasonID: UUID
+    ) async throws -> ATHLTHArenaSeasonCloseout? {
+        guard currentUserID != nil else { return nil }
+        let rows: [ATHLTHArenaSeasonCloseout] = try await client.rpc(
+            "arena_club_season_closeout",
+            params: ATHLTHArenaSeasonIDParams(seasonID: seasonID)
+        ).execute().value
+        return rows.first
     }
 
     func loadSeasonSeriesLinks(

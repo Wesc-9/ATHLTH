@@ -174,37 +174,31 @@ final class ATHLTHArenaSafetyTests: XCTestCase {
         XCTAssertTrue(ATHLTHArenaSeasonPresentation.leadingAthletes(rows).isEmpty)
     }
 
-    func testSeasonChampionRequiresFinishedAndResolvedLinkedCompetitions() {
-        let a = seasonSeries(status: "completed")
-        let b = seasonSeries(status: "completed")
+    func testSeasonChampionRequiresTrustedServerCloseout() {
         XCTAssertTrue(ATHLTHArenaSeasonPresentation.canDeclareChampion(
             phase: .completed, linkedCompetitionCount: 2,
-            visibleCompetitions: [a, b]
+            incompleteCompetitionCount: 0, unresolvedCompetitionCount: 0
         ))
         XCTAssertFalse(ATHLTHArenaSeasonPresentation.canDeclareChampion(
             phase: .active, linkedCompetitionCount: 2,
-            visibleCompetitions: [a, b]
+            incompleteCompetitionCount: 0, unresolvedCompetitionCount: 0
+        ))
+        XCTAssertFalse(ATHLTHArenaSeasonPresentation.canDeclareChampion(
+            phase: .upcoming, linkedCompetitionCount: 2,
+            incompleteCompetitionCount: 0, unresolvedCompetitionCount: 0
         ))
         XCTAssertFalse(ATHLTHArenaSeasonPresentation.canDeclareChampion(
             phase: .completed, linkedCompetitionCount: 0,
-            visibleCompetitions: []
+            incompleteCompetitionCount: 0, unresolvedCompetitionCount: 0
         ))
-        // Inaccessible series cannot be assumed finished.
         XCTAssertFalse(ATHLTHArenaSeasonPresentation.canDeclareChampion(
             phase: .completed, linkedCompetitionCount: 2,
-            visibleCompetitions: [a]
+            incompleteCompetitionCount: 1, unresolvedCompetitionCount: 0
         ))
-        for unfinished in [
-            seasonSeries(status: "active"),
-            seasonSeries(status: "draft"),
-            seasonSeries(status: "unknown"),
-            seasonSeries(status: "completed", completionReason: "deadline_unresolved")
-        ] {
-            XCTAssertFalse(ATHLTHArenaSeasonPresentation.canDeclareChampion(
-                phase: .completed, linkedCompetitionCount: 2,
-                visibleCompetitions: [a, unfinished]
-            ))
-        }
+        XCTAssertFalse(ATHLTHArenaSeasonPresentation.canDeclareChampion(
+            phase: .completed, linkedCompetitionCount: 2,
+            incompleteCompetitionCount: 0, unresolvedCompetitionCount: 1
+        ))
     }
 
     func testSeasonCompetitionRanksPreserveTiesAndSkipPositions() {

@@ -258,6 +258,24 @@ begin
  ) then
    raise exception 'A competition may be attached to multiple Club seasons';
  end if;
+ -- Members may obtain an aggregate result-finalization state without
+ -- reading other athletes' private competition details.
+ if has_function_privilege(
+   'anon',
+   'public.arena_club_season_closeout(uuid)'::regprocedure,
+   'EXECUTE'
+ ) or not has_function_privilege(
+   'authenticated',
+   'public.arena_club_season_closeout(uuid)'::regprocedure,
+   'EXECUTE'
+ ) then
+   raise exception 'Club season closeout is not restricted to authenticated members';
+ end if;
+ if pg_get_functiondef(
+   'public.arena_club_season_closeout(uuid)'::regprocedure
+ ) not ilike '%community_group_members%' then
+   raise exception 'Club season closeout must enforce current membership';
+ end if;
  -- Administrators may correct a draft link, but not bypass season history.
  if has_function_privilege(
    'anon',
