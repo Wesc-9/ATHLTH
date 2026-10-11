@@ -30,7 +30,7 @@ struct ATHLTHArenaInboxSection: View {
             case "priority":
                 return entry.isReplacement ||
                     entry.membership?.response == "invited" ||
-                    (entry.isGroup && entry.membership?.response == "accepted")
+                    entry.membership?.response == "accepted"
             case "direct":
                 return !entry.isGroup
             case "groups":
