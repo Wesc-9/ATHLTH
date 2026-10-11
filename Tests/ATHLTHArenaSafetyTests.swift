@@ -877,6 +877,88 @@ final class ATHLTHArenaSafetyTests: XCTestCase {
         ))
     }
 
+    private func clubSeason(
+        _ title: String,
+        start: String,
+        end: String,
+        id: UUID = UUID()
+    ) -> ATHLTHArenaClubSeason {
+        ATHLTHArenaClubSeason(
+            id: id,
+            clubID: UUID(),
+            title: title,
+            startsOn: start,
+            endsOn: end,
+            createdBy: nil
+        )
+    }
+
+    func testSeasonHomePrioritizesActiveAndUpcomingOverRecentHistory() {
+        let active = clubSeason(
+            "Active", start: "2026-10-01", end: "2026-10-25"
+        )
+        let old = clubSeason(
+            "Finished", start: "2026-09-01", end: "2026-09-30"
+        )
+        let soon = clubSeason(
+            "Next", start: "2026-10-12", end: "2026-10-31"
+        )
+        let history = [
+            old,
+            clubSeason("Older", start: "2026-08-01", end: "2026-08-31"),
+            clubSeason("Much older", start: "2026-07-01", end: "2026-07-31"),
+            clubSeason("Historic", start: "2026-06-01", end: "2026-06-30")
+        ]
+        XCTAssertEqual(
+            ATHLTHArenaSeasonPresentation.prioritizedSeasons(
+                history + [soon, active],
+                today: "2026-10-11"
+            ).prefix(4).map(\.id),
+            [active.id, soon.id, old.id, history[1].id]
+        )
+    }
+
+    func testSeasonHomeShowsNearestActiveDeadlineAndUpcomingStartFirst() {
+        let activeLate = clubSeason(
+            "Long", start: "2026-10-01", end: "2026-12-31"
+        )
+        let activeSoon = clubSeason(
+            "Soon", start: "2026-10-10", end: "2026-10-11"
+        )
+        let nextMonth = clubSeason(
+            "Later", start: "2026-11-01", end: "2026-11-30"
+        )
+        let tomorrow = clubSeason(
+            "Tomorrow", start: "2026-10-12", end: "2026-10-15"
+        )
+        let order = ATHLTHArenaSeasonPresentation.prioritizedSeasons(
+            [nextMonth, activeLate, tomorrow, activeSoon],
+            today: "2026-10-11"
+        )
+        XCTAssertEqual(
+            order.map(\.id),
+            [activeSoon.id, activeLate.id, tomorrow.id, nextMonth.id]
+        )
+    }
+
+    func testCompletedSeasonHistoryOrdersLatestFirstAndTiesAreStable() {
+        let recent = clubSeason(
+            "Recent", start: "2026-08-01", end: "2026-09-30"
+        )
+        let old = clubSeason(
+            "Old", start: "2026-07-01", end: "2026-07-31"
+        )
+        let rows = [old, recent]
+        let first = ATHLTHArenaSeasonPresentation.prioritizedSeasons(
+            rows, today: "2026-10-11"
+        )
+        let second = ATHLTHArenaSeasonPresentation.prioritizedSeasons(
+            Array(rows.reversed()), today: "2026-10-11"
+        )
+        XCTAssertEqual(first.map(\.id), [recent.id, old.id])
+        XCTAssertEqual(first.map(\.id), second.map(\.id))
+    }
+
     func testUnresolvedSeasonCompetitionHasDistinctStatus() {
         let unresolved = seasonSeries(
             status: "completed", completionReason: "deadline_unresolved"
