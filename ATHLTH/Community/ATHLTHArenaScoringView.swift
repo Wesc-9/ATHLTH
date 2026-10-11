@@ -15,6 +15,7 @@ struct ATHLTHArenaScoringSection: View {
 
     @State private var results: [ATHLTHArenaRoundResult] = []
     @State private var votes: [ATHLTHArenaRoundResultVote] = []
+    @State private var linkedWorkouts: [ATHLTHArenaWorkoutEvidence] = []
     @State private var loading = false
     @State private var writing = false
     @State private var errorMessage: String?
@@ -64,7 +65,19 @@ struct ATHLTHArenaScoringSection: View {
                 ))
                 .font(.headline)
                 Spacer()
-                if loading { ProgressView().controlSize(.small) }
+                if loading {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Button {
+                        Task { await reload() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Refresh standings", norwegian: "Oppdater poengstilling"
+                    ))
+                }
             }
 
             ForEach(rankedMembers) { member in
@@ -227,6 +240,38 @@ struct ATHLTHArenaScoringSection: View {
                                          ? Color.green : ATHLTHTheme.accentDeep)
                 }
             }
+            let roundEvidence = linkedWorkouts.filter { $0.roundID == round.id }
+            if !roundEvidence.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Linked workout evidence",
+                        norwegian: "Tilknyttede treningsøkter"
+                    ))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    ForEach(roundEvidence) { entry in
+                        HStack(spacing: 8) {
+                            Image(systemName: "link")
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                            let athlete = rankedMembers.first { $0.slotID == entry.slotID }
+                            Text(athlete.map(memberName) ??
+                                 ATHLTHLocalization.choose(
+                                    english: "Participant", norwegian: "Deltaker"
+                                 ))
+                                .font(.caption)
+                            Spacer()
+                            Text(workoutMetricLabel(entry))
+                                .font(.caption.weight(.semibold))
+                                .monospacedDigit()
+                            Text(entry.source == "apple_health"
+                                 ? "Health" : entry.source == "iphone" ? "iPhone" : "ATHLTH")
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+            }
             if let result {
                 Text(result.rankedSlots.compactMap { slotID in
                     rankedMembers.first { $0.slotID == slotID }.map(memberName)
@@ -280,6 +325,17 @@ struct ATHLTHArenaScoringSection: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 17))
     }
 
+    private func workoutMetricLabel(_ entry: ATHLTHArenaWorkoutEvidence) -> String {
+        if entry.metricType == "distance_meters" {
+            return String(format: "%.2f km", entry.metricValue / 1_000)
+        }
+        if entry.metricType == "elapsed_seconds" {
+            let seconds = Int(entry.metricValue.rounded())
+            return String(format: "%d:%02d", seconds / 60, seconds % 60)
+        }
+        return ATHLTHLocalization.choose(english: "1 session", norwegian: "1 økt")
+    }
+
     private func memberName(_ member: ATHLTHArenaRemoteMember) -> String {
         if member.isDeleted {
             return ATHLTHLocalization.choose(english: "Deleted user", norwegian: "Slettet bruker")
@@ -301,6 +357,7 @@ struct ATHLTHArenaScoringSection: View {
             let loaded = try await cloud.loadRoundResults(seriesID: series.id)
             results = loaded
             votes = try await cloud.loadResultVotes(resultIDs: loaded.map(\.id))
+            linkedWorkouts = try await cloud.loadWorkoutEvidence(seriesID: series.id)
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
