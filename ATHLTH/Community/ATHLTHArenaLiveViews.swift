@@ -616,9 +616,7 @@ private struct ATHLTHArenaSeasonDetailView: View {
         return competitionOptions.filter {
             $0.scope == .club &&
             $0.clubID == season.clubID &&
-            !linked.contains($0.id) &&
-            // The server applies the authoritative dates and status checks.
-            ($0.startsAt ?? Date.distantPast) <= Date.distantFuture
+            !linked.contains($0.id)
         }
     }
 
