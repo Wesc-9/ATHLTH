@@ -2848,17 +2848,22 @@ private struct ATHLTHArenaRelaySection: View {
                                         Text(athleteName(for: leg.slotID))
                                             .font(.caption)
                                         Spacer()
-                                        if let time = reports.first(where: {
-                                            $0.slotID == leg.slotID &&
-                                            $0.seriesID == series.id
-                                        })?.elapsedSeconds {
+                                        if let time = ATHLTHArenaRelayProgress.reportedTime(
+                                            for: leg, reports: reports
+                                        ) {
                                             Text(GhostTargetTimeFormatter.string(time))
                                                 .font(.caption.weight(.medium))
                                                 .monospacedDigit()
                                         } else {
-                                            Text("—")
-                                                .font(.caption)
-                                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                            Label(
+                                                ATHLTHLocalization.choose(
+                                                    english: "Not reported",
+                                                    norwegian: "Ikke registrert"
+                                                ),
+                                                systemImage: "clock"
+                                            )
+                                            .font(.caption2)
+                                            .foregroundStyle(ATHLTHTheme.mutedText)
                                         }
                                     }
                                 }
@@ -2912,26 +2917,91 @@ private struct ATHLTHArenaRelaySection: View {
                             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 13))
                         }
 
-                        if let one = ATHLTHArenaRelayProgress.team(
-                                1, legs: legs, reports: reports
-                            )?.completeTotalSeconds,
-                           let two = ATHLTHArenaRelayProgress.team(
-                                2, legs: legs, reports: reports
-                            )?.completeTotalSeconds {
-                            Label(
-                                one == two
-                                    ? ATHLTHLocalization.choose(
-                                        english: "Reported relay tie",
-                                        norwegian: "Foreløpig lik stafettid"
+                        if let comparison = ATHLTHArenaRelayProgress.provisionalComparison(
+                            legs: legs, reports: reports
+                        ) {
+                            VStack(alignment: .leading, spacing: 9) {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Reported relay comparison",
+                                        norwegian: "Foreløpig stafettresultat"
+                                    ),
+                                    systemImage: "flag.checkered"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                                HStack(spacing: 10) {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(ATHLTHLocalization.choose(
+                                            english: "Team 1", norwegian: "Lag 1"
+                                        ))
+                                        .font(.caption)
+                                        Text(GhostTargetTimeFormatter.string(
+                                            comparison.firstTeamSeconds
+                                        ))
+                                        .font(.headline.monospacedDigit())
+                                    }
+                                    Spacer(minLength: 4)
+                                    Image(systemName: "arrow.left.arrow.right")
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                    Spacer(minLength: 4)
+                                    VStack(alignment: .trailing, spacing: 3) {
+                                        Text(ATHLTHLocalization.choose(
+                                            english: "Team 2", norwegian: "Lag 2"
+                                        ))
+                                        .font(.caption)
+                                        Text(GhostTargetTimeFormatter.string(
+                                            comparison.secondTeamSeconds
+                                        ))
+                                        .font(.headline.monospacedDigit())
+                                    }
+                                }
+
+                                if let leadingTeam = comparison.leadingTeam {
+                                    Text(
+                                        ATHLTHLocalization.choose(
+                                            english: "Provisional leader: team",
+                                            norwegian: "Foreløpig leder: lag"
+                                        ) + " \(leadingTeam) · " +
+                                        String(format: "%.1f s", comparison.marginSeconds)
                                     )
-                                    : ATHLTHLocalization.choose(
-                                        english: "Provisional team", norwegian: "Foreløpig lag"
-                                    ) + " \(one < two ? 1 : 2) · " +
-                                        String(format: "%.0f s", abs(one-two)),
-                                systemImage: "flag.checkered"
+                                    .font(.caption.weight(.semibold))
+                                } else {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english: "Provisional tie",
+                                            norwegian: "Foreløpig uavgjort"
+                                        ),
+                                        systemImage: "equal.circle"
+                                    )
+                                    .font(.caption.weight(.semibold))
+                                }
+
+                                Text(ATHLTHLocalization.choose(
+                                    english: "All stages are reported, but times are self-declared. Confirm results with your team; this does not approve a win or allocate Arena points.",
+                                    norwegian: "Alle etapper er registrert, men tidene er selvrapporterte. Kontroller resultatet med laget; dette godkjenner verken seier eller Arena-poeng."
+                                ))
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            .padding(13)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                ATHLTHTheme.vitalitySoft.opacity(0.44),
+                                in: RoundedRectangle(cornerRadius: 16)
                             )
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .accessibilityElement(children: .contain)
+                        } else {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Waiting for complete, consistent leg reports from both teams.",
+                                    norwegian: "Venter på komplette og gyldige etapperapporter fra begge lag."
+                                ),
+                                systemImage: "clock.arrow.circlepath"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
                         }
 
                         if reportWindowOpen, let ownLeg {
