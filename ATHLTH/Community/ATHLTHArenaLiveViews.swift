@@ -606,10 +606,12 @@ private struct ATHLTHArenaSeasonDetailView: View {
     @State private var standings: [ATHLTHArenaSeasonStandingsRow] = []
     @State private var links: [ATHLTHArenaSeasonSeriesLink] = []
     @State private var competitionOptions: [ATHLTHArenaRemoteSeries] = []
+    @State private var clubDisplayNames: [UUID: String] = [:]
     @State private var loading = false
     @State private var adding = false
     @State private var errorMessage: String?
     private let cloud = ATHLTHArenaCloudService()
+    private let directory = ATHLTHArenaClubDirectory()
 
     private var candidates: [ATHLTHArenaRemoteSeries] {
         let linked = Set(links.map(\.seriesID))
@@ -626,11 +628,29 @@ private struct ATHLTHArenaSeasonDetailView: View {
                 english: "You", norwegian: "Du"
             )
         }
-        return (social.visibleProfiles + social.mutualFollows)
-            .first(where: { $0.userID == id })?.resolvedName ??
+        return clubDisplayNames[id] ??
+            (social.visibleProfiles + social.mutualFollows)
+                .first(where: { $0.userID == id })?.resolvedName ??
             ATHLTHLocalization.choose(
                 english: "Club member", norwegian: "Klubbmedlem"
             )
+    }
+
+    private var seasonStatus: String {
+        let today = ATHLTHArenaSeasonDate.sql(Date())
+        if today < season.startsOn {
+            return ATHLTHLocalization.choose(
+                english: "Upcoming season", norwegian: "Kommende sesong"
+            )
+        }
+        if today > season.endsOn {
+            return ATHLTHLocalization.choose(
+                english: "Completed season", norwegian: "Avsluttet sesong"
+            )
+        }
+        return ATHLTHLocalization.choose(
+            english: "Season in progress", norwegian: "Sesongen pågår"
+        )
     }
 
     var body: some View {
@@ -642,6 +662,9 @@ private struct ATHLTHArenaSeasonDetailView: View {
                         .tracking(1)
                     Text(season.title)
                         .font(.title2.weight(.bold))
+                    Label(seasonStatus, systemImage: "calendar.badge.clock")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.93))
                     Text(ATHLTHArenaSeasonDate.label(season.startsOn) +
                          " – " + ATHLTHArenaSeasonDate.label(season.endsOn))
                         .font(.subheadline)
@@ -806,6 +829,12 @@ private struct ATHLTHArenaSeasonDetailView: View {
             standings = try await rank
             links = try await linkRows
             competitionOptions = try await allSeries
+            // Resolve permitted Club member display names without exposing
+            // private profile details or breaking the scoreboard on RLS errors.
+            let athletes = (try? await directory.athletes(in: season.clubID)) ?? []
+            clubDisplayNames = Dictionary(
+                uniqueKeysWithValues: athletes.map { ($0.id, $0.displayName) }
+            )
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
