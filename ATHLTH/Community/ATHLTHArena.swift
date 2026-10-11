@@ -191,6 +191,129 @@ struct ATHLTHArenaCompetitionDraft: Codable, Identifiable {
     var rounds: [ATHLTHArenaRoundDraft] = []
 }
 
+
+// MARK: - Publication preflight
+
+/// Mirrors the published Arena limits before a remote write. The backend
+/// remains the authority for membership, invitations and competition starts.
+enum ATHLTHArenaDraftIssue: Equatable {
+    case missingTitle, titleTooLong, invalidDuration, invalidInvitees
+    case duelNeedsOneOpponent, missingClub, missingRounds, tooManyRounds
+    case invalidRound, invalidDistance, missingRoute
+
+    var message: String {
+        switch self {
+        case .missingTitle:
+            return ATHLTHLocalization.choose(
+                english: "Give the competition a name before inviting.",
+                norwegian: "Gi konkurransen et navn før du inviterer."
+            )
+        case .titleTooLong:
+            return ATHLTHLocalization.choose(
+                english: "The competition name can have up to 80 characters.",
+                norwegian: "Konkurransenavnet kan ha maksimalt 80 tegn."
+            )
+        case .invalidDuration:
+            return ATHLTHLocalization.choose(
+                english: "Choose a duration from 1 to 90 days.",
+                norwegian: "Velg en varighet mellom 1 og 90 dager."
+            )
+        case .invalidInvitees:
+            return ATHLTHLocalization.choose(
+                english: "Select 1–20 different participants, excluding yourself.",
+                norwegian: "Velg 1–20 forskjellige deltakere, uten deg selv."
+            )
+        case .duelNeedsOneOpponent:
+            return ATHLTHLocalization.choose(
+                english: "A 1-on-1 duel requires exactly one opponent.",
+                norwegian: "En 1-mot-1-duell krever nøyaktig én motstander."
+            )
+        case .missingClub:
+            return ATHLTHLocalization.choose(
+                english: "Choose a Club before sending invitations.",
+                norwegian: "Velg en klubb før du sender invitasjoner."
+            )
+        case .missingRounds:
+            return ATHLTHLocalization.choose(
+                english: "Add at least one round before sending invitations.",
+                norwegian: "Legg til minst én runde før du sender invitasjoner."
+            )
+        case .tooManyRounds:
+            return ATHLTHLocalization.choose(
+                english: "A competition can contain up to 16 rounds. Remove a round to continue.",
+                norwegian: "En konkurranse kan ha maksimalt 16 runder. Fjern en runde for å fortsette."
+            )
+        case .invalidRound:
+            return ATHLTHLocalization.choose(
+                english: "One or more rounds need a valid name and rules.",
+                norwegian: "Én eller flere runder mangler gyldig navn eller regler."
+            )
+        case .invalidDistance:
+            return ATHLTHLocalization.choose(
+                english: "Choose a valid round distance between 0.1 and 500 km.",
+                norwegian: "Velg en gyldig rundedistanse mellom 0,1 og 500 km."
+            )
+        case .missingRoute:
+            return ATHLTHLocalization.choose(
+                english: "A route round needs a saved route with a valid preview.",
+                norwegian: "En ruterunde må ha en lagret rute med gyldig forhåndsvisning."
+            )
+        }
+    }
+}
+
+enum ATHLTHArenaDraftValidation {
+    static func issue(for draft: ATHLTHArenaCompetitionDraft) -> ATHLTHArenaDraftIssue? {
+        let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if title.isEmpty { return .missingTitle }
+        if title.count > 80 { return .titleTooLong }
+        if !(1...90).contains(draft.durationDays) { return .invalidDuration }
+        if draft.scope == .club && draft.clubID == nil { return .missingClub }
+
+        let invitees = draft.participantIDs
+        if !(1...20).contains(invitees.count) ||
+            invitees.contains(draft.ownerID) ||
+            Set(invitees).count != invitees.count {
+            return .invalidInvitees
+        }
+        if draft.scope == .duel && invitees.count != 1 {
+            return .duelNeedsOneOpponent
+        }
+        if draft.rounds.isEmpty { return .missingRounds }
+        if draft.rounds.count > 16 { return .tooManyRounds }
+        if Set(draft.rounds.map(\.id)).count != draft.rounds.count {
+            return .invalidRound
+        }
+
+        for round in draft.rounds {
+            let name = round.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            let rules = round.rules.trimmingCharacters(in: .whitespacesAndNewlines)
+            if name.isEmpty || name.count > 80 || rules.isEmpty || rules.count > 600 {
+                return .invalidRound
+            }
+            if round.template == .fastestDistance || round.template == .fastestRoute {
+                guard let distance = round.targetDistanceMeters,
+                      distance.isFinite, (100...500_000).contains(distance) else {
+                    return .invalidDistance
+                }
+            }
+            if round.template == .fastestRoute {
+                guard let route = round.routeSnapshot,
+                      route.distanceKilometers.isFinite,
+                      (0.1...500).contains(route.distanceKilometers),
+                      route.coordinates.count >= 2 else {
+                    return .missingRoute
+                }
+                if abs((round.targetDistanceMeters ?? 0) -
+                       route.distanceKilometers * 1_000) > 1 {
+                    return .invalidDistance
+                }
+            }
+        }
+        return nil
+    }
+}
+
 enum ATHLTHArenaDraftStorage {
     private static func key(for userID: UUID) -> String {
         AccountLocalStorage.key("arenaDrafts", userID: userID)
@@ -1455,8 +1578,10 @@ struct ATHLTHArenaCreateView: View {
                                 Button {
                                     if scope == .duel {
                                         selectedFriendIDs = [friend.userID]
-                                    } else if !selectedFriendIDs.insert(friend.userID).inserted {
+                                    } else if selectedFriendIDs.contains(friend.userID) {
                                         selectedFriendIDs.remove(friend.userID)
+                                    } else if selectedFriendIDs.count < 20 {
+                                        selectedFriendIDs.insert(friend.userID)
                                     }
                                 } label: {
                                     HStack {
@@ -1576,6 +1701,10 @@ struct ATHLTHArenaDraftDetailView: View {
     @State private var publishing = false
     @State private var publishError: String?
 
+    private var validationIssue: ATHLTHArenaDraftIssue? {
+        ATHLTHArenaDraftValidation.issue(for: draft)
+    }
+
     init(
         draft: ATHLTHArenaCompetitionDraft,
         onSave: @escaping (ATHLTHArenaCompetitionDraft) -> Void,
@@ -1675,6 +1804,12 @@ struct ATHLTHArenaDraftDetailView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(ATHLTHTheme.accentDeep)
+                .disabled(draft.rounds.count >= 16)
+                if draft.rounds.count >= 16 {
+                    Text(ATHLTHArenaDraftIssue.tooManyRounds.message)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
 
                 VStack(alignment: .leading, spacing: 9) {
                     if draft.scope == .club && draft.clubID == nil {
@@ -1701,13 +1836,14 @@ struct ATHLTHArenaDraftDetailView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(ATHLTHTheme.accentDeep)
-                        .disabled(
-                            publishing ||
-                            draft.participantIDs.isEmpty ||
-                            draft.rounds.isEmpty
-                        )
+                        .disabled(publishing || validationIssue != nil)
                     }
 
+                    if let issue = validationIssue {
+                        Label(issue.message, systemImage: "info.circle")
+                            .font(.footnote)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
                     if let publishError {
                         Text(publishError)
                             .font(.footnote)
@@ -1752,6 +1888,7 @@ struct ATHLTHArenaDraftDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingAddRound) {
             ATHLTHArenaAddRoundView { round in
+                guard draft.rounds.count < 16 else { return }
                 draft.rounds.append(round)
                 onSave(draft)
             }
@@ -1768,7 +1905,7 @@ struct ATHLTHArenaDraftDetailView: View {
 
     @MainActor
     private func publishDraft() async {
-        guard !publishing else { return }
+        guard !publishing, validationIssue == nil else { return }
         publishing = true
         publishError = nil
         defer { publishing = false }
