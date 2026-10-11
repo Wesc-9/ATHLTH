@@ -14,6 +14,7 @@ final class MirroredWorkoutAudioCoach:
             .disabled
     private var guidanceGate =
         ATHLTHGuidancePriorityGate()
+    private var eventLedger = ATHLTHCoachEventLedger()
 
     private var nextDistanceMeters:
         Double?
@@ -41,6 +42,7 @@ final class MirroredWorkoutAudioCoach:
         self.configuration =
             configuration
         guidanceGate.reset()
+        eventLedger.reset()
         lastState = nil
         lastStepIndex = nil
         announcedStart = false
@@ -213,6 +215,7 @@ final class MirroredWorkoutAudioCoach:
         ATHLTHSpokenAudioSession
             .deactivate()
         guidanceGate.reset()
+        eventLedger.reset()
         configuration = .disabled
         nextDistanceMeters = nil
         nextTimeSeconds = nil
@@ -261,8 +264,14 @@ final class MirroredWorkoutAudioCoach:
 
         speak(
             text,
-            priority:
-                .structuredStep
+            priority: .structuredStep,
+            event: ATHLTHCoachEvent(
+                kind: .runningStep,
+                key: String(index),
+                priority: .structuredStep,
+                createdAt: snapshot.capturedAt,
+                validFor: 15
+            )
         )
     }
 
@@ -271,11 +280,13 @@ final class MirroredWorkoutAudioCoach:
             WatchWorkoutLiveSnapshot
     ) {
         var due = false
+        var milestoneKeys: [String] = []
 
         if let next =
                 nextDistanceMeters,
            snapshot.distanceMeters >= next {
             due = true
+            milestoneKeys.append("d\\(Int(next.rounded()))")
 
             if let interval =
                     configuration
@@ -295,6 +306,7 @@ final class MirroredWorkoutAudioCoach:
                 nextTimeSeconds,
            snapshot.elapsedTime >= next {
             due = true
+            milestoneKeys.append("t\\(Int(next.rounded()))")
 
             if let interval =
                     configuration
@@ -323,8 +335,14 @@ final class MirroredWorkoutAudioCoach:
 
         speak(
             text,
-            priority:
-                .routineCoach
+            priority: .routineCoach,
+            event: ATHLTHCoachEvent(
+                kind: .routineMilestone,
+                key: milestoneKeys.joined(separator: "-"),
+                priority: .routineCoach,
+                createdAt: snapshot.capturedAt,
+                validFor: 10
+            )
         )
     }
 
@@ -582,9 +600,14 @@ final class MirroredWorkoutAudioCoach:
     private func speak(
         _ text: String,
         priority:
-            ATHLTHGuidancePriority
+            ATHLTHGuidancePriority,
+        event: ATHLTHCoachEvent? = nil
     ) {
         guard !text.isEmpty else {
+            return
+        }
+        if let event,
+           !eventLedger.canDeliver(event) {
             return
         }
 
@@ -608,6 +631,10 @@ final class MirroredWorkoutAudioCoach:
             )
         case .deliver:
             break
+        }
+
+        if let event {
+            eventLedger.didDeliver(event)
         }
 
         do {
