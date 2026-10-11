@@ -24,6 +24,26 @@ struct WorkoutChangeDecision: Codable, Hashable {
     let approvedWorkout: PlannedSession?
 }
 
+/// Permission attached to the original invitation. Proposals are always
+/// suggestions; only the organizer can apply them to the shared workout.
+enum WorkoutInviteExercisePolicy {
+    static func hasAddedExercises(
+        original: PlannedSession,
+        proposed: PlannedSession
+    ) -> Bool {
+        let existingIDs = Set(original.exercises.map(\.id))
+        return proposed.exercises.contains { !existingIDs.contains($0.id) }
+    }
+
+    static func canPropose(
+        original: PlannedSession,
+        proposed: PlannedSession
+    ) -> Bool {
+        !hasAddedExercises(original: original, proposed: proposed) ||
+            original.allowInviteeExercises == true
+    }
+}
+
 enum WorkoutChangeComparison {
     struct Row: Identifiable {
         var id: String { key }
@@ -42,6 +62,8 @@ enum WorkoutChangeComparison {
             // provided by the original invitation rather than a user edit.
             guard key != "id", key != "sharedSourceOwnerID",
                   key != "sharedSourceSessionID",
+                  key != "invitedPartnerID",
+                  key != "allowInviteeExercises",
                   key != "gearIDs", key != "spotifyPlaylist",
                   key != "spotifyAutoplayOnStart",
                   signature(before[key]) != signature(after[key])
