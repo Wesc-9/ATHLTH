@@ -5525,7 +5525,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         guard !text.isEmpty,
               ATHLTHCoachVoicePausePolicy.allowsSpeech(
                   coachEnabled: audioCoachConfiguration.enabled,
-                  speechPaused: coachSpeechPaused
+                  speechPaused: coachSpeechPaused,
+                  priority: priority
               )
         else { return }
         if let event,
