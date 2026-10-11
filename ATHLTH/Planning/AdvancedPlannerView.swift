@@ -4659,6 +4659,7 @@ struct SessionEditorView: View {
     @State private var workoutCategory: String?
     @State private var showingSavedWorkoutPicker = false
     @State private var selectedPartnerID: UUID?
+    @State private var allowInviteeExercises = false
     @State private var directPartnerID: UUID?
     @State private var physicalMeetup = true
     @State private var meetingPoint: PlannedWorkoutMeetingPoint?
@@ -4840,6 +4841,7 @@ struct SessionEditorView: View {
         _meetingPoint = State(initialValue: workout.meetingPoint)
         _physicalMeetup = State(initialValue:
             workout.trainTogetherMode != .sameWorkout)
+        _allowInviteeExercises = State(initialValue: workout.allowInviteeExercises == true)
         _reminderMinutesBefore = State(initialValue: workout.reminderMinutesBefore ?? 0)
         _plannedExercises = State(initialValue: workout.exercises)
         _selectedRunningWorkouts = State(
@@ -6487,6 +6489,22 @@ struct SessionEditorView: View {
             }
 
             if selectedPartnerID != nil {
+                Toggle(
+                    ATHLTHLocalization.choose(
+                        english: "Allow guest to add exercises",
+                        norwegian: "La invitert legge til øvelser"
+                    ),
+                    isOn: $allowInviteeExercises
+                )
+                .tint(ATHLTHTheme.accentDeep)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "New exercises and all shared changes must be approved by the organizer before they appear for everyone.",
+                    norwegian: "Nye øvelser og andre felles endringer må godkjennes av arrangøren før de gjelder for alle."
+                ))
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+
                 Picker(
                     ATHLTHLocalization.choose(
                         english: "Training mode", norwegian: "Hvordan trener dere?"
@@ -7640,6 +7658,8 @@ struct SessionEditorView: View {
     }
 
     private func addExercise(_ exercise: Exercise) {
+        guard onPreparedWorkout == nil ||
+            initialSourceWorkout?.allowInviteeExercises == true else { return }
         let planned = PlannedExercise(
             id: UUID(),
             exerciseID: exercise.id,
@@ -8392,6 +8412,7 @@ struct SessionEditorView: View {
         workoutCategory = workout.workoutCategory
         meetingPoint = workout.meetingPoint
         physicalMeetup = workout.trainTogetherMode != .sameWorkout
+        allowInviteeExercises = workout.allowInviteeExercises == true
         reminderMinutesBefore = workout.reminderMinutesBefore ?? 0
 
         if let scheduled = workout.scheduledStart {
@@ -8503,8 +8524,15 @@ struct SessionEditorView: View {
             meetingPoint: physicalMeetup ? meetingPoint : nil,
             reminderMinutesBefore: scheduledTimeEnabled && reminderMinutesBefore > 0
                 ? reminderMinutesBefore : nil,
-            trainTogetherMode: selectedPartnerID == nil ? nil :
-                (physicalMeetup ? .physical : .sameWorkout)
+            trainTogetherMode: onPreparedWorkout != nil
+                ? initialSourceWorkout?.trainTogetherMode
+                : selectedPartnerID == nil ? nil :
+                    (physicalMeetup ? .physical : .sameWorkout),
+            invitedPartnerID: onPreparedWorkout != nil
+                ? initialSourceWorkout?.invitedPartnerID : selectedPartnerID,
+            allowInviteeExercises: onPreparedWorkout != nil
+                ? initialSourceWorkout?.allowInviteeExercises
+                : selectedPartnerID == nil ? nil : allowInviteeExercises
         )
 
     }
