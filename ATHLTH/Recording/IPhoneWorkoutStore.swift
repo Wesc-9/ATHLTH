@@ -3482,9 +3482,15 @@ final class IPhoneWorkoutStore:
             // Speech remains best-effort and must never stop the workout.
         }
 
+        let spokenPhrase = (configuration.speechStyle ?? .balanced).render(
+            phrase,
+            language: configuration.language,
+            priority: priority,
+            eventKind: event?.kind
+        )
         let utterance =
             AVSpeechUtterance(
-                string: phrase
+                string: spokenPhrase
             )
 
         if let voiceIdentifier =
@@ -3523,7 +3529,7 @@ final class IPhoneWorkoutStore:
         speechSynthesizer.speak(utterance)
         if rememberForReplay,
            ATHLTHCoachReplayMemory.mayRemember(priority: priority) {
-            coachReplayMemory.remember(phrase, priority: priority)
+            coachReplayMemory.remember(spokenPhrase, priority: priority)
             lastCoachMessage = coachReplayMemory.text
         }
     }
