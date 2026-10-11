@@ -461,6 +461,12 @@ struct StrengthExerciseLog: Identifiable, Codable, Hashable {
     var isCompleted: Bool {
         completedAt != nil
     }
+
+    var isWarmUpExercise: Bool {
+        !sets.isEmpty && sets.allSatisfy {
+            $0.isWarmUp == true || $0.plannedSetType == .warmUp
+        }
+    }
 }
 
 enum StrengthPersonalRecordKind: String, Codable, Hashable {
