@@ -5354,21 +5354,6 @@ struct SessionEditorView: View {
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active { persistDraft() }
             }
-            .onChange(of: title) { _, _ in persistDraft() }
-            .onChange(of: kind) { _, _ in persistDraft() }
-            .onChange(of: durationMinutes) { _, _ in persistDraft() }
-            .onChange(of: distanceKilometers) { _, _ in persistDraft() }
-            .onChange(of: notes) { _, _ in persistDraft() }
-            .onChange(of: scheduledTime) { _, _ in persistDraft() }
-            .onChange(of: scheduledTimeEnabled) { _, _ in persistDraft() }
-            .onChange(of: selectedPartnerID) { _, _ in persistDraft() }
-            .onChange(of: plannedExercises) { _, _ in persistDraft() }
-            .onChange(of: selectedRunningWorkouts) { _, _ in persistDraft() }
-            .onChange(of: workoutBlocks) { _, _ in persistDraft() }
-            .onChange(of: selectedGearIDs) { _, _ in persistDraft() }
-            .onChange(of: targetPaceEnabled) { _, _ in persistDraft() }
-            .onChange(of: heartRateTargetEnabled) { _, _ in persistDraft() }
-            .onChange(of: paceAlertsEnabled) { _, _ in persistDraft() }
             .onChange(of: selectedRouteID) { oldRouteID, newRouteID in
                 syncMetricsFromRouteChange(
                     previousRouteID: oldRouteID,
