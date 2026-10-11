@@ -1357,17 +1357,79 @@ final class SupabaseSocialService: Sendable {
             }
 
             if !participantWrites.isEmpty {
+                // Participant identity fields are immutable in Supabase.
+                // Upserting every local snapshot rewrites invited_at and
+                // can overwrite a guest's accepted/declined state. Insert
+                // only genuinely new invitations; never replay transitions.
+                let remote: [BackendChallengeParticipant] = try await client
+                    .from("social_challenge_participants")
+                    .select()
+                    .eq("challenge_id", value: challenge.id)
+                    .limit(200)
+                    .execute()
+                    .value
+
+                let remoteIDs = Set(remote.map(\.id))
+                let remoteUserIDs = Set(remote.map(\.userID))
+                let newInvitations = participantWrites.filter { candidate in
+                    !remoteIDs.contains(candidate.id) &&
+                    !remoteUserIDs.contains(candidate.userID) &&
+                    (
+                        (candidate.userID == currentUserID &&
+                         candidate.state == "creator") ||
+                        (candidate.userID != currentUserID &&
+                         candidate.state == "invited")
+                    )
+                }
+
+                if !newInvitations.isEmpty {
+                    try await client
+                        .from("social_challenge_participants")
+                        .insert(newInvitations)
+                        .execute()
+                }
+
+                // Only the creator can withdraw an invitation that the
+                // guest has not answered. Never reset an accepted guest.
+                for remoteParticipant in remote where
+                    remoteParticipant.userID != currentUserID &&
+                    remoteParticipant.state == "invited"
+                {
+                    guard participantWrites.contains(where: {
+                        $0.id == remoteParticipant.id &&
+                        $0.state == "withdrawn"
+                    }) else { continue }
+
+                    try await client
+                        .from("social_challenge_participants")
+                        .update(["state": "withdrawn"])
+                        .eq("id", value: remoteParticipant.id)
+                        .eq("state", value: "invited")
+                        .execute()
+                }
+            }
+        } else if let mine = challenge.participants.first(
+            where: { $0.userID == currentUserID }
+        ) {
+            // A guest may respond only once. Re-sending the same response
+            // on every refresh triggers Invalid challenge invitation transition.
+            let remote: [BackendChallengeParticipant] = try await client
+                .from("social_challenge_participants")
+                .select()
+                .eq("id", value: mine.id)
+                .limit(1)
+                .execute()
+                .value
+
+            if remote.first?.state == "invited" &&
+                (mine.state == .accepted || mine.state == .declined) {
                 try await client
                     .from("social_challenge_participants")
-                    .upsert(participantWrites)
+                    .update(["state": mine.state.rawValue])
+                    .eq("id", value: mine.id)
+                    .eq("state", value: "invited")
                     .execute()
             }
-        } else if let mine = challenge.participants.first(where: { $0.userID == currentUserID }) {
-            try await client
-                .from("social_challenge_participants")
-                .update(["state": mine.state.rawValue])
-                .eq("id", value: mine.id)
-                .execute()
         }
 
         let remoteAttempts: [BackendChallengeAttempt] = try await client
