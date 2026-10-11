@@ -1694,6 +1694,7 @@ struct ATHLTHArenaDraftDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft: ATHLTHArenaCompetitionDraft
     @State private var showingAddRound = false
+    @State private var roundToEdit: ATHLTHArenaRoundDraft?
 
     let onSave: (ATHLTHArenaCompetitionDraft) -> Void
     let onPublished: (UUID) -> Void
@@ -1778,6 +1779,15 @@ struct ATHLTHArenaDraftDetailView: View {
                                 .foregroundStyle(ATHLTHTheme.mutedText)
                         }
                         Spacer(minLength: 3)
+                        Button {
+                            roundToEdit = round
+                        } label: {
+                            Image(systemName: "pencil")
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                        }
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Edit round rules", norwegian: "Rediger rundereglene"
+                        ))
                         Button(role: .destructive) {
                             draft.rounds.removeAll { $0.id == round.id }
                             onSave(draft)
@@ -1893,6 +1903,14 @@ struct ATHLTHArenaDraftDetailView: View {
                 onSave(draft)
             }
         }
+        .sheet(item: $roundToEdit) { original in
+            ATHLTHArenaEditRoundView(round: original) { updated in
+                guard let index = draft.rounds.firstIndex(where: { $0.id == original.id })
+                else { return }
+                draft.rounds[index] = updated
+                onSave(draft)
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button(ATHLTHLocalization.choose(english: "Done", norwegian: "Ferdig")) {
@@ -1917,6 +1935,117 @@ struct ATHLTHArenaDraftDetailView: View {
         } catch {
             publishError = error.localizedDescription
         }
+    }
+}
+
+/// Editing the descriptive rules never changes a structured distance or
+/// route snapshot; the creator can remove/recreate a round to change its course.
+private struct ATHLTHArenaEditRoundView: View {
+    @Environment(\.dismiss) private var dismiss
+    let round: ATHLTHArenaRoundDraft
+    let onSave: (ATHLTHArenaRoundDraft) -> Void
+
+    @State private var title: String
+    @State private var rules: String
+
+    init(
+        round: ATHLTHArenaRoundDraft,
+        onSave: @escaping (ATHLTHArenaRoundDraft) -> Void
+    ) {
+        self.round = round
+        self.onSave = onSave
+        _title = State(initialValue: round.title)
+        _rules = State(initialValue: round.rules)
+    }
+
+    private var isValid: Bool {
+        let name = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let detail = rules.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (1...80).contains(name.count) &&
+            (1...600).contains(detail.count)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text(round.template.title)
+                        .font(.subheadline.weight(.semibold))
+                    if let distance = round.targetDistanceMeters {
+                        Text(String(format: "%.2f km", distance / 1_000))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    if let route = round.routeSnapshot {
+                        Text(route.title)
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                } header: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Round type", norwegian: "Type runde"
+                    ))
+                } footer: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "To change the distance or route, remove this round and add a new one.",
+                        norwegian: "For å endre distanse eller rute må du fjerne runden og legge til en ny."
+                    ))
+                }
+
+                Section {
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english: "Round name", norwegian: "Navn på runden"
+                        ),
+                        text: $title
+                    )
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english: "Rules and verification", norwegian: "Regler og verifisering"
+                        ),
+                        text: $rules, axis: .vertical
+                    )
+                    .lineLimit(3...8)
+                } header: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Details", norwegian: "Detaljer"
+                    ))
+                } footer: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Maximum 80 characters in the name and 600 in the rules. Participants approve these rules before the competition starts.",
+                        norwegian: "Maksimalt 80 tegn i navnet og 600 i reglene. Deltakerne må godkjenne reglene før konkurransen starter."
+                    ))
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(ATHLTHArenaLightStyle.canvasBackground)
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Edit round", norwegian: "Rediger runde"
+            ))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Cancel", norwegian: "Avbryt"
+                    )) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Save", norwegian: "Lagre"
+                    )) {
+                        guard isValid else { return }
+                        var updated = round
+                        updated.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+                        updated.rules = rules.trimmingCharacters(in: .whitespacesAndNewlines)
+                        onSave(updated)
+                        dismiss()
+                    }
+                    .disabled(!isValid)
+                }
+            }
+        }
+        .environment(\.colorScheme, .light)
+        .tint(ATHLTHArenaLightStyle.action)
     }
 }
 
