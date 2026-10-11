@@ -287,6 +287,27 @@ struct WorkoutStartOptionsView: View {
                         showingTrainingPartners = true
                     }
 
+                    // Audio Coach is a core workout option, not an
+                    // advanced-only control. Basic users may enable simple
+                    // spoken guidance without changing tracking mode.
+                    advancedOptionButton(
+                        title: "Audio Coach",
+                        subtitle:
+                            strengthAudioCoach.enabled
+                                ? ATHLTHLocalization.choose(
+                                    english: "Strength coaching on · adjust",
+                                    norwegian: "Styrkeveiledning på · juster"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Off · tap to enable",
+                                    norwegian: "Av · trykk for å aktivere"
+                                ),
+                        icon: "waveform.and.mic",
+                        tint: ATHLTHTheme.premiumGold
+                    ) {
+                        showingAudioCoachSettings = true
+                    }
+
                     if trackingMode == .advanced {
                         VStack(spacing: 9) {
                             advancedOptionButton(
@@ -297,24 +318,6 @@ struct WorkoutStartOptionsView: View {
                                 tint: Color.green
                             ) {
                                 showingSpotifyPicker = true
-                            }
-
-                            advancedOptionButton(
-                                title: "Audio Coach",
-                                subtitle:
-                                    strengthAudioCoach.enabled
-                                        ? ATHLTHLocalization.choose(
-                                            english: "Strength cues on",
-                                            norwegian: "Styrkevarsler på"
-                                        )
-                                        : ATHLTHLocalization.choose(
-                                            english: "Off",
-                                            norwegian: "Av"
-                                        ),
-                                icon: "waveform.and.mic",
-                                tint: ATHLTHTheme.premiumGold
-                            ) {
-                                showingAudioCoachSettings = true
                             }
 
                             advancedOptionButton(
@@ -676,9 +679,8 @@ struct WorkoutStartOptionsView: View {
             }
 
             var watchAudioCoach =
-                trackingMode == .advanced
-                    ? strengthAudioCoach
-                        .watchConfiguration
+                strengthAudioCoach.enabled
+                    ? strengthAudioCoach.watchConfiguration
                     : .disabled
             watchAudioCoach
                 .strengthHapticsEnabled =
