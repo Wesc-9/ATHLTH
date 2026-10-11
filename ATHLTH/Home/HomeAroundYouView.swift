@@ -769,6 +769,26 @@ struct HomeAroundYouSection: View {
     }
 }
 
+/// Public marketplace cards expose only a broad city/area, never exact
+/// meetup coordinates. Keep map eligibility isolated and regression-testable.
+enum ExplorePublicWorkoutMapPolicy {
+    static func canDisplay(
+        status: TrainTogetherPostStatus,
+        broadArea: String,
+        scheduledStart: Date,
+        asOf now: Date = Date()
+    ) -> Bool {
+        guard status == .open || status == .full,
+              scheduledStart > now.addingTimeInterval(-2 * 3_600)
+        else { return false }
+
+        let area = broadArea.trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return !area.isEmpty &&
+            !["online", "remote", "på avstand", "digitalt"].contains(area)
+    }
+}
+
 private struct ExploreTrainTogetherAreaPin: Identifiable {
     let post: TrainTogetherPost
     let coordinate: CLLocationCoordinate2D
@@ -3002,11 +3022,11 @@ struct AroundYouExploreView: View {
     /// Private invitations and private meeting coordinates are NEVER used.
     private var publicMapPosts: [TrainTogetherPost] {
         marketplace.posts.filter { post in
-            (post.status == .open || post.status == .full) &&
-            post.scheduledStart > Date().addingTimeInterval(-2 * 3_600) &&
-            !post.broadArea.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-            post.broadArea.lowercased() != "online" &&
-            post.broadArea.lowercased() != "på avstand"
+            ExplorePublicWorkoutMapPolicy.canDisplay(
+                status: post.status,
+                broadArea: post.broadArea,
+                scheduledStart: post.scheduledStart
+            )
         }
     }
 
