@@ -304,6 +304,46 @@ struct OfficialWeeklyChallengeParticipant: Codable, Hashable {
     }
 }
 
+/// Shared countdown for the official weekly card and challenge details.
+/// Uses the exact end instant rather than Calendar.day, which displays
+/// "0 days" while there are still many hours left.
+enum OfficialWeeklyChallengeCountdown {
+    static func remaining(
+        until endsAt: Date,
+        now: Date = Date(),
+        norwegian: Bool = ATHLTHLocalization.isNorwegian
+    ) -> String {
+        let remainingSeconds = endsAt.timeIntervalSince(now)
+        guard remainingSeconds > 0 else {
+            return norwegian ? "Avsluttet" : "Ended"
+        }
+
+        // Round up to whole minutes so an active challenge never shows 0 min.
+        let totalMinutes = Int(ceil(remainingSeconds / 60))
+        if totalMinutes < 60 {
+            return norwegian
+                ? "\(totalMinutes) \(totalMinutes == 1 ? "minutt" : "minutter") igjen"
+                : "\(totalMinutes) \(totalMinutes == 1 ? "minute" : "minutes") left"
+        }
+
+        let totalHours = totalMinutes / 60
+        let days = totalHours / 24
+        let hours = totalHours % 24
+
+        if days == 0 {
+            return norwegian
+                ? "\(totalHours) \(totalHours == 1 ? "time" : "timer") igjen"
+                : "\(totalHours) \(totalHours == 1 ? "hour" : "hours") left"
+        }
+
+        if norwegian {
+            return "\(days) \(days == 1 ? "dag" : "dager") og \(hours) \(hours == 1 ? "time" : "timer") igjen"
+        }
+
+        return "\(days) \(days == 1 ? "day" : "days"), \(hours) \(hours == 1 ? "hour" : "hours") left"
+    }
+}
+
 struct OfficialWeeklyChallengeAIDraft: Codable, Hashable {
     let title: String
     let subtitle: String
@@ -1764,8 +1804,20 @@ struct OfficialWeeklyChallengeCard: View {
 
                     Spacer()
 
-                    Text(timeRemaining)
-                        .font(.caption.weight(.semibold))
+                    TimelineView(.periodic(from: .now, by: 60)) { context in
+                        Text(
+                            challenge.startsAt > context.date
+                                ? ATHLTHLocalization.choose(
+                                    english: "Starts " + challenge.startsAt.formatted(.dateTime.month(.abbreviated).day()),
+                                    norwegian: "Starter " + challenge.startsAt.formatted(.dateTime.month(.abbreviated).day())
+                                )
+                                : OfficialWeeklyChallengeCountdown.remaining(
+                                    until: challenge.endsAt,
+                                    now: context.date
+                                )
+                        )
+                    }
+                    .font(.caption.weight(.semibold))
                         .foregroundStyle(
                             ATHLTHTheme.primaryText.opacity(0.78)
                         )
@@ -1919,26 +1971,6 @@ struct OfficialWeeklyChallengeCard: View {
         .frame(width: 76, height: 76)
     }
 
-    private var timeRemaining: String {
-        if challenge.startsAt > Date() {
-            return "Starts " + challenge.startsAt.formatted(
-                .dateTime.month(.abbreviated).day()
-            )
-        }
-
-        let days = max(
-            Calendar.current.dateComponents(
-                [.day],
-                from: Date(),
-                to: challenge.endsAt
-            ).day ?? 0,
-            0
-        )
-
-        return days == 0
-            ? "Ends today"
-            : "\(days) day\(days == 1 ? "" : "s") left"
-    }
 }
 
 private struct OfficialWeeklyFriendProgressRow: Identifiable {
@@ -5153,18 +5185,7 @@ private struct OfficialWeeklyChallengeEditorPreviewCard:
         )
     }
 
-    private var daysRemaining: Int {
-        max(
-            Calendar.current
-                .dateComponents(
-                    [.day],
-                    from: Date(),
-                    to: challenge.endsAt
-                )
-                .day ?? 0,
-            0
-        )
-    }
+
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -5344,17 +5365,15 @@ private struct OfficialWeeklyChallengeEditorPreviewCard:
                                     "person.2.fill"
                             )
 
-                            Label(
-                                ATHLTHLocalization.format(
-                                    english:
-                                        "%d days left",
-                                    norwegian:
-                                        "%d dager igjen",
-                                    daysRemaining
-                                ),
-                                systemImage:
-                                    "clock"
-                            )
+                            TimelineView(.periodic(from: .now, by: 60)) { context in
+                                Label(
+                                    OfficialWeeklyChallengeCountdown.remaining(
+                                        until: challenge.endsAt,
+                                        now: context.date
+                                    ),
+                                    systemImage: "clock"
+                                )
+                            }
                         }
                         .font(
                             .caption2
