@@ -15,6 +15,7 @@ final class MirroredWorkoutAudioCoach:
     private var guidanceGate =
         ATHLTHGuidancePriorityGate()
     private var eventLedger = ATHLTHCoachEventLedger()
+    private var cueQueue = ATHLTHCoachCueQueue()
 
     private var nextDistanceMeters:
         Double?
@@ -43,6 +44,7 @@ final class MirroredWorkoutAudioCoach:
             configuration
         guidanceGate.reset()
         eventLedger.reset()
+        cueQueue.reset()
         lastState = nil
         lastStepIndex = nil
         announcedStart = false
@@ -206,6 +208,7 @@ final class MirroredWorkoutAudioCoach:
         synthesizer.stopSpeaking(at: .immediate)
         ATHLTHSpokenAudioSession.deactivate()
         guidanceGate.reset()
+        cueQueue.reset()
     }
 
     func stop() {
@@ -216,6 +219,7 @@ final class MirroredWorkoutAudioCoach:
             .deactivate()
         guidanceGate.reset()
         eventLedger.reset()
+        cueQueue.reset()
         configuration = .disabled
         nextDistanceMeters = nil
         nextTimeSeconds = nil
@@ -624,6 +628,16 @@ final class MirroredWorkoutAudioCoach:
 
         switch decision {
         case .drop:
+            if priority >= .structuredStep {
+                let queuedEvent = event ??
+                    ATHLTHCoachEventFallback.event(for: priority)
+                cueQueue.enqueue(
+                    ATHLTHCoachQueuedCue(
+                        event: queuedEvent,
+                        text: text
+                    )
+                )
+            }
             return
         case .interruptAndDeliver:
             synthesizer.stopSpeaking(
@@ -691,6 +705,17 @@ final class MirroredWorkoutAudioCoach:
         )
     }
 
+    private func deliverNextQueuedCue() {
+        guard !synthesizer.isSpeaking,
+              let next = cueQueue.popNext()
+        else { return }
+        speak(
+            next.text,
+            priority: next.event.priority,
+            event: next.event
+        )
+    }
+
     nonisolated func speechSynthesizer(
         _ synthesizer:
             AVSpeechSynthesizer,
@@ -710,6 +735,7 @@ final class MirroredWorkoutAudioCoach:
                 .voiceDidFinish()
             ATHLTHSpokenAudioSession
                 .deactivate()
+            self.deliverNextQueuedCue()
         }
     }
 
@@ -732,6 +758,7 @@ final class MirroredWorkoutAudioCoach:
                 .voiceDidFinish()
             ATHLTHSpokenAudioSession
                 .deactivate()
+            self.deliverNextQueuedCue()
         }
     }
 }
