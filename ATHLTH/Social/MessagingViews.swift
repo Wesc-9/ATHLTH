@@ -5946,12 +5946,27 @@ private struct ThreadChallengeInvitationBubble: View {
         VStack(alignment: .leading, spacing: 12) {
             Button(action: onDetails) {
                 HStack(alignment: .top, spacing: 10) {
+                    if let challenge {
+                        ChallengeCoverArtworkView(
+                            sport: challenge.sport,
+                            artworkName: challenge.rules.coverArtworkName,
+                            remoteURL: challenge.rules.coverImageURL
+                        )
+                        .frame(width: 58, height: 62)
+                        .clipShape(RoundedRectangle(cornerRadius: 11))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 11)
+                                .stroke(Color.white.opacity(0.84), lineWidth: 0.8)
+                        }
+                        .accessibilityHidden(true)
+                    } else {
                     Image(systemName: challenge?.sport.systemImage ?? "bolt.fill")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(ATHLTHTheme.accentDeep)
                         .frame(width: 42, height: 42)
                         .background(Color.white.opacity(0.70),
                             in: RoundedRectangle(cornerRadius: 13))
+                    }
                     VStack(alignment: .leading, spacing: 5) {
                         Text(ATHLTHLocalization.choose(
                             english: "ATHLTH · CHALLENGE",
