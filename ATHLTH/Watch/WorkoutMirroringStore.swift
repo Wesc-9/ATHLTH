@@ -21,6 +21,29 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     @Published private(set) var isUserMinimized = false
     @Published private(set) var liveViewIsVisible = false
     @Published private(set) var presentationGeneration = 0
+    @Published private(set) var lastCoachMessage: String?
+
+    var mirroredIPhoneCoachAvailable: Bool {
+        iPhoneAudioCoachAttached &&
+        iPhoneAudioCoach.isEnabled &&
+        (snapshot?.kind == .running || snapshot?.kind == .walking)
+    }
+
+    var isIPhoneCoachVoiceOwner: Bool {
+        mirroredIPhoneCoachAvailable &&
+        (snapshot?.supportsAudioCoachVoiceLease != true ||
+            hasAcknowledgedVoiceLease)
+    }
+
+    var canReplayMirroredCoachMessage: Bool {
+        isIPhoneCoachVoiceOwner &&
+        iPhoneAudioCoach.canReplayLastCoachMessage
+    }
+
+    func replayMirroredCoachMessage() {
+        guard canReplayMirroredCoachMessage else { return }
+        iPhoneAudioCoach.replayLastCoachMessage()
+    }
 
     private let healthStore = HKHealthStore()
     private var mirroredSession: HKWorkoutSession?
@@ -172,6 +195,9 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     override init() {
         super.init()
 
+        iPhoneAudioCoach.onLastSpokenCoachMessage = { [weak self] message in
+            self?.lastCoachMessage = message
+        }
         iPhoneAudioCoach.onSpokenEventAttempt = { [weak self] event, startedAt in
             self?.sendSpokenEventReceipt(
                 event: event,
