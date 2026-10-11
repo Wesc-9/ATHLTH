@@ -1607,6 +1607,187 @@ struct AroundYouExploreView: View {
         }
     }
 
+    private func selectEvent(_ event: CommunityEventItem) {
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
+            selectedRoute = nil
+            selectedPublicWorkout = nil
+            selectedEvent = event
+        }
+    }
+
+    private func selectPublicWorkout(_ post: TrainTogetherPost) {
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
+            selectedRoute = nil
+            selectedEvent = nil
+            selectedPublicWorkout = post
+        }
+    }
+
+    /// Same card treatment as the route preview, followed by the existing
+    /// full event page (including participation, route and event chat).
+    private func eventPreviewCard(_ item: CommunityEventItem) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 11) {
+                Image(systemName: item.event.activityType.systemImage)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.purple)
+                    .frame(width: 43, height: 43)
+                    .background(Color.purple.opacity(0.10),
+                                in: RoundedRectangle(cornerRadius: 14))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.event.title)
+                        .font(.headline)
+                        .lineLimit(2)
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                    Text(item.event.summary.isEmpty
+                         ? ATHLTHLocalization.choose(
+                            english: "Community event",
+                            norwegian: "Arrangement")
+                         : item.event.summary)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .lineLimit(2)
+                }
+
+                Spacer(minLength: 0)
+
+                Button {
+                    selectedEvent = nil
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.caption.weight(.bold))
+                        .frame(width: 30, height: 30)
+                        .background(Color.primary.opacity(0.06), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english: "Close event preview",
+                        norwegian: "Lukk arrangementsvisning"
+                    )
+                )
+            }
+
+            HStack(spacing: 8) {
+                Label(item.event.startsAt.formatted(
+                    .dateTime.day().month(.abbreviated).hour().minute()),
+                    systemImage: "calendar")
+                if !item.event.meetingName.isEmpty {
+                    Label(item.event.meetingName, systemImage: "mappin")
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            .font(.caption.weight(.medium))
+            .foregroundStyle(ATHLTHTheme.mutedText)
+
+            Button {
+                eventToOpen = item
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "View event details",
+                        norwegian: "Se arrangementet"
+                    ),
+                    systemImage: "arrow.up.right"
+                )
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .frame(height: 43)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(ATHLTHTheme.accentDeep)
+        }
+        .padding(15)
+        .background(.regularMaterial,
+                    in: RoundedRectangle(cornerRadius: 21, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 21, style: .continuous)
+                .stroke(.white.opacity(0.75), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.12), radius: 14, y: 7)
+    }
+
+    private func publicWorkoutPreviewCard(_ post: TrainTogetherPost) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 11) {
+                Image(systemName: "person.2.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 43, height: 43)
+                    .background(ATHLTHTheme.vitality,
+                                in: RoundedRectangle(cornerRadius: 14))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(post.title)
+                        .font(.headline)
+                        .lineLimit(2)
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Public Train Together · approximate area",
+                            norwegian: "Offentlig Tren sammen · omtrentlig område"
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                Spacer(minLength: 0)
+                Button {
+                    selectedPublicWorkout = nil
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.caption.weight(.bold))
+                        .frame(width: 30, height: 30)
+                        .background(Color.primary.opacity(0.06), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english: "Close workout preview",
+                        norwegian: "Lukk øktvisning"
+                    )
+                )
+            }
+
+            HStack(spacing: 8) {
+                Label(post.scheduledStart.formatted(
+                    .dateTime.day().month(.abbreviated).hour().minute()),
+                    systemImage: "calendar")
+                Label(post.broadArea, systemImage: "mappin")
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .font(.caption.weight(.medium))
+            .foregroundStyle(ATHLTHTheme.mutedText)
+
+            Button {
+                publicWorkoutToOpen = post
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "View workout and join",
+                        norwegian: "Se økt og påmelding"
+                    ),
+                    systemImage: "arrow.up.right"
+                )
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .frame(height: 43)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(ATHLTHTheme.vitality)
+        }
+        .padding(15)
+        .background(.regularMaterial,
+                    in: RoundedRectangle(cornerRadius: 21, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 21, style: .continuous)
+                .stroke(.white.opacity(0.75), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.12), radius: 14, y: 7)
+    }
+
     private func selectRoute(
         _ route: TrainingRoute
     ) {
