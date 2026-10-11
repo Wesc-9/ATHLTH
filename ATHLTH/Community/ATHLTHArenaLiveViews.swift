@@ -2768,6 +2768,9 @@ private struct ATHLTHArenaRelaySection: View {
     @State private var assignments: [ATHLTHArenaTeamAssignment] = []
     @State private var legs: [ATHLTHArenaRelayLeg] = []
     @State private var reports: [ATHLTHArenaRelayLegReport] = []
+    @State private var roundResults: [ATHLTHArenaRoundResult] = []
+    // Fail closed until current result-review state is fetched.
+    @State private var roundReviewUnavailable = true
     @State private var reportHistory: [ATHLTHArenaRelayLegHistory] = []
     @State private var historyUnavailable = false
     @State private var historyExpanded = false
@@ -2803,6 +2806,18 @@ private struct ATHLTHArenaRelaySection: View {
     private var reportWindowOpen: Bool {
         series.status == "active" &&
             (series.endsAt.map { Date() <= $0 } ?? true)
+    }
+
+    private var reviewLocked: Bool {
+        let routeRoundIDs = Set(legs.map(\.routeRoundID))
+        return roundResults.contains {
+            routeRoundIDs.contains($0.roundID) &&
+                ($0.status == "pending" || $0.status == "approved")
+        }
+    }
+
+    private var canReportLeg: Bool {
+        reportWindowOpen && !reviewLocked && !roundReviewUnavailable
     }
 
     /// A runner may remind only the next scheduled teammate, after
@@ -3095,7 +3110,32 @@ private struct ATHLTHArenaRelaySection: View {
 
                         relayHistoryCard
 
-                        if reportWindowOpen, let ownLeg {
+                        if reviewLocked {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "The round result is under review or approved. Leg times are locked so everyone votes on the same reports.",
+                                    norwegian: "Runderesultatet er til godkjenning eller godkjent. Etappetidene er låst slik at alle stemmer på samme grunnlag."
+                                ),
+                                systemImage: "lock.shield"
+                            )
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .padding(11)
+                            .background(ATHLTHTheme.vitalitySoft.opacity(0.5),
+                                        in: RoundedRectangle(cornerRadius: 13))
+                        } else if roundReviewUnavailable && reportWindowOpen {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Result approvals could not be checked. Refresh before changing your time.",
+                                    norwegian: "Kunne ikke kontrollere resultatgodkjenningen. Oppdater før du endrer etappetiden."
+                                ),
+                                systemImage: "exclamationmark.shield"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                        }
+
+                        if canReportLeg, let ownLeg {
                             VStack(alignment: .leading, spacing: 8) {
                                 if !ATHLTHDeviceRole.isIPad,
                                    let agreedRoute = availableRoutes.first(where: {
@@ -3556,10 +3596,13 @@ private struct ATHLTHArenaRelaySection: View {
             async let roster = cloud.loadTeamAssignments(seriesID: series.id)
             async let plan = cloud.loadRelayLegs(seriesID: series.id)
             async let resultRows = cloud.loadRelayReports(seriesID: series.id)
+            async let reviewRows = cloud.loadRoundResults(seriesID: series.id)
             async let historyRows = cloud.loadRelayHistory(seriesID: series.id)
             assignments = try await roster
             legs = try await plan
             reports = try await resultRows
+            roundResults = try await reviewRows
+            roundReviewUnavailable = false
             do {
                 reportHistory = try await historyRows
                 historyUnavailable = false
@@ -3574,6 +3617,7 @@ private struct ATHLTHArenaRelaySection: View {
             }
             errorMessage = nil
         } catch {
+            roundReviewUnavailable = true
             errorMessage = error.localizedDescription
         }
     }
@@ -3591,7 +3635,7 @@ private struct ATHLTHArenaRelaySection: View {
         guard candidate.canPrefill(
             for: ownLeg?.slotID,
             routeRoundID: ownLeg?.routeRoundID,
-            reportWindowOpen: reportWindowOpen
+            reportWindowOpen: canReportLeg
         ) else {
             ownGPSNotice = ATHLTHLocalization.choose(
                 english: "The agreed stage or competition window changed. Find a matching run again.",
@@ -3614,7 +3658,7 @@ private struct ATHLTHArenaRelaySection: View {
     /// automatically reported, and no GPS data leaves this screen.
     @MainActor
     private func suggestOwnLegTime(from route: TrainingRoute) async {
-        guard !checkingOwnGPS, !writing, reportWindowOpen,
+        guard !checkingOwnGPS, !writing, canReportLeg,
               let ownLeg,
               let startsAt = series.startsAt,
               let endsAt = series.endsAt,
@@ -3666,7 +3710,7 @@ private struct ATHLTHArenaRelaySection: View {
         }
 
         guard !Task.isCancelled,
-              reportWindowOpen,
+              canReportLeg,
               self.ownLeg?.slotID == ownLeg.slotID,
               self.ownLeg?.routeRoundID == routeRoundID else { return }
 
@@ -3687,7 +3731,7 @@ private struct ATHLTHArenaRelaySection: View {
 
     @MainActor
     private func saveLeg(_ slotID: UUID, _ seconds: Double?) async {
-        guard !writing, reportWindowOpen,
+        guard !writing, canReportLeg,
               ownLeg?.slotID == slotID else { return }
         writing = true
         defer { writing = false }
