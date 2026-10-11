@@ -5236,6 +5236,15 @@ struct DirectMessageThreadView: View {
             proposed: proposed,
             submittedAt: Date()
         )
+        guard WorkoutInviteExercisePolicy.canPropose(
+            original: agreed, proposed: proposed
+        ) else {
+            plannedInviteError = ATHLTHLocalization.choose(
+                english: "The organizer has not allowed adding new exercises to this workout.",
+                norwegian: "Arrangøren har ikke tillatt at du legger til nye øvelser i denne økten."
+            )
+            return
+        }
         guard proposal.hasChanges else {
             plannedInviteError = ATHLTHLocalization.choose(
                 english: "Change at least one detail before sending.",
@@ -5321,6 +5330,9 @@ struct DirectMessageThreadView: View {
                     submittedAt: proposal.submittedAt
                 )).isEmpty,
                 proposal.proposed.id == current.id,
+                WorkoutInviteExercisePolicy.canPropose(
+                    original: current, proposed: proposal.proposed
+                ),
                 !proposal.proposed.title
                     .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                 proposal.proposed.scheduledStart.map({ $0 > Date() }) ?? true
@@ -5337,6 +5349,13 @@ struct DirectMessageThreadView: View {
                 approved.gearIDs = current.gearIDs
                 approved.spotifyPlaylist = current.spotifyPlaylist
                 approved.spotifyAutoplayOnStart = current.spotifyAutoplayOnStart
+                // Invitee-supplied changes cannot alter organizer permissions,
+                // ownership or the identity of the invited athlete.
+                approved.allowInviteeExercises = current.allowInviteeExercises
+                approved.invitedPartnerID = current.invitedPartnerID
+                approved.trainTogetherMode = current.trainTogetherMode
+                approved.sharedSourceOwnerID = current.sharedSourceOwnerID
+                approved.sharedSourceSessionID = current.sharedSourceSessionID
                 revision = approved
 
                 if inStandalone {
