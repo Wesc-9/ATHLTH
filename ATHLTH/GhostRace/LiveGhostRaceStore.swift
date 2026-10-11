@@ -25,6 +25,16 @@ enum LiveGhostRaceReentry {
         if expiresAt > now { return true }
         return roomStatus == .countdown || roomStatus == .racing
     }
+
+    /// Only a locally recovered recording from this exact challenge may
+    /// reconnect its shared session. Never launch a second workout here.
+    static func canReconnectPhoneWorkout(
+        comparisonRouteID: UUID?,
+        challengeID: UUID,
+        roomStatus: LiveGhostRaceRoomStatus?
+    ) -> Bool {
+        comparisonRouteID == challengeID && roomStatus == .racing
+    }
 }
 
 enum LiveGhostRacePhase:
