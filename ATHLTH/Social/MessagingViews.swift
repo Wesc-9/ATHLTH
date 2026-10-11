@@ -82,6 +82,7 @@ struct MessageInboxView: View {
 
     var onNewMessage: () -> Void = {}
 
+    @State private var arenaInboxVisibleCount = 0
     @State private var searchText = ""
     @State private var showingSearch = false
     @State private var selectedFilter:
@@ -110,6 +111,11 @@ struct MessageInboxView: View {
                 }
 
                 inboxFilterBar
+
+                ATHLTHArenaInboxSection(
+                    filterKey: selectedFilter.rawValue,
+                    onVisibleCountChanged: { arenaInboxVisibleCount = $0 }
+                )
 
                 if let error = displayableError {
                     inboxErrorCard(error)
@@ -1227,6 +1233,7 @@ struct MessageInboxView: View {
 
     private var shouldShowEmptyState: Bool {
         displayedPersonItems.isEmpty &&
+        arenaInboxVisibleCount == 0 &&
         !shouldShowCoachConversation
     }
 
