@@ -322,3 +322,24 @@ GRANT EXECUTE ON FUNCTION public.arena_vote_replacement(uuid,boolean) TO authent
 REVOKE ALL ON FUNCTION private.arena_notify_chat() FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON FUNCTION private.arena_send_invitation_to_inbox() FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON FUNCTION private.arena_redact_deleted_messages() FROM PUBLIC,anon,authenticated;
+
+
+-- Nominees may inspect the series and rules before accepting the inherited
+-- score/slot, but cannot post or vote on ordinary rounds until replacement.
+CREATE OR REPLACE FUNCTION private.arena_can_access(p_series_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public, private
+AS $$
+ SELECT (SELECT auth.uid()) IS NOT NULL AND (
+  EXISTS(SELECT 1 FROM public.arena_series s
+         WHERE s.id=p_series_id AND s.owner_id=(SELECT auth.uid()))
+  OR EXISTS(SELECT 1 FROM public.arena_series_members m
+        WHERE m.series_id=p_series_id AND m.user_id=(SELECT auth.uid())
+          AND m.response IN ('invited','accepted'))
+  OR EXISTS(SELECT 1 FROM public.arena_replacement_proposals p
+        WHERE p.series_id=p_series_id AND p.nominee_id=(SELECT auth.uid())
+          AND p.status='pending')
+ );
+$$;
+REVOKE ALL ON FUNCTION private.arena_can_access(uuid) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION private.arena_can_access(uuid) TO authenticated;
