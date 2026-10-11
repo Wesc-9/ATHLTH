@@ -52,6 +52,35 @@ begin
     or has_table_privilege('anon','public.ghost_race_challenges','INSERT') then
    raise exception 'Anonymous actors cannot view or create Live Ghost challenges';
  end if;
+ -- Linked Live Ghost results must be restricted to accepted active
+ -- 1v1 participants and may never bypass the existing friend policy.
+ if not exists (
+   select 1 from information_schema.columns
+   where table_schema='public'
+     and table_name='ghost_race_challenges'
+     and column_name='arena_round_id'
+ ) then
+   raise exception 'Live Ghost to Arena round provenance is missing';
+ end if;
+ if not exists (
+   select 1 from pg_policies
+   where schemaname='public'
+     and tablename='ghost_race_challenges'
+     and policyname='friends can send ghost races'
+     and with_check like '%can_send_ghost_race%'
+     and with_check like '%ghost_race_arena_link_allowed%'
+ ) then
+   raise exception 'Live Ghost invite must validate friend/privacy and Arena membership';
+ end if;
+ if has_table_privilege('anon','public.ghost_race_challenges','SELECT')
+    or has_table_privilege('anon','public.ghost_race_challenges','INSERT') then
+   raise exception 'Linked Live Ghost races leaked to anonymous users';
+ end if;
+ if private.ghost_race_arena_link_allowed(
+     gen_random_uuid(),gen_random_uuid(),gen_random_uuid()
+   ) then
+   raise exception 'Unrelated Live Ghost actors may link arbitrary Arena rounds';
+ end if;
  if not exists (
    select 1 from information_schema.columns
    where table_schema='public' and table_name='arena_series'
