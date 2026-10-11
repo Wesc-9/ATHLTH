@@ -3510,6 +3510,48 @@ struct WatchRunWorkoutExperienceView: View {
                     .watchSurface(radius: 17)
                 }
                 .buttonStyle(.plain)
+
+                if workoutManager.audioCoachConfiguration.enabled {
+                    HStack(spacing: 8) {
+                        controlButton(
+                            title: workoutManager.coachSpeechPaused
+                                ? ATHLTHLocalization.choose(
+                                    english: "Resume voice", norwegian: "Tale på"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Pause voice", norwegian: "Pause tale"
+                                ),
+                            icon: workoutManager.coachSpeechPaused
+                                ? "play.fill"
+                                : "speaker.slash.fill",
+                            accent: false
+                        ) {
+                            workoutManager.setCoachSpeechPaused(
+                                !workoutManager.coachSpeechPaused
+                            )
+                        }
+
+                        controlButton(
+                            title: ATHLTHLocalization.choose(
+                                english: "Status now", norwegian: "Status nå"
+                            ),
+                            icon: "waveform",
+                            accent: true
+                        ) {
+                            workoutManager.announceCoachStatusNow()
+                        }
+                        .disabled(workoutManager.coachSpeechPaused)
+                        .opacity(workoutManager.coachSpeechPaused ? 0.45 : 1)
+                    }
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Voice only · workout and haptics continue",
+                        norwegian: "Kun tale · økten og vibrasjoner fortsetter"
+                    ))
+                    .font(.system(size: 10))
+                    .foregroundStyle(WatchTheme.muted)
+                    .lineLimit(2)
+                }
             }
 
             Button {
