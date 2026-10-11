@@ -8300,8 +8300,9 @@ struct SessionEditorView: View {
             clonePlannedExercises(
                 workout.exercises
             )
-        plannedExercises =
-            copiedExercises.isEmpty
+        plannedExercises = preserveSourceID
+            ? workout.exercises
+            : copiedExercises.isEmpty
                 ? plannedExercisesFromBlocks(
                     workout.resolvedWorkoutBlocks
                 )
@@ -8351,10 +8352,13 @@ struct SessionEditorView: View {
             workout.spotifyAutoplayOnStart
         workoutTemplateID =
             workout.workoutTemplateID
-        workoutBlocks =
-            workout.resolvedWorkoutBlocks
-        workoutCategory =
-            workout.workoutCategory
+        workoutBlocks = preserveSourceID
+            ? workout.workoutBlocks ?? []
+            : workout.resolvedWorkoutBlocks
+        workoutCategory = workout.workoutCategory
+        meetingPoint = workout.meetingPoint
+        physicalMeetup = workout.trainTogetherMode != .sameWorkout
+        reminderMinutesBefore = workout.reminderMinutesBefore ?? 0
 
         if let scheduled = workout.scheduledStart {
             scheduledTimeEnabled = true
