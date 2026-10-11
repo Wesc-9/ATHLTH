@@ -20,8 +20,9 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
 
         // No plan and rest days both use photo heroes. Verify that image
         // aspect ratios cannot force a wider-than-screen SwiftUI layout.
+        let scenarios: [TrainingPlan?] = [nil, plan]
         for width in [320.0, 375.0, 430.0] {
-            for currentPlan: TrainingPlan? in [nil, plan] {
+            for currentPlan in scenarios {
                 let today = ATHLTHTrainTodayPremiumView(
                     plan: currentPlan,
                     sessions: [],
