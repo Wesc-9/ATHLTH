@@ -3390,7 +3390,8 @@ final class IPhoneWorkoutStore:
               ATHLTHCoachVoicePausePolicy.allowsSpeech(
                   coachEnabled:
                       active?.audioCoachConfiguration?.enabled == true,
-                  speechPaused: coachSpeechPaused
+                  speechPaused: coachSpeechPaused,
+                  priority: priority
               )
         else {
             return
