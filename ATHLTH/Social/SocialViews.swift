@@ -2296,6 +2296,15 @@ struct FriendProfileView: View {
                         followActionInProgress = false
                     }
                 } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Unfollow",
+                            norwegian: "Slutt å følge"
+                        ),
+                        systemImage: "person.fill.xmark"
+                    )
+                }
+            } label: {
                 profileActionLabel(
                     title: ATHLTHLocalization.choose(
                         english: "Following",
