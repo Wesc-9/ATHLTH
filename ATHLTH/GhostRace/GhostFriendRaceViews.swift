@@ -1,5 +1,25 @@
 import SwiftUI
 
+private enum GhostFriendCourseMode: String, CaseIterable, Identifiable {
+    case previousWorkout
+    case plannedRoute
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .previousWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Previous run", norwegian: "Tidligere økt"
+            )
+        case .plannedRoute:
+            return ATHLTHLocalization.choose(
+                english: "Planned route", norwegian: "Velg rute"
+            )
+        }
+    }
+}
+
 struct GhostFriendRaceHubView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var health: HealthKitManager
@@ -16,6 +36,10 @@ struct GhostFriendRaceHubView: View {
     @State private var runs: [WorkoutSummary] = []
     @State private var selectedFriendID: UUID?
     @State private var selectedWorkoutID: UUID?
+    @State private var selectedPlannedRoute: TrainingRoute?
+    @State private var courseMode: GhostFriendCourseMode = .previousWorkout
+    @State private var targetTimeText = "40:00"
+    @State private var showingRoutePicker = false
     @State private var loadingRuns = false
     @State private var sending = false
     @State private var startingChallengeID: UUID?
@@ -25,8 +49,35 @@ struct GhostFriendRaceHubView: View {
 
     /// Opening a duel from an active Arena 1v1 series can suggest its
     /// opponent; the existing mutual-follow and permission checks remain.
-    init(preferredFriendID: UUID? = nil) {
+    init(
+        preferredFriendID: UUID? = nil,
+        preferredRoute: TrainingRoute? = nil
+    ) {
         _selectedFriendID = State(initialValue: preferredFriendID)
+        _selectedPlannedRoute = State(initialValue: preferredRoute)
+        _courseMode = State(initialValue: preferredRoute == nil
+            ? .previousWorkout : .plannedRoute)
+        if let preferredRoute {
+            let suggestion = preferredRoute.expectedTravelTimeSeconds ??
+                max(preferredRoute.distanceKilometers * 330, 300)
+            _targetTimeText = State(initialValue:
+                GhostTargetTimeFormatter.string(suggestion))
+        }
+    }
+
+    private var targetTime: TimeInterval? {
+        guard let seconds = GhostTargetTimeFormatter.parse(targetTimeText),
+              seconds.isFinite, (60...86_400).contains(seconds) else {
+            return nil
+        }
+        return seconds
+    }
+
+    private var canSendSelectedCourse: Bool {
+        switch courseMode {
+        case .previousWorkout: return selectedWorkoutID != nil
+        case .plannedRoute: return selectedPlannedRoute != nil && targetTime != nil
+        }
     }
 
     var body: some View {
@@ -70,20 +121,106 @@ struct GhostFriendRaceHubView: View {
                     }
 
                     Picker(
-                        "Reference run",
-                        selection: $selectedWorkoutID
+                        ATHLTHLocalization.choose(
+                            english: "Course source", norwegian: "Velg grunnlag"
+                        ),
+                        selection: $courseMode
                     ) {
-                        Text("Choose run")
-                            .tag(UUID?.none)
-
-                        ForEach(runs.prefix(40)) { workout in
-                            Text(runTitle(workout))
-                                .tag(Optional(workout.id))
+                        ForEach(GhostFriendCourseMode.allCases) { option in
+                            Text(option.title).tag(option)
                         }
                     }
+                    .pickerStyle(.segmented)
 
-                    if loadingRuns {
-                        ProgressView("Loading runs…")
+                    if courseMode == .previousWorkout {
+                        Picker(
+                            ATHLTHLocalization.choose(
+                                english: "GPS reference run", norwegian: "GPS-økt"
+                            ),
+                            selection: $selectedWorkoutID
+                        ) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Choose run", norwegian: "Velg økt"
+                            ))
+                            .tag(UUID?.none)
+
+                            ForEach(runs.prefix(40)) { workout in
+                                Text(runTitle(workout))
+                                    .tag(Optional(workout.id))
+                            }
+                        }
+
+                        if loadingRuns {
+                            ProgressView(
+                                ATHLTHLocalization.choose(
+                                    english: "Loading past runs…",
+                                    norwegian: "Henter tidligere økter…"
+                                )
+                            )
+                        }
+
+                        Text(ATHLTHLocalization.choose(
+                            english: "The selected run's GPS course and pace are used as the reference. You choose whether to share it.",
+                            norwegian: "GPS-løypen og tiden fra den valgte økten brukes som grunnlag. Du velger selv om du vil dele."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    } else {
+                        Button {
+                            showingRoutePicker = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
+                                Text(selectedPlannedRoute?.title ??
+                                    ATHLTHLocalization.choose(
+                                        english: "Choose or create route",
+                                        norwegian: "Velg eller lag rute"
+                                    ))
+                                Spacer(minLength: 4)
+                                Image(systemName: "chevron.right")
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(ATHLTHTheme.accentDeep)
+
+                        if let route = selectedPlannedRoute {
+                            Label(
+                                String(format: "%.2f km", route.distanceKilometers),
+                                systemImage: "map"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+
+                        HStack {
+                            TextField(
+                                ATHLTHLocalization.choose(
+                                    english: "Target finish time (mm:ss)",
+                                    norwegian: "Måltid (mm:ss)"
+                                ),
+                                text: $targetTimeText
+                            )
+                            .keyboardType(.numbersAndPunctuation)
+                            Text("mm:ss")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        if targetTime == nil {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Enter a target time between 1 minute and 24 hours.",
+                                norwegian: "Velg en måltid mellom 1 minutt og 24 timer."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                        }
+
+                        Text(ATHLTHLocalization.choose(
+                            english: "Your selected route and a synthetic pacing reference are shared with the friend; no previous workout is claimed. Both start together in the Live Ghost lobby.",
+                            norwegian: "Den valgte ruten og en beregnet mål-Ghost deles med vennen, ikke en tidligere økt. Begge starter samtidig fra Live Ghost-lobbyen."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
 
                     Button {
@@ -99,7 +236,10 @@ struct GhostFriendRaceHubView: View {
                             .frame(maxWidth: .infinity)
                         } else {
                             Label(
-                                "Send Ghost Race",
+                                ATHLTHLocalization.choose(
+                                    english: "Invite to synchronized duel",
+                                    norwegian: "Inviter til synkronisert duell"
+                                ),
                                 systemImage: "paperplane.fill"
                             )
                             .frame(maxWidth: .infinity)
@@ -109,7 +249,7 @@ struct GhostFriendRaceHubView: View {
                     .tint(ATHLTHTheme.vitality)
                     .disabled(
                         selectedFriendID == nil ||
-                        selectedWorkoutID == nil ||
+                        !canSendSelectedCourse ||
                         sending ||
                         friendRaces.isSending
                     )
@@ -144,8 +284,33 @@ struct GhostFriendRaceHubView: View {
                 .foregroundStyle(.secondary)
             }
         }
-        .navigationTitle("Race a Friend")
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Live Ghost duel", norwegian: "Live Ghost-duell"
+        ))
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showingRoutePicker) {
+            NavigationStack {
+                SavedRoutesView(
+                    selectionTitle: ATHLTHLocalization.choose(
+                        english: "Duel route", norwegian: "Rute for duellen"
+                    ),
+                    onSelect: { route in
+                        selectedPlannedRoute = route
+                        let suggested = route.expectedTravelTimeSeconds ??
+                            max(route.distanceKilometers * 330, 300)
+                        targetTimeText = GhostTargetTimeFormatter.string(suggested)
+                        showingRoutePicker = false
+                    }
+                )
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Close", norwegian: "Lukk"
+                        )) { showingRoutePicker = false }
+                    }
+                }
+            }
+        }
         .task {
             await social.refresh()
             await friendRaces.refresh()
@@ -465,43 +630,38 @@ struct GhostFriendRaceHubView: View {
 
     @MainActor
     private func sendChallenge() async {
-        guard let friendID =
-                selectedFriendID,
-              let friend =
-                social.mutualFollows.first(
-                    where: {
-                        $0.userID == friendID
-                    }
-                ),
-              let workoutID =
-                selectedWorkoutID,
-              let workout =
-                runs.first(
-                    where: {
-                        $0.id == workoutID
-                    }
-                )
-        else {
-            return
-        }
+        guard let friendID = selectedFriendID,
+              let friend = social.mutualFollows.first(where: {
+                  $0.userID == friendID
+              }), !sending else { return }
 
         sending = true
-        defer {
-            sending = false
-        }
+        defer { sending = false }
 
-        let detail =
-            await health.workoutDetail(
-                for: workout
+        let sent: Bool
+        switch courseMode {
+        case .plannedRoute:
+            guard let route = selectedPlannedRoute,
+                  let seconds = targetTime else { return }
+            sent = await friendRaces.sendPlannedRoute(
+                to: friend,
+                route: route,
+                targetDurationSeconds: seconds,
+                settings: settings
             )
-
-        let sent =
-            await friendRaces.send(
+        case .previousWorkout:
+            guard let workoutID = selectedWorkoutID,
+                  let workout = runs.first(where: {
+                      $0.id == workoutID
+                  }) else { return }
+            let detail = await health.workoutDetail(for: workout)
+            sent = await friendRaces.send(
                 to: friend,
                 workout: workout,
                 detail: detail,
                 settings: settings
             )
+        }
 
         if sent {
             selectedFriendID = nil
