@@ -662,11 +662,10 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
         room: LiveGhostRaceRoomRecord?,
         expiresAt: Date
     ) -> Bool {
-        switch room?.status {
-        case .finished, .cancelled: return false
-        case .racing, .countdown: return true
-        case .lobby, nil: return expiresAt > Date()
-        }
+        ATHLTHArenaLinkedRaceAccess.canOpen(
+            roomStatus: room?.status,
+            expiresAt: expiresAt
+        )
     }
 
     private func userName(_ id: UUID) -> String {
