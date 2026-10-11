@@ -173,6 +173,14 @@ final class IPhoneWorkoutStore:
     @Published private(set) var automaticPauseActive = false
     /// Temporary voice mute: does not stop recording or critical haptics.
     @Published private(set) var coachSpeechPaused = false
+    @Published private(set) var lastCoachMessage: String?
+    private var coachReplayMemory = ATHLTHCoachReplayMemory()
+
+    var canReplayLastCoachMessage: Bool {
+        active?.audioCoachConfiguration?.enabled == true &&
+        !coachSpeechPaused &&
+        coachReplayMemory.replayableText() != nil
+    }
     @Published private(set) var completionStartedWorkout: PhoneWorkout?
     @Published private(set) var lastCompletedWorkout: PhoneWorkout?
     @Published private(set) var recoveredWorkoutLastCheckpoint:
@@ -537,6 +545,8 @@ final class IPhoneWorkoutStore:
         coachEventLedger.reset()
         coachCueQueue.reset()
         coachSpeechPaused = false
+        coachReplayMemory.reset()
+        lastCoachMessage = nil
 
         let now = Date()
         recoveredWorkoutLastCheckpoint = nil
@@ -802,6 +812,22 @@ final class IPhoneWorkoutStore:
                 priority: .structuredStep,
                 validFor: 8
             )
+        )
+    }
+
+    /// Explicit replay uses this workout's current voice settings but
+    /// never re-records the replay or moves automatic cue thresholds.
+    func replayLastCoachMessage() {
+        guard canReplayLastCoachMessage,
+              let phrase = coachReplayMemory.replayableText(),
+              let configuration = active?.audioCoachConfiguration
+        else { return }
+
+        speak(
+            phrase,
+            configuration: configuration,
+            priority: .structuredStep,
+            rememberForReplay: false
         )
     }
 
@@ -2111,6 +2137,8 @@ final class IPhoneWorkoutStore:
         coachEventLedger.reset()
         coachCueQueue.reset()
         coachSpeechPaused = false
+        coachReplayMemory.reset()
+        lastCoachMessage = nil
         speechSynthesizer.stopSpeaking(
             at: .immediate
         )
@@ -3384,7 +3412,8 @@ final class IPhoneWorkoutStore:
         priority:
             ATHLTHGuidancePriority =
                 .routineCoach,
-        event: ATHLTHCoachEvent? = nil
+        event: ATHLTHCoachEvent? = nil,
+        rememberForReplay: Bool = true
     ) {
         guard !phrase.isEmpty,
               ATHLTHCoachVoicePausePolicy.allowsSpeech(
@@ -3492,6 +3521,11 @@ final class IPhoneWorkoutStore:
                 .resolvedSpeechVolume
 
         speechSynthesizer.speak(utterance)
+        if rememberForReplay,
+           ATHLTHCoachReplayMemory.mayRemember(priority: priority) {
+            coachReplayMemory.remember(phrase, priority: priority)
+            lastCoachMessage = coachReplayMemory.text
+        }
     }
 
     private func deliverNextQueuedCoachCue() {
