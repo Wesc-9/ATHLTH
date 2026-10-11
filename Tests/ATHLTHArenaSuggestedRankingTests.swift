@@ -26,6 +26,7 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
             metricType: metric,
             metricValue: value,
             reportedDistanceMeters: 5_000,
+            reportedRouteMatchPercent: nil,
             verificationLevel: "participant_reported"
         )
     }
