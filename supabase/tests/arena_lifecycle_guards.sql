@@ -72,6 +72,23 @@ begin
  ) then
    raise exception 'Live Ghost invite must validate friend/privacy and Arena membership';
  end if;
+ if not exists (
+   select 1 from pg_policies
+   where schemaname='public'
+     and tablename='ghost_race_challenges'
+     and policyname='friends can send ghost races'
+     and with_check like '%ghost_race_arena_link_allowed%'
+     and with_check like '%ghost_race_arena_route_compatible%'
+ ) then
+   raise exception 'Linked Live Ghost requires both membership and route compatibility';
+ end if;
+ if private.ghost_race_arena_route_compatible(
+      gen_random_uuid(), 'planned_route', 5000.0
+    ) or private.ghost_race_arena_route_compatible(
+      gen_random_uuid(), 'previous_workout', 5000.0
+    ) then
+   raise exception 'Unrelated Live Ghost route attribution incorrectly permitted';
+ end if;
  if has_table_privilege('anon','public.ghost_race_challenges','SELECT')
     or has_table_privilege('anon','public.ghost_race_challenges','INSERT') then
    raise exception 'Linked Live Ghost races leaked to anonymous users';
