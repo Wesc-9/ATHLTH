@@ -2414,55 +2414,13 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    // Creating or accepting a challenge must never publish a feed item.
+    // Explicit publication is available only for completed results.
     func publishChallenges(
         _ challenges: [ATHLTHChallenge],
         visibility: ProfileVisibility = .friends
     ) async {
-        guard let currentUserID,
-              let configuredVisibility = privacy.flatMap({
-                  ProfileVisibility(rawValue: $0.recentActivityVisibility)
-              }),
-              configuredVisibility != .privateOnly
-        else {
-            return
-        }
-
-        for challenge in challenges
-        where challenge.creatorID == currentUserID &&
-                challenge.createdAt >= activationDate {
-            do {
-                var metadata: [String: String] = [
-                    "challenge_id": challenge.id.uuidString,
-                    "sport": challenge.sport.rawValue
-                ]
-
-                if let summary = challenge.rules.summary,
-                   !summary.isEmpty {
-                    metadata["summary"] = summary
-                }
-
-                if let artwork = challenge.rules.coverArtworkName,
-                   !artwork.isEmpty {
-                    metadata["cover_artwork"] = artwork
-                }
-
-                if let imageURL = challenge.rules.coverImageURL,
-                   !imageURL.isEmpty {
-                    metadata["cover_image_url"] = imageURL
-                }
-
-                try await service.publishActivity(
-                    eventKey: "challenge-\(challenge.id.uuidString)-created",
-                    kind: "challenge",
-                    title: "Challenge created",
-                    subtitle: challenge.title,
-                    metadata: metadata,
-                    visibility: configuredVisibility
-                )
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-        }
+        // Deliberately no-op; retained to avoid changing existing callers.
     }
 
     @discardableResult
