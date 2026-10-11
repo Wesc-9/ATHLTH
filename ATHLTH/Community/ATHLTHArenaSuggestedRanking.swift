@@ -40,6 +40,27 @@ enum ATHLTHArenaLinkedRaceAccess {
     }
 }
 
+/// A linked Live Ghost duel must be started from an explicitly chosen
+/// Arena route round. Never infer the first round or attach a generic duel.
+enum ATHLTHArenaLiveRoundSelection {
+    static func linkedRoundID(
+        selectedRoundID: UUID?,
+        selectedRouteID: UUID?,
+        rounds: [ATHLTHArenaRemoteProposal]
+    ) -> UUID? {
+        guard let selectedRoundID,
+              let selectedRouteID,
+              let selected = rounds.first(where: {
+                  $0.id == selectedRoundID
+              }),
+              selected.template == .fastestRoute,
+              selected.routeSnapshot?.routeID == selectedRouteID else {
+            return nil
+        }
+        return selected.id
+    }
+}
+
 /// Provisional, participant-shared workout leaderboard. These values are
 /// not independently attested and never grant points by themselves.
 struct ATHLTHArenaSuggestedStanding: Identifiable, Equatable {
