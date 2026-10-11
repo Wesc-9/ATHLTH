@@ -790,17 +790,11 @@ struct ATHLTHArenaOnlineDetailView: View {
 
         // The comparison uses a reported time for this exact round, not
         // a competitor's private GPS trace or a server-verified result.
-        let rivalSeconds = sharedWorkoutEvidence
-            .filter {
-                $0.roundID == round.id &&
-                $0.userID != session.profile.userID &&
-                $0.metricType == "elapsed_seconds" &&
-                $0.reportedRouteMatchPercent != nil &&
-                $0.metricValue.isFinite &&
-                (60...86_400).contains($0.metricValue)
-            }
-            .map(\.metricValue)
-            .min()
+        let rivalSeconds = ATHLTHArenaSuggestedRanking.fastestSharedRivalTime(
+            roundID: round.id,
+            currentUserID: session.profile.userID,
+            evidence: sharedWorkoutEvidence
+        )
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
