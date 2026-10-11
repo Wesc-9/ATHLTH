@@ -33,6 +33,75 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
         )
     }
 
+    func testLiveDuelRequiresExplicitRoundSelectionAcrossMultipleRoutes() {
+        let first = UUID()
+        let second = UUID()
+        let routeA = UUID()
+        let routeB = UUID()
+        let rounds = [
+            makeRouteRound(id: first, routeID: routeA),
+            makeRouteRound(id: second, routeID: routeB)
+        ]
+
+        // Starting from the global Arena shortcut must not silently
+        // attach the first route when the athlete never chose a round.
+        XCTAssertNil(ATHLTHArenaLiveRoundSelection.linkedRoundID(
+            selectedRoundID: nil, selectedRouteID: routeA, rounds: rounds
+        ))
+        XCTAssertEqual(ATHLTHArenaLiveRoundSelection.linkedRoundID(
+            selectedRoundID: second, selectedRouteID: routeB, rounds: rounds
+        ), second)
+        XCTAssertNil(ATHLTHArenaLiveRoundSelection.linkedRoundID(
+            selectedRoundID: second, selectedRouteID: routeA, rounds: rounds
+        ))
+        XCTAssertNil(ATHLTHArenaLiveRoundSelection.linkedRoundID(
+            selectedRoundID: UUID(), selectedRouteID: routeB, rounds: rounds
+        ))
+    }
+
+    func testNonRouteCompetitionCannotBeLinkedAsRouteDuel() {
+        let roundID = UUID()
+        let routeID = UUID()
+        let distanceRound = ATHLTHArenaRemoteProposal(
+            id: roundID,
+            seriesID: UUID(),
+            proposedBy: nil,
+            template: .fastestDistance,
+            title: "5 km",
+            rules: "Fastest time",
+            position: 0,
+            targetDistanceMeters: 5_000,
+            routeSnapshot: nil
+        )
+        XCTAssertNil(ATHLTHArenaLiveRoundSelection.linkedRoundID(
+            selectedRoundID: roundID,
+            selectedRouteID: routeID,
+            rounds: [distanceRound]
+        ))
+    }
+
+    private func makeRouteRound(id: UUID, routeID: UUID) -> ATHLTHArenaRemoteProposal {
+        ATHLTHArenaRemoteProposal(
+            id: id,
+            seriesID: UUID(),
+            proposedBy: nil,
+            template: .fastestRoute,
+            title: "Course",
+            rules: "Same route for everyone",
+            position: 0,
+            targetDistanceMeters: 5_000,
+            routeSnapshot: ChallengeRouteSnapshot(
+                routeID: routeID,
+                title: "Course",
+                distanceKilometers: 5,
+                coordinates: [
+                    RouteCoordinate(latitude: 63.43, longitude: 10.4, altitude: nil, sequence: 0),
+                    RouteCoordinate(latitude: 63.44, longitude: 10.41, altitude: nil, sequence: 1)
+                ]
+            )
+        )
+    }
+
     func testFastestRunUsesBestTimeAndNeverLongestTime() {
         let a = UUID()
         let b = UUID()
