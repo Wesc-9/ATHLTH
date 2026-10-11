@@ -6116,7 +6116,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 liveSurfaceConfiguration,
             liveSurfaceContext:
                 liveSurfaceContext,
-            supportsAudioCoachVoiceLease: true
+            supportsAudioCoachVoiceLease: true,
+            coachHeartRateSampleAt: coachHeartRateSampleAt,
+            coachPaceSampleAt: coachPaceSampleAt
         )
 
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
