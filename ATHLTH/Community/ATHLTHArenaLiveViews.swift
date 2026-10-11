@@ -872,6 +872,18 @@ private struct ATHLTHArenaSeasonDetailView: View {
         )
     }
 
+    private var activeSeasonCompetitionCount: Int {
+        visibleSeasonCompetitions.filter {
+            ATHLTHArenaSeasonCompetitionTimeline.phase($0) == .active
+        }.count
+    }
+
+    private var completedSeasonCompetitionCount: Int {
+        visibleSeasonCompetitions.filter {
+            ATHLTHArenaSeasonCompetitionTimeline.phase($0) == .completed
+        }.count
+    }
+
     private var seasonStatus: String {
         switch seasonPhase {
         case .upcoming:
@@ -1119,18 +1131,14 @@ private struct ATHLTHArenaSeasonDetailView: View {
                 if !visibleSeasonCompetitions.isEmpty {
                     HStack(spacing: 12) {
                         Label(
-                            "\(visibleSeasonCompetitions.filter {
-                                ATHLTHArenaSeasonCompetitionTimeline.phase($0) == .active
-                            }.count) " + ATHLTHLocalization.choose(
+                            "\(activeSeasonCompetitionCount) " + ATHLTHLocalization.choose(
                                 english: "active", norwegian: "aktive"
                             ),
                             systemImage: "bolt.fill"
                         )
                         Spacer(minLength: 0)
                         Label(
-                            "\(visibleSeasonCompetitions.filter {
-                                ATHLTHArenaSeasonCompetitionTimeline.phase($0) == .completed
-                            }.count) " + ATHLTHLocalization.choose(
+                            "\(completedSeasonCompetitionCount) " + ATHLTHLocalization.choose(
                                 english: "completed", norwegian: "fullførte"
                             ),
                             systemImage: "checkmark.seal"
