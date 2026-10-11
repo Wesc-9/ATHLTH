@@ -10,6 +10,9 @@ final class StrengthAudioCoachSpeaker:
 {
     private let synthesizer =
         AVSpeechSynthesizer()
+    private var cueQueue = ATHLTHCoachCueQueue()
+    private var eventLedger = ATHLTHCoachEventLedger()
+    private var latestConfiguration: StrengthAudioCoachConfiguration?
 
     override init() {
         super.init()
@@ -20,7 +23,9 @@ final class StrengthAudioCoachSpeaker:
         english: String,
         norwegian: String,
         configuration:
-            StrengthAudioCoachConfiguration
+            StrengthAudioCoachConfiguration,
+        cueKind: ATHLTHCoachEventKind = .strengthSet,
+        event: ATHLTHCoachEvent? = nil
     ) {
         guard configuration.enabled else {
             return
@@ -51,9 +56,27 @@ final class StrengthAudioCoachSpeaker:
             return
         }
 
-        synthesizer.stopSpeaking(
-            at: .immediate
+        latestConfiguration = configuration
+        let resolvedEvent = event ?? ATHLTHCoachEvent(
+            kind: cueKind,
+            key: UUID().uuidString,
+            priority: .structuredStep,
+            validFor: cueKind == .strengthRest ? 8 : 20
         )
+        guard eventLedger.canDeliver(resolvedEvent) else {
+            return
+        }
+
+        if synthesizer.isSpeaking {
+            cueQueue.enqueue(
+                ATHLTHCoachQueuedCue(
+                    event: resolvedEvent,
+                    text: text
+                )
+            )
+            return
+        }
+        eventLedger.didDeliver(resolvedEvent)
 
         let audioSession =
             AVAudioSession.sharedInstance()
@@ -130,7 +153,26 @@ final class StrengthAudioCoachSpeaker:
         synthesizer.speak(utterance)
     }
 
+    private func deliverNextQueuedCue() {
+        guard !synthesizer.isSpeaking,
+              let configuration = latestConfiguration,
+              configuration.enabled,
+              let next = cueQueue.popNext()
+        else { return }
+
+        speak(
+            english: next.text,
+            norwegian: next.text,
+            configuration: configuration,
+            cueKind: next.event.kind,
+            event: next.event
+        )
+    }
+
     func stop() {
+        cueQueue.reset()
+        eventLedger.reset()
+        latestConfiguration = nil
         synthesizer.stopSpeaking(
             at: .immediate
         )
@@ -142,7 +184,11 @@ final class StrengthAudioCoachSpeaker:
         didFinish utterance: AVSpeechUtterance
     ) {
         Task { @MainActor [weak self] in
-            self?.deactivateAudioSession()
+            guard let self,
+                  !self.synthesizer.isSpeaking
+            else { return }
+            self.deactivateAudioSession()
+            self.deliverNextQueuedCue()
         }
     }
 
@@ -151,7 +197,11 @@ final class StrengthAudioCoachSpeaker:
         didCancel utterance: AVSpeechUtterance
     ) {
         Task { @MainActor [weak self] in
-            self?.deactivateAudioSession()
+            guard let self,
+                  !self.synthesizer.isSpeaking
+            else { return }
+            self.deactivateAudioSession()
+            self.deliverNextQueuedCue()
         }
     }
 
