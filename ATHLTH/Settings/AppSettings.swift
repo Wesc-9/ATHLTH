@@ -533,6 +533,9 @@ final class AppSettingsStore: ObservableObject {
     @Published var audioCoachDuckOtherAudio: Bool { didSet { persist() } }
     @Published var audioCoachVoiceIdentifier: String? { didSet { persist() } }
     @Published var audioCoachSpeechRate: Double { didSet { persist() } }
+    @Published var audioCoachSpeechStyle: ATHLTHCoachSpeechStyle {
+        didSet { persist() }
+    }
     @Published var audioCoachSpeechVolume: Double { didSet { persist() } }
     @Published var audioCoachAnnounceWorkoutStart: Bool { didSet { persist() } }
     @Published var audioCoachAnnouncePauseResume: Bool { didSet { persist() } }
@@ -888,6 +891,12 @@ final class AppSettingsStore: ObservableObject {
             defaults.object(
                 forKey: "settings.audioCoach.speechRate"
             ) as? Double ?? 0.48
+        audioCoachSpeechStyle =
+            ATHLTHCoachSpeechStyle(
+                rawValue: defaults.string(
+                    forKey: "settings.audioCoach.speechStyle"
+                ) ?? ""
+            ) ?? .balanced
         audioCoachSpeechVolume =
             defaults.object(
                 forKey: "settings.audioCoach.speechVolume"
@@ -1195,6 +1204,10 @@ final class AppSettingsStore: ObservableObject {
             forKey: "settings.audioCoach.speechRate"
         )
         defaults.set(
+            audioCoachSpeechStyle.rawValue,
+            forKey: "settings.audioCoach.speechStyle"
+        )
+        defaults.set(
             audioCoachSpeechVolume,
             forKey: "settings.audioCoach.speechVolume"
         )
@@ -1453,7 +1466,8 @@ final class AppSettingsStore: ObservableObject {
             announcePauseResume:
                 audioCoachAnnouncePauseResume,
             announceWorkoutComplete:
-                audioCoachAnnounceWorkoutComplete
+                audioCoachAnnounceWorkoutComplete,
+            speechStyle: audioCoachSpeechStyle
         )
     }
 
