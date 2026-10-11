@@ -318,6 +318,32 @@ struct ATHLTHArenaOnlineSection: View {
 // MARK: - Club Arena seasons
 // A premium summary for server-enforced seasons. This intentionally does not
 // touch the separate Club Weekly Challenge or award points on the device.
+/// A season may have a current leader without an official champion.
+/// The client only presents points already settled by the Arena server.
+enum ATHLTHArenaSeasonPhase: Equatable {
+    case upcoming, active, completed
+}
+
+enum ATHLTHArenaSeasonPresentation {
+    static func phase(startsOn: String, endsOn: String, today: String) -> ATHLTHArenaSeasonPhase {
+        if today < startsOn { return .upcoming }
+        if today > endsOn { return .completed }
+        return .active
+    }
+
+    static func leadingAthletes(
+        _ standings: [ATHLTHArenaSeasonStandingsRow]
+    ) -> [ATHLTHArenaSeasonStandingsRow] {
+        guard let best = standings.map(\.points).filter({
+            $0.isFinite && $0 > 0
+        }).max() else {
+            return []
+        }
+        // Server-side ties must never be resolved by arbitrary UUID ordering.
+        return standings.filter { $0.points.isFinite && abs($0.points - best) < 0.001 }
+    }
+}
+
 private enum ATHLTHArenaSeasonDate {
     static func sql(_ date: Date) -> String {
         let components = Calendar.current.dateComponents(
@@ -636,21 +662,34 @@ private struct ATHLTHArenaSeasonDetailView: View {
             )
     }
 
+    private var seasonPhase: ATHLTHArenaSeasonPhase {
+        ATHLTHArenaSeasonPresentation.phase(
+            startsOn: season.startsOn,
+            endsOn: season.endsOn,
+            today: ATHLTHArenaSeasonDate.sql(Date())
+        )
+    }
+
+    private var leaders: [ATHLTHArenaSeasonStandingsRow] {
+        seasonPhase == .upcoming ? [] :
+            ATHLTHArenaSeasonPresentation.leadingAthletes(standings)
+    }
+
     private var seasonStatus: String {
-        let today = ATHLTHArenaSeasonDate.sql(Date())
-        if today < season.startsOn {
+        switch seasonPhase {
+        case .upcoming:
             return ATHLTHLocalization.choose(
                 english: "Upcoming season", norwegian: "Kommende sesong"
             )
-        }
-        if today > season.endsOn {
+        case .active:
+            return ATHLTHLocalization.choose(
+                english: "Season in progress", norwegian: "Sesongen pågår"
+            )
+        case .completed:
             return ATHLTHLocalization.choose(
                 english: "Completed season", norwegian: "Avsluttet sesong"
             )
         }
-        return ATHLTHLocalization.choose(
-            english: "Season in progress", norwegian: "Sesongen pågår"
-        )
     }
 
     var body: some View {
@@ -688,6 +727,74 @@ private struct ATHLTHArenaSeasonDetailView: View {
                     .font(.headline)
                     Spacer()
                     if loading { ProgressView().controlSize(.small) }
+                }
+
+                if !leaders.isEmpty && !loading {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 10) {
+                            Image(systemName: seasonPhase == .completed
+                                  ? "trophy.fill" : "chart.line.uptrend.xyaxis")
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .frame(width: 42, height: 42)
+                                .background(ATHLTHTheme.champagneSoft.opacity(0.60),
+                                            in: Circle())
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(seasonPhase == .completed
+                                    ? (leaders.count > 1
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Joint season champions",
+                                            norwegian: "Delte sesongmestere"
+                                          )
+                                        : ATHLTHLocalization.choose(
+                                            english: "Season champion",
+                                            norwegian: "Sesongmester"
+                                          ))
+                                    : (leaders.count > 1
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Tied for the lead",
+                                            norwegian: "Delt førsteplass"
+                                          )
+                                        : ATHLTHLocalization.choose(
+                                            english: "Current season leader",
+                                            norwegian: "Foreløpig sesongleder"
+                                          )))
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                Text(leaders.map { name($0.userID) }
+                                    .joined(separator: " · "))
+                                    .font(.headline)
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        HStack(spacing: 7) {
+                            Text("\(leaders[0].points.formatted()) p")
+                                .font(.title3.weight(.bold).monospacedDigit())
+                            Spacer()
+                            Text("\(links.count) " + ATHLTHLocalization.choose(
+                                english: "season competitions",
+                                norwegian: "sesongkonkurranser"
+                            ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        if seasonPhase == .active {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Provisional standing. No champion until the season ends.",
+                                    norwegian: "Foreløpig stilling. Ingen kåret mester før sesongen er avsluttet."
+                                ),
+                                systemImage: "info.circle"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                    }
+                    .padding(16)
+                    .background(ATHLTHArenaLightStyle.card(20))
+                    .accessibilityElement(children: .combine)
                 }
 
                 if standings.isEmpty && !loading {
