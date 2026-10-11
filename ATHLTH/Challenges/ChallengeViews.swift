@@ -634,15 +634,77 @@ struct ChallengeCreationView: View {
 
     let preselectedFriends: [SocialProfileCard]
     let preselectedRouteID: UUID?
+    let changeProposalFor: ATHLTHChallenge?
 
     init(
         preselectedFriends: [SocialProfileCard] = [],
-        preselectedRouteID: UUID? = nil
+        preselectedRouteID: UUID? = nil,
+        changeProposalFor: ATHLTHChallenge? = nil
     ) {
         self.preselectedFriends = preselectedFriends
         self.preselectedRouteID = preselectedRouteID
+        self.changeProposalFor = changeProposalFor
 
-        _selectedRouteID = State(initialValue: preselectedRouteID)
+        _selectedRouteID = State(initialValue:
+            changeProposalFor?.rules.route?.routeID ?? preselectedRouteID
+        )
+        if let challenge = changeProposalFor {
+            let r = challenge.rules
+            _sport = State(initialValue: challenge.sport)
+            _scoring = State(initialValue: r.scoring == .fastestRoute
+                ? .fastestDistance : r.scoring)
+            _title = State(initialValue: challenge.title)
+            _challengeSummary = State(initialValue: r.summary ?? "")
+            _selectedCoverArtworkName = State(initialValue:
+                r.coverArtworkName ?? "GoalRunning")
+            _coverWasManuallySelected = State(initialValue: true)
+            _targetDistanceKm = State(initialValue:
+                (r.targetDistanceMeters ?? 5000) / 1000)
+            _targetDurationMinutes = State(initialValue:
+                (r.targetDurationSeconds ?? 3600) / 60)
+            _timeBasis = State(initialValue: r.timeBasis)
+            _usesSpecificRoute = State(initialValue: r.route != nil)
+            _gpsRequired = State(initialValue: r.gpsRequired)
+            _routeMatchPercent = State(initialValue:
+                r.minimumRouteMatchPercent ?? 90)
+            _distanceTolerancePercent = State(initialValue:
+                r.distanceTolerancePercent ?? 2)
+            _startFinishToleranceMeters = State(initialValue:
+                r.startFinishToleranceMeters ?? 100)
+            _routeDirection = State(initialValue: r.routeDirection ?? .sameDirection)
+            _attemptPolicy = State(initialValue: r.attemptPolicy ?? .best)
+            _attemptLimit = State(initialValue: r.maximumAttempts ?? 0)
+            _allowTreadmill = State(initialValue: r.allowTreadmill ?? false)
+            _allowTargetGhost = State(initialValue: r.allowTargetGhost ?? true)
+            _allowLiveGhost = State(initialValue: r.allowLiveGhost ?? true)
+            _advancedRules = State(initialValue: true)
+            _heartRateZone = State(initialValue: r.heartRateZone ?? 5)
+            _heartRateAggregation = State(initialValue:
+                r.heartRateAggregation ?? .totalChallenge)
+            _exerciseName = State(initialValue: r.exerciseName ?? "Bench Press")
+            _requiredWeightEnabled = State(initialValue:
+                r.fixedWeightKilograms != nil)
+            _requiredWeightKg = State(initialValue:
+                r.fixedWeightKilograms ?? 80)
+            _verificationPolicy = State(initialValue: r.verificationPolicy)
+            _startsAt = State(initialValue: r.startsAt)
+            _hasEnd = State(initialValue: r.endsAt != nil)
+            _endsAt = State(initialValue: r.endsAt ??
+                Calendar.current.date(byAdding: .day, value: 7,
+                                      to: r.startsAt) ?? r.startsAt)
+            _allowMultipleAttempts = State(initialValue: r.allowMultipleAttempts)
+            _invitees = State(initialValue: challenge.participants.filter {
+                $0.state != .creator
+            })
+            _meetupEnabled = State(initialValue: r.meetup != nil)
+            _meetupPlaceName = State(initialValue: r.meetup?.placeName ?? "")
+            _meetupAt = State(initialValue: r.meetup?.scheduledAt ?? r.startsAt)
+            if let meetup = r.meetup {
+                _meetupCoordinate = State(initialValue:
+                    CLLocationCoordinate2D(latitude: meetup.latitude,
+                                           longitude: meetup.longitude))
+            }
+        }
 
         if preselectedRouteID != nil {
             _step = State(initialValue: 0)
@@ -758,15 +820,17 @@ struct ChallengeCreationView: View {
                 )
             }
             .navigationTitle(
-                preselectedRouteID == nil
+                changeProposalFor != nil
                     ? ATHLTHLocalization.choose(
-                        english: "Create Challenge",
-                        norwegian: "Opprett utfordring"
+                        english: "Propose changes", norwegian: "Foreslå endringer"
                     )
-                    : ATHLTHLocalization.choose(
-                        english: "Challenge Route",
-                        norwegian: "Challenge-rute"
-                    )
+                    : preselectedRouteID == nil
+                        ? ATHLTHLocalization.choose(
+                            english: "Create Challenge", norwegian: "Opprett utfordring"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Challenge Route", norwegian: "Challenge-rute"
+                        )
             )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -797,7 +861,11 @@ struct ChallengeCreationView: View {
                         }
                     } label: {
                         Text(
-                            creatingChallenge
+                            changeProposalFor != nil
+                                ? ATHLTHLocalization.choose(
+                                    english: "Send proposal", norwegian: "Send forslag"
+                                )
+                                : creatingChallenge
                                 ? ATHLTHLocalization.choose(
                                     english: "Creating…",
                                     norwegian: "Oppretter…"
@@ -835,7 +903,12 @@ struct ChallengeCreationView: View {
                             }
 
                             Text(
-                                creatingChallenge
+                                changeProposalFor != nil
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Send change proposal",
+                                        norwegian: "Send endringsforslag"
+                                    )
+                                    : creatingChallenge
                                     ? ATHLTHLocalization.choose(
                                         english: "Creating…",
                                         norwegian: "Oppretter…"
@@ -3946,7 +4019,8 @@ struct ChallengeCreationView: View {
             if scoring ==
                 .fastestDistance {
                 return usesSpecificRoute
-                    ? selectedRouteID != nil
+                    ? (selectedRouteID != nil ||
+                       changeProposalFor?.rules.route != nil)
                     : targetDistanceKm > 0
             }
 
@@ -6527,7 +6601,8 @@ struct ChallengeCreationView: View {
                 )
             )
 
-        if !inviteeIDs.isEmpty,
+        if changeProposalFor == nil &&
+           !inviteeIDs.isEmpty,
            let duplicate =
                 challenges.visibleChallenges.first(
                     where: { existing in
@@ -6605,8 +6680,8 @@ struct ChallengeCreationView: View {
             return
         }
 
-        let challengeID = UUID()
-        var uploadedCoverURL: String?
+        let challengeID = changeProposalFor?.id ?? UUID()
+        var uploadedCoverURL: String? = changeProposalFor?.rules.coverImageURL
 
         if let selectedCoverImageData {
             guard let imageURL =
@@ -6628,21 +6703,25 @@ struct ChallengeCreationView: View {
             uploadedCoverURL = imageURL
         }
 
-        let creator = ChallengeParticipant(
+        let creator = changeProposalFor?.participants.first(where: {
+            $0.state == .creator
+        }) ?? ChallengeParticipant(
             userID: session.profile.userID,
             username: session.profile.username,
             displayName: session.profile.displayName,
             state: .creator
         )
 
-        let routeSnapshot = selectedRoute.map {
-            ChallengeRouteSnapshot(
-                routeID: $0.id,
-                title: $0.title,
-                distanceKilometers: $0.distanceKilometers,
-                coordinates: $0.coordinates
-            )
-        }
+        let routeSnapshot: ChallengeRouteSnapshot? = usesSpecificRoute
+            ? (selectedRoute.map {
+                ChallengeRouteSnapshot(
+                    routeID: $0.id,
+                    title: $0.title,
+                    distanceKilometers: $0.distanceKilometers,
+                    coordinates: $0.coordinates
+                )
+            } ?? changeProposalFor?.rules.route)
+            : nil
 
         let meetup: ChallengeMeetup?
         if meetupEnabled, let meetupCoordinate {
@@ -6761,13 +6840,19 @@ struct ChallengeCreationView: View {
 
         let challenge = ATHLTHChallenge(
             id: challengeID,
-            creatorID: session.profile.userID,
+            creatorID: changeProposalFor?.creatorID ?? session.profile.userID,
             title: resolvedTitle,
             sport: sport,
             participants: [creator] + invitees,
             rules: rules,
-            visibility: visibility
+            visibility: .privateOnly
         )
+
+        if let original = changeProposalFor {
+            await sendChangeProposal(original: original, suggested: challenge)
+            creatingChallenge = false
+            return
+        }
 
         challenges.add(challenge)
 
@@ -6801,6 +6886,79 @@ struct ChallengeCreationView: View {
         // Never auto-post the challenge or its rules to Community.
 
         dismiss()
+    }
+
+    @MainActor
+    private func sendChangeProposal(
+        original: ATHLTHChallenge,
+        suggested: ATHLTHChallenge
+    ) async {
+        guard !original.rulesAreLocked &&
+                original.status != .completed &&
+                original.status != .cancelled &&
+                original.creatorID != session.profile.userID &&
+                original.participants.contains(where: {
+                    $0.userID == session.profile.userID &&
+                    ($0.state == .invited || $0.state == .accepted)
+                }) else {
+            createError = ATHLTHLocalization.choose(
+                english: "This challenge can no longer be changed.",
+                norwegian: "Denne utfordringen kan ikke endres lenger."
+            )
+            return
+        }
+
+        let proposal = ChallengeChangeProposal(
+            id: UUID(),
+            challengerID: session.profile.userID,
+            original: original,
+            proposed: suggested,
+            submittedAt: Date()
+        )
+        guard proposal.hasChanges else {
+            createError = ATHLTHLocalization.choose(
+                english: "Change at least one detail before sending.",
+                norwegian: "Endre minst én detalj før du sender."
+            )
+            return
+        }
+        do {
+            let conversationID = try await messaging.openConversation(
+                with: original.creatorID
+            )
+            let draft = try MessageShareDraft(
+                kind: .challenge,
+                title: suggested.title,
+                subtitle: ATHLTHLocalization.choose(
+                    english: "Proposed changes awaiting approval",
+                    norwegian: "Endringsforslag venter på godkjenning"
+                ),
+                snapshot: proposal,
+                sourceObjectID: original.id,
+                sourceOwnerID: original.creatorID,
+                shareVersion: 2
+            )
+            let sent = await messaging.send(
+                to: original.creatorID,
+                conversationID: conversationID,
+                body: ATHLTHLocalization.choose(
+                    english: "I proposed changes to the challenge. Review the red changes.",
+                    norwegian: "Jeg foreslår endringer i utfordringen. Se endringene merket med rødt."
+                ),
+                attachment: draft
+            )
+            guard sent else {
+                createError = messaging.errorMessage ??
+                    ATHLTHLocalization.choose(
+                        english: "Could not send the proposal.",
+                        norwegian: "Kunne ikke sende forslaget."
+                    )
+                return
+            }
+            dismiss()
+        } catch {
+            createError = error.localizedDescription
+        }
     }
 
     @MainActor
