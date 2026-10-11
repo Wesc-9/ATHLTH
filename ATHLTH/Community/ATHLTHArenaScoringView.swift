@@ -142,7 +142,10 @@ struct ATHLTHArenaScoringSection: View {
                 .foregroundStyle(ATHLTHTheme.accentDeep)
             }
 
-            if series.status == "completed", let first = rankedMembers.first {
+            if series.status == "completed",
+               series.completionReason != "deadline_unresolved",
+               let first = rankedMembers.first,
+               first.points > 0 {
                 let champions = rankedMembers.filter { $0.points == first.points }
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 12) {
@@ -184,6 +187,30 @@ struct ATHLTHArenaScoringSection: View {
                     RoundedRectangle(cornerRadius: 22)
                         .stroke(ATHLTHTheme.accentDeep.opacity(0.15), lineWidth: 1)
                 )
+            }
+
+            if series.status == "completed",
+               series.completionReason == "deadline_unresolved" {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Finished with unresolved rounds",
+                            norwegian: "Avsluttet med uavklarte runder"
+                        ),
+                        systemImage: "clock.badge.exclamationmark"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Only unanimously approved results received points. Missing or disputed results received no points; the table shows approved results only.",
+                        norwegian: "Bare enstemmig godkjente resultater har fått poeng. Manglende eller omstridte runder gir ingen poeng. Tabellen viser godkjente resultater."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                .padding(16)
+                .background(.regularMaterial,
+                            in: RoundedRectangle(cornerRadius: 18))
             }
 
             if series.status != "draft" {
@@ -269,7 +296,11 @@ struct ATHLTHArenaScoringSection: View {
                 if let result {
                     Text(result.status == "approved"
                          ? ATHLTHLocalization.choose(english: "Approved", norwegian: "Godkjent")
-                         : ATHLTHLocalization.choose(english: "Pending", norwegian: "Venter"))
+                         : result.status == "expired"
+                            ? ATHLTHLocalization.choose(english: "Expired", norwegian: "Utløpt")
+                            : result.status == "rejected"
+                              ? ATHLTHLocalization.choose(english: "Rejected", norwegian: "Avvist")
+                              : ATHLTHLocalization.choose(english: "Pending", norwegian: "Venter"))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(result.status == "approved"
                                          ? Color.green : ATHLTHTheme.accentDeep)
@@ -339,7 +370,8 @@ struct ATHLTHArenaScoringSection: View {
                         .disabled(writing)
                     }
                 }
-            } else if series.status == "active" && isOrganizer {
+            } else if series.status == "active" && isOrganizer &&
+                      (series.endsAt.map { Date() <= $0.addingTimeInterval(48 * 3_600) } ?? false) {
                 Button {
                     roundToScore = round
                 } label: {
