@@ -194,6 +194,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var finishing = false
     private var mirroringActive = false
     private var mirroringRetryPending = false
+    private var iPhoneVoiceLease = ATHLTHAudioCoachVoiceLease()
     private var lastMirrorSnapshotSentAt: Date?
     private let speechSynthesizer = AVSpeechSynthesizer()
     private var coachAudioSessionIsActive = false
@@ -296,6 +297,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
         resetAudioCoachThresholds()
         persistWorkoutRecoveryState()
+        if !configuration.enabled ||
+            !configuration.shouldPreferIPhoneAudioWhenReachable {
+            iPhoneVoiceLease.reset()
+        }
 
         if !configuration.enabled {
             audioCoachReadyAnnouncedForWorkout = false
@@ -344,6 +349,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         resetAudioCoachThresholds()
         persistWorkoutRecoveryState()
+        if !configuration.enabled ||
+            !configuration.shouldPreferIPhoneAudioWhenReachable {
+            iPhoneVoiceLease.reset()
+        }
 
         if !configuration.enabled {
             audioCoachReadyAnnouncedForWorkout = false
@@ -3003,6 +3012,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         mirroringActive = false
         mirroringRetryPending = false
         lastMirrorSnapshotSentAt = nil
+        iPhoneVoiceLease.reset()
         nextDistanceAnnouncementMeters = nil
         nextTimeAnnouncementSeconds = nil
         structuredStepStartElapsedTime = 0
@@ -5379,17 +5389,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     ) {
         guard !text.isEmpty else { return }
 
-        let iPhoneReachable =
-            WCSession.isSupported() &&
-            WCSession.default.activationState == .activated &&
-            WCSession.default.isReachable
-
+        // WCSession reachability alone cannot confirm iPhone speech.
+        // Fall back to local Watch coaching when this short lease expires.
         guard ATHLTHAudioCoachVoiceRouting
             .shouldSpeakOnWatch(
                 configuration: audioCoachConfiguration,
                 workoutKind: kind,
                 priority: priority,
-                iPhoneReachable: iPhoneReachable
+                iPhoneVoiceLeaseActive:
+                    mirroringActive && iPhoneVoiceLease.isActive()
             )
         else {
             // iPhone handles routine and structured running commentary.
@@ -6525,6 +6533,37 @@ extension WatchWorkoutManager:
             guard let self else { return }
 
             for payload in data {
+                if let offer = try? JSONDecoder().decode(
+                    ATHLTHAudioCoachLeaseOffer.self,
+                    from: payload
+                ) {
+                    let eligible =
+                        self.mirroringActive &&
+                        self.audioCoachConfiguration.enabled &&
+                        self.audioCoachConfiguration
+                            .shouldPreferIPhoneAudioWhenReachable &&
+                        (self.kind == .running ||
+                         self.kind == .walking) &&
+                        self.isActive
+
+                    if let acknowledgement =
+                        self.iPhoneVoiceLease.grant(
+                            offer: offer,
+                            workoutStartedAt: self.startedAt,
+                            eligible: eligible
+                        ),
+                       let session = self.workoutSession,
+                       let response = try? JSONEncoder()
+                           .encode(acknowledgement) {
+                        Task { @MainActor in
+                            try? await session.sendToRemoteWorkoutSession(
+                                data: response
+                            )
+                        }
+                    }
+                    continue
+                }
+
                 guard
                     let command =
                         try? JSONDecoder().decode(
