@@ -299,8 +299,11 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
 
     @State private var rooms: [LiveGhostRaceRoomRecord] = []
     @State private var participants: [LiveGhostRaceParticipantRecord] = []
+    @State private var roundResults: [ATHLTHArenaRoundResult] = []
+    @State private var roundResultsLoaded = false
     @State private var loading = false
     @State private var errorMessage: String?
+    private let arenaCloud = ATHLTHArenaCloudService()
 
     private var linked: [GhostFriendRaceChallengeRecord] {
         let roundIDs = Set(rounds.map(\.id))
@@ -366,6 +369,10 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
                         $0.challengeID == challenge.id &&
                         $0.userID == challenge.recipientID
                     }?.elapsedSeconds
+                    let existingResult = roundResults.first {
+                        $0.roundID == challenge.arenaRoundID &&
+                        $0.status != "rejected"
+                    }
                     let review = ATHLTHArenaLiveDuelReview.candidate(
                         senderID: challenge.senderID,
                         recipientID: challenge.recipientID,
@@ -448,7 +455,26 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
                             .font(.caption2)
                             .foregroundStyle(ATHLTHTheme.mutedText)
 
-                            if isOrganizer,
+                            if let existingResult {
+                                Label(
+                                    existingResult.status == "approved"
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Round result approved",
+                                            norwegian: "Runderesultatet er godkjent"
+                                        )
+                                        : ATHLTHLocalization.choose(
+                                            english: "Round result already submitted",
+                                            norwegian: "Resultatforslag er allerede sendt"
+                                        ),
+                                    systemImage: existingResult.status == "approved"
+                                        ? "checkmark.seal.fill" : "clock"
+                                )
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                            }
+
+                            if isOrganizer, roundResultsLoaded,
+                               existingResult == nil,
                                let review,
                                let liveDraft = proposalDraft(
                                    for: challenge, result: review
@@ -585,6 +611,8 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
         guard !ids.isEmpty else {
             rooms = []
             participants = []
+            roundResults = []
+            roundResultsLoaded = false
             errorMessage = races.errorMessage
             return
         }
@@ -602,10 +630,19 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
                     .select()
                     .in("challenge_id", values: ids)
                     .execute().value
-            rooms = try await roomsTask
-            participants = try await participantsTask
+            async let resultsTask = arenaCloud.loadRoundResults(seriesID: series.id)
+            let loadedRooms = try await roomsTask
+            let loadedParticipants = try await participantsTask
+            let loadedResults = try await resultsTask
+            rooms = loadedRooms
+            participants = loadedParticipants
+            roundResults = loadedResults
+            roundResultsLoaded = true
             errorMessage = nil
         } catch {
+            // Never offer a new result proposal if the server's current
+            // round status could not be fetched.
+            roundResultsLoaded = false
             errorMessage = error.localizedDescription
         }
     }
