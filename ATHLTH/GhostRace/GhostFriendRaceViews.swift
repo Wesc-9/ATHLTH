@@ -23,6 +23,12 @@ struct GhostFriendRaceHubView: View {
     @State private var captureDevice:
         WorkoutCaptureDevice = .iPhone
 
+    /// Opening a duel from an active Arena 1v1 series can suggest its
+    /// opponent; the existing mutual-follow and permission checks remain.
+    init(preferredFriendID: UUID? = nil) {
+        _selectedFriendID = State(initialValue: preferredFriendID)
+    }
+
     var body: some View {
         List {
             Section {
