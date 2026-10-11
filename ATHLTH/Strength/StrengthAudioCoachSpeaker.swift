@@ -138,12 +138,14 @@ final class StrengthAudioCoachSpeaker:
         )
         try? audioSession.setActive(true)
 
-        let spokenText = (configuration.speechStyle ?? .balanced).render(
-            text,
-            language: configuration.language,
-            priority: .structuredStep,
-            eventKind: resolvedEvent.kind
-        )
+        let spokenText = rememberForReplay
+            ? (configuration.speechStyle ?? .balanced).render(
+                text,
+                language: configuration.language,
+                priority: .structuredStep,
+                eventKind: resolvedEvent.kind
+            )
+            : text
         let utterance =
             AVSpeechUtterance(
                 string: spokenText
