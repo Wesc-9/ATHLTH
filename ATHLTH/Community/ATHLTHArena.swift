@@ -52,6 +52,61 @@ enum ATHLTHArenaScoring: String, CaseIterable, Codable, Identifiable {
     }
 }
 
+/// The primary Arena action is a view-only interpretation of server state.
+/// It never marks rounds complete or assigns points. The server remains
+/// authoritative for invitations, approvals and score settlement.
+enum ATHLTHArenaNextAction: Equatable {
+    case respondToInvite
+    case addRound
+    case approveRule(UUID)
+    case waitingForInvites
+    case waitingForPlayers
+    case waitingForRules
+    case startSeries
+    case runRoute
+    case compete
+    case reviewScores
+    case finalStandings
+
+    static func resolve(
+        status: String,
+        response: String?,
+        isOrganizer: Bool,
+        roundIDs: [UUID],
+        personallyApproved: Set<UUID>,
+        allRulesApproved: Bool,
+        pendingInvites: Int,
+        acceptedCount: Int,
+        hasRoute: Bool,
+        deadlinePassed: Bool
+    ) -> ATHLTHArenaNextAction? {
+        if response == "invited" { return .respondToInvite }
+        guard response == "accepted" else { return nil }
+        switch status {
+        case "draft":
+            if roundIDs.isEmpty {
+                return isOrganizer ? .addRound : .waitingForRules
+            }
+            if let roundID = roundIDs.first(where: {
+                !personallyApproved.contains($0)
+            }) {
+                return .approveRule(roundID)
+            }
+            if pendingInvites > 0 { return .waitingForInvites }
+            if acceptedCount < 2 { return .waitingForPlayers }
+            if !allRulesApproved { return .waitingForRules }
+            return isOrganizer ? .startSeries : .waitingForRules
+        case "active":
+            if deadlinePassed { return .reviewScores }
+            return hasRoute ? .runRoute : .compete
+        case "completed":
+            return .finalStandings
+        default:
+            return nil
+        }
+    }
+}
+
 enum ATHLTHArenaRoundTemplate: String, CaseIterable, Codable, Identifiable {
     case fastest5K
     case fastest1K
