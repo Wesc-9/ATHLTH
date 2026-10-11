@@ -1176,6 +1176,111 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
         ))
     }
 
+    func testArenaLiveRouteRequiresCorrectFrozenGeometry() {
+        let coordinates = (0..<31).map { index in
+            RouteCoordinate(
+                latitude: 63.42 + Double(index) * 0.00035,
+                longitude: 10.39 + Double(index) * 0.00014,
+                altitude: nil,
+                sequence: index
+            )
+        }
+        let route = ChallengeRouteSnapshot(
+            routeID: UUID(),
+            title: "Agreed Arena course",
+            distanceKilometers: 1.5,
+            coordinates: coordinates
+        )
+        func ghostPoints(
+            shiftedLatitude: Double = 0,
+            reversed: Bool = false
+        ) -> [GhostFriendRacePoint] {
+            let points = reversed ? Array(coordinates.reversed()) : coordinates
+            return points.enumerated().map { index, point in
+                GhostFriendRacePoint(
+                    latitude: point.latitude + shiftedLatitude,
+                    longitude: point.longitude,
+                    elapsedTime: Double(index) * 30,
+                    cumulativeMeters: Double(index) * 50,
+                    sequence: index
+                )
+            }
+        }
+
+        XCTAssertTrue(ATHLTHArenaLiveRoundCompatibility.matchesFrozenRoute(
+            snapshot: route,
+            sharedPoints: ghostPoints(),
+            privacyTrimmed: false
+        ))
+        // Same approximate length but a completely different course.
+        XCTAssertFalse(ATHLTHArenaLiveRoundCompatibility.matchesFrozenRoute(
+            snapshot: route,
+            sharedPoints: ghostPoints(shiftedLatitude: 0.02),
+            privacyTrimmed: false
+        ))
+        XCTAssertFalse(ATHLTHArenaLiveRoundCompatibility.matchesFrozenRoute(
+            snapshot: route,
+            sharedPoints: ghostPoints(reversed: true),
+            privacyTrimmed: false
+        ))
+        XCTAssertFalse(ATHLTHArenaLiveRoundCompatibility.matchesFrozenRoute(
+            snapshot: route,
+            sharedPoints: ghostPoints(),
+            privacyTrimmed: true
+        ))
+        XCTAssertFalse(ATHLTHArenaLiveRoundCompatibility.matchesFrozenRoute(
+            snapshot: nil,
+            sharedPoints: ghostPoints(),
+            privacyTrimmed: false
+        ))
+    }
+
+    func testArenaLiveRouteRejectsBadGPSAndMissingEnd() {
+        let course = (0..<11).map { index in
+            RouteCoordinate(
+                latitude: 63.4 + Double(index) * 0.0004,
+                longitude: 10.4,
+                altitude: nil,
+                sequence: index
+            )
+        }
+        let route = ChallengeRouteSnapshot(
+            routeID: UUID(),
+            title: "Frozen route",
+            distanceKilometers: 0.5,
+            coordinates: course
+        )
+        func points(_ samples: [RouteCoordinate]) -> [GhostFriendRacePoint] {
+            samples.enumerated().map { index, point in
+                GhostFriendRacePoint(
+                    latitude: point.latitude,
+                    longitude: point.longitude,
+                    elapsedTime: Double(index),
+                    cumulativeMeters: Double(index) * 50,
+                    sequence: index
+                )
+            }
+        }
+        XCTAssertFalse(ATHLTHArenaLiveRoundCompatibility.matchesFrozenRoute(
+            snapshot: route,
+            sharedPoints: points(Array(course.dropLast(3))),
+            privacyTrimmed: false
+        ))
+        var invalid = points(course)
+        invalid[4] = GhostFriendRacePoint(
+            latitude: 123,
+            longitude: 10.4,
+            elapsedTime: 4,
+            cumulativeMeters: 200,
+            sequence: 4
+        )
+        XCTAssertFalse(ATHLTHArenaLiveRoundCompatibility.matchesFrozenRoute(
+            snapshot: route,
+            sharedPoints: invalid,
+            privacyTrimmed: false
+        ))
+    }
+
     func testCustomRoundsDoNotInferUnsupportedResults() {
         let standings = ATHLTHArenaSuggestedRanking.standings(
             template: .custom,
