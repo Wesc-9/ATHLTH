@@ -489,6 +489,20 @@ struct ATHLTHArenaCreateView: View {
     @State private var durationDays = 14
     @State private var selectedFriendIDs: Set<UUID> = []
 
+    init(
+        ownerID: UUID,
+        friends: [SocialProfileCard],
+        preselectedFriendID: UUID? = nil,
+        onCreate: @escaping (ATHLTHArenaCompetitionDraft) -> Void
+    ) {
+        self.ownerID = ownerID
+        self.friends = friends
+        self.onCreate = onCreate
+        _selectedFriendIDs = State(initialValue:
+            preselectedFriendID.map { Set([$0]) } ?? []
+        )
+    }
+
     var body: some View {
         NavigationStack {
             Form {
