@@ -96,13 +96,20 @@ struct ATHLTHTrainTodayPremiumView: View {
         let finished = completedIDs.contains(workout.id)
         return VStack(alignment: .leading, spacing: 0) {
             ZStack(alignment: .topLeading) {
-                Image(workoutImage(for: workout.kind))
-                    .resizable()
-                    .scaledToFill()
-                    .saturation(0.45)
-                    .frame(height: 147)
-                    .frame(maxWidth: .infinity)
-                    .clipped()
+                // Bound the image to the card width. An unconstrained
+                // scaledToFill image can expand the entire vertical ScrollView.
+                GeometryReader { imageGeometry in
+                    Image(workoutImage(for: workout.kind))
+                        .resizable()
+                        .scaledToFill()
+                        .saturation(0.45)
+                        .frame(
+                            width: imageGeometry.size.width,
+                            height: 147
+                        )
+                        .clipped()
+                }
+                .frame(height: 147)
 
                 LinearGradient(
                     colors: [.black.opacity(0.46), .clear],
@@ -346,13 +353,20 @@ struct ATHLTHTrainTodayPremiumView: View {
 
     private func stateImage(_ assetName: String, label: String) -> some View {
         ZStack(alignment: .topLeading) {
-            Image(assetName)
-                .resizable()
-                .scaledToFill()
-                .saturation(0.35)
-                .frame(height: 143)
-                .frame(maxWidth: .infinity)
-                .clipped()
+            // Keep the hero's layout width equal to the available card
+            // width; only crop the image inside that measured region.
+            GeometryReader { imageGeometry in
+                Image(assetName)
+                    .resizable()
+                    .scaledToFill()
+                    .saturation(0.35)
+                    .frame(
+                        width: imageGeometry.size.width,
+                        height: 143
+                    )
+                    .clipped()
+            }
+            .frame(height: 143)
             LinearGradient(
                 colors: [.black.opacity(0.35), .clear],
                 startPoint: .top,
@@ -480,13 +494,18 @@ struct ATHLTHTrainTodayPremiumView: View {
     private var ghostRaceSection: some View {
         Button(action: onGhostRace) {
             ZStack(alignment: .leading) {
-                Image("GoalRunning")
-                    .resizable()
-                    .scaledToFill()
-                    .saturation(0.25)
-                    .frame(height: 79)
-                    .frame(maxWidth: .infinity)
-                    .clipped()
+                GeometryReader { imageGeometry in
+                    Image("GoalRunning")
+                        .resizable()
+                        .scaledToFill()
+                        .saturation(0.25)
+                        .frame(
+                            width: imageGeometry.size.width,
+                            height: 79
+                        )
+                        .clipped()
+                }
+                .frame(height: 79)
                 LinearGradient(
                     colors: [
                         Color.black.opacity(0.69),
