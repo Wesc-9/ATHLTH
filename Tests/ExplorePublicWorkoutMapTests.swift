@@ -16,7 +16,7 @@ final class ExplorePublicWorkoutMapTests: XCTestCase {
             scheduledStart: upcoming, asOf: now
         ))
 
-        for status: TrainTogetherPostStatus in [.cancelled, .completed] {
+        for status in [TrainTogetherPostStatus.cancelled, .completed] {
             XCTAssertFalse(ExplorePublicWorkoutMapPolicy.canDisplay(
                 status: status, broadArea: "Trondheim",
                 scheduledStart: upcoming, asOf: now
