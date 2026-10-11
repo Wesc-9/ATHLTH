@@ -19,6 +19,34 @@ final class GhostRaceCadenceTests:
         return defaults
     }
 
+    func testLiveGhostReentryAfterInviteExpiryRequiresStartedRoom() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let expired = now.addingTimeInterval(-60)
+        let valid = now.addingTimeInterval(60)
+
+        XCTAssertTrue(LiveGhostRaceReentry.allowed(
+            expiresAt: valid, roomStatus: nil, now: now
+        ))
+        XCTAssertTrue(LiveGhostRaceReentry.allowed(
+            expiresAt: expired, roomStatus: .countdown, now: now
+        ))
+        XCTAssertTrue(LiveGhostRaceReentry.allowed(
+            expiresAt: expired, roomStatus: .racing, now: now
+        ))
+        XCTAssertFalse(LiveGhostRaceReentry.allowed(
+            expiresAt: expired, roomStatus: nil, now: now
+        ))
+        XCTAssertFalse(LiveGhostRaceReentry.allowed(
+            expiresAt: expired, roomStatus: .lobby, now: now
+        ))
+        XCTAssertFalse(LiveGhostRaceReentry.allowed(
+            expiresAt: expired, roomStatus: .finished, now: now
+        ))
+        XCTAssertFalse(LiveGhostRaceReentry.allowed(
+            expiresAt: expired, roomStatus: .cancelled, now: now
+        ))
+    }
+
     func testTargetPaceAndFinishTimeConversion() {
         XCTAssertEqual(
             GhostTargetPaceFormatter.secondsPerKilometer(from: "4:45"), 285
