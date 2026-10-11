@@ -5,7 +5,7 @@ import XCTest
 final class ATHLTHArenaLocalEvidenceCheckTests: XCTestCase {
     private let started = Date(timeIntervalSince1970: 1_790_000_000)
 
-    private func run(
+    private func makeRun(
         id: UUID = UUID(),
         distance: Double = 5_000,
         duration: Double = 1_600,
@@ -23,7 +23,7 @@ final class ATHLTHArenaLocalEvidenceCheckTests: XCTestCase {
     }
 
     func testFinishedAthlthPhoneWorkoutMatchesLocalHistory() {
-        let original = run()
+        let original = makeRun()
         let presented = SocialPublishableWorkout(phoneWorkout: original)
         XCTAssertEqual(
             ATHLTHArenaLocalEvidenceCheck.verify(
@@ -34,7 +34,7 @@ final class ATHLTHArenaLocalEvidenceCheckTests: XCTestCase {
     }
 
     func testWorkoutMissingFromHistoryCannotBeShared() {
-        let published = SocialPublishableWorkout(phoneWorkout: run())
+        let published = SocialPublishableWorkout(phoneWorkout: makeRun())
         XCTAssertEqual(
             ATHLTHArenaLocalEvidenceCheck.verify(
                 published, health: [], phone: [], strength: []
@@ -44,7 +44,7 @@ final class ATHLTHArenaLocalEvidenceCheckTests: XCTestCase {
     }
 
     func testAlteredDistanceConflictsWithOriginalLog() {
-        var original = run()
+        var original = makeRun()
         let published = SocialPublishableWorkout(phoneWorkout: original)
         original.distanceMeters = 8_500
         XCTAssertEqual(
@@ -56,7 +56,7 @@ final class ATHLTHArenaLocalEvidenceCheckTests: XCTestCase {
     }
 
     func testDeletedAndUnfinishedLogDoesNotQualify() {
-        var recorded = run()
+        var recorded = makeRun()
         let published = SocialPublishableWorkout(phoneWorkout: recorded)
         recorded.end = nil
         XCTAssertEqual(
@@ -68,8 +68,8 @@ final class ATHLTHArenaLocalEvidenceCheckTests: XCTestCase {
     }
 
     func testDifferentWorkoutUUIDNeverQualifiesEvenWithSameStats() {
-        let presented = SocialPublishableWorkout(phoneWorkout: run())
-        let otherWorkout = run()
+        let presented = SocialPublishableWorkout(phoneWorkout: makeRun())
+        let otherWorkout = makeRun()
         XCTAssertEqual(
             ATHLTHArenaLocalEvidenceCheck.verify(
                 presented, health: [], phone: [otherWorkout], strength: []
