@@ -155,7 +155,7 @@ struct ATHLTHArenaOnlineDetailView: View {
     }
 
     private var isGroupSeries: Bool {
-        series.scope == .friends
+        members.count > 2
     }
 
     var body: some View {
