@@ -306,7 +306,12 @@ enum ATHLTHArenaDraftValidation {
                 guard let route = round.routeSnapshot,
                       route.distanceKilometers.isFinite,
                       (0.1...500).contains(route.distanceKilometers),
-                      route.coordinates.count >= 2 else {
+                      (2...1_500).contains(route.coordinates.count),
+                      route.coordinates.allSatisfy({
+                          $0.latitude.isFinite && $0.longitude.isFinite &&
+                          (-90...90).contains($0.latitude) &&
+                          (-180...180).contains($0.longitude)
+                      }) else {
                     return .missingRoute
                 }
                 if abs((round.targetDistanceMeters ?? 0) -
@@ -2080,13 +2085,19 @@ struct ATHLTHArenaAddRoundView: View {
               let route = selectedRoute,
               route.distanceKilometers.isFinite,
               (0.1...500).contains(route.distanceKilometers),
-              route.coordinates.count >= 2 else { return nil }
+              route.coordinates.count >= 2,
+              route.coordinates.allSatisfy({
+                  $0.latitude.isFinite && $0.longitude.isFinite &&
+                  (-90...90).contains($0.latitude) &&
+                  (-180...180).contains($0.longitude)
+              }) else { return nil }
         // Share a bounded route preview only with competition participants.
         // Full GPS verification is intentionally NOT inferred from this shape.
         let stride = max(1, Int(ceil(Double(route.coordinates.count) / 1_400)))
         let reduced = route.coordinates.enumerated().compactMap { index, value in
             (index % stride == 0 || index == route.coordinates.count - 1) ? value : nil
         }
+        guard (2...1_500).contains(reduced.count) else { return nil }
         return ChallengeRouteSnapshot(
             routeID: route.id,
             title: route.title,
