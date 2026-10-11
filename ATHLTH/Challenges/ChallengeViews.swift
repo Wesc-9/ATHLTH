@@ -7945,6 +7945,7 @@ struct ChallengeDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var settings: AppSettingsStore
@@ -7982,7 +7983,12 @@ struct ChallengeDetailView: View {
                 ScrollView {
                     LazyVStack(spacing: 18) {
                         detailHero(challenge)
-                        invitationStatusCard(challenge)
+                        if challenge.status == .cancelled ||
+                           challenge.participants.contains(where: {
+                               $0.state == .declined || $0.state == .accepted
+                           }) {
+                            invitationStatusCard(challenge)
+                        }
 
                         if currentParticipant?.state == .invited &&
                            challenge.status != .cancelled &&
@@ -8432,7 +8438,29 @@ struct ChallengeDetailView: View {
             var cancelled = challenge
             cancelled.status = .cancelled
             challenges.update(cancelled)
-            // The challenge remains visible in both inboxes with status Cancelled.
+            // Direct messages also notify invited athletes in the background.
+            // Backend challenge state remains authoritative if a DM cannot send.
+            let invitedUserIDs = Set(challenge.participants.compactMap {
+                $0.userID == session.profile.userID ? nil : $0.userID
+            })
+            for recipientID in invitedUserIDs {
+                guard social.mutualFollows.contains(where: {
+                    $0.userID == recipientID
+                }) else { continue }
+                if let conversation = try? await messaging.openConversation(
+                    with: recipientID
+                ) {
+                    _ = await messaging.send(
+                        to: recipientID,
+                        conversationID: conversation,
+                        body: ATHLTHLocalization.choose(
+                            english: "The challenge \(challenge.title) has been cancelled.",
+                            norwegian: "Utfordringen \(challenge.title) er avlyst."
+                        ),
+                        attachment: nil
+                    )
+                }
+            }
             await social.refreshChallenges(challengeStore: challenges)
         }
     }
