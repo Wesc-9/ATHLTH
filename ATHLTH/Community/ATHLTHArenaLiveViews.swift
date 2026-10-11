@@ -1,4 +1,5 @@
 import Foundation
+import MapKit
 import SwiftUI
 
 /// Shared Arena series with live invitations, consensual scoring and
@@ -268,6 +269,11 @@ struct ATHLTHArenaOnlineDetailView: View {
                 }
                 .id("arena-participants")
 
+                if let route = rounds.compactMap(\.routeSnapshot).first {
+                    arenaRoutePreview(route)
+                        .id("arena-map")
+                }
+
                 ATHLTHArenaScoringSection(
                     series: currentSeries,
                     members: members,
@@ -506,6 +512,14 @@ struct ATHLTHArenaOnlineDetailView: View {
                     target: "arena-participants",
                     proxy: proxy
                 )
+                if rounds.contains(where: { $0.routeSnapshot != nil }) {
+                    navigationButton(
+                        title: ATHLTHLocalization.choose(english: "Map", norwegian: "Kart"),
+                        icon: "map.fill",
+                        target: "arena-map",
+                        proxy: proxy
+                    )
+                }
                 if isGroupSeries && canParticipate {
                     NavigationLink {
                         ATHLTHArenaGroupChatView(series: currentSeries)
@@ -546,6 +560,67 @@ struct ATHLTHArenaOnlineDetailView: View {
                 .background(ATHLTHArenaLightStyle.card(16))
         }
         .buttonStyle(.plain)
+    }
+
+    private func arenaRoutePreview(_ route: ChallengeRouteSnapshot) -> some View {
+        let points = route.coordinates.map {
+            CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+        }
+        let latitudes = points.map(\.latitude)
+        let longitudes = points.map(\.longitude)
+        let minLatitude = latitudes.min() ?? 0
+        let maxLatitude = latitudes.max() ?? 0
+        let minLongitude = longitudes.min() ?? 0
+        let maxLongitude = longitudes.max() ?? 0
+        let region = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(
+                latitude: (minLatitude + maxLatitude) / 2,
+                longitude: (minLongitude + maxLongitude) / 2
+            ),
+            span: MKCoordinateSpan(
+                latitudeDelta: max(0.008, (maxLatitude - minLatitude) * 1.35),
+                longitudeDelta: max(0.008, (maxLongitude - minLongitude) * 1.35)
+            )
+        )
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "map.fill")
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                Text(ATHLTHLocalization.choose(
+                    english: "Competition route", norwegian: "Konkurranserute"
+                ))
+                .font(.headline)
+                Spacer()
+                Text(String(format: "%.2f km", route.distanceKilometers))
+                    .font(.subheadline.weight(.bold))
+            }
+            Text(route.title)
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+
+            if points.count >= 2 {
+                Map(initialPosition: .region(region)) {
+                    MapPolyline(coordinates: points)
+                        .stroke(ATHLTHTheme.accentDeep, lineWidth: 5)
+                }
+                .mapControlVisibility(.hidden)
+                .frame(height: 210)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Map of the agreed competition route",
+                    norwegian: "Kart over den avtalte konkurranseruten"
+                ))
+            }
+            Text(ATHLTHLocalization.choose(
+                english: "Route results require participant approval; map preview is not GPS verification.",
+                norwegian: "Ruteresultater godkjennes av deltakerne. Kartvisningen er ikke GPS-verifisering."
+            ))
+            .font(.caption)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+        }
+        .padding(16)
+        .background(ATHLTHArenaLightStyle.card(20))
     }
 
     private var summary: some View {
