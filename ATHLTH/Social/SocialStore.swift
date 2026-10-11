@@ -1157,6 +1157,35 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    /// Switch an already created, in-person lobby to individual starts.
+    /// This updates the shared server record, so all members see the same
+    /// mode and still publish progress into the same session.
+    @discardableResult
+    func enableIndependentWorkoutStart(sessionID: UUID) async -> Bool {
+        guard let currentUserID,
+              let workout = workoutSessions.first(where: { $0.id == sessionID })
+                  ?? activeWorkoutSession,
+              workout.id == sessionID,
+              workout.creatorID == currentUserID,
+              var payload = workout.invitePayload
+        else {
+            return false
+        }
+
+        payload.startIndependently = true
+        do {
+            try await service.enableIndependentWorkoutStart(
+                sessionID: sessionID,
+                invitePayload: payload
+            )
+            try await refreshWorkoutLobby(sessionID: sessionID)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     @discardableResult
     func waitForCoordinatedWorkoutStart(
         sessionID: UUID
@@ -1199,8 +1228,7 @@ final class SocialStore: ObservableObject {
                 }
 
                 if session.invitePayload?
-                    .resolvedParticipationMode ==
-                    .remote,
+                    .resolvedStartIndependently == true,
                    currentParticipant.readyAt != nil {
                     currentJoinedWorkoutSessionID =
                         sessionID
