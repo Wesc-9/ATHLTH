@@ -35,6 +35,25 @@ begin
  end if;
  if not exists (
    select 1 from information_schema.columns
+   where table_schema='public'
+     and table_name='ghost_race_challenges'
+     and column_name='source_kind'
+ ) then
+   raise exception 'Live Ghost course origin must distinguish past workouts from planned routes';
+ end if;
+ if not exists (
+   select 1 from pg_constraint
+   where conrelid='public.ghost_race_challenges'::regclass
+     and conname='ghost_race_source_kind_check' and convalidated
+ ) then
+   raise exception 'Live Ghost course origins require a validated constraint';
+ end if;
+ if has_table_privilege('anon','public.ghost_race_challenges','SELECT')
+    or has_table_privilege('anon','public.ghost_race_challenges','INSERT') then
+   raise exception 'Anonymous actors cannot view or create Live Ghost challenges';
+ end if;
+ if not exists (
+   select 1 from information_schema.columns
    where table_schema='public' and table_name='arena_series'
    and column_name='completion_reason'
  ) then
