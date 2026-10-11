@@ -100,12 +100,23 @@ struct ATHLTHArenaGroupChatView: View {
         .refreshable { await reload() }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    Task { await reload() }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
+                HStack(spacing: 15) {
+                    NavigationLink {
+                        ATHLTHArenaOnlineDetailView(series: series)
+                    } label: {
+                        Image(systemName: "trophy.fill")
+                    }
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "View competition and approve rounds",
+                        norwegian: "Se konkurransen og godkjenn runder"
+                    ))
+                    Button {
+                        Task { await reload() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .disabled(isLoading)
                 }
-                .disabled(isLoading)
             }
         }
     }
