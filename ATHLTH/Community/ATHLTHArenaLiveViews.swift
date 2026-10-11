@@ -772,6 +772,19 @@ enum ATHLTHArenaSeasonCompetitionTimeline {
         }
     }
 
+    /// Pre-start corrections are allowed for Club admins only. The backend
+    /// repeats every check under row locks before deleting the link.
+    static func canDetach(
+        _ series: ATHLTHArenaRemoteSeries,
+        endsOn: String,
+        today: String,
+        canManage: Bool
+    ) -> Bool {
+        canManage && series.scope == .club &&
+            series.status == "draft" &&
+            today <= endsOn
+    }
+
     static func symbol(_ series: ATHLTHArenaRemoteSeries) -> String {
         switch phase(series) {
         case .active: return "bolt.fill"
@@ -795,6 +808,7 @@ private struct ATHLTHArenaSeasonDetailView: View {
     @State private var clubDisplayNames: [UUID: String] = [:]
     @State private var loading = false
     @State private var adding = false
+    @State private var seriesToDetach: ATHLTHArenaRemoteSeries?
     @State private var errorMessage: String?
     private let cloud = ATHLTHArenaCloudService()
     private let directory = ATHLTHArenaClubDirectory()
@@ -1127,7 +1141,8 @@ private struct ATHLTHArenaSeasonDetailView: View {
                 }
 
                 ForEach(visibleSeasonCompetitions) { item in
-                    NavigationLink {
+                    HStack(spacing: 8) {
+                        NavigationLink {
                         ATHLTHArenaOnlineDetailView(series: item)
                     } label: {
                         HStack(alignment: .top, spacing: 12) {
@@ -1168,7 +1183,34 @@ private struct ATHLTHArenaSeasonDetailView: View {
                         .background(ATHLTHArenaLightStyle.card(18))
                         .accessibilityElement(children: .combine)
                     }
-                    .buttonStyle(.plain)
+                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                        if ATHLTHArenaSeasonCompetitionTimeline.canDetach(
+                            item,
+                            endsOn: season.endsOn,
+                            today: ATHLTHArenaSeasonDate.sql(Date()),
+                            canManage: canManage
+                        ) {
+                            Button {
+                                seriesToDetach = item
+                            } label: {
+                                Image(systemName: "minus.circle")
+                                    .font(.title3)
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    .frame(width: 42, height: 48)
+                                    .background(
+                                        ATHLTHArenaLightStyle.card(15)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(ATHLTHLocalization.choose(
+                                english: "Remove unstarted competition from season",
+                                norwegian: "Fjern ustartet konkurranse fra sesongen"
+                            ))
+                            .disabled(adding || loading)
+                        }
+                    }
                 }
 
                 if inaccessibleCompetitionCount > 0 {
@@ -1210,6 +1252,60 @@ private struct ATHLTHArenaSeasonDetailView: View {
         .task(id: season.id) { await refresh() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await refresh() } }
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Remove this unstarted competition from the season?",
+                norwegian: "Fjerne denne ustartede konkurransen fra sesongen?"
+            ),
+            isPresented: Binding(
+                get: { seriesToDetach != nil },
+                set: { if !$0 { seriesToDetach = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let item = seriesToDetach {
+                Button(ATHLTHLocalization.choose(
+                    english: "Remove from season",
+                    norwegian: "Fjern fra sesongen"
+                ), role: .destructive) {
+                    seriesToDetach = nil
+                    Task { await detach(item.id) }
+                }
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Cancel", norwegian: "Avbryt"
+            ), role: .cancel) {
+                seriesToDetach = nil
+            }
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "The competition itself and all workouts remain unchanged. A started competition cannot be removed.",
+                norwegian: "Selve konkurransen og alle økter beholdes. En påbegynt konkurranse kan ikke fjernes."
+            ))
+        }
+    }
+
+    @MainActor
+    private func detach(_ id: UUID) async {
+        guard !adding,
+              let item = competitionOptions.first(where: { $0.id == id }),
+              links.contains(where: { $0.seriesID == id }),
+              ATHLTHArenaSeasonCompetitionTimeline.canDetach(
+                  item,
+                  endsOn: season.endsOn,
+                  today: ATHLTHArenaSeasonDate.sql(Date()),
+                  canManage: canManage
+              ) else { return }
+        adding = true
+        defer { adding = false }
+        do {
+            try await cloud.detachSeasonSeries(
+                seasonID: season.id, seriesID: id
+            )
+            await refresh()
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
