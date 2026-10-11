@@ -1461,13 +1461,13 @@ final class AppSettingsStore: ObservableObject {
                         1.0
                     )
                 ),
+            speechStyle: audioCoachSpeechStyle,
             announceWorkoutStart:
                 audioCoachAnnounceWorkoutStart,
             announcePauseResume:
                 audioCoachAnnouncePauseResume,
             announceWorkoutComplete:
-                audioCoachAnnounceWorkoutComplete,
-            speechStyle: audioCoachSpeechStyle
+                audioCoachAnnounceWorkoutComplete
         )
     }
 
