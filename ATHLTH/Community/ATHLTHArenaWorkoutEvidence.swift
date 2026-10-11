@@ -483,9 +483,12 @@ struct ATHLTHArenaEvidenceSection: View {
 
             matches.append(ATHLTHArenaEvidenceCandidate(
                 workout: workout,
+                // Use the same HealthKit workout duration that the server
+                // receives when the athlete explicitly shares this proof.
+                // GPS analysis time is used for quality checks only.
                 match: ATHLTHArenaEvidenceMatcher.Match(
                     metricType: "elapsed_seconds",
-                    metricValue: analysis.durationSeconds
+                    metricValue: workout.duration
                 ),
                 sourceCheck: localCheck,
                 routeProof: ATHLTHArenaRouteProof(
