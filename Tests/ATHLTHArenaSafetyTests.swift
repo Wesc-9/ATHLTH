@@ -701,4 +701,90 @@ final class ATHLTHArenaSafetyTests: XCTestCase {
         XCTAssertNil(nextAction(status: "cancelled"))
     }
 
+    private func seasonSeries(
+        status: String,
+        title: String = "Arena round",
+        starts: Date? = nil,
+        completed: Date? = nil,
+        completionReason: String? = nil
+    ) -> ATHLTHArenaRemoteSeries {
+        ATHLTHArenaRemoteSeries(
+            id: UUID(),
+            ownerID: UUID(),
+            clubID: UUID(),
+            title: title,
+            scope: .club,
+            scoring: .winner,
+            durationDays: 14,
+            status: status,
+            startsAt: starts,
+            endsAt: nil,
+            completedAt: completed,
+            completionReason: completionReason
+        )
+    }
+
+    func testSeasonCompetitionAgendaPrioritizesActiveThenPreparingThenCompleted() {
+        let now = Date(timeIntervalSince1970: 1_792_000_000)
+        let completed = seasonSeries(
+            status: "completed", title: "Old competition",
+            completed: now.addingTimeInterval(-86_400)
+        )
+        let pending = seasonSeries(
+            status: "draft", title: "Upcoming competition",
+            starts: now.addingTimeInterval(2 * 86_400)
+        )
+        let active = seasonSeries(
+            status: "active", title: "Current competition",
+            starts: now
+        )
+        let sorted = ATHLTHArenaSeasonCompetitionTimeline.ordered(
+            [completed, pending, active]
+        )
+        XCTAssertEqual(sorted.map(\.id), [active.id, pending.id, completed.id])
+        XCTAssertEqual(ATHLTHArenaSeasonCompetitionTimeline.phase(active), .active)
+        XCTAssertEqual(ATHLTHArenaSeasonCompetitionTimeline.phase(pending), .preparing)
+        XCTAssertEqual(ATHLTHArenaSeasonCompetitionTimeline.phase(completed), .completed)
+    }
+
+    func testSeasonAgendaOrdersCompletedMostRecentFirst() {
+        let date = Date(timeIntervalSince1970: 1_792_000_000)
+        let old = seasonSeries(
+            status: "completed", title: "A",
+            completed: date.addingTimeInterval(-100_000)
+        )
+        let newest = seasonSeries(
+            status: "completed", title: "Z",
+            completed: date
+        )
+        XCTAssertEqual(
+            ATHLTHArenaSeasonCompetitionTimeline.ordered([old, newest]).map(\.id),
+            [newest.id, old.id]
+        )
+    }
+
+    func testSeasonAgendaTreatsUnknownStatusAsUnavailableNotActive() {
+        let uncertain = seasonSeries(status: "unknown")
+        let active = seasonSeries(status: "active")
+        let order = ATHLTHArenaSeasonCompetitionTimeline.ordered([uncertain, active])
+        XCTAssertEqual(order.map(\.id), [active.id, uncertain.id])
+        XCTAssertEqual(ATHLTHArenaSeasonCompetitionTimeline.phase(uncertain), .unavailable)
+        XCTAssertNotEqual(
+            ATHLTHArenaSeasonCompetitionTimeline.status(uncertain),
+            ATHLTHArenaSeasonCompetitionTimeline.status(active)
+        )
+    }
+
+    func testUnresolvedSeasonCompetitionHasDistinctStatus() {
+        let unresolved = seasonSeries(
+            status: "completed", completionReason: "deadline_unresolved"
+        )
+        let settled = seasonSeries(status: "completed")
+        XCTAssertNotEqual(
+            ATHLTHArenaSeasonCompetitionTimeline.status(unresolved),
+            ATHLTHArenaSeasonCompetitionTimeline.status(settled)
+        )
+    }
+
+
 }
