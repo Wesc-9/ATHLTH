@@ -90,6 +90,67 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
         XCTAssertTrue(ATHLTHArenaSuggestedRanking.hasTieAtTop(standings))
     }
 
+    func testSuggestedWinnerNeedsEvidenceFromEveryAthlete() {
+        let a = UUID()
+        let b = UUID()
+        let suggestion = ATHLTHArenaSuggestedRanking.eligibleSuggestion(
+            template: .fastest5K,
+            scoring: .winner,
+            roundID: roundID,
+            requiredSlots: [a, b],
+            evidence: [workout(slot: a, value: 1_300, metric: "elapsed_seconds")]
+        )
+        XCTAssertNil(suggestion)
+    }
+
+    func testCompleteUnequalResultsProduceWinnerSuggestion() {
+        let a = UUID()
+        let b = UUID()
+        let suggestion = ATHLTHArenaSuggestedRanking.eligibleSuggestion(
+            template: .fastest5K,
+            scoring: .winner,
+            roundID: roundID,
+            requiredSlots: [a, b],
+            evidence: [
+                workout(slot: a, value: 1_300, metric: "elapsed_seconds"),
+                workout(slot: b, value: 1_250, metric: "elapsed_seconds")
+            ]
+        )
+        XCTAssertEqual(suggestion, [b])
+    }
+
+    func testEqualTimesNeverProduceAutomaticSuggestion() {
+        let a = UUID()
+        let b = UUID()
+        let suggestion = ATHLTHArenaSuggestedRanking.eligibleSuggestion(
+            template: .fastest1K,
+            scoring: .winner,
+            roundID: roundID,
+            requiredSlots: [a, b],
+            evidence: [
+                workout(slot: a, value: 250, metric: "elapsed_seconds"),
+                workout(slot: b, value: 250, metric: "elapsed_seconds")
+            ]
+        )
+        XCTAssertNil(suggestion)
+    }
+
+    func testPodiumTieAtThirdPlaceRequiresManualReview() {
+        let slots = (0..<4).map { _ in UUID() }
+        let evidence = zip(slots, [10_000.0, 9_000, 8_000, 8_000])
+            .map { slot, distance in
+                workout(slot: slot, value: distance, metric: "distance_meters")
+            }
+        let suggestion = ATHLTHArenaSuggestedRanking.eligibleSuggestion(
+            template: .mostDistance,
+            scoring: .podium,
+            roundID: roundID,
+            requiredSlots: slots,
+            evidence: evidence
+        )
+        XCTAssertNil(suggestion)
+    }
+
     func testCustomRoundsDoNotInferUnsupportedResults() {
         let standings = ATHLTHArenaSuggestedRanking.standings(
             template: .custom,
