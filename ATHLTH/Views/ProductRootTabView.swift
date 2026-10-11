@@ -443,12 +443,7 @@ struct ProductRootTabView: View {
             if let sessionID =
                     social.coordinatedLobbySessionID {
                 TrainTogetherCreatorLobbyView(
-                    sessionID: sessionID,
-                    onStartAnotherWorkout: {
-                        // Close only the local wait; preserve the invitation.
-                        social.prepareForAnotherWorkout()
-                        selectedTab = 1
-                    }
+                    sessionID: sessionID
                 )
                 .environmentObject(social)
             }
