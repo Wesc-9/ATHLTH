@@ -114,6 +114,71 @@ final class ATHLTHArenaDraftValidationTests: XCTestCase {
         XCTAssertEqual(ATHLTHArenaDraftValidation.issue(for: draft), .missingRoute)
     }
 
+
+    func testMalformedRouteCoordinatesAreRejectedBeforeInvitations() {
+        var draft = validDraft()
+        let start = RouteCoordinate(
+            latitude: 59.90, longitude: 10.70, altitude: nil, sequence: 0
+        )
+        let impossible = RouteCoordinate(
+            latitude: 91, longitude: 10.71, altitude: nil, sequence: 1
+        )
+        draft.rounds = [
+            ATHLTHArenaRoundDraft(
+                template: .fastestRoute,
+                title: "Route",
+                rules: "Follow the agreed route",
+                targetDistanceMeters: 5_000,
+                routeSnapshot: ChallengeRouteSnapshot(
+                    routeID: UUID(),
+                    title: "Invalid",
+                    distanceKilometers: 5,
+                    coordinates: [start, impossible]
+                )
+            )
+        ]
+        XCTAssertEqual(ATHLTHArenaDraftValidation.issue(for: draft), .missingRoute)
+        draft.rounds[0].routeSnapshot = ChallengeRouteSnapshot(
+            routeID: UUID(),
+            title: "Valid",
+            distanceKilometers: 5,
+            coordinates: [
+                start,
+                RouteCoordinate(
+                    latitude: 59.91, longitude: 10.72, altitude: nil, sequence: 1
+                )
+            ]
+        )
+        XCTAssertNil(ATHLTHArenaDraftValidation.issue(for: draft))
+    }
+
+    func testRouteSnapshotPointLimitRejectsOversizedSharedRoutes() {
+        var draft = validDraft()
+        let coordinates = (0..<1_501).map { index in
+            RouteCoordinate(
+                latitude: 59.90,
+                longitude: 10.70 + Double(index) * 0.00001,
+                altitude: nil,
+                sequence: index
+            )
+        }
+        draft.rounds = [
+            ATHLTHArenaRoundDraft(
+                template: .fastestRoute,
+                title: "Long route preview",
+                rules: "Follow the route",
+                targetDistanceMeters: 5_000,
+                routeSnapshot: ChallengeRouteSnapshot(
+                    routeID: UUID(),
+                    title: "Too many points",
+                    distanceKilometers: 5,
+                    coordinates: coordinates
+                )
+            )
+        ]
+        XCTAssertEqual(ATHLTHArenaDraftValidation.issue(for: draft), .missingRoute)
+    }
+
     func testLegacyPresetRoundsNeedNoCustomDistanceField() {
         var draft = validDraft()
         draft.rounds = [
