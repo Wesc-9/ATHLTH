@@ -53,8 +53,7 @@ struct ATHLTHArenaOnlineSection: View {
                 .foregroundStyle(ATHLTHTheme.mutedText)
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.regularMaterial,
-                            in: RoundedRectangle(cornerRadius: 17))
+                .background(ATHLTHArenaLightStyle.card(17))
             }
 
             ForEach(series) { item in
@@ -319,8 +318,7 @@ struct ATHLTHArenaOnlineDetailView: View {
                         }
                         .foregroundStyle(ATHLTHTheme.primaryText)
                         .padding(16)
-                        .background(.regularMaterial,
-                                    in: RoundedRectangle(cornerRadius: 18))
+                        .background(ATHLTHArenaLightStyle.card(18))
                     }
                     .buttonStyle(.plain)
                 }
@@ -395,9 +393,8 @@ struct ATHLTHArenaOnlineDetailView: View {
             .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
         }
-        .background(ATHLTHPremiumCanvas(
-            accent: ATHLTHTheme.champagneSoft.opacity(0.16)
-        ))
+        .background(ATHLTHArenaLightStyle.canvasBackground)
+        .environment(\.colorScheme, .light)
         .navigationTitle(series.title)
         .navigationBarTitleDisplayMode(.inline)
         .overlay {
