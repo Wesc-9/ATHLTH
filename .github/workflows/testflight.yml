@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - release/v1.7.2
+      - release/v1.7.3
     paths:
       - .github/testflight-trigger
 
@@ -520,12 +520,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if gh release view "v1.7.2" >/dev/null 2>&1; then
-            echo "GitHub release v1.7.2 already exists; TestFlight build uploaded without recreating the release."
+          if gh release view "v1.7.3" >/dev/null 2>&1; then
+            echo "GitHub release v1.7.3 already exists; TestFlight build uploaded without recreating the release."
           else
-            gh release create "v1.7.2" \
+            gh release create "v1.7.3" \
               --target "$GITHUB_SHA" \
-              --title "ATHLTH 1.7.2" \
+              --title "ATHLTH 1.7.3" \
               --generate-notes
           fi
 
