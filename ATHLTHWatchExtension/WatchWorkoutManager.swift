@@ -298,7 +298,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         resetAudioCoachThresholds()
         persistWorkoutRecoveryState()
         if !configuration.enabled ||
-            !configuration.shouldPreferIPhoneAudioWhenReachable {
+            !configuration.shouldPreferIPhoneAudioWhenReachable ||
+            !configuration.shouldUseAcknowledgedVoiceLease {
             iPhoneVoiceLease.reset()
         }
 
@@ -350,7 +351,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         resetAudioCoachThresholds()
         persistWorkoutRecoveryState()
         if !configuration.enabled ||
-            !configuration.shouldPreferIPhoneAudioWhenReachable {
+            !configuration.shouldPreferIPhoneAudioWhenReachable ||
+            !configuration.shouldUseAcknowledgedVoiceLease {
             iPhoneVoiceLease.reset()
         }
 
@@ -5389,15 +5391,26 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     ) {
         guard !text.isEmpty else { return }
 
-        // WCSession reachability alone cannot confirm iPhone speech.
-        // Fall back to local Watch coaching when this short lease expires.
+        // Both upgraded apps use an acknowledged short-lived lease.
+        // When paired with an older iPhone, preserve the legacy
+        // reachability behavior to avoid duplicate spoken updates.
+        let phoneOwnsRoutineSpeech: Bool
+        if audioCoachConfiguration.shouldUseAcknowledgedVoiceLease {
+            phoneOwnsRoutineSpeech =
+                mirroringActive && iPhoneVoiceLease.isActive()
+        } else {
+            phoneOwnsRoutineSpeech =
+                WCSession.isSupported() &&
+                WCSession.default.activationState == .activated &&
+                WCSession.default.isReachable
+        }
+
         guard ATHLTHAudioCoachVoiceRouting
             .shouldSpeakOnWatch(
                 configuration: audioCoachConfiguration,
                 workoutKind: kind,
                 priority: priority,
-                iPhoneVoiceLeaseActive:
-                    mirroringActive && iPhoneVoiceLease.isActive()
+                iPhoneVoiceLeaseActive: phoneOwnsRoutineSpeech
             )
         else {
             // iPhone handles routine and structured running commentary.
@@ -6543,6 +6556,8 @@ extension WatchWorkoutManager:
                         self.audioCoachConfiguration.enabled &&
                         self.audioCoachConfiguration
                             .shouldPreferIPhoneAudioWhenReachable &&
+                        self.audioCoachConfiguration
+                            .shouldUseAcknowledgedVoiceLease &&
                         (self.kind == .running ||
                          self.kind == .walking) &&
                         self.isActive
