@@ -6893,16 +6893,16 @@ struct ChallengeCreationView: View {
                     ? selectedCoverArtworkName
                     : nil,
             coverImageURL: uploadedCoverURL,
-            trainTogetherModeRaw: meetupEnabled
-                ? (sameWorkoutMode
-                    ? ChallengeTrainTogetherMode.sameWorkout.rawValue
-                    : ChallengeTrainTogetherMode.physical.rawValue)
-                : nil,
             startsAt: startsAt,
             endsAt: hasEnd ? endsAt : nil,
             allowMultipleAttempts: allowMultipleAttempts,
             lockRulesAtStart: true,
-            meetup: meetup
+            meetup: meetup,
+            trainTogetherModeRaw: meetupEnabled
+                ? (sameWorkoutMode
+                    ? ChallengeTrainTogetherMode.sameWorkout.rawValue
+                    : ChallengeTrainTogetherMode.physical.rawValue)
+                : nil
         )
 
         let challenge = ATHLTHChallenge(
