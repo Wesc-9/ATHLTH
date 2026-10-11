@@ -7962,6 +7962,9 @@ struct ChallengeDetailView: View {
     @State private var challengeDeleteError: String?
     @State private var showingChallengeTargetGhost = false
     @State private var showingChangeProposalEditor = false
+    @State private var showingChallengeCancellation = false
+    @State private var cancellingChallenge = false
+    @State private var challengeCancellationError: String?
 
     private var challenge: ATHLTHChallenge? {
         challenges.challenge(id: challengeID)
@@ -7979,8 +7982,11 @@ struct ChallengeDetailView: View {
                 ScrollView {
                     LazyVStack(spacing: 18) {
                         detailHero(challenge)
+                        invitationStatusCard(challenge)
 
-                        if currentParticipant?.state == .invited {
+                        if currentParticipant?.state == .invited &&
+                           challenge.status != .cancelled &&
+                           challenge.status != .completed {
                             invitationResponseCard(challenge)
                         } else if currentParticipant == nil &&
                                     challenge.visibility == .publicProfile &&
@@ -8082,6 +8088,24 @@ struct ChallengeDetailView: View {
                            challenge.status != .completed &&
                            challenge.status != .cancelled {
                             Button(role: .destructive) {
+                                showingChallengeCancellation = true
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Cancel challenge",
+                                        norwegian: "Avlys utfordring"
+                                    ),
+                                    systemImage: "xmark.circle.fill"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 46)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(.red)
+                            .disabled(cancellingChallenge)
+
+                            Button(role: .destructive) {
                                 challengeDeleteError = nil
                                 showingCancel = true
                             } label: {
@@ -8173,6 +8197,40 @@ struct ChallengeDetailView: View {
                             )
                         }
                     }
+                }
+                .confirmationDialog(
+                    ATHLTHLocalization.choose(
+                        english: "Cancel the challenge for everyone?",
+                        norwegian: "Avlyse utfordringen for alle?"
+                    ),
+                    isPresented: $showingChallengeCancellation,
+                    titleVisibility: .visible
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel challenge", norwegian: "Avlys utfordring"
+                        ),
+                        role: .destructive
+                    ) {
+                        cancelChallenge(challenge)
+                    }
+                    Button(ATHLTHLocalization.choose(
+                        english: "Keep challenge", norwegian: "Behold utfordringen"
+                    ), role: .cancel) {}
+                }
+                .alert(
+                    ATHLTHLocalization.choose(
+                        english: "Cancellation failed",
+                        norwegian: "Kunne ikke avlyse"
+                    ),
+                    isPresented: Binding(
+                        get: { challengeCancellationError != nil },
+                        set: { if !$0 { challengeCancellationError = nil } }
+                    )
+                ) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text(challengeCancellationError ?? "")
                 }
                 .sheet(isPresented: $showingChangeProposalEditor) {
                     ChallengeCreationView(changeProposalFor: challenge)
@@ -8354,6 +8412,82 @@ struct ChallengeDetailView: View {
             ATHLTHTheme.canvasTop
                 .ignoresSafeArea()
         )
+    }
+
+    private func cancelChallenge(_ challenge: ATHLTHChallenge) {
+        guard !cancellingChallenge,
+              challenge.creatorID == session.profile.userID,
+              challenge.status != .cancelled
+        else { return }
+        cancellingChallenge = true
+        Task { @MainActor in
+            defer { cancellingChallenge = false }
+            guard await social.cancelChallenge(challengeID: challenge.id) else {
+                challengeCancellationError = social.errorMessage ??
+                    ATHLTHLocalization.choose(
+                        english: "Please try again.", norwegian: "Prøv igjen."
+                    )
+                return
+            }
+            var cancelled = challenge
+            cancelled.status = .cancelled
+            challenges.update(cancelled)
+            // The challenge remains visible in both inboxes with status Cancelled.
+            await social.refreshChallenges(challengeStore: challenges)
+        }
+    }
+
+    private func invitationStatusCard(_ challenge: ATHLTHChallenge) -> some View {
+        let recipient = challenge.participants.first {
+            $0.userID == (challenge.creatorID == session.profile.userID
+                ? challenge.participants.first(where: {
+                    $0.userID != session.profile.userID
+                })?.userID
+                : session.profile.userID)
+        }
+        let title: String
+        let icon: String
+        let highlight: Color
+        if challenge.status == .cancelled {
+            title = ATHLTHLocalization.choose(
+                english: "Challenge cancelled", norwegian: "Utfordringen er avlyst"
+            )
+            icon = "xmark.octagon.fill"
+            highlight = .red
+        } else if recipient?.state == .accepted {
+            title = ATHLTHLocalization.choose(
+                english: "Challenge accepted", norwegian: "Utfordringen er godtatt"
+            )
+            icon = "checkmark.circle.fill"
+            highlight = ATHLTHTheme.accentDeep
+        } else if recipient?.state == .declined {
+            title = ATHLTHLocalization.choose(
+                english: "Challenge declined", norwegian: "Utfordringen er avslått"
+            )
+            icon = "xmark.circle.fill"
+            highlight = .red
+        } else {
+            title = ""
+            icon = "circle"
+            highlight = ATHLTHTheme.accentDeep
+        }
+
+        return HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.title3)
+            Text(title)
+                .font(.subheadline.weight(.bold))
+            Spacer()
+        }
+        .foregroundStyle(highlight)
+        .padding(14)
+        .background(
+            highlight.opacity(0.07),
+            in: RoundedRectangle(cornerRadius: 16)
+        )
+        .opacity(title.isEmpty ? 0 : 1)
+        .frame(height: title.isEmpty ? 0 : nil)
+        .accessibilityHidden(title.isEmpty)
     }
 
     private func deleteChallenge(
