@@ -141,10 +141,22 @@ enum ATHLTHArenaSuggestedRanking {
             return []
         }
         let valid = evidence.filter {
-            $0.roundID == roundID &&
-            $0.metricType == expectedMetric &&
-            $0.metricValue.isFinite &&
-            $0.metricValue > 0
+            guard $0.roundID == roundID,
+                  $0.metricType == expectedMetric,
+                  $0.metricValue.isFinite,
+                  $0.metricValue > 0 else {
+                return false
+            }
+            // A shared elapsed time is not a route attempt without a
+            // satisfactory reported match to this exact round's course.
+            // Device reports remain provisional until participant approval.
+            if template == .fastestRoute {
+                return $0.activityType == "running" &&
+                    ($0.reportedRouteMatchPercent.map {
+                        $0.isFinite && (90...100).contains($0)
+                    } ?? false)
+            }
+            return true
         }
         let groups = Dictionary(grouping: valid, by: \.slotID)
         let values = groups.compactMap { slot, entries -> ATHLTHArenaSuggestedStanding? in
