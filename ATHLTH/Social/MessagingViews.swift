@@ -5629,6 +5629,252 @@ private struct ThreadChallengeRequestCard: View {
     }
 }
 
+/// Inline invitation used by both backend challenges and chat attachments.
+private struct ThreadChallengeInvitationBubble: View {
+    let challenge: ATHLTHChallenge?
+    let fallbackTitle: String
+    let fallbackSubtitle: String?
+    let currentUserID: UUID?
+    let isMine: Bool
+    let responding: Bool
+    let onDetails: () -> Void
+    let onAccept: () -> Void
+    let onDecline: () -> Void
+
+    private var invitee: ChallengeParticipant? {
+        guard let challenge, let currentUserID else { return nil }
+        let inviteeID = challenge.creatorID == currentUserID
+            ? challenge.participants.first(where: { $0.userID != currentUserID })?.userID
+            : currentUserID
+        return challenge.participants.first(where: { $0.userID == inviteeID })
+    }
+
+    private var expired: Bool {
+        if let date = challenge?.rules.endsAt { return date <= Date() }
+        return false
+    }
+
+    private var mayRespond: Bool {
+        guard let challenge, let currentUserID else { return false }
+        return challenge.creatorID != currentUserID &&
+            !isMine && invitee?.state == .invited &&
+            !expired && challenge.status != .cancelled &&
+            challenge.status != .completed
+    }
+
+    private var status: (text: String, icon: String) {
+        guard let challenge else {
+            return (ATHLTHLocalization.choose(
+                english: "No longer available",
+                norwegian: "Ikke lenger tilgjengelig"
+            ), "exclamationmark.circle")
+        }
+        if challenge.status == .cancelled {
+            return (ATHLTHLocalization.choose(
+                english: "Cancelled", norwegian: "Avlyst"
+            ), "xmark.circle")
+        }
+        switch invitee?.state {
+        case .accepted:
+            return (ATHLTHLocalization.choose(
+                english: "Accepted", norwegian: "Godtatt"
+            ), "checkmark.circle.fill")
+        case .declined:
+            return (ATHLTHLocalization.choose(
+                english: "Declined", norwegian: "Avslått"
+            ), "xmark.circle.fill")
+        case .withdrawn:
+            return (ATHLTHLocalization.choose(
+                english: "Withdrawn", norwegian: "Trukket tilbake"
+            ), "arrow.uturn.backward")
+        case .invited:
+            if expired || challenge.status == .completed {
+                return (ATHLTHLocalization.choose(
+                    english: "Expired", norwegian: "Utløpt"
+                ), "clock.badge.xmark")
+            }
+            return isMine
+                ? (ATHLTHLocalization.choose(
+                    english: "Waiting for a reply",
+                    norwegian: "Venter på svar"
+                ), "clock")
+                : (ATHLTHLocalization.choose(
+                    english: "Awaiting your response",
+                    norwegian: "Venter på ditt svar"
+                ), "clock")
+        case .creator, .none:
+            return (ATHLTHLocalization.choose(
+                english: "Shared challenge",
+                norwegian: "Delt utfordring"
+            ), "bolt.fill")
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button(action: onDetails) {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: challenge?.sport.systemImage ?? "bolt.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 42, height: 42)
+                        .background(Color.white.opacity(0.70),
+                            in: RoundedRectangle(cornerRadius: 13))
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "ATHLTH · CHALLENGE",
+                            norwegian: "ATHLTH · UTFORDRING"
+                        ))
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(1.4)
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        Text(challenge?.title ?? fallbackTitle)
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .multilineTextAlignment(.leading)
+                        Text(challenge.map {
+                            $0.sport.title + " · " + $0.rules.scoring.title
+                        } ?? fallbackSubtitle ?? "")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    Spacer(minLength: 2)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.bold())
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(challenge == nil)
+
+            Label(status.text, systemImage: status.icon)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(Color.white.opacity(0.59), in: Capsule())
+
+            if let endsAt = challenge?.rules.endsAt {
+                Label(
+                    endsAt.formatted(date: .abbreviated, time: .shortened),
+                    systemImage: "calendar"
+                )
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+
+            if mayRespond {
+                HStack(spacing: 8) {
+                    Button(action: onDecline) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Decline", norwegian: "Avslå"
+                        ))
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    Button(action: onAccept) {
+                        HStack(spacing: 5) {
+                            if responding {
+                                ProgressView().controlSize(.mini)
+                            }
+                            Text(ATHLTHLocalization.choose(
+                                english: "Accept", norwegian: "Godta"
+                            ))
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accentDeep)
+                }
+                .disabled(responding)
+            }
+
+            Button(action: onDetails) {
+                HStack(spacing: 6) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "View details", norwegian: "Se detaljer"
+                    ))
+                    Image(systemName: "arrow.up.right")
+                }
+                .font(.caption.weight(.bold))
+                .foregroundStyle(ATHLTHTheme.vitality)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .disabled(challenge == nil)
+        }
+        .padding(15)
+        .frame(maxWidth: 310, alignment: .leading)
+        .background {
+            RoundedRectangle(cornerRadius: 23, style: .continuous)
+                .fill(LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.97),
+                        ATHLTHTheme.surfaceStone.opacity(0.88),
+                        ATHLTHTheme.cardWarm.opacity(0.68)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 23, style: .continuous)
+                .stroke(LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.99),
+                        ATHLTHTheme.accent.opacity(0.22),
+                        Color.white.opacity(0.70)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ), lineWidth: 1)
+        }
+        .shadow(color: ATHLTHTheme.accentDeep.opacity(0.08),
+                radius: 14, x: 0, y: 6)
+    }
+}
+
+private struct ThreadChallengeTimelineRow: View {
+    let challenge: ATHLTHChallenge
+    let friend: SocialProfileCard
+    let currentUserID: UUID?
+    let invitedAt: Date
+    let responding: Bool
+    let onAccept: () -> Void
+    let onDecline: () -> Void
+    let onDetails: () -> Void
+
+    private var isMine: Bool { challenge.creatorID == currentUserID }
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            if !isMine {
+                SocialAvatar(profile: friend, size: 32)
+            } else {
+                Spacer(minLength: 48)
+            }
+            VStack(alignment: isMine ? .trailing : .leading, spacing: 6) {
+                ThreadChallengeInvitationBubble(
+                    challenge: challenge,
+                    fallbackTitle: challenge.title,
+                    fallbackSubtitle: nil,
+                    currentUserID: currentUserID,
+                    isMine: isMine,
+                    responding: responding,
+                    onDetails: onDetails,
+                    onAccept: onAccept,
+                    onDecline: onDecline
+                )
+                Text(invitedAt.formatted(date: .omitted, time: .shortened))
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            if !isMine { Spacer(minLength: 48) }
+        }
+    }
+}
+
 private struct MessageBubble: View {
     @EnvironmentObject private var challengeStore: ChallengeStore
 
@@ -5640,6 +5886,9 @@ private struct MessageBubble: View {
     let inviteResponse: PlannedWorkoutInviteResponse?
     let respondingToInvite: Bool
     let onRespondToInvite: (Bool) -> Void
+    let respondingToChallenge: Bool
+    let onRespondToChallenge: (ATHLTHChallenge, Bool) -> Void
+    let onOpenChallenge: (UUID) -> Void
 
     private var isPlannedInvitation: Bool {
         message.attachmentKind == .workout && message.shareVersion == 2
@@ -5827,7 +6076,37 @@ private struct MessageBubble: View {
             }
 
             VStack(alignment: isMine ? .trailing : .leading, spacing: 6) {
-                if let attachmentKind = message.attachmentKind {
+                if message.attachmentKind == .challenge {
+                    let challengeID = message.sourceObjectID ??
+                        message.decodeSnapshot(ATHLTHChallenge.self)?.id
+                    let linkedChallenge = challengeID.flatMap {
+                        challengeStore.challenge(id: $0)
+                    }
+                    ThreadChallengeInvitationBubble(
+                        challenge: linkedChallenge,
+                        fallbackTitle: message.attachmentTitle ??
+                            ATHLTHLocalization.choose(
+                                english: "Challenge", norwegian: "Utfordring"
+                            ),
+                        fallbackSubtitle: message.attachmentSubtitle,
+                        currentUserID: currentUserID,
+                        isMine: isMine,
+                        responding: respondingToChallenge,
+                        onDetails: {
+                            if let challengeID { onOpenChallenge(challengeID) }
+                        },
+                        onAccept: {
+                            if let linkedChallenge {
+                                onRespondToChallenge(linkedChallenge, true)
+                            }
+                        },
+                        onDecline: {
+                            if let linkedChallenge {
+                                onRespondToChallenge(linkedChallenge, false)
+                            }
+                        }
+                    )
+                } else if let attachmentKind = message.attachmentKind {
                     VStack(alignment: .leading, spacing: 9) {
                         HStack(spacing: 8) {
                             Image(systemName: attachmentKind.systemImage)
