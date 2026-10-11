@@ -2139,11 +2139,18 @@ struct FriendProfileView: View {
         .contentShape(Rectangle())
     }
 
+    /// A balanced 2-by-2 action grid keeps full Norwegian labels readable
+    /// on compact iPhones. Challenge and Train Together always sit together.
     private func actionBar(
         _ profile: SocialFriendProfile
     ) -> some View {
-        VStack(spacing: 9) {
-            HStack(spacing: 8) {
+        LazyVGrid(
+            columns: [
+                GridItem(.flexible(minimum: 0), spacing: 8),
+                GridItem(.flexible(minimum: 0), spacing: 8)
+            ],
+            spacing: 8
+        ) {
             mainFollowButton(profile)
 
             NavigationLink {
@@ -2152,14 +2159,12 @@ struct FriendProfileView: View {
                 )
             } label: {
                 profileActionLabel(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english: "Message",
-                            norwegian: "Melding"
-                        ),
-                    icon: "message",
-                    tint:
-                        ATHLTHTheme.accentDeep,
+                    title: ATHLTHLocalization.choose(
+                        english: "Message",
+                        norwegian: "Melding"
+                    ),
+                    icon: "bubble.left.fill",
+                    tint: ATHLTHTheme.accentDeep,
                     emphasized: false
                 )
             }
@@ -2167,39 +2172,32 @@ struct FriendProfileView: View {
 
             Button {
                 if social.mutualFollows.contains(
-                    where: {
-                        $0.userID == userID
-                    }
+                    where: { $0.userID == userID }
                 ) {
                     showingArenaChoice = true
                 } else {
-                    followActionError =
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Follow each other before sending a challenge.",
-                            norwegian:
-                                "Dere må følge hverandre før du kan sende en utfordring."
-                        )
+                    followActionError = ATHLTHLocalization.choose(
+                        english: "Follow each other before sending a challenge.",
+                        norwegian: "Dere må følge hverandre før du kan sende en utfordring."
+                    )
                 }
             } label: {
                 profileActionLabel(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english: "Challenge",
-                            norwegian: "Utfordre"
-                        ),
+                    title: ATHLTHLocalization.choose(
+                        english: "Challenge",
+                        norwegian: "Utfordre"
+                    ),
                     icon: "trophy.fill",
-                    tint:
-                        ATHLTHTheme
-                            .premiumGold,
+                    tint: ATHLTHTheme.premiumGold,
                     emphasized: false
                 )
             }
             .buttonStyle(.plain)
 
-            }
             Button {
-                if social.mutualFollows.contains(where: { $0.userID == userID }) {
+                if social.mutualFollows.contains(
+                    where: { $0.userID == userID }
+                ) {
                     showingTrainingEditor = true
                 } else {
                     followActionError = ATHLTHLocalization.choose(
@@ -2208,49 +2206,15 @@ struct FriendProfileView: View {
                     )
                 }
             } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "figure.run.circle.fill")
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.vitality)
-                        .frame(width: 36, height: 36)
-                        .background(Color.white.opacity(0.68), in: Circle())
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Train Together",
-                            norwegian: "Tren sammen"
-                        ))
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                        Text(ATHLTHLocalization.choose(
-                            english: "Build or reuse a workout · private invitation",
-                            norwegian: "Lag eller hent en økt · privat invitasjon"
-                        ))
-                        .font(.caption2)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                    }
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                }
-                .padding(.horizontal, 13)
-                .frame(maxWidth: .infinity)
-                .frame(height: 60)
-                .background(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.96),
-                            ATHLTHTheme.cardWarm.opacity(0.88)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+                profileActionLabel(
+                    title: ATHLTHLocalization.choose(
+                        english: "Train Together",
+                        norwegian: "Tren sammen"
                     ),
-                    in: RoundedRectangle(cornerRadius: 17, style: .continuous)
+                    icon: "figure.run",
+                    tint: ATHLTHTheme.vitality,
+                    emphasized: false
                 )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 17, style: .continuous)
-                        .stroke(Color.white.opacity(0.92), lineWidth: 1)
-                }
             }
             .buttonStyle(.plain)
         }
@@ -2362,11 +2326,11 @@ struct FriendProfileView: View {
                 }
             } label: {
                 HStack(spacing: 7) {
-                    Image(systemName: "checkmark")
+                    Image(systemName: "person.crop.circle.badge.checkmark")
                         .font(
                             .system(
-                                size: 13,
-                                weight: .bold
+                                size: 16,
+                                weight: .semibold
                             )
                         )
 
@@ -2383,6 +2347,7 @@ struct FriendProfileView: View {
                         )
                     )
                     .lineLimit(1)
+                    .minimumScaleFactor(0.76)
 
                     Image(systemName: "chevron.down")
                         .font(
