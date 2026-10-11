@@ -348,8 +348,17 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     // leaves range. Optional keeps older payloads fully compatible.
     var preferIPhoneAudioWhenReachable: Bool? = nil
 
+    // The iPhone sets this on newly prepared mirrored workouts. Old iPhone
+    // versions omit it; Watch then follows the previous reachability rule
+    // rather than speaking simultaneously with a legacy mirrored phone.
+    var useAcknowledgedVoiceLease: Bool? = nil
+
     var shouldPreferIPhoneAudioWhenReachable: Bool {
         preferIPhoneAudioWhenReachable ?? false
+    }
+
+    var shouldUseAcknowledgedVoiceLease: Bool {
+        useAcknowledgedVoiceLease ?? false
     }
 
     // Strength-specific Audio Coach cues. Optional fields keep older queued
