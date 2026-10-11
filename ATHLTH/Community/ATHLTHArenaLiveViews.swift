@@ -2210,6 +2210,25 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
                                 .accessibilityElement(children: .contain)
                             }
 
+                            if let round = rounds.first(where: { $0.id == challenge.arenaRoundID }),
+                               !ATHLTHArenaLiveRoundCompatibility.permitsPrefilledResult(
+                                   template: round.template,
+                                   targetDistanceMeters: round.targetDistanceMeters,
+                                   routeDistanceKilometers: round.routeSnapshot?.distanceKilometers,
+                                   sharedCourseDistanceMeters: challenge.distanceMeters,
+                                   sourceKind: challenge.sourceKind
+                               ) {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Course not comparable to this round. A privacy-trimmed or different-distance race needs manual review.",
+                                        norwegian: "Løypen samsvarer ikke med runden. En forkortet eller annerledes løype må vurderes manuelt."
+                                    ),
+                                    systemImage: "exclamationmark.triangle"
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                            }
+
                             Text(ATHLTHLocalization.choose(
                                 english: "Live results are participant-reported and not independently route-verified. Series points require a separate result proposal and unanimous approval.",
                                 norwegian: "Live-resultater er oppgitt av deltakerne og ikke uavhengig ruteverifisert. Seriepoeng krever et eget resultatforslag og enstemmig godkjenning."
@@ -2344,7 +2363,14 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
     ) -> ATHLTHArenaLiveOutcomeDraft? {
         guard series.status == "active",
               let roundID = challenge.arenaRoundID,
-              rounds.contains(where: { $0.id == roundID }),
+              let round = rounds.first(where: { $0.id == roundID }),
+              ATHLTHArenaLiveRoundCompatibility.permitsPrefilledResult(
+                  template: round.template,
+                  targetDistanceMeters: round.targetDistanceMeters,
+                  routeDistanceKilometers: round.routeSnapshot?.distanceKilometers,
+                  sharedCourseDistanceMeters: challenge.distanceMeters,
+                  sourceKind: challenge.sourceKind
+              ),
               let winnerID = result.winnerID,
               winnerID == challenge.senderID || winnerID == challenge.recipientID,
               let sender = members.first(where: {
