@@ -488,6 +488,11 @@ struct ATHLTHArenaCreateView: View {
     @State private var scoring: ATHLTHArenaScoring = .winner
     @State private var durationDays = 14
     @State private var selectedFriendIDs: Set<UUID> = []
+    @State private var clubChoices: [ATHLTHArenaClubChoice] = []
+    @State private var selectedClubID: UUID?
+    @State private var clubAthletes: [ATHLTHArenaClubAthlete] = []
+    @State private var clubError: String?
+    private let clubDirectory = ATHLTHArenaClubDirectory()
 
     init(
         ownerID: UUID,
@@ -544,49 +549,117 @@ struct ATHLTHArenaCreateView: View {
                     ))
                 }
 
-                Section {
-                    if friends.isEmpty {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Mutual followers will appear here. You can still save a draft now.",
-                            norwegian: "Gjensidige følgere vises her. Du kan likevel lagre et utkast nå."
-                        ))
-                        .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(friends, id: \.userID) { friend in
+                if scope == .club {
+                    Section {
+                        if clubChoices.isEmpty {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Club admins can publish Club Arena series.",
+                                norwegian: "Klubbadministratorer kan publisere Arena-serier for klubben."
+                            ))
+                            .foregroundStyle(.secondary)
+                        }
+                        ForEach(clubChoices) { choice in
                             Button {
-                                if scope == .duel {
-                                    selectedFriendIDs = [friend.userID]
-                                } else if !selectedFriendIDs.insert(friend.userID).inserted {
-                                    selectedFriendIDs.remove(friend.userID)
-                                }
+                                selectedClubID = choice.id
+                                selectedFriendIDs.removeAll()
+                                Task { await loadClubAthletes(choice.id) }
                             } label: {
                                 HStack {
-                                    Text(friend.resolvedName)
-                                        .foregroundStyle(ATHLTHTheme.primaryText)
+                                    Text(choice.name).foregroundStyle(ATHLTHTheme.primaryText)
                                     Spacer()
-                                    Image(systemName:
-                                        selectedFriendIDs.contains(friend.userID)
-                                        ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    Image(systemName: selectedClubID == choice.id
+                                          ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
                                 }
                             }
                         }
+                    } header: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Choose Club", norwegian: "Velg klubb"
+                        ))
                     }
-                } header: {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Invitees (draft only)",
-                        norwegian: "Deltakere (kun utkast)"
-                    ))
-                } footer: {
-                    Text(scope == .club
-                        ? ATHLTHLocalization.choose(
-                            english: "Club membership and invitations will be connected in the next phase.",
-                            norwegian: "Club-medlemskap og invitasjoner kobles på i neste fase."
-                          )
-                        : ATHLTHLocalization.choose(
-                            english: "Selecting someone here does not send an invitation.",
-                            norwegian: "Å velge noen her sender ikke en invitasjon."
-                          ))
+                    Section {
+                        if selectedClubID == nil {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Select a Club to see members.",
+                                norwegian: "Velg en klubb for å se medlemmer."
+                            )).foregroundStyle(.secondary)
+                        }
+                        ForEach(clubAthletes) { athlete in
+                            Button {
+                                if !selectedFriendIDs.insert(athlete.id).inserted {
+                                    selectedFriendIDs.remove(athlete.id)
+                                }
+                            } label: {
+                                HStack {
+                                    Text(athlete.displayName)
+                                        .foregroundStyle(ATHLTHTheme.primaryText)
+                                    Spacer()
+                                    Image(systemName: selectedFriendIDs.contains(athlete.id)
+                                          ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                }
+                            }
+                        }
+                        if let clubError {
+                            Text(clubError).font(.caption).foregroundStyle(.red)
+                        }
+                    } header: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Club athletes", norwegian: "Klubbmedlemmer"
+                        ))
+                    } footer: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Select up to 20 members; Inbox invitations are sent on publishing.",
+                            norwegian: "Velg opptil 20 medlemmer. Invitasjoner sendes via innboksen ved publisering."
+                        ))
+                    }
+                } else {
+                    Section {
+                        if friends.isEmpty {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Mutual followers will appear here. You can still save a draft now.",
+                                norwegian: "Gjensidige følgere vises her. Du kan likevel lagre et utkast nå."
+                            ))
+                            .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(friends, id: \.userID) { friend in
+                                Button {
+                                    if scope == .duel {
+                                        selectedFriendIDs = [friend.userID]
+                                    } else if !selectedFriendIDs.insert(friend.userID).inserted {
+                                        selectedFriendIDs.remove(friend.userID)
+                                    }
+                                } label: {
+                                    HStack {
+                                        Text(friend.resolvedName)
+                                            .foregroundStyle(ATHLTHTheme.primaryText)
+                                        Spacer()
+                                        Image(systemName:
+                                            selectedFriendIDs.contains(friend.userID)
+                                            ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    }
+                                }
+                            }
+                        }
+                    } header: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Invitees (draft only)",
+                            norwegian: "Deltakere (kun utkast)"
+                        ))
+                    } footer: {
+                        Text(scope == .club
+                            ? ATHLTHLocalization.choose(
+                                english: "Club membership and invitations will be connected in the next phase.",
+                                norwegian: "Club-medlemskap og invitasjoner kobles på i neste fase."
+                              )
+                            : ATHLTHLocalization.choose(
+                                english: "Selecting someone here does not send an invitation.",
+                                norwegian: "Å velge noen her sender ikke en invitasjon."
+                              ))
+                    }
+    
                 }
             }
             .navigationTitle(ATHLTHLocalization.choose(
@@ -611,19 +684,47 @@ struct ATHLTHArenaCreateView: View {
                             participantIDs: Array(selectedFriendIDs).sorted {
                                 $0.uuidString < $1.uuidString
                             },
-                            clubID: nil
+                            clubID: scope == .club ? selectedClubID : nil
                         )
                         onCreate(draft)
                         dismiss()
                     }
-                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(
+                        title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                        (scope == .club && selectedClubID == nil)
+                    )
                 }
             }
+            .task { await loadClubs() }
             .onChange(of: scope) { _, next in
-                if next == .duel && selectedFriendIDs.count > 1 {
-                    selectedFriendIDs = []
+                selectedFriendIDs.removeAll()
+                if next != .club {
+                    selectedClubID = nil
+                    clubAthletes = []
                 }
             }
+        }
+    }
+
+    @MainActor
+    private func loadClubs() async {
+        do {
+            clubChoices = try await clubDirectory.manageableClubs()
+            clubError = nil
+        } catch {
+            clubError = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func loadClubAthletes(_ club: UUID) async {
+        do {
+            let loaded = try await clubDirectory.athletes(in: club)
+            guard selectedClubID == club else { return }
+            clubAthletes = loaded
+            clubError = nil
+        } catch {
+            clubError = error.localizedDescription
         }
     }
 }
@@ -742,10 +843,10 @@ struct ATHLTHArenaDraftDetailView: View {
                 .tint(ATHLTHTheme.accentDeep)
 
                 VStack(alignment: .leading, spacing: 9) {
-                    if draft.scope == .club {
+                    if draft.scope == .club && draft.clubID == nil {
                         Text(ATHLTHLocalization.choose(
-                            english: "Club series stay as local drafts until Club membership is connected.",
-                            norwegian: "Club-serier forblir lokale utkast inntil Club-medlemskap er koblet til."
+                            english: "Choose a Club when creating a new draft.",
+                            norwegian: "Velg en klubb når du oppretter et nytt utkast."
                         ))
                         .font(.footnote)
                         .foregroundStyle(ATHLTHTheme.mutedText)
@@ -794,8 +895,8 @@ struct ATHLTHArenaDraftDetailView: View {
                     ), systemImage: "lock.shield")
                     .font(.subheadline.weight(.semibold))
                     Text(ATHLTHLocalization.choose(
-                        english: "These are private drafts, not live competitions. Invitations, participant approval and awarding points require the upcoming synchronized Arena service.",
-                        norwegian: "Dette er private utkast, ikke aktive konkurranser. Invitasjoner, deltakernes godkjenning og poeng krever den kommende synkroniserte Arena-tjenesten."
+                        english: "These are private drafts. Publishing sends Inbox invitations and opens a shared Arena lobby. Points require participant approval.",
+                        norwegian: "Dette er private utkast. Publisering sender invitasjoner via innboksen og åpner en felles Arena-lobby. Poeng krever deltakernes godkjenning."
                     ))
                     .font(.footnote)
                 }
