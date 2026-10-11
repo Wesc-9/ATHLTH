@@ -8,6 +8,7 @@ struct ATHLTHConversationHero<
     let subtitle: String
     let backgroundAsset: String
     let onBack: () -> Void
+    let onProfileTap: (() -> Void)?
 
     private let avatar: Avatar
     private let trailing: Trailing
@@ -19,6 +20,7 @@ struct ATHLTHConversationHero<
         subtitle: String,
         backgroundAsset: String = "GoalMountain",
         onBack: @escaping () -> Void,
+        onProfileTap: (() -> Void)? = nil,
         @ViewBuilder avatar: () -> Avatar,
         @ViewBuilder trailing: () -> Trailing
     ) {
@@ -26,6 +28,7 @@ struct ATHLTHConversationHero<
         self.subtitle = subtitle
         self.backgroundAsset = backgroundAsset
         self.onBack = onBack
+        self.onProfileTap = onProfileTap
         self.avatar = avatar()
         self.trailing = trailing()
     }
@@ -129,59 +132,71 @@ struct ATHLTHConversationHero<
                     }
                     .buttonStyle(.plain)
 
-                    avatar
-                        .frame(
-                            width: 44,
-                            height: 44
-                        )
+                    Button {
+                        onProfileTap?()
+                    } label: {
+                        HStack(spacing: 10) {
+                        avatar
+                            .frame(
+                                width: 44,
+                                height: 44
+                            )
+                            .shadow(
+                                color:
+                                    Color.black
+                                        .opacity(
+                                            0.16
+                                        ),
+                                radius: 7,
+                                y: 3
+                            )
+    
+                        VStack(
+                            alignment: .leading,
+                            spacing: 2
+                        ) {
+                            Text(title)
+                                .font(
+                                    .headline
+                                        .weight(.bold)
+                                )
+                                .foregroundStyle(
+                                    .white
+                                )
+                                .lineLimit(1)
+                                .minimumScaleFactor(
+                                    0.78
+                                )
+    
+                            Text(subtitle)
+                                .font(.caption)
+                                .foregroundStyle(
+                                    Color.white
+                                        .opacity(
+                                            0.88
+                                        )
+                                )
+                                .lineLimit(1)
+                                .minimumScaleFactor(
+                                    0.80
+                                )
+                        }
                         .shadow(
                             color:
                                 Color.black
-                                    .opacity(
-                                        0.16
-                                    ),
-                            radius: 7,
-                            y: 3
+                                    .opacity(0.30),
+                            radius: 5,
+                            y: 2
                         )
-
-                    VStack(
-                        alignment: .leading,
-                        spacing: 2
-                    ) {
-                        Text(title)
-                            .font(
-                                .headline
-                                    .weight(.bold)
-                            )
-                            .foregroundStyle(
-                                .white
-                            )
-                            .lineLimit(1)
-                            .minimumScaleFactor(
-                                0.78
-                            )
-
-                        Text(subtitle)
-                            .font(.caption)
-                            .foregroundStyle(
-                                Color.white
-                                    .opacity(
-                                        0.88
-                                    )
-                            )
-                            .lineLimit(1)
-                            .minimumScaleFactor(
-                                0.80
-                            )
+                        .layoutPriority(1)
+    
+                            }
                     }
-                    .shadow(
-                        color:
-                            Color.black
-                                .opacity(0.30),
-                        radius: 5,
-                        y: 2
+                    .buttonStyle(.plain)
+                    .disabled(onProfileTap == nil)
+                    .accessibilityLabel(
+                        onProfileTap == nil ? title : title + " · Vis profil"
                     )
-                    .layoutPriority(1)
 
                     Spacer(
                         minLength: 8
