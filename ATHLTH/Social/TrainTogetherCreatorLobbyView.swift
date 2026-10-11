@@ -5,6 +5,7 @@ struct TrainTogetherCreatorLobbyView: View {
     @StateObject private var companion = SocialWorkoutCompanionStore()
 
     let sessionID: UUID
+    let onStartAnotherWorkout: () -> Void
 
     private var session: SocialWorkoutSessionRecord? {
         social.workoutSessions.first {
@@ -670,6 +671,29 @@ struct TrainTogetherCreatorLobbyView: View {
                     .center
                 )
 
+                Button(action: onStartAnotherWorkout) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Start another workout",
+                            norwegian: "Start en annen økt"
+                        ),
+                        systemImage: "figure.run"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                }
+                .buttonStyle(.bordered)
+                .tint(ATHLTHTheme.accent)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Your invitation stays sent. This workout has not started yet.",
+                    norwegian: "Invitasjonen blir liggende. Denne økten er ikke startet."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .multilineTextAlignment(.center)
+
                 Divider()
 
                 Button(
@@ -677,7 +701,7 @@ struct TrainTogetherCreatorLobbyView: View {
                 ) {
                     Task {
                         await social
-                            .cancelActiveWorkout()
+                            .cancelActiveWorkout(sessionID: sessionID)
                     }
                 } label: {
                     Text(
