@@ -47,6 +47,35 @@ final class GhostRaceCadenceTests:
         ))
     }
 
+    func testLiveGhostReconnectionNeverUsesUnrelatedPhoneWorkout() {
+        let duel = UUID()
+        XCTAssertTrue(LiveGhostRaceReentry.canReconnectPhoneWorkout(
+            comparisonRouteID: duel,
+            challengeID: duel,
+            roomStatus: .racing
+        ))
+        XCTAssertFalse(LiveGhostRaceReentry.canReconnectPhoneWorkout(
+            comparisonRouteID: UUID(),
+            challengeID: duel,
+            roomStatus: .racing
+        ))
+        XCTAssertFalse(LiveGhostRaceReentry.canReconnectPhoneWorkout(
+            comparisonRouteID: nil,
+            challengeID: duel,
+            roomStatus: .racing
+        ))
+        XCTAssertFalse(LiveGhostRaceReentry.canReconnectPhoneWorkout(
+            comparisonRouteID: duel,
+            challengeID: duel,
+            roomStatus: .finished
+        ))
+        XCTAssertFalse(LiveGhostRaceReentry.canReconnectPhoneWorkout(
+            comparisonRouteID: duel,
+            challengeID: duel,
+            roomStatus: .lobby
+        ))
+    }
+
     func testTargetPaceAndFinishTimeConversion() {
         XCTAssertEqual(
             GhostTargetPaceFormatter.secondsPerKilometer(from: "4:45"), 285
