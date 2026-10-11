@@ -617,7 +617,8 @@ final class ATHLTHNotificationStore: ObservableObject {
                     let identifiers = requests
                         .map(\.identifier)
                         .filter {
-                            $0.hasPrefix("challenge-")
+                            $0.hasPrefix("challenge-") ||
+                            $0.hasPrefix(OfficialWeeklyChallengeReminderPolicy.identifierPrefix)
                         }
 
                     continuation.resume(
