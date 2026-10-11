@@ -1233,9 +1233,14 @@ final class SocialStore: ObservableObject {
                 try await refreshWorkoutLobby(sessionID: sessionID)
             }
 
-            // Explicit tap, not 'ready' or invitation creation, starts
-            // the creator's recording. Invited athletes still start
-            // independently after tapping their own start control.
+            // The database authorizes this specific creator start.
+            // Readiness alone never authorizes an exercise recording.
+            try await service.scheduleIndependentWorkoutStart(
+                sessionID: sessionID
+            )
+            try await refreshWorkoutLobby(sessionID: sessionID)
+
+            // Invited athletes still explicitly start their own recording.
             creatorIndependentStartRequestedID = sessionID
             return true
         } catch {
@@ -1309,6 +1314,7 @@ final class SocialStore: ObservableObject {
 
                 if session.invitePayload?
                     .startIndependently == true,
+                   session.coordinatedStartAt != nil,
                    currentParticipant.readyAt != nil,
                    (session.creatorID == currentUserID
                     ? creatorIndependentStartRequestedID == sessionID
