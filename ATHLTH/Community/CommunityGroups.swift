@@ -7571,10 +7571,8 @@ struct CommunityGroupDetailView: View {
                 }
             }
 
-            LazyVGrid(
-                columns: [GridItem(.flexible()), GridItem(.flexible())],
-                spacing: 8
-            ) {
+            // Keep the four Club shortcuts compact on a single row.
+            HStack(spacing: 8) {
                 if groups.canManage(
                     currentGroup
                 ) {
@@ -7660,6 +7658,8 @@ struct CommunityGroupDetailView: View {
                     .buttonStyle(.plain)
                 }
 
+                referenceChallengeAction
+
                 Button {
                     if groups
                         .canCreateGroupContent(
@@ -7705,7 +7705,6 @@ struct CommunityGroupDetailView: View {
                 }
                 .buttonStyle(.plain)
 
-                referenceChallengeAction
             }
         }
         .padding(13)
