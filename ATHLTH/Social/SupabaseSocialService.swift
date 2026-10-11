@@ -1302,6 +1302,20 @@ final class SupabaseSocialService: Sendable {
             .execute()
     }
 
+    /// Keep cancelled invitations visible to both athletes instead of deleting
+    /// the challenge row (deletion would erase its status from inbox cards).
+    func cancelChallenge(_ challengeID: UUID) async throws {
+        guard let currentUserID else {
+            throw SocialServiceError.notAuthenticated
+        }
+        try await client
+            .from("social_challenges")
+            .update(["status": ATHLTHChallengeStatus.cancelled.rawValue])
+            .eq("id", value: challengeID)
+            .eq("creator_id", value: currentUserID)
+            .execute()
+    }
+
     func syncChallenge(_ challenge: ATHLTHChallenge) async throws {
         guard let currentUserID else {
             throw SocialServiceError.notAuthenticated
