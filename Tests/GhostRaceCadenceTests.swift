@@ -76,6 +76,45 @@ final class GhostRaceCadenceTests:
         ))
     }
 
+    func testLiveGhostFinishGateAllowsRetryAfterNetworkFailure() {
+        let duel = UUID()
+        var gate = ATHLTHLiveGhostFinishGate()
+        XCTAssertTrue(gate.begin(
+            challengeID: duel, completedRouteID: duel, seconds: 1_200
+        ))
+        XCTAssertFalse(gate.begin(
+            challengeID: duel, completedRouteID: duel, seconds: 1_200
+        ))
+        gate.end(challengeID: duel, succeeded: false)
+        XCTAssertTrue(gate.begin(
+            challengeID: duel, completedRouteID: duel, seconds: 1_200
+        ))
+        gate.end(challengeID: duel, succeeded: true)
+        XCTAssertFalse(gate.begin(
+            challengeID: duel, completedRouteID: duel, seconds: 1_200
+        ))
+    }
+
+    func testLiveGhostFinishGateRejectsOtherWorkoutsAndInvalidTimes() {
+        let duel = UUID()
+        var gate = ATHLTHLiveGhostFinishGate()
+        XCTAssertFalse(gate.begin(
+            challengeID: duel, completedRouteID: UUID(), seconds: 1_200
+        ))
+        XCTAssertFalse(gate.begin(
+            challengeID: duel, completedRouteID: nil, seconds: 1_200
+        ))
+        XCTAssertFalse(gate.begin(
+            challengeID: duel, completedRouteID: duel, seconds: .infinity
+        ))
+        XCTAssertFalse(gate.begin(
+            challengeID: duel, completedRouteID: duel, seconds: 0
+        ))
+        XCTAssertTrue(gate.begin(
+            challengeID: duel, completedRouteID: duel, seconds: 1_200
+        ))
+    }
+
     func testTargetPaceAndFinishTimeConversion() {
         XCTAssertEqual(
             GhostTargetPaceFormatter.secondsPerKilometer(from: "4:45"), 285
