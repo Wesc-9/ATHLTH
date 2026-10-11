@@ -1,5 +1,6 @@
 import MapKit
 import SwiftUI
+import AVFoundation
 
 /// The run-first Apple Watch experience.
 ///
@@ -13,6 +14,7 @@ struct WatchRunWorkoutExperienceView: View {
     private var isLuminanceReduced
 
     @State private var selectedPage = 0
+    @State private var coachOutputName: String?
     @State private var confirmingEnd = false
     @State private var ghostMapPosition:
         MapCameraPosition = .automatic
@@ -74,6 +76,18 @@ struct WatchRunWorkoutExperienceView: View {
         .foregroundStyle(
             WatchTheme.textPrimary
         )
+        .onAppear {
+            coachOutputName = AVAudioSession.sharedInstance()
+                .currentRoute.outputs.first?.portName
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: AVAudioSession.routeChangeNotification
+            )
+        ) { _ in
+            coachOutputName = AVAudioSession.sharedInstance()
+                .currentRoute.outputs.first?.portName
+        }
         .confirmationDialog(
             "End workout?",
             isPresented: $confirmingEnd,
@@ -3408,7 +3422,8 @@ struct WatchRunWorkoutExperienceView: View {
     // MARK: - Page 5: controls
 
     private var controlsPage: some View {
-        VStack(spacing: 9) {
+        ScrollView {
+            VStack(spacing: 9) {
             pageLabel(
                 "CONTROLS",
                 icon: "slider.horizontal.3"
@@ -3544,11 +3559,57 @@ struct WatchRunWorkoutExperienceView: View {
                         .opacity(workoutManager.coachSpeechPaused ? 0.45 : 1)
                     }
 
-                    Text(ATHLTHLocalization.choose(
-                        english: "Voice only · workout and haptics continue",
-                        norwegian: "Kun tale · økten og vibrasjoner fortsetter"
-                    ))
+                    if let lastMessage = workoutManager.lastCoachMessage {
+                        Text(lastMessage)
+                            .font(.system(size: 10))
+                            .foregroundStyle(WatchTheme.muted)
+                            .lineLimit(2)
+                    }
+
+                    TimelineView(.periodic(from: .now, by: 5)) { _ in
+                        Button {
+                            workoutManager.replayLastCoachMessage()
+                        } label: {
+                            HStack {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Listen again",
+                                        norwegian: "Hør igjen"
+                                    ),
+                                    systemImage: "arrow.counterclockwise"
+                                )
+                                .font(.system(size: 11, weight: .semibold))
+                                Spacer(minLength: 2)
+                                Text("45 s")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(WatchTheme.muted)
+                            }
+                            .padding(10)
+                            .watchSurface(radius: 14)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!workoutManager.canReplayLastCoachMessage)
+                        .opacity(workoutManager.canReplayLastCoachMessage ? 1 : 0.45)
+                    }
+
+                    HStack(spacing: 6) {
+                        Image(systemName: "speaker.wave.2")
+                        Text(coachOutputName ??
+                            ATHLTHLocalization.choose(
+                                english: "System audio",
+                                norwegian: "Systemlyd"
+                            )
+                        )
+                        .lineLimit(1)
+                    }
                     .font(.system(size: 10))
+                    .foregroundStyle(WatchTheme.muted)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose output in Watch Control Center",
+                        norwegian: "Velg lydutgang i Kontrollsenter"
+                    ))
+                    .font(.system(size: 9))
                     .foregroundStyle(WatchTheme.muted)
                     .lineLimit(2)
                 }
@@ -3609,8 +3670,11 @@ struct WatchRunWorkoutExperienceView: View {
                 .center
             )
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+        }
+        .scrollIndicators(.hidden)
     }
 
     // MARK: - Components
