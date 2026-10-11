@@ -77,6 +77,7 @@ struct StrengthAudioCoachConfiguration:
     var voiceIdentifier: String? = nil
     var speechRate: Double = 0.48
     var speechVolume: Double = 1.0
+    var speechStyle: ATHLTHCoachSpeechStyle? = nil
     var duckOtherAudio = true
 
     var announceSetComplete = true
@@ -127,6 +128,7 @@ struct StrengthAudioCoachConfiguration:
                     1.0
                 )
             )
+        configuration.speechStyle = speechStyle
 
         configuration
             .announceStrengthSetComplete =
