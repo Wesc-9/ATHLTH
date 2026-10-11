@@ -127,6 +127,192 @@ struct ATHLTHArenaOnlineSection: View {
     }
 }
 
+/// Results here are informational. Arena's normal result proposal and
+/// unanimous participant voting remain the ONLY path to award round points.
+/// The DB-authenticated round link prevents unrelated races showing here.
+private struct ATHLTHArenaLinkedLiveDuelsSection: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var social: SocialStore
+    @StateObject private var races = GhostFriendRaceStore()
+
+    let series: ATHLTHArenaRemoteSeries
+    let rounds: [ATHLTHArenaRemoteProposal]
+
+    @State private var rooms: [LiveGhostRaceRoomRecord] = []
+    @State private var participants: [LiveGhostRaceParticipantRecord] = []
+    @State private var loading = false
+    @State private var errorMessage: String?
+
+    private var linked: [GhostFriendRaceChallengeRecord] {
+        let roundIDs = Set(rounds.map(\.id))
+        return races.challenges.filter {
+            guard let roundID = $0.arenaRoundID else { return false }
+            return roundIDs.contains(roundID) &&
+                $0.status == .accepted
+        }
+        .sorted { $0.createdAt > $1.createdAt }
+    }
+
+    var body: some View {
+        if series.scope == .duel {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Linked Live Ghost duels",
+                            norwegian: "Tilknyttede Live Ghost-dueller"
+                        ),
+                        systemImage: "bolt.horizontal.circle.fill"
+                    )
+                    .font(.headline)
+                    Spacer()
+                    if loading {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Button {
+                            Task { await refresh() }
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Refresh linked races",
+                            norwegian: "Oppdater tilknyttede dueller"
+                        ))
+                    }
+                }
+
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+
+                if linked.isEmpty && !loading {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Live duels started from a specific Arena round will appear here. The group still approves any series points.",
+                        norwegian: "Live-dueller startet fra en bestemt Arena-runde vises her. Gruppen må fortsatt godkjenne eventuelle seriepoeng."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                ForEach(Array(linked.prefix(8))) { challenge in
+                    let room = rooms.first { $0.challengeID == challenge.id }
+                    VStack(alignment: .leading, spacing: 9) {
+                        HStack {
+                            Text(rounds.first { $0.id == challenge.arenaRoundID }?.title ??
+                                ATHLTHLocalization.choose(
+                                    english: "Arena round", norwegian: "Arena-runde"
+                                ))
+                                .font(.subheadline.weight(.semibold))
+                            Spacer()
+                            Text(room?.status == .finished
+                                ? ATHLTHLocalization.choose(
+                                    english: "Finished", norwegian: "Fullført"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Live / pending", norwegian: "Live / venter"
+                                ))
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                        }
+
+                        if room?.status == .finished {
+                            ForEach([challenge.senderID, challenge.recipientID], id: \.self) { userID in
+                                HStack {
+                                    Text(userName(userID))
+                                        .font(.caption)
+                                    Spacer()
+                                    let time = participants.first {
+                                        $0.challengeID == challenge.id &&
+                                        $0.userID == userID
+                                    }?.elapsedSeconds
+                                    Text(time.map(GhostTargetTimeFormatter.string) ?? "—")
+                                        .font(.caption.weight(.semibold))
+                                        .monospacedDigit()
+                                }
+                            }
+                            Text(ATHLTHLocalization.choose(
+                                english: "These are reported live times, not verified Arena round results. Use 'Propose result' in the standings and obtain all approvals before points are awarded.",
+                                norwegian: "Dette er oppgitte live-tider, ikke verifiserte Arena-runderesultater. Bruk «Foreslå resultat» i sammenlagtstillingen og få alle godkjenninger før poeng tildeles."
+                            ))
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        } else if challenge.expiresAt > Date() {
+                            NavigationLink {
+                                LiveGhostRaceLobbyView(challenge: challenge)
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Open synchronized race",
+                                        norwegian: "Åpne synkronisert duell"
+                                    ),
+                                    systemImage: "arrow.up.right"
+                                )
+                            }
+                            .font(.caption.weight(.semibold))
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(13)
+                    .background(ATHLTHArenaLightStyle.card(17))
+                }
+            }
+            .task(id: series.id) { await refresh() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { Task { await refresh() } }
+            }
+        }
+    }
+
+    private func userName(_ id: UUID) -> String {
+        if id == session.profile.userID {
+            return ATHLTHLocalization.choose(english: "You", norwegian: "Du")
+        }
+        return (social.visibleProfiles + social.mutualFollows)
+            .first(where: { $0.userID == id })?.resolvedName ??
+            ATHLTHLocalization.choose(english: "Opponent", norwegian: "Motstander")
+    }
+
+    @MainActor
+    private func refresh() async {
+        guard !loading else { return }
+        loading = true
+        defer { loading = false }
+
+        await races.refresh()
+        let ids = linked.map(\.id)
+        guard !ids.isEmpty else {
+            rooms = []
+            participants = []
+            errorMessage = races.errorMessage
+            return
+        }
+
+        do {
+            async let roomsTask: [LiveGhostRaceRoomRecord] =
+                SupabaseEnvironment.client
+                    .from("live_ghost_race_rooms")
+                    .select()
+                    .in("challenge_id", values: ids)
+                    .execute().value
+            async let participantsTask: [LiveGhostRaceParticipantRecord] =
+                SupabaseEnvironment.client
+                    .from("live_ghost_race_participants")
+                    .select()
+                    .in("challenge_id", values: ids)
+                    .execute().value
+            rooms = try await roomsTask
+            participants = try await participantsTask
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
 struct ATHLTHArenaOnlineDetailView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
@@ -348,6 +534,13 @@ struct ATHLTHArenaOnlineDetailView: View {
                     approvedRules: Dictionary(grouping: approvals, by: \.roundID)
                 )
                 .id("arena-standings")
+
+                if canParticipate && currentSeries.scope == .duel {
+                    ATHLTHArenaLinkedLiveDuelsSection(
+                        series: currentSeries,
+                        rounds: rounds
+                    )
+                }
 
                 if currentSeries.status == "active" && canParticipate {
                     ATHLTHArenaEvidenceSection(
