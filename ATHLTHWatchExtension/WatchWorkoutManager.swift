@@ -243,6 +243,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var lastAcceptedOutdoorLocation: CLLocation?
     private var healthKitDistanceMeters: Double = 0
     private var healthKitDistanceLastUpdatedAt: Date?
+    private var coachHeartRateSampleAt: Date?
+    private var coachPaceSampleAt: Date?
     private var autoPauseDetector =
         OutdoorAutoPauseDetector()
     private var manualPauseActive = false
@@ -3055,6 +3057,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         lastAcceptedOutdoorLocation = nil
         healthKitDistanceMeters = 0
         healthKitDistanceLastUpdatedAt = nil
+        coachHeartRateSampleAt = nil
+        coachPaceSampleAt = nil
         speechSynthesizer.stopSpeaking(at: .immediate)
         deactivateAudioCoachAudioSession()
         audioCoachReadyAnnouncedForWorkout = false
@@ -3185,6 +3189,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         lastAcceptedOutdoorLocation = nil
         healthKitDistanceMeters = 0
         healthKitDistanceLastUpdatedAt = nil
+        coachHeartRateSampleAt = nil
+        coachPaceSampleAt = nil
         offRouteStartedAt = nil
         lastOffRouteAlertAt = nil
         routeWasOff = false
@@ -3913,7 +3919,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         using location: CLLocation
     ) {
         guard kind == .running ||
-                kind == .walking
+                kind == .walking,
+              ATHLTHCoachSensorFreshness.isFresh(
+                  sampledAt: location.timestamp,
+                  maximumAge: ATHLTHCoachSensorFreshness.maximumPaceAge
+              )
         else {
             return
         }
@@ -3935,6 +3945,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     smoothed = rawPace
                 }
 
+                coachPaceSampleAt = location.timestamp
                 publish {
                     self.currentPaceSecondsPerKilometer =
                         smoothed
@@ -5073,7 +5084,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         var hasEvaluableTarget = false
 
         if configuration.heartRateEnabled,
-           heartRate > 0,
+           ATHLTHCoachSensorFreshness.validHeartRate(
+               heartRate,
+               sampledAt: coachHeartRateSampleAt
+           ),
            let minimum =
                 configuration
                     .heartRateMinimumBPM,
@@ -5101,6 +5115,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         if violation == nil,
            configuration.paceAlertsEnabled,
+           ATHLTHCoachSensorFreshness.validPace(
+               currentPaceSecondsPerKilometer,
+               sampledAt: coachPaceSampleAt
+           ),
            let pace =
                 currentPaceSecondsPerKilometer,
            let step =
@@ -6154,9 +6172,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         if let heartType, types.contains(heartType),
-           let statistics = builder.statistics(for: heartType) {
+           let statistics = builder.statistics(for: heartType),
+           let latestQuantity = statistics.mostRecentQuantity() {
             let unit = HKUnit.count().unitDivided(by: .minute())
-            let latest = statistics.mostRecentQuantity()?.doubleValue(for: unit) ?? heartRate
+            let latest = latestQuantity.doubleValue(for: unit)
+            coachHeartRateSampleAt = Date()
             let average = statistics.averageQuantity()?.doubleValue(for: unit)
             let maximum = statistics.maximumQuantity()?.doubleValue(for: unit)
 
