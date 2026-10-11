@@ -510,6 +510,16 @@ private struct ATHLTHArenaInvitationChangeParams: Encodable {
     }
 }
 
+private struct ATHLTHArenaInvitationReceipt: Decodable {
+    let slotID: UUID
+    let response: String
+
+    enum CodingKeys: String, CodingKey {
+        case slotID = "slot_id"
+        case response
+    }
+}
+
 private struct ATHLTHArenaStartParams: Encodable {
     let series: UUID
     enum CodingKeys: String, CodingKey { case series = "p_series" }
@@ -755,6 +765,7 @@ enum ATHLTHArenaCloudError: LocalizedError {
     case needRounds
     case tooManyRounds
     case invalidDraft(String)
+    case invitationAlreadyHandled
     case evidenceNotFound
 
     var errorDescription: String? {
@@ -786,6 +797,11 @@ enum ATHLTHArenaCloudError: LocalizedError {
             )
         case .invalidDraft(let message):
             return message
+        case .invitationAlreadyHandled:
+            return ATHLTHLocalization.choose(
+                english: "This invitation has changed or was already answered. Refresh Arena to see the latest status.",
+                norwegian: "Invitasjonen er endret eller allerede besvart. Oppdater Arena for å se siste status."
+            )
         case .evidenceNotFound:
             return ATHLTHLocalization.choose(
                 english: "The workout link is no longer available.",
@@ -1351,16 +1367,25 @@ final class ATHLTHArenaCloudService: Sendable {
         ).execute().value
     }
 
+    /// Require one affected invitation row. A stale second-device response
+    /// must not be reported as success after its invitation was replaced.
     func respond(seriesID: UUID, accept: Bool) async throws {
         guard let userID = currentUserID else {
             throw ATHLTHArenaCloudError.signInRequired
         }
-        try await client
+        let desiredResponse = accept ? "accepted" : "declined"
+        let changed: [ATHLTHArenaInvitationReceipt] = try await client
             .from("arena_series_members")
-            .update(["response": accept ? "accepted" : "declined"])
+            .update(["response": desiredResponse])
             .eq("series_id", value: seriesID)
             .eq("user_id", value: userID)
-            .execute()
+            .eq("response", value: "invited")
+            .select("slot_id,response")
+            .execute().value
+        guard changed.count == 1,
+              changed[0].response == desiredResponse else {
+            throw ATHLTHArenaCloudError.invitationAlreadyHandled
+        }
     }
 
     func propose(
