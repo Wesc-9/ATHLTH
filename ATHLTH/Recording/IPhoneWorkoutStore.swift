@@ -3387,7 +3387,11 @@ final class IPhoneWorkoutStore:
         event: ATHLTHCoachEvent? = nil
     ) {
         guard !phrase.isEmpty,
-              !coachSpeechPaused
+              ATHLTHCoachVoicePausePolicy.allowsSpeech(
+                  coachEnabled:
+                      active?.audioCoachConfiguration?.enabled == true,
+                  speechPaused: coachSpeechPaused
+              )
         else {
             return
         }
