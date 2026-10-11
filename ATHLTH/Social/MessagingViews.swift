@@ -3092,6 +3092,7 @@ struct DirectMessageThreadView: View {
     @State private var respondingToPlannedInviteID: UUID?
     @State private var plannedInviteError: String?
     @State private var respondingToChallengeID: UUID?
+    @State private var respondingToProposalID: UUID?
     @State private var challengeDetailsDestination: ThreadChallengeDetailsDestination?
 
     var body: some View {
@@ -3505,6 +3506,14 @@ struct DirectMessageThreadView: View {
                                 },
                                 onOpenChallenge: { id in
                                     openChallengeDetails(id)
+                                },
+                                challengeChangeResponse: proposalResponse(
+                                    for: message, in: messages
+                                ),
+                                respondingToProposal: respondingToProposalID ==
+                                    message.id,
+                                onReviewProposal: { accept in
+                                    reviewChallengeChange(message, accept: accept)
                                 }
                             )
                             .id(item.id)
@@ -4867,6 +4876,161 @@ struct DirectMessageThreadView: View {
         isSending = false
     }
 
+    private func proposalResponse(
+        for message: DirectMessageRecord,
+        in messages: [DirectMessageRecord]
+    ) -> ChallengeChangeProposalResponse? {
+        guard message.attachmentKind == .challenge,
+              message.shareVersion == 2,
+              let proposal = message.decodeSnapshot(ChallengeChangeProposal.self)
+        else { return nil }
+
+        return messages
+            .filter {
+                $0.attachmentKind == .challenge &&
+                $0.shareVersion == 3 &&
+                $0.senderID == proposal.original.creatorID &&
+                $0.createdAt >= message.createdAt
+            }
+            .sorted { $0.createdAt > $1.createdAt }
+            .compactMap {
+                $0.decodeSnapshot(ChallengeChangeProposalResponse.self)
+            }
+            .first { $0.proposalID == proposal.id &&
+                $0.challengeID == proposal.challengeID }
+    }
+
+    private func reviewChallengeChange(
+        _ message: DirectMessageRecord, accept: Bool
+    ) {
+        guard let proposal = message.decodeSnapshot(ChallengeChangeProposal.self),
+              message.shareVersion == 2,
+              message.attachmentKind == .challenge,
+              proposal.challengerID == friend.userID,
+              proposal.original.creatorID == session.profile.userID,
+              respondingToProposalID == nil,
+              let conversationID
+        else { return }
+
+        respondingToProposalID = message.id
+        Task {
+            defer { respondingToProposalID = nil }
+            if accept {
+                guard let current = challengeStore.challenge(id: proposal.challengeID),
+                      current.creatorID == session.profile.userID,
+                      !current.rulesAreLocked,
+                      current.status != .completed,
+                      current.status != .cancelled,
+                      current.title == proposal.original.title,
+                      current.sport == proposal.original.sport,
+                      current.rules == proposal.original.rules,
+                      Set(current.participants.compactMap(\.userID)) ==
+                          Set(proposal.original.participants.compactMap(\.userID))
+                else {
+                    plannedInviteError = ATHLTHLocalization.choose(
+                        english: "The challenge has changed or started. Ask for a new proposal.",
+                        norwegian: "Utfordringen er endret eller startet. Be om et nytt forslag."
+                    )
+                    return
+                }
+
+                var approved = current
+                approved.title = proposal.proposed.title
+                approved.sport = proposal.proposed.sport
+                approved.rules = proposal.proposed.rules
+                approved.visibility = .privateOnly
+
+                // Preserve the current creator identity and participant response
+                // state; proposals may change invitees, not impersonate athletes.
+                let creator = current.participants.first(where: {
+                    $0.userID == current.creatorID
+                })
+                let proposedInvitees = proposal.proposed.participants.filter {
+                    $0.userID != current.creatorID
+                }
+                guard let creator,
+                      !proposedInvitees.isEmpty,
+                      proposedInvitees.allSatisfy({ $0.userID != nil }),
+                      Set(proposedInvitees.compactMap(\.userID)).count ==
+                          proposedInvitees.count,
+                      approved.rules.endsAt.map({
+                          $0 > approved.rules.startsAt
+                      }) ?? true else {
+                    plannedInviteError = ATHLTHLocalization.choose(
+                        english: "Invalid proposal. Please revise it.",
+                        norwegian: "Forslaget er ugyldig. Be om et nytt forslag."
+                    )
+                    return
+                }
+
+                approved.participants = [creator] + proposedInvitees.map {
+                    participant in
+                    current.participants.first(where: {
+                        $0.userID == participant.userID
+                    }) ?? participant
+                }
+
+                guard await social.syncChallenge(approved) else {
+                    plannedInviteError = social.errorMessage ??
+                        ATHLTHLocalization.choose(
+                            english: "Could not approve changes.",
+                            norwegian: "Kunne ikke godkjenne endringene."
+                        )
+                    return
+                }
+                challengeStore.update(approved)
+            }
+
+            do {
+                let response = ChallengeChangeProposalResponse(
+                    proposalID: proposal.id,
+                    challengeID: proposal.challengeID,
+                    accepted: accept
+                )
+                let payload = try MessageShareDraft(
+                    kind: .challenge,
+                    title: proposal.proposed.title,
+                    subtitle: accept
+                        ? ATHLTHLocalization.choose(
+                            english: "Approved", norwegian: "Godkjent"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Rejected", norwegian: "Avslått"
+                        ),
+                    snapshot: response,
+                    sourceObjectID: proposal.challengeID,
+                    sourceOwnerID: proposal.original.creatorID,
+                    shareVersion: 3
+                )
+                let sent = await messaging.send(
+                    to: friend.userID,
+                    conversationID: conversationID,
+                    body: accept
+                        ? ATHLTHLocalization.choose(
+                            english: "I approved the proposed changes.",
+                            norwegian: "Jeg har godkjent endringene."
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "I rejected the proposed changes.",
+                            norwegian: "Jeg har avslått endringsforslaget."
+                        ),
+                    attachment: payload
+                )
+                if !sent {
+                    plannedInviteError = messaging.errorMessage ??
+                        ATHLTHLocalization.choose(
+                            english: "Could not deliver the decision.",
+                            norwegian: "Kunne ikke sende svaret."
+                        )
+                } else {
+                    await messaging.refreshConversation(conversationID)
+                }
+            } catch {
+                plannedInviteError = error.localizedDescription
+            }
+        }
+    }
+
     private func plannedInviteResponse(
         for invitation: DirectMessageRecord,
         in messages: [DirectMessageRecord]
@@ -4976,7 +5140,8 @@ struct DirectMessageThreadView: View {
     }
 
     private func saveAttachment(_ message: DirectMessageRecord) {
-        guard message.shareVersion != 3 else { return }
+        guard message.shareVersion != 3 && message.shareVersion != 2
+            else { return }
 
         guard message.senderID != messaging.currentUserID else { return }
 
@@ -5855,6 +6020,9 @@ private struct MessageBubble: View {
     let respondingToChallenge: Bool
     let onRespondToChallenge: (ATHLTHChallenge, Bool) -> Void
     let onOpenChallenge: (UUID) -> Void
+    let challengeChangeResponse: ChallengeChangeProposalResponse?
+    let respondingToProposal: Bool
+    let onReviewProposal: (Bool) -> Void
 
     private var isPlannedInvitation: Bool {
         message.attachmentKind == .workout && message.shareVersion == 2
@@ -6042,7 +6210,22 @@ private struct MessageBubble: View {
             }
 
             VStack(alignment: isMine ? .trailing : .leading, spacing: 6) {
-                if message.attachmentKind == .challenge {
+                if message.attachmentKind == .challenge &&
+                   message.shareVersion == 2,
+                   let proposal = message.decodeSnapshot(ChallengeChangeProposal.self) {
+                    ChallengeProposalCard(
+                        proposal: proposal,
+                        response: challengeChangeResponse,
+                        currentUserID: currentUserID,
+                        sending: respondingToProposal,
+                        onApprove: { onReviewProposal(true) },
+                        onReject: { onReviewProposal(false) }
+                    )
+                } else if message.attachmentKind == .challenge &&
+                          message.shareVersion == 3,
+                          let response = message.decodeSnapshot(ChallengeChangeProposalResponse.self) {
+                    ChallengeProposalResponseCard(response: response)
+                } else if message.attachmentKind == .challenge {
                     let challengeID = message.sourceObjectID ??
                         message.decodeSnapshot(ATHLTHChallenge.self)?.id
                     let linkedChallenge = challengeID.flatMap {
