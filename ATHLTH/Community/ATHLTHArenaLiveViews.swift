@@ -206,7 +206,13 @@ struct ATHLTHArenaOnlineDetailView: View {
                        .first(where: { $0 != session.profile.userID }),
                    social.mutualFollows.contains(where: { $0.userID == opponentID }) {
                     NavigationLink {
-                        GhostFriendRaceHubView(preferredFriendID: opponentID)
+                        GhostFriendRaceHubView(
+                            preferredFriendID: opponentID,
+                            preferredRoute: rounds
+                                .compactMap(\.routeSnapshot)
+                                .compactMap { arenaTrainingRoute(from: $0) }
+                                .first
+                        )
                     } label: {
                         HStack(spacing: 11) {
                             Image(systemName: "bolt.horizontal.circle.fill")
@@ -220,8 +226,8 @@ struct ATHLTHArenaOnlineDetailView: View {
                                 ))
                                 .font(.subheadline.weight(.bold))
                                 Text(ATHLTHLocalization.choose(
-                                    english: "Opponent selected. Invite using an earlier GPS run.",
-                                    norwegian: "Motstanderen er valgt. Inviter med en tidligere GPS-økt."
+                                    english: "Opponent selected. Choose your earlier run or this competition route.",
+                                    norwegian: "Motstanderen er valgt. Bruk en tidligere økt eller konkurranseruten."
                                 ))
                                 .font(.caption)
                                 .foregroundStyle(.white.opacity(0.84))
