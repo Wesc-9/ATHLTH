@@ -26,6 +26,8 @@ declare
  v_id uuid;
  v_wall_seconds numeric;
  v_target numeric;
+ v_min_seconds numeric;
+ v_max_seconds numeric;
 begin
  if v_actor is null then raise exception 'Sign in required'; end if;
  select * into v_round from public.arena_round_proposals where id=p_round;
@@ -51,7 +53,15 @@ begin
    raise exception 'Invalid workout evidence fields';
  end if;
  if v_round.template in ('fastest5K','fastest1K') then
-   v_target := case when v_round.template='fastest5K' then 5000 else 1000 end;
+   if v_round.template='fastest5K' then
+     v_target := 5000;
+     v_min_seconds := 150;
+     v_max_seconds := 18000;
+   else
+     v_target := 1000;
+     v_min_seconds := 60;
+     v_max_seconds := 7200;
+   end if;
    if p_activity<>'running' or p_metric_type<>'elapsed_seconds'
      or p_distance is null or abs(p_distance-v_target)>v_target*0.02
      or p_metric < case when v_target=5000 then 150 else 60 end
@@ -85,7 +95,8 @@ begin
   p_metric_type,p_metric,p_distance,'participant_reported'
  ) returning id into v_id;
  return v_id;
-end;$$;
+end;
+$;
 
 create or replace function public.arena_share_evidence_v2(
  p_round uuid,p_source_workout uuid,p_source text,p_activity text,
