@@ -2230,20 +2230,21 @@ struct FriendProfileView: View {
             Image(systemName: icon)
                 .font(
                     .system(
-                        size: 13,
+                        size: 15,
                         weight: .semibold
                     )
                 )
+                .foregroundStyle(emphasized ? Color.white : tint)
 
             Text(title)
                 .font(
                     .system(
-                        size: 11,
+                        size: 12,
                         weight: .semibold
                     )
                 )
                 .lineLimit(1)
-                .minimumScaleFactor(0.72)
+                .minimumScaleFactor(0.80)
         }
         .foregroundStyle(
             emphasized
@@ -2252,7 +2253,7 @@ struct FriendProfileView: View {
                     .primaryText
         )
         .frame(maxWidth: .infinity)
-        .frame(height: 46)
+        .frame(height: 49)
         .background(
             emphasized
                 ? ATHLTHTheme
@@ -2342,7 +2343,7 @@ struct FriendProfileView: View {
                     )
                     .font(
                         .system(
-                            size: 11,
+                            size: 12,
                             weight: .semibold
                         )
                     )
@@ -2359,7 +2360,7 @@ struct FriendProfileView: View {
                 }
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .frame(height: 46)
+                .frame(height: 49)
                 .background(
                     ATHLTHTheme.accentDeep,
                     in: RoundedRectangle(
