@@ -1397,7 +1397,14 @@ final class StrengthWorkoutStore: ObservableObject {
                 workout.plannedSessionID,
             allowsLiveExerciseBuilding:
                 workout
-                    .allowsLiveExerciseBuilding
+                    .allowsLiveExerciseBuilding,
+            timedSetCountdown: currentTimedSetCountdown.map {
+                WatchTimedStrengthCountdown(
+                    targetSeconds: $0.targetSeconds,
+                    secondsAtPause: $0.secondsAtPause,
+                    resumedAt: $0.resumedAt
+                )
+            }
         )
     }
 

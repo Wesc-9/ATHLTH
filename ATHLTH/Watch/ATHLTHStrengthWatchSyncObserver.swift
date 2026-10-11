@@ -63,6 +63,9 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             .onChange(of: strengthWorkout.draftWarmUp) { _, _ in
                 scheduleDraftSnapshot()
             }
+            .onChange(of: strengthWorkout.timedSetCountdown) { _, _ in
+                sendSnapshotNow()
+            }
     }
 
     @MainActor
@@ -146,7 +149,10 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             command.kind == .updateDraft ||
             command.kind == .completeSet ||
             command.kind ==
-                .completeSetWithoutDetails
+                .completeSetWithoutDetails ||
+            command.kind == .startTimedSet ||
+            command.kind == .pauseTimedSet ||
+            command.kind == .resetTimedSet
 
         if setScopedCommand,
            let exerciseIndex =
@@ -324,6 +330,17 @@ struct ATHLTHStrengthWatchSyncObserver: View {
 
         case .nextExercise:
             strengthWorkout.moveToNextExercise()
+
+        case .startTimedSet:
+            // The authoritative store guards against duplicate starts,
+            // completed sets and non-time-based exercises.
+            strengthWorkout.startOrResumeTimedSet()
+
+        case .pauseTimedSet:
+            strengthWorkout.pauseTimedSet()
+
+        case .resetTimedSet:
+            strengthWorkout.resetTimedSet()
 
         case .requestSnapshot:
             break

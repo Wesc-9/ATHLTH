@@ -39,3 +39,21 @@ Baseline: `release/v1.7.3`. Keep recording engines, workout ownership, iPhone/Wa
   time-set countdown state, Watch controls and offline reconciliation. Do not
   claim bidirectional timed-set support until those are implemented and tested.
 - Physical Apple Watch layout testing and Xcode/watchOS build remain release gates.
+
+## Step 2 — timed strength countdown integration
+
+- Optional date-anchored `WatchTimedStrengthCountdown` within the existing
+  backwards-compatible strength snapshot; no secondary workout/session started.
+- iPhone's authoritative `StrengthTimedSetCountdown` is exposed to Watch
+  through `watchSnapshot`, updated whenever the countdown is changed.
+- Three set-scoped Watch commands: start/resume, pause and reset. They use
+  existing durable Watch command transport and exercise/set identity guards.
+- Optimistic local Watch countdown state avoids round-trip delay; subsequent
+  iPhone snapshots reconcile it. Completing the set clears the local timer.
+- Dedicated first Watch page for timed sets; existing Crown editor remains
+  available via the next page. AOD shows remaining/paused/ready state using
+  the same absolute-date anchor.
+- Timed sets still require an explicit completion action: no automatic
+  recording when the countdown expires.
+- Validation gate: compile both targets and regression tests, then check
+  offline/reconnect and device behavior before TestFlight.

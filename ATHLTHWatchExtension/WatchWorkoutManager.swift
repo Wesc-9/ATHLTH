@@ -1762,8 +1762,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             snapshot.draftReps = max(reps, 0)
         }
         if let durationSeconds {
-            snapshot.draftDurationSeconds =
-                min(max(durationSeconds, 0), 7_200)
+            let next = min(max(durationSeconds, 0), 7_200)
+            if snapshot.draftDurationSeconds != next {
+                snapshot.timedSetCountdown = nil
+            }
+            snapshot.draftDurationSeconds = next
         }
         if let weightKilograms {
             snapshot.draftWeightKilograms =
@@ -1819,6 +1822,91 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     snapshot.exerciseIndex,
                 setIndex:
                     snapshot.setIndex
+            )
+        )
+    }
+
+    /// Timed strength work uses a date anchor, not display tick counts.
+    /// These operations are journaled like other set-scoped Watch actions.
+    func startOrResumeTimedStrengthSet() {
+        guard var snapshot = strengthSession,
+              snapshot.inputMode != .iPhone,
+              snapshot.targetKindRaw == "time",
+              !snapshot.isResting,
+              !snapshot.currentExerciseComplete
+        else { return }
+
+        let now = Date()
+        if var timer = snapshot.timedSetCountdown {
+            guard !timer.isRunning, timer.remaining(at: now) > 0 else {
+                return
+            }
+            timer.resumedAt = now
+            snapshot.timedSetCountdown = timer
+        } else {
+            let seconds = min(max(snapshot.draftDurationSeconds ?? 60, 15), 7_200)
+            snapshot.timedSetCountdown = WatchTimedStrengthCountdown(
+                targetSeconds: seconds,
+                secondsAtPause: TimeInterval(seconds),
+                resumedAt: now
+            )
+        }
+
+        guard sendTimedStrengthCommand(.startTimedSet, snapshot: snapshot, at: now)
+        else { return }
+        snapshot.updatedAt = now
+        publish { self.strengthSession = snapshot }
+        persistWorkoutRecoveryState()
+    }
+
+    func pauseTimedStrengthSet() {
+        guard var snapshot = strengthSession,
+              snapshot.inputMode != .iPhone,
+              var timer = snapshot.timedSetCountdown,
+              timer.isRunning else { return }
+        let now = Date()
+        timer.secondsAtPause = timer.remaining(at: now)
+        timer.resumedAt = nil
+        snapshot.timedSetCountdown = timer
+
+        guard sendTimedStrengthCommand(.pauseTimedSet, snapshot: snapshot, at: now)
+        else { return }
+        snapshot.updatedAt = now
+        publish { self.strengthSession = snapshot }
+        persistWorkoutRecoveryState()
+    }
+
+    func resetTimedStrengthSet() {
+        guard var snapshot = strengthSession,
+              snapshot.inputMode != .iPhone,
+              snapshot.timedSetCountdown != nil else { return }
+        let now = Date()
+        snapshot.timedSetCountdown = nil
+
+        guard sendTimedStrengthCommand(.resetTimedSet, snapshot: snapshot, at: now)
+        else { return }
+        snapshot.updatedAt = now
+        publish { self.strengthSession = snapshot }
+        persistWorkoutRecoveryState()
+    }
+
+    private func sendTimedStrengthCommand(
+        _ kind: WatchStrengthCommandKind,
+        snapshot: WatchStrengthSessionSnapshot,
+        at date: Date
+    ) -> Bool {
+        sendStrengthCommand(
+            WatchStrengthCommand(
+                id: UUID(),
+                workoutID: snapshot.workoutID,
+                kind: kind,
+                reps: nil,
+                weightKilograms: nil,
+                restSeconds: nil,
+                addRestSeconds: nil,
+                sentAt: date,
+                exerciseIndex: snapshot.exerciseIndex,
+                setIndex: snapshot.setIndex
             )
         )
     }
@@ -2020,6 +2108,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 snapshot.totalSets
             )
 
+        updated.timedSetCountdown = nil
+
         let nextSetIndex =
             snapshot.setIndex + 1
 
@@ -2099,6 +2189,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         var updated = snapshot
+        updated.timedSetCountdown = nil
         updated.exerciseIndex =
             next.index
         updated.exerciseName =
@@ -2348,6 +2439,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             .appleWatch
         snapshot.isResting = false
         snapshot.restEndsAt = nil
+        snapshot.timedSetCountdown = nil
         snapshot.completedSets = 0
         snapshot.allExercisesComplete =
             false

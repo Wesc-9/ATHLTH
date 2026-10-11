@@ -143,3 +143,66 @@ extension ATHLTHLivePresentationModelTests {
         XCTAssertEqual(plan.primary, .restRemaining)
     }
 }
+
+extension ATHLTHLivePresentationModelTests {
+    func testTimedStrengthCountdownAnchorsToAbsoluteDate() {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let countdown = WatchTimedStrengthCountdown(
+            targetSeconds: 300,
+            secondsAtPause: 300,
+            resumedAt: start
+        )
+        XCTAssertEqual(countdown.remaining(at: start), 300, accuracy: 0.001)
+        XCTAssertEqual(
+            countdown.remaining(at: start.addingTimeInterval(75)),
+            225, accuracy: 0.001
+        )
+        XCTAssertEqual(
+            countdown.remaining(at: start.addingTimeInterval(350)),
+            0, accuracy: 0.001
+        )
+    }
+
+    func testTimedStrengthCountdownPausedAndResumedWithoutDrift() {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        var timer = WatchTimedStrengthCountdown(
+            targetSeconds: 120,
+            secondsAtPause: 120,
+            resumedAt: start
+        )
+        let pausedAt = start.addingTimeInterval(40)
+        timer.secondsAtPause = timer.remaining(at: pausedAt)
+        timer.resumedAt = nil
+
+        XCTAssertEqual(
+            timer.remaining(at: pausedAt.addingTimeInterval(300)),
+            80, accuracy: 0.001
+        )
+
+        timer.resumedAt = pausedAt.addingTimeInterval(300)
+        XCTAssertEqual(
+            timer.remaining(at: pausedAt.addingTimeInterval(320)),
+            60, accuracy: 0.001
+        )
+    }
+
+    func testTimedStrengthCountdownRoundTripsOverWire() throws {
+        let timer = WatchTimedStrengthCountdown(
+            targetSeconds: 180,
+            secondsAtPause: 92.5,
+            resumedAt: Date(timeIntervalSince1970: 1_700_000_500)
+        )
+        let data = try JSONEncoder().encode(timer)
+        XCTAssertEqual(
+            try JSONDecoder().decode(WatchTimedStrengthCountdown.self, from: data),
+            timer
+        )
+    }
+
+    func testTimeControlCommandsUseDistinctTypes() {
+        let events: [WatchStrengthCommandKind] = [
+            .startTimedSet, .pauseTimedSet, .resetTimedSet
+        ]
+        XCTAssertEqual(Set(events).count, 3)
+    }
+}

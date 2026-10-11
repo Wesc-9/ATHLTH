@@ -172,11 +172,47 @@ struct WatchTrainingAlwaysOnDashboard: View {
                     ))
                     .font(.system(size: compact ? 9 : 10))
                     .foregroundStyle(secondary)
+                } else if current.targetKindRaw == "time" {
+                    // Same absolute-date timer as the interactive Watch
+                    // screen and iPhone; never use a screen-owned counter.
+                    TimelineView(.periodic(from: .now, by: 5)) { timeline in
+                        let remaining = current.timedSetCountdown?
+                            .remaining(at: timeline.date)
+                            ?? Double(current.draftDurationSeconds ?? 0)
+                        HStack(alignment: .firstTextBaseline, spacing: 5) {
+                            Text(timeString(remaining))
+                                .font(.system(
+                                    size: compact ? 38 : 44,
+                                    weight: .bold, design: .rounded
+                                ))
+                                .monospacedDigit()
+                                .foregroundStyle(primary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.72)
+
+                            Text(current.timedSetCountdown == nil
+                                ? ATHLTHLocalization.choose(
+                                    english: "TARGET", norwegian: "MÅL"
+                                  )
+                                : remaining <= 0
+                                    ? ATHLTHLocalization.choose(
+                                        english: "READY", norwegian: "KLAR"
+                                      )
+                                    : current.timedSetCountdown?.isRunning == true
+                                        ? ATHLTHLocalization.choose(
+                                            english: "LEFT", norwegian: "IGJEN"
+                                          )
+                                        : ATHLTHLocalization.choose(
+                                            english: "PAUSED", norwegian: "PAUSE"
+                                          ))
+                                .font(.system(size: compact ? 10 : 11,
+                                              weight: .bold))
+                                .foregroundStyle(accent)
+                        }
+                    }
                 } else {
                     HStack(alignment: .firstTextBaseline, spacing: 5) {
-                        Text(current.targetKindRaw == "time"
-                             ? timeString(Double(current.draftDurationSeconds ?? 0))
-                             : String(current.draftReps))
+                        Text(String(current.draftReps))
                             .font(.system(
                                 size: compact ? 43 : 51,
                                 weight: .bold,
@@ -184,13 +220,7 @@ struct WatchTrainingAlwaysOnDashboard: View {
                             ))
                             .monospacedDigit()
                             .foregroundStyle(primary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.72)
-                        Text(current.targetKindRaw == "time"
-                             ? ATHLTHLocalization.choose(
-                                 english: "TARGET", norwegian: "MÅL"
-                               )
-                             : "REPS")
+                        Text("REPS")
                             .font(.system(size: compact ? 11 : 12,
                                           weight: .bold))
                             .foregroundStyle(accent)

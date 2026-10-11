@@ -126,23 +126,34 @@ struct WatchActiveWorkoutView: View {
                     if workoutManager.kind == .strength {
                         // Set/rest remains the first page. Additional pages
                         // are read-only and do not mutate the workout.
-                        strengthOneScreenPage
-                            .tag(0)
+                        if workoutManager.strengthSession?.targetKindRaw == "time",
+                           workoutManager.strengthSession?.isResting != true,
+                           workoutManager.strengthSession?.currentExerciseComplete != true {
+                            WatchStrengthTimedSetPage()
+                                .tag(0)
+                            // Existing editor remains available for target,
+                            // load and Digital Crown changes.
+                            strengthOneScreenPage
+                                .tag(1)
+                        } else {
+                            strengthOneScreenPage
+                                .tag(0)
+                        }
 
                         WatchStrengthSessionStatusPage()
-                            .tag(1)
-
-                        WatchStrengthExerciseQueuePage()
                             .tag(2)
 
-                        WatchStrengthPulsePage()
+                        WatchStrengthExerciseQueuePage()
                             .tag(3)
 
-                        WatchSpotifyRemotePage()
+                        WatchStrengthPulsePage()
                             .tag(4)
 
-                        nonRunningControlsPage
+                        WatchSpotifyRemotePage()
                             .tag(5)
+
+                        nonRunningControlsPage
+                            .tag(6)
                     } else {
                         ScrollView {
                             VStack(spacing: 10) {
@@ -179,6 +190,11 @@ struct WatchActiveWorkoutView: View {
             // A new rest period is a meaningful phase change: show the
             // countdown, but never advance the set automatically.
             if workoutManager.kind == .strength && previous != true && current == true {
+                selectedNonRunningPage = 0
+            }
+        }
+        .onChange(of: workoutManager.strengthSession?.targetKindRaw) { previous, current in
+            if workoutManager.kind == .strength && previous != current {
                 selectedNonRunningPage = 0
             }
         }

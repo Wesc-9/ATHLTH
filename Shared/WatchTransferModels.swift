@@ -1046,6 +1046,21 @@ struct WatchStrengthExerciseSummary: Codable, Hashable {
     var firstPendingSetIndex: Int? = nil
 }
 
+/// Absolute-date countdown snapshot. No display ticks are transmitted over WatchConnectivity.
+struct WatchTimedStrengthCountdown: Codable, Hashable {
+    var targetSeconds: Int
+    var secondsAtPause: TimeInterval
+    var resumedAt: Date?
+
+    func remaining(at date: Date = Date()) -> TimeInterval {
+        max(secondsAtPause - (resumedAt.map {
+            max(date.timeIntervalSince($0), 0)
+        } ?? 0), 0)
+    }
+
+    var isRunning: Bool { resumedAt != nil }
+}
+
 struct WatchStrengthSessionSnapshot: Codable, Hashable {
     var workoutID: UUID
     var title: String
@@ -1087,6 +1102,9 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
     var startedAt: Date? = nil
     var plannedSessionID: UUID? = nil
     var allowsLiveExerciseBuilding: Bool? = nil
+
+    /// Optional: older Watch versions receive the planned duration only.
+    var timedSetCountdown: WatchTimedStrengthCountdown? = nil
 }
 
 enum WatchStrengthCommandKind: String, Codable, Hashable {
@@ -1097,6 +1115,9 @@ enum WatchStrengthCommandKind: String, Codable, Hashable {
     case addRest
     case nextExercise
     case requestSnapshot
+    case startTimedSet
+    case pauseTimedSet
+    case resetTimedSet
 }
 
 struct WatchStrengthCommand: Codable, Hashable {
