@@ -954,6 +954,7 @@ private struct ATHLTHArenaTeamsSection: View {
     }
 
     var body: some View {
+        Group {
         if isVisible {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 9) {
@@ -1099,10 +1100,11 @@ private struct ATHLTHArenaTeamsSection: View {
                     Task { _ = await saveTeams(first: [], second: []) }
                 }
             }
-            .task(id: series.id) { await refresh() }
-            .onChange(of: scenePhase) { _, phase in
-                if phase == .active { Task { await refresh() } }
-            }
+        }
+        }
+        .task(id: series.id) { await refresh() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await refresh() } }
         }
     }
 
@@ -1155,6 +1157,8 @@ private struct ATHLTHArenaTeamsSection: View {
 
 private struct ATHLTHArenaTeamEditor: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var social: SocialStore
 
     let members: [ATHLTHArenaRemoteMember]
     let onSave: ([UUID], [UUID]) async -> Bool
@@ -1187,6 +1191,15 @@ private struct ATHLTHArenaTeamEditor: View {
         abs(first.count - second.count) <= 1
     }
 
+    private func displayName(_ member: ATHLTHArenaRemoteMember) -> String {
+        if member.userID == session.profile.userID {
+            return ATHLTHLocalization.choose(english: "You", norwegian: "Du")
+        }
+        return (social.visibleProfiles + social.mutualFollows)
+            .first(where: { $0.userID == member.userID })?.resolvedName ??
+            ATHLTHLocalization.choose(english: "Athlete", norwegian: "Deltaker")
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -1200,10 +1213,7 @@ private struct ATHLTHArenaTeamEditor: View {
                 }
                 Section {
                     ForEach(members) { member in
-                        Picker(member.userID?.uuidString.prefix(8).description ??
-                               ATHLTHLocalization.choose(
-                                   english: "Athlete", norwegian: "Deltaker"
-                               ), selection: Binding(
+                        Picker(displayName(member), selection: Binding(
                             get: { choices[member.slotID] ?? 0 },
                             set: { choices[member.slotID] = $0 }
                         )) {
