@@ -2717,12 +2717,32 @@ private struct ATHLTHArenaRelaySection: View {
 
     @State private var assignments: [ATHLTHArenaTeamAssignment] = []
     @State private var legs: [ATHLTHArenaRelayLeg] = []
+    @State private var reports: [ATHLTHArenaRelayLegReport] = []
+    @State private var legTimeText = ""
     @State private var loading = false
     @State private var writing = false
     @State private var editing = false
     @State private var confirmRemove = false
     @State private var errorMessage: String?
     private let cloud = ATHLTHArenaCloudService()
+
+    private var ownLeg: ATHLTHArenaRelayLeg? {
+        guard let ownSlot = members.first(where: {
+            $0.userID == session.profile.userID && $0.response == "accepted"
+        })?.slotID else { return nil }
+        return legs.first(where: { $0.slotID == ownSlot })
+    }
+
+    private var parsedLegTime: Double? {
+        guard let seconds = GhostTargetTimeFormatter.parse(legTimeText),
+              seconds.isFinite, (10...86_400).contains(seconds) else { return nil }
+        return seconds
+    }
+
+    private var reportWindowOpen: Bool {
+        series.status == "active" &&
+            (series.endsAt.map { Date() <= $0 } ?? true)
+    }
 
     private var availableRoutes: [ATHLTHArenaRemoteProposal] {
         rounds.filter { $0.template == .fastestRoute && $0.routeSnapshot != nil }
@@ -2815,12 +2835,121 @@ private struct ATHLTHArenaRelaySection: View {
                                         Text(athleteName(for: leg.slotID))
                                             .font(.caption)
                                         Spacer()
-                                        Image(systemName: "arrow.right")
-                                            .font(.caption2)
+                                        if let time = reports.first(where: {
+                                            $0.slotID == leg.slotID &&
+                                            $0.seriesID == series.id
+                                        })?.elapsedSeconds {
+                                            Text(GhostTargetTimeFormatter.string(time))
+                                                .font(.caption.weight(.medium))
+                                                .monospacedDigit()
+                                        } else {
+                                            Text("—")
+                                                .font(.caption)
+                                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                        }
+                                    }
+                                }
+                                if let progress = ATHLTHArenaRelayProgress.team(
+                                    team, legs: legs, reports: reports
+                                ) {
+                                    HStack {
+                                        Text("\(progress.completedLegs)/\(progress.totalLegs) " +
+                                            ATHLTHLocalization.choose(
+                                                english: "legs reported",
+                                                norwegian: "etapper rapportert"
+                                            ))
+                                            .font(.caption)
                                             .foregroundStyle(ATHLTHTheme.mutedText)
+                                        Spacer()
+                                        if let total = progress.completeTotalSeconds {
+                                            Text(GhostTargetTimeFormatter.string(total))
+                                                .font(.subheadline.weight(.semibold))
+                                                .monospacedDigit()
+                                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                        }
                                     }
                                 }
                             }
+                            .padding(11)
+                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 13))
+                        }
+
+                        if let one = ATHLTHArenaRelayProgress.team(
+                                1, legs: legs, reports: reports
+                            )?.completeTotalSeconds,
+                           let two = ATHLTHArenaRelayProgress.team(
+                                2, legs: legs, reports: reports
+                            )?.completeTotalSeconds {
+                            Label(
+                                one == two
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Reported relay tie",
+                                        norwegian: "Foreløpig lik stafettid"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Provisional team", norwegian: "Foreløpig lag"
+                                    ) + " \(one < two ? 1 : 2) · " +
+                                        String(format: "%.0f s", abs(one-two)),
+                                systemImage: "flag.checkered"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                        }
+
+                        if reportWindowOpen, let ownLeg {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Report your leg time",
+                                    norwegian: "Registrer din etappetid"
+                                ))
+                                .font(.subheadline.weight(.semibold))
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Your time is self-reported. It is not GPS-verified and does not award Arena points.",
+                                    norwegian: "Tiden oppgis av deg. Den er ikke GPS-verifisert og gir ikke Arena-poeng."
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                TextField(
+                                    ATHLTHLocalization.choose(
+                                        english: "Time (mm:ss or h:mm:ss)",
+                                        norwegian: "Tid (mm:ss eller t:mm:ss)"
+                                    ),
+                                    text: $legTimeText
+                                )
+                                .keyboardType(.numbersAndPunctuation)
+                                .textFieldStyle(.roundedBorder)
+                                HStack {
+                                    Button {
+                                        guard let value = parsedLegTime else { return }
+                                        Task { await saveLeg(ownLeg.slotID, value) }
+                                    } label: {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Submit time",
+                                                norwegian: "Registrer tid"
+                                            ),
+                                            systemImage: "checkmark.circle"
+                                        )
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(ATHLTHTheme.accentDeep)
+                                    .disabled(writing || parsedLegTime == nil)
+                                    if reports.contains(where: {
+                                        $0.slotID == ownLeg.slotID
+                                    }) {
+                                        Button(role: .destructive) {
+                                            Task { await saveLeg(ownLeg.slotID, nil) }
+                                        } label: {
+                                            Text(ATHLTHLocalization.choose(
+                                                english: "Withdraw", norwegian: "Trekk tilbake"
+                                            ))
+                                        }
+                                        .disabled(writing)
+                                    }
+                                }
+                            }
+                            .padding(12)
+                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
                         }
                         if canConfigure {
                             Button(role: .destructive) {
@@ -2852,8 +2981,8 @@ private struct ATHLTHArenaRelaySection: View {
                     }
 
                     Text(ATHLTHLocalization.choose(
-                        english: "This is a route and runner plan, not a live baton handoff or automatically verified relay score. Only approved Arena results award points.",
-                        norwegian: "Dette er en plan for rute og løpere, ikke automatisk veksling eller verifisert stafettid. Bare godkjente Arena-resultater gir poeng."
+                        english: "Stage times are self-reported. Team totals appear only when all runners submit. There is no automatic baton exchange, verified relay time or automatic Arena points.",
+                        norwegian: "Etappetider oppgis av løperne. Lagtotalen vises først når alle har registrert tid. Ingen automatisk veksling, verifisert stafettid eller automatisk Arena-poeng."
                     ))
                     .font(.caption2)
                     .foregroundStyle(ATHLTHTheme.mutedText)
@@ -2923,9 +3052,33 @@ private struct ATHLTHArenaRelaySection: View {
         do {
             async let roster = cloud.loadTeamAssignments(seriesID: series.id)
             async let plan = cloud.loadRelayLegs(seriesID: series.id)
+            async let resultRows = cloud.loadRelayReports(seriesID: series.id)
             assignments = try await roster
             legs = try await plan
+            reports = try await resultRows
+            if let slot = ownLeg?.slotID,
+               let existing = reports.first(where: { $0.slotID == slot }),
+               legTimeText.isEmpty {
+                legTimeText = GhostTargetTimeFormatter.string(existing.elapsedSeconds)
+            }
             errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func saveLeg(_ slotID: UUID, _ seconds: Double?) async {
+        guard !writing, reportWindowOpen,
+              ownLeg?.slotID == slotID else { return }
+        writing = true
+        defer { writing = false }
+        do {
+            try await cloud.reportRelayLeg(
+                seriesID: series.id, slotID: slotID, seconds: seconds
+            )
+            if seconds == nil { legTimeText = "" }
+            await refresh()
         } catch {
             errorMessage = error.localizedDescription
         }
