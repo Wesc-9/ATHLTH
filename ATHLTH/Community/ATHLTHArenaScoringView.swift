@@ -33,6 +33,7 @@ struct ATHLTHArenaScoringSection: View {
     @State private var errorMessage: String?
     @State private var confirmStart = false
     @State private var roundToScore: ATHLTHArenaRemoteProposal?
+    @State private var checkingLiveProposal = false
 
     private let cloud = ATHLTHArenaCloudService()
 
@@ -264,17 +265,8 @@ struct ATHLTHArenaScoringSection: View {
             if phase == .active { Task { await reload() } }
         }
         .onChange(of: liveOutcomeDraft?.id) { _, _ in
-            guard let draft = liveOutcomeDraft,
-                  series.status == "active",
-                  isOrganizer,
-                  let round = rounds.first(where: { $0.id == draft.roundID }),
-                  results.first(where: {
-                      $0.roundID == round.id && $0.status != "rejected"
-                  }) == nil else {
-                return
-            }
-            // The editor still requires an explicit Submit and unanimous votes.
-            roundToScore = round
+            guard let draft = liveOutcomeDraft else { return }
+            Task { await prepareLiveOutcome(draft) }
         }
         .sheet(item: $roundToScore, onDismiss: {
             liveOutcomeDraft = nil
@@ -615,6 +607,58 @@ struct ATHLTHArenaScoringSection: View {
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    /// A newly completed Live Ghost race can only prepare a draft.
+    /// Re-check the authoritative round status immediately before showing
+    /// the editor; a competing device may have submitted a proposal already.
+    @MainActor
+    private func prepareLiveOutcome(
+        _ draft: ATHLTHArenaLiveOutcomeDraft
+    ) async {
+        guard !checkingLiveProposal,
+              !writing,
+              series.status == "active",
+              isOrganizer,
+              let round = rounds.first(where: { $0.id == draft.roundID })
+        else {
+            liveOutcomeDraft = nil
+            return
+        }
+
+        checkingLiveProposal = true
+        defer { checkingLiveProposal = false }
+
+        do {
+            let latestResults = try await cloud.loadRoundResults(
+                seriesID: series.id
+            )
+            guard !Task.isCancelled,
+                  liveOutcomeDraft?.id == draft.id else { return }
+
+            results = latestResults
+            if latestResults.contains(where: {
+                $0.roundID == round.id && $0.status != "rejected"
+            }) {
+                errorMessage = ATHLTHLocalization.choose(
+                    english: "A result has already been submitted for this round. Review its status instead of proposing a duplicate.",
+                    norwegian: "Det finnes allerede et resultatforslag for denne runden. Kontroller statusen i stedet for å sende et nytt."
+                )
+                liveOutcomeDraft = nil
+                return
+            }
+
+            // A result editor only: the organizer must submit deliberately,
+            // and all eligible athletes must approve before any points move.
+            errorMessage = nil
+            roundToScore = round
+        } catch {
+            errorMessage = ATHLTHLocalization.choose(
+                english: "Could not check the latest round status. Try again before preparing a result.",
+                norwegian: "Kunne ikke kontrollere siste rundestatus. Prøv igjen før du klargjør et resultat."
+            ) + " " + error.localizedDescription
+            liveOutcomeDraft = nil
         }
     }
 
