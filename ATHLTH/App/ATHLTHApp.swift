@@ -2306,6 +2306,14 @@ struct AppRootView: View {
             .recordWatchWorkout(result)
 
         Task { @MainActor in
+            // Finish the synchronized race before slower HealthKit and
+            // integration work can delay the opponent's result.
+            if result.kind == .running {
+                await realtimeSocial.finishCurrentLiveGhostRace(
+                    elapsedSeconds: result.duration
+                )
+            }
+
             let routeLocations:
                 [CLLocation]
             if let workoutID =
@@ -2374,12 +2382,6 @@ struct AppRootView: View {
                         appSession
                             .onboardingProfile?
                             .maximumHeartRateBPM
-                )
-
-            await realtimeSocial
-                .finishCurrentLiveGhostRace(
-                    elapsedSeconds:
-                        result.duration
                 )
 
             await social.finishActiveWorkout(
@@ -2492,6 +2494,14 @@ struct AppRootView: View {
         )
 
         Task {
+            // A completed run settles Live Ghost before other async
+            // post-workout integrations, on both iPhone and Watch.
+            if !workout.walking {
+                await realtimeSocial.finishCurrentLiveGhostRace(
+                    elapsedSeconds: publishable.duration
+                )
+            }
+
             await homeAssistant.sendCompletedWorkout(
                 name: publishable.title,
                 type: publishable.activity.rawValue,
@@ -2558,12 +2568,6 @@ struct AppRootView: View {
                         appSession
                             .onboardingProfile?
                             .maximumHeartRateBPM
-                )
-
-            await realtimeSocial
-                .finishCurrentLiveGhostRace(
-                    elapsedSeconds:
-                        publishable.duration
                 )
 
             await social.finishActiveWorkout(
