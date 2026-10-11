@@ -1601,6 +1601,13 @@ struct ATHLTHArenaOnlineDetailView: View {
                         isOrganizer: isOrganizer
                     )
                     .id("arena-teams")
+                    ATHLTHArenaRelaySection(
+                        series: currentSeries,
+                        members: members,
+                        rounds: rounds,
+                        isOrganizer: isOrganizer
+                    )
+                    .id("arena-relay")
                 }
 
                 if let route = rounds.compactMap(\.routeSnapshot).first {
