@@ -1612,11 +1612,11 @@ struct IPhoneWorkoutView: View {
         }
         .task(
             id:
-                social.currentJoinedWorkoutSessionID
+                social.recordingWorkoutSessionID
         ) {
             guard
                 let sessionID =
-                    social.currentJoinedWorkoutSessionID,
+                    social.recordingWorkoutSessionID,
                 let userID =
                     social.currentUserID
             else {
