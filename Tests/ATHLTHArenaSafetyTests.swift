@@ -9,6 +9,107 @@ final class ATHLTHArenaSafetyTests: XCTestCase {
         return decoder
     }
 
+    private func overviewSeries(
+        status: String,
+        endsAt: String? = nil,
+        completedAt: String? = nil,
+        id: UUID = UUID()
+    ) throws -> ATHLTHArenaRemoteSeries {
+        var fields = [
+            "\"id\":\"\\(id.uuidString)\"",
+            "\"owner_id\":null",
+            "\"title\":\"Test competition\"",
+            "\"scope\":\"duel\"",
+            "\"scoring\":\"winner\"",
+            "\"duration_days\":14",
+            "\"status\":\"\\(status)\""
+        ]
+        if let endsAt {
+            fields.append("\"ends_at\":\"\\(endsAt)\"")
+        }
+        if let completedAt {
+            fields.append("\"completed_at\":\"\\(completedAt)\"")
+        }
+        return try decoder().decode(
+            ATHLTHArenaRemoteSeries.self,
+            from: Data(("{"+fields.joined(separator: ",")+"}").utf8)
+        )
+    }
+
+    func testArenaHomePutsUrgentCompetitionsFirst() throws {
+        let expired = try overviewSeries(
+            status: "active", endsAt: "2026-10-11T12:00:00Z"
+        )
+        let tonight = try overviewSeries(
+            status: "active", endsAt: "2026-10-11T23:00:00Z"
+        )
+        let nextWeek = try overviewSeries(
+            status: "active", endsAt: "2026-10-20T12:00:00Z"
+        )
+        let missingDate = try overviewSeries(status: "active")
+        let alreadyDone = try overviewSeries(
+            status: "completed", endsAt: "2026-10-11T11:00:00Z"
+        )
+        let ordered = ATHLTHArenaSeriesOverview.orderedActive(
+            [missingDate, nextWeek, tonight, alreadyDone, expired]
+        )
+        XCTAssertEqual(
+            ordered.map(\.id),
+            [expired.id, tonight.id, nextWeek.id, missingDate.id]
+        )
+    }
+
+    func testArenaHomeDeadlineUsesRealMinutesHoursAndDays() throws {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        func subject(_ delta: TimeInterval) throws -> ATHLTHArenaRemoteSeries {
+            let series = try overviewSeries(
+                status: "active",
+                endsAt: ISO8601DateFormatter().string(
+                    from: now.addingTimeInterval(delta)
+                )
+            )
+            return series
+        }
+        XCTAssertEqual(
+            ATHLTHArenaSeriesOverview.urgency(for: try subject(-1), at: now),
+            .review
+        )
+        XCTAssertEqual(
+            ATHLTHArenaSeriesOverview.urgency(for: try subject(59), at: now),
+            .minutes(1)
+        )
+        XCTAssertEqual(
+            ATHLTHArenaSeriesOverview.urgency(for: try subject(3_600), at: now),
+            .hours(1)
+        )
+        XCTAssertEqual(
+            ATHLTHArenaSeriesOverview.urgency(for: try subject(48 * 3_600), at: now),
+            .days(2)
+        )
+        XCTAssertNil(
+            ATHLTHArenaSeriesOverview.urgency(for: try subject(4 * 86_400), at: now)
+        )
+    }
+
+    func testArenaHomeCompletedHistoryNewestFirst() throws {
+        let early = try overviewSeries(
+            status: "completed", completedAt: "2026-09-01T09:00:00Z"
+        )
+        let late = try overviewSeries(
+            status: "completed", completedAt: "2026-10-11T19:00:00Z"
+        )
+        let active = try overviewSeries(status: "active")
+        XCTAssertEqual(
+            ATHLTHArenaSeriesOverview.orderedCompleted(
+                [early, active, late]
+            ).map(\.id),
+            [late.id, early.id]
+        )
+        XCTAssertNil(
+            ATHLTHArenaSeriesOverview.urgency(for: late, at: Date())
+        )
+    }
+
     func testDeletedMemberKeepsStableSlotAndEarnedPoints() throws {
         let slotID = UUID()
         let seriesID = UUID()
