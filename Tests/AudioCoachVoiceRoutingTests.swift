@@ -22,7 +22,7 @@ final class AudioCoachVoiceRoutingTests: XCTestCase {
                     configuration: configuration,
                     workoutKind: .running,
                     priority: priority,
-                    iPhoneReachable: true
+                    iPhoneVoiceLeaseActive: true
                 ),
                 "Routine/step speech must not duplicate on Watch and iPhone"
             )
@@ -42,7 +42,7 @@ final class AudioCoachVoiceRoutingTests: XCTestCase {
                     configuration: configuration,
                     workoutKind: .running,
                     priority: priority,
-                    iPhoneReachable: true
+                    iPhoneVoiceLeaseActive: true
                 ),
                 "The mirrored iPhone coach does not reproduce this alert"
             )
@@ -61,7 +61,7 @@ final class AudioCoachVoiceRoutingTests: XCTestCase {
                     configuration: configuration,
                     workoutKind: .strength,
                     priority: priority,
-                    iPhoneReachable: true
+                    iPhoneVoiceLeaseActive: true
                 )
             )
         }
@@ -73,7 +73,7 @@ final class AudioCoachVoiceRoutingTests: XCTestCase {
                 configuration: mirroredConfiguration(),
                 workoutKind: .walking,
                 priority: .routineCoach,
-                iPhoneReachable: true
+                iPhoneVoiceLeaseActive: true
             )
         )
     }
@@ -92,7 +92,7 @@ final class AudioCoachVoiceRoutingTests: XCTestCase {
                     configuration: configuration,
                     workoutKind: .running,
                     priority: priority,
-                    iPhoneReachable: false
+                    iPhoneVoiceLeaseActive: false
                 )
             )
         }
@@ -106,7 +106,7 @@ final class AudioCoachVoiceRoutingTests: XCTestCase {
                 configuration: configuration,
                 workoutKind: .running,
                 priority: .routineCoach,
-                iPhoneReachable: true
+                iPhoneVoiceLeaseActive: true
             )
         )
     }
@@ -117,6 +117,127 @@ final class AudioCoachVoiceRoutingTests: XCTestCase {
             from: JSONEncoder().encode(WatchAudioCoachConfiguration.disabled)
         )
         XCTAssertFalse(decoded.shouldPreferIPhoneAudioWhenReachable)
+    }
+
+    func testValidOfferGrantsTemporaryLeaseAndAcknowledgesRequest() {
+        var lease = ATHLTHAudioCoachVoiceLease()
+        let now = Date(timeIntervalSince1970: 1_000)
+        let startedAt = now.addingTimeInterval(-30)
+        let offer = ATHLTHAudioCoachLeaseOffer(
+            generationID: UUID(),
+            requestID: UUID(),
+            workoutStartedAt: startedAt,
+            issuedAt: now
+        )
+
+        let acknowledgement = lease.grant(
+            offer: offer,
+            workoutStartedAt: startedAt,
+            eligible: true,
+            now: now
+        )
+        XCTAssertEqual(acknowledgement?.requestID, offer.requestID)
+        XCTAssertEqual(acknowledgement?.generationID, offer.generationID)
+        XCTAssertTrue(lease.isActive(at: now.addingTimeInterval(5)))
+        XCTAssertFalse(lease.isActive(at: now.addingTimeInterval(7)))
+    }
+
+    func testLeaseRejectsStaleOfferOrDifferentWorkout() {
+        let now = Date(timeIntervalSince1970: 2_000)
+        let startedAt = now.addingTimeInterval(-30)
+        var lease = ATHLTHAudioCoachVoiceLease()
+        let offer = ATHLTHAudioCoachLeaseOffer(
+            generationID: UUID(),
+            requestID: UUID(),
+            workoutStartedAt: startedAt,
+            issuedAt: now.addingTimeInterval(-10)
+        )
+        XCTAssertNil(lease.grant(
+            offer: offer,
+            workoutStartedAt: startedAt,
+            eligible: true,
+            now: now
+        ))
+        XCTAssertFalse(lease.isActive(at: now))
+        let freshOffer = ATHLTHAudioCoachLeaseOffer(
+            generationID: offer.generationID,
+            requestID: UUID(),
+            workoutStartedAt: startedAt,
+            issuedAt: now
+        )
+        XCTAssertNil(lease.grant(
+            offer: freshOffer,
+            workoutStartedAt: startedAt.addingTimeInterval(60),
+            eligible: true,
+            now: now
+        ))
+        XCTAssertFalse(lease.isActive(at: now))
+    }
+
+    func testLeaseRejectsIneligibleOrOutOfOrderOffer() {
+        let now = Date(timeIntervalSince1970: 3_000)
+        let startedAt = now.addingTimeInterval(-20)
+        var lease = ATHLTHAudioCoachVoiceLease()
+        let first = ATHLTHAudioCoachLeaseOffer(
+            generationID: UUID(),
+            requestID: UUID(),
+            workoutStartedAt: startedAt,
+            issuedAt: now
+        )
+        XCTAssertNil(lease.grant(
+            offer: first,
+            workoutStartedAt: startedAt,
+            eligible: false,
+            now: now
+        ))
+        XCTAssertNotNil(lease.grant(
+            offer: first,
+            workoutStartedAt: startedAt,
+            eligible: true,
+            now: now
+        ))
+        let earlier = ATHLTHAudioCoachLeaseOffer(
+            generationID: first.generationID,
+            requestID: UUID(),
+            workoutStartedAt: startedAt,
+            issuedAt: now.addingTimeInterval(-1)
+        )
+        XCTAssertNil(lease.grant(
+            offer: earlier,
+            workoutStartedAt: startedAt,
+            eligible: true,
+            now: now
+        ))
+        lease.reset()
+        XCTAssertFalse(lease.isActive(at: now))
+    }
+
+    func testLeaseCanUseJsonAcrossPhoneAndWatch() throws {
+        let startedAt = Date(timeIntervalSince1970: 4_000)
+        let offer = ATHLTHAudioCoachLeaseOffer(
+            generationID: UUID(),
+            requestID: UUID(),
+            workoutStartedAt: startedAt,
+            issuedAt: startedAt
+        )
+        let decoded = try JSONDecoder().decode(
+            ATHLTHAudioCoachLeaseOffer.self,
+            from: JSONEncoder().encode(offer)
+        )
+        XCTAssertEqual(offer, decoded)
+
+        var lease = ATHLTHAudioCoachVoiceLease()
+        let acknowledgement = try XCTUnwrap(lease.grant(
+            offer: decoded,
+            workoutStartedAt: startedAt,
+            eligible: true,
+            now: startedAt
+        ))
+        let decodedAck = try JSONDecoder().decode(
+            ATHLTHAudioCoachLeaseAcknowledgement.self,
+            from: JSONEncoder().encode(acknowledgement)
+        )
+        XCTAssertEqual(decodedAck.requestID, offer.requestID)
     }
 
     func testPriorityGateDoesNotOverrideCriticalWithRoutine() {
