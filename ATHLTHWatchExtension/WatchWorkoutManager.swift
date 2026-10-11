@@ -730,36 +730,24 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         let summary: String
         if kind == .strength, let strengthSession {
-            var strengthParts: [String] = [
-                coachPhrase(
-                    english: "\(strengthSession.completedSets) of \(strengthSession.totalSets) sets completed.",
-                    norwegian: "\(strengthSession.completedSets) av \(strengthSession.totalSets) sett fullført."
-                )
-            ]
-            if let exerciseName = strengthSession.exerciseName,
-               !exerciseName.isEmpty {
-                strengthParts.append(
-                    coachPhrase(
-                        english: "Current exercise",
-                        norwegian: "Nåværende øvelse"
-                    ) + ": " + exerciseName
-                )
-            }
-            if let restEndsAt = strengthSession.restEndsAt {
-                let seconds = max(
-                    Int(restEndsAt.timeIntervalSinceNow.rounded()),
-                    0
-                )
-                if seconds > 0 {
-                    strengthParts.append(
-                        coachPhrase(
-                            english: "\(seconds) seconds of rest remaining.",
-                            norwegian: "\(seconds) sekunder igjen av hvilen."
-                        )
-                    )
-                }
-            }
-            summary = strengthParts.joined(separator: " ")
+            let english = ATHLTHStrengthCoachStatusMessage.make(
+                completedSets: strengthSession.completedSets,
+                totalSets: strengthSession.totalSets,
+                exerciseName: strengthSession.exerciseName,
+                restEndsAt: strengthSession.restEndsAt,
+                norwegian: false
+            )
+            let norwegian = ATHLTHStrengthCoachStatusMessage.make(
+                completedSets: strengthSession.completedSets,
+                totalSets: strengthSession.totalSets,
+                exerciseName: strengthSession.exerciseName,
+                restEndsAt: strengthSession.restEndsAt,
+                norwegian: true
+            )
+            summary = coachPhrase(
+                english: english,
+                norwegian: norwegian
+            )
         } else {
             summary = metricsAnnouncement
         }
