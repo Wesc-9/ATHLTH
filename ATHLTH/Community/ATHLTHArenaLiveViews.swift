@@ -3021,6 +3021,7 @@ struct ATHLTHArenaOnlineDetailView: View {
     @State private var approvals: [ATHLTHArenaRemoteApproval] = []
     @State private var sharedWorkoutEvidence: [ATHLTHArenaWorkoutEvidence] = []
     @State private var loading = false
+    @State private var refreshQueued = false
     @State private var writing = false
     @State private var message: String?
     @State private var showingRoundCreator = false
@@ -3452,6 +3453,25 @@ struct ATHLTHArenaOnlineDetailView: View {
         }
         .task(id: series.id) {
             await refresh()
+        }
+        // Series status changes arrive immediately; approvals and invitation
+        // changes have a bounded foreground polling fallback because those
+        // tables are not published to Supabase Realtime.
+        .task(id: series.id) {
+            await listenForSeriesChanges()
+        }
+        .task(id: series.id) {
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(nanoseconds: 30_000_000_000)
+                } catch {
+                    break
+                }
+                if Task.isCancelled { break }
+                if scenePhase == .active {
+                    await refresh()
+                }
+            }
         }
         .refreshable { await refresh() }
         .onChange(of: scenePhase) { _, phase in
@@ -4280,38 +4300,68 @@ struct ATHLTHArenaOnlineDetailView: View {
             )
     }
 
+    /// Subscribes only to the published series table; round approvals and
+    /// membership are refreshed by the foreground fallback below.
+    @MainActor
+    private func listenForSeriesChanges() async {
+        let channel = await SupabaseEnvironment.client.channel(
+            "arena-series-status-\(series.id.uuidString.lowercased())"
+        )
+        let changes = await channel.postgresChange(
+            AnyAction.self, schema: "public", table: "arena_series"
+        )
+        await channel.subscribe()
+        for await _ in changes {
+            if Task.isCancelled { break }
+            await refresh()
+        }
+        await channel.unsubscribe()
+    }
+
+    /// A write can request a refresh while a previous read is in flight.
+    /// Queue one more read instead of dropping that important update.
     @MainActor
     private func refresh() async {
-        guard !loading else { return }
+        if loading {
+            refreshQueued = true
+            return
+        }
         loading = true
         defer { loading = false }
-        do {
-            async let loadedSeries = cloud.loadSeries()
-            async let loadedMembers = cloud.loadMembers(seriesID: series.id)
-            async let loadedRounds = cloud.loadProposals(seriesID: series.id)
-            let memberRows = try await loadedMembers
-            let roundRows = try await loadedRounds
-            let approvalRows = try await cloud.loadApprovals(
-                roundIDs: roundRows.map(\.id)
-            )
-            let seriesRows = try await loadedSeries
-            latestSeries = seriesRows.first { $0.id == series.id }
-            members = memberRows
-            rounds = roundRows
-            approvals = approvalRows
-            if memberRows.contains(where: {
-                $0.userID == session.profile.userID && $0.response == "accepted"
-            }) {
-                sharedWorkoutEvidence =
-                    (try? await cloud.loadWorkoutEvidence(seriesID: series.id)) ?? []
-            } else {
-                sharedWorkoutEvidence = []
+
+        repeat {
+            refreshQueued = false
+            do {
+                async let loadedSeries = cloud.loadSeries()
+                async let loadedMembers = cloud.loadMembers(seriesID: series.id)
+                async let loadedRounds = cloud.loadProposals(seriesID: series.id)
+                let memberRows = try await loadedMembers
+                let roundRows = try await loadedRounds
+                let approvalRows = try await cloud.loadApprovals(
+                    roundIDs: roundRows.map(\.id)
+                )
+                let seriesRows = try await loadedSeries
+                guard !Task.isCancelled else { return }
+                latestSeries = seriesRows.first { $0.id == series.id }
+                members = memberRows
+                rounds = roundRows
+                approvals = approvalRows
+                if memberRows.contains(where: {
+                    $0.userID == session.profile.userID && $0.response == "accepted"
+                }) {
+                    sharedWorkoutEvidence =
+                        (try? await cloud.loadWorkoutEvidence(seriesID: series.id)) ?? []
+                } else {
+                    sharedWorkoutEvidence = []
+                }
+                guard !Task.isCancelled else { return }
+                remoteRevision = UUID()
+                message = nil
+            } catch {
+                if Task.isCancelled { return }
+                message = error.localizedDescription
             }
-            remoteRevision = UUID()
-            message = nil
-        } catch {
-            message = error.localizedDescription
-        }
+        } while refreshQueued && !Task.isCancelled
     }
 
     @MainActor
