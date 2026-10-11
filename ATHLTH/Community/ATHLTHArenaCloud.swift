@@ -157,6 +157,29 @@ enum ATHLTHArenaRelayProgress {
                 ? validTimes.reduce(0,+) : nil
         )
     }
+
+    /// Returns the earliest leg without one valid, same-series report.
+    /// This means "not reported", not that the runner is currently racing:
+    /// there is no electronic baton exchange or verified start order yet.
+    static func nextUnreportedLeg(
+        for team: Int,
+        legs: [ATHLTHArenaRelayLeg],
+        reports: [ATHLTHArenaRelayLegReport]
+    ) -> ATHLTHArenaRelayLeg? {
+        guard let progress = self.team(team, legs: legs, reports: reports),
+              progress.completeTotalSeconds == nil else { return nil }
+        let ordered = legs.filter { $0.teamIndex == team }
+            .sorted { $0.legOrder < $1.legOrder }
+        for leg in ordered {
+            let matching = reports.filter { $0.slotID == leg.slotID }
+            guard matching.count == 1,
+                  matching[0].seriesID == leg.seriesID,
+                  matching[0].elapsedSeconds.isFinite,
+                  (10...86_400).contains(matching[0].elapsedSeconds)
+            else { return leg }
+        }
+        return nil
+    }
 }
 
 private struct ATHLTHArenaReportRelayLegParams: Encodable {
