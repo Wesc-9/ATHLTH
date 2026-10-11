@@ -212,6 +212,21 @@ struct LiveGhostRaceLobbyView: View {
                     .foregroundStyle(
                         ATHLTHTheme.primaryText
                     )
+                Label(
+                    challenge.sourceKind == "planned_route"
+                        ? ATHLTHLocalization.choose(
+                            english: "Planned route · shared start",
+                            norwegian: "Planlagt rute · felles start"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Previous GPS run · shared start",
+                            norwegian: "Tidligere GPS-økt · felles start"
+                        ),
+                    systemImage: challenge.sourceKind == "planned_route"
+                        ? "map.fill" : "figure.run"
+                )
+                .font(.caption.weight(.medium))
+                .foregroundStyle(ATHLTHTheme.mutedText)
 
                 Text(
                     ATHLTHLocalization.choose(
@@ -478,7 +493,7 @@ struct LiveGhostRaceLobbyView: View {
                 .disabled(
                     liveRace.isChangingReady ||
                     isLaunching ||
-                    !deviceCanStart
+                    (ownParticipant?.ready != true && !deviceCanStart)
                 )
             }
         }
@@ -793,13 +808,16 @@ struct LiveGhostRaceLobbyView: View {
     private var deviceCanStart: Bool {
         switch captureDevice {
         case .iPhone:
-            return phoneWorkout.active ==
-                nil
+            return phoneWorkout.active == nil &&
+                !watchConnection.hasActiveWatchWorkout &&
+                !watchConnection.workoutLaunchInProgress
 
         case .appleWatch:
             return watchConnection.isReady &&
-                !watchConnection
-                    .workoutLaunchInProgress
+                !watchConnection.workoutLaunchInProgress &&
+                !watchConnection.hasActiveWatchWorkout &&
+                phoneWorkout.active == nil &&
+                !watchConnection.hasActiveIPhoneWorkout
         }
     }
 
@@ -813,6 +831,14 @@ struct LiveGhostRaceLobbyView: View {
         let next =
             !(ownParticipant?.ready ??
                 false)
+
+        if next && !deviceCanStart {
+            launchError = ATHLTHLocalization.choose(
+                english: "Finish the active workout or connect the selected device before marking ready.",
+                norwegian: "Avslutt den aktive økten eller koble til valgt enhet før du markerer deg klar."
+            )
+            return
+        }
 
         await liveRace.setReady(
             next,
@@ -850,8 +876,9 @@ struct LiveGhostRaceLobbyView: View {
         guard
             !Task.isCancelled,
             !didLaunch,
-            ownParticipant?.ready ==
-                true
+            ownParticipant?.ready == true,
+            liveRace.participant(userID: opponentID)?.ready == true,
+            liveRace.room?.phase() == .racing
         else {
             return
         }
@@ -861,10 +888,13 @@ struct LiveGhostRaceLobbyView: View {
 
     @MainActor
     private func launchLiveRace() async {
-        guard !didLaunch,
-              !isLaunching,
-              deviceCanStart
-        else {
+        guard !didLaunch, !isLaunching else { return }
+        guard deviceCanStart else {
+            launchError = ATHLTHLocalization.choose(
+                english: "The selected device became unavailable. Your readiness was reset to prevent a duplicate workout.",
+                norwegian: "Valgt enhet er ikke lenger klar. Klarstatusen ble nullstilt for å hindre doble treningsøkter."
+            )
+            await liveRace.setReady(false, captureDevice: captureDevice)
             return
         }
 
