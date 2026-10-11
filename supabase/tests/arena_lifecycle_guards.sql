@@ -258,6 +258,27 @@ begin
  ) then
    raise exception 'A competition may be attached to multiple Club seasons';
  end if;
+ -- Administrators may correct a draft link, but not bypass season history.
+ if has_function_privilege(
+   'anon',
+   'public.arena_detach_club_season_series(uuid,uuid)'::regprocedure,
+   'EXECUTE'
+ ) or not has_function_privilege(
+   'authenticated',
+   'public.arena_detach_club_season_series(uuid,uuid)'::regprocedure,
+   'EXECUTE'
+ ) then
+   raise exception 'Arena season unlink privileges are incorrect';
+ end if;
+ if pg_get_functiondef(
+   'public.arena_detach_club_season_series(uuid,uuid)'::regprocedure
+ ) not ilike '%can_manage_community_group%'
+ or pg_get_functiondef(
+   'public.arena_detach_club_season_series(uuid,uuid)'::regprocedure
+ ) not ilike '%status <> ''draft''%'
+ then
+   raise exception 'Arena season unlink must enforce Club admin and draft-only state';
+ end if;
  -- Season audit history must not block account deletion. Creator/linker
  -- references are nullable and cascade to NULL, not to deleted history.
  if not exists (
