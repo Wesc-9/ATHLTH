@@ -113,6 +113,15 @@ struct ATHLTHArenaRelayLegReport: Decodable, Identifiable {
     }
 }
 
+/// A provisional comparison only; never a verified race or awarded
+/// team score. The participants must still review the source reports.
+struct ATHLTHArenaRelayComparison: Equatable {
+    let firstTeamSeconds: Double
+    let secondTeamSeconds: Double
+    let leadingTeam: Int?
+    let marginSeconds: Double
+}
+
 struct ATHLTHArenaRelayTeamProgress: Equatable {
     let team: Int
     let completedLegs: Int
@@ -155,6 +164,51 @@ enum ATHLTHArenaRelayProgress {
             totalLegs: stages.count,
             completeTotalSeconds: validTimes.count == stages.count
                 ? validTimes.reduce(0,+) : nil
+        )
+    }
+
+    /// One safe reported time for a frozen leg. Duplicate, foreign-series
+    /// and impossible values are hidden instead of displayed as valid times.
+    static func reportedTime(
+        for leg: ATHLTHArenaRelayLeg,
+        reports: [ATHLTHArenaRelayLegReport]
+    ) -> Double? {
+        let matches = reports.filter { $0.slotID == leg.slotID }
+        guard matches.count == 1,
+              let record = matches.first,
+              record.seriesID == leg.seriesID,
+              record.elapsedSeconds.isFinite,
+              (10...86_400).contains(record.elapsedSeconds)
+        else { return nil }
+        return record.elapsedSeconds
+    }
+
+    /// Reported team times may be compared only for equal, complete teams
+    /// racing the exact same frozen route in one competition. This is a
+    /// read-only suggestion and deliberately never allocates Arena points.
+    static func provisionalComparison(
+        legs: [ATHLTHArenaRelayLeg],
+        reports: [ATHLTHArenaRelayLegReport]
+    ) -> ATHLTHArenaRelayComparison? {
+        guard let first = team(1, legs: legs, reports: reports),
+              let second = team(2, legs: legs, reports: reports),
+              first.totalLegs == second.totalLegs,
+              first.totalLegs >= 2,
+              legs.count == first.totalLegs + second.totalLegs,
+              Set(legs.map(\.slotID)).count == legs.count,
+              Set(legs.map(\.seriesID)).count == 1,
+              Set(legs.map(\.routeRoundID)).count == 1,
+              let one = first.completeTotalSeconds,
+              let two = second.completeTotalSeconds,
+              one.isFinite, two.isFinite,
+              one > 0, two > 0
+        else { return nil }
+        let gap = abs(one - two)
+        return ATHLTHArenaRelayComparison(
+            firstTeamSeconds: one,
+            secondTeamSeconds: two,
+            leadingTeam: gap < 0.5 ? nil : (one < two ? 1 : 2),
+            marginSeconds: gap
         )
     }
 
