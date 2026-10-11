@@ -1421,7 +1421,6 @@ struct FriendProfileView: View {
     @State private var profile: SocialFriendProfile?
     @State private var loading = true
     @State private var showingChallenge = false
-    @State private var showingTrainingMode = false
     @State private var showingTrainingEditor = false
     @State private var trainPhysically = true
     @State private var showingReport = false
@@ -1604,32 +1603,6 @@ struct FriendProfileView: View {
                     preselectedFriends: [profile.card]
                 )
             }
-        }
-        .confirmationDialog(
-            ATHLTHLocalization.choose(
-                english: "How would you like to train?",
-                norwegian: "Hvordan vil dere trene?"
-            ),
-            isPresented: $showingTrainingMode,
-            titleVisibility: .visible
-        ) {
-            Button(ATHLTHLocalization.choose(
-                english: "Train together in person",
-                norwegian: "Trene fysisk sammen"
-            )) {
-                trainPhysically = true
-                showingTrainingEditor = true
-            }
-            Button(ATHLTHLocalization.choose(
-                english: "Train the same workout",
-                norwegian: "Trene samme økt"
-            )) {
-                trainPhysically = false
-                showingTrainingEditor = true
-            }
-            Button(ATHLTHLocalization.choose(
-                english: "Cancel", norwegian: "Avbryt"
-            ), role: .cancel) {}
         }
         .sheet(isPresented: $showingTrainingEditor) {
             SessionEditorView(
@@ -2244,7 +2217,7 @@ struct FriendProfileView: View {
             }
             Button {
                 if social.mutualFollows.contains(where: { $0.userID == userID }) {
-                    showingTrainingMode = true
+                    showingTrainingEditor = true
                 } else {
                     followActionError = ATHLTHLocalization.choose(
                         english: "Follow each other before sending a workout invitation.",
@@ -2260,14 +2233,14 @@ struct FriendProfileView: View {
                         .background(Color.white.opacity(0.68), in: Circle())
                     VStack(alignment: .leading, spacing: 3) {
                         Text(ATHLTHLocalization.choose(
-                            english: "Invite to workout",
-                            norwegian: "Inviter til treningsøkt"
+                            english: "Train Together",
+                            norwegian: "Tren sammen"
                         ))
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
                         Text(ATHLTHLocalization.choose(
-                            english: "Private invitation · plan together",
-                            norwegian: "Privat invitasjon · planlegg sammen"
+                            english: "Build or reuse a workout · private invitation",
+                            norwegian: "Lag eller hent en økt · privat invitasjon"
                         ))
                         .font(.caption2)
                         .foregroundStyle(ATHLTHTheme.mutedText)
