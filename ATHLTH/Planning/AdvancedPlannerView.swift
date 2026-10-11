@@ -4738,6 +4738,8 @@ struct SessionEditorView: View {
             initialValue: workout.workoutCategory
         )
         _meetingPoint = State(initialValue: workout.meetingPoint)
+        _physicalMeetup = State(initialValue:
+            workout.trainTogetherMode != .sameWorkout)
         _reminderMinutesBefore = State(initialValue: workout.reminderMinutesBefore ?? 0)
         _plannedExercises = State(initialValue: workout.exercises)
         _selectedRunningWorkouts = State(
@@ -8392,7 +8394,9 @@ struct SessionEditorView: View {
                 workoutCategory,
             meetingPoint: physicalMeetup ? meetingPoint : nil,
             reminderMinutesBefore: scheduledTimeEnabled && reminderMinutesBefore > 0
-                ? reminderMinutesBefore : nil
+                ? reminderMinutesBefore : nil,
+            trainTogetherMode: selectedPartnerID == nil ? nil :
+                (physicalMeetup ? .physical : .sameWorkout)
         )
 
     }

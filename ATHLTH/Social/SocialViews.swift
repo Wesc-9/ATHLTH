@@ -2186,7 +2186,8 @@ struct FriendProfileView: View {
     private func actionBar(
         _ profile: SocialFriendProfile
     ) -> some View {
-        HStack(spacing: 8) {
+        VStack(spacing: 9) {
+            HStack(spacing: 8) {
             mainFollowButton(profile)
 
             NavigationLink {
@@ -2240,24 +2241,60 @@ struct FriendProfileView: View {
             }
             .buttonStyle(.plain)
 
+            }
             Button {
                 if social.mutualFollows.contains(where: { $0.userID == userID }) {
                     showingTrainingMode = true
                 } else {
                     followActionError = ATHLTHLocalization.choose(
-                        english: "Follow each other to invite someone to train.",
-                        norwegian: "Dere må følge hverandre for å invitere til trening."
+                        english: "Follow each other before sending a workout invitation.",
+                        norwegian: "Dere må følge hverandre før du kan sende en treningsinvitasjon."
                     )
                 }
             } label: {
-                profileActionLabel(
-                    title: ATHLTHLocalization.choose(
-                        english: "Train together", norwegian: "Tren sammen"
+                HStack(spacing: 12) {
+                    Image(systemName: "figure.run.circle.fill")
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.vitality)
+                        .frame(width: 36, height: 36)
+                        .background(Color.white.opacity(0.68), in: Circle())
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Invite to workout",
+                            norwegian: "Inviter til treningsøkt"
+                        ))
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Private invitation · plan together",
+                            norwegian: "Privat invitasjon · planlegg sammen"
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+                .padding(.horizontal, 13)
+                .frame(maxWidth: .infinity)
+                .frame(height: 60)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.96),
+                            ATHLTHTheme.cardWarm.opacity(0.88)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     ),
-                    icon: "figure.run.circle",
-                    tint: ATHLTHTheme.vitality,
-                    emphasized: false
+                    in: RoundedRectangle(cornerRadius: 17, style: .continuous)
                 )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 17, style: .continuous)
+                        .stroke(Color.white.opacity(0.92), lineWidth: 1)
+                }
             }
             .buttonStyle(.plain)
         }

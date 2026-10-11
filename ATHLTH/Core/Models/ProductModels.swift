@@ -971,6 +971,11 @@ struct PlannedExercise: Identifiable, Codable, Hashable {
     }
 }
 
+enum PlannedWorkoutTogetherMode: String, Codable, Hashable {
+    case physical
+    case sameWorkout
+}
+
 /// A place chosen explicitly by the athlete, shared only with invited partners.
 struct PlannedWorkoutMeetingPoint: Codable, Hashable {
     var name: String
@@ -1042,6 +1047,8 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     // nil/0 disables reminders; a local notification is scheduled only
     // when a valid future start time has been chosen.
     var reminderMinutesBefore: Int? = nil
+    // A private invitation mode; optional for backwards compatibility.
+    var trainTogetherMode: PlannedWorkoutTogetherMode? = nil
 
     var sharedSourceOwnerID: UUID? = nil
     var sharedSourceSessionID: UUID? = nil
