@@ -393,6 +393,8 @@ struct WorkoutStartOptionsView: View {
                         settings.audioCoachSpeechRate
                     strengthAudioCoach.speechVolume =
                         settings.audioCoachSpeechVolume
+                    strengthAudioCoach.speechStyle =
+                        settings.audioCoachSpeechStyle
                     strengthAudioCoach.duckOtherAudio =
                         settings.audioCoachDuckOtherAudio
                     audioCoachLoaded = true
@@ -1523,6 +1525,29 @@ private struct StrengthAudioCoachSettingsView: View {
                         "Audio Coach",
                         isOn: $configuration.enabled
                     )
+                }
+
+                Section {
+                    Picker(
+                        ATHLTHLocalization.choose(
+                            english: "Speaking style",
+                            norwegian: "Talemåte"
+                        ),
+                        selection: Binding(
+                            get: { configuration.speechStyle ?? .balanced },
+                            set: { configuration.speechStyle = $0 }
+                        )
+                    ) {
+                        ForEach(ATHLTHCoachSpeechStyle.allCases) { style in
+                            Text(style.title).tag(style)
+                        }
+                    }
+                    Text(ATHLTHLocalization.choose(
+                        english: "Changes the wording, not the number of messages or the voice speed.",
+                        norwegian: "Endrer ordlyden, ikke antall meldinger eller talehastigheten."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 Section {
