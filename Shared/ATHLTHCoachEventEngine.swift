@@ -88,6 +88,21 @@ struct ATHLTHCoachEventLedger {
         }
     }
 
+    /// A validated receipt from the companion marks the same cue as used,
+    /// avoiding a replay when voice ownership moves back to Watch.
+    mutating func noteCompanionDelivery(id: String) {
+        guard !id.isEmpty,
+              id.count <= 110,
+              !deliveredIDs.contains(id)
+        else { return }
+
+        deliveredIDs.insert(id)
+        deliveryOrder.append(id)
+        if deliveryOrder.count > Self.maxEntries {
+            deliveredIDs.remove(deliveryOrder.removeFirst())
+        }
+    }
+
     mutating func reset() {
         deliveredIDs.removeAll(keepingCapacity: true)
         deliveryOrder.removeAll(keepingCapacity: true)
