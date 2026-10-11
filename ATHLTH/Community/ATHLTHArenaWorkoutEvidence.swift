@@ -240,6 +240,15 @@ struct ATHLTHArenaEvidenceSection: View {
                             Text(entry.startedAt, style: .date)
                                 .font(.caption2)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
+                            if let match = entry.reportedRouteMatchPercent {
+                                Text(String(format: "%.0f %%", match) + " · " +
+                                     ATHLTHLocalization.choose(
+                                        english: "Device-reported route match",
+                                        norwegian: "Rutematch rapportert av enheten"
+                                     ))
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
                         }
                         Spacer()
                         Button(role: .destructive) {
@@ -554,6 +563,11 @@ private struct ATHLTHArenaEvidencePicker: View {
                                 Text(candidate.sourceCheck.description)
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
+                                if let proof = candidate.routeProof {
+                                    Text(String(format: "GPS-rutematch %.0f %%", proof.matchPercent))
+                                        .font(.caption2.weight(.semibold))
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                }
                             }
                             Spacer()
                             Text(candidate.match.formatted)
@@ -598,10 +612,16 @@ private struct ATHLTHArenaEvidencePicker: View {
                     english: "Cancel", norwegian: "Avbryt"
                 ), role: .cancel) { candidateToConfirm = nil }
             } message: {
-                Text(ATHLTHLocalization.choose(
-                    english: "Participants will see the workout timestamp, source and result, not your GPS track or heart rate.",
-                    norwegian: "Deltakerne får se tidspunkt, øktkilde og resultat, ikke GPS-spor eller puls."
-                ))
+                Text(candidateToConfirm?.routeProof != nil
+                    ? ATHLTHLocalization.choose(
+                        english: "Participants will see the workout time, distance and device-reported route match. Your GPS track is never uploaded. These measurements still require group approval.",
+                        norwegian: "Deltakerne ser tid, distanse og rutematch rapportert av enheten. GPS-sporet lastes ikke opp. Resultatet må fortsatt godkjennes av gruppen."
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Participants will see the workout timestamp, source and result, not your GPS track or heart rate.",
+                        norwegian: "Deltakerne får se tidspunkt, øktkilde og resultat, ikke GPS-spor eller puls."
+                    )
+                )
             }
         }
     }
