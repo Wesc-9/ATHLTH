@@ -338,6 +338,7 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     var voiceIdentifier: String? = nil
     var speechRate: Float? = nil
     var speechVolume: Float? = nil
+    var speechStyle: ATHLTHCoachSpeechStyle? = nil
     var announceWorkoutStart: Bool? = nil
     var announcePauseResume: Bool? = nil
     var announceWorkoutComplete: Bool? = nil
