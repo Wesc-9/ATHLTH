@@ -5183,7 +5183,9 @@ struct SessionEditorView: View {
                 )
 
 
-                partnerPlanningSection
+                if onPreparedWorkout == nil {
+                    partnerPlanningSection
+                }
                 plannedWorkoutLogisticsSection
 
                 if existingWorkout == nil ||
@@ -8472,6 +8474,13 @@ struct SessionEditorView: View {
     private func saveSession() {
         guard canAdd, !isSaving else { return }
         let workout = composeSession()
+
+        // Train Together and negotiations must prepare data, never send
+        // an additional invite or mutate the personal calendar here.
+        if onPreparedWorkout != nil {
+            commitSession(workout)
+            return
+        }
 
         guard let partnerID = selectedPartnerID else {
             commitSession(workout)
