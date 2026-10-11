@@ -2976,6 +2976,7 @@ struct HomeWeeklyProgressStrip:
             selection in
             HomeWeeklyProgressDaySheet(
                 selection: selection,
+                plan: plan,
                 onOpenWorkout: {
                     daySheetDetent = .large
                 }
@@ -4016,6 +4017,7 @@ private struct HomeWeeklyProgressDaySheet:
 
     let selection:
         HomeWeeklyProgressDaySelection
+    let plan: TrainingPlan?
     let onOpenWorkout: () -> Void
 
     @State private var showingStandaloneSessionEditor = false
@@ -4122,7 +4124,7 @@ private struct HomeWeeklyProgressDaySheet:
                                 Button {
                                     selectedInvitationLobby = workout
                                 } label: {
-                                    plannedRow(workout)
+                                    plannedRowContent(workout)
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityHint(
@@ -4241,24 +4243,54 @@ private struct HomeWeeklyProgressDaySheet:
             .padding(.top, 4)
     }
 
+    /// Resolve the real parent plan. Calendar-only workouts have no plan,
+    /// so never invent a plan ID just to open a detail screen.
+    private func planID(for workout: PlannedSession) -> UUID? {
+        guard let plan else { return nil }
+        let belongsToPlan = plan.weeks.contains { week in
+            week.days.contains { day in
+                day.sessions.contains { $0.id == workout.id }
+            }
+        }
+        return belongsToPlan ? plan.id : nil
+    }
+
+    @ViewBuilder
     private func plannedRow(
         _ workout: PlannedSession
     ) -> some View {
-        Group {
-            if workout.trainTogetherMode != nil {
-                NavigationLink {
-                    PlannedWorkoutLobbyView(workout: workout)
-                } label: {
-                    plannedRowContent(workout)
-                }
-                .buttonStyle(.plain)
-                .accessibilityHint(ATHLTHLocalization.choose(
-                    english: "Open invited athletes and their responses",
-                    norwegian: "Åpne lobby med inviterte og svarstatus"
-                ))
-            } else {
+        if let planID = planID(for: workout) {
+            NavigationLink {
+                PlannedWorkoutDetailView(
+                    planID: planID,
+                    workout: workout,
+                    isHealthCompleted: false
+                )
+                .onAppear(perform: onOpenWorkout)
+            } label: {
                 plannedRowContent(workout)
             }
+            .buttonStyle(.plain)
+            .accessibilityHint(
+                ATHLTHLocalization.choose(
+                    english: "Open details for this planned workout",
+                    norwegian: "Åpne detaljer for denne planlagte økten"
+                )
+            )
+        } else {
+            NavigationLink {
+                HomeWeeklyStandaloneWorkoutDetailView(workout: workout)
+                    .onAppear(perform: onOpenWorkout)
+            } label: {
+                plannedRowContent(workout)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(
+                ATHLTHLocalization.choose(
+                    english: "Open details for this calendar workout",
+                    norwegian: "Åpne detaljer for denne kalenderøkten"
+                )
+            )
         }
     }
 
