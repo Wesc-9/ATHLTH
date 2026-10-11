@@ -976,6 +976,24 @@ struct ATHLTHArenaOnlineDetailView: View {
         members.count > 2
     }
 
+    /// A live race linked to a specific round requires exactly the agreed
+    /// 1v1 pair. A generic Live Ghost race remains available separately.
+    private var linkedLiveDuelOpponentID: UUID? {
+        guard currentSeries.scope == .duel,
+              currentSeries.status == "active",
+              canParticipate,
+              acceptedMembers.count == 2,
+              let opponentID = acceptedMembers
+                .compactMap(\.userID)
+                .first(where: { $0 != session.profile.userID }),
+              social.mutualFollows.contains(where: {
+                  $0.userID == opponentID
+              }) else {
+            return nil
+        }
+        return opponentID
+    }
+
     private var nextAction: ATHLTHArenaNextAction? {
         let activeIDs = Set(acceptedMembers.compactMap(\.userID))
         let ownApprovals = Set(approvals.filter {
@@ -1016,28 +1034,12 @@ struct ATHLTHArenaOnlineDetailView: View {
                 }
                 detailNavigator(scrollProxy)
 
-                if currentSeries.scope == .duel,
-                   currentSeries.status == "active",
-                   canParticipate,
-                   let opponentID = acceptedMembers
-                       .compactMap(\.userID)
-                       .first(where: { $0 != session.profile.userID }),
-                   social.mutualFollows.contains(where: { $0.userID == opponentID }) {
+                if let opponentID = linkedLiveDuelOpponentID {
                     NavigationLink {
-                        GhostFriendRaceHubView(
-                            preferredFriendID: opponentID,
-                            preferredRoute: rounds
-                                .first(where: {
-                                    $0.template == .fastestRoute &&
-                                    $0.routeSnapshot != nil
-                                })
-                                .flatMap(\.routeSnapshot)
-                                .flatMap { arenaTrainingRoute(from: $0) },
-                            arenaRoundID: rounds.first(where: {
-                                $0.template == .fastestRoute &&
-                                $0.routeSnapshot != nil
-                            })?.id
-                        )
+                        // Generic shortcut is intentionally unlinked: a race
+                        // must be launched from the chosen round card to
+                        // qualify as evidence for that exact Arena round.
+                        GhostFriendRaceHubView(preferredFriendID: opponentID)
                     } label: {
                         HStack(spacing: 11) {
                             Image(systemName: "bolt.horizontal.circle.fill")
@@ -1051,8 +1053,8 @@ struct ATHLTHArenaOnlineDetailView: View {
                                 ))
                                 .font(.subheadline.weight(.bold))
                                 Text(ATHLTHLocalization.choose(
-                                    english: "Opponent selected. Choose your earlier run or this competition route.",
-                                    norwegian: "Motstanderen er valgt. Bruk en tidligere økt eller konkurranseruten."
+                                    english: "Quick duel outside series scoring. For an Arena round, start Live Ghost from that round below.",
+                                    norwegian: "Hurtigduell uten seriepoeng. For en Arena-runde starter du Live Ghost fra runden nedenfor."
                                 ))
                                 .font(.caption)
                                 .foregroundStyle(.white.opacity(0.84))
@@ -2028,6 +2030,43 @@ struct ATHLTHArenaOnlineDetailView: View {
                         english: "Configure target Ghost for this competition route",
                         norwegian: "Sett opp mål-Ghost for konkurranseruten"
                     ))
+
+                    if round.template == .fastestRoute,
+                       let opponentID = linkedLiveDuelOpponentID {
+                        NavigationLink {
+                            GhostFriendRaceHubView(
+                                preferredFriendID: opponentID,
+                                preferredRoute: route,
+                                arenaRoundID: round.id
+                            )
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "bolt.horizontal.circle.fill")
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Start synchronized route duel",
+                                        norwegian: "Start synkronisert ruteduell"
+                                    ))
+                                    .font(.subheadline.weight(.semibold))
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Links to this round for participant review",
+                                        norwegian: "Kobles til denne runden for godkjenning"
+                                    ))
+                                    .font(.caption)
+                                    .foregroundStyle(.white.opacity(0.85))
+                                }
+                                Spacer(minLength: 2)
+                                Image(systemName: "arrow.up.right")
+                            }
+                            .foregroundStyle(.white)
+                            .padding(13)
+                            .background(
+                                ATHLTHTheme.accentDeep,
+                                in: RoundedRectangle(cornerRadius: 14)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
             Text("\(voteCount)/\(acceptedIDs.count) " +
