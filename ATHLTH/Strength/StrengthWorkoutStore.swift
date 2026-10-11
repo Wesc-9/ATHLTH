@@ -1684,6 +1684,31 @@ final class StrengthWorkoutStore: ObservableObject {
         persistCheckpointNow()
     }
 
+    // Classify an exercise without altering completed sets or its planned prescription.
+    @discardableResult
+    func setWarmUpExercise(_ exerciseID: UUID, isWarmUp: Bool) -> Bool {
+        guard var workout = activeWorkout,
+              let exerciseIndex = workout.exercises.firstIndex(where: { $0.id == exerciseID }),
+              !workout.exercises[exerciseIndex].sets.isEmpty,
+              workout.exercises[exerciseIndex].sets.allSatisfy({ !$0.isCompleted })
+        else {
+            return false
+        }
+
+        for setIndex in workout.exercises[exerciseIndex].sets.indices {
+            workout.exercises[exerciseIndex].sets[setIndex].isWarmUp = isWarmUp
+            workout.exercises[exerciseIndex].sets[setIndex].plannedSetType =
+                isWarmUp ? .warmUp : .work
+        }
+
+        activeWorkout = workout
+        if currentExerciseIndex == exerciseIndex {
+            reloadDraftFromCurrentSet()
+        }
+        persistCheckpointNow()
+        return true
+    }
+
     func appendExercise(
         _ exercise: Exercise,
         sets: Int = 3,
@@ -2989,7 +3014,7 @@ final class StrengthWorkoutStore: ObservableObject {
                     ].restSecondsOverride ??
                     draftRestSeconds,
                 rir: nil,
-                isWarmUp: false,
+                isWarmUp: workout.exercises[currentExerciseIndex].isWarmUpExercise,
                 targetKind:
                     targetKind,
                 plannedDurationSeconds:
