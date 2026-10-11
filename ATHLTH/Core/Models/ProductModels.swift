@@ -1049,6 +1049,13 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     var reminderMinutesBefore: Int? = nil
     // A private invitation mode; optional for backwards compatibility.
     var trainTogetherMode: PlannedWorkoutTogetherMode? = nil
+    // Stored on the organizer's calendar item so the invitation and its
+    // replies can be resolved again when the calendar is reopened.
+    var invitedPartnerID: UUID? = nil
+    // The guest may propose adding exercises only if the organizer allows it.
+    // All proposed modifications still require organizer approval.
+    var allowInviteeExercises: Bool? = nil
+
 
     var sharedSourceOwnerID: UUID? = nil
     var sharedSourceSessionID: UUID? = nil
