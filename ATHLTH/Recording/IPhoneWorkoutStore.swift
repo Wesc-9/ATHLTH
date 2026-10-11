@@ -186,6 +186,21 @@ final class IPhoneWorkoutStore:
         recoveredWorkoutLastCheckpoint != nil
     }
 
+    /// Live Ghost needs an immediately authorized outdoor recorder before
+    /// both athletes agree to a synchronized start. A deferred permission
+    /// dialog would otherwise cause one runner to start late.
+    var canStartSynchronizedOutdoorWorkout: Bool {
+        guard accountID != nil, !saving else { return false }
+        return manager.authorizationStatus == .authorizedAlways ||
+            manager.authorizationStatus == .authorizedWhenInUse
+    }
+
+    func requestLiveGhostLocationPermissionIfNeeded() {
+        if manager.authorizationStatus == .notDetermined {
+            manager.requestWhenInUseAuthorization()
+        }
+    }
+
     var recoveredActiveWorkoutNeedsReview: Bool {
         guard active != nil,
               let recoveredWorkoutLastCheckpoint
