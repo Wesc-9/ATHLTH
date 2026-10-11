@@ -1569,6 +1569,13 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             return
         }
 
+        // The local workout has ended. Stop sharing its live position
+        // immediately, even if submitting the finish later fails.
+        // This never stops the recorded iPhone/Watch workout itself.
+        isSharingLiveLocation = false
+        resetLocationPublishThrottle()
+        await setCurrentLiveLocationSharing(false)
+
         var succeeded = false
         defer {
             liveGhostFinishGate.end(
