@@ -5125,7 +5125,7 @@ struct ActiveStrengthWorkoutView: View {
                                             norwegian: "Fortsett"
                                         )
                                         : ATHLTHLocalization.choose(
-                                            english: "Start  timer",
+                                            english: "Start countdown",
                                             norwegian: "Start nedtelling"
                                         ),
                                 systemImage: isRunning ? "pause.fill" : "play.fill"
