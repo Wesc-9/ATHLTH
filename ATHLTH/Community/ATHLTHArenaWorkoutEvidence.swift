@@ -47,7 +47,7 @@ enum ATHLTHArenaEvidenceMatcher {
                   let distance = workout.distanceMeters,
                   distance.isFinite,
                   abs(distance - target) <= target * 0.02,
-                  workout.duration >= (target == 5_000 ? 150 : 60),
+                  workout.duration >= (target == 5_000 ? 600 : 100),
                   workout.duration <= (target == 5_000 ? 18_000 : 7_200)
             else { return nil }
             return Match(metricType: "elapsed_seconds", metricValue: workout.duration)
@@ -57,7 +57,8 @@ enum ATHLTHArenaEvidenceMatcher {
                   let distance = workout.distanceMeters,
                   distance.isFinite,
                   (300...500_000).contains(distance),
-                  workout.duration >= 300
+                  workout.duration >= 300,
+                  distance <= workout.endDate.timeIntervalSince(workout.startDate) * 15
             else { return nil }
             return Match(metricType: "distance_meters", metricValue: distance)
 
