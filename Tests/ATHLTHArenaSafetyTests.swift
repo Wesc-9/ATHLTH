@@ -871,6 +871,26 @@ final class ATHLTHArenaSafetyTests: XCTestCase {
         )
     }
 
+    func testArenaDoesNotAdvertiseStartWhenAPlayerDeclines() {
+        let round = UUID()
+        XCTAssertEqual(
+            ATHLTHArenaNextAction.resolve(
+                status: "draft",
+                response: "accepted",
+                isOrganizer: true,
+                roundIDs: [round],
+                personallyApproved: Set([round]),
+                allRulesApproved: true,
+                pendingInvites: 0,
+                acceptedCount: 2,
+                hasUnacceptedMembers: true,
+                hasRoute: false,
+                deadlinePassed: false
+            ),
+            .waitingForPlayers
+        )
+    }
+
     func testArenaNextActionDoesNotCallAnExpiredSeriesActive() {
         XCTAssertEqual(
             nextAction(status: "active", hasRoute: true), .runRoute
