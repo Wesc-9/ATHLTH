@@ -317,6 +317,93 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
         .sorted { $0.createdAt > $1.createdAt }
     }
 
+    private var rivalry: ATHLTHArenaRivalrySummary {
+        ATHLTHArenaRivalrySummary.calculate(
+            challenges: linked,
+            rooms: rooms,
+            participants: participants,
+            eligibleRoundIDs: Set(rounds.map(\.id)),
+            currentUserID: session.profile.userID
+        )
+    }
+
+    private var rivalryRecord: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 7) {
+                Image(systemName: "medal.fill")
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                Text(ATHLTHLocalization.choose(
+                    english: "Head-to-head record", norwegian: "Innbyrdes oppgjør"
+                ))
+                .font(.subheadline.weight(.semibold))
+                Spacer()
+                Text(ATHLTHLocalization.choose(
+                    english: "Reported races", norwegian: "Oppgitte dueller"
+                ))
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+
+            HStack(spacing: 0) {
+                rivalryStat(
+                    title: ATHLTHLocalization.choose(
+                        english: "Wins", norwegian: "Seire"
+                    ),
+                    value: rivalry.wins
+                )
+                Divider().frame(height: 38)
+                rivalryStat(
+                    title: ATHLTHLocalization.choose(
+                        english: "Losses", norwegian: "Tap"
+                    ),
+                    value: rivalry.losses
+                )
+                Divider().frame(height: 38)
+                rivalryStat(
+                    title: ATHLTHLocalization.choose(
+                        english: "Draws", norwegian: "Uavgjort"
+                    ),
+                    value: rivalry.ties
+                )
+            }
+
+            if rivalry.excluded > 0 {
+                Label(
+                    ATHLTHLocalization.format(
+                        english: "%d finished races excluded due to missing or inconsistent times.",
+                        norwegian: "%d fullførte dueller er utelatt på grunn av manglende eller motstridende tider.",
+                        rivalry.excluded
+                    ),
+                    systemImage: "exclamationmark.triangle"
+                )
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+
+            Text(ATHLTHLocalization.choose(
+                english: "Only consistent, completed Live Ghost results linked to this series. This is not the official Arena score.",
+                norwegian: "Kun fullførte Live Ghost-dueller med samsvarende resultater i denne serien. Dette er ikke den offisielle poengstillingen."
+            ))
+            .font(.caption2)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+        }
+        .padding(14)
+        .background(ATHLTHArenaLightStyle.card(17))
+    }
+
+    private func rivalryStat(title: String, value: Int) -> some View {
+        VStack(spacing: 2) {
+            Text(value.formatted())
+                .font(.title3.weight(.bold).monospacedDigit())
+                .foregroundStyle(ATHLTHTheme.primaryText)
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+    }
+
     private var shownDuels: [GhostFriendRaceChallengeRecord] {
         linked.filter { challenge in
             let status = rooms.first(where: { $0.challengeID == challenge.id })?.status
@@ -360,6 +447,10 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
                     Text(errorMessage)
                         .font(.caption)
                         .foregroundStyle(.red)
+                }
+
+                if rivalry.finishedCount > 0 || rivalry.excluded > 0 {
+                    rivalryRecord
                 }
 
                 Picker(
