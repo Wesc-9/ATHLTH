@@ -4520,8 +4520,28 @@ private enum HeartRateTargetMode: String, CaseIterable, Identifiable {
     }
 }
 
+private struct SessionEditorStoredDraft: Codable {
+    let workout: PlannedSession
+    let selectedPartnerID: UUID?
+    let scheduledTimeEnabled: Bool
+    let editorModeRaw: String
+    let targetPaceEnabled: Bool
+    let heartRateTargetEnabled: Bool
+    let heartRateTargetModeRaw: String
+    let heartRateTargetZone: Int
+    let customHeartRateMinBPM: Int
+    let customHeartRateMaxBPM: Int
+    let paceAlertsEnabled: Bool
+    let paceAlertToleranceSeconds: Int
+    let targetAlertGraceSeconds: Int
+    let targetAlertRepeatSeconds: Int
+    let targetAlertDelivery: WatchAlertDelivery
+    let targetAlertAnnounceBackInTarget: Bool
+}
+
 struct SessionEditorView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
@@ -4544,6 +4564,9 @@ struct SessionEditorView: View {
     @State private var workoutBlocks: [WorkoutTemplateBlock] = []
     @State private var workoutCategory: String?
     @State private var showingSavedWorkoutPicker = false
+    @State private var selectedPartnerID: UUID?
+    @State private var draftRestored = false
+    @State private var draftFinalized = false
 
     @State private var plannedExercises: [PlannedExercise] = []
     @State private var exerciseBeingEdited: PlannedExercise?
@@ -5191,7 +5214,12 @@ struct SessionEditorView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel", norwegian: "Avbryt"
+                        )
+                    ) {
+                        finishDraft()
                         dismiss()
                     }
                 }
@@ -5274,6 +5302,30 @@ struct SessionEditorView: View {
                         spotifyWorkoutPlaylistSelection
                 )
             }
+            .onAppear {
+                restoreDraftIfNeeded()
+            }
+            .onDisappear {
+                persistDraft()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { persistDraft() }
+            }
+            .onChange(of: title) { _, _ in persistDraft() }
+            .onChange(of: kind) { _, _ in persistDraft() }
+            .onChange(of: durationMinutes) { _, _ in persistDraft() }
+            .onChange(of: distanceKilometers) { _, _ in persistDraft() }
+            .onChange(of: notes) { _, _ in persistDraft() }
+            .onChange(of: scheduledTime) { _, _ in persistDraft() }
+            .onChange(of: scheduledTimeEnabled) { _, _ in persistDraft() }
+            .onChange(of: selectedPartnerID) { _, _ in persistDraft() }
+            .onChange(of: plannedExercises) { _, _ in persistDraft() }
+            .onChange(of: selectedRunningWorkouts) { _, _ in persistDraft() }
+            .onChange(of: workoutBlocks) { _, _ in persistDraft() }
+            .onChange(of: selectedGearIDs) { _, _ in persistDraft() }
+            .onChange(of: targetPaceEnabled) { _, _ in persistDraft() }
+            .onChange(of: heartRateTargetEnabled) { _, _ in persistDraft() }
+            .onChange(of: paceAlertsEnabled) { _, _ in persistDraft() }
             .onChange(of: selectedRouteID) { oldRouteID, newRouteID in
                 syncMetricsFromRouteChange(
                     previousRouteID: oldRouteID,
@@ -8021,11 +8073,11 @@ struct SessionEditorView: View {
         }
     }
 
-    private func saveSession() {
+    private func composeSession() -> PlannedSession {
         let cleanNotes = notes
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
-        let workout = PlannedSession(
+        return PlannedSession(
             id: existingWorkout?.id ?? UUID(),
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
             kind: kind,
@@ -8110,6 +8162,14 @@ struct SessionEditorView: View {
                 workoutCategory
         )
 
+    }
+
+    private func saveSession() {
+        guard canAdd else { return }
+        commitSession(composeSession())
+    }
+
+    private func commitSession(_ workout: PlannedSession) {
         if isStandalone {
             session
                 .addStandalonePlannedSession(
@@ -8136,7 +8196,79 @@ struct SessionEditorView: View {
             }
         }
 
+        finishDraft()
         dismiss()
+    }
+
+    private var draftStorageKey: String {
+        let context: String
+        if let workout = existingWorkout {
+            context = "edit.\(workout.id.uuidString)"
+        } else if isStandalone {
+            context = "standalone"
+        } else {
+            context = "day.\(planID?.uuidString ?? "active").\(dayID?.uuidString ?? "unknown")"
+        }
+        return "athlth.sessionEditor.draft.v1.\(session.profile.userID.uuidString).\(context)"
+    }
+
+    private func persistDraft() {
+        guard draftRestored, !draftFinalized else { return }
+        let draft = SessionEditorStoredDraft(
+            workout: composeSession(),
+            selectedPartnerID: selectedPartnerID,
+            scheduledTimeEnabled: scheduledTimeEnabled,
+            editorModeRaw: editorMode.rawValue,
+            targetPaceEnabled: targetPaceEnabled,
+            heartRateTargetEnabled: heartRateTargetEnabled,
+            heartRateTargetModeRaw: heartRateTargetMode.rawValue,
+            heartRateTargetZone: heartRateTargetZone,
+            customHeartRateMinBPM: customHeartRateMinBPM,
+            customHeartRateMaxBPM: customHeartRateMaxBPM,
+            paceAlertsEnabled: paceAlertsEnabled,
+            paceAlertToleranceSeconds: paceAlertToleranceSeconds,
+            targetAlertGraceSeconds: targetAlertGraceSeconds,
+            targetAlertRepeatSeconds: targetAlertRepeatSeconds,
+            targetAlertDelivery: targetAlertDelivery,
+            targetAlertAnnounceBackInTarget: targetAlertAnnounceBackInTarget
+        )
+        if let data = try? JSONEncoder().encode(draft) {
+            UserDefaults.standard.set(data, forKey: draftStorageKey)
+        }
+    }
+
+    private func restoreDraftIfNeeded() {
+        guard !draftRestored else { return }
+        defer { draftRestored = true }
+        guard let data = UserDefaults.standard.data(forKey: draftStorageKey),
+              let draft = try? JSONDecoder().decode(SessionEditorStoredDraft.self, from: data)
+        else { return }
+
+        applySavedWorkout(draft.workout)
+        durationMinutes = draft.workout.durationMinutes ?? 0
+        scheduledTimeEnabled = draft.scheduledTimeEnabled
+        selectedPartnerID = draft.selectedPartnerID
+        editorMode = SessionEditorMode(rawValue: draft.editorModeRaw) ?? editorMode
+        targetPaceEnabled = draft.targetPaceEnabled
+        heartRateTargetEnabled = draft.heartRateTargetEnabled
+        heartRateTargetMode = HeartRateTargetMode(
+            rawValue: draft.heartRateTargetModeRaw
+        ) ?? .zone
+        heartRateTargetZone = draft.heartRateTargetZone
+        customHeartRateMinBPM = draft.customHeartRateMinBPM
+        customHeartRateMaxBPM = draft.customHeartRateMaxBPM
+        paceAlertsEnabled = draft.paceAlertsEnabled
+        paceAlertToleranceSeconds = draft.paceAlertToleranceSeconds
+        targetAlertGraceSeconds = draft.targetAlertGraceSeconds
+        targetAlertRepeatSeconds = draft.targetAlertRepeatSeconds
+        targetAlertDelivery = draft.targetAlertDelivery
+        targetAlertAnnounceBackInTarget = draft.targetAlertAnnounceBackInTarget
+        didLoadRunGuidanceDefaults = true
+    }
+
+    private func finishDraft() {
+        draftFinalized = true
+        UserDefaults.standard.removeObject(forKey: draftStorageKey)
     }
 
     private func compactPlannedSetLabel(
