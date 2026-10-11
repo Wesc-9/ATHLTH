@@ -628,7 +628,7 @@ final class MirroredWorkoutAudioCoach:
 
         switch decision {
         case .drop:
-            if priority >= .structuredStep {
+            if priority >= .ghostImportant {
                 let queuedEvent = event ??
                     ATHLTHCoachEventFallback.event(for: priority)
                 cueQueue.enqueue(
