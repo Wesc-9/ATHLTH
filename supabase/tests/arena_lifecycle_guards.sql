@@ -82,6 +82,20 @@ begin
    raise exception 'Unrelated Live Ghost actors may link arbitrary Arena rounds';
  end if;
  if not exists (
+   select 1 from pg_trigger
+   where tgrelid='public.live_ghost_race_participants'::regclass
+     and tgname='live_ghost_finish_once_before_update'
+     and tgenabled='O'
+ ) then
+   raise exception 'Live Ghost must preserve the first submitted finish';
+ end if;
+ if not exists (
+   select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+   where n.nspname='private' and p.proname='live_ghost_finish_once_guard'
+ ) then
+   raise exception 'Live Ghost finish validation function missing';
+ end if;
+ if not exists (
    select 1 from information_schema.columns
    where table_schema='public' and table_name='arena_series'
    and column_name='completion_reason'
