@@ -53,6 +53,22 @@ final class AudioCoachCueQueueTests: XCTestCase {
         XCTAssertEqual(queue.popNext(now: origin.addingTimeInterval(3))?.event.kind, .runningStep)
     }
 
+    func testImportantGhostUpdateIsQueuedButPeriodicGhostIsNot() {
+        var queue = ATHLTHCoachCueQueue()
+        XCTAssertFalse(queue.enqueue(
+            cue(.ghostUpdate, key: "periodic", priority: .ghostPeriodic),
+            now: origin
+        ))
+        XCTAssertTrue(queue.enqueue(
+            cue(.ghostUpdate, key: "leadChange", priority: .ghostImportant),
+            now: origin
+        ))
+        XCTAssertEqual(
+            queue.popNext(now: origin)?.event.key,
+            "leadChange"
+        )
+    }
+
     func testSamePriorityUsesOldestCueFirst() {
         var queue = ATHLTHCoachCueQueue()
         XCTAssertTrue(queue.enqueue(
