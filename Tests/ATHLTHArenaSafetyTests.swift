@@ -94,4 +94,121 @@ final class ATHLTHArenaSafetyTests: XCTestCase {
         )
         XCTAssertNil(message.senderID)
     }
+    private func nextAction(
+        status: String = "draft",
+        response: String? = "accepted",
+        organizer: Bool = false,
+        rounds: [UUID] = [UUID()],
+        approved: Set<UUID> = [],
+        allApproved: Bool = false,
+        pendingInvites: Int = 0,
+        acceptedCount: Int = 2,
+        hasRoute: Bool = false,
+        pastDeadline: Bool = false
+    ) -> ATHLTHArenaNextAction? {
+        ATHLTHArenaNextAction.resolve(
+            status: status,
+            response: response,
+            isOrganizer: organizer,
+            roundIDs: rounds,
+            personallyApproved: approved,
+            allRulesApproved: allApproved,
+            pendingInvites: pendingInvites,
+            acceptedCount: acceptedCount,
+            hasRoute: hasRoute,
+            deadlinePassed: pastDeadline
+        )
+    }
+
+    func testArenaNextActionPrioritizesInvitationAndDoesNotShowForOutsiders() {
+        XCTAssertEqual(
+            nextAction(response: "invited", organizer: true, rounds: []),
+            .respondToInvite
+        )
+        XCTAssertNil(nextAction(response: nil))
+        XCTAssertNil(nextAction(response: "declined"))
+    }
+
+    func testArenaNextActionCreatorSetsUpFirstRound() {
+        XCTAssertEqual(
+            nextAction(organizer: true, rounds: []), .addRound
+        )
+        XCTAssertEqual(
+            nextAction(organizer: false, rounds: []), .waitingForRules
+        )
+    }
+
+    func testArenaNextActionRequiresPersonalRuleApprovalBeforeStart() {
+        let round = UUID()
+        XCTAssertEqual(
+            nextAction(
+                organizer: true,
+                rounds: [round],
+                approved: [],
+                allApproved: true
+            ),
+            .approveRule(round)
+        )
+        XCTAssertEqual(
+            nextAction(
+                organizer: true,
+                rounds: [round],
+                approved: [round],
+                allApproved: true,
+                pendingInvites: 1
+            ),
+            .waitingForInvites
+        )
+        XCTAssertEqual(
+            nextAction(
+                organizer: true,
+                rounds: [round],
+                approved: [round],
+                allApproved: false
+            ),
+            .waitingForRules
+        )
+    }
+
+    func testArenaNextActionOnlyOrganizerMaySeeStartPrompt() {
+        let round = UUID()
+        XCTAssertEqual(
+            nextAction(
+                organizer: true,
+                rounds: [round],
+                approved: [round],
+                allApproved: true
+            ),
+            .startSeries
+        )
+        XCTAssertEqual(
+            nextAction(
+                organizer: false,
+                rounds: [round],
+                approved: [round],
+                allApproved: true
+            ),
+            .waitingForRules
+        )
+    }
+
+    func testArenaNextActionDoesNotCallAnExpiredSeriesActive() {
+        XCTAssertEqual(
+            nextAction(status: "active", hasRoute: true), .runRoute
+        )
+        XCTAssertEqual(
+            nextAction(status: "active", hasRoute: false), .compete
+        )
+        XCTAssertEqual(
+            nextAction(
+                status: "active", hasRoute: true, pastDeadline: true
+            ),
+            .reviewScores
+        )
+        XCTAssertEqual(
+            nextAction(status: "completed"), .finalStandings
+        )
+        XCTAssertNil(nextAction(status: "cancelled"))
+    }
+
 }
