@@ -24,6 +24,7 @@ final class SocialStore: ObservableObject {
     /// The creator must tap Start alone, even for remote workouts.
     /// This local intent is not the server-side participation mode.
     private var creatorIndependentStartRequestedID: UUID?
+    private var creatorCaptureDevices: [UUID: WorkoutCaptureDevice] = [:]
     @Published private(set) var privacy: SocialPrivacySettings?
     @Published private(set) var workoutMedia: [WorkoutMediaRecord] = []
     @Published private(set) var isRefreshing = false
@@ -988,6 +989,10 @@ final class SocialStore: ObservableObject {
 
     /// Leave an invitation pending while starting a different workout.
     /// This only detaches the local launch; it never cancels the sent invites.
+    func proposedCreatorCaptureDevice(for sessionID: UUID) -> WorkoutCaptureDevice {
+        creatorCaptureDevices[sessionID] ?? .iPhone
+    }
+
     func prepareForAnotherWorkout() {
         coordinatedLobbySessionID = nil
         isCoordinatedLobbyMinimized = false
@@ -1035,21 +1040,13 @@ final class SocialStore: ObservableObject {
             )
 
             activeWorkoutSession = session
+            creatorCaptureDevices[session.id] = creatorCaptureDevice ?? .iPhone
             coordinatedLobbySessionID = session.id
             isCoordinatedLobbyMinimized = false
             try await refreshWorkoutLobby(sessionID: session.id)
 
-            if let creatorCaptureDevice,
-               let creator = activeWorkoutParticipants.first(
-                    where: { $0.userID == currentUserID }
-               ) {
-                try await service.setWorkoutReady(
-                    participantID: creator.id,
-                    captureDevice: creatorCaptureDevice
-                )
-                try await refreshWorkoutLobby(sessionID: session.id)
-            }
-
+            // Creating an invitation is not the same as tapping Ready.
+            // The creator must explicitly confirm readiness in the lobby.
             // Both physical and remote invitations wait in the lobby.
             // Neither mode starts its training engine before an explicit
             // Start together / Start alone action by the creator.
@@ -1153,12 +1150,32 @@ final class SocialStore: ObservableObject {
         sessionID: UUID,
         countdownSeconds: TimeInterval = 3
     ) async -> Bool {
-        guard workoutSessions.first(where: { $0.id == sessionID })?
-            .creatorID == currentUserID else {
-            return false
-        }
+        guard let ownUserID = currentUserID else { return false }
 
         do {
+            try await refreshWorkoutLobby(sessionID: sessionID)
+            guard let session = workoutSessions.first(where: { $0.id == sessionID }),
+                  session.creatorID == ownUserID,
+                  session.status == .active,
+                  session.coordinatedStartAt == nil,
+                  session.invitePayload?.startIndependently != true,
+                  let creator = workoutParticipants.first(where: {
+                      $0.sessionID == sessionID && $0.userID == ownUserID
+                  }),
+                  creator.isReady
+            else { return false }
+
+            let invitees = workoutParticipants.filter {
+                $0.sessionID == sessionID &&
+                $0.userID != ownUserID &&
+                $0.state != .declined
+            }
+            guard !invitees.isEmpty,
+                  invitees.allSatisfy({
+                      $0.state == .accepted && $0.isReady
+                  })
+            else { return false }
+
             _ = try await service.scheduleWorkoutStart(
                 sessionID: sessionID,
                 countdownSeconds:
@@ -1199,7 +1216,7 @@ final class SocialStore: ObservableObject {
         }
 
         do {
-            if !payload.resolvedStartIndependently {
+            if payload.startIndependently != true {
                 payload.startIndependently = true
                 try await service.enableIndependentWorkoutStart(
                     sessionID: sessionID,
@@ -1283,7 +1300,7 @@ final class SocialStore: ObservableObject {
                 }
 
                 if session.invitePayload?
-                    .resolvedStartIndependently == true,
+                    .startIndependently == true,
                    currentParticipant.readyAt != nil,
                    (session.creatorID != currentUserID ||
                     creatorIndependentStartRequestedID == sessionID) {
@@ -1458,6 +1475,7 @@ final class SocialStore: ObservableObject {
             if creatorIndependentStartRequestedID == target.id {
                 creatorIndependentStartRequestedID = nil
             }
+            creatorCaptureDevices.removeValue(forKey: target.id)
             if currentJoinedWorkoutSessionID == target.id {
                 currentJoinedWorkoutSessionID = nil
             }
