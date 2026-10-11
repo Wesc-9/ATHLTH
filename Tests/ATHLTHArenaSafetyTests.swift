@@ -252,6 +252,66 @@ final class ATHLTHArenaSafetyTests: XCTestCase {
         XCTAssertNil(progress?.completeTotalSeconds)
     }
 
+    func testRelayNextUnreportedLegFollowsAgreedOrderNotReportedOrder() {
+        let series = UUID(), route = UUID()
+        let a = UUID(), b = UUID(), c = UUID(), d = UUID()
+        let stages = relayFixture(
+            series: series, route: route,
+            first: [a,b], second: [c,d]
+        )
+        XCTAssertEqual(
+            ATHLTHArenaRelayProgress.nextUnreportedLeg(
+                for: 1, legs: stages, reports: []
+            )?.slotID, a
+        )
+        // A future stage being reported does not imply physical baton movement.
+        XCTAssertEqual(
+            ATHLTHArenaRelayProgress.nextUnreportedLeg(
+                for: 1, legs: stages,
+                reports: [relayReport(slot: b, series: series, seconds: 650)]
+            )?.slotID, a
+        )
+        XCTAssertEqual(
+            ATHLTHArenaRelayProgress.nextUnreportedLeg(
+                for: 1, legs: stages,
+                reports: [relayReport(slot: a, series: series, seconds: 500)]
+            )?.slotID, b
+        )
+        XCTAssertNil(ATHLTHArenaRelayProgress.nextUnreportedLeg(
+            for: 1, legs: stages, reports: [
+                relayReport(slot: a, series: series, seconds: 500),
+                relayReport(slot: b, series: series, seconds: 650)
+            ]
+        ))
+    }
+
+    func testRelayNextUnreportedRejectsInvalidAndDuplicateReports() {
+        let series = UUID(), route = UUID()
+        let a = UUID(), b = UUID()
+        let stages = relayFixture(
+            series: series, route: route,
+            first: [a,b], second: [UUID(),UUID()]
+        )
+        XCTAssertEqual(
+            ATHLTHArenaRelayProgress.nextUnreportedLeg(
+                for: 1, legs: stages,
+                reports: [relayReport(slot: a, series: UUID(), seconds: 400)]
+            )?.slotID, a
+        )
+        XCTAssertEqual(
+            ATHLTHArenaRelayProgress.nextUnreportedLeg(
+                for: 1, legs: stages,
+                reports: [
+                    relayReport(slot: a, series: series, seconds: 400),
+                    relayReport(slot: a, series: series, seconds: 410)
+                ]
+            )?.slotID, a
+        )
+        XCTAssertNil(ATHLTHArenaRelayProgress.nextUnreportedLeg(
+            for: 0, legs: stages, reports: []
+        ))
+    }
+
     func testRelayRejectsMalformedPlanBeforeShowingResults() {
         let series = UUID(), route = UUID(), a = UUID(), b = UUID()
         let valid = relayFixture(series: series, route: route,
