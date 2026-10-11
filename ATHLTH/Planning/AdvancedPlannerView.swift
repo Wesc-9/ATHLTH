@@ -4564,6 +4564,33 @@ private struct SessionEditorStoredDraft: Codable {
     let targetAlertAnnounceBackInTarget: Bool
 }
 
+/// One estimate powers both the overview and the editable duration.
+enum PlannedSessionDurationEstimator {
+    static func strengthMinutes(for exercises: [PlannedExercise]) -> Int? {
+        guard !exercises.isEmpty else { return nil }
+        let seconds = exercises.reduce(0) { total, exercise in
+            let targets = exercise.resolvedSetTargets
+            let work = targets.reduce(0) { partial, target in
+                switch exercise.resolvedTargetKind {
+                case .reps:
+                    return partial + max(target.reps ?? exercise.reps ?? 8, 1) * 4
+                case .time:
+                    return partial + max(
+                        target.durationSeconds ??
+                            exercise.resolvedTargetDurationSeconds ?? 60,
+                        15
+                    )
+                }
+            }
+            let rest = targets.dropLast().reduce(0) {
+                $0 + max($1.restSeconds ?? exercise.restSeconds ?? 90, 0)
+            }
+            return total + work + rest
+        }
+        return max(1, Int(ceil(Double(seconds) / 60)))
+    }
+}
+
 struct SessionEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -4591,6 +4618,8 @@ struct SessionEditorView: View {
     @State private var title = ""
     @State private var kind: WorkoutKind = .strength
     @State private var durationMinutes = 0
+    @State private var strengthDurationAdjustmentMinutes = 0
+    @State private var pendingInvitationWorkout: PlannedSession?
     @State private var distanceKilometers = 5.0
     @State private var notes = ""
     @State private var workoutTemplateID: UUID?
@@ -4755,6 +4784,13 @@ struct SessionEditorView: View {
         _kind = State(initialValue: workout.kind)
         _durationMinutes = State(
             initialValue: workout.durationMinutes ?? 45
+        )
+        let estimated = PlannedSessionDurationEstimator
+            .strengthMinutes(for: workout.exercises) ?? 0
+        _strengthDurationAdjustmentMinutes = State(
+            initialValue: estimated > 0
+                ? (workout.durationMinutes ?? estimated) - estimated
+                : 0
         )
         _distanceKilometers = State(
             initialValue: workout.targetDistanceKilometers ?? 5.0
@@ -5116,8 +5152,8 @@ struct SessionEditorView: View {
                             english: "Duration",
                             norwegian: "Varighet"
                         ) + ": " +
-                        (durationMinutes == 0 ? "–" : "\(durationMinutes) min"),
-                        value: $durationMinutes,
+                        (resolvedDurationMinutes == 0 ? "–" : "\(resolvedDurationMinutes) min"),
+                        value: plannedDurationBinding,
                         in: 0...300,
                         step: 5
                     )
@@ -6774,81 +6810,38 @@ struct SessionEditorView: View {
         }
     }
 
-    private var workoutOverviewDuration:
-        String {
+    private var workoutOverviewDuration: String {
         if kind == .strength,
-           !plannedExercises.isEmpty {
-            let seconds =
-                plannedExercises.reduce(0) {
-                    total,
-                    exercise in
-
-                    let targets =
-                        exercise
-                            .resolvedSetTargets
-                    let work =
-                        targets.reduce(0) {
-                            partial,
-                            target in
-
-                            switch exercise
-                                .resolvedTargetKind {
-                            case .reps:
-                                return partial +
-                                    max(
-                                        target.reps ??
-                                            exercise
-                                                .reps ??
-                                            8,
-                                        1
-                                    ) * 4
-                            case .time:
-                                return partial +
-                                    max(
-                                        target
-                                            .durationSeconds ??
-                                            exercise
-                                                .resolvedTargetDurationSeconds ??
-                                            60,
-                                        15
-                                    )
-                            }
-                        }
-                    let rest =
-                        targets
-                            .dropLast()
-                            .reduce(0) {
-                                $0 +
-                                max(
-                                    $1.restSeconds ??
-                                        exercise
-                                            .restSeconds ??
-                                        90,
-                                    0
-                                )
-                            }
-
-                    return
-                        total +
-                        work +
-                        rest
-                }
-
-            let estimated =
-                max(
-                    Int(
-                        ceil(
-                            Double(seconds) /
-                            60.0
-                        )
-                    ),
-                    1
-                )
-
-            return "~\(estimated)m"
+           let estimate = PlannedSessionDurationEstimator
+               .strengthMinutes(for: plannedExercises) {
+            return "~\(estimate)m"
         }
+        return resolvedDurationMinutes > 0
+            ? "\(resolvedDurationMinutes)m" : "–"
+    }
 
-        return durationMinutes > 0 ? "\(durationMinutes)m" : "–"
+    private var resolvedDurationMinutes: Int {
+        if kind == .strength,
+           let estimate = PlannedSessionDurationEstimator
+               .strengthMinutes(for: plannedExercises) {
+            return min(max(estimate + strengthDurationAdjustmentMinutes, 5), 300)
+        }
+        return durationMinutes
+    }
+
+    private var plannedDurationBinding: Binding<Int> {
+        Binding(
+            get: { resolvedDurationMinutes },
+            set: { newValue in
+                if kind == .strength,
+                   let estimate = PlannedSessionDurationEstimator
+                       .strengthMinutes(for: plannedExercises) {
+                    strengthDurationAdjustmentMinutes = newValue - estimate
+                } else {
+                    durationMinutes = newValue
+                }
+            }
+        )
     }
 
     private var workoutOverviewPrimaryCount:
@@ -8293,6 +8286,13 @@ struct SessionEditorView: View {
         kind = workout.kind
         durationMinutes =
             workout.durationMinutes ?? durationMinutes
+        if let estimate = PlannedSessionDurationEstimator
+            .strengthMinutes(for: workout.exercises) {
+            strengthDurationAdjustmentMinutes =
+                (workout.durationMinutes ?? estimate) - estimate
+        } else {
+            strengthDurationAdjustmentMinutes = 0
+        }
         distanceKilometers =
             workout.targetDistanceKilometers ??
             distanceKilometers
@@ -8395,7 +8395,7 @@ struct SessionEditorView: View {
                     : scheduledTimeEnabled
                         ? scheduledTime
                         : nil,
-            durationMinutes: durationMinutes > 0 ? durationMinutes : nil,
+            durationMinutes: resolvedDurationMinutes > 0 ? resolvedDurationMinutes : nil,
             targetDistanceKilometers:
                 (kind == .walking || kind == .running)
                     ? distanceKilometers
@@ -8479,10 +8479,10 @@ struct SessionEditorView: View {
 
     private func saveSession() {
         guard canAdd, !isSaving else { return }
-        let workout = composeSession()
+        let workout = pendingInvitationWorkout ?? composeSession()
 
-        // Train Together and negotiations must prepare data, never send
-        // an additional invite or mutate the personal calendar here.
+        // Marketplace proposals only prepare a workout; they must not
+        // modify the author's calendar or send another invitation.
         if onPreparedWorkout != nil {
             commitSession(workout)
             return
@@ -8493,7 +8493,14 @@ struct SessionEditorView: View {
             return
         }
 
-        // A planned invitation is a share through Messages, not a live lobby.
+        // The author's calendar is independent of the recipient's answer
+        // and of temporary Messages/network failures. A retry reuses the
+        // SAME session ID, rather than creating duplicate calendar entries.
+        if pendingInvitationWorkout == nil {
+            persistSession(workout)
+            pendingInvitationWorkout = workout
+        }
+
         isSaving = true
         Task {
             do {
@@ -8507,8 +8514,7 @@ struct SessionEditorView: View {
                     norwegian: "Tidspunkt avtales"
                 )
                 var sharedWorkout = workout
-                // Private device, gear and music preferences belong to the
-                // person planning the workout, not the invited athlete.
+                // Device, personal gear and music never leave the sender.
                 sharedWorkout.gearIDs = []
                 sharedWorkout.spotifyPlaylist = nil
                 sharedWorkout.spotifyAutoplayOnStart = false
@@ -8522,8 +8528,8 @@ struct SessionEditorView: View {
                     shareVersion: 2
                 )
                 let body = ATHLTHLocalization.choose(
-                    english: (physicalMeetup ? "Let's meet and train! " : "Let's do the same workout! ") + "\(workout.title) · \(scheduled). The session is attached.",
-                    norwegian: (physicalMeetup ? "Vil du trene fysisk sammen? " : "Vil du trene samme økt? ") + "\(workout.title) · \(scheduled). Økten er vedlagt."
+                    english: (physicalMeetup ? "Let's meet and train! " : "Let's do the same workout! ") + "\(workout.title) · \(scheduled). Accept or decline the invitation below.",
+                    norwegian: (physicalMeetup ? "Vil du trene fysisk sammen? " : "Vil du trene samme økt? ") + "\(workout.title) · \(scheduled). Godta eller avslå invitasjonen nedenfor."
                 )
                 let sent = await messaging.send(
                     to: partnerID,
@@ -8532,17 +8538,26 @@ struct SessionEditorView: View {
                     attachment: attachment
                 )
                 if sent {
-                    commitSession(workout)
+                    pendingInvitationWorkout = nil
+                    finishDraft()
+                    dismiss()
                 } else {
-                    invitationError = messaging.errorMessage ??
+                    invitationError = (messaging.errorMessage ??
                         ATHLTHLocalization.choose(
-                            english: "Try again, or choose Just me.",
-                            norwegian: "Prøv igjen, eller velg Bare meg."
+                            english: "Could not send invitation.",
+                            norwegian: "Kunne ikke sende invitasjonen."
+                        )) + ATHLTHLocalization.choose(
+                            english: " Your workout is saved in your calendar. Try Plan again to retry the invitation.",
+                            norwegian: " Økten er lagret i kalenderen din. Trykk Planlegg igjen for å prøve invitasjonen på nytt."
                         )
                     showingInvitationError = true
                 }
             } catch {
-                invitationError = error.localizedDescription
+                invitationError = error.localizedDescription +
+                    ATHLTHLocalization.choose(
+                        english: " The workout is already saved in your calendar.",
+                        norwegian: " Økten er allerede lagret i kalenderen din."
+                    )
                 showingInvitationError = true
             }
             isSaving = false
@@ -8556,36 +8571,25 @@ struct SessionEditorView: View {
             dismiss()
             return
         }
-        if isStandalone {
-            session
-                .addStandalonePlannedSession(
-                    workout
-                )
-        } else if existingWorkout != nil,
-                  let planID {
-            session.updateSession(
-                workout,
-                inPlan: planID
-            )
-        } else if let dayID {
-            if let planID {
-                session.addSession(
-                    workout,
-                    toDay: dayID,
-                    inPlan: planID
-                )
-            } else {
-                session.addSession(
-                    workout,
-                    toDay: dayID
-                )
-            }
-        }
 
-        // Session store schedules the reminder during the successful save.
-        // Avoid duplicate asynchronous scheduling tasks here.
+        persistSession(workout)
         finishDraft()
         dismiss()
+    }
+
+    private func persistSession(_ workout: PlannedSession) {
+        if isStandalone {
+            session.addStandalonePlannedSession(workout)
+        } else if existingWorkout != nil, let planID {
+            session.updateSession(workout, inPlan: planID)
+        } else if let dayID {
+            if let planID {
+                session.addSession(workout, toDay: dayID, inPlan: planID)
+            } else {
+                session.addSession(workout, toDay: dayID)
+            }
+        }
+        // AppSessionStore schedules the reminder when saving.
     }
 
     private var draftStorageKey: String {
