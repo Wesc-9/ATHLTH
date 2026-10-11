@@ -1164,6 +1164,7 @@ private struct ATHLTHArenaTeamEditor: View {
     let onSave: ([UUID], [UUID]) async -> Bool
     @State private var choices: [UUID: Int]
     @State private var saving = false
+    @State private var confirmAutoDistribution = false
 
     init(
         members: [ATHLTHArenaRemoteMember],
@@ -1191,6 +1192,13 @@ private struct ATHLTHArenaTeamEditor: View {
         abs(first.count - second.count) <= 1
     }
 
+    private func suggestBalancedTeams() {
+        guard let suggested = ATHLTHArenaTeamBalancer.suggestedAssignments(
+            members: members
+        ) else { return }
+        choices = suggested
+    }
+
     private func displayName(_ member: ATHLTHArenaRemoteMember) -> String {
         if member.userID == session.profile.userID {
             return ATHLTHLocalization.choose(english: "You", norwegian: "Du")
@@ -1211,6 +1219,43 @@ private struct ATHLTHArenaTeamEditor: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 }
+                Section {
+                    Button {
+                        if choices.isEmpty {
+                            suggestBalancedTeams()
+                        } else {
+                            confirmAutoDistribution = true
+                        }
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Automatically divide teams",
+                                norwegian: "Fordel lag automatisk"
+                            ),
+                            systemImage: "person.3.sequence.fill"
+                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .disabled(
+                        saving ||
+                        ATHLTHArenaTeamBalancer.suggestedAssignments(
+                            members: members
+                        ) == nil
+                    )
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Creates an even team-size suggestion. This does not assess fitness or skill. You can adjust every athlete before saving.",
+                        norwegian: "Foreslår jevne lag etter antall deltakere, ikke treningsnivå eller ferdigheter. Du kan endre hvert lag før lagring."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                } header: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Quick distribution",
+                        norwegian: "Hurtigfordeling"
+                    ))
+                }
+
                 Section {
                     ForEach(members) { member in
                         Picker(displayName(member), selection: Binding(
@@ -1262,6 +1307,29 @@ private struct ATHLTHArenaTeamEditor: View {
                 english: "Set up teams", norwegian: "Sett opp lag"
             ))
             .navigationBarTitleDisplayMode(.inline)
+            .confirmationDialog(
+                ATHLTHLocalization.choose(
+                    english: "Replace your current team choices?",
+                    norwegian: "Erstatte gjeldende lagfordeling?"
+                ),
+                isPresented: $confirmAutoDistribution,
+                titleVisibility: .visible
+            ) {
+                Button(ATHLTHLocalization.choose(
+                    english: "Create balanced suggestion",
+                    norwegian: "Lag forslag med jevn fordeling"
+                )) {
+                    suggestBalancedTeams()
+                }
+                Button(ATHLTHLocalization.choose(
+                    english: "Cancel", norwegian: "Avbryt"
+                ), role: .cancel) {}
+            } message: {
+                Text(ATHLTHLocalization.choose(
+                    english: "Only your unsaved selection changes. The server team lineup stays unchanged until you tap Save.",
+                    norwegian: "Bare utkastet på skjermen endres. Lagoppsettet på serveren oppdateres først når du trykker Lagre."
+                ))
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(ATHLTHLocalization.choose(
