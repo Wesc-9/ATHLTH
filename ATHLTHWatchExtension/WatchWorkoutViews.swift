@@ -123,32 +123,42 @@ struct WatchActiveWorkoutView: View {
                     selection:
                         $selectedNonRunningPage
                 ) {
-                    if workoutManager.kind ==
-                        .strength {
+                    if workoutManager.kind == .strength {
+                        // Set/rest remains the first page. Additional pages
+                        // are read-only and do not mutate the workout.
                         strengthOneScreenPage
                             .tag(0)
+
+                        WatchStrengthSessionStatusPage()
+                            .tag(1)
+
+                        WatchStrengthExerciseQueuePage()
+                            .tag(2)
+
+                        WatchStrengthPulsePage()
+                            .tag(3)
+
+                        WatchSpotifyRemotePage()
+                            .tag(4)
+
+                        nonRunningControlsPage
+                            .tag(5)
                     } else {
                         ScrollView {
                             VStack(spacing: 10) {
                                 activeContent
                             }
-                            .padding(
-                                .horizontal,
-                                8
-                            )
-                            .padding(
-                                .bottom,
-                                10
-                            )
+                            .padding(.horizontal, 8)
+                            .padding(.bottom, 10)
                         }
                         .tag(0)
+
+                        WatchSpotifyRemotePage()
+                            .tag(1)
+
+                        nonRunningControlsPage
+                            .tag(2)
                     }
-
-                    WatchSpotifyRemotePage()
-                        .tag(1)
-
-                    nonRunningControlsPage
-                        .tag(2)
                 }
                 .tabViewStyle(.verticalPage)
             }
@@ -165,6 +175,13 @@ struct WatchActiveWorkoutView: View {
             .ignoresSafeArea()
         )
         .interactiveDismissDisabled(workoutManager.state != .completed)
+        .onChange(of: workoutManager.strengthSession?.isResting) { previous, current in
+            // A new rest period is a meaningful phase change: show the
+            // countdown, but never advance the set automatically.
+            if workoutManager.kind == .strength && previous != true && current == true {
+                selectedNonRunningPage = 0
+            }
+        }
         .sheet(
             isPresented:
                 $showingStrengthSetOptions
@@ -598,21 +615,17 @@ struct WatchActiveWorkoutView: View {
                     )
 
                     WatchStrengthRestView(
-                        restEndsAt:
-                            restEndsAt,
+                        restEndsAt: restEndsAt,
                         onAdd: {
-                            workoutManager
-                                .addStrengthRest(
-                                    seconds: 30
-                                )
+                            workoutManager.addStrengthRest(seconds: 30)
                         },
                         onSkip: {
-                            workoutManager
-                                .skipStrengthRest()
+                            workoutManager.skipStrengthRest()
                         },
                         onNextExercise: snapshot.currentExerciseComplete && snapshot.hasNextExercise
                             ? { workoutManager.moveToNextStrengthExercise() }
-                            : nil
+                            : nil,
+                        allowsControls: snapshot.inputMode != .iPhone
                     )
                 }
                 .padding(
@@ -725,6 +738,8 @@ struct WatchActiveWorkoutView: View {
                     maxHeight: .infinity,
                     alignment: .top
                 )
+            } else if snapshot.inputMode == .iPhone {
+                WatchStrengthReadOnlySetPage()
             } else if snapshot.exerciseName != nil {
                 VStack(spacing: 6) {
                     compactStrengthTopBar(
@@ -759,6 +774,33 @@ struct WatchActiveWorkoutView: View {
                         )
                     }
 
+                    HStack(spacing: 5) {
+                        Text(
+                            snapshot.isWarmUp == true
+                                ? ATHLTHLocalization.choose(
+                                    english: "WARM-UP",
+                                    norwegian: "OPPVARMING"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "WORK SET",
+                                    norwegian: "ARBEIDSSETT"
+                                )
+                        )
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(WatchTheme.accentDeep)
+
+                        Spacer(minLength: 0)
+
+                        if workoutManager.heartRate > 0 {
+                            Label(
+                                "\(Int(workoutManager.heartRate.rounded()))",
+                                systemImage: "heart.fill"
+                            )
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(WatchTheme.liveHeart)
+                        }
+                    }
+
                     HStack(spacing: 6) {
                         if snapshot
                             .targetKindRaw ==
@@ -768,9 +810,9 @@ struct WatchActiveWorkoutView: View {
                                     ATHLTHLocalization
                                         .choose(
                                             english:
-                                                "Duration",
+                                                "Time target",
                                             norwegian:
-                                                "Varighet"
+                                                "Tidsmål"
                                         ),
                                 valueText:
                                     durationText(
@@ -3050,39 +3092,54 @@ private struct WatchStrengthRestView: View {
     let onAdd: () -> Void
     let onSkip: () -> Void
     let onNextExercise: (() -> Void)?
-
-    @State private var sentCompletion = false
+    var allowsControls = true
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) {
-            context in
+        TimelineView(.periodic(from: .now, by: 1)) { context in
             let remaining = max(
-                restEndsAt.timeIntervalSince(
-                    context.date
-                ),
-                0
+                restEndsAt.timeIntervalSince(context.date), 0
             )
 
-            VStack(spacing: 8) {
-                Text("REST")
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(1.2)
+            VStack(spacing: 7) {
+                Text(ATHLTHLocalization.choose(
+                    english: "REST", norwegian: "PAUSE"
+                ))
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1)
                     .foregroundStyle(WatchTheme.muted)
 
                 if remaining > 0 {
                     Text(durationText(remaining))
-                        .font(
-                            .system(
-                                size: 34,
-                                weight: .bold,
-                                design: .rounded
+                        .font(.system(
+                            size: 38, weight: .bold, design: .rounded
+                        ))
+                        .monospacedDigit()
+                        .foregroundStyle(WatchTheme.textPrimary)
+                        .accessibilityLabel(
+                            ATHLTHLocalization.choose(
+                                english: "Rest remaining",
+                                norwegian: "Gjenstående pause"
                             )
                         )
-                        .monospacedDigit()
+                } else {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "READY", norwegian: "KLAR"
+                        ),
+                        systemImage: "checkmark.circle.fill"
+                    )
+                    .font(.system(size: 23, weight: .bold, design: .rounded))
+                    .foregroundStyle(WatchTheme.liveAction)
+                }
 
+                if allowsControls {
                     HStack(spacing: 7) {
-                        Button("+30") {
+                        Button {
                             onAdd()
+                        } label: {
+                            Text("+30 s")
+                                .font(.system(size: 11, weight: .bold))
+                                .frame(maxWidth: .infinity, minHeight: 32)
                         }
                         .buttonStyle(.bordered)
 
@@ -3099,53 +3156,44 @@ private struct WatchStrengthRestView: View {
                                         english: "Next exercise",
                                         norwegian: "Neste øvelse"
                                     )
-                                    : ATHLTHLocalization.choose(
-                                        english: "Skip rest",
-                                        norwegian: "Hopp over"
+                                    : (
+                                        remaining > 0
+                                            ? ATHLTHLocalization.choose(
+                                                english: "Skip rest",
+                                                norwegian: "Hopp over"
+                                            )
+                                            : ATHLTHLocalization.choose(
+                                                english: "Next set",
+                                                norwegian: "Neste sett"
+                                            )
                                     )
                             )
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 11, weight: .semibold))
+                            .minimumScaleFactor(0.77)
                             .lineLimit(2)
-                            .minimumScaleFactor(0.8)
+                            .frame(maxWidth: .infinity, minHeight: 32)
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(WatchTheme.green)
+                        .tint(WatchTheme.liveAction)
                     }
                 } else {
-                    Label(
-                        "Next set",
-                        systemImage: "checkmark.circle.fill"
-                    )
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(WatchTheme.green)
-                    .onAppear {
-                        guard !sentCompletion else {
-                            return
-                        }
-                        sentCompletion = true
-                        onSkip()
-                    }
+                    Text(ATHLTHLocalization.choose(
+                        english: "Continue on iPhone",
+                        norwegian: "Fortsett på iPhone"
+                    ))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(WatchTheme.muted)
                 }
             }
+            .padding(9)
             .frame(maxWidth: .infinity)
-            .padding(10)
-            .watchSurface()
+            .watchSurface(radius: 17)
         }
     }
 
-    private func durationText(
-        _ duration: TimeInterval
-    ) -> String {
-        let total = max(
-            Int(duration.rounded(.down)),
-            0
-        )
-
-        return String(
-            format: "%02d:%02d",
-            total / 60,
-            total % 60
-        )
+    private func durationText(_ duration: TimeInterval) -> String {
+        let total = max(Int(duration.rounded(.up)), 0)
+        return String(format: "%02d:%02d", total / 60, total % 60)
     }
 }
 

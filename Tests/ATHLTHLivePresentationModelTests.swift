@@ -106,3 +106,40 @@ final class ATHLTHLivePresentationModelTests: XCTestCase {
         XCTAssertEqual(plan.phase, .completed)
     }
 }
+
+extension ATHLTHLivePresentationModelTests {
+    func testStrengthNavigationRetainsCorePages() {
+        let plan = ATHLTHLivePresentationResolver.resolve(
+            .init(kind: .strength, state: .running)
+        )
+        XCTAssertEqual(
+            plan.pages,
+            [.set, .rest, .exercises, .summary, .music, .controls]
+        )
+        XCTAssertEqual(plan.primary, .reps)
+    }
+
+    func testStrengthCountdownAndWarmUpNeverInventReps() {
+        let plan = ATHLTHLivePresentationResolver.resolve(
+            .init(
+                kind: .strength,
+                state: .running,
+                isTimedStrengthSet: true
+            )
+        )
+        XCTAssertEqual(plan.primary, .strengthTimeTarget)
+        XCTAssertFalse(plan.secondary.contains(.reps))
+    }
+
+    func testStrengthPauseRemainsExplicit() {
+        let plan = ATHLTHLivePresentationResolver.resolve(
+            .init(
+                kind: .strength,
+                state: .running,
+                isStrengthResting: true
+            )
+        )
+        XCTAssertEqual(plan.phase, .resting)
+        XCTAssertEqual(plan.primary, .restRemaining)
+    }
+}
