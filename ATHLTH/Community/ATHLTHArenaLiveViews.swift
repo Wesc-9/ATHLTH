@@ -2701,3 +2701,424 @@ struct ATHLTHArenaOnlineDetailView: View {
         }
     }
 }
+
+
+/// Optional stafettplan on an accepted two-team Arena roster.
+/// Deliberately planning-only: no live baton exchange or independent points.
+private struct ATHLTHArenaRelaySection: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var session: AppSessionStore
+
+    let series: ATHLTHArenaRemoteSeries
+    let members: [ATHLTHArenaRemoteMember]
+    let rounds: [ATHLTHArenaRemoteProposal]
+    let isOrganizer: Bool
+
+    @State private var assignments: [ATHLTHArenaTeamAssignment] = []
+    @State private var legs: [ATHLTHArenaRelayLeg] = []
+    @State private var loading = false
+    @State private var writing = false
+    @State private var editing = false
+    @State private var confirmRemove = false
+    @State private var errorMessage: String?
+    private let cloud = ATHLTHArenaCloudService()
+
+    private var availableRoutes: [ATHLTHArenaRemoteProposal] {
+        rounds.filter { $0.template == .fastestRoute && $0.routeSnapshot != nil }
+    }
+
+    private var canConfigure: Bool {
+        let first = assignments.filter { $0.teamIndex == 1 }.count
+        let second = assignments.filter { $0.teamIndex == 2 }.count
+        return isOrganizer && series.status == "draft" &&
+            first >= 2 && first == second && !availableRoutes.isEmpty &&
+            members.allSatisfy { $0.response == "accepted" && $0.userID != nil }
+    }
+
+    private var validPlan: Bool {
+        guard !legs.isEmpty, legs.count == assignments.count,
+              Set(legs.map(\.slotID)) == Set(assignments.map(\.slotID)),
+              Set(legs.map(\.routeRoundID)).count == 1,
+              availableRoutes.contains(where: { $0.id == legs[0].routeRoundID })
+        else { return false }
+        for team in 1...2 {
+            let group = legs.filter { $0.teamIndex == team }
+            let roster = assignments.filter { $0.teamIndex == team }
+            if Set(group.map(\.slotID)) != Set(roster.map(\.slotID)) ||
+                Set(group.map(\.legOrder)) != Set(1...roster.count) {
+                return false
+            }
+        }
+        return true
+    }
+
+    var body: some View {
+        Group {
+            if !assignments.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "figure.run.circle.fill")
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Relay · leg plan",
+                            norwegian: "Stafett · etappeplan"
+                        ))
+                        .font(.headline)
+                        Spacer()
+                        if loading { ProgressView().controlSize(.small) }
+                        Button { Task { await refresh() } } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Refresh relay plan", norwegian: "Oppdater etappeplan"
+                        ))
+                        if canConfigure {
+                            Button {
+                                editing = true
+                            } label: {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Configure", norwegian: "Sett opp"
+                                ))
+                                .font(.caption.weight(.semibold))
+                            }
+                            .disabled(writing)
+                        }
+                    }
+
+                    if validPlan, let routeID = legs.first?.routeRoundID,
+                       let route = availableRoutes.first(where: { $0.id == routeID }) {
+                        Label(
+                            route.title + " · " + String(
+                                format: "%.2f km / etappe",
+                                route.routeSnapshot?.distanceKilometers ?? 0
+                            ),
+                            systemImage: "map"
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                        ForEach(1...2, id: \.self) { team in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Team", norwegian: "Lag"
+                                ) + " \(team)")
+                                .font(.subheadline.weight(.semibold))
+                                ForEach(legs.filter { $0.teamIndex == team }
+                                    .sorted { $0.legOrder < $1.legOrder }) { leg in
+                                    HStack(spacing: 9) {
+                                        Text("\(leg.legOrder).")
+                                            .font(.caption.monospacedDigit())
+                                            .frame(width: 26, alignment: .leading)
+                                        Text(athleteName(for: leg.slotID))
+                                            .font(.caption)
+                                        Spacer()
+                                        Image(systemName: "arrow.right")
+                                            .font(.caption2)
+                                            .foregroundStyle(ATHLTHTheme.mutedText)
+                                    }
+                                }
+                            }
+                        }
+                        if canConfigure {
+                            Button(role: .destructive) {
+                                confirmRemove = true
+                            } label: {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Remove leg order",
+                                    norwegian: "Fjern etappeplan"
+                                ))
+                                .font(.caption)
+                            }
+                            .disabled(writing)
+                        }
+                    } else {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Choose the agreed route and the runner order. Both teams need the same number of athletes.",
+                            norwegian: "Velg avtalt rute og løperrekkefølge. Begge lag må ha like mange deltakere."
+                        ))
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        if availableRoutes.isEmpty {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Add a route challenge round before configuring relay legs.",
+                                norwegian: "Legg til en ruteutfordring før du setter opp stafetten."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                    }
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "This is a route and runner plan, not a live baton handoff or automatically verified relay score. Only approved Arena results award points.",
+                        norwegian: "Dette er en plan for rute og løpere, ikke automatisk veksling eller verifisert stafettid. Bare godkjente Arena-resultater gir poeng."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                }
+                .padding(15)
+                .background(ATHLTHArenaLightStyle.card(20))
+                .sheet(isPresented: $editing) {
+                    ATHLTHArenaRelayEditor(
+                        members: members,
+                        assignments: assignments,
+                        existing: legs,
+                        rounds: availableRoutes,
+                        onSave: savePlan
+                    )
+                }
+                .confirmationDialog(
+                    ATHLTHLocalization.choose(
+                        english: "Remove relay plan from draft?",
+                        norwegian: "Fjerne stafettplanen fra utkastet?"
+                    ),
+                    isPresented: $confirmRemove
+                ) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Remove", norwegian: "Fjern"
+                    ), role: .destructive) {
+                        Task { _ = await savePlan(nil, [], []) }
+                    }
+                }
+            }
+        }
+        .task(id: series.id) { await refresh() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await refresh() } }
+        }
+    }
+
+    private func athleteName(for slotID: UUID) -> String {
+        guard let member = members.first(where: { $0.slotID == slotID }) else {
+            return ATHLTHLocalization.choose(english: "Athlete", norwegian: "Deltaker")
+        }
+        if member.isDeleted {
+            return ATHLTHLocalization.choose(
+                english: "Deleted athlete", norwegian: "Slettet deltaker"
+            )
+        }
+        if member.userID == session.profile.userID {
+            return ATHLTHLocalization.choose(english: "You", norwegian: "Du")
+        }
+        return (social.visibleProfiles + social.mutualFollows)
+            .first(where: { $0.userID == member.userID })?.resolvedName ??
+            ATHLTHLocalization.choose(english: "Athlete", norwegian: "Deltaker")
+    }
+
+    @MainActor
+    private func refresh() async {
+        guard !loading else { return }
+        loading = true
+        defer { loading = false }
+        do {
+            async let roster = cloud.loadTeamAssignments(seriesID: series.id)
+            async let plan = cloud.loadRelayLegs(seriesID: series.id)
+            assignments = try await roster
+            legs = try await plan
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func savePlan(
+        _ routeID: UUID?, _ first: [UUID], _ second: [UUID]
+    ) async -> Bool {
+        guard !writing else { return false }
+        writing = true
+        defer { writing = false }
+        do {
+            try await cloud.saveRelayLineup(
+                seriesID: series.id, routeRoundID: routeID,
+                first: first, second: second
+            )
+            await refresh()
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+}
+
+/// A deterministic local edit buffer. The backend checks equal team sizes,
+/// unique stages, agreed route and every official slot once on Save.
+private struct ATHLTHArenaRelayEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var session: AppSessionStore
+
+    let members: [ATHLTHArenaRemoteMember]
+    let assignments: [ATHLTHArenaTeamAssignment]
+    let rounds: [ATHLTHArenaRemoteProposal]
+    let onSave: (UUID?, [UUID], [UUID]) async -> Bool
+
+    @State private var selectedRouteID: UUID?
+    @State private var orders: [UUID: Int]
+    @State private var saving = false
+    @State private var saveFailed = false
+
+    init(
+        members: [ATHLTHArenaRemoteMember],
+        assignments: [ATHLTHArenaTeamAssignment],
+        existing: [ATHLTHArenaRelayLeg],
+        rounds: [ATHLTHArenaRemoteProposal],
+        onSave: @escaping (UUID?, [UUID], [UUID]) async -> Bool
+    ) {
+        self.members = members
+        self.assignments = assignments
+        self.rounds = rounds
+        self.onSave = onSave
+
+        var order: [UUID: Int] = [:]
+        for team in 1...2 {
+            let slots = assignments.filter { $0.teamIndex == team }
+                .map(\.slotID).sorted { $0.uuidString < $1.uuidString }
+            for (index, slot) in slots.enumerated() {
+                order[slot] = existing.first(where: {
+                    $0.slotID == slot && $0.teamIndex == team
+                })?.legOrder ?? index + 1
+            }
+        }
+        _orders = State(initialValue: order)
+        _selectedRouteID = State(
+            initialValue: existing.first?.routeRoundID ?? rounds.first?.id
+        )
+    }
+
+    private func teamMembers(_ team: Int) -> [ATHLTHArenaRemoteMember] {
+        let slots = Set(assignments.filter { $0.teamIndex == team }.map(\.slotID))
+        return members.filter { slots.contains($0.slotID) }.sorted {
+            $0.slotID.uuidString < $1.slotID.uuidString
+        }
+    }
+
+    private func ordered(_ team: Int) -> [UUID] {
+        teamMembers(team).sorted {
+            (orders[$0.slotID] ?? Int.max) < (orders[$1.slotID] ?? Int.max)
+        }.map(\.slotID)
+    }
+
+    private var valid: Bool {
+        let a = teamMembers(1), b = teamMembers(2)
+        guard a.count >= 2, a.count == b.count,
+              assignments.count == members.count,
+              let selectedRouteID,
+              rounds.contains(where: { $0.id == selectedRouteID })
+        else { return false }
+        return [a,b].allSatisfy { team in
+            Set(team.compactMap { orders[$0.slotID] }) == Set(1...team.count)
+        }
+    }
+
+    private func displayName(_ member: ATHLTHArenaRemoteMember) -> String {
+        if member.userID == session.profile.userID {
+            return ATHLTHLocalization.choose(english: "You", norwegian: "Du")
+        }
+        return (social.visibleProfiles + social.mutualFollows)
+            .first(where: { $0.userID == member.userID })?.resolvedName ??
+            ATHLTHLocalization.choose(english: "Athlete", norwegian: "Deltaker")
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose a route challenge. Every leg follows the same course; no live baton exchange is started here.",
+                        norwegian: "Velg en ruteutfordring. Alle etapper bruker samme løype; ingen automatisk veksling startes her."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    Picker(ATHLTHLocalization.choose(
+                        english: "Relay course", norwegian: "Stafettløype"
+                    ), selection: $selectedRouteID) {
+                        ForEach(rounds) { round in
+                            Text(round.title + " · " + String(
+                                format: "%.2f km", round.routeSnapshot?.distanceKilometers ?? 0
+                            ))
+                            .tag(Optional(round.id))
+                        }
+                    }
+                }
+                ForEach(1...2, id: \.self) { team in
+                    Section {
+                        ForEach(teamMembers(team)) { member in
+                            Picker(displayName(member), selection: Binding(
+                                get: { orders[member.slotID] ?? 0 },
+                                set: { orders[member.slotID] = $0 }
+                            )) {
+                                Text("—").tag(0)
+                                ForEach(1...max(1, teamMembers(team).count), id: \.self) { index in
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Leg", norwegian: "Etappe"
+                                    ) + " \(index)").tag(index)
+                                }
+                            }
+                        }
+                    } header: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Team", norwegian: "Lag"
+                        ) + " \(team)")
+                    }
+                }
+                if !valid {
+                    Section {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Assign each athlete a unique leg number within their team. Teams must have equal sizes.",
+                            norwegian: "Gi hver løper et unikt etappenummer på sitt lag. Lagene må ha like mange løpere."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    }
+                }
+                if saveFailed {
+                    Section {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Could not save the relay plan. Review Arena errors and try again.",
+                            norwegian: "Kunne ikke lagre etappeplanen. Kontroller Arena-feilen og prøv igjen."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                    }
+                }
+            }
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Relay leg order", norwegian: "Etapperekkefølge"
+            ))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Cancel", norwegian: "Avbryt"
+                    )) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Save", norwegian: "Lagre"
+                    )) {
+                        guard valid else { return }
+                        saving = true
+                        Task {
+                            let ok = await onSave(
+                                selectedRouteID, ordered(1), ordered(2)
+                            )
+                            saving = false
+                            saveFailed = !ok
+                            if ok { dismiss() }
+                        }
+                    }
+                    .disabled(!valid || saving)
+                }
+            }
+        }
+    }
+}
