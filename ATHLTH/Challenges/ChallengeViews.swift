@@ -3873,6 +3873,7 @@ struct ChallengeCreationView: View {
         }
     }
 
+    @ViewBuilder
     private var creationInviteeAvatars:
         some View {
         if invitees.isEmpty {
