@@ -3405,24 +3405,6 @@ struct DirectMessageThreadView: View {
             )
         }
 
-        if !pendingChallengesFromFriend.isEmpty {
-            return ATHLTHLocalization.choose(
-                english:
-                    "Challenge waiting for response",
-                norwegian:
-                    "Challenge venter på svar"
-            )
-        }
-
-        if !outgoingChallengesToFriend.isEmpty {
-            return ATHLTHLocalization.choose(
-                english:
-                    "Challenge sent · waiting",
-                norwegian:
-                    "Challenge sendt · venter"
-            )
-        }
-
         return ATHLTHLocalization.choose(
             english:
                 "ATHLTH conversation",
@@ -5618,6 +5600,7 @@ private struct ThreadChallengeInvitationBubble: View {
     let fallbackTitle: String
     let fallbackSubtitle: String?
     let currentUserID: UUID?
+    let friendUserID: UUID
     let isMine: Bool
     let responding: Bool
     let onDetails: () -> Void
@@ -5627,8 +5610,7 @@ private struct ThreadChallengeInvitationBubble: View {
     private var invitee: ChallengeParticipant? {
         guard let challenge, let currentUserID else { return nil }
         let inviteeID = challenge.creatorID == currentUserID
-            ? challenge.participants.first(where: { $0.userID != currentUserID })?.userID
-            : currentUserID
+            ? friendUserID : currentUserID
         return challenge.participants.first(where: { $0.userID == inviteeID })
     }
 
@@ -5843,6 +5825,7 @@ private struct ThreadChallengeTimelineRow: View {
                     fallbackTitle: challenge.title,
                     fallbackSubtitle: nil,
                     currentUserID: currentUserID,
+                    friendUserID: friend.userID,
                     isMine: isMine,
                     responding: responding,
                     onDetails: onDetails,
@@ -6073,6 +6056,7 @@ private struct MessageBubble: View {
                             ),
                         fallbackSubtitle: message.attachmentSubtitle,
                         currentUserID: currentUserID,
+                        friendUserID: friend.userID,
                         isMine: isMine,
                         responding: respondingToChallenge,
                         onDetails: {
