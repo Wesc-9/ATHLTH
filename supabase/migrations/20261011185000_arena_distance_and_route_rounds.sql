@@ -14,6 +14,9 @@ alter table public.arena_round_proposals
     'mostDistance','mostWorkouts','mostRepetitions','custom'
   ));
 
+-- Safe when the schema was previously applied to the linked database.
+alter table public.arena_round_proposals
+  drop constraint if exists arena_round_target_configuration_check;
 alter table public.arena_round_proposals
   add constraint arena_round_target_configuration_check
   check (
