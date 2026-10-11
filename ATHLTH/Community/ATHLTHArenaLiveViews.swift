@@ -123,6 +123,7 @@ struct ATHLTHArenaOnlineDetailView: View {
     @State private var message: String?
     @State private var showingRoundCreator = false
     @State private var latestSeries: ATHLTHArenaRemoteSeries?
+    @State private var remoteRevision = UUID()
 
     private var currentSeries: ATHLTHArenaRemoteSeries {
         latestSeries ?? series
@@ -222,7 +223,7 @@ struct ATHLTHArenaOnlineDetailView: View {
                     onChanged: { await refresh() },
                     approvedRules: Dictionary(grouping: approvals, by: \.roundID)
                 )
-                .id(currentSeries.status)
+                .id(remoteRevision)
 
                 ATHLTHArenaReplacementSection(
                     series: currentSeries,
@@ -230,6 +231,7 @@ struct ATHLTHArenaOnlineDetailView: View {
                     isOrganizer: isOrganizer,
                     onChanged: { await refresh() }
                 )
+                .id(remoteRevision)
 
                 if isGroupSeries && canParticipate {
                     NavigationLink {
@@ -539,6 +541,7 @@ struct ATHLTHArenaOnlineDetailView: View {
             members = memberRows
             rounds = roundRows
             approvals = approvalRows
+            remoteRevision = UUID()
             message = nil
         } catch {
             message = error.localizedDescription
