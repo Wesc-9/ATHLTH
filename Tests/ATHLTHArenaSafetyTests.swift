@@ -16,19 +16,19 @@ final class ATHLTHArenaSafetyTests: XCTestCase {
         id: UUID = UUID()
     ) throws -> ATHLTHArenaRemoteSeries {
         var fields = [
-            "\"id\":\"\\(id.uuidString)\"",
+            "\"id\":\"\(id.uuidString)\"",
             "\"owner_id\":null",
             "\"title\":\"Test competition\"",
             "\"scope\":\"duel\"",
             "\"scoring\":\"winner\"",
             "\"duration_days\":14",
-            "\"status\":\"\\(status)\""
+            "\"status\":\"\(status)\""
         ]
         if let endsAt {
-            fields.append("\"ends_at\":\"\\(endsAt)\"")
+            fields.append("\"ends_at\":\"\(endsAt)\"")
         }
         if let completedAt {
-            fields.append("\"completed_at\":\"\\(completedAt)\"")
+            fields.append("\"completed_at\":\"\(completedAt)\"")
         }
         return try decoder().decode(
             ATHLTHArenaRemoteSeries.self,
