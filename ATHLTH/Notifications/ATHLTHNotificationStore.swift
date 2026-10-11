@@ -131,7 +131,11 @@ final class ATHLTHNotificationStore: ObservableObject {
         switch item.socialEventKind?.lowercased() {
         case "message",
              "message_request",
-             "message_request_accepted":
+             "message_request_accepted",
+             "arena_invite",
+             "arena_chat",
+             "arena_replacement",
+             "arena_round":
             return true
         default:
             return false
