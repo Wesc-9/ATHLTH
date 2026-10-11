@@ -374,7 +374,11 @@ enum ATHLTHArenaSeasonPresentation {
         _ rows: [ATHLTHArenaSeasonStandingsRow]
     ) -> [ATHLTHArenaSeasonStandingsRow] {
         rows.sorted {
-            if $0.points != $1.points { return $0.points > $1.points }
+            // Invalid values are never treated as winning scores. Avoid
+            // inconsistent sorting when historical data contains NaN.
+            let lhsPoints = $0.points.isFinite ? max(0, $0.points) : 0
+            let rhsPoints = $1.points.isFinite ? max(0, $1.points) : 0
+            if lhsPoints != rhsPoints { return lhsPoints > rhsPoints }
             return $0.userID.uuidString < $1.userID.uuidString
         }
     }
