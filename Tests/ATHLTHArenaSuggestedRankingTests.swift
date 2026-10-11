@@ -245,6 +245,65 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
         ))
     }
 
+    func testLiveDuelDraftRespectsWinnerAndPodiumScoring() {
+        let sender = UUID(), recipient = UUID()
+        let senderSlot = UUID(), recipientSlot = UUID()
+        let candidate = ATHLTHArenaLiveDuelReview.candidate(
+            senderID: sender,
+            recipientID: recipient,
+            senderSeconds: 1_600,
+            recipientSeconds: 1_550,
+            reportedWinnerID: recipient,
+            isFinished: true
+        )
+        let result = try? XCTUnwrap(candidate)
+        XCTAssertNotNil(result)
+        if let result {
+            XCTAssertEqual(
+                ATHLTHArenaLiveDuelReview.proposedSlots(
+                    candidate: result,
+                    senderID: sender,
+                    recipientID: recipient,
+                    senderSlotID: senderSlot,
+                    recipientSlotID: recipientSlot,
+                    scoring: .winner
+                ),
+                [recipientSlot]
+            )
+            XCTAssertEqual(
+                ATHLTHArenaLiveDuelReview.proposedSlots(
+                    candidate: result,
+                    senderID: sender,
+                    recipientID: recipient,
+                    senderSlotID: senderSlot,
+                    recipientSlotID: recipientSlot,
+                    scoring: .podium
+                ),
+                [recipientSlot, senderSlot]
+            )
+        }
+    }
+
+    func testTiedLiveDuelNeverCreatesPrefilledRanking() {
+        let a = UUID(), b = UUID()
+        let candidate = ATHLTHArenaLiveDuelReview.candidate(
+            senderID: a, recipientID: b,
+            senderSeconds: 2_000, recipientSeconds: 2_000.2,
+            reportedWinnerID: nil, isFinished: true
+        )
+        XCTAssertNotNil(candidate)
+        if let candidate {
+            XCTAssertNil(
+                ATHLTHArenaLiveDuelReview.proposedSlots(
+                    candidate: candidate,
+                    senderID: a, recipientID: b,
+                    senderSlotID: UUID(), recipientSlotID: UUID(),
+                    scoring: .winner
+                )
+            )
+        }
+    }
+
     func testCustomRoundsDoNotInferUnsupportedResults() {
         let standings = ATHLTHArenaSuggestedRanking.standings(
             template: .custom,
