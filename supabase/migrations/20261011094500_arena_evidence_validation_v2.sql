@@ -64,8 +64,8 @@ begin
    end if;
    if p_activity<>'running' or p_metric_type<>'elapsed_seconds'
      or p_distance is null or abs(p_distance-v_target)>v_target*0.02
-     or p_metric < case when v_target=5000 then 150 else 60 end
-     or p_metric > case when v_target=5000 then 18000 else 7200 end
+     or p_metric < v_min_seconds
+     or p_metric > v_max_seconds
      or p_metric > v_wall_seconds+120 then
      raise exception 'Timed run must have matching full-workout distance and elapsed time';
    end if;
