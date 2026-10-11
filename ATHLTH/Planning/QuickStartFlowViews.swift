@@ -3426,6 +3426,21 @@ struct StrengthQuickBuilderView: View {
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(.primary)
 
+                                if exercise.isWarmUpExercise {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english: "WARM-UP",
+                                            norwegian: "OPPVARMING"
+                                        ),
+                                        systemImage: "flame.fill"
+                                    )
+                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                                    .foregroundStyle(ATHLTHTheme.premiumGold)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(ATHLTHTheme.premiumGoldSoft, in: Capsule())
+                                }
+
                                 Text(exerciseSummary(exercise))
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
@@ -3439,6 +3454,28 @@ struct StrengthQuickBuilderView: View {
                         }
                     }
                     .buttonStyle(.plain)
+                    .contextMenu {
+                        Button {
+                            if let position = exercises.firstIndex(where: { $0.id == exercise.id }) {
+                                exercises[position].setEntireExerciseWarmUp(
+                                    !exercises[position].isWarmUpExercise
+                                )
+                            }
+                        } label: {
+                            Label(
+                                exercise.isWarmUpExercise
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Mark as working sets",
+                                        norwegian: "Marker som arbeidssett"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Mark as warm-up",
+                                        norwegian: "Marker som oppvarming"
+                                    ),
+                                systemImage: exercise.isWarmUpExercise ? "dumbbell.fill" : "flame.fill"
+                            )
+                        }
+                    }
                 }
                 .onDelete { offsets in
                     exercises.remove(atOffsets: offsets)
