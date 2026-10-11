@@ -492,6 +492,45 @@ enum ATHLTHGuidancePriority:
     }
 }
 
+/// Determines which device should deliver each category of Audio Coach cue.
+///
+/// Reachable iPhone mirroring currently reproduces routine run updates and
+/// structured run-step transitions. Target/route/Ghost alerts originate on
+/// Watch, and strength cues are also Watch-only. Those must not be silenced
+/// just because WatchConnectivity says the phone is reachable.
+///
+/// This policy is deliberately pure so routing decisions can be regression
+/// tested without an active HealthKit workout or an audio route.
+enum ATHLTHAudioCoachVoiceRouting {
+    static func shouldSpeakOnWatch(
+        configuration: WatchAudioCoachConfiguration,
+        workoutKind: WatchWorkoutKind,
+        priority: ATHLTHGuidancePriority,
+        iPhoneReachable: Bool
+    ) -> Bool {
+        guard configuration.shouldPreferIPhoneAudioWhenReachable,
+              iPhoneReachable
+        else {
+            return true
+        }
+
+        // The mirrored iPhone Audio Coach only speaks running/walking cues.
+        // Preserve the full strength experience on Watch.
+        if workoutKind == .strength {
+            return true
+        }
+
+        // These categories have no equivalent spoken event in the mirrored
+        // iPhone coach. Keeping them on Watch avoids silent critical alerts.
+        switch priority {
+        case .ghostPeriodic, .ghostImportant, .targetCritical, .routeCritical:
+            return true
+        case .routineCoach, .structuredStep:
+            return false
+        }
+    }
+}
+
 enum ATHLTHGuidanceDeliveryDecision:
     Hashable
 {
