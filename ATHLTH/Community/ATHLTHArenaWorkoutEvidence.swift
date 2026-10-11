@@ -93,6 +93,7 @@ struct ATHLTHArenaEvidenceSection: View {
 
     @State private var entries: [ATHLTHArenaWorkoutEvidence] = []
     @State private var selectedRound: ATHLTHArenaRemoteProposal?
+    @State private var pendingWithdrawal: ATHLTHArenaWorkoutEvidence?
     @State private var submitting = false
     @State private var errorMessage: String?
     @State private var notice: String?
@@ -179,6 +180,35 @@ struct ATHLTHArenaEvidenceSection: View {
                 ))
                 .font(.caption)
                 .foregroundStyle(ATHLTHTheme.mutedText)
+
+                ForEach(entries.filter { $0.userID == session.profile.userID }) { entry in
+                    HStack(spacing: 10) {
+                        Image(systemName: "link.circle")
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(rounds.first { $0.id == entry.roundID }?.title ??
+                                 ATHLTHLocalization.choose(
+                                    english: "Arena round", norwegian: "Arena-runde"
+                                 ))
+                                .font(.caption.weight(.semibold))
+                            Text(entry.startedAt, style: .date)
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        Spacer()
+                        Button(role: .destructive) {
+                            pendingWithdrawal = entry
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Remove", norwegian: "Fjern"
+                            ), systemImage: "trash")
+                        }
+                        .font(.caption)
+                        .disabled(submitting)
+                    }
+                    .padding(11)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 15))
+                }
             }
 
             Text(ATHLTHLocalization.choose(
@@ -200,6 +230,34 @@ struct ATHLTHArenaEvidenceSection: View {
             }
         }
         .task(id: series.id) { await refresh() }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Remove this shared workout?",
+                norwegian: "Fjerne denne delte økten?"
+            ),
+            isPresented: Binding(
+                get: { pendingWithdrawal != nil },
+                set: { if !$0 { pendingWithdrawal = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Remove shared metrics", norwegian: "Fjern delte øktdata"
+            ), role: .destructive) {
+                if let evidence = pendingWithdrawal {
+                    Task { await withdraw(evidence) }
+                }
+                pendingWithdrawal = nil
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Cancel", norwegian: "Avbryt"
+            ), role: .cancel) { pendingWithdrawal = nil }
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "The shared workout metadata will be removed. Previously approved aggregate competition points remain.",
+                norwegian: "De delte øktdataene fjernes. Allerede godkjente sammenlagtpoeng beholdes."
+            ))
+        }
         .sheet(item: $selectedRound) { round in
             ATHLTHArenaEvidencePicker(
                 round: round,
@@ -234,6 +292,23 @@ struct ATHLTHArenaEvidenceSection: View {
         do {
             entries = try await cloud.loadWorkoutEvidence(seriesID: series.id)
             errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func withdraw(_ evidence: ATHLTHArenaWorkoutEvidence) async {
+        guard !submitting else { return }
+        submitting = true
+        defer { submitting = false }
+        do {
+            try await cloud.withdrawWorkoutEvidence(id: evidence.id)
+            notice = ATHLTHLocalization.choose(
+                english: "Shared workout metadata removed.",
+                norwegian: "Delte øktdata er fjernet."
+            )
+            await refresh()
         } catch {
             errorMessage = error.localizedDescription
         }
