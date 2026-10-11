@@ -98,7 +98,7 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
                                 HStack(spacing: 10) {
                                     Text("\(index + 1).")
                                         .foregroundStyle(ATHLTHTheme.mutedText)
-                                    Text(exercise.name)
+                                    Text(exercise.embeddedExercise.displayName)
                                         .font(.subheadline.weight(.medium))
                                     Spacer(minLength: 0)
                                 }
@@ -161,7 +161,7 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
             )
         }
         .sheet(isPresented: $showingInvitationLobby) {
-            PlannedWorkoutInvitationLobby(workout: currentWorkout)
+            PlannedWorkoutLobbyView(workout: currentWorkout)
                 .presentationDetents([.medium, .large])
         }
     }
