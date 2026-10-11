@@ -6,7 +6,7 @@ import Supabase
 // privacy checks, atomic invitations and approval permissions.
 struct ATHLTHArenaRemoteSeries: Decodable, Identifiable {
     let id: UUID
-    let ownerID: UUID
+    let ownerID: UUID?
     let title: String
     let scope: ATHLTHArenaScope
     let scoring: ATHLTHArenaScoring
@@ -26,12 +26,14 @@ struct ATHLTHArenaRemoteMember: Decodable, Identifiable {
     let userID: UUID?
     let response: String
     let points: Double
+    let createdAt: Date
 
     var id: UUID { slotID }
     var isDeleted: Bool { userID == nil || response == "deleted" }
 
     enum CodingKeys: String, CodingKey {
         case response, points
+        case createdAt = "created_at"
         case slotID = "slot_id"
         case seriesID = "series_id"
         case userID = "user_id"
