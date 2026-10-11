@@ -1,4 +1,13 @@
 import SwiftUI
+import Supabase
+
+/// A linked Arena round is resolved separately and respects both tables' RLS.
+private struct LiveGhostArenaRoundLink: Decodable {
+    let seriesID: UUID
+    enum CodingKeys: String, CodingKey {
+        case seriesID = "series_id"
+    }
+}
 
 /// A countdown can arrive before a participant's READY update; re-arm
 /// the launch task whenever either readiness state changes.
@@ -33,6 +42,7 @@ struct LiveGhostRaceLobbyView: View {
     @State private var isLaunching = false
     @State private var isConnectingLiveSession = false
     @State private var rematchSent = false
+    @State private var accessibleArenaSeries: ATHLTHArenaRemoteSeries?
 
     var body: some View {
         ScrollView {
@@ -119,6 +129,27 @@ struct LiveGhostRaceLobbyView: View {
                 if case .finished =
                     liveRace.phase() {
                     resultCard
+                    if let accessibleArenaSeries {
+                        NavigationLink {
+                            ATHLTHArenaOnlineDetailView(series: accessibleArenaSeries)
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Review result in Arena",
+                                    norwegian: "Se og godkjenn resultatet i Arena"
+                                ),
+                                systemImage: "checkmark.shield.fill"
+                            )
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 50)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHTheme.accentDeep)
+                        .accessibilityHint(ATHLTHLocalization.choose(
+                            english: "Opens the linked competition. Points still require participant approval.",
+                            norwegian: "Åpner den tilknyttede konkurransen. Poeng krever fortsatt godkjenning fra deltakerne."
+                        ))
+                    }
                 } else if ownParticipant?.finishedAt != nil {
                     pendingFinishCard
                 }
@@ -158,6 +189,9 @@ struct LiveGhostRaceLobbyView: View {
             await liveRace.open(
                 challenge: challenge
             )
+        }
+        .task(id: challenge.arenaRoundID) {
+            await resolveAccessibleArenaSeries()
         }
         .task(id: LiveGhostStartTrigger(
             startsAt: liveRace.room?.startsAt,
@@ -961,6 +995,34 @@ struct LiveGhostRaceLobbyView: View {
                 !watchConnection.hasActiveWatchWorkout &&
                 phoneWorkout.active == nil &&
                 !watchConnection.hasActiveIPhoneWorkout
+        }
+    }
+
+    /// No fallback by title or club membership is allowed: only the exact
+    /// database-linked round can open the result review destination.
+    @MainActor
+    private func resolveAccessibleArenaSeries() async {
+        accessibleArenaSeries = nil
+        guard let roundID = challenge.arenaRoundID else { return }
+        do {
+            let round: LiveGhostArenaRoundLink = try await SupabaseEnvironment.client
+                .from("arena_round_proposals")
+                .select("series_id")
+                .eq("id", value: roundID)
+                .single()
+                .execute().value
+            let series: ATHLTHArenaRemoteSeries = try await SupabaseEnvironment.client
+                .from("arena_series")
+                .select()
+                .eq("id", value: round.seriesID)
+                .single()
+                .execute().value
+            guard !Task.isCancelled else { return }
+            accessibleArenaSeries = series
+        } catch {
+            // Both tables are RLS protected; a deleted or inaccessible link
+            // must never become a navigation destination.
+            accessibleArenaSeries = nil
         }
     }
 
