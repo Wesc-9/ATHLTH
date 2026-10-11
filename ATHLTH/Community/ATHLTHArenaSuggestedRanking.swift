@@ -141,6 +141,78 @@ enum ATHLTHArenaLiveDuelReview {
     }
 }
 
+/// Read-only summary of this Arena series' completed, consistent Live Ghost
+/// races. It deliberately excludes incomplete or disputed submissions and
+/// never allocates points or overwrites the official Arena standings.
+struct ATHLTHArenaRivalrySummary: Equatable {
+    let wins: Int
+    let losses: Int
+    let ties: Int
+    let excluded: Int
+
+    var finishedCount: Int { wins + losses + ties }
+
+    static func calculate(
+        challenges: [GhostFriendRaceChallengeRecord],
+        rooms: [LiveGhostRaceRoomRecord],
+        participants: [LiveGhostRaceParticipantRecord],
+        eligibleRoundIDs: Set<UUID>,
+        currentUserID: UUID
+    ) -> ATHLTHArenaRivalrySummary {
+        let roomByID = Dictionary(
+            rooms.map { ($0.challengeID, $0) },
+            uniquingKeysWith: { latest, _ in latest }
+        )
+        let timesByChallenge = Dictionary(grouping: participants, by: \.challengeID)
+        var wins = 0
+        var losses = 0
+        var ties = 0
+        var excluded = 0
+        var seen = Set<UUID>()
+        for challenge in challenges {
+            guard let roundID = challenge.arenaRoundID,
+                  eligibleRoundIDs.contains(roundID),
+                  challenge.status == .accepted,
+                  challenge.senderID == currentUserID ||
+                    challenge.recipientID == currentUserID,
+                  seen.insert(challenge.id).inserted
+            else { continue }
+
+            guard let room = roomByID[challenge.id],
+                  room.status == .finished else { continue }
+            let participantsForRace = timesByChallenge[challenge.id] ?? []
+            let senderTime = participantsForRace.first {
+                $0.userID == challenge.senderID
+            }?.elapsedSeconds
+            let recipientTime = participantsForRace.first {
+                $0.userID == challenge.recipientID
+            }?.elapsedSeconds
+
+            guard let result = ATHLTHArenaLiveDuelReview.candidate(
+                senderID: challenge.senderID,
+                recipientID: challenge.recipientID,
+                senderSeconds: senderTime,
+                recipientSeconds: recipientTime,
+                reportedWinnerID: room.winnerID,
+                isFinished: true
+            ) else {
+                excluded += 1
+                continue
+            }
+
+            if let winnerID = result.winnerID {
+                if winnerID == currentUserID { wins += 1 }
+                else { losses += 1 }
+            } else {
+                ties += 1
+            }
+        }
+        return ATHLTHArenaRivalrySummary(
+            wins: wins, losses: losses, ties: ties, excluded: excluded
+        )
+    }
+}
+
 enum ATHLTHArenaSuggestedRanking {
     /// A suggested pace target only, never a verified result or a replay of
     /// someone else's private GPS trace. Based on an explicitly shared round
