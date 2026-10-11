@@ -213,6 +213,37 @@ struct ATHLTHArenaRivalrySummary: Equatable {
     }
 }
 
+/// Progress represents server-reviewed Arena rounds, not completed
+/// workouts. Rejected and expired proposals never count as approved.
+struct ATHLTHArenaRoundProgress: Equatable {
+    let total: Int
+    let approved: Int
+    let pending: Int
+
+    var unresolved: Int { max(0, total - approved - pending) }
+
+    var approvedFraction: Double {
+        total > 0 ? Double(approved) / Double(total) : 0
+    }
+
+    static func summarize(
+        roundIDs: [UUID],
+        results: [ATHLTHArenaRoundResult]
+    ) -> ATHLTHArenaRoundProgress {
+        let uniqueRounds = Set(roundIDs)
+        let eligible = results.filter { uniqueRounds.contains($0.roundID) }
+        let approved = Set(eligible.filter { $0.status == "approved" }.map(\.roundID))
+        let pending = Set(eligible.filter {
+            $0.status == "pending" && !approved.contains($0.roundID)
+        }.map(\.roundID))
+        return ATHLTHArenaRoundProgress(
+            total: uniqueRounds.count,
+            approved: approved.count,
+            pending: pending.count
+        )
+    }
+}
+
 enum ATHLTHArenaSuggestedRanking {
     /// A suggested pace target only, never a verified result or a replay of
     /// someone else's private GPS trace. Based on an explicitly shared round
