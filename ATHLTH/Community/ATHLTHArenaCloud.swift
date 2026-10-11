@@ -50,6 +50,33 @@ struct ATHLTHArenaRemoteMember: Decodable, Identifiable {
     }
 }
 
+/// A roster overlay only: the official source of points remains the
+/// accepted, server-settled Arena series member score.
+struct ATHLTHArenaTeamAssignment: Decodable, Identifiable {
+    let slotID: UUID
+    let seriesID: UUID
+    let teamIndex: Int
+    var id: UUID { slotID }
+
+    enum CodingKeys: String, CodingKey {
+        case slotID = "slot_id"
+        case seriesID = "series_id"
+        case teamIndex = "team_index"
+    }
+}
+
+private struct ATHLTHArenaTeamLineupParams: Encodable {
+    let seriesID: UUID
+    let firstTeamSlots: [UUID]
+    let secondTeamSlots: [UUID]
+
+    enum CodingKeys: String, CodingKey {
+        case seriesID = "p_series_id"
+        case firstTeamSlots = "p_first_team_slots"
+        case secondTeamSlots = "p_second_team_slots"
+    }
+}
+
 struct ATHLTHArenaRemoteProposal: Decodable, Identifiable {
     let id: UUID
     let seriesID: UUID
@@ -502,6 +529,36 @@ final class ATHLTHArenaCloudService: Sendable {
             .eq("series_id", value: seriesID)
             .execute()
             .value
+    }
+
+    func loadTeamAssignments(
+        seriesID: UUID
+    ) async throws -> [ATHLTHArenaTeamAssignment] {
+        try await client
+            .from("arena_series_team_assignments")
+            .select("slot_id,series_id,team_index")
+            .eq("series_id", value: seriesID)
+            .execute().value
+    }
+
+    /// Server locks the roster once the series starts. Clients cannot
+    /// directly insert or update team assignments.
+    func saveTeamAssignments(
+        seriesID: UUID,
+        first: [UUID],
+        second: [UUID]
+    ) async throws {
+        guard currentUserID != nil else {
+            throw ATHLTHArenaCloudError.signInRequired
+        }
+        try await client.rpc(
+            "arena_save_team_lineup",
+            params: ATHLTHArenaTeamLineupParams(
+                seriesID: seriesID,
+                firstTeamSlots: first,
+                secondTeamSlots: second
+            )
+        ).execute()
     }
 
     func loadProposals(seriesID: UUID) async throws -> [ATHLTHArenaRemoteProposal] {
