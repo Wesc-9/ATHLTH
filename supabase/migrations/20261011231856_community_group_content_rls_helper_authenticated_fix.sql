@@ -1,0 +1,49 @@
+-- Restore authenticated evaluation of the club-content RLS helper.
+-- It is SECURITY DEFINER but now explicitly restricts the requested
+-- identity to auth.uid(), so a caller cannot impersonate another member.
+create or replace function private.can_manage_community_group_content(
+  p_group_id uuid,
+  p_content_type text,
+  p_content_id uuid,
+  p_user_id uuid
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, private
+as $body$
+  select (select auth.uid()) is not null
+     and p_user_id = (select auth.uid())
+     and (
+       private.can_manage_community_group(p_group_id)
+       or case
+         when p_content_type = 'event' then exists (
+           select 1 from public.community_group_events e
+           where e.id = p_content_id
+             and e.group_id = p_group_id
+             and e.creator_id = p_user_id
+         )
+         when p_content_type = 'challenge' then exists (
+           select 1 from public.community_group_challenges c
+           where c.id = p_content_id
+             and c.group_id = p_group_id
+             and c.creator_id = p_user_id
+         )
+         when p_content_type = 'announcement' then exists (
+           select 1 from public.community_group_announcements a
+           where a.id = p_content_id
+             and a.group_id = p_group_id
+             and a.author_id = p_user_id
+         )
+         else false
+       end
+     );
+$body$;
+
+revoke all on function private.can_manage_community_group_content(
+  uuid, text, uuid, uuid
+) from public, anon;
+grant execute on function private.can_manage_community_group_content(
+  uuid, text, uuid, uuid
+) to authenticated;
