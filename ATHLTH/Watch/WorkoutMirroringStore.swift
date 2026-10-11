@@ -421,6 +421,22 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         var latestSnapshot: WatchWorkoutLiveSnapshot?
 
         for data in incoming {
+            if let receipt = try? JSONDecoder().decode(
+                ATHLTHCoachDeliveryReceipt.self,
+                from: data
+            ) {
+                // Match a real, current Watch workout before changing the
+                // phone's dedup ledger. Never treat a receipt as a metric.
+                if iPhoneAudioCoachAttached,
+                   let current = snapshot,
+                   current.state == .running ||
+                    current.state == .paused,
+                   receipt.isValid(for: current.startedAt) {
+                    iPhoneAudioCoach.recordWatchSpokenEvent(receipt)
+                }
+                continue
+            }
+
             if let acknowledgement =
                 try? JSONDecoder().decode(
                     ATHLTHAudioCoachLeaseAcknowledgement.self,
