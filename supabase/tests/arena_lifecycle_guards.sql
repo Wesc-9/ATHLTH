@@ -112,6 +112,44 @@ begin
  ) then
    raise exception 'Live Ghost finish validation function missing';
  end if;
+ -- A relay plan can be read by authorized series participants but can only
+ -- be changed through the organizer-only draft RPC.
+ if not (select relrowsecurity from pg_class
+         where oid='public.arena_series_relay_legs'::regclass) then
+   raise exception 'Relay stage plan must have RLS';
+ end if;
+ if has_table_privilege('anon','public.arena_series_relay_legs','SELECT')
+    or has_table_privilege('anon','public.arena_series_relay_legs','INSERT')
+    or has_table_privilege('authenticated','public.arena_series_relay_legs','INSERT')
+    or has_table_privilege('authenticated','public.arena_series_relay_legs','UPDATE')
+    or has_table_privilege('authenticated','public.arena_series_relay_legs','DELETE') then
+   raise exception 'Relay plans allow unsafe direct writes';
+ end if;
+ if not exists (
+   select 1 from pg_policies where schemaname='public'
+    and tablename='arena_series_relay_legs'
+    and policyname='arena_relay_legs_read'
+    and qual like '%arena_can_access%'
+ ) then
+   raise exception 'Relay plan read access bypasses Arena membership';
+ end if;
+ if not has_function_privilege('authenticated',
+    'public.arena_save_relay_lineup(uuid,uuid,uuid[],uuid[])'::regprocedure,'EXECUTE')
+    or has_function_privilege('anon',
+    'public.arena_save_relay_lineup(uuid,uuid,uuid[],uuid[])'::regprocedure,'EXECUTE') then
+   raise exception 'Relay lineup RPC is not authenticated only';
+ end if;
+ if has_function_privilege('authenticated',
+    'private.arena_clear_relay_on_roster_change()'::regprocedure,'EXECUTE') then
+   raise exception 'Relay reset trigger must not be publicly invocable';
+ end if;
+ if not exists (
+    select 1 from pg_trigger where
+      tgrelid='public.arena_series_team_assignments'::regclass
+      and tgname='arena_clear_relay_on_roster_change' and tgenabled='O'
+ ) then
+    raise exception 'Team changes do not clear stale relay plans';
+ end if;
  -- Team mode is an optional read-only overlay. Only the organizer
  -- can replace all assignments through the draft-only RPC.
  if not (select relrowsecurity from pg_class
