@@ -77,6 +77,7 @@ enum ATHLTHArenaNextAction: Equatable {
         allRulesApproved: Bool,
         pendingInvites: Int,
         acceptedCount: Int,
+        hasUnacceptedMembers: Bool = false,
         hasRoute: Bool,
         deadlinePassed: Bool
     ) -> ATHLTHArenaNextAction? {
@@ -93,7 +94,11 @@ enum ATHLTHArenaNextAction: Equatable {
                 return .approveRule(roundID)
             }
             if pendingInvites > 0 { return .waitingForInvites }
-            if acceptedCount < 2 { return .waitingForPlayers }
+            // Declined/deleted slots must be dealt with before the start gate.
+            // Do not advertise "Start" solely because remaining athletes approved.
+            if hasUnacceptedMembers || acceptedCount < 2 {
+                return .waitingForPlayers
+            }
             if !allRulesApproved { return .waitingForRules }
             return isOrganizer ? .startSeries : .waitingForRules
         case "active":
