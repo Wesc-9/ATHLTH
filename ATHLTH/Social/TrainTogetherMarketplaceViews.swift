@@ -2654,6 +2654,11 @@ struct TrainTogetherPostCreateView:
 
     @State private var selectedSourceID:
         UUID?
+    /// The same structured workout prepared by SessionEditorView.
+    @State private var preparedWorkout: PlannedSession?
+    @State private var workoutToEdit: PlannedSession?
+    @State private var showingSharedWorkoutEditor = false
+    @State private var showingPlannedWorkoutPicker = false
     @State private var title = ""
     @State private var kind:
         WorkoutKind = .running
@@ -2739,45 +2744,18 @@ struct TrainTogetherPostCreateView:
 
                 sourceCard
 
-                createSectionHeader(
-                    ATHLTHLocalization.choose(
-                        english: "Workout",
-                        norwegian: "Treningsøkt"
-                    )
-                )
-
-                workoutCard
-
-                if kind == .strength {
+                if preparedWorkout != nil {
                     createSectionHeader(
                         ATHLTHLocalization.choose(
-                            english:
-                                "Strength exercises",
-                            norwegian:
-                                "Styrkeøvelser"
+                            english: "Train Together options",
+                            norwegian: "Train Together-valg"
                         ),
-                        subtitle:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Optional. Add the exercises if everyone should receive the same structured workout.",
-                                norwegian:
-                                    "Valgfritt. Legg inn øvelser hvis alle skal få samme strukturerte styrkeøkt."
-                            )
+                        subtitle: ATHLTHLocalization.choose(
+                            english: "Only meetup and participation differ from personal planning.",
+                            norwegian: "Kun oppmøte og deltakelse kommer i tillegg til øktplanen."
+                        )
                     )
-
-                    strengthExercisesCard
-                }
-
-                createSectionHeader(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Social workout",
-                        norwegian:
-                            "Sosial økt"
-                    )
-                )
-
-                socialWorkoutCard
+                    socialWorkoutCard
 
                 if participationMode ==
                     .physical {
@@ -2798,6 +2776,7 @@ struct TrainTogetherPostCreateView:
                     )
 
                     meetupCard
+                }
                 }
             }
             .padding(16)
@@ -2867,6 +2846,23 @@ struct TrainTogetherPostCreateView:
                     !canPublish ||
                     marketplace.isWorking
                 )
+            }
+        }
+        .sheet(isPresented: $showingSharedWorkoutEditor) {
+            SessionEditorView(
+                standaloneDate: scheduledStart,
+                initialSourceWorkout: workoutToEdit,
+                onPreparedWorkout: { workout in
+                    applyPreparedWorkout(workout)
+                }
+            )
+        }
+        .sheet(isPresented: $showingPlannedWorkoutPicker) {
+            PlanWorkoutPickerView { workout in
+                selectedSourceID = workout.id
+                workoutToEdit = workout
+                showingPlannedWorkoutPicker = false
+                showingSharedWorkoutEditor = true
             }
         }
         .sheet(
@@ -3011,120 +3007,92 @@ struct TrainTogetherPostCreateView:
         }
     }
 
-    private var sourceCard:
-        some View {
-        ATHLTHCard {
-            VStack(
-                alignment: .leading,
-                spacing: 12
-            ) {
-                Menu {
-                    Button {
-                        startFromScratch()
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Create from scratch",
-                                norwegian:
-                                    "Lag fra bunnen"
-                            ),
-                            systemImage:
-                                "plus"
-                        )
-                    }
-
-                    ForEach(
-                        availablePlannedSessions
-                    ) { workout in
-                        Button {
-                            apply(workout)
-                        } label: {
-                            Label(
-                                workout.title,
-                                systemImage:
-                                    workout
-                                        .kind
-                                        .systemImage
-                            )
+    private var sourceCard: some View {
+        Group {
+            if let preparedWorkout {
+                ATHLTHCard {
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack(spacing: 11) {
+                            Image(systemName: preparedWorkout.kind.systemImage)
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .frame(width: 46, height: 46)
+                                .background(ATHLTHTheme.accentSoft,
+                                    in: RoundedRectangle(cornerRadius: 14))
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "PLANNED WORKOUT",
+                                    norwegian: "PLANLAGT ØKT"
+                                ))
+                                .font(.caption2.weight(.bold))
+                                .tracking(1.2)
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                Text(preparedWorkout.title)
+                                    .font(.headline)
+                                Text(preparedWorkout.kind.title)
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            Spacer()
                         }
-                    }
-                } label: {
-                    HStack(spacing: 12) {
-                        createIcon(
-                            selectedWorkout?
-                                .kind
-                                .systemImage ??
-                            "calendar.badge.plus"
-                        )
-
-                        VStack(
-                            alignment: .leading,
-                            spacing: 2
-                        ) {
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "Workout source",
-                                    norwegian:
-                                        "Grunnlag"
-                                )
-                            )
+                        if let time = preparedWorkout.scheduledStart {
+                            Label(time.formatted(date: .abbreviated,
+                                                 time: .shortened),
+                                  systemImage: "calendar")
+                                .font(.caption)
+                        }
+                        if let duration = preparedWorkout.durationMinutes {
+                            Label("\(duration) min", systemImage: "clock")
+                                .font(.caption)
+                        }
+                        if !preparedWorkout.exercises.isEmpty {
+                            Text(ATHLTHLocalization.format(
+                                english: "%d exercises",
+                                norwegian: "%d øvelser",
+                                preparedWorkout.exercises.count
+                            ))
                             .font(.caption)
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .mutedText
-                            )
-
-                            Text(
-                                selectedWorkout?
-                                    .title ??
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "New workout",
-                                    norwegian:
-                                        "Ny økt"
-                                )
-                            )
-                            .font(
-                                .subheadline
-                                    .weight(
-                                        .semibold
-                                    )
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .primaryText
-                            )
-                            .lineLimit(1)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
                         }
-
-                        Spacer()
-
-                        Image(
-                            systemName:
-                                "chevron.up.chevron.down"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(
-                            .secondary
-                        )
+                        Button {
+                            workoutToEdit = preparedWorkout
+                            showingSharedWorkoutEditor = true
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Edit workout", norwegian: "Rediger økt"
+                            ), systemImage: "square.and.pencil")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHTheme.accentDeep)
+                        Button {
+                            preparedWorkout = nil
+                            workoutToEdit = nil
+                            selectedSourceID = nil
+                        } label: {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Choose another workout",
+                                norwegian: "Velg en annen økt"
+                            ))
+                            .font(.caption.weight(.semibold))
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
-                .buttonStyle(.plain)
-
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Choose a planned workout to reuse its structure, or build a new one here.",
-                        norwegian:
-                            "Velg en planlagt økt for å bruke oppsettet, eller bygg en ny her."
-                    )
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .mutedText
+            } else {
+                WorkoutPlanningSourceCard(
+                    context: ATHLTHLocalization.choose(
+                        english: "Build the workout in the shared planner. Then choose how and where to train together.",
+                        norwegian: "Bygg økten i den felles planleggeren. Velg deretter hvordan og hvor dere trener sammen."
+                    ),
+                    onCreateNew: {
+                        selectedSourceID = nil
+                        workoutToEdit = nil
+                        showingSharedWorkoutEditor = true
+                    },
+                    onUsePlanned: {
+                        showingPlannedWorkoutPicker = true
+                    }
                 )
             }
         }
@@ -4130,6 +4098,7 @@ struct TrainTogetherPostCreateView:
                 )
 
         return
+            preparedWorkout != nil &&
             !cleanTitle.isEmpty &&
             (
                 participationMode ==
@@ -4141,8 +4110,30 @@ struct TrainTogetherPostCreateView:
                     .addingTimeInterval(
                         10 * 60
                     ) &&
-            durationMinutes >= 10 &&
+            (durationMinutes == 0 || durationMinutes >= 10) &&
             distanceIsValid
+    }
+
+    private func applyPreparedWorkout(_ workout: PlannedSession) {
+        preparedWorkout = workout
+        title = workout.title
+        kind = normalizedKind(workout.kind)
+        if let when = workout.scheduledStart {
+            scheduledStart = when
+        }
+        durationMinutes = workout.durationMinutes ?? 0
+        distanceText = workout.targetDistanceKilometers.map {
+            String(format: "%g", $0)
+        } ?? ""
+        plannedExercises = workout.exercises
+        note = workout.notes ?? ""
+        if let point = workout.meetingPoint {
+            meetingName = point.name
+            meetingAddress = point.address
+            meetingLatitude = point.latitude
+            meetingLongitude = point.longitude
+            broadArea = point.name
+        }
     }
 
     private func startFromScratch() {
@@ -4316,37 +4307,16 @@ struct TrainTogetherPostCreateView:
                 ? distanceKilometers
                 : nil
 
-        var workout =
-            selectedWorkout ??
-            PlannedSession(
-                id: UUID(),
-                title: cleanTitle,
-                kind: kind,
-                scheduledStart:
-                    scheduledStart,
-                durationMinutes:
-                    durationMinutes,
-                targetDistanceKilometers:
-                    resolvedDistance,
-                targetPaceSecondsPerKilometer:
-                    nil,
-                routeID: nil,
-                exercises:
-                    kind == .strength
-                        ? plannedExercises
-                        : [],
-                notes:
-                    note.isEmpty
-                        ? nil
-                        : note
-            )
+        // Never reconstitute a simplified workout here; preserve the full
+        // premium planner structure, pace, route, blocks and alerts.
+        guard var workout = preparedWorkout else { return }
 
         workout.title = cleanTitle
         workout.kind = kind
         workout.scheduledStart =
             scheduledStart
         workout.durationMinutes =
-            durationMinutes
+            durationMinutes > 0 ? durationMinutes : nil
         workout.targetDistanceKilometers =
             resolvedDistance
 
@@ -4415,7 +4385,7 @@ struct TrainTogetherPostCreateView:
                 scheduledStart:
                     scheduledStart,
                 durationMinutes:
-                    durationMinutes,
+                    durationMinutes > 0 ? durationMinutes : nil,
                 distanceKilometers:
                     resolvedDistance,
                 level: level,
