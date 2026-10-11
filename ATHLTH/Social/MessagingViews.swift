@@ -6015,8 +6015,7 @@ private struct ThreadChallengeInvitationBubble: View {
 
             if isMine,
                challenge?.status != .cancelled,
-               challenge?.status != .completed,
-               invitee?.state == .invited {
+               challenge?.status != .completed {
                 Button(role: .destructive) {
                     confirmCancellation = true
                 } label: {
