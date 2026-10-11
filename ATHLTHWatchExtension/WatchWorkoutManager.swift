@@ -5276,20 +5276,18 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         haptic: WKHapticType,
         priority: ATHLTHGuidancePriority
     ) {
-        if delivery.usesHaptics,
-           liveSurfaceConfiguration
-                .hapticsEnabled,
-           guidancePriorityGate
-            .allowsHaptic(
-                for: priority
-            ) {
-            WKInterfaceDevice.current()
-                .play(haptic)
+        let channels = ATHLTHCoachAlertChannels.resolve(
+            delivery: delivery,
+            voiceEnabled: liveSurfaceConfiguration.audioAlertsEnabled,
+            hapticsEnabled: liveSurfaceConfiguration.hapticsEnabled,
+            hapticPermittedByPriority:
+                guidancePriorityGate.allowsHaptic(for: priority)
+        )
+        if channels.haptic {
+            WKInterfaceDevice.current().play(haptic)
         }
 
-        if delivery.usesVoice,
-           liveSurfaceConfiguration
-                .audioAlertsEnabled {
+        if channels.voice {
             speak(
                 coachPhrase(
                     english: english,
