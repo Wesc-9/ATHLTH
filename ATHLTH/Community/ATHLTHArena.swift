@@ -186,12 +186,7 @@ struct ATHLTHArenaEntryCard: View {
                 .foregroundStyle(ATHLTHTheme.mutedText)
         }
         .padding(16)
-        .background(.regularMaterial, in:
-            RoundedRectangle(cornerRadius: 23, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 23, style: .continuous)
-                .stroke(Color.white.opacity(0.70), lineWidth: 1)
-        }
+        .background(ATHLTHArenaLightStyle.card(23))
     }
 }
 
@@ -317,9 +312,8 @@ struct ATHLTHArenaHomeView: View {
             .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
         }
-        .background(ATHLTHPremiumCanvas(
-            accent: ATHLTHTheme.champagneSoft.opacity(0.16)
-        ))
+        .background(ATHLTHArenaLightStyle.canvasBackground)
+        .environment(\.colorScheme, .light)
         .navigationTitle("Arena")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: session.profile.userID) {
@@ -434,9 +428,8 @@ struct ATHLTHArenaHomeView: View {
             .buttonStyle(.borderedProminent)
             .tint(ATHLTHTheme.accentDeep)
         }
-        .padding(18)
-        .background(.regularMaterial, in:
-            RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .padding(20)
+        .background(ATHLTHArenaLightStyle.card(24))
     }
 
     private func draftRow(_ draft: ATHLTHArenaCompetitionDraft) -> some View {
@@ -670,6 +663,8 @@ struct ATHLTHArenaCreateView: View {
     
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(ATHLTHArenaLightStyle.canvasBackground)
             .navigationTitle(ATHLTHLocalization.choose(
                 english: "New series", norwegian: "Ny konkurranseserie"
             ))
@@ -733,6 +728,8 @@ struct ATHLTHArenaCreateView: View {
             clubError = nil
         } catch {
             clubError = error.localizedDescription
+        .environment(\.colorScheme, .light)
+        .tint(ATHLTHArenaLightStyle.action)
         }
     }
 }
@@ -918,9 +915,8 @@ struct ATHLTHArenaDraftDetailView: View {
             .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
         }
-        .background(ATHLTHPremiumCanvas(
-            accent: ATHLTHTheme.champagneSoft.opacity(0.16)
-        ))
+        .background(ATHLTHArenaLightStyle.canvasBackground)
+        .environment(\.colorScheme, .light)
         .navigationTitle(ATHLTHLocalization.choose(
             english: "Competition series", norwegian: "Konkurranseserie"
         ))
@@ -999,6 +995,8 @@ struct ATHLTHArenaAddRoundView: View {
                     ))
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(ATHLTHArenaLightStyle.canvasBackground)
             .navigationTitle(ATHLTHLocalization.choose(
                 english: "New round", norwegian: "Ny runde"
             ))
@@ -1038,6 +1036,8 @@ struct ATHLTHArenaAddRoundView: View {
                     )
                 }
             }
+        .environment(\.colorScheme, .light)
+        .tint(ATHLTHArenaLightStyle.action)
         }
     }
 }
@@ -1115,9 +1115,8 @@ struct ATHLTHArenaSingleChallengesView: View {
             .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
         }
-        .background(ATHLTHPremiumCanvas(
-            accent: ATHLTHTheme.champagneSoft.opacity(0.16)
-        ))
+        .background(ATHLTHArenaLightStyle.canvasBackground)
+        .environment(\.colorScheme, .light)
         .navigationTitle(ATHLTHLocalization.choose(
             english: "Challenges", norwegian: "Utfordringer"
         ))
