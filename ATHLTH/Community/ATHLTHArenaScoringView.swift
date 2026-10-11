@@ -144,21 +144,46 @@ struct ATHLTHArenaScoringSection: View {
 
             if series.status == "completed", let first = rankedMembers.first {
                 let champions = rankedMembers.filter { $0.points == first.points }
-                VStack(alignment: .leading, spacing: 4) {
-                    Label(
-                        champions.count == 1
-                            ? ATHLTHLocalization.choose(english: "Champion", norwegian: "Mester")
-                            : ATHLTHLocalization.choose(english: "Joint champions", norwegian: "Delt seier"),
-                        systemImage: "crown.fill"
-                    )
-                    .font(.subheadline.weight(.bold))
-                    Text(champions.map(memberName).joined(separator: " · "))
-                        .font(.title3.weight(.bold))
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "crown.fill")
+                            .font(.title2.weight(.bold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 50, height: 50)
+                            .background(
+                                ATHLTHTheme.champagneSoft.opacity(0.27),
+                                in: Circle()
+                            )
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(champions.count == 1
+                                ? ATHLTHLocalization.choose(
+                                    english: "Arena champion", norwegian: "Arena-mester"
+                                  )
+                                : ATHLTHLocalization.choose(
+                                    english: "Joint Arena champions", norwegian: "Delte Arena-mestere"
+                                  ))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                            Text(champions.map(memberName).joined(separator: " · "))
+                                .font(.title3.weight(.bold))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    Text(ATHLTHLocalization.choose(
+                        english: "Final score approved by all eligible participants.",
+                        norwegian: "Sluttresultatet er godkjent av alle stemmeberettigede deltakerne."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
                 }
-                .foregroundStyle(ATHLTHTheme.accentDeep)
-                .padding(16)
+                .padding(18)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22)
+                        .stroke(ATHLTHTheme.accentDeep.opacity(0.15), lineWidth: 1)
+                )
             }
 
             if series.status != "draft" {
