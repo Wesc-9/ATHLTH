@@ -4265,7 +4265,7 @@ private struct WatchRunWalkWorkoutPager: View {
 }
 
 
-private struct WatchAudioCoachLiveSettingsView: View {
+struct WatchAudioCoachLiveSettingsView: View {
     @ObservedObject var workoutManager: WatchWorkoutManager
 
     var body: some View {
