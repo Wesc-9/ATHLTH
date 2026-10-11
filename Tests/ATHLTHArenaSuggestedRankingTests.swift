@@ -192,6 +192,59 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
         )
     }
 
+    func testFinishedLiveDuelResultMatchesReportedWinner() {
+        let sender = UUID()
+        let recipient = UUID()
+        let candidate = ATHLTHArenaLiveDuelReview.candidate(
+            senderID: sender,
+            recipientID: recipient,
+            senderSeconds: 1_500,
+            recipientSeconds: 1_450,
+            reportedWinnerID: recipient,
+            isFinished: true
+        )
+        XCTAssertEqual(candidate?.winnerID, recipient)
+        XCTAssertEqual(candidate?.marginSeconds, 50)
+    }
+
+    func testLiveDuelRequiresBothTimesAndCompletedRace() {
+        let a = UUID(), b = UUID()
+        XCTAssertNil(ATHLTHArenaLiveDuelReview.candidate(
+            senderID: a, recipientID: b, senderSeconds: nil,
+            recipientSeconds: 1_500, reportedWinnerID: b, isFinished: true
+        ))
+        XCTAssertNil(ATHLTHArenaLiveDuelReview.candidate(
+            senderID: a, recipientID: b, senderSeconds: 1_400,
+            recipientSeconds: 1_500, reportedWinnerID: a, isFinished: false
+        ))
+        XCTAssertNil(ATHLTHArenaLiveDuelReview.candidate(
+            senderID: a, recipientID: b, senderSeconds: .infinity,
+            recipientSeconds: 1_500, reportedWinnerID: b, isFinished: true
+        ))
+    }
+
+    func testLiveDuelDisagreementNeverSuggestsWinner() {
+        let a = UUID(), b = UUID()
+        XCTAssertNil(ATHLTHArenaLiveDuelReview.candidate(
+            senderID: a, recipientID: b, senderSeconds: 1_400,
+            recipientSeconds: 1_500, reportedWinnerID: b, isFinished: true
+        ))
+    }
+
+    func testTiedLiveDuelHasNoAutomaticWinner() {
+        let a = UUID(), b = UUID()
+        let candidate = ATHLTHArenaLiveDuelReview.candidate(
+            senderID: a, recipientID: b, senderSeconds: 1_500.0,
+            recipientSeconds: 1_500.3, reportedWinnerID: nil, isFinished: true
+        )
+        XCTAssertNotNil(candidate)
+        XCTAssertNil(candidate?.winnerID)
+        XCTAssertNil(ATHLTHArenaLiveDuelReview.candidate(
+            senderID: a, recipientID: b, senderSeconds: 1_500.0,
+            recipientSeconds: 1_500.3, reportedWinnerID: a, isFinished: true
+        ))
+    }
+
     func testCustomRoundsDoNotInferUnsupportedResults() {
         let standings = ATHLTHArenaSuggestedRanking.standings(
             template: .custom,
