@@ -1639,7 +1639,15 @@ struct ATHLTHArenaOnlineDetailView: View {
                         series: currentSeries,
                         members: members,
                         rounds: rounds,
-                        isOrganizer: isOrganizer
+                        isOrganizer: isOrganizer,
+                        onReview: { roundID in
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                scrollProxy.scrollTo(
+                                    "arena-review-\(roundID.uuidString)",
+                                    anchor: .top
+                                )
+                            }
+                        }
                     )
                     .id("arena-relay")
                 }
@@ -2727,11 +2735,14 @@ private struct ATHLTHArenaRelaySection: View {
     let members: [ATHLTHArenaRemoteMember]
     let rounds: [ATHLTHArenaRemoteProposal]
     let isOrganizer: Bool
+    let onReview: (UUID) -> Void
 
     @State private var assignments: [ATHLTHArenaTeamAssignment] = []
     @State private var legs: [ATHLTHArenaRelayLeg] = []
     @State private var reports: [ATHLTHArenaRelayLegReport] = []
     @State private var legTimeText = ""
+    @State private var pendingLegSeconds: Double?
+    @State private var confirmLegTime = false
     @State private var nextNoticeStatus: String?
     @State private var nextNoticeAttempted = false
     @State private var loading = false
@@ -2998,6 +3009,35 @@ private struct ATHLTHArenaRelaySection: View {
                                 ))
                                 .font(.caption2)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
+
+                                if let round = availableRoutes.first(where: {
+                                    $0.id == legs.first?.routeRoundID
+                                }) {
+                                    Button {
+                                        onReview(round.id)
+                                    } label: {
+                                        HStack {
+                                            Label(
+                                                ATHLTHLocalization.choose(
+                                                    english: "Review the competition's round result",
+                                                    norwegian: "Kontroller rundens resultat"
+                                                ),
+                                                systemImage: "checkmark.shield"
+                                            )
+                                            Spacer()
+                                            Image(systemName: "arrow.right")
+                                        }
+                                        .font(.subheadline.weight(.semibold))
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .tint(ATHLTHTheme.accentDeep)
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "The relay total is a comparison only. Arena round and team points still follow the agreed scoring rules and participant approvals.",
+                                        norwegian: "Stafettiden er kun en sammenligning. Runde- og lagpoeng følger fortsatt avtalte poengregler og deltakernes godkjenning."
+                                    ))
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                }
                             }
                             .padding(13)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -3096,7 +3136,8 @@ private struct ATHLTHArenaRelaySection: View {
                                 HStack {
                                     Button {
                                         guard let value = parsedLegTime else { return }
-                                        Task { await saveLeg(ownLeg.slotID, value) }
+                                        pendingLegSeconds = value
+                                        confirmLegTime = true
                                     } label: {
                                         Label(
                                             ATHLTHLocalization.choose(
@@ -3212,6 +3253,33 @@ private struct ATHLTHArenaRelaySection: View {
                 }
                 .confirmationDialog(
                     ATHLTHLocalization.choose(
+                        english: "Confirm your relay leg time",
+                        norwegian: "Bekreft etappetiden din"
+                    ),
+                    isPresented: $confirmLegTime,
+                    titleVisibility: .visible
+                ) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Confirm and report time",
+                        norwegian: "Bekreft og registrer tid"
+                    )) {
+                        guard let ownLeg, let seconds = pendingLegSeconds,
+                              (10...86_400).contains(seconds) else { return }
+                        pendingLegSeconds = nil
+                        Task { await saveLeg(ownLeg.slotID, seconds) }
+                    }
+                    Button(ATHLTHLocalization.choose(
+                        english: "Cancel", norwegian: "Avbryt"
+                    ), role: .cancel) { pendingLegSeconds = nil }
+                } message: {
+                    Text((pendingLegSeconds.map(GhostTargetTimeFormatter.string) ?? "—") +
+                        " · " + ATHLTHLocalization.choose(
+                            english: "This is self-reported, not GPS-verified, and grants no Arena points automatically.",
+                            norwegian: "Tiden er selvrapportert, ikke GPS-verifisert, og gir ingen automatisk Arena-poeng."
+                        ))
+                }
+                .confirmationDialog(
+                    ATHLTHLocalization.choose(
                         english: "Remove relay plan from draft?",
                         norwegian: "Fjerne stafettplanen fra utkastet?"
                     ),
@@ -3225,7 +3293,20 @@ private struct ATHLTHArenaRelaySection: View {
                 }
             }
         }
-        .task(id: series.id) { await refresh() }
+        .task(id: series.id) {
+            await refresh()
+            // Refresh the active relay while visible, without a persistent
+            // listener or polling in the background. No automatic baton.
+            while !Task.isCancelled && series.status == "active" {
+                do {
+                    try await Task.sleep(for: .seconds(30))
+                } catch {
+                    break
+                }
+                guard !Task.isCancelled else { break }
+                if scenePhase == .active { await refresh() }
+            }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await refresh() } }
         }
