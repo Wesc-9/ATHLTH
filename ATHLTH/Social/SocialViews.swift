@@ -4849,12 +4849,15 @@ struct WorkoutInviteLaunchSheet: View {
                 }
 
                 Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "When the sender starts the group, ATHLTH counts down 3–2–1 and starts your copied workout on your chosen device.",
-                        norwegian:
-                            "Når avsender starter gruppen, teller ATHLTH ned 3–2–1 og starter øktkopien på enheten du valgte."
-                    )
+                    payload?.resolvedStartIndependently == true
+                        ? ATHLTHLocalization.choose(
+                            english: "Start when you are ready. Your friends' live progress remains available.",
+                            norwegian: "Start når du er klar. Du kan fortsatt følge vennenes fremdrift direkte."
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "When the organizer starts the group, everyone gets the same 3–2–1 countdown.",
+                            norwegian: "Når arrangøren starter gruppen, får alle samme 3–2–1-nedtelling."
+                        )
                 )
                 .font(.caption2)
                 .foregroundStyle(.secondary)
