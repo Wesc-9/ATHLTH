@@ -1,4 +1,5 @@
 import SwiftUI
+import Supabase
 
 /// One shared room per Arena series. Membership and posting authorization
 /// are enforced in the database; this is not a reusable public Club chat.
@@ -118,6 +119,7 @@ struct ATHLTHArenaGroupChatView: View {
         .navigationTitle(series.title)
         .navigationBarTitleDisplayMode(.inline)
         .task(id: series.id) { await reload() }
+        .task(id: series.id) { await listenForMessages() }
         .refreshable { await reload() }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -243,6 +245,26 @@ struct ATHLTHArenaGroupChatView: View {
     }
 
     @MainActor
+    /// Live updates while the group chat is on screen. Supabase checks row
+    /// access with existing Arena RLS; no participant data is broadcast
+    /// outside the competition. The task stops on navigation away.
+    private func listenForMessages() async {
+        let channel = await SupabaseEnvironment.client.channel(
+            "arena-chat-\(series.id.uuidString.lowercased())"
+        )
+        let changes = await channel.postgresChange(
+            AnyAction.self,
+            schema: "public",
+            table: "arena_series_messages"
+        )
+        await channel.subscribe()
+        for await _ in changes {
+            if Task.isCancelled { break }
+            await reload()
+        }
+        await channel.unsubscribe()
+    }
+
     private func reload() async {
         guard !isLoading else { return }
         isLoading = true
