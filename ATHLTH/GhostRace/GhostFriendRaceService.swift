@@ -40,6 +40,8 @@ struct GhostFriendRaceChallengeRecord:
     let privacyTrimmed: Bool
     /// Earlier challenges are decoded as previous workouts.
     let sourceKind: String?
+    /// Optional link to the approved 1v1 round; never implies verified points.
+    let arenaRoundID: UUID?
     var status: GhostFriendRaceStatus
     let createdAt: Date
     var respondedAt: Date?
@@ -56,6 +58,7 @@ struct GhostFriendRaceChallengeRecord:
         case routePoints = "route_points"
         case privacyTrimmed = "privacy_trimmed"
         case sourceKind = "source_kind"
+        case arenaRoundID = "arena_round_id"
         case status
         case createdAt = "created_at"
         case respondedAt = "responded_at"
@@ -104,6 +107,7 @@ private struct GhostFriendRaceInsert: Encodable {
     let routePoints: [GhostFriendRacePoint]
     let privacyTrimmed: Bool
     let sourceKind: String
+    let arenaRoundID: UUID?
     let status: String
 
     enum CodingKeys: String, CodingKey {
@@ -116,6 +120,7 @@ private struct GhostFriendRaceInsert: Encodable {
         case routePoints = "route_points"
         case privacyTrimmed = "privacy_trimmed"
         case sourceKind = "source_kind"
+        case arenaRoundID = "arena_round_id"
         case status
     }
 }
@@ -352,7 +357,8 @@ final class SupabaseGhostFriendRaceService {
         title: String,
         reference: GhostRaceReference,
         hideStartAndEnd: Bool,
-        sourceKind: String = "previous_workout"
+        sourceKind: String = "previous_workout",
+        arenaRoundID: UUID? = nil
     ) async throws {
         guard let senderID =
                 currentUserID
@@ -407,6 +413,7 @@ final class SupabaseGhostFriendRaceService {
                     sanitized
                         .privacyTrimmed,
                 sourceKind: sourceKind,
+                arenaRoundID: arenaRoundID,
                 status:
                     GhostFriendRaceStatus
                         .pending.rawValue
@@ -425,7 +432,8 @@ final class SupabaseGhostFriendRaceService {
         to recipientID: UUID,
         route: TrainingRoute,
         targetDurationSeconds: TimeInterval,
-        hideStartAndEnd: Bool
+        hideStartAndEnd: Bool,
+        arenaRoundID: UUID? = nil
     ) async throws {
         guard route.distanceKilometers.isFinite,
               (0.1...500).contains(route.distanceKilometers),
@@ -453,7 +461,8 @@ final class SupabaseGhostFriendRaceService {
             title: "Live-duell · \(route.title)",
             reference: reference,
             hideStartAndEnd: hideStartAndEnd,
-            sourceKind: "planned_route"
+            sourceKind: "planned_route",
+            arenaRoundID: arenaRoundID
         )
     }
 
@@ -501,6 +510,8 @@ final class SupabaseGhostFriendRaceService {
                     challenge.privacyTrimmed,
                 sourceKind: challenge.sourceKind == "planned_route"
                     ? "planned_route" : "previous_workout",
+                // A rematch is new and requires a new Arena agreement.
+                arenaRoundID: nil,
                 status:
                     GhostFriendRaceStatus
                         .pending
@@ -623,7 +634,8 @@ final class GhostFriendRaceStore:
         to friend: SocialProfileCard,
         workout: WorkoutSummary,
         detail: WorkoutDetail,
-        settings: AppSettingsStore
+        settings: AppSettingsStore,
+        arenaRoundID: UUID? = nil
     ) async -> Bool {
         guard !isSending else {
             return false
@@ -667,7 +679,8 @@ final class GhostFriendRaceStore:
                 reference: reference,
                 hideStartAndEnd:
                     settings
-                        .hideRouteStartAndEnd
+                        .hideRouteStartAndEnd,
+                arenaRoundID: arenaRoundID
             )
 
             await refresh()
@@ -685,7 +698,8 @@ final class GhostFriendRaceStore:
         to friend: SocialProfileCard,
         route: TrainingRoute,
         targetDurationSeconds: TimeInterval,
-        settings: AppSettingsStore
+        settings: AppSettingsStore,
+        arenaRoundID: UUID? = nil
     ) async -> Bool {
         guard !isSending else { return false }
         isSending = true
@@ -696,7 +710,8 @@ final class GhostFriendRaceStore:
                 to: friend.userID,
                 route: route,
                 targetDurationSeconds: targetDurationSeconds,
-                hideStartAndEnd: settings.hideRouteStartAndEnd
+                hideStartAndEnd: settings.hideRouteStartAndEnd,
+                arenaRoundID: arenaRoundID
             )
             await refresh()
             return true
