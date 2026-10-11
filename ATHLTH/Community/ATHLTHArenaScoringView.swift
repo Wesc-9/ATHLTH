@@ -451,6 +451,24 @@ private struct ATHLTHArenaOutcomeEditor: View {
             ATHLTHLocalization.choose(english: "Participant", norwegian: "Deltaker")
     }
 
+    @ViewBuilder
+    private func rankingPicker(at index: Int) -> some View {
+        let localizedPlace = ATHLTHLocalization.choose(
+            english: "place", norwegian: "plass"
+        )
+        let caption = String(index + 1) + ". " + localizedPlace
+        let choice = Binding<UUID>(
+            get: { slots[index] },
+            set: { slots[index] = $0 }
+        )
+        Picker(caption, selection: choice) {
+            ForEach(members) { member in
+                Text(memberLabel(member))
+                    .tag(member.slotID)
+            }
+        }
+    }
+
     private var valid: Bool {
         slots.count == (series.scoring == .winner ? 1 : min(3, members.count)) &&
         Set(slots).count == slots.count &&
@@ -464,20 +482,7 @@ private struct ATHLTHArenaOutcomeEditor: View {
                     english: "Ranking", norwegian: "Plassering"
                 )) {
                     ForEach(slots.indices, id: \.self) { index in
-                        Picker(
-                            "\(index + 1). " + ATHLTHLocalization.choose(
-                                english: "place", norwegian: "plass"
-                            ),
-                            selection: Binding(
-                                get: { slots[index] },
-                                set: { slots[index] = $0 }
-                            )
-                        ) {
-                            ForEach(members) { member in
-                                Text(memberLabel(member))
-                                    .tag(member.slotID)
-                            }
-                        }
+                        rankingPicker(at: index)
                     }
                 }
 
