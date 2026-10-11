@@ -6317,6 +6317,22 @@ struct SessionEditorView: View {
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(.primary)
 
+                                if planned.isWarmUpExercise {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english: "WARM-UP",
+                                            norwegian: "OPPVARMING"
+                                        ),
+                                        systemImage: "flame.fill"
+                                    )
+                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                                    .tracking(0.5)
+                                    .foregroundStyle(ATHLTHTheme.premiumGold)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(ATHLTHTheme.premiumGoldSoft, in: Capsule())
+                                }
+
                                 Text(plannedExerciseSummary(planned))
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
@@ -9385,6 +9401,30 @@ struct PlannedExerciseEditorView: View {
         )
     }
 
+    private var entireWarmUpBinding: Binding<Bool> {
+        Binding(
+            get: {
+                !individualSetTargets.isEmpty &&
+                individualSetTargets.allSatisfy {
+                    $0.isWarmUp == true || $0.setType == .warmUp
+                }
+            },
+            set: { warmUp in
+                let targets = useIndividualSetTargets
+                    ? normalizedIndividualTargets()
+                    : (0..<max(sets, 1)).map { _ in sharedSetTarget() }
+
+                individualSetTargets = targets.map { target in
+                    var updated = target
+                    updated.isWarmUp = warmUp
+                    updated.setType = warmUp ? .warmUp : .work
+                    return updated
+                }
+                useIndividualSetTargets = true
+            }
+        )
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -9526,6 +9566,52 @@ struct PlannedExerciseEditorView: View {
                 .listRowBackground(
                     ATHLTHTheme.card
                 )
+
+                Section {
+                    HStack(spacing: 12) {
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 19, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.premiumGold)
+                            .frame(width: 46, height: 46)
+                            .background(
+                                ATHLTHTheme.premiumGoldSoft,
+                                in: RoundedRectangle(cornerRadius: 15, style: .continuous)
+                            )
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Warm-up exercise",
+                                    norwegian: "Oppvarmingsøvelse"
+                                )
+                            )
+                            .font(.subheadline.weight(.bold))
+
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Mark every set as warm-up. These sets won't count toward training load or PRs.",
+                                    norwegian: "Marker alle sett som oppvarming. De teller ikke mot treningsbelastning eller PR."
+                                )
+                            )
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Spacer(minLength: 4)
+                        Toggle(
+                            ATHLTHLocalization.choose(
+                                english: "Warm-up exercise",
+                                norwegian: "Oppvarmingsøvelse"
+                            ),
+                            isOn: entireWarmUpBinding
+                        )
+                        .labelsHidden()
+                        .tint(ATHLTHTheme.premiumGold)
+                    }
+                    .padding(.vertical, 5)
+                }
+                .listRowBackground(ATHLTHTheme.card)
 
                 Section(
                     ATHLTHLocalization.choose(
@@ -11469,6 +11555,11 @@ struct PlannedExerciseEditorView: View {
             return
         }
 
+        let entireWarmUp = !individualSetTargets.isEmpty &&
+            individualSetTargets.allSatisfy {
+                $0.isWarmUp == true || $0.setType == .warmUp
+            }
+
         while individualSetTargets.count <
             safeCount {
             let source =
@@ -11491,11 +11582,10 @@ struct PlannedExerciseEditorView: View {
                         source.targetRPE,
                     targetRIR:
                         source.targetRIR,
-                    isWarmUp: false,
-                    setType:
-                        source.setType == .warmUp
-                            ? .work
-                            : source.setType,
+                    isWarmUp: entireWarmUp,
+                    setType: entireWarmUp
+                        ? .warmUp
+                        : (source.setType == .warmUp ? .work : source.setType),
                     tempo:
                         source.tempo,
                     notes:
