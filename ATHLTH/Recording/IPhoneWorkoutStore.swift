@@ -3306,7 +3306,7 @@ final class IPhoneWorkoutStore:
 
         switch decision {
         case .drop:
-            if priority >= .structuredStep {
+            if priority >= .ghostImportant {
                 let queuedEvent = event ??
                     ATHLTHCoachEventFallback.event(for: priority)
                 coachCueQueue.enqueue(
