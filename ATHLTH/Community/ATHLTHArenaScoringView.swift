@@ -2,6 +2,15 @@ import Foundation
 import SwiftUI
 import Supabase
 
+/// A live duel may offer a result *draft*, never award points by itself.
+/// A fresh ID allows the organizer to explicitly reopen review of the same race.
+struct ATHLTHArenaLiveOutcomeDraft: Identifiable {
+    let id = UUID()
+    let roundID: UUID
+    let rankedSlots: [UUID]
+    let evidenceNote: String
+}
+
 /// Arena scoring is confirmed by the whole group. Manual evidence is never
 /// labelled as HealthKit/GPS verified; there is no silent point allocation.
 struct ATHLTHArenaScoringSection: View {
@@ -13,6 +22,7 @@ struct ATHLTHArenaScoringSection: View {
     let members: [ATHLTHArenaRemoteMember]
     let rounds: [ATHLTHArenaRemoteProposal]
     let isOrganizer: Bool
+    let liveOutcomeDraft: ATHLTHArenaLiveOutcomeDraft?
     let onChanged: () async -> Void
 
     @State private var results: [ATHLTHArenaRoundResult] = []
@@ -252,18 +262,36 @@ struct ATHLTHArenaScoringSection: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await reload() } }
         }
+        .onChange(of: liveOutcomeDraft?.id) { _, _ in
+            guard let draft = liveOutcomeDraft,
+                  series.status == "active",
+                  isOrganizer,
+                  let round = rounds.first(where: { $0.id == draft.roundID }),
+                  results.first(where: {
+                      $0.roundID == round.id && $0.status != "rejected"
+                  }) == nil else {
+                return
+            }
+            // The editor still requires an explicit Submit and unanimous votes.
+            roundToScore = round
+        }
         .sheet(item: $roundToScore) { round in
             ATHLTHArenaOutcomeEditor(
                 round: round,
                 series: series,
                 members: rankedMembers,
-                suggestedSlots: ATHLTHArenaSuggestedRanking.eligibleSuggestion(
+                suggestedSlots: (
+                    liveOutcomeDraft?.roundID == round.id
+                        ? liveOutcomeDraft?.rankedSlots : nil
+                ) ?? ATHLTHArenaSuggestedRanking.eligibleSuggestion(
                     template: round.template,
                     scoring: series.scoring,
                     roundID: round.id,
                     requiredSlots: rankedMembers.map(\.slotID),
                     evidence: linkedWorkouts
-                )
+                ),
+                initialEvidence: liveOutcomeDraft?.roundID == round.id
+                    ? liveOutcomeDraft?.evidenceNote : nil
             ) { slots, note in
                 Task { await propose(round: round, slots: slots, evidence: note) }
             }
@@ -654,6 +682,7 @@ private struct ATHLTHArenaOutcomeEditor: View {
         series: ATHLTHArenaRemoteSeries,
         members: [ATHLTHArenaRemoteMember],
         suggestedSlots: [UUID]?,
+        initialEvidence: String? = nil,
         onPropose: @escaping ([UUID], String) -> Void
     ) {
         self.round = round
@@ -667,6 +696,7 @@ private struct ATHLTHArenaOutcomeEditor: View {
             index < suggestion.count ? suggestion[index] : nil
         }
         _slots = State(initialValue: initial)
+        _evidence = State(initialValue: initialEvidence ?? "")
         _exerciseName = State(initialValue:
             ATHLTHArenaRepetitionResult.agreedExercise(in: round.rules) ?? ""
         )
