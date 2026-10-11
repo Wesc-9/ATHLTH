@@ -26,6 +26,15 @@ enum LiveGhostRaceReentry {
         return roomStatus == .countdown || roomStatus == .racing
     }
 
+    /// The backend also rejects reentry to finished/cancelled sessions.
+    /// Keep the client UI consistent so athletes are never invited to
+    /// reconnect after the competition has ended.
+    static func canReconnectSharedSession(
+        roomStatus: LiveGhostRaceRoomStatus?
+    ) -> Bool {
+        roomStatus != .finished && roomStatus != .cancelled
+    }
+
     /// Only a locally recovered recording from this exact challenge may
     /// reconnect its shared session. Never launch a second workout here.
     static func canReconnectPhoneWorkout(
