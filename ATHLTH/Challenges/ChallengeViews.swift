@@ -756,7 +756,11 @@ struct ChallengeCreationView: View {
     @State private var requiredWeightKg = 80.0
     @State private var verificationPolicy: ChallengeVerificationPolicy = .verifiedPreferredManualAllowed
 
-    @State private var startsAt = Date()
+    // Give the recipient a real window to review or negotiate the rules.
+    // The backend locks rule changes at the scheduled start time.
+    @State private var startsAt = Calendar.current.date(
+        byAdding: .day, value: 1, to: Date()
+    ) ?? Date().addingTimeInterval(86_400)
     @State private var hasEnd = true
     @State private var endsAt = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
     @State private var allowMultipleAttempts = true
@@ -4021,6 +4025,11 @@ struct ChallengeCreationView: View {
         }
 
         if invitees.isEmpty {
+            return false
+        }
+
+        if startsAt <= Date().addingTimeInterval(60) &&
+            changeProposalFor == nil {
             return false
         }
 
