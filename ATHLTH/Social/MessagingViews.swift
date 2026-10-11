@@ -4970,6 +4970,19 @@ struct DirectMessageThreadView: View {
                     }) ?? participant
                 }
 
+                let incomingIDs = Set(proposedInvitees.compactMap(\.userID))
+                let withdrawn = current.participants.filter {
+                    $0.userID != current.creatorID &&
+                    $0.userID.map { !incomingIDs.contains($0) } == true
+                }
+                guard withdrawn.allSatisfy({ $0.state == .invited }) else {
+                    plannedInviteError = ATHLTHLocalization.choose(
+                        english: "Accepted participants cannot be removed from an active agreement.",
+                        norwegian: "Deltakere som har godtatt, kan ikke fjernes fra avtalen."
+                    )
+                    return
+                }
+
                 guard await social.syncChallenge(approved) else {
                     plannedInviteError = social.errorMessage ??
                         ATHLTHLocalization.choose(
@@ -4977,6 +4990,19 @@ struct DirectMessageThreadView: View {
                             norwegian: "Kunne ikke godkjenne endringene."
                         )
                     return
+                }
+                for participant in withdrawn {
+                    guard await social.withdrawChallengeInvite(
+                        participantID: participant.id
+                    ) else {
+                        plannedInviteError = social.errorMessage ??
+                            ATHLTHLocalization.choose(
+                                english: "Some invitations could not be withdrawn.",
+                                norwegian: "Noen invitasjoner kunne ikke trekkes tilbake."
+                            )
+                        await social.refreshChallenges(challengeStore: challengeStore)
+                        return
+                    }
                 }
                 challengeStore.update(approved)
             }
