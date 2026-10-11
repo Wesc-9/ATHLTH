@@ -123,7 +123,8 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     }
 
     private func receiveVoiceLeaseAcknowledgement(
-        _ acknowledgement: ATHLTHAudioCoachLeaseAcknowledgement
+        _ acknowledgement: ATHLTHAudioCoachLeaseAcknowledgement,
+        latestSnapshot: WatchWorkoutLiveSnapshot? = nil
     ) {
         guard iPhoneAudioCoachAttached,
               iPhoneAudioCoach.isEnabled,
@@ -132,8 +133,11 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
                 voiceLeaseGenerationID,
               acknowledgement.requestID ==
                 latestVoiceLeaseRequestID,
-              let current = snapshot,
+              let current = latestSnapshot ?? snapshot,
               current.supportsAudioCoachVoiceLease == true,
+              current.state == .running ||
+                current.state == .paused ||
+                current.state == .preparing,
               let startedAt = current.startedAt,
               abs(startedAt.timeIntervalSince(
                   acknowledgement.workoutStartedAt
@@ -445,32 +449,26 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
 
     private func handle(_ incoming: [Data]) {
         var latestSnapshot: WatchWorkoutLiveSnapshot?
+        var receipts: [ATHLTHCoachDeliveryReceipt] = []
+        var acknowledgements: [ATHLTHAudioCoachLeaseAcknowledgement] = []
 
+        // Decode the whole batch before acting on receipts or lease acks.
+        // HealthKit can deliver these alongside the first snapshot for a
+        // workout, while the cached snapshot still describes another state.
         for data in incoming {
             if let receipt = try? JSONDecoder().decode(
                 ATHLTHCoachDeliveryReceipt.self,
                 from: data
             ) {
-                // Match a real, current Watch workout before changing the
-                // phone's dedup ledger. Never treat a receipt as a metric.
-                if iPhoneAudioCoachAttached,
-                   let current = snapshot,
-                   current.state == .running ||
-                    current.state == .paused,
-                   receipt.isValid(for: current.startedAt) {
-                    iPhoneAudioCoach.recordWatchSpokenEvent(receipt)
-                }
+                receipts.append(receipt)
                 continue
             }
 
-            if let acknowledgement =
-                try? JSONDecoder().decode(
-                    ATHLTHAudioCoachLeaseAcknowledgement.self,
-                    from: data
-                ) {
-                receiveVoiceLeaseAcknowledgement(
-                    acknowledgement
-                )
+            if let acknowledgement = try? JSONDecoder().decode(
+                ATHLTHAudioCoachLeaseAcknowledgement.self,
+                from: data
+            ) {
+                acknowledgements.append(acknowledgement)
                 continue
             }
 
@@ -480,6 +478,31 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
             ) {
                 latestSnapshot = decoded
             }
+        }
+
+        // Record Watch speech before handling the snapshot: otherwise the
+        // iPhone could speak the same structured step while taking ownership.
+        if iPhoneAudioCoachAttached {
+            for receipt in receipts {
+                if let verifiedStart =
+                    ATHLTHCoachReceiptAcceptance.verifiedWorkoutStart(
+                        for: receipt,
+                        latestSnapshot: latestSnapshot,
+                        previousSnapshot: snapshot
+                    ) {
+                    iPhoneAudioCoach.recordWatchSpokenEvent(
+                        receipt,
+                        verifiedWorkoutStart: verifiedStart
+                    )
+                }
+            }
+        }
+
+        for acknowledgement in acknowledgements {
+            receiveVoiceLeaseAcknowledgement(
+                acknowledgement,
+                latestSnapshot: latestSnapshot
+            )
         }
 
         guard let latestSnapshot else { return }

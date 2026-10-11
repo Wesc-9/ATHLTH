@@ -229,10 +229,19 @@ final class MirroredWorkoutAudioCoach:
     /// speech handoff to iPhone. Only the mirror store validates the receipt
     /// against its active workout before calling this method.
     func recordWatchSpokenEvent(
-        _ receipt: ATHLTHCoachDeliveryReceipt
+        _ receipt: ATHLTHCoachDeliveryReceipt,
+        verifiedWorkoutStart: Date
     ) {
-        guard receipt.isValid(for: workoutStartedAt)
+        guard receipt.isValid(for: verifiedWorkoutStart),
+              workoutStartedAt.map({
+                  abs($0.timeIntervalSince(verifiedWorkoutStart)) <= 1
+              }) ?? true
         else { return }
+
+        // The receipt can precede the very first snapshot handled by this
+        // coach. Bind it to the independently verified active session so a
+        // handoff cannot replay an already-spoken step.
+        workoutStartedAt = verifiedWorkoutStart
         eventLedger.noteCompanionDelivery(id: receipt.deliveryID)
     }
 

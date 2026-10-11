@@ -206,4 +206,90 @@ final class AudioCoachFreshnessAndReceiptTests: XCTestCase {
         XCTAssertEqual(updated.coachHeartRateSampleAt, now)
         XCTAssertEqual(updated.coachPaceSampleAt, now)
     }
+
+    func testReceiptInSameBatchUsesNewSnapshotForValidation() {
+        let previousStart = now.addingTimeInterval(-600)
+        let currentStart = now.addingTimeInterval(-90)
+        let previous = receiptSnapshot(startedAt: previousStart)
+        let current = receiptSnapshot(startedAt: currentStart)
+        let receipt = ATHLTHCoachDeliveryReceipt(
+            workoutStartedAt: currentStart,
+            eventKind: .runningStep,
+            eventKey: "2",
+            sentAt: now
+        )
+
+        XCTAssertEqual(
+            ATHLTHCoachReceiptAcceptance.verifiedWorkoutStart(
+                for: receipt,
+                latestSnapshot: current,
+                previousSnapshot: previous,
+                now: now
+            ),
+            currentStart
+        )
+        XCTAssertEqual(
+            ATHLTHCoachReceiptAcceptance.verifiedWorkoutStart(
+                for: receipt,
+                latestSnapshot: current,
+                previousSnapshot: nil,
+                now: now
+            ),
+            currentStart
+        )
+        XCTAssertNil(
+            ATHLTHCoachReceiptAcceptance.verifiedWorkoutStart(
+                for: receipt,
+                latestSnapshot: previous,
+                previousSnapshot: current,
+                now: now
+            )
+        )
+    }
+
+    func testBatchReceiptRejectsCompletedOrWrongWorkout() {
+        let currentStart = now.addingTimeInterval(-90)
+        let receipt = ATHLTHCoachDeliveryReceipt(
+            workoutStartedAt: currentStart,
+            eventKind: .routineMilestone,
+            eventKey: "d1000",
+            sentAt: now
+        )
+        var completed = receiptSnapshot(startedAt: currentStart)
+        completed.state = .completed
+        XCTAssertNil(
+            ATHLTHCoachReceiptAcceptance.verifiedWorkoutStart(
+                for: receipt,
+                latestSnapshot: completed,
+                previousSnapshot: receiptSnapshot(startedAt: currentStart),
+                now: now
+            )
+        )
+        XCTAssertNil(
+            ATHLTHCoachReceiptAcceptance.verifiedWorkoutStart(
+                for: receipt,
+                latestSnapshot: nil,
+                previousSnapshot: nil,
+                now: now
+            )
+        )
+    }
+
+    private func receiptSnapshot(
+        startedAt: Date
+    ) -> WatchWorkoutLiveSnapshot {
+        WatchWorkoutLiveSnapshot(
+            kind: .running,
+            state: .running,
+            startedAt: startedAt,
+            capturedAt: now,
+            elapsedTime: now.timeIntervalSince(startedAt),
+            heartRate: 140,
+            activeCalories: 40,
+            distanceMeters: 800,
+            averageHeartRate: nil,
+            maxHeartRate: nil,
+            routePointCount: 1
+        )
+    }
 }

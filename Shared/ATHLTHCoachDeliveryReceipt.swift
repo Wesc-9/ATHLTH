@@ -35,3 +35,22 @@ struct ATHLTHCoachDeliveryReceipt: Codable, Hashable {
         }
     }
 }
+
+
+/// A receipt may arrive in the same HealthKit mirroring batch as a newer
+/// workout snapshot. Validate against that snapshot, never an older session.
+/// Receipt text and health measurements are intentionally not persisted.
+enum ATHLTHCoachReceiptAcceptance {
+    static func verifiedWorkoutStart(
+        for receipt: ATHLTHCoachDeliveryReceipt,
+        latestSnapshot: WatchWorkoutLiveSnapshot?,
+        previousSnapshot: WatchWorkoutLiveSnapshot?,
+        now: Date = Date()
+    ) -> Date? {
+        guard let current = latestSnapshot ?? previousSnapshot,
+              current.state == .running || current.state == .paused,
+              receipt.isValid(for: current.startedAt, now: now)
+        else { return nil }
+        return current.startedAt
+    }
+}
