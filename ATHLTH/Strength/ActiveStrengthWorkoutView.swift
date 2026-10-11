@@ -6140,8 +6140,21 @@ struct ActiveStrengthWorkoutView: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(workout.exercises) { exercise in
-                        Label(exercise.exercise.displayName, systemImage: "dumbbell")
-                            .font(.subheadline)
+                        HStack(spacing: 8) {
+                            Label(exercise.exercise.displayName, systemImage: "dumbbell")
+                                .font(.subheadline)
+                            if exercise.isWarmUpExercise {
+                                Image(systemName: "flame.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.premiumGold)
+                                    .accessibilityLabel(
+                                        ATHLTHLocalization.choose(
+                                            english: "Warm-up",
+                                            norwegian: "Oppvarming"
+                                        )
+                                    )
+                            }
+                        }
                     }
                 }
                 .padding(.top, 8)
@@ -6177,6 +6190,23 @@ struct ActiveStrengthWorkoutView: View {
                         .foregroundStyle(.secondary)
                     Text(exercise.exercise.displayName)
                         .font(.title2.weight(.bold))
+
+                    if exercise.isWarmUpExercise {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "WARM-UP",
+                                norwegian: "OPPVARMING"
+                            ),
+                            systemImage: "flame.fill"
+                        )
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .tracking(0.5)
+                        .foregroundStyle(ATHLTHTheme.premiumGold)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(ATHLTHTheme.premiumGoldSoft, in: Capsule())
+                    }
+
                     Text(exercise.exercise.primaryMuscles.joined(separator: " · "))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -6223,6 +6253,27 @@ struct ActiveStrengthWorkoutView: View {
                 Spacer()
 
                 Menu {
+                    Button {
+                        _ = strength.setWarmUpExercise(
+                            exercise.id,
+                            isWarmUp: !exercise.isWarmUpExercise
+                        )
+                    } label: {
+                        Label(
+                            exercise.isWarmUpExercise
+                                ? ATHLTHLocalization.choose(
+                                    english: "Mark as working sets",
+                                    norwegian: "Marker som arbeidssett"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Mark as warm-up",
+                                    norwegian: "Marker som oppvarming"
+                                ),
+                            systemImage: exercise.isWarmUpExercise ? "dumbbell.fill" : "flame.fill"
+                        )
+                    }
+                    .disabled(exercise.sets.contains(where: { $0.isCompleted }))
+
                     Button {
                         showingExerciseRestEditor =
                             true
@@ -7632,6 +7683,53 @@ private struct FreestyleExercisePrescriptionView: View {
                     }
                 }
 
+                Section {
+                    HStack(spacing: 12) {
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.premiumGold)
+                            .frame(width: 44, height: 44)
+                            .background(
+                                ATHLTHTheme.premiumGoldSoft,
+                                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            )
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Warm-up exercise",
+                                    norwegian: "Oppvarmingsøvelse"
+                                )
+                            )
+                            .font(.subheadline.weight(.bold))
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "All sets become warm-up and won't count toward volume or PRs.",
+                                    norwegian: "Alle sett blir oppvarming og teller ikke mot volum eller PR."
+                                )
+                            )
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Spacer(minLength: 4)
+                        Toggle(
+                            ATHLTHLocalization.choose(
+                                english: "Warm-up exercise",
+                                norwegian: "Oppvarmingsøvelse"
+                            ),
+                            isOn: Binding(
+                                get: { warmUpSets == sets },
+                                set: { warmUpSets = $0 ? sets : 0 }
+                            )
+                        )
+                        .labelsHidden()
+                        .tint(ATHLTHTheme.premiumGold)
+                    }
+                    .padding(.vertical, 5)
+                }
+
                 Section(
                     ATHLTHLocalization.choose(
                         english: "Planned setup",
@@ -7687,15 +7785,10 @@ private struct FreestyleExercisePrescriptionView: View {
                         value: $warmUpSets,
                         in: 0...sets
                     )
-                    .onChange(of: sets) {
-                        _,
-                        newValue in
-
-                        warmUpSets =
-                            min(
-                                warmUpSets,
-                                newValue
-                            )
+                    .onChange(of: sets) { oldValue, newValue in
+                        warmUpSets = warmUpSets == oldValue
+                            ? newValue
+                            : min(warmUpSets, newValue)
                     }
                 }
 
@@ -10002,6 +10095,18 @@ private struct StrengthActiveExerciseQueueView: View {
                                         Text(exercise.exercise.displayName)
                                             .font(.subheadline.weight(.semibold))
                                             .lineLimit(2)
+
+                                        if exercise.isWarmUpExercise {
+                                            Label(
+                                                ATHLTHLocalization.choose(
+                                                    english: "WARM-UP",
+                                                    norwegian: "OPPVARMING"
+                                                ),
+                                                systemImage: "flame.fill"
+                                            )
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundStyle(ATHLTHTheme.premiumGold)
+                                        }
 
                                         let done = exercise.sets.filter(\.isCompleted).count
                                         Text(
