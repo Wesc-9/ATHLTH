@@ -380,6 +380,43 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
         ))
     }
 
+    func testLiveGhostCanRejoinCountdownOrRaceAfterInvitationExpires() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let expired = now.addingTimeInterval(-3_600)
+        XCTAssertTrue(ATHLTHArenaLinkedRaceAccess.canOpen(
+            roomStatus: .countdown, expiresAt: expired, now: now
+        ))
+        XCTAssertTrue(ATHLTHArenaLinkedRaceAccess.canOpen(
+            roomStatus: .racing, expiresAt: expired, now: now
+        ))
+    }
+
+    func testExpiredUnstartedLiveGhostCannotOpenLobby() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let expired = now.addingTimeInterval(-1)
+        let future = now.addingTimeInterval(600)
+        XCTAssertFalse(ATHLTHArenaLinkedRaceAccess.canOpen(
+            roomStatus: nil, expiresAt: expired, now: now
+        ))
+        XCTAssertFalse(ATHLTHArenaLinkedRaceAccess.canOpen(
+            roomStatus: .lobby, expiresAt: expired, now: now
+        ))
+        XCTAssertTrue(ATHLTHArenaLinkedRaceAccess.canOpen(
+            roomStatus: nil, expiresAt: future, now: now
+        ))
+    }
+
+    func testFinishedAndCancelledLiveGhostNeverRestartWorkout() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let future = now.addingTimeInterval(600)
+        XCTAssertFalse(ATHLTHArenaLinkedRaceAccess.canOpen(
+            roomStatus: .finished, expiresAt: future, now: now
+        ))
+        XCTAssertFalse(ATHLTHArenaLinkedRaceAccess.canOpen(
+            roomStatus: .cancelled, expiresAt: future, now: now
+        ))
+    }
+
     func testCustomRoundsDoNotInferUnsupportedResults() {
         let standings = ATHLTHArenaSuggestedRanking.standings(
             template: .custom,
