@@ -241,6 +241,41 @@ begin
  ) then
    raise exception 'Invitation response notification trigger is missing';
  end if;
+ -- Relay reminders are a user-triggered inbox notification, not a
+ -- client-writeable baton state or an automatic scoring surface.
+ if not exists (
+   select 1 from pg_proc p
+   join pg_namespace n on n.oid=p.pronamespace
+   where n.nspname='public'
+     and p.proname='arena_notify_next_relay_runner'
+ ) then
+   raise exception 'Opt-in relay runner notification RPC is missing';
+ end if;
+ if has_function_privilege(
+   'anon',
+   'public.arena_notify_next_relay_runner(uuid,uuid)'::regprocedure,
+   'EXECUTE'
+ ) or not has_function_privilege(
+   'authenticated',
+   'public.arena_notify_next_relay_runner(uuid,uuid)'::regprocedure,
+   'EXECUTE'
+ ) then
+   raise exception 'Relay reminder RPC must require an authenticated runner';
+ end if;
+ if has_table_privilege(
+   'authenticated',
+   'public.arena_relay_next_runner_notices',
+   'INSERT'
+ ) or has_table_privilege(
+   'anon',
+   'public.arena_relay_next_runner_notices',
+   'SELECT'
+ ) or not (
+   select relrowsecurity from pg_class
+   where oid='public.arena_relay_next_runner_notices'::regclass
+ ) then
+   raise exception 'Relay reminder dedup state must remain server-private';
+ end if;
  -- Arena 2.0 route evidence must remain participant-reported and private.
  if not exists (
    select 1 from information_schema.columns
