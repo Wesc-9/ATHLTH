@@ -4764,64 +4764,47 @@ struct DirectMessageThreadView: View {
         _ challenge: ATHLTHChallenge,
         accept: Bool
     ) {
-        guard
-            let participant =
-                challengeStore
-                    .invitationParticipant(
-                        in: challenge,
-                        userID:
-                            session.profile
-                                .userID
-                    )
-        else {
-            return
-        }
+        guard respondingToChallengeID == nil,
+              let current = challengeStore.challenge(id: challenge.id),
+              current.creatorID == friend.userID,
+              current.status != .cancelled,
+              current.status != .completed,
+              current.rules.endsAt.map({ $0 > Date() }) ?? true,
+              let participant = challengeStore.invitationParticipant(
+                  in: current, userID: session.profile.userID
+              ),
+              participant.state == .invited
+        else { return }
 
-        challengeStore
-            .setParticipantState(
-                challengeID:
-                    challenge.id,
-                participantID:
-                    participant.id,
-                state:
-                    accept
-                        ? .accepted
-                        : .declined
-            )
+        respondingToChallengeID = current.id
+        challengeStore.setParticipantState(
+            challengeID: current.id,
+            participantID: participant.id,
+            state: accept ? .accepted : .declined
+        )
 
-        guard
-            let updated =
-                challengeStore.challenge(
-                    id:
-                        challenge.id
-                )
-        else {
+        guard let updated = challengeStore.challenge(id: current.id) else {
+            respondingToChallengeID = nil
             return
         }
 
         Task {
-            let synced =
-                await social.syncChallenge(
-                    updated
-                )
-
-            if !synced {
-                challengeStore
-                    .setParticipantState(
-                        challengeID:
-                            challenge.id,
-                        participantID:
-                            participant.id,
-                        state:
-                            .invited
-                    )
+            let synced = await social.syncChallenge(updated)
+            if synced {
+                await social.markChallengeInviteRead(challengeID: current.id)
             } else {
-                await social
-                    .markChallengeInviteRead(
-                        challengeID:
-                            challenge.id
+                challengeStore.setParticipantState(
+                    challengeID: current.id,
+                    participantID: participant.id,
+                    state: .invited
+                )
+                plannedInviteError = social.errorMessage ??
+                    ATHLTHLocalization.choose(
+                        english: "Please try again.",
+                        norwegian: "Prøv igjen."
                     )
             }
+            respondingToChallengeID = nil
         }
     }
 
