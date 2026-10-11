@@ -631,6 +631,8 @@ enum WorkoutLaunchCoordinator {
             watchAudioCoach
                 .preferIPhoneAudioWhenReachable =
                     true
+            watchAudioCoach
+                .useAcknowledgedVoiceLease = true
             workoutMirroring?
                 .prepareIPhoneAudioCoach(
                     watchAudioCoach
@@ -844,6 +846,8 @@ enum WorkoutLaunchCoordinator {
             watchAudioCoach
                 .preferIPhoneAudioWhenReachable =
                     true
+            watchAudioCoach
+                .useAcknowledgedVoiceLease = true
             workoutMirroring?
                 .prepareIPhoneAudioCoach(
                     watchAudioCoach
