@@ -193,9 +193,13 @@ struct ATHLTHArenaWorkoutEvidence: Decodable, Identifiable {
     let endedAt: Date
     let metricType: String
     let metricValue: Double
+    let reportedDistanceMeters: Double?
+    let verificationLevel: String
 
     enum CodingKeys: String, CodingKey {
         case id, source
+        case reportedDistanceMeters = "reported_distance_meters"
+        case verificationLevel = "verification_level"
         case seriesID = "series_id"
         case roundID = "round_id"
         case slotID = "slot_id"
@@ -218,8 +222,10 @@ private struct ATHLTHArenaEvidenceParams: Encodable {
     let endedAt: Date
     let metricType: String
     let metricValue: Double
+    let distanceMeters: Double?
 
     enum CodingKeys: String, CodingKey {
+        case distanceMeters = "p_distance"
         case roundID = "p_round"
         case sourceWorkoutID = "p_source_workout"
         case source = "p_source"
@@ -228,6 +234,23 @@ private struct ATHLTHArenaEvidenceParams: Encodable {
         case endedAt = "p_ended"
         case metricType = "p_metric_type"
         case metricValue = "p_metric"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var fields = encoder.container(keyedBy: CodingKeys.self)
+        try fields.encode(roundID, forKey: .roundID)
+        try fields.encode(sourceWorkoutID, forKey: .sourceWorkoutID)
+        try fields.encode(source, forKey: .source)
+        try fields.encode(activity, forKey: .activity)
+        try fields.encode(startedAt, forKey: .startedAt)
+        try fields.encode(endedAt, forKey: .endedAt)
+        try fields.encode(metricType, forKey: .metricType)
+        try fields.encode(metricValue, forKey: .metricValue)
+        if let distanceMeters {
+            try fields.encode(distanceMeters, forKey: .distanceMeters)
+        } else {
+            try fields.encodeNil(forKey: .distanceMeters)
+        }
     }
 }
 
@@ -543,7 +566,7 @@ final class ATHLTHArenaCloudService: Sendable {
         default: activity = "other"
         }
         let _: UUID = try await client.rpc(
-            "arena_share_evidence",
+            "arena_share_evidence_v2",
             params: ATHLTHArenaEvidenceParams(
                 roundID: roundID,
                 sourceWorkoutID: workout.id,
@@ -552,7 +575,8 @@ final class ATHLTHArenaCloudService: Sendable {
                 startedAt: workout.startDate,
                 endedAt: workout.endDate,
                 metricType: metricType,
-                metricValue: metricValue
+                metricValue: metricValue,
+                distanceMeters: workout.distanceMeters
             )
         ).execute().value
     }
