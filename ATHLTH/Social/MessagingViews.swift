@@ -3089,6 +3089,8 @@ struct DirectMessageThreadView: View {
     @State private var requestResponseInFlight = false
     @State private var requestResponseAccepting: Bool?
     @State private var requestResponseError: String?
+    @State private var respondingToPlannedInviteID: UUID?
+    @State private var plannedInviteError: String?
 
     var body: some View {
         ZStack {
@@ -3623,9 +3625,14 @@ struct DirectMessageThreadView: View {
                                 currentUserProfile:
                                     currentUserProfileCard,
                                 onSaveAttachment: {
-                                    saveAttachment(
-                                        message
-                                    )
+                                    saveAttachment(message)
+                                },
+                                inviteResponse: plannedInviteResponse(
+                                    for: message, in: messages
+                                ),
+                                respondingToInvite: respondingToPlannedInviteID == message.id,
+                                onRespondToInvite: { accept in
+                                    respondToPlannedInvite(message, accept: accept)
                                 }
                             )
                             .id(item.id)
@@ -4962,7 +4969,117 @@ struct DirectMessageThreadView: View {
         isSending = false
     }
 
+    private func plannedInviteResponse(
+        for invitation: DirectMessageRecord,
+        in messages: [DirectMessageRecord]
+    ) -> PlannedWorkoutInviteResponse? {
+        guard invitation.attachmentKind == .workout,
+              invitation.shareVersion == 2,
+              let sourceID = invitation.sourceObjectID else { return nil }
+        let responderID = invitation.senderID == session.profile.userID
+            ? friend.userID : session.profile.userID
+        return messages
+            .filter {
+                $0.attachmentKind == .workout &&
+                $0.shareVersion == 3 &&
+                $0.sourceObjectID == sourceID &&
+                $0.senderID == responderID
+            }
+            .sorted { $0.createdAt > $1.createdAt }
+            .compactMap {
+                $0.decodeSnapshot(PlannedWorkoutInviteResponse.self)
+            }
+            .first { $0.sourceWorkoutID == sourceID }
+    }
+
+    private func respondToPlannedInvite(
+        _ invitation: DirectMessageRecord,
+        accept: Bool
+    ) {
+        guard invitation.senderID == friend.userID,
+              invitation.attachmentKind == .workout,
+              invitation.shareVersion == 2,
+              respondingToPlannedInviteID == nil,
+              let conversationID,
+              let workout = invitation.decodeSnapshot(PlannedSession.self),
+              let sourceID = invitation.sourceObjectID
+        else { return }
+
+        respondingToPlannedInviteID = invitation.id
+        Task {
+            defer { respondingToPlannedInviteID = nil }
+            do {
+                let decision: PlannedWorkoutInviteDecision = accept
+                    ? .accepted : .declined
+                let response = PlannedWorkoutInviteResponse(
+                    sourceWorkoutID: sourceID,
+                    decision: decision
+                )
+                let shared = try MessageShareDraft(
+                    kind: .workout,
+                    title: workout.title,
+                    subtitle: accept
+                        ? ATHLTHLocalization.choose(
+                            english: "Invitation accepted", norwegian: "Invitasjonen er godtatt"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Invitation declined", norwegian: "Invitasjonen er avslått"
+                        ),
+                    snapshot: response,
+                    sourceObjectID: sourceID,
+                    sourceOwnerID: invitation.senderID,
+                    shareVersion: 3
+                )
+                let body = accept
+                    ? ATHLTHLocalization.choose(
+                        english: "I will join the planned workout.",
+                        norwegian: "Jeg blir med på den planlagte økten."
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "I cannot join this workout.",
+                        norwegian: "Jeg kan ikke bli med på denne økten."
+                    )
+                guard await messaging.send(
+                    to: friend.userID,
+                    conversationID: conversationID,
+                    body: body,
+                    attachment: shared
+                ) else {
+                    plannedInviteError = messaging.errorMessage ??
+                        ATHLTHLocalization.choose(
+                            english: "Could not send a response.",
+                            norwegian: "Kunne ikke sende svar."
+                        )
+                    return
+                }
+
+                if accept {
+                    var copy = workout
+                    copy.gearIDs = []
+                    copy.spotifyPlaylist = nil
+                    copy.spotifyAutoplayOnStart = false
+                    copy.sharedSourceOwnerID = invitation.senderID
+                    copy.sharedSourceSessionID = sourceID
+                    if copy.scheduledStart != nil {
+                        session.addStandalonePlannedSession(copy)
+                    } else {
+                        session.saveSharedWorkout(
+                            copy,
+                            sourceOwnerID: invitation.senderID,
+                            sourceSessionID: sourceID
+                        )
+                    }
+                }
+                await messaging.refreshConversation(conversationID)
+            } catch {
+                plannedInviteError = error.localizedDescription
+            }
+        }
+    }
+
     private func saveAttachment(_ message: DirectMessageRecord) {
+        guard message.shareVersion != 3 else { return }
+
         guard message.senderID != messaging.currentUserID else { return }
 
         switch message.attachmentKind {
@@ -5578,6 +5695,17 @@ private struct MessageBubble: View {
     let currentUserID: UUID?
     let currentUserProfile: SocialProfileCard
     let onSaveAttachment: () -> Void
+    let inviteResponse: PlannedWorkoutInviteResponse?
+    let respondingToInvite: Bool
+    let onRespondToInvite: (Bool) -> Void
+
+    private var isPlannedInvitation: Bool {
+        message.attachmentKind == .workout && message.shareVersion == 2
+    }
+
+    private var isPlannedInviteResponse: Bool {
+        message.attachmentKind == .workout && message.shareVersion == 3
+    }
 
     private var isMine: Bool {
         message.senderID == currentUserID
@@ -5762,7 +5890,17 @@ private struct MessageBubble: View {
                         HStack(spacing: 8) {
                             Image(systemName: attachmentKind.systemImage)
                                 .foregroundStyle(ATHLTHTheme.vitality)
-                            Text(attachmentKind.title.uppercased())
+                            Text(isPlannedInvitation
+                                 ? ATHLTHLocalization.choose(
+                                     english: "WORKOUT INVITATION",
+                                     norwegian: "TRENINGSINVITASJON"
+                                   )
+                                 : isPlannedInviteResponse
+                                     ? ATHLTHLocalization.choose(
+                                         english: "INVITATION RESPONSE",
+                                         norwegian: "SVAR PÅ INVITASJON"
+                                       )
+                                     : attachmentKind.title.uppercased())
                                 .font(.caption2.weight(.semibold))
                                 .tracking(1)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
@@ -5807,11 +5945,76 @@ private struct MessageBubble: View {
                             )
                         }
 
+                        if isPlannedInvitation {
+                            if let meeting = message.decodeSnapshot(PlannedSession.self)?.meetingPoint {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Label(meeting.name, systemImage: "mappin.circle.fill")
+                                        .font(.caption.weight(.semibold))
+                                    Text(meeting.address)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                    if let url = URL(string: "https://maps.apple.com/?ll=\(meeting.latitude),\(meeting.longitude)") {
+                                        Link(
+                                            ATHLTHLocalization.choose(
+                                                english: "Open in Maps",
+                                                norwegian: "Åpne i Kart"
+                                            ),
+                                            destination: url
+                                        )
+                                        .font(.caption.weight(.semibold))
+                                    }
+                                }
+                            }
+
+                            if let inviteResponse {
+                                Label(
+                                    inviteResponse.decision == .accepted
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Accepted", norwegian: "Godtatt"
+                                        )
+                                        : ATHLTHLocalization.choose(
+                                            english: "Declined", norwegian: "Avslått"
+                                        ),
+                                    systemImage: inviteResponse.decision == .accepted
+                                        ? "checkmark.circle.fill" : "xmark.circle.fill"
+                                )
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                            } else if isMine {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Waiting for a reply",
+                                        norwegian: "Venter på svar"
+                                    ),
+                                    systemImage: "clock"
+                                )
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            } else {
+                                HStack(spacing: 9) {
+                                    Button(ATHLTHLocalization.choose(
+                                        english: "Decline", norwegian: "Avslå"
+                                    )) {
+                                        onRespondToInvite(false)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    Button(ATHLTHLocalization.choose(
+                                        english: "Accept", norwegian: "Godta"
+                                    )) {
+                                        onRespondToInvite(true)
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(ATHLTHTheme.vitality)
+                                }
+                                .disabled(respondingToInvite)
+                            }
+                        }
+
                         Text(provenanceText)
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
 
-                        if !isMine {
+                        if !isMine && !isPlannedInvitation && !isPlannedInviteResponse {
                             Button {
                                 onSaveAttachment()
                             } label: {

@@ -8396,7 +8396,8 @@ struct SessionEditorView: View {
                     subtitle: scheduled,
                     snapshot: sharedWorkout,
                     sourceObjectID: workout.id,
-                    sourceOwnerID: session.profile.userID
+                    sourceOwnerID: session.profile.userID,
+                    shareVersion: 2
                 )
                 let body = ATHLTHLocalization.choose(
                     english: "Would you like to train together? \(workout.title) · \(scheduled). The session is attached.",

@@ -120,6 +120,18 @@ struct DirectMessageRecord: Identifiable, Codable, Hashable {
     }
 }
 
+// Responses use the existing workout attachment type with shareVersion 3.
+// This keeps the messaging backend and its allowed attachment types unchanged.
+enum PlannedWorkoutInviteDecision: String, Codable, Hashable {
+    case accepted
+    case declined
+}
+
+struct PlannedWorkoutInviteResponse: Codable, Hashable {
+    let sourceWorkoutID: UUID
+    let decision: PlannedWorkoutInviteDecision
+}
+
 struct MessageShareDraft: Hashable {
     let kind: MessageShareKind
     let title: String
