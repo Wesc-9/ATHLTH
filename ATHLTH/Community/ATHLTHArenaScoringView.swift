@@ -733,8 +733,6 @@ private struct ATHLTHArenaOutcomeEditor: View {
                             english: "Optional notes for repetitions; otherwise describe the result...",
                             norwegian: "Valgfri kommentar ved repetisjoner, ellers beskriv resultatet..."
                         ),
-                            norwegian: "For eksempel tider og distanse..."
-                        ),
                         text: $evidence,
                         axis: .vertical
                     )
