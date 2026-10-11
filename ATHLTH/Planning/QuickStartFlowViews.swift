@@ -106,6 +106,7 @@ struct AudioCoachDraft {
     var voiceIdentifier: String? = nil
     var speechRate: Double = 0.48
     var speechVolume: Double = 1.0
+    var speechStyle: ATHLTHCoachSpeechStyle = .balanced
     var announceWorkoutStart = true
     var announcePauseResume = true
     var announceWorkoutComplete = true
@@ -153,6 +154,8 @@ struct AudioCoachDraft {
             settings.audioCoachSpeechRate
         speechVolume =
             settings.audioCoachSpeechVolume
+        speechStyle =
+            settings.audioCoachSpeechStyle
         announceWorkoutStart =
             settings.audioCoachAnnounceWorkoutStart
         announcePauseResume =
@@ -233,7 +236,8 @@ struct AudioCoachDraft {
             announcePauseResume:
                 announcePauseResume,
             announceWorkoutComplete:
-                announceWorkoutComplete
+                announceWorkoutComplete,
+            speechStyle: speechStyle
         )
     }
 }
