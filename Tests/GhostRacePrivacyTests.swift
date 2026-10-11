@@ -82,6 +82,53 @@ final class GhostRacePrivacyTests: XCTestCase {
     }
 
     @MainActor
+    func testPlannedRouteGhostUsesSyntheticPaceAndExistingPrivacyTrimming() throws {
+        let coordinates = (0..<41).map { i in
+            RouteCoordinate(
+                latitude: 63.42 + Double(i) * 0.0003,
+                longitude: 10.39 + Double(i) * 0.0002,
+                altitude: nil,
+                sequence: i
+            )
+        }
+        let route = TrainingRoute(
+            id: UUID(),
+            ownerID: UUID(),
+            title: "Arena test route",
+            visibility: .privateOnly,
+            coordinates: coordinates,
+            distanceKilometers: 1.5,
+            elevationGainMeters: nil,
+            importedFilename: nil,
+            createdAt: Date(),
+            startName: nil,
+            endName: nil,
+            expectedTravelTimeSeconds: nil,
+            routeSource: "arena_competition"
+        )
+        let builder = GhostRaceStore()
+        try builder.prepareTarget(
+            route: route,
+            targetDurationSeconds: 900
+        )
+        let reference = try XCTUnwrap(builder.reference)
+        XCTAssertEqual(reference.sourceWorkoutID, route.id)
+        XCTAssertEqual(reference.durationSeconds, 900, accuracy: 0.001)
+
+        let protected = try GhostFriendRaceSanitizer.makePayload(
+            from: reference,
+            hideStartAndEnd: true
+        )
+        XCTAssertTrue(protected.privacyTrimmed)
+        XCTAssertLessThan(protected.distanceMeters, reference.distanceMeters)
+        XCTAssertEqual(protected.points.first?.elapsedTime ?? -1, 0, accuracy: 0.01)
+        XCTAssertEqual(protected.points.first?.cumulativeMeters ?? -1, 0, accuracy: 0.01)
+        XCTAssertLessThanOrEqual(protected.points.count, 350)
+        XCTAssertNotEqual(protected.points.first?.latitude,
+                          reference.points.first?.latitude)
+    }
+
+    @MainActor
     func testPhoneGhostRuntimeProducesRouteAwareComparison() throws {
         let reference = makeReference(
             distanceMeters: 2_000,
