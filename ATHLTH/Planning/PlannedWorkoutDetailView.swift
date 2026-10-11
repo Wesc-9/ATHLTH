@@ -245,6 +245,48 @@ struct PlannedWorkoutDetailView: View {
                     )
                 }
 
+                if let meeting = currentWorkout.meetingPoint {
+                    detailRow(
+                        icon: "mappin.and.ellipse",
+                        title: ATHLTHLocalization.choose(
+                            english: "Meeting point",
+                            norwegian: "Møtested"
+                        ),
+                        value: meeting.name
+                    )
+
+                    if let mapsURL = URL(string:
+                        "https://maps.apple.com/?ll=\(meeting.latitude),\(meeting.longitude)"
+                    ) {
+                        Link(destination: mapsURL) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "View in Maps",
+                                    norwegian: "Vis i Kart"
+                                ),
+                                systemImage: "map"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                        }
+                    }
+                }
+
+                if let minutes = currentWorkout.reminderMinutesBefore,
+                   minutes > 0 {
+                    detailRow(
+                        icon: "bell",
+                        title: ATHLTHLocalization.choose(
+                            english: "Reminder",
+                            norwegian: "Påminnelse"
+                        ),
+                        value: ATHLTHLocalization.choose(
+                            english: "\(minutes) min before",
+                            norwegian: "\(minutes) min før"
+                        )
+                    )
+                }
+
                 if let duration = currentWorkout.durationMinutes {
                     detailRow(
                         icon: "timer",

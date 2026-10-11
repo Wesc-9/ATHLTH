@@ -452,6 +452,13 @@ struct AdvancedPlannerView: View {
                         ATHLTHTheme.mutedText
                     )
                 }
+
+                if let meeting = workout.meetingPoint {
+                    Label(meeting.name, systemImage: "mappin.circle")
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .lineLimit(1)
+                }
             }
 
             Spacer()
@@ -6356,7 +6363,7 @@ struct SessionEditorView: View {
 
     private var plannedWorkoutLogisticsSection: some View {
         Section {
-            if selectedPartnerID != nil {
+            if selectedPartnerID != nil || meetingPoint != nil {
                 Button {
                     showingMeetingPointPicker = true
                 } label: {
@@ -8355,7 +8362,7 @@ struct SessionEditorView: View {
                     : workoutBlocks,
             workoutCategory:
                 workoutCategory,
-            meetingPoint: selectedPartnerID == nil ? nil : meetingPoint,
+            meetingPoint: meetingPoint,
             reminderMinutesBefore: scheduledTimeEnabled && reminderMinutesBefore > 0
                 ? reminderMinutesBefore : nil
         )
@@ -8454,7 +8461,8 @@ struct SessionEditorView: View {
             }
         }
 
-        PlannedWorkoutReminderScheduler.sync(workout)
+        // Session store schedules the reminder during the successful save.
+        // Avoid duplicate asynchronous scheduling tasks here.
         finishDraft()
         dismiss()
     }
