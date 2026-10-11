@@ -49,7 +49,7 @@ struct LiveGhostRaceLobbyView: View {
 
                 phaseCard
 
-                if didLaunch &&
+                if (didLaunch || canReconnectRecoveredPhoneRace) &&
                    realtime.currentSession?.ghostChallengeID != challenge.id {
                     ATHLTHCard {
                         VStack(alignment: .leading, spacing: 10) {
@@ -934,6 +934,16 @@ struct LiveGhostRaceLobbyView: View {
         }
     }
 
+    /// Recover only this duel's already-running iPhone workout. Merely
+    /// reopening the lobby must never initiate another recording.
+    private var canReconnectRecoveredPhoneRace: Bool {
+        LiveGhostRaceReentry.canReconnectPhoneWorkout(
+            comparisonRouteID: phoneWorkout.active?.plannedComparisonRouteID,
+            challengeID: challenge.id,
+            roomStatus: liveRace.room?.status
+        )
+    }
+
     private var deviceCanStart: Bool {
         switch captureDevice {
         case .iPhone:
@@ -1103,7 +1113,7 @@ struct LiveGhostRaceLobbyView: View {
 
     @MainActor
     private func connectLiveSession() async {
-        guard didLaunch,
+        guard didLaunch || canReconnectRecoveredPhoneRace,
               !isConnectingLiveSession,
               realtime.currentSession?.ghostChallengeID != challenge.id else {
             return
