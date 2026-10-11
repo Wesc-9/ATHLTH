@@ -769,6 +769,12 @@ struct HomeAroundYouSection: View {
     }
 }
 
+private struct ExploreTrainTogetherAreaPin: Identifiable {
+    let post: TrainTogetherPost
+    let coordinate: CLLocationCoordinate2D
+    var id: UUID { post.id }
+}
+
 struct AroundYouExploreView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
@@ -782,6 +788,7 @@ struct AroundYouExploreView: View {
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var challenges: ChallengeStore
+    @StateObject private var marketplace = TrainTogetherMarketplaceStore()
 
     @ObservedObject var locationStore: HomeLocationStore
     var embeddedInTab: Bool = false
@@ -794,6 +801,12 @@ struct AroundYouExploreView: View {
     @State private var mapPosition: MapCameraPosition = .automatic
     @State private var hasCenteredOnUser = false
     @State private var selectedRoute: TrainingRoute?
+    @State private var selectedEvent: CommunityEventItem?
+    @State private var eventToOpen: CommunityEventItem?
+    @State private var selectedPublicWorkout: TrainTogetherPost?
+    @State private var publicWorkoutToOpen: TrainTogetherPost?
+    @State private var publicWorkoutPins: [ExploreTrainTogetherAreaPin] = []
+    @State private var cachedPublicAreaCenters: [String: CLLocationCoordinate2D] = [:]
     @State private var routeActionMessage: String?
     @State private var routeActionError: String?
     @State private var startingRoute = false
@@ -814,7 +827,50 @@ struct AroundYouExploreView: View {
             MapReader { proxy in
                 Map(position: $mapPosition) {
                     if locationStore.canShowUserLocation {
-                        UserAnnotation()
+                        if let userCoordinate = locationStore.location?.coordinate,
+                           let avatarURL = session.profile.avatarURL {
+                            Annotation(
+                                ATHLTHLocalization.choose(
+                                    english: "My location",
+                                    norwegian: "Min posisjon"
+                                ),
+                                coordinate: userCoordinate,
+                                anchor: .center
+                            ) {
+                                ATHLTHStorageImage(url: avatarURL) { phase in
+                                    if case .success(let image) = phase {
+                                        image
+                                            .resizable()
+                                            .scaledToFill()
+                                    } else {
+                                        Circle().fill(.black)
+                                    }
+                                }
+                                .frame(width: 33, height: 33)
+                                .clipShape(Circle())
+                                .overlay {
+                                    Circle()
+                                        .stroke(.white, lineWidth: 2.5)
+                                }
+                                .background {
+                                    Circle()
+                                        .fill(Color.blue.opacity(0.27))
+                                        .frame(width: 44, height: 44)
+                                }
+                                .shadow(color: .black.opacity(0.22), radius: 5, y: 2)
+                                .accessibilityLabel(
+                                    ATHLTHLocalization.choose(
+                                        english: "Your current location",
+                                        norwegian: "Din nåværende posisjon"
+                                    )
+                                )
+                            }
+                            .annotationTitles(.hidden)
+                        } else {
+                            // Keep MapKit's normal dot when no profile photo
+                            // has been uploaded (or location is not yet fixed).
+                            UserAnnotation()
+                        }
                     }
 
                     if filter == .all || filter == .routes {
@@ -911,15 +967,73 @@ struct AroundYouExploreView: View {
                         ForEach(nearbyEvents.prefix(30)) { item in
                             if let coordinate =
                                 eventCoordinate(item) {
-                                Marker(
+                                Annotation(
                                     item.event.title,
-                                    systemImage:
-                                        item.event
-                                            .activityType
-                                            .systemImage,
-                                    coordinate: coordinate
+                                    coordinate: coordinate,
+                                    anchor: .bottom
+                                ) {
+                                    Button {
+                                        selectEvent(item)
+                                    } label: {
+                                        Image(systemName: item.event.activityType.systemImage)
+                                            .font(.system(size: 16, weight: .bold))
+                                            .foregroundStyle(.white)
+                                            .frame(width: 36, height: 36)
+                                            .background(Color.purple, in: Circle())
+                                            .overlay {
+                                                Circle()
+                                                    .stroke(.white, lineWidth: 2.5)
+                                            }
+                                            .shadow(color: .black.opacity(0.22), radius: 6, y: 3)
+                                            .scaleEffect(selectedEvent?.id == item.id ? 1.15 : 1)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel(
+                                        ATHLTHLocalization.choose(
+                                            english: "View event: ",
+                                            norwegian: "Vis arrangement: "
+                                        ) + item.event.title
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if filter == .all || filter == .events {
+                        ForEach(nearbyPublicWorkoutPins) { pin in
+                            Annotation(
+                                pin.post.broadArea,
+                                coordinate: pin.coordinate,
+                                anchor: .bottom
+                            ) {
+                                Button {
+                                    selectPublicWorkout(pin.post)
+                                } label: {
+                                    Image(
+                                        systemName: pin.post.workoutKind == "strength"
+                                            ? "dumbbell.fill"
+                                            : "person.2.fill"
+                                    )
+                                    .font(.system(size: 15, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 37, height: 37)
+                                    .background(ATHLTHTheme.vitality, in: Circle())
+                                    .overlay {
+                                        Circle().stroke(.white, lineWidth: 2.5)
+                                    }
+                                    .shadow(color: .black.opacity(0.20), radius: 5, y: 2)
+                                    .scaleEffect(
+                                        selectedPublicWorkout?.id == pin.post.id
+                                            ? 1.13 : 1
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(
+                                    ATHLTHLocalization.choose(
+                                        english: "Public Train Together workout: ",
+                                        norwegian: "Offentlig Tren sammen-økt: "
+                                    ) + pin.post.title
                                 )
-                                .tint(.purple)
                             }
                         }
                     }
