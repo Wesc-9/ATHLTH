@@ -5,7 +5,7 @@ import Supabase
 
 /// Converts a frozen Arena course to a temporary workout route. Never uses
 /// another participant's HealthKit session or creates a second recorder.
-private enum ATHLTHArenaCompetitionCourse {
+enum ATHLTHArenaCompetitionCourse {
     static func route(
         from snapshot: ChallengeRouteSnapshot,
         ownerID: UUID
