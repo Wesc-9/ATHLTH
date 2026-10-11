@@ -1094,6 +1094,88 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
         ))
     }
 
+    func testArenaLivePrefillAcceptsMatchingDistanceAndCustomTarget() {
+        XCTAssertTrue(ATHLTHArenaLiveRoundCompatibility.permitsPrefilledResult(
+            template: .fastest5K,
+            targetDistanceMeters: nil,
+            routeDistanceKilometers: nil,
+            sharedCourseDistanceMeters: 5_030,
+            sourceKind: "previous_workout"
+        ))
+        XCTAssertTrue(ATHLTHArenaLiveRoundCompatibility.permitsPrefilledResult(
+            template: .fastestDistance,
+            targetDistanceMeters: 7_500,
+            routeDistanceKilometers: nil,
+            sharedCourseDistanceMeters: 7_490,
+            sourceKind: "planned_route"
+        ))
+    }
+
+    func testArenaLivePrefillRejectsDifferentDistanceAndInvalidTargets() {
+        XCTAssertFalse(ATHLTHArenaLiveRoundCompatibility.permitsPrefilledResult(
+            template: .fastest5K,
+            targetDistanceMeters: nil,
+            routeDistanceKilometers: nil,
+            sharedCourseDistanceMeters: 1_000,
+            sourceKind: "previous_workout"
+        ))
+        XCTAssertFalse(ATHLTHArenaLiveRoundCompatibility.permitsPrefilledResult(
+            template: .fastestDistance,
+            targetDistanceMeters: nil,
+            routeDistanceKilometers: nil,
+            sharedCourseDistanceMeters: 7_500,
+            sourceKind: "planned_route"
+        ))
+        XCTAssertFalse(ATHLTHArenaLiveRoundCompatibility.permitsPrefilledResult(
+            template: .fastest1K,
+            targetDistanceMeters: nil,
+            routeDistanceKilometers: nil,
+            sharedCourseDistanceMeters: .infinity,
+            sourceKind: "previous_workout"
+        ))
+    }
+
+    func testArenaLivePrefillDoesNotCountPrivacyTrimmedCourseAsFullDistance() {
+        XCTAssertFalse(ATHLTHArenaLiveRoundCompatibility.permitsPrefilledResult(
+            template: .fastest5K,
+            targetDistanceMeters: nil,
+            routeDistanceKilometers: nil,
+            sharedCourseDistanceMeters: 4_500,
+            sourceKind: "previous_workout"
+        ))
+        XCTAssertFalse(ATHLTHArenaLiveRoundCompatibility.permitsPrefilledResult(
+            template: .fastestRoute,
+            targetDistanceMeters: 5_000,
+            routeDistanceKilometers: 5,
+            sharedCourseDistanceMeters: 4_500,
+            sourceKind: "planned_route"
+        ))
+    }
+
+    func testArenaLiveRoutePrefillRequiresPlannedCourseAndMatchingLength() {
+        XCTAssertTrue(ATHLTHArenaLiveRoundCompatibility.permitsPrefilledResult(
+            template: .fastestRoute,
+            targetDistanceMeters: 5_000,
+            routeDistanceKilometers: 5,
+            sharedCourseDistanceMeters: 5_010,
+            sourceKind: "planned_route"
+        ))
+        XCTAssertFalse(ATHLTHArenaLiveRoundCompatibility.permitsPrefilledResult(
+            template: .fastestRoute,
+            targetDistanceMeters: 5_000,
+            routeDistanceKilometers: 5,
+            sharedCourseDistanceMeters: 5_010,
+            sourceKind: "previous_workout"
+        ))
+        XCTAssertFalse(ATHLTHArenaLiveRoundCompatibility.permitsPrefilledResult(
+            template: .mostDistance,
+            targetDistanceMeters: nil,
+            routeDistanceKilometers: nil,
+            sharedCourseDistanceMeters: 5_000,
+            sourceKind: "planned_route"
+        ))
+    }
+
     func testCustomRoundsDoNotInferUnsupportedResults() {
         let standings = ATHLTHArenaSuggestedRanking.standings(
             template: .custom,
