@@ -24,7 +24,7 @@ struct ATHLTHCoachCueQueue {
         purgeExpired(now: now)
         guard cue.event.isFresh(at: now),
               !cue.text.isEmpty,
-              cue.event.priority >= .structuredStep,
+              cue.event.priority >= .ghostImportant,
               !pending.contains(where: {
                   $0.event.deliveryID == cue.event.deliveryID
               })
