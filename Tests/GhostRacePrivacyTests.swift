@@ -290,6 +290,47 @@ final class GhostRacePrivacyTests: XCTestCase {
         )
     }
 
+    func testAgreedArenaRouteIsRequiredForLinkedLiveDuel() {
+        let round = UUID()
+        let course = UUID()
+        XCTAssertEqual(
+            GhostFriendRaceArenaLinkPolicy.eligibleRoundID(
+                roundID: round,
+                agreedRouteID: course,
+                selectedRouteID: course,
+                isPlannedRoute: true
+            ),
+            round
+        )
+        XCTAssertNil(
+            GhostFriendRaceArenaLinkPolicy.eligibleRoundID(
+                roundID: round,
+                agreedRouteID: course,
+                selectedRouteID: UUID(),
+                isPlannedRoute: true
+            )
+        )
+    }
+
+    func testEarlierWorkoutMustNeverBeAttributedToUnverifiedArenaRoute() {
+        XCTAssertNil(
+            GhostFriendRaceArenaLinkPolicy.eligibleRoundID(
+                roundID: UUID(),
+                agreedRouteID: UUID(),
+                selectedRouteID: UUID(),
+                isPlannedRoute: false
+            )
+        )
+        XCTAssertNil(
+            GhostFriendRaceArenaLinkPolicy.eligibleRoundID(
+                roundID: UUID(),
+                agreedRouteID: nil,
+                selectedRouteID: nil,
+                isPlannedRoute: true
+            )
+        )
+    }
+
     private func makeReference(
         distanceMeters: Double,
         durationSeconds: TimeInterval,
