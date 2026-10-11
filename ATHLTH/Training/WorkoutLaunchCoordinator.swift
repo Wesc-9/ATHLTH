@@ -924,6 +924,13 @@ enum WorkoutLaunchCoordinator {
                 .workoutAlreadyActive
         }
 
+        // Basic tracking can still opt into voice guidance. Keep the
+        // selected coach in all workout and invitation payloads without
+        // enabling advanced tracking metrics or Spotify by accident.
+        let includeCoachConfiguration =
+            trackingMode == .advanced ||
+            advancedConfiguration.audioCoach.enabled
+
         var inviteAdvancedConfiguration =
             advancedConfiguration
         inviteAdvancedConfiguration.spotifyPlaylist = nil
@@ -947,7 +954,7 @@ enum WorkoutLaunchCoordinator {
                         strengthTrackingMode:
                             trackingMode,
                         strengthAdvancedConfiguration:
-                            trackingMode == .advanced
+                            includeCoachConfiguration
                                 ? inviteAdvancedConfiguration
                                 : nil,
                         participationMode:
@@ -975,7 +982,7 @@ enum WorkoutLaunchCoordinator {
                     strengthTrackingMode:
                         trackingMode,
                     strengthAdvancedConfiguration:
-                        trackingMode == .advanced
+                        includeCoachConfiguration
                             ? advancedConfiguration
                             : nil
                 )
@@ -1059,7 +1066,7 @@ enum WorkoutLaunchCoordinator {
             trackingMode: trackingMode,
             captureDevice: captureDevice,
             advancedConfiguration:
-                trackingMode == .advanced
+                includeCoachConfiguration
                     ? advancedConfiguration
                     : nil
         )
