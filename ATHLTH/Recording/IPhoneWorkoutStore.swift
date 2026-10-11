@@ -245,6 +245,7 @@ final class IPhoneWorkoutStore:
     private var guidancePriorityGate =
         ATHLTHGuidancePriorityGate()
     private var coachEventLedger = ATHLTHCoachEventLedger()
+    private var coachCueQueue = ATHLTHCoachCueQueue()
     private var nextDistanceAnnouncementMeters: Double?
     private var nextTimeAnnouncementSeconds: TimeInterval?
     private var offRouteStartedAt: Date?
@@ -353,6 +354,7 @@ final class IPhoneWorkoutStore:
                 active.ghostOpponentName
             guidancePriorityGate.reset()
             coachEventLedger.reset()
+            coachCueQueue.reset()
         }
 
         lastRouteCompletion =
@@ -530,6 +532,7 @@ final class IPhoneWorkoutStore:
         )
         guidancePriorityGate.reset()
         coachEventLedger.reset()
+        coachCueQueue.reset()
 
         let now = Date()
         recoveredWorkoutLastCheckpoint = nil
@@ -694,6 +697,7 @@ final class IPhoneWorkoutStore:
             resetCoachThresholds(configuration: nil)
             deactivateCoachAudioSession()
             guidancePriorityGate.reset()
+            coachCueQueue.reset()
         }
 
         persistActiveCheckpoint(force: true)
@@ -2011,6 +2015,7 @@ final class IPhoneWorkoutStore:
         )
         guidancePriorityGate.reset()
         coachEventLedger.reset()
+        coachCueQueue.reset()
         speechSynthesizer.stopSpeaking(
             at: .immediate
         )
@@ -3301,6 +3306,16 @@ final class IPhoneWorkoutStore:
 
         switch decision {
         case .drop:
+            if priority >= .structuredStep {
+                let queuedEvent = event ??
+                    ATHLTHCoachEventFallback.event(for: priority)
+                coachCueQueue.enqueue(
+                    ATHLTHCoachQueuedCue(
+                        event: queuedEvent,
+                        text: phrase
+                    )
+                )
+            }
             return
         case .interruptAndDeliver:
             speechSynthesizer
@@ -3367,6 +3382,18 @@ final class IPhoneWorkoutStore:
         speechSynthesizer.speak(utterance)
     }
 
+    private func deliverNextQueuedCoachCue() {
+        guard !speechSynthesizer.isSpeaking,
+              let next = coachCueQueue.popNext()
+        else { return }
+        speak(
+            next.text,
+            configuration: active?.audioCoachConfiguration,
+            priority: next.event.priority,
+            event: next.event
+        )
+    }
+
     private func deactivateCoachAudioSession() {
         speechSynthesizer.stopSpeaking(
             at: .immediate
@@ -3391,6 +3418,7 @@ final class IPhoneWorkoutStore:
 
             ATHLTHSpokenAudioSession
                 .deactivate()
+            self.deliverNextQueuedCoachCue()
         }
     }
 
@@ -3409,6 +3437,7 @@ final class IPhoneWorkoutStore:
 
             ATHLTHSpokenAudioSession
                 .deactivate()
+            self.deliverNextQueuedCoachCue()
         }
     }
 
