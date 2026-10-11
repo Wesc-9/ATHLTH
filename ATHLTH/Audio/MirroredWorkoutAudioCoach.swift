@@ -176,6 +176,36 @@ final class MirroredWorkoutAudioCoach:
         }
     }
 
+    /// A new acknowledged lease must not replay an old start, step or
+    /// milestone when iPhone takes over speech mid-workout.
+    func synchronizeOnHandoff(
+        _ snapshot: WatchWorkoutLiveSnapshot
+    ) {
+        lastState = snapshot.state
+        announcedStart =
+            snapshot.state != .preparing
+        lastStepIndex = snapshot.runningStepIndex
+
+        if let interval = configuration.distanceIntervalMeters,
+           interval > 0 {
+            nextDistanceMeters =
+                (floor(snapshot.distanceMeters / interval) + 1) * interval
+        }
+        if let interval = configuration.timeIntervalSeconds,
+           interval > 0 {
+            nextTimeSeconds =
+                (floor(snapshot.elapsedTime / interval) + 1) * interval
+        }
+    }
+
+    /// Stop audio immediately on expired ownership without discarding
+    /// workout progress or queued configuration.
+    func suspendForWatchFallback() {
+        synthesizer.stopSpeaking(at: .immediate)
+        ATHLTHSpokenAudioSession.deactivate()
+        guidanceGate.reset()
+    }
+
     func stop() {
         synthesizer.stopSpeaking(
             at: .immediate
