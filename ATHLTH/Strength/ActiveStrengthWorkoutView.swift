@@ -631,20 +631,26 @@ struct ActiveStrengthWorkoutView: View {
         else { return }
 
         let totalSets = workout.exercises.flatMap(\.sets).count
-        let completed = workout.totalCompletedSets
         let exerciseName =
             strength.currentExercise?.exercise.displayName ??
             workout.title
-        var english = "\(completed) of \(totalSets) sets complete. Current exercise: \(exerciseName)."
-        var norwegian = "\(completed) av \(totalSets) sett fullført. Nåværende øvelse: \(exerciseName)."
-
-        if let restEndsAt = strength.restEndsAt {
-            let seconds = max(Int(restEndsAt.timeIntervalSinceNow.rounded()), 0)
-            if seconds > 0 {
-                english += " \(seconds) seconds of rest remaining."
-                norwegian += " \(seconds) sekunder igjen av hvilen."
-            }
-        }
+        let now = Date()
+        let english = ATHLTHStrengthCoachStatusMessage.make(
+            completedSets: workout.totalCompletedSets,
+            totalSets: totalSets,
+            exerciseName: exerciseName,
+            restEndsAt: strength.restEndsAt,
+            now: now,
+            norwegian: false
+        )
+        let norwegian = ATHLTHStrengthCoachStatusMessage.make(
+            completedSets: workout.totalCompletedSets,
+            totalSets: totalSets,
+            exerciseName: exerciseName,
+            restEndsAt: strength.restEndsAt,
+            now: now,
+            norwegian: true
+        )
         strengthCoach.speak(
             english: english,
             norwegian: norwegian,
