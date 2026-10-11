@@ -174,6 +174,39 @@ final class ATHLTHArenaSafetyTests: XCTestCase {
         XCTAssertTrue(ATHLTHArenaSeasonPresentation.leadingAthletes(rows).isEmpty)
     }
 
+    func testSeasonChampionRequiresFinishedAndResolvedLinkedCompetitions() {
+        let a = seasonSeries(status: "completed")
+        let b = seasonSeries(status: "completed")
+        XCTAssertTrue(ATHLTHArenaSeasonPresentation.canDeclareChampion(
+            phase: .completed, linkedCompetitionCount: 2,
+            visibleCompetitions: [a, b]
+        ))
+        XCTAssertFalse(ATHLTHArenaSeasonPresentation.canDeclareChampion(
+            phase: .active, linkedCompetitionCount: 2,
+            visibleCompetitions: [a, b]
+        ))
+        XCTAssertFalse(ATHLTHArenaSeasonPresentation.canDeclareChampion(
+            phase: .completed, linkedCompetitionCount: 0,
+            visibleCompetitions: []
+        ))
+        // Inaccessible series cannot be assumed finished.
+        XCTAssertFalse(ATHLTHArenaSeasonPresentation.canDeclareChampion(
+            phase: .completed, linkedCompetitionCount: 2,
+            visibleCompetitions: [a]
+        ))
+        for unfinished in [
+            seasonSeries(status: "active"),
+            seasonSeries(status: "draft"),
+            seasonSeries(status: "unknown"),
+            seasonSeries(status: "completed", completionReason: "deadline_unresolved")
+        ] {
+            XCTAssertFalse(ATHLTHArenaSeasonPresentation.canDeclareChampion(
+                phase: .completed, linkedCompetitionCount: 2,
+                visibleCompetitions: [a, unfinished]
+            ))
+        }
+    }
+
     func testSeasonCompetitionRanksPreserveTiesAndSkipPositions() {
         let a = ATHLTHArenaSeasonStandingsRow(
             userID: UUID(), points: 12, competitions: 3

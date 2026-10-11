@@ -379,6 +379,24 @@ enum ATHLTHArenaSeasonPresentation {
         }
     }
 
+    /// No season winner until all linked competitions are visible,
+    /// finished and resolved. Calendar expiry alone is insufficient.
+    static func canDeclareChampion(
+        phase: ATHLTHArenaSeasonPhase,
+        linkedCompetitionCount: Int,
+        visibleCompetitions: [ATHLTHArenaRemoteSeries]
+    ) -> Bool {
+        guard phase == .completed,
+              linkedCompetitionCount > 0,
+              visibleCompetitions.count == linkedCompetitionCount else {
+            return false
+        }
+        return visibleCompetitions.allSatisfy {
+            $0.status == "completed" &&
+            $0.completionReason != "deadline_unresolved"
+        }
+    }
+
     static func phase(startsOn: String, endsOn: String, today: String) -> ATHLTHArenaSeasonPhase {
         if today < startsOn { return .upcoming }
         if today > endsOn { return .completed }
@@ -855,6 +873,14 @@ private struct ATHLTHArenaSeasonDetailView: View {
         )
     }
 
+    private var championsAreFinal: Bool {
+        ATHLTHArenaSeasonPresentation.canDeclareChampion(
+            phase: seasonPhase,
+            linkedCompetitionCount: links.count,
+            visibleCompetitions: visibleSeasonCompetitions
+        )
+    }
+
     private var leaders: [ATHLTHArenaSeasonStandingsRow] {
         seasonPhase == .upcoming ? [] :
             ATHLTHArenaSeasonPresentation.leadingAthletes(standings)
@@ -895,9 +921,14 @@ private struct ATHLTHArenaSeasonDetailView: View {
                 english: "Season in progress", norwegian: "Sesongen pågår"
             )
         case .completed:
-            return ATHLTHLocalization.choose(
-                english: "Completed season", norwegian: "Avsluttet sesong"
-            )
+            return championsAreFinal
+                ? ATHLTHLocalization.choose(
+                    english: "Completed season", norwegian: "Avsluttet sesong"
+                )
+                : ATHLTHLocalization.choose(
+                    english: "Ended · results pending",
+                    norwegian: "Avsluttet · avventer resultatkontroll"
+                )
         }
     }
 
@@ -1002,7 +1033,7 @@ private struct ATHLTHArenaSeasonDetailView: View {
                                 .background(ATHLTHTheme.champagneSoft.opacity(0.60),
                                             in: Circle())
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(seasonPhase == .completed
+                                Text(championsAreFinal
                                     ? (leaders.count > 1
                                         ? ATHLTHLocalization.choose(
                                             english: "Joint season champions",
@@ -1049,6 +1080,16 @@ private struct ATHLTHArenaSeasonDetailView: View {
                                     norwegian: "Foreløpig stilling. Ingen kåret mester før sesongen er avsluttet."
                                 ),
                                 systemImage: "info.circle"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                         else if seasonPhase == .completed && !championsAreFinal {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Standings remain provisional: at least one linked competition is ongoing, unresolved or not accessible for review. Only approved points count.",
+                                    norwegian: "Stillingen er foreløpig: minst én tilknyttet konkurranse pågår, er uavklart eller kan ikke kontrolleres. Bare godkjente poeng teller."
+                                ),
+                                systemImage: "clock.badge.exclamationmark"
                             )
                             .font(.caption)
                             .foregroundStyle(ATHLTHTheme.mutedText)
