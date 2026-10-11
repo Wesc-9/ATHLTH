@@ -176,7 +176,11 @@ struct ActiveStrengthWorkoutView: View {
                             ATHLTHLocalization.choose(
                                 english: "Add to active workout",
                                 norwegian: "Legg til i økten"
-                            )
+                            ),
+                        selectedExerciseCounts: Dictionary(
+                            activeExistingPlannedExercises.compactMap(\.exerciseID).map { ($0, 1) },
+                            uniquingKeysWith: +
+                        )
                     ) { entry in
                         pendingExercise = entry
                         showingExerciseLibrary = false
