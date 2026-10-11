@@ -572,9 +572,7 @@ private struct ATHLTHArenaOutcomeEditor: View {
                     }
                 }
 
-                Section(ATHLTHLocalization.choose(
-                    english: "Evidence / explanation", norwegian: "Resultatgrunnlag"
-                )) {
+                Section {
                     TextField(
                         ATHLTHLocalization.choose(
                             english: "E.g. final times and distance...",
@@ -584,6 +582,10 @@ private struct ATHLTHArenaOutcomeEditor: View {
                         axis: .vertical
                     )
                     .lineLimit(3...7)
+                } header: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Evidence / explanation", norwegian: "Resultatgrunnlag"
+                    ))
                 } footer: {
                     Text(ATHLTHLocalization.choose(
                         english: "Manual results are suggestions until every participant confirms.",
