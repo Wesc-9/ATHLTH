@@ -1180,10 +1180,15 @@ private struct ATHLTHArenaSeasonDetailView: View {
 
                         HStack(alignment: .firstTextBaseline, spacing: 12) {
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(personalSeasonRank.map { "\($0). plass" } ??
-                                    ATHLTHLocalization.choose(
-                                        english: "Unranked", norwegian: "Uten plassering"
-                                    ))
+                                Text(personalSeasonRank.map { rank in
+                                    ATHLTHLocalization.format(
+                                        english: "%d. place",
+                                        norwegian: "%d. plass",
+                                        rank
+                                    )
+                                } ?? ATHLTHLocalization.choose(
+                                    english: "Unranked", norwegian: "Uten plassering"
+                                ))
                                 .font(.title3.weight(.bold))
                                 .foregroundStyle(ATHLTHTheme.primaryText)
                                 Text(ATHLTHLocalization.choose(
