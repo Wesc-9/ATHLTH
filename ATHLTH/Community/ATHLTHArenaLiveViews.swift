@@ -294,7 +294,7 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
     let rounds: [ATHLTHArenaRemoteProposal]
     let members: [ATHLTHArenaRemoteMember]
     let isOrganizer: Bool
-    let onReview: () -> Void
+    let onReview: (UUID) -> Void
     let onPropose: (ATHLTHArenaLiveOutcomeDraft) -> Void
 
     @State private var rooms: [LiveGhostRaceRoomRecord] = []
@@ -467,11 +467,15 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
                                 .buttonStyle(.borderedProminent)
                                 .tint(ATHLTHTheme.accentDeep)
                             } else {
-                                Button(action: onReview) {
+                                Button {
+                                    if let roundID = challenge.arenaRoundID {
+                                        onReview(roundID)
+                                    }
+                                } label: {
                                     Label(
                                         ATHLTHLocalization.choose(
-                                            english: "Go to result review",
-                                            norwegian: "Gå til resultatgodkjenning"
+                                            english: "Review this round's result",
+                                            norwegian: "Kontroller resultatet i denne runden"
                                         ),
                                         systemImage: "checkmark.shield"
                                     )
@@ -837,10 +841,11 @@ struct ATHLTHArenaOnlineDetailView: View {
                         rounds: rounds,
                         members: members,
                         isOrganizer: isOrganizer,
-                        onReview: {
+                        onReview: { roundID in
                             withAnimation(.easeInOut(duration: 0.25)) {
                                 scrollProxy.scrollTo(
-                                    "arena-standings", anchor: .top
+                                    "arena-review-\(roundID.uuidString)",
+                                    anchor: .top
                                 )
                             }
                         },
@@ -848,7 +853,8 @@ struct ATHLTHArenaOnlineDetailView: View {
                             pendingLiveOutcome = proposal
                             withAnimation(.easeInOut(duration: 0.25)) {
                                 scrollProxy.scrollTo(
-                                    "arena-standings", anchor: .top
+                                    "arena-review-\(proposal.roundID.uuidString)",
+                                    anchor: .top
                                 )
                             }
                         }
