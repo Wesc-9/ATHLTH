@@ -1234,6 +1234,12 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     // Old Watch builds omit this marker. New iPhone builds can retain the
     // legacy phone-voice path for mixed-version Watch/iPhone installations.
     var supportsAudioCoachVoiceLease: Bool? = nil
+
+    // Sample ages travel separately from the current displayed values.
+    // Older Watch builds omit these markers; coaching then avoids claiming
+    // fresh live heart-rate or pace data it cannot verify.
+    var coachHeartRateSampleAt: Date? = nil
+    var coachPaceSampleAt: Date? = nil
 }
 
 struct WatchGhostRaceTimingPoint: Codable, Hashable {
