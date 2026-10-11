@@ -7,6 +7,7 @@ import Supabase
 struct ATHLTHArenaRemoteSeries: Decodable, Identifiable {
     let id: UUID
     let ownerID: UUID?
+    let clubID: UUID?
     let title: String
     let scope: ATHLTHArenaScope
     let scoring: ATHLTHArenaScoring
@@ -22,6 +23,7 @@ struct ATHLTHArenaRemoteSeries: Decodable, Identifiable {
         case endsAt = "ends_at"
         case completedAt = "completed_at"
         case ownerID = "owner_id"
+        case clubID = "club_id"
         case durationDays = "duration_days"
     }
 }
@@ -312,6 +314,24 @@ private struct ATHLTHArenaPublishRequest: Encodable {
     }
 }
 
+private struct ATHLTHArenaPublishClubRequest: Encodable {
+    let club: UUID
+    let title: String
+    let scoring: String
+    let durationDays: Int
+    let invitees: [UUID]
+    let rounds: [ATHLTHArenaPublishRound]
+
+    enum CodingKeys: String, CodingKey {
+        case club = "p_club"
+        case title = "p_title"
+        case scoring = "p_scoring"
+        case durationDays = "p_duration_days"
+        case invitees = "p_invitees"
+        case rounds = "p_rounds"
+    }
+}
+
 private struct ATHLTHArenaNewRound: Encodable {
     let seriesID: UUID
     let proposedBy: UUID
@@ -354,8 +374,8 @@ enum ATHLTHArenaCloudError: LocalizedError {
             )
         case .unavailableScope:
             return ATHLTHLocalization.choose(
-                english: "Club series need Club membership integration and cannot be published yet.",
-                norwegian: "Club-serier kan ikke publiseres før Club-medlemskap er koblet til."
+                english: "Choose a Club before publishing a Club Arena series.",
+                norwegian: "Velg en klubb før du publiserer en Arena-konkurranse."
             )
         case .needInvitees:
             return ATHLTHLocalization.choose(
@@ -613,7 +633,7 @@ final class ATHLTHArenaCloudService: Sendable {
         guard let currentUserID, currentUserID == draft.ownerID else {
             throw ATHLTHArenaCloudError.signInRequired
         }
-        guard draft.scope != .club else {
+        guard draft.scope != .club || draft.clubID != nil else {
             throw ATHLTHArenaCloudError.unavailableScope
         }
         let invitees = Array(Set(draft.participantIDs))
@@ -644,6 +664,22 @@ final class ATHLTHArenaCloudService: Sendable {
                 )
             }
         )
+        if draft.scope == .club, let clubID = draft.clubID {
+            let clubParams = ATHLTHArenaPublishClubRequest(
+                club: clubID,
+                title: draft.title,
+                scoring: draft.scoring.rawValue,
+                durationDays: draft.durationDays,
+                invitees: invitees,
+                rounds: params.rounds
+            )
+            let publishedID: UUID = try await client
+                .rpc("arena_publish_club_series", params: clubParams)
+                .execute()
+                .value
+            return publishedID
+        }
+
         let publishedID: UUID = try await client
             .rpc("arena_publish_series", params: params)
             .execute()
