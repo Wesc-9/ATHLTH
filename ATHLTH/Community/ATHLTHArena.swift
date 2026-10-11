@@ -55,6 +55,8 @@ enum ATHLTHArenaScoring: String, CaseIterable, Codable, Identifiable {
 enum ATHLTHArenaRoundTemplate: String, CaseIterable, Codable, Identifiable {
     case fastest5K
     case fastest1K
+    case fastestDistance
+    case fastestRoute
     case mostDistance
     case mostWorkouts
     case mostRepetitions
@@ -66,6 +68,8 @@ enum ATHLTHArenaRoundTemplate: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .fastest5K: return ATHLTHLocalization.choose(english: "Fastest 5 km", norwegian: "Raskeste 5 km")
         case .fastest1K: return ATHLTHLocalization.choose(english: "Fastest 1 km", norwegian: "Raskeste 1 km")
+        case .fastestDistance: return ATHLTHLocalization.choose(english: "Custom distance", norwegian: "Valgfri distanse")
+        case .fastestRoute: return ATHLTHLocalization.choose(english: "Route time trial", norwegian: "Ruteutfordring")
         case .mostDistance: return ATHLTHLocalization.choose(english: "Most distance", norwegian: "Flest kilometer")
         case .mostWorkouts: return ATHLTHLocalization.choose(english: "Most workouts", norwegian: "Flest treningsøkter")
         case .mostRepetitions: return ATHLTHLocalization.choose(english: "Most repetitions", norwegian: "Flest repetisjoner")
@@ -75,10 +79,15 @@ enum ATHLTHArenaRoundTemplate: String, CaseIterable, Codable, Identifiable {
 
     var explanation: String {
         switch self {
-        case .fastest5K, .fastest1K:
+        case .fastest5K, .fastest1K, .fastestDistance:
             return ATHLTHLocalization.choose(
                 english: "The fastest qualifying time wins.",
                 norwegian: "Raskeste gyldige tid vinner."
+            )
+        case .fastestRoute:
+            return ATHLTHLocalization.choose(
+                english: "Complete the agreed route. Route results need participant review; automatic GPS verification is not yet supported.",
+                norwegian: "Fullfør avtalt rute. Ruteresultater godkjennes av deltakerne; automatisk GPS-kontroll støttes ikke ennå."
             )
         case .mostDistance:
             return ATHLTHLocalization.choose(
@@ -109,6 +118,9 @@ struct ATHLTHArenaRoundDraft: Codable, Identifiable, Equatable {
     var template: ATHLTHArenaRoundTemplate
     var title: String
     var rules: String
+    /// Structured fields for distance and route rounds; older drafts decode nil.
+    var targetDistanceMeters: Double? = nil
+    var routeSnapshot: ChallengeRouteSnapshot? = nil
 }
 
 struct ATHLTHArenaCompetitionDraft: Codable, Identifiable {
@@ -1389,12 +1401,56 @@ struct ATHLTHArenaDraftDetailView: View {
 
 struct ATHLTHArenaAddRoundView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var session: AppSessionStore
     let onAdd: (ATHLTHArenaRoundDraft) -> Void
 
     @State private var template: ATHLTHArenaRoundTemplate = .fastest5K
     @State private var title = ATHLTHArenaRoundTemplate.fastest5K.title
     @State private var rules = ATHLTHArenaRoundTemplate.fastest5K.explanation
     @State private var exerciseName = ""
+    @State private var distanceText = "5"
+    @State private var selectedRoute: TrainingRoute?
+    @State private var showingSavedRoutes = false
+
+    private var distanceKM: Double? {
+        guard let value = Double(
+            distanceText.trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: ",", with: ".")
+        ), value.isFinite, (0.1...500).contains(value) else { return nil }
+        return value
+    }
+
+    private var routeSnapshot: ChallengeRouteSnapshot? {
+        guard template == .fastestRoute,
+              let route = selectedRoute,
+              route.distanceKilometers.isFinite,
+              (0.1...500).contains(route.distanceKilometers),
+              route.coordinates.count >= 2 else { return nil }
+        // Share a bounded route preview only with competition participants.
+        // Full GPS verification is intentionally NOT inferred from this shape.
+        let stride = max(1, Int(ceil(Double(route.coordinates.count) / 1_400)))
+        let reduced = route.coordinates.enumerated().compactMap { index, value in
+            (index % stride == 0 || index == route.coordinates.count - 1) ? value : nil
+        }
+        return ChallengeRouteSnapshot(
+            routeID: route.id,
+            title: route.title,
+            distanceKilometers: route.distanceKilometers,
+            coordinates: reduced
+        )
+    }
+
+    private var isValid: Bool {
+        let hasText = !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !rules.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        switch template {
+        case .fastestDistance: return hasText && distanceKM != nil
+        case .fastestRoute: return hasText && routeSnapshot != nil
+        case .mostRepetitions:
+            return hasText && !exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        default: return hasText
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -1410,6 +1466,69 @@ struct ATHLTHArenaAddRoundView: View {
                     TextField(ATHLTHLocalization.choose(
                         english: "Round name", norwegian: "Navn på runden"
                     ), text: $title)
+                }
+
+                if template == .fastestDistance {
+                    Section {
+                        HStack {
+                            TextField(ATHLTHLocalization.choose(
+                                english: "Distance in km", norwegian: "Distanse i km"
+                            ), text: $distanceText)
+                            .keyboardType(.decimalPad)
+                            Text("km").foregroundStyle(.secondary)
+                        }
+                        if distanceKM == nil {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Choose between 0.1 and 500 km.",
+                                norwegian: "Velg mellom 0,1 og 500 km."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                        }
+                    } header: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Competition distance", norwegian: "Konkurransedistanse"
+                        ))
+                    }
+                }
+
+                if template == .fastestRoute {
+                    Section {
+                        Button {
+                            showingSavedRoutes = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(selectedRoute?.title ?? ATHLTHLocalization.choose(
+                                        english: "Choose or build a route",
+                                        norwegian: "Velg eller lag en rute"
+                                    ))
+                                    if let route = selectedRoute {
+                                        Text(String(format: "%.2f km", route.distanceKilometers))
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        Text(ATHLTHLocalization.choose(
+                            english: "The route preview is shared with invited participants. Route results require manual approval; GPS matching is not yet automatic.",
+                            norwegian: "Ruten deles med inviterte deltakere. Ruteresultater krever manuell godkjenning; GPS-matching er ikke automatisk ennå."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    } header: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Competition route", norwegian: "Konkurranserute"
+                        ))
+                    }
+                }
+
+                Section {
                     if template == .mostRepetitions {
                         TextField(ATHLTHLocalization.choose(
                             english: "Exercise to compete in (required)",
@@ -1423,8 +1542,8 @@ struct ATHLTHArenaAddRoundView: View {
                         .lineLimit(2...5)
                 } footer: {
                     Text(ATHLTHLocalization.choose(
-                        english: "The scoring and verification rules must be accepted by participants before a round goes live.",
-                        norwegian: "Regler for poeng og verifisering må godkjennes av deltakerne før runden starter."
+                        english: "Participants approve the rules before the competition starts.",
+                        norwegian: "Deltakerne må godkjenne reglene før konkurransen starter."
                     ))
                 }
             }
@@ -1434,9 +1553,30 @@ struct ATHLTHArenaAddRoundView: View {
                 english: "New round", norwegian: "Ny runde"
             ))
             .navigationBarTitleDisplayMode(.inline)
-            .onChange(of: template) { _, newValue in
-                title = newValue.title
-                rules = newValue.explanation
+            .onChange(of: template) { _, value in
+                title = value.title
+                rules = value.explanation
+            }
+            .sheet(isPresented: $showingSavedRoutes) {
+                NavigationStack {
+                    SavedRoutesView(
+                        selectionTitle: ATHLTHLocalization.choose(
+                            english: "Competition route",
+                            norwegian: "Konkurranserute"
+                        ),
+                        onSelect: { route in
+                            selectedRoute = route
+                            showingSavedRoutes = false
+                        }
+                    )
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(ATHLTHLocalization.choose(
+                                english: "Close", norwegian: "Lukk"
+                            )) { showingSavedRoutes = false }
+                        }
+                    }
+                }
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -1446,31 +1586,30 @@ struct ATHLTHArenaAddRoundView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(ATHLTHLocalization.choose(english: "Add", norwegian: "Legg til")) {
+                        let prefix = template == .mostRepetitions
+                            ? "Øvelse: " + exerciseName.trimmingCharacters(in: .whitespacesAndNewlines) + "\n"
+                            : ""
+                        let detail = template == .fastestDistance && distanceKM != nil
+                            ? "Distanse: " + String(format: "%.2f km. ", distanceKM!) : ""
                         onAdd(ATHLTHArenaRoundDraft(
                             template: template,
-                            title: String(title.trimmingCharacters(
-                                in: .whitespacesAndNewlines).prefix(80)),
-                            rules: String((
-                                (template == .mostRepetitions
-                                    ? "Øvelse: " + exerciseName.trimmingCharacters(
-                                        in: .whitespacesAndNewlines
-                                      ) + "\n"
-                                    : "") +
-                                rules.trimmingCharacters(in: .whitespacesAndNewlines)
-                            ).prefix(600))
+                            title: String(title.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80)),
+                            rules: String((prefix + detail +
+                                rules.trimmingCharacters(in: .whitespacesAndNewlines)).prefix(600)),
+                            targetDistanceMeters: template == .fastestDistance
+                                ? distanceKM.map { $0 * 1_000 } :
+                                (template == .fastestRoute
+                                    ? routeSnapshot.map { $0.distanceKilometers * 1_000 }
+                                    : nil),
+                            routeSnapshot: routeSnapshot
                         ))
                         dismiss()
                     }
-                    .disabled(
-                        title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                        rules.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                        (template == .mostRepetitions &&
-                         exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    )
+                    .disabled(!isValid)
                 }
             }
-        .environment(\.colorScheme, .light)
-        .tint(ATHLTHArenaLightStyle.action)
+            .environment(\.colorScheme, .light)
+            .tint(ATHLTHArenaLightStyle.action)
         }
     }
 }
