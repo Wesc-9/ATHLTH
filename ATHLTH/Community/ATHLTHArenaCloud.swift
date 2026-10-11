@@ -236,6 +236,16 @@ enum ATHLTHArenaRelayProgress {
     }
 }
 
+private struct ATHLTHArenaNextRelayRunnerParams: Encodable {
+    let seriesID: UUID
+    let fromSlotID: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case seriesID = "p_series_id"
+        case fromSlotID = "p_from_slot_id"
+    }
+}
+
 private struct ATHLTHArenaReportRelayLegParams: Encodable {
     let seriesID: UUID
     let slotID: UUID
@@ -774,6 +784,23 @@ final class ATHLTHArenaCloudService: Sendable {
                 elapsedSeconds: seconds
             )
         ).execute()
+    }
+
+    /// Sends at most one opt-in inbox reminder to the next runner,
+    /// after preceding relay legs have been reported. False means no
+    /// eligible next leg or a reminder was already sent.
+    func notifyNextRelayRunner(
+        seriesID: UUID, fromSlotID: UUID
+    ) async throws -> Bool {
+        guard currentUserID != nil else {
+            throw ATHLTHArenaCloudError.signInRequired
+        }
+        return try await client.rpc(
+            "arena_notify_next_relay_runner",
+            params: ATHLTHArenaNextRelayRunnerParams(
+                seriesID: seriesID, fromSlotID: fromSlotID
+            )
+        ).execute().value
     }
 
     func loadRelayLegs(seriesID: UUID) async throws -> [ATHLTHArenaRelayLeg] {
