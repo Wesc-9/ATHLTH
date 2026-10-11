@@ -462,3 +462,4 @@ extension PlannedExercise {
             return updated
         }
     }
+}
