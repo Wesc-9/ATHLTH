@@ -325,6 +325,110 @@ final class ATHLTHArenaSafetyTests: XCTestCase {
         ))
     }
 
+    func testRelayComparisonRequiresBothCompleteTeams() {
+        let series = UUID(), route = UUID()
+        let slots = (0..<4).map { _ in UUID() }
+        let legs = relayFixture(
+            series: series, route: route,
+            first: Array(slots.prefix(2)), second: Array(slots.suffix(2))
+        )
+        let partial = [
+            relayReport(slot: slots[0], series: series, seconds: 300),
+            relayReport(slot: slots[1], series: series, seconds: 400),
+            relayReport(slot: slots[2], series: series, seconds: 350)
+        ]
+        XCTAssertNil(ATHLTHArenaRelayProgress.provisionalComparison(
+            legs: legs, reports: partial
+        ))
+        let complete = partial + [
+            relayReport(slot: slots[3], series: series, seconds: 450)
+        ]
+        let candidate = ATHLTHArenaRelayProgress.provisionalComparison(
+            legs: legs, reports: complete
+        )
+        XCTAssertEqual(candidate?.firstTeamSeconds, 700)
+        XCTAssertEqual(candidate?.secondTeamSeconds, 800)
+        XCTAssertEqual(candidate?.leadingTeam, 1)
+        XCTAssertEqual(candidate?.marginSeconds, 100)
+    }
+
+    func testRelayComparisonDoesNotInventWinnerForNearTie() {
+        let series = UUID(), route = UUID()
+        let slots = (0..<4).map { _ in UUID() }
+        let legs = relayFixture(
+            series: series, route: route,
+            first: Array(slots.prefix(2)), second: Array(slots.suffix(2))
+        )
+        let times = [320.0, 400.0, 350.0, 370.3]
+        let reports = zip(slots, times).map { slot, seconds in
+            relayReport(slot: slot, series: series, seconds: seconds)
+        }
+        let result = ATHLTHArenaRelayProgress.provisionalComparison(
+            legs: legs, reports: reports
+        )
+        XCTAssertNotNil(result)
+        XCTAssertNil(result?.leadingTeam)
+    }
+
+    func testRelayComparisonRejectsForeignRouteOrDuplicateAthlete() {
+        let series = UUID(), route = UUID()
+        let slots = (0..<4).map { _ in UUID() }
+        let legs = relayFixture(
+            series: series, route: route,
+            first: Array(slots.prefix(2)), second: Array(slots.suffix(2))
+        )
+        let reports = slots.map {
+            relayReport(slot: $0, series: series, seconds: 500)
+        }
+        var modified = legs
+        modified[3] = ATHLTHArenaRelayLeg(
+            slotID: slots[3], seriesID: series, teamIndex: 2,
+            legOrder: 2, routeRoundID: UUID()
+        )
+        XCTAssertNil(ATHLTHArenaRelayProgress.provisionalComparison(
+            legs: modified, reports: reports
+        ))
+        modified = legs
+        modified[3] = ATHLTHArenaRelayLeg(
+            slotID: slots[0], seriesID: series, teamIndex: 2,
+            legOrder: 2, routeRoundID: route
+        )
+        XCTAssertNil(ATHLTHArenaRelayProgress.provisionalComparison(
+            legs: modified, reports: reports
+        ))
+    }
+
+    func testRelayComparisonRejectsDuplicateInvalidOrForeignReports() {
+        let series = UUID(), route = UUID()
+        let slots = (0..<4).map { _ in UUID() }
+        let legs = relayFixture(
+            series: series, route: route,
+            first: Array(slots.prefix(2)), second: Array(slots.suffix(2))
+        )
+        let base = slots.map {
+            relayReport(slot: $0, series: series, seconds: 500)
+        }
+        XCTAssertNil(ATHLTHArenaRelayProgress.provisionalComparison(
+            legs: legs, reports: base + [base[0]]
+        ))
+        var foreign = base
+        foreign[1] = relayReport(slot: slots[1], series: UUID(), seconds: 500)
+        XCTAssertNil(ATHLTHArenaRelayProgress.provisionalComparison(
+            legs: legs, reports: foreign
+        ))
+        var invalid = base
+        invalid[0] = relayReport(slot: slots[0], series: series, seconds: .infinity)
+        XCTAssertNil(ATHLTHArenaRelayProgress.provisionalComparison(
+            legs: legs, reports: invalid
+        ))
+        XCTAssertNil(ATHLTHArenaRelayProgress.reportedTime(
+            for: legs[0], reports: base + [base[0]]
+        ))
+        XCTAssertEqual(ATHLTHArenaRelayProgress.reportedTime(
+            for: legs[1], reports: base
+        ), 500)
+    }
+
     func testArenaNextActionPrioritizesInvitationAndDoesNotShowForOutsiders() {
         XCTAssertEqual(
             nextAction(response: "invited", organizer: true, rounds: []),
