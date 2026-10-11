@@ -900,6 +900,7 @@ struct IPhoneWorkoutView: View {
     @State private var confirmFinish = false
     @State private var followMe = true
     @State private var showingTreadmillInclineEditor = false
+    @State private var showingLiveAudioCoach = false
     @State private var treadmillInclineDraft = 0.0
     @State private var treadmillInclineEditingWorkoutID:
         UUID?
@@ -1545,6 +1546,13 @@ struct IPhoneWorkoutView: View {
                     )
                 }
             }
+            .sheet(isPresented: $showingLiveAudioCoach) {
+                IPhoneAudioCoachLiveSheet()
+                    .environmentObject(recorder)
+                    .environmentObject(settings)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            }
             .sheet(
                 isPresented:
                     $showingTreadmillInclineEditor
@@ -1941,6 +1949,54 @@ struct IPhoneWorkoutView: View {
                 )
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
+
+            Button {
+                showingLiveAudioCoach = true
+            } label: {
+                HStack(spacing: 11) {
+                    Image(
+                        systemName:
+                            workout.audioCoachConfiguration?.enabled == true
+                                ? "waveform.circle.fill"
+                                : "waveform.circle"
+                    )
+                    .font(.system(size: 24))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Audio Coach")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                        Text(
+                            workout.audioCoachConfiguration?.enabled == true
+                                ? ATHLTHLocalization.choose(
+                                    english: "On · adjust during workout",
+                                    norwegian: "På · juster under økten"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Off · tap to enable",
+                                    norwegian: "Av · trykk for å aktivere"
+                                )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    Spacer(minLength: 5)
+                    Image(systemName: "slider.horizontal.3")
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .background(
+                    Color.white.opacity(0.93),
+                    in: RoundedRectangle(cornerRadius: 17, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 17, style: .continuous)
+                        .stroke(ATHLTHTheme.accentDeep.opacity(0.10))
+                }
+            }
+            .buttonStyle(.plain)
 
             HStack(spacing: 7) {
                 Image(
@@ -3029,6 +3085,301 @@ struct IPhoneWorkoutView: View {
     }
 }
 
+
+
+private struct IPhoneAudioCoachLiveSheet: View {
+    @EnvironmentObject private var recorder: IPhoneWorkoutStore
+    @EnvironmentObject private var settings: AppSettingsStore
+    @Environment(\.dismiss) private var dismiss
+
+    private var configuration: WatchAudioCoachConfiguration {
+        recorder.active?.audioCoachConfiguration ?? .disabled
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                ATHLTHPlusFeatureGate(
+                    feature: .audioCoach,
+                    title: "Audio Coach · ATHLTH+",
+                    message: ATHLTHLocalization.choose(
+                        english: "Live spoken workout updates are part of ATHLTH+.",
+                        norwegian: "Talte oppdateringer under trening er en del av ATHLTH+."
+                    )
+                ) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        coachCard {
+                            HStack(spacing: 12) {
+                                Image(systemName: "waveform")
+                                    .font(.title2)
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Audio Coach").font(.headline)
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Only for this workout",
+                                        norwegian: "Gjelder bare denne økten"
+                                    ))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Toggle("Audio Coach", isOn: enabledBinding)
+                                    .labelsHidden()
+                                    .tint(ATHLTHTheme.accentDeep)
+                            }
+                        }
+
+                        if configuration.enabled {
+                            coachCard {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Frequency", norwegian: "Hvor ofte?"
+                                    ))
+                                    .font(.headline)
+                                    Toggle(
+                                        ATHLTHLocalization.choose(
+                                            english: "By distance", norwegian: "Etter distanse"
+                                        ),
+                                        isOn: distanceTriggerBinding
+                                    )
+                                    if configuration.distanceIntervalMeters != nil {
+                                        Stepper(
+                                            distanceIntervalTitle,
+                                            value: distanceIntervalBinding,
+                                            in: 250...10_000,
+                                            step: 250
+                                        )
+                                    }
+                                    Divider()
+                                    Toggle(
+                                        ATHLTHLocalization.choose(
+                                            english: "By time", norwegian: "Etter tid"
+                                        ),
+                                        isOn: timeTriggerBinding
+                                    )
+                                    if configuration.timeIntervalSeconds != nil {
+                                        Stepper(
+                                            timeIntervalTitle,
+                                            value: timeIntervalBinding,
+                                            in: 60...3_600,
+                                            step: 60
+                                        )
+                                    }
+                                }
+                                .tint(ATHLTHTheme.accentDeep)
+                            }
+
+                            coachCard {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "What should I hear?",
+                                        norwegian: "Hva skal coachen si?"
+                                    ))
+                                    .font(.headline)
+                                    coachToggle(
+                                        ATHLTHLocalization.choose(
+                                            english: "Distance", norwegian: "Distanse"
+                                        ), \.announceDistance
+                                    )
+                                    coachToggle(
+                                        ATHLTHLocalization.choose(
+                                            english: "Elapsed time", norwegian: "Tid"
+                                        ), \.announceElapsedTime
+                                    )
+                                    coachToggle(
+                                        ATHLTHLocalization.choose(
+                                            english: "Average pace",
+                                            norwegian: "Gjennomsnittstempo"
+                                        ), \.announceAveragePace
+                                    )
+                                    if recorder.active?.plannedRouteTitle != nil {
+                                        coachToggle(
+                                            ATHLTHLocalization.choose(
+                                                english: "Distance remaining",
+                                                norwegian: "Gjenstående rute"
+                                            ), \.announceRemainingRouteDistance
+                                        )
+                                    }
+                                    coachToggle(
+                                        ATHLTHLocalization.choose(
+                                            english: "Clock time", norwegian: "Klokkeslett"
+                                        ), \.announceClockTime
+                                    )
+                                    Toggle(
+                                        ATHLTHLocalization.choose(
+                                            english: "Lower music while speaking",
+                                            norwegian: "Demp musikk når coachen snakker"
+                                        ),
+                                        isOn: duckBinding
+                                    )
+                                }
+                                .tint(ATHLTHTheme.accentDeep)
+                            }
+                        }
+
+                        NavigationLink {
+                            ATHLTHAudioCoachSettingsView()
+                        } label: {
+                            HStack(spacing: 9) {
+                                Image(systemName: "slider.horizontal.3")
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Voice and default settings",
+                                    norwegian: "Stemme og standardinnstillinger"
+                                ))
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .padding(15)
+                            .background(
+                                Color.white,
+                                in: RoundedRectangle(cornerRadius: 17)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(16)
+                }
+            }
+            .background(ATHLTHTheme.canvasBottom.ignoresSafeArea())
+            .navigationTitle("Audio Coach")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Done", norwegian: "Ferdig"
+                    )) { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func coachCard<Content: View>(
+        @ViewBuilder _ content: () -> Content
+    ) -> some View {
+        content()
+            .padding(16)
+            .background(
+                Color.white.opacity(0.96),
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color.black.opacity(0.045), lineWidth: 1)
+            }
+    }
+
+    private func update(
+        _ change: (inout WatchAudioCoachConfiguration) -> Void
+    ) {
+        guard recorder.active != nil else { return }
+        var next = configuration
+        change(&next)
+        recorder.updateAudioCoachDuringWorkout(next)
+    }
+
+    private var enabledBinding: Binding<Bool> {
+        Binding(
+            get: { configuration.enabled },
+            set: { enabled in
+                if enabled {
+                    var next = configuration
+                    if next.distanceIntervalMeters == nil &&
+                        next.timeIntervalSeconds == nil &&
+                        !next.announceDistance &&
+                        !next.announceElapsedTime &&
+                        !next.announceAveragePace {
+                        var draft = AudioCoachDraft()
+                        draft.load(from: settings)
+                        draft.enabled = true
+                        next = draft.configuration()
+                    }
+                    next.enabled = true
+                    recorder.updateAudioCoachDuringWorkout(next)
+                } else {
+                    update { $0.enabled = false }
+                }
+            }
+        )
+    }
+
+    private var distanceTriggerBinding: Binding<Bool> {
+        Binding(
+            get: { configuration.distanceIntervalMeters != nil },
+            set: { enabled in
+                update { $0.distanceIntervalMeters = enabled ? 1_000 : nil }
+            }
+        )
+    }
+
+    private var distanceIntervalBinding: Binding<Double> {
+        Binding(
+            get: { configuration.distanceIntervalMeters ?? 1_000 },
+            set: { value in
+                update { $0.distanceIntervalMeters = value }
+            }
+        )
+    }
+
+    private var distanceIntervalTitle: String {
+        ATHLTHLocalization.format(
+            english: "Every %.2f km",
+            norwegian: "Hver %.2f km",
+            (configuration.distanceIntervalMeters ?? 1_000) / 1_000
+        )
+    }
+
+    private var timeTriggerBinding: Binding<Bool> {
+        Binding(
+            get: { configuration.timeIntervalSeconds != nil },
+            set: { enabled in
+                update { $0.timeIntervalSeconds = enabled ? 600 : nil }
+            }
+        )
+    }
+
+    private var timeIntervalBinding: Binding<Double> {
+        Binding(
+            get: { configuration.timeIntervalSeconds ?? 600 },
+            set: { value in
+                update { $0.timeIntervalSeconds = value }
+            }
+        )
+    }
+
+    private var timeIntervalTitle: String {
+        let minutes = Int((configuration.timeIntervalSeconds ?? 600) / 60)
+        return ATHLTHLocalization.choose(
+            english: "Every \(minutes) min",
+            norwegian: "Hvert \(minutes). minutt"
+        )
+    }
+
+    private func coachToggle(
+        _ title: String,
+        _ keyPath: WritableKeyPath<WatchAudioCoachConfiguration, Bool>
+    ) -> some View {
+        Toggle(
+            title,
+            isOn: Binding(
+                get: { configuration[keyPath: keyPath] },
+                set: { value in
+                    update { $0[keyPath: keyPath] = value }
+                }
+            )
+        )
+    }
+
+    private var duckBinding: Binding<Bool> {
+        Binding(
+            get: { configuration.shouldDuckOtherAudio },
+            set: { value in
+                update { $0.duckOtherAudio = value }
+            }
+        )
+    }
+}
 
 struct TreadmillInclineEditorView: View {
     @Environment(\.dismiss) private var dismiss
