@@ -233,6 +233,20 @@ enum GhostRaceStartService {
                     )
                 }
 
+                guard phoneWorkout.canStartSynchronizedOutdoorWorkout else {
+                    throw NSError(
+                        domain: "ATHLTH.GhostRace",
+                        code: 22,
+                        userInfo: [
+                            NSLocalizedDescriptionKey:
+                                ATHLTHLocalization.choose(
+                                    english: "Allow iPhone location access and sign in before starting a synchronized race.",
+                                    norwegian: "Tillat stedstilgang på iPhone og logg inn før du starter en synkronisert duell."
+                                )
+                        ]
+                    )
+                }
+
                 var coach =
                     settings.audioCoachConfiguration(
                         enabled:
@@ -267,6 +281,23 @@ enum GhostRaceStartService {
                     ghostUpdates:
                         ghostAudio
                 )
+                // start() may reject recording without throwing (for
+                // example when a previous workout is still saving). A
+                // synchronized duel must not claim a successful local
+                // launch until the recorder actually exists.
+                guard phoneWorkout.active != nil else {
+                    throw NSError(
+                        domain: "ATHLTH.GhostRace",
+                        code: 23,
+                        userInfo: [
+                            NSLocalizedDescriptionKey:
+                                ATHLTHLocalization.choose(
+                                    english: "The iPhone workout could not begin. Check location permission and try again before the countdown.",
+                                    norwegian: "iPhone-økten kunne ikke starte. Kontroller stedstilgang og prøv igjen før nedtellingen."
+                                )
+                        ]
+                    )
+                }
                 return
             }
 
