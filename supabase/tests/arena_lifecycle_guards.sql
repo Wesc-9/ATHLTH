@@ -96,5 +96,20 @@ begin
          where oid='public.arena_workout_evidence'::regclass) then
    raise exception 'Arena evidence row-level security disabled';
  end if;
+ if not private.arena_route_snapshot_valid(
+   '{"title":"Valid route","distanceKilometers":5,"coordinates":[{"latitude":59.1,"longitude":10.1},{"latitude":59.2,"longitude":10.2}]}'::jsonb,
+   5000
+ ) then
+   raise exception 'Valid Arena route snapshot rejected';
+ end if;
+ if private.arena_route_snapshot_valid(
+   '{"title":"Invalid route","distanceKilometers":5,"coordinates":[{"latitude":123,"longitude":10},{"latitude":59.2,"longitude":10.2}]}'::jsonb,
+   5000
+ ) or private.arena_route_snapshot_valid(
+   '{"title":"Missing point","distanceKilometers":5,"coordinates":[{"latitude":59,"longitude":10}]}'::jsonb,
+   5000
+ ) then
+   raise exception 'Malformed Arena route was accepted';
+ end if;
 end $$;
 rollback;
