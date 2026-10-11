@@ -1576,6 +1576,12 @@ struct FriendProfileView: View {
                 }
             }
         }
+        .background {
+            // Keep native edge-swipe navigation even without a visible
+            // back button on visited profiles.
+            ATHLTHSwipeBackEnabler()
+                .frame(width: 0, height: 0)
+        }
         .task {
             await load()
         }
