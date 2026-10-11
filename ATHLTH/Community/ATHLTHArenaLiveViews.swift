@@ -3,6 +3,40 @@ import MapKit
 import SwiftUI
 import Supabase
 
+/// Converts a frozen Arena course to a temporary workout route. Never uses
+/// another participant's HealthKit session or creates a second recorder.
+private enum ATHLTHArenaCompetitionCourse {
+    static func route(
+        from snapshot: ChallengeRouteSnapshot,
+        ownerID: UUID
+    ) -> TrainingRoute? {
+        guard snapshot.distanceKilometers.isFinite,
+              (0.1...500).contains(snapshot.distanceKilometers),
+              (2...1_500).contains(snapshot.coordinates.count),
+              snapshot.coordinates.allSatisfy({
+                  $0.latitude.isFinite && $0.longitude.isFinite &&
+                  (-90...90).contains($0.latitude) &&
+                  (-180...180).contains($0.longitude)
+              }) else { return nil }
+
+        return TrainingRoute(
+            id: snapshot.routeID ?? UUID(),
+            ownerID: ownerID,
+            title: snapshot.title,
+            visibility: .privateOnly,
+            coordinates: snapshot.coordinates,
+            distanceKilometers: snapshot.distanceKilometers,
+            elevationGainMeters: nil,
+            importedFilename: nil,
+            createdAt: Date(),
+            startName: nil,
+            endName: nil,
+            expectedTravelTimeSeconds: nil,
+            routeSource: "arena_competition"
+        )
+    }
+}
+
 /// Shared Arena series with live invitations, consensual scoring and
 /// deadline-based completion. Club and Weekly Challenges remain separate.
 struct ATHLTHArenaOnlineSection: View {
@@ -2173,30 +2207,9 @@ struct ATHLTHArenaOnlineDetailView: View {
     private func arenaTrainingRoute(
         from snapshot: ChallengeRouteSnapshot
     ) -> TrainingRoute? {
-        guard snapshot.distanceKilometers.isFinite,
-              (0.1...500).contains(snapshot.distanceKilometers),
-              (2...1_500).contains(snapshot.coordinates.count),
-              snapshot.coordinates.allSatisfy({
-                  $0.latitude.isFinite && $0.longitude.isFinite &&
-                  (-90...90).contains($0.latitude) &&
-                  (-180...180).contains($0.longitude)
-              }) else {
-            return nil
-        }
-        return TrainingRoute(
-            id: snapshot.routeID ?? UUID(),
-            ownerID: session.profile.userID,
-            title: snapshot.title,
-            visibility: .privateOnly,
-            coordinates: snapshot.coordinates,
-            distanceKilometers: snapshot.distanceKilometers,
-            elevationGainMeters: nil,
-            importedFilename: nil,
-            createdAt: Date(),
-            startName: nil,
-            endName: nil,
-            expectedTravelTimeSeconds: nil,
-            routeSource: "arena_competition"
+        ATHLTHArenaCompetitionCourse.route(
+            from: snapshot,
+            ownerID: session.profile.userID
         )
     }
 
@@ -2898,6 +2911,59 @@ private struct ATHLTHArenaRelaySection: View {
 
                         if reportWindowOpen, let ownLeg {
                             VStack(alignment: .leading, spacing: 8) {
+                                if !ATHLTHDeviceRole.isIPad,
+                                   let agreedRoute = availableRoutes.first(where: {
+                                       $0.id == ownLeg.routeRoundID
+                                   })?.routeSnapshot,
+                                   let workoutRoute = ATHLTHArenaCompetitionCourse.route(
+                                       from: agreedRoute,
+                                       ownerID: session.profile.userID
+                                   ) {
+                                    NavigationLink {
+                                        TargetGhostSetupView(
+                                            route: workoutRoute,
+                                            challengeTitle: series.title + " · " +
+                                                ATHLTHLocalization.choose(
+                                                    english: "Relay leg", norwegian: "Stafettetappe"
+                                                ) + " \(ownLeg.legOrder)"
+                                        )
+                                    } label: {
+                                        HStack(spacing: 11) {
+                                            Image(systemName: "figure.run.circle.fill")
+                                                .font(.title3)
+                                            VStack(alignment: .leading, spacing: 3) {
+                                                Text(ATHLTHLocalization.choose(
+                                                    english: "Run your relay leg",
+                                                    norwegian: "Løp din stafettetappe"
+                                                ))
+                                                .font(.subheadline.weight(.semibold))
+                                                Text(ATHLTHLocalization.choose(
+                                                    english: "Open the agreed course in the existing workout and Ghost engine.",
+                                                    norwegian: "Åpne avtalt løype i den vanlige trenings- og Ghost-motoren."
+                                                ))
+                                                .font(.caption)
+                                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                            }
+                                            Spacer(minLength: 5)
+                                            Image(systemName: "arrow.up.right")
+                                                .font(.caption.weight(.semibold))
+                                        }
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                        .padding(12)
+                                        .background(
+                                            ATHLTHTheme.vitalitySoft.opacity(0.67),
+                                            in: RoundedRectangle(cornerRadius: 14)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Starting the course does not automatically submit your leg, exchange a baton or approve points. Report your completed time below.",
+                                        norwegian: "Å starte løypen registrerer ikke etappen, veksler ikke automatisk og godkjenner ikke poeng. Registrer tiden etter økten nedenfor."
+                                    ))
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+
                                 Text(ATHLTHLocalization.choose(
                                     english: "Report your leg time",
                                     norwegian: "Registrer din etappetid"
