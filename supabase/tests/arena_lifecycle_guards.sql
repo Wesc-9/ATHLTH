@@ -182,6 +182,39 @@ begin
  ) then
    raise exception 'Arena team setup RPC privileges are incorrect';
  end if;
+ -- Relay timing is opt-in per assigned athlete; clients may not
+ -- write another member's time directly or grant points.
+ if not (select relrowsecurity from pg_class
+         where oid='public.arena_relay_leg_reports'::regclass) then
+   raise exception 'Arena relay leg reporting RLS disabled';
+ end if;
+ if has_table_privilege('anon','public.arena_relay_leg_reports','SELECT')
+    or has_table_privilege('anon','public.arena_relay_leg_reports','INSERT')
+    or has_table_privilege('authenticated','public.arena_relay_leg_reports','INSERT')
+    or has_table_privilege('authenticated','public.arena_relay_leg_reports','UPDATE')
+    or has_table_privilege('authenticated','public.arena_relay_leg_reports','DELETE')
+ then
+   raise exception 'Arena relay report table direct privileges are too broad';
+ end if;
+ if not has_function_privilege(
+   'authenticated',
+   'public.arena_report_relay_leg(uuid,uuid,numeric)'::regprocedure,
+   'EXECUTE'
+ ) or has_function_privilege(
+   'anon',
+   'public.arena_report_relay_leg(uuid,uuid,numeric)'::regprocedure,
+   'EXECUTE'
+ ) then
+   raise exception 'Arena relay time submission RPC privileges are incorrect';
+ end if;
+ if not exists (
+   select 1 from pg_policies
+   where schemaname='public' and tablename='arena_relay_leg_reports'
+     and policyname='arena_relay_reports_read'
+     and qual like '%arena_can_access%'
+ ) then
+   raise exception 'Arena relay leg report reads are not protected by series membership';
+ end if;
  if not exists (
    select 1 from information_schema.columns
    where table_schema='public' and table_name='arena_series'
