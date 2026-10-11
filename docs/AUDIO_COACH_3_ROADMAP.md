@@ -38,13 +38,29 @@ Audio Coach skal være integrert i alle støttede økter fra planlegging til opp
 
 **Viktig presisering:** ACK bekrefter at Watch har mottatt leieforespørselen og at økten matcher; den bekrefter **ikke** at en fysisk lydutgang fungerer eller at brukeren hørte meldingen. Må ikke omtales som fullstendig «garantert lydlevering» før lydrute- og hendelsesleveringstester er gjennomført.
 
-### 2. Felles Coach Event Engine
+### 2. Felles Coach Event Engine — STEG 2A IMPLEMENTERT; 2B GJENSTÅR
 
-- [ ] Typed `CoachEvent`: oppstart, nedtelling, steg, mål, tempo, puls, styrkesett, hvile, Ghost, rute, avslutning.
-- [ ] Prioritetskø med cooldown, sammenslåing, utløpsfrist, sensorvalidering og dedup.
-- [ ] Samme regler for haptikk/voice-kombinasjon og lokaliserte meldinger.
-- [ ] Regelstyrt og offline som standard; ingen nettanrop på live-kritisk bane.
-- [ ] Diagnose-/testlogg uten identifiserende eller følsomme treningsopplysninger.
+**2A: Lokal hendelsesidentitet, deduplisering og utløp – KODE IMPLEMENTERT, BYGG/ENHETSTEST AVVENTER**
+
+- [x] Delt, lettvekts `ATHLTHCoachEventKind` med typer for øktstart/pause/avslutning, plansteg, milepæl, mål/rute/Ghost, styrkesett/hvile og manuell status.
+- [x] `ATHLTHCoachEventLedger`: stabil identitet per type+nøkkel, tidsfrist for levering, lokal duplikatkontroll, reset ved ny økt og maksimum 256 markører.
+- [x] iPhone-opptak: rutinemilepæler og strukturerte trinn koblet til ledgeren.
+- [x] Apple Watch: rutinemilepæler, plantrinn og øktstart koblet til ledgeren. Utløpte milepæler droppes også etter asynkron aktivering av lydrute.
+- [x] Speilet iPhone: rutinemilepæler og plantrinn koblet til ledgeren med tidsstempel fra speilet snapshot.
+- [x] Enhetstester: duplicate, eventtyper, manglende/ugyldig nøkkel, gammelt tidsstempel, minnegrense og reset.
+- [ ] Bekreftet godkjent iOS+Watch-bygg og automatisk testkjøring på den samlede grenen.
+
+**2B: Leveringssikkerhet og flere kategorier**
+
+- [ ] Ekte felles prioritetskø, sammenslåing og utløp for alle talte Ghost-/rute-/styrke-/målsonehendelser.
+- [ ] Kvittering for event-ID på tvers av iPhone/Watch, med korrekt at-most-once-forsøk ved overlevering.
+- [ ] Tydelige regler for haptikk/voice-kombinasjon og lokalisering av alle treningsmeldinger.
+- [ ] Regelstyrt, offline og uten nettanrop på live-kritisk bane.
+- [ ] Kontroll av sensorers alder og kvalitet før målsone- og tempoanbefalinger.
+- [ ] Minimal hendelsesdiagnostikk uten identifiserende eller følsomme treningsopplysninger.
+- [ ] Fysisk test av AirPods/Spotify, bakgrunn, pause/fortsett og iPhone-til-/frakobling.
+
+**Avgrensning:** 2A gir *lokal* duplikatkontroll for utvalgte typer, ikke global exactly-once-garanti på tvers av enheter. Markører inneholder kun type og intervall-/steg-ID, ikke selve talemeldingen eller brukerens helsehistorikk.
 
 ### 3. Oppdagbarhet og premiumdesign
 
