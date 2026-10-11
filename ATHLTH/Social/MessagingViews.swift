@@ -4773,6 +4773,7 @@ struct DirectMessageThreadView: View {
             // a stale "message request" composer after a pending conversation
             // has already been promoted to accepted.
             await messaging.refreshConversation(id)
+            session.syncApprovedSharedWorkouts(from: messaging.messages(in: id))
             await social.refreshChallenges(
                 challengeStore:
                     challengeStore
@@ -4797,6 +4798,8 @@ struct DirectMessageThreadView: View {
                     .refreshConversation(
                         id
                     )
+
+                session.syncApprovedSharedWorkouts(from: messaging.messages(in: id))
 
                 pollTick += 1
                 if pollTick.isMultiple(
