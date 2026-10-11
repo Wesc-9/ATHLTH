@@ -380,6 +380,20 @@ private struct ATHLTHArenaOutcomeEditor: View {
         _slots = State(initialValue: Array(members.prefix(needed).map(\.slotID)))
     }
 
+    private func memberLabel(_ member: ATHLTHArenaRemoteMember) -> String {
+        if member.isDeleted {
+            return ATHLTHLocalization.choose(
+                english: "Deleted user", norwegian: "Slettet bruker"
+            )
+        }
+        if member.userID == session.profile.userID {
+            return ATHLTHLocalization.choose(english: "You", norwegian: "Du")
+        }
+        return (social.visibleProfiles + social.mutualFollows)
+            .first { $0.userID == member.userID }?.resolvedName ??
+            ATHLTHLocalization.choose(english: "Participant", norwegian: "Deltaker")
+    }
+
     private var valid: Bool {
         slots.count == (series.scoring == .winner ? 1 : min(3, members.count)) &&
         Set(slots).count == slots.count &&
@@ -403,15 +417,7 @@ private struct ATHLTHArenaOutcomeEditor: View {
                             )
                         ) {
                             ForEach(members) { member in
-                                Text(member.isDeleted
-                                     ? ATHLTHLocalization.choose(
-                                        english: "Deleted user", norwegian: "Slettet bruker"
-                                       )
-                                     : member.userID == session.profile.userID
-                                        ? ATHLTHLocalization.choose(english: "You", norwegian: "Du")
-                                        : (social.visibleProfiles + social.mutualFollows)
-                                            .first { $0.userID == member.userID }?.resolvedName ??
-                                          ATHLTHLocalization.choose(english: "Participant", norwegian: "Deltaker"))
+                                Text(memberLabel(member))
                                     .tag(member.slotID)
                             }
                         }
