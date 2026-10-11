@@ -7929,6 +7929,7 @@ struct ChallengeDetailView: View {
     @State private var deletingChallenge = false
     @State private var challengeDeleteError: String?
     @State private var showingChallengeTargetGhost = false
+    @State private var showingChangeProposalEditor = false
 
     private var challenge: ATHLTHChallenge? {
         challenges.challenge(id: challengeID)
@@ -7964,6 +7965,30 @@ struct ChallengeDetailView: View {
 
                         leaderboardCard(challenge)
                         rulesCard(challenge)
+
+                        if challenge.creatorID != session.profile.userID,
+                           (currentParticipant?.state == .invited ||
+                            currentParticipant?.state == .accepted),
+                           !challenge.rulesAreLocked &&
+                           challenge.status != .completed &&
+                           challenge.status != .cancelled {
+                            Button {
+                                showingChangeProposalEditor = true
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Propose changes to the challenge",
+                                        norwegian: "Foreslå endringer i utfordringen"
+                                    ),
+                                    systemImage: "square.and.pencil"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 48)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(ATHLTHTheme.accentDeep)
+                        }
 
                         if challenge.sport == .running,
                            challenge.status == .active,
@@ -8101,6 +8126,9 @@ struct ChallengeDetailView: View {
                             )
                         }
                     }
+                }
+                .sheet(isPresented: $showingChangeProposalEditor) {
+                    ChallengeCreationView(changeProposalFor: challenge)
                 }
                 .sheet(isPresented: $showingManualStrengthAttempt) {
                     if let currentParticipant {
