@@ -562,6 +562,39 @@ struct ATHLTHArenaOnlineDetailView: View {
         .buttonStyle(.plain)
     }
 
+    /// Reuses the existing route workout and Ghost engines, not a new
+    /// independent workout recorder. A round only contains a shared course,
+    /// never another athlete's private GPS workout.
+    private func arenaTrainingRoute(
+        from snapshot: ChallengeRouteSnapshot
+    ) -> TrainingRoute? {
+        guard snapshot.distanceKilometers.isFinite,
+              (0.1...500).contains(snapshot.distanceKilometers),
+              (2...1_500).contains(snapshot.coordinates.count),
+              snapshot.coordinates.allSatisfy({
+                  $0.latitude.isFinite && $0.longitude.isFinite &&
+                  (-90...90).contains($0.latitude) &&
+                  (-180...180).contains($0.longitude)
+              }) else {
+            return nil
+        }
+        return TrainingRoute(
+            id: snapshot.routeID ?? UUID(),
+            ownerID: session.profile.userID,
+            title: snapshot.title,
+            visibility: .privateOnly,
+            coordinates: snapshot.coordinates,
+            distanceKilometers: snapshot.distanceKilometers,
+            elevationGainMeters: nil,
+            importedFilename: nil,
+            createdAt: Date(),
+            startName: nil,
+            endName: nil,
+            expectedTravelTimeSeconds: nil,
+            routeSource: "arena_competition"
+        )
+    }
+
     private func arenaRoutePreview(_ route: ChallengeRouteSnapshot) -> some View {
         let points = route.coordinates.map {
             CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
@@ -773,6 +806,57 @@ struct ATHLTHArenaOnlineDetailView: View {
             Text(round.rules)
                 .font(.caption)
                 .foregroundStyle(ATHLTHTheme.mutedText)
+
+            if let snapshot = round.routeSnapshot {
+                Label(
+                    String(format: "%.2f km", snapshot.distanceKilometers),
+                    systemImage: "point.topleft.down.to.point.bottomright.curvepath"
+                )
+                .font(.caption.weight(.medium))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                if currentSeries.status == "active", canParticipate,
+                   let route = arenaTrainingRoute(from: snapshot) {
+                    NavigationLink {
+                        TargetGhostSetupView(
+                            route: route,
+                            challengeTitle: currentSeries.title
+                        )
+                    } label: {
+                        HStack(spacing: 9) {
+                            Image(systemName: "figure.run.circle.fill")
+                                .font(.title3)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Train with a target Ghost",
+                                    norwegian: "Tren med mål-Ghost"
+                                ))
+                                .font(.subheadline.weight(.semibold))
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Choose a pace or finish time on this route.",
+                                    norwegian: "Velg tempo eller sluttid på denne ruten."
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            Spacer()
+                            Image(systemName: "arrow.right")
+                                .font(.caption.weight(.medium))
+                        }
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .padding(12)
+                        .background(
+                            ATHLTHTheme.vitalitySoft.opacity(0.65),
+                            in: RoundedRectangle(cornerRadius: 14)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Configure target Ghost for this competition route",
+                        norwegian: "Sett opp mål-Ghost for konkurranseruten"
+                    ))
+                }
+            }
             Text("\(voteCount)/\(acceptedIDs.count) " +
                  ATHLTHLocalization.choose(
                     english: "accepted members approved",
