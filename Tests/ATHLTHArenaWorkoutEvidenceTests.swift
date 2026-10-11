@@ -46,6 +46,18 @@ final class ATHLTHArenaWorkoutEvidenceTests: XCTestCase {
         XCTAssertNil(match(oneK, as: .fastest5K))
     }
 
+    func testImpossibleFiveKilometerTimeIsNotSuggested() {
+        XCTAssertNil(match(recordedRun(distance: 5_000, duration: 550), as: .fastest5K))
+    }
+
+    func testImpossibleOneKilometerTimeIsNotSuggested() {
+        XCTAssertNil(match(recordedRun(distance: 1_000, duration: 90), as: .fastest1K))
+    }
+
+    func testImpossibleDistanceSpeedIsNotSuggested() {
+        XCTAssertNil(match(recordedRun(distance: 10_000, duration: 600), as: .mostDistance))
+    }
+
     func testUnsupportedExerciseSpecificRoundIsNotAutoMatched() {
         let workout = recordedRun(distance: 5_000)
         XCTAssertNil(match(workout, as: .mostRepetitions))
