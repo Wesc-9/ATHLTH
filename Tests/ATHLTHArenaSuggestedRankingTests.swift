@@ -154,6 +154,54 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
         XCTAssertNil(suggestion)
     }
 
+    func testRouteRankingRequiresReportedGPSMatchForSameRound() {
+        let qualified = UUID()
+        let unqualified = UUID()
+        let standings = ATHLTHArenaSuggestedRanking.standings(
+            template: .fastestRoute,
+            roundID: roundID,
+            evidence: [
+                workout(slot: qualified, value: 1_220, metric: "elapsed_seconds",
+                        routeMatchPercent: 96),
+                workout(slot: unqualified, value: 900, metric: "elapsed_seconds"),
+                workout(slot: unqualified, value: 920, metric: "elapsed_seconds",
+                        routeMatchPercent: 89.9),
+                workout(slot: unqualified, value: 910, metric: "elapsed_seconds",
+                        round: UUID(), routeMatchPercent: 98)
+            ]
+        )
+        XCTAssertEqual(standings.map(\.slotID), [qualified])
+        XCTAssertEqual(standings.first?.result, 1_220)
+    }
+
+    func testRouteRankingOnlySuggestsWinnerWhenBothHaveMatchingGPSReports() {
+        let a = UUID()
+        let b = UUID()
+        let evidence = [
+            workout(slot: a, value: 1_500, metric: "elapsed_seconds",
+                    routeMatchPercent: 94),
+            workout(slot: b, value: 1_350, metric: "elapsed_seconds")
+        ]
+        XCTAssertNil(ATHLTHArenaSuggestedRanking.eligibleSuggestion(
+            template: .fastestRoute,
+            scoring: .winner,
+            roundID: roundID,
+            requiredSlots: [a, b],
+            evidence: evidence
+        ))
+        let completed = evidence + [
+            workout(slot: b, value: 1_420, metric: "elapsed_seconds",
+                    routeMatchPercent: 91)
+        ]
+        XCTAssertEqual(ATHLTHArenaSuggestedRanking.eligibleSuggestion(
+            template: .fastestRoute,
+            scoring: .winner,
+            roundID: roundID,
+            requiredSlots: [a, b],
+            evidence: completed
+        ), [b])
+    }
+
     func testRivalTargetUsesOnlyOtherParticipantsValidRouteReports() {
         let me = UUID()
         let other = UUID()
