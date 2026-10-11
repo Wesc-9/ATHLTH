@@ -112,6 +112,11 @@ struct StrengthAIExercisePlan:
     let exercises: [StrengthAIExerciseSuggestion]
 }
 
+private struct StrengthAIServiceErrorPayload: Decodable {
+    let error: String?
+    let code: String?
+}
+
 @MainActor
 private final class StrengthAIExerciseService {
     private let client: SupabaseClient
@@ -1208,43 +1213,62 @@ struct StrengthAIExercisePlannerView: View {
     private func resolvedErrorMessage(
         _ error: Error
     ) -> String {
-        let raw =
-            error.localizedDescription
-                .lowercased()
-
-        if raw.contains(
-            "premium"
-        ) ||
-            raw.contains(
-                "athlth+"
-            ) {
-            return ATHLTHLocalization.choose(
-                english:
-                    "AI exercise selection requires ATHLTH+.",
-                norwegian:
-                    "AI-valg av øvelser krever ATHLTH+."
+        // Supabase's generic localizedDescription hides the actual HTTP
+        // status and JSON error code. Surface actionable, localized errors
+        // without leaking server internals or the user's private context.
+        if case let FunctionsError.httpError(status, data) = error {
+            let serverError = try? JSONDecoder().decode(
+                StrengthAIServiceErrorPayload.self,
+                from: data
             )
+
+            if serverError?.code == "PREMIUM_REQUIRED" || status == 403 {
+                return ATHLTHLocalization.choose(
+                    english: "AI exercise selection requires ATHLTH+.",
+                    norwegian: "AI-valg av øvelser krever ATHLTH+."
+                )
+            }
+            if serverError?.code == "AI_RATE_LIMIT" || status == 429 {
+                return ATHLTHLocalization.choose(
+                    english: "AI request limit reached. Try again a little later.",
+                    norwegian: "Grensen for AI-forespørsler er nådd. Prøv igjen litt senere."
+                )
+            }
+
+            switch status {
+            case 401:
+                return ATHLTHLocalization.choose(
+                    english: "Your session has expired. Sign in again and retry.",
+                    norwegian: "Innloggingen er utløpt. Logg inn på nytt og prøv igjen."
+                )
+            case 400:
+                return ATHLTHLocalization.choose(
+                    english: "The selected exercises could not be used. Try another focus or fewer exercises.",
+                    norwegian: "Valgte øvelser kunne ikke brukes. Prøv et annet fokus eller færre øvelser."
+                )
+            case 502, 503, 504:
+                return ATHLTHLocalization.choose(
+                    english: "The ATHLTH AI service is temporarily unavailable. Try again shortly.",
+                    norwegian: "ATHLTH AI-tjenesten er midlertidig utilgjengelig. Prøv igjen om litt."
+                )
+            default:
+                return ATHLTHLocalization.choose(
+                    english: "The AI request failed (HTTP \\(status)). Try again.",
+                    norwegian: "AI-forespørselen feilet (HTTP \\(status)). Prøv igjen."
+                )
+            }
         }
 
-        if raw.contains(
-            "rate"
-        ) ||
-            raw.contains(
-                "limit"
-            ) {
+        if error is URLError {
             return ATHLTHLocalization.choose(
-                english:
-                    "AI has reached its temporary request limit. Try again a little later.",
-                norwegian:
-                    "AI har nådd en midlertidig forespørselsgrense. Prøv igjen litt senere."
+                english: "Check your internet connection and try again.",
+                norwegian: "Kontroller internettforbindelsen og prøv igjen."
             )
         }
 
         return ATHLTHLocalization.choose(
-            english:
-                "ATHLTH AI could not create a suggestion right now. Try again.",
-            norwegian:
-                "ATHLTH AI klarte ikke å lage et forslag akkurat nå. Prøv igjen."
+            english: "ATHLTH AI could not create a suggestion right now. Try again.",
+            norwegian: "ATHLTH AI klarte ikke å lage et forslag akkurat nå. Prøv igjen."
         )
     }
 
