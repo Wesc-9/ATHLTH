@@ -234,6 +234,7 @@ final class IPhoneWorkoutStore:
     private var pendingAutoPauseEnabled: Bool = false
 
     private var lastLocation: CLLocation?
+    private var coachPaceSampleAt: Date?
     private var autoPauseDetector =
         OutdoorAutoPauseDetector()
     private var plannedRouteLocations: [CLLocation] = []
@@ -578,6 +579,7 @@ final class IPhoneWorkoutStore:
         requestLiveWorkoutPresentationAfterLaunch()
 
         lastLocation = nil
+        coachPaceSampleAt = nil
         automaticPauseActive = false
         autoPauseDetector.reset(
             enabled: autoPauseEnabled
@@ -866,6 +868,7 @@ final class IPhoneWorkoutStore:
             active = workout
             manager.stopUpdatingLocation()
             lastLocation = nil
+        coachPaceSampleAt = nil
             message = ATHLTHLocalization.choose(
                 english: "Workout paused.",
                 norwegian: "Økten er satt på pause."
@@ -904,6 +907,7 @@ final class IPhoneWorkoutStore:
         )
         manager.stopUpdatingLocation()
         lastLocation = nil
+        coachPaceSampleAt = nil
         persistActiveCheckpoint(force: true)
         syncLiveActivity()
 
@@ -973,6 +977,7 @@ final class IPhoneWorkoutStore:
                 ? 1
                 : 5
         lastLocation = nil
+        coachPaceSampleAt = nil
 
         if environment == .outdoor {
             manager.allowsBackgroundLocationUpdates = true
@@ -1040,6 +1045,7 @@ final class IPhoneWorkoutStore:
 
         automaticPauseActive = true
         lastLocation = nil
+        coachPaceSampleAt = nil
         message = ATHLTHLocalization.choose(
             english: "Auto-pause · waiting for movement",
             norwegian: "Auto-pause · venter på bevegelse"
@@ -1065,6 +1071,7 @@ final class IPhoneWorkoutStore:
         workout.lastCheckpoint = date
         automaticPauseActive = false
         lastLocation = nil
+        coachPaceSampleAt = nil
         message = nil
     }
 
@@ -2097,7 +2104,13 @@ final class IPhoneWorkoutStore:
         workout: inout PhoneWorkout,
         location: CLLocation
     ) {
-        guard location.speed >= 0.35 else {
+        guard location.speed >= 0.35,
+              ATHLTHCoachSensorFreshness.isFresh(
+                  sampledAt: location.timestamp,
+                  maximumAge:
+                    ATHLTHCoachSensorFreshness.maximumPaceAge
+              )
+        else {
             return
         }
 
@@ -2109,6 +2122,8 @@ final class IPhoneWorkoutStore:
         else {
             return
         }
+
+        coachPaceSampleAt = location.timestamp
 
         if let existing =
             workout
@@ -3233,10 +3248,13 @@ final class IPhoneWorkoutStore:
             .announceEstimatedRemainingRouteTime,
            let remaining =
                 workout.routeRemainingMeters,
+           ATHLTHCoachSensorFreshness.validPace(
+               workout.currentPaceSecondsPerKilometer,
+               sampledAt: coachPaceSampleAt
+           ),
            let pace =
                 workout
-                    .currentPaceSecondsPerKilometer,
-           pace > 0 {
+                    .currentPaceSecondsPerKilometer {
             parts.append(
                 (norwegian
                     ? "Omtrent \(durationPhrase((remaining / 1_000) * pace, norwegian: true)) igjen"
@@ -4122,7 +4140,7 @@ final class IPhoneWorkoutStore:
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        Task { @MainActor in self.message = "GPS is unavailable. Time continues; distance will resume when the signal returns."; self.lastLocation = nil }
+        Task { @MainActor in self.message = "GPS is unavailable. Time continues; distance will resume when the signal returns."; self.lastLocation = nil; self.coachPaceSampleAt = nil }
     }
 
     private func accept(
