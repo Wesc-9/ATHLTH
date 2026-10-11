@@ -3919,10 +3919,13 @@ struct HomeWeeklyProgressStrip:
     private func plannedSessions(
         for date: Date
     ) -> [PlannedSession] {
+        // A day contains both scheduled plan workouts and independently
+        // planned sessions, including workouts awaiting a friend's reply.
+        let standalone = session.standalonePlannedSessions(on: date)
         guard let plan,
               !plan.weeks.isEmpty
         else {
-            return []
+            return standalone
         }
 
         let weekIndex: Int
@@ -3934,7 +3937,7 @@ struct HomeWeeklyProgressStrip:
                 startDate: startDate,
                 calendar: calendar
             ) else {
-                return []
+                return standalone
             }
             weekIndex = position.weekIndex
             dayIndex = position.dayIndex
@@ -3949,27 +3952,35 @@ struct HomeWeeklyProgressStrip:
                 from: currentWeekInterval.start,
                 to: weekStart
             ).day ?? 0
-            guard elapsed >= 0 else { return [] }
+            guard elapsed >= 0 else { return standalone }
             weekIndex = elapsed / 7
             let weekday = calendar.component(.weekday, from: date)
             dayIndex = ((weekday + 5) % 7) + 1
         }
 
         guard plan.weeks.indices.contains(weekIndex) else {
-            return []
+            return standalone
         }
 
-        return plan.weeks[
+        let scheduled = plan.weeks[
             weekIndex
         ]
         .days
         .first(
             where: {
-                $0.dayIndex ==
-                    dayIndex
+                $0.dayIndex == dayIndex
             }
         )?
         .sessions ?? []
+
+        // Never show duplicates if a workout also exists in a plan.
+        let standaloneIDs = Set(standalone.map(\.id))
+        return (scheduled.filter { !standaloneIDs.contains($0.id) } +
+                standalone)
+            .sorted {
+                ($0.scheduledStart ?? .distantFuture) <
+                    ($1.scheduledStart ?? .distantFuture)
+            }
     }
 
     private func dayName(
@@ -4000,6 +4011,7 @@ struct HomeWeeklyProgressStrip:
 
 private struct HomeWeeklyProgressDaySheet:
     View {
+    @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var strength: StrengthWorkoutStore
 
     let selection:
@@ -4007,6 +4019,20 @@ private struct HomeWeeklyProgressDaySheet:
     let onOpenWorkout: () -> Void
 
     @State private var showingStandaloneSessionEditor = false
+
+    private var currentPlanned: [PlannedSession] {
+        // selection.planned is a snapshot from when the sheet opened.
+        // Observe AppSessionStore so a newly saved workout appears here
+        // immediately, without having to close and reopen the calendar.
+        let standalone = session.standalonePlannedSessions(on: selection.date)
+        let standaloneIDs = Set(standalone.map(\.id))
+        return (selection.planned.filter {
+            !standaloneIDs.contains($0.id)
+        } + standalone).sorted {
+            ($0.scheduledStart ?? .distantFuture) <
+                ($1.scheduledStart ?? .distantFuture)
+        }
+    }
 
     private var canPlanWorkout: Bool {
         HomeWeeklyProgressCalendar.canScheduleStandalone(
@@ -4063,7 +4089,7 @@ private struct HomeWeeklyProgressDaySheet:
                         .padding(.bottom, 4)
                     }
 
-                    if selection.planned.isEmpty &&
+                    if currentPlanned.isEmpty &&
                         selection.communityEvents.isEmpty &&
                         selection.actual.isEmpty {
                         ContentUnavailableView(
@@ -4079,9 +4105,7 @@ private struct HomeWeeklyProgressDaySheet:
                         .padding(.top, 40)
                     }
 
-                    if !selection
-                        .planned
-                        .isEmpty {
+                    if !currentPlanned.isEmpty {
                         sectionTitle(
                             ATHLTHLocalization.choose(
                                 english:
@@ -4092,7 +4116,7 @@ private struct HomeWeeklyProgressDaySheet:
                         )
 
                         ForEach(
-                            selection.planned
+                            currentPlanned
                         ) { workout in
                             plannedRow(
                                 workout
@@ -4264,6 +4288,19 @@ private struct HomeWeeklyProgressDaySheet:
                     ATHLTHTheme.mutedText
                 )
                 .lineLimit(1)
+
+                if workout.trainTogetherMode != nil && !completed {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Friend invited · your workout is scheduled",
+                            norwegian: "Venn invitert · økten din er planlagt"
+                        ),
+                        systemImage: "person.crop.circle.badge.clock"
+                    )
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .lineLimit(1)
+                }
             }
 
             Spacer()
