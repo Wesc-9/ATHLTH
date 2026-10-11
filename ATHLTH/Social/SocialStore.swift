@@ -24,6 +24,7 @@ final class SocialStore: ObservableObject {
     /// The creator must tap Start alone, even for remote workouts.
     /// This local intent is not the server-side participation mode.
     private var creatorIndependentStartRequestedID: UUID?
+    private var participantIndependentStartRequestedIDs: Set<UUID> = []
     private var creatorCaptureDevices: [UUID: WorkoutCaptureDevice] = [:]
     @Published private(set) var privacy: SocialPrivacySettings?
     @Published private(set) var workoutMedia: [WorkoutMediaRecord] = []
@@ -993,10 +994,17 @@ final class SocialStore: ObservableObject {
         creatorCaptureDevices[sessionID] ?? .iPhone
     }
 
+    /// Choosing Ready only joins the lobby. A later host solo start must
+    /// never automatically start the invited athlete's recording.
+    func requestParticipantIndependentStart(sessionID: UUID) {
+        participantIndependentStartRequestedIDs.insert(sessionID)
+    }
+
     func prepareForAnotherWorkout() {
         coordinatedLobbySessionID = nil
         isCoordinatedLobbyMinimized = false
         creatorIndependentStartRequestedID = nil
+        participantIndependentStartRequestedIDs.removeAll()
 
         if let sessionID = currentJoinedWorkoutSessionID,
            !workoutParticipants.contains(where: {
@@ -1302,11 +1310,13 @@ final class SocialStore: ObservableObject {
                 if session.invitePayload?
                     .startIndependently == true,
                    currentParticipant.readyAt != nil,
-                   (session.creatorID != currentUserID ||
-                    creatorIndependentStartRequestedID == sessionID) {
+                   (session.creatorID == currentUserID
+                    ? creatorIndependentStartRequestedID == sessionID
+                    : participantIndependentStartRequestedIDs.contains(sessionID)) {
                     currentJoinedWorkoutSessionID =
                         sessionID
                     creatorIndependentStartRequestedID = nil
+                    participantIndependentStartRequestedIDs.remove(sessionID)
 
                     if coordinatedLobbySessionID ==
                         sessionID {
@@ -1476,6 +1486,7 @@ final class SocialStore: ObservableObject {
                 creatorIndependentStartRequestedID = nil
             }
             creatorCaptureDevices.removeValue(forKey: target.id)
+            participantIndependentStartRequestedIDs.remove(target.id)
             if currentJoinedWorkoutSessionID == target.id {
                 currentJoinedWorkoutSessionID = nil
             }
