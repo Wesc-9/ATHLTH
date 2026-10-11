@@ -709,6 +709,23 @@ struct LiveGhostRaceLobbyView: View {
                         .title2.weight(.bold)
                     )
 
+                Label(
+                    challenge.arenaRoundID != nil
+                        ? ATHLTHLocalization.choose(
+                            english: "Provisional live times. Review and approve the Arena round separately; points are never awarded automatically.",
+                            norwegian: "Foreløpige live-tider. Resultatet må godkjennes separat i Arena; poeng tildeles aldri automatisk."
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Reported live times, not independently verified race results.",
+                            norwegian: "Oppgitte live-tider, ikke uavhengig verifiserte løpsresultater."
+                        ),
+                    systemImage: resultCandidate == nil
+                        ? "exclamationmark.triangle" : "info.circle"
+                )
+                .font(.caption)
+                .foregroundStyle(resultCandidate == nil
+                    ? .orange : ATHLTHTheme.mutedText)
+
                 HStack(spacing: 10) {
                     resultMetric(
                         title:
@@ -1231,10 +1248,28 @@ struct LiveGhostRaceLobbyView: View {
             : room.senderMaxLeadMeters
     }
 
+    /// A missing, contradictory or malformed finish is never displayed as
+    /// a win or tie. The Arena result review uses the same common validator.
+    private var resultCandidate: ATHLTHArenaLiveDuelCandidate? {
+        ATHLTHArenaLiveDuelReview.candidate(
+            senderID: challenge.senderID,
+            recipientID: challenge.recipientID,
+            senderSeconds: liveRace.participant(userID: challenge.senderID)?.elapsedSeconds,
+            recipientSeconds: liveRace.participant(userID: challenge.recipientID)?.elapsedSeconds,
+            reportedWinnerID: liveRace.room?.winnerID,
+            isFinished: liveRace.room?.status == .finished
+        )
+    }
+
     private var resultTitle: String {
-        guard let winnerID =
-                liveRace.room?.winnerID
-        else {
+        guard let candidate = resultCandidate else {
+            return ATHLTHLocalization.choose(
+                english: "Result requires review",
+                norwegian: "Resultatet må kontrolleres"
+            )
+        }
+
+        guard let winnerID = candidate.winnerID else {
             return ATHLTHLocalization.choose(
                 english: "It's a tie",
                 norwegian: "Uavgjort"
@@ -1256,34 +1291,21 @@ struct LiveGhostRaceLobbyView: View {
     }
 
     private var resultMargin: String {
-        guard
-            let own =
-                ownParticipant?
-                    .elapsedSeconds,
-            let opponent =
-                opponentParticipant?
-                    .elapsedSeconds
-        else {
+        guard let candidate = resultCandidate else {
             return "—"
         }
-
-        let delta =
-            abs(own - opponent)
-
-        if delta < 0.5 {
+        if candidate.marginSeconds < 0.5 {
             return "0.0 s"
         }
-
-        return String(
-            format: "%.1f s",
-            delta
-        )
+        return String(format: "%.1f s", candidate.marginSeconds)
     }
 
     private func resultTime(
         _ seconds: TimeInterval?
     ) -> String {
-        guard let seconds else {
+        guard let seconds,
+              seconds.isFinite,
+              (60...86_400).contains(seconds) else {
             return "—"
         }
 
