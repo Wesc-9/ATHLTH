@@ -26,6 +26,7 @@ struct ATHLTHArenaScoringSection: View {
     let onChanged: () async -> Void
 
     @State private var results: [ATHLTHArenaRoundResult] = []
+    @State private var resultsLoaded = false
     @State private var votes: [ATHLTHArenaRoundResultVote] = []
     @State private var linkedWorkouts: [ATHLTHArenaWorkoutEvidence] = []
     @State private var loading = false
@@ -39,6 +40,13 @@ struct ATHLTHArenaScoringSection: View {
 
     private var acceptedIDs: Set<UUID> {
         Set(members.filter { $0.response == "accepted" }.compactMap(\.userID))
+    }
+
+    private var roundProgress: ATHLTHArenaRoundProgress {
+        ATHLTHArenaRoundProgress.summarize(
+            roundIDs: rounds.map(\.id),
+            results: results
+        )
     }
 
     private var rankedMembers: [ATHLTHArenaRemoteMember] {
@@ -91,6 +99,10 @@ struct ATHLTHArenaScoringSection: View {
                         english: "Refresh standings", norwegian: "Oppdater poengstilling"
                     ))
                 }
+            }
+
+            if series.status != "draft", !rounds.isEmpty, resultsLoaded {
+                roundProgressCard
             }
 
             ForEach(rankedMembers) { member in
@@ -313,6 +325,65 @@ struct ATHLTHArenaScoringSection: View {
                 norwegian: "Regler og deltakere låses til konkurransen avsluttes, bortsett fra enstemmig godkjente erstatninger for slettede brukere."
             ))
         }
+    }
+
+    /// Uses only authoritative round proposals and voted result status.
+    /// A GPS activity or a pending result never turns the progress ring green.
+    private var roundProgressCard: some View {
+        let progress = roundProgress
+        return VStack(alignment: .leading, spacing: 11) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Rounds approved", norwegian: "Godkjente runder"
+                    ))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Only unanimously accepted results count.",
+                        norwegian: "Kun enstemmig godkjente resultater teller."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                Spacer(minLength: 8)
+                Text("\(progress.approved) / \(progress.total)")
+                    .font(.title3.weight(.bold).monospacedDigit())
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+            }
+
+            ProgressView(value: progress.approvedFraction)
+                .tint(ATHLTHTheme.accentDeep)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Approved competition rounds",
+                    norwegian: "Godkjente konkurranserunder"
+                ))
+                .accessibilityValue("\(progress.approved) / \(progress.total)")
+
+            HStack(spacing: 12) {
+                Label(
+                    ATHLTHLocalization.choose(english: "Approved", norwegian: "Godkjent") +
+                    ": \(progress.approved)",
+                    systemImage: "checkmark.seal.fill"
+                )
+                Label(
+                    ATHLTHLocalization.choose(english: "Pending vote", norwegian: "Avventer") +
+                    ": \(progress.pending)",
+                    systemImage: "clock"
+                )
+                Label(
+                    ATHLTHLocalization.choose(english: "Unresolved", norwegian: "Uavklart") +
+                    ": \(progress.unresolved)",
+                    systemImage: "circle.dotted"
+                )
+            }
+            .font(.caption2)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+            .lineLimit(1)
+            .minimumScaleFactor(0.72)
+        }
+        .padding(14)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
     }
 
     @ViewBuilder
@@ -601,11 +672,17 @@ struct ATHLTHArenaScoringSection: View {
         defer { loading = false }
         do {
             let loaded = try await cloud.loadRoundResults(seriesID: series.id)
+            let loadedVotes = try await cloud.loadResultVotes(resultIDs: loaded.map(\.id))
+            let loadedWorkouts = try await cloud.loadWorkoutEvidence(seriesID: series.id)
+            guard !Task.isCancelled else { return }
             results = loaded
-            votes = try await cloud.loadResultVotes(resultIDs: loaded.map(\.id))
-            linkedWorkouts = try await cloud.loadWorkoutEvidence(seriesID: series.id)
+            votes = loadedVotes
+            linkedWorkouts = loadedWorkouts
+            resultsLoaded = true
             errorMessage = nil
         } catch {
+            // Do not present last-known points progress as fresh on errors.
+            resultsLoaded = false
             errorMessage = error.localizedDescription
         }
     }
