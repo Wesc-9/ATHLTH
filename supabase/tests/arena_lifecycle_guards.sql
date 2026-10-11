@@ -59,5 +59,42 @@ begin
  ) then
    raise exception 'Invitation response notification trigger is missing';
  end if;
+ -- Arena 2.0 route evidence must remain participant-reported and private.
+ if not exists (
+   select 1 from information_schema.columns
+   where table_schema='public' and table_name='arena_workout_evidence'
+     and column_name='reported_route_match_percent'
+ ) or not exists (
+   select 1 from information_schema.columns
+   where table_schema='public' and table_name='arena_round_proposals'
+     and column_name='route_snapshot'
+ ) then
+   raise exception 'Arena route evidence fields are missing';
+ end if;
+ if has_function_privilege(
+   'anon',
+   'public.arena_share_route_evidence(uuid,uuid,timestamptz,timestamptz,numeric,numeric,numeric,numeric,numeric)'::regprocedure,
+   'EXECUTE'
+ ) then
+   raise exception 'Anonymous route evidence submission is forbidden';
+ end if;
+ if not has_function_privilege(
+   'authenticated',
+   'public.arena_share_route_evidence(uuid,uuid,timestamptz,timestamptz,numeric,numeric,numeric,numeric,numeric)'::regprocedure,
+   'EXECUTE'
+ ) then
+   raise exception 'Authenticated route evidence RPC is missing';
+ end if;
+ if not exists (
+   select 1 from pg_constraint
+   where conrelid='public.arena_round_proposals'::regclass
+     and conname='arena_round_target_configuration_check' and convalidated
+ ) then
+   raise exception 'Arena structured round rules constraint is missing';
+ end if;
+ if not (select relrowsecurity from pg_class
+         where oid='public.arena_workout_evidence'::regclass) then
+   raise exception 'Arena evidence row-level security disabled';
+ end if;
 end $$;
 rollback;
