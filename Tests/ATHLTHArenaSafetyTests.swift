@@ -225,6 +225,40 @@ final class ATHLTHArenaSafetyTests: XCTestCase {
         ), 1)
     }
 
+    func testSeasonProgressUsesWholeCalendarDaysIncludingLastDay() {
+        let first = ATHLTHArenaSeasonPresentation.progress(
+            startsOn: "2026-10-01", endsOn: "2026-10-31", today: "2026-10-01"
+        )
+        XCTAssertEqual(first?.fraction ?? -1, 1.0 / 31.0, accuracy: 0.000001)
+        XCTAssertEqual(first?.daysRemaining, 30)
+
+        let last = ATHLTHArenaSeasonPresentation.progress(
+            startsOn: "2026-10-01", endsOn: "2026-10-31", today: "2026-10-31"
+        )
+        XCTAssertEqual(last?.fraction ?? -1, 1, accuracy: 0.000001)
+        XCTAssertEqual(last?.daysRemaining, 0)
+
+        let before = ATHLTHArenaSeasonPresentation.progress(
+            startsOn: "2026-10-01", endsOn: "2026-10-31", today: "2026-09-29"
+        )
+        XCTAssertEqual(before?.fraction ?? -1, 0, accuracy: 0.000001)
+        XCTAssertEqual(before?.daysToStart, 2)
+
+        let after = ATHLTHArenaSeasonPresentation.progress(
+            startsOn: "2026-10-01", endsOn: "2026-10-31", today: "2026-11-02"
+        )
+        XCTAssertEqual(after?.fraction ?? -1, 1, accuracy: 0.000001)
+    }
+
+    func testSeasonProgressRejectsReversedOrInvalidDates() {
+        XCTAssertNil(ATHLTHArenaSeasonPresentation.progress(
+            startsOn: "2026-10-31", endsOn: "2026-10-01", today: "2026-10-12"
+        ))
+        XCTAssertNil(ATHLTHArenaSeasonPresentation.progress(
+            startsOn: "2026-02-30", endsOn: "2026-03-01", today: "2026-02-28"
+        ))
+    }
+
     func testDeletedChatAuthorHasNoProfileID() throws {
         let payload = """
         {
