@@ -3713,7 +3713,27 @@ struct ChallengeCreationView: View {
                 ),
             icon: "person.2.fill"
         ) {
-            if preselectedFriends.count != 1 {
+            if preselectedFriends.count == 1,
+               let recipient = preselectedFriends.first {
+                HStack(spacing: 12) {
+                    SocialAvatar(profile: recipient, size: 38)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(recipient.resolvedName)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Direct challenge · one recipient",
+                            norwegian: "Direkte utfordring · én mottaker"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    Spacer()
+                    Image(systemName: "lock.shield.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+            } else {
             Button {
                 showingInvitePicker =
                     true
@@ -6684,9 +6704,12 @@ struct ChallengeCreationView: View {
         var uploadedCoverURL: String? = changeProposalFor?.rules.coverImageURL
 
         if let selectedCoverImageData {
+            // Never upload a proposed image to the live challenge's path:
+            // proposed artwork remains separate until creator approval.
+            let coverUploadID = changeProposalFor == nil ? challengeID : UUID()
             guard let imageURL =
                     await social.uploadChallengeCover(
-                        challengeID: challengeID,
+                        challengeID: coverUploadID,
                         jpegData: selectedCoverImageData
                     )
             else {
