@@ -533,9 +533,24 @@ struct PlannedWorkoutLobbyView: View {
         ))
         .navigationBarTitleDisplayMode(.inline)
         .task(id: sourceWorkoutID) {
+            await refresh()
+            // A calendar sheet can open before Community loads its profiles.
+            // Resolve names once when a relevant participant is missing.
+            if (organizerID != session.profile.userID &&
+                social.profile(for: organizerID) == nil) ||
+                invitedAthletes.contains(where: {
+                    $0.id != session.profile.userID &&
+                    social.profile(for: $0.id) == nil
+                }) {
+                await social.refresh()
+            }
             while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .seconds(25))
+                } catch {
+                    break
+                }
                 await refresh()
-                try? await Task.sleep(for: .seconds(25))
             }
         }
     }
