@@ -59,14 +59,11 @@ final class SocialStore: ObservableObject {
     /// An invitation alone is not a workout. Restore a live social link
     /// after relaunch only when this athlete actually started that session.
     var recordingWorkoutSessionID: UUID? {
-        if let currentJoinedWorkoutSessionID {
-            return currentJoinedWorkoutSessionID
-        }
         guard let currentUserID else { return nil }
-        return workoutSessions
+
+        let recordingSessions = workoutSessions
             .filter { $0.status == .active }
-            .sorted { $0.createdAt > $1.createdAt }
-            .first { session in
+            .filter { session in
                 workoutParticipants.contains {
                     $0.sessionID == session.id &&
                     $0.userID == currentUserID &&
@@ -74,7 +71,19 @@ final class SocialStore: ObservableObject {
                     $0.workoutFinishedAt == nil &&
                     $0.launchFailedAt == nil
                 }
-            }?.id
+            }
+
+        // The local join pointer may be set before a session starts.
+        // Require confirmed recording evidence, even for that session.
+        if let currentJoinedWorkoutSessionID,
+           recordingSessions.contains(where: {
+               $0.id == currentJoinedWorkoutSessionID
+           }) {
+            return currentJoinedWorkoutSessionID
+        }
+        return recordingSessions
+            .sorted { $0.createdAt > $1.createdAt }
+            .first?.id
     }
 
     var followerCount: Int { followerIDs.count }
@@ -1456,7 +1465,10 @@ final class SocialStore: ObservableObject {
     ) async {
         // Only an actually joined workout may be completed. A sent
         // invitation is not evidence that this recording belongs to it.
-        guard let sessionID = recordingWorkoutSessionID,
+        // A just-finished workout can repair a missing start receipt.
+        // Never infer its identity from a merely pending invitation.
+        guard let sessionID =
+                currentJoinedWorkoutSessionID ?? recordingWorkoutSessionID,
               let currentUserID
         else {
             return
