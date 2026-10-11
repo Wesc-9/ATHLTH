@@ -207,6 +207,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         Task<Void, Never>?
     private var guidancePriorityGate =
         ATHLTHGuidancePriorityGate()
+    private var coachEventLedger = ATHLTHCoachEventLedger()
     private var nextDistanceAnnouncementMeters: Double?
     private var nextTimeAnnouncementSeconds: TimeInterval?
     private var structuredStepStartElapsedTime: TimeInterval = 0
@@ -3056,6 +3057,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         audioCoachReadyAnnouncedForWorkout = false
         strengthCommandJournal = []
         guidancePriorityGate.reset()
+        coachEventLedger.reset()
         publish {
             self.state = .idle
             self.elapsedTime = 0
@@ -3187,6 +3189,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         targetWasOutside = false
         audioCoachReadyAnnouncedForWorkout = false
         guidancePriorityGate.reset()
+        coachEventLedger.reset()
         resetAudioCoachThresholds()
 
         do {
@@ -3463,7 +3466,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 norwegian:
                     "Audio Coach er klar. Økten er startet."
             ),
-            priority: .routineCoach
+            priority: .routineCoach,
+            event: ATHLTHCoachEvent(
+                kind: .workoutStart,
+                key: "ready",
+                priority: .routineCoach,
+                validFor: 15
+            )
         )
     }
 
@@ -3475,12 +3484,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         var shouldAnnounce = false
+        var milestoneKeys: [String] = []
 
         if let interval =
                 audioCoachConfiguration.distanceIntervalMeters,
            interval > 0,
            let nextDistance = nextDistanceAnnouncementMeters,
            distanceMeters >= nextDistance {
+            milestoneKeys.append("d\(Int(nextDistance.rounded()))")
             repeat {
                 nextDistanceAnnouncementMeters =
                     (nextDistanceAnnouncementMeters ?? nextDistance) +
@@ -3496,6 +3507,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
            interval > 0,
            let nextTime = nextTimeAnnouncementSeconds,
            elapsedTime >= nextTime {
+            milestoneKeys.append("t\(Int(nextTime.rounded()))")
             repeat {
                 nextTimeAnnouncementSeconds =
                     (nextTimeAnnouncementSeconds ?? nextTime) +
@@ -3510,7 +3522,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             WKInterfaceDevice.current().play(.click)
             speak(
                 metricsAnnouncement,
-                priority: .routineCoach
+                priority: .routineCoach,
+                event: ATHLTHCoachEvent(
+                    kind: .routineMilestone,
+                    key: milestoneKeys.joined(separator: "-"),
+                    priority: .routineCoach,
+                    validFor: 10
+                )
             )
         }
     }
@@ -3632,7 +3650,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         speak(
             parts.joined(separator: ". "),
-            priority: .structuredStep
+            priority: .structuredStep,
+            event: ATHLTHCoachEvent(
+                kind: .runningStep,
+                key: "\(structuredStepIndex)-\(prefix)",
+                priority: .structuredStep,
+                validFor: 15
+            )
         )
     }
 
@@ -5387,9 +5411,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         _ text: String,
         priority:
             ATHLTHGuidancePriority =
-                .routineCoach
+                .routineCoach,
+        event: ATHLTHCoachEvent? = nil
     ) {
         guard !text.isEmpty else { return }
+        if let event,
+           !coachEventLedger.canDeliver(event) {
+            return
+        }
 
         // Both upgraded apps use an acknowledged short-lived lease.
         // When paired with an older iPhone, preserve the legacy
@@ -5447,6 +5476,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         case .deliver:
             break
+        }
+
+        if let event {
+            coachEventLedger.didDeliver(event)
         }
 
         let utterance = AVSpeechUtterance(
@@ -5509,6 +5542,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 else {
                     self.guidancePriorityGate
                         .voiceDidFinish()
+                    return
+                }
+
+                // An audio-route activation may outlast a short interval.
+                // Drop expired commentary rather than speak stale guidance.
+                if let event,
+                   !event.isFresh() {
+                    self.guidancePriorityGate.voiceDidFinish()
+                    self.deactivateAudioCoachAudioSession()
                     return
                 }
 
