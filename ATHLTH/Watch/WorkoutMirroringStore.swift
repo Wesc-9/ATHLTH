@@ -143,8 +143,41 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         }
     }
 
+    private func sendSpokenEventReceipt(
+        event: ATHLTHCoachEvent,
+        startedAt: Date
+    ) {
+        guard iPhoneAudioCoachAttached,
+              hasAcknowledgedVoiceLease,
+              let session = mirroredSession,
+              let currentStart = snapshot?.startedAt,
+              abs(currentStart.timeIntervalSince(startedAt)) <= 1
+        else { return }
+
+        let receipt = ATHLTHCoachDeliveryReceipt(
+            workoutStartedAt: startedAt,
+            eventKind: event.kind,
+            eventKey: event.key,
+            sentAt: Date()
+        )
+        guard receipt.isValid(for: currentStart),
+              let data = try? JSONEncoder().encode(receipt)
+        else { return }
+
+        Task { @MainActor in
+            try? await session.sendToRemoteWorkoutSession(data: data)
+        }
+    }
+
     override init() {
         super.init()
+
+        iPhoneAudioCoach.onSpokenEventAttempt = { [weak self] event, startedAt in
+            self?.sendSpokenEventReceipt(
+                event: event,
+                startedAt: startedAt
+            )
+        }
 
         guard ATHLTHDeviceRole
             .supportsDirectAppleWatch
