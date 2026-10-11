@@ -1109,16 +1109,22 @@ struct AroundYouExploreView: View {
                     }
                 }
                 .overlay(alignment: .bottom) {
-                    if let route = selectedRoute {
-                        routePreviewCard(route)
-                            .padding(.horizontal, 12)
-                            .padding(.bottom, 6)
-                            .transition(
-                                .move(edge: .bottom)
-                                    .combined(with: .opacity)
-                            )
-                            .zIndex(10)
+                    Group {
+                        if let event = selectedEvent {
+                            eventPreviewCard(event)
+                        } else if let post = selectedPublicWorkout {
+                            publicWorkoutPreviewCard(post)
+                        } else if let route = selectedRoute {
+                            routePreviewCard(route)
+                        }
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 6)
+                    .transition(
+                        .move(edge: .bottom)
+                            .combined(with: .opacity)
+                    )
+                    .zIndex(10)
                 }
                 .animation(
                     .spring(
@@ -1127,6 +1133,10 @@ struct AroundYouExploreView: View {
                     ),
                     value: selectedRoute?.id
                 )
+                .animation(.spring(response: 0.34, dampingFraction: 0.86),
+                           value: selectedEvent?.id)
+                .animation(.spring(response: 0.34, dampingFraction: 0.86),
+                           value: selectedPublicWorkout?.id)
             }
 
             exploreFloatingControls
@@ -1158,9 +1168,12 @@ struct AroundYouExploreView: View {
                 routeDiscovery.refresh()
             async let eventsRefresh: Void =
                 community.refresh()
+            async let publicWorkoutsRefresh: Void =
+                marketplace.refresh()
             _ = await (
                 routesRefresh,
-                eventsRefresh
+                eventsRefresh,
+                publicWorkoutsRefresh
             )
         }
         .task(id: locationStore.location?.timestamp) {
@@ -1176,6 +1189,9 @@ struct AroundYouExploreView: View {
             await publicTrailDiscovery.refresh(
                 near: location
             )
+        }
+        .task(id: publicWorkoutLookupKey) {
+            await resolvePublicWorkoutAreas()
         }
         .task(id: selectedRoute?.id) {
             guard let selectedRoute else {
@@ -1212,6 +1228,19 @@ struct AroundYouExploreView: View {
         .onChange(of: filter) { _, _ in
             withAnimation(.easeInOut(duration: 0.18)) {
                 selectedRoute = nil
+                selectedEvent = nil
+                selectedPublicWorkout = nil
+            }
+        }
+        .sheet(item: $eventToOpen) { item in
+            NavigationStack {
+                CommunityEventDetailView(eventID: item.id)
+            }
+        }
+        .sheet(item: $publicWorkoutToOpen) { post in
+            NavigationStack {
+                TrainTogetherPostDetailView(postID: post.id)
+                    .environmentObject(marketplace)
             }
         }
         .sheet(item: $routeToStart) { route in
@@ -1581,6 +1610,8 @@ struct AroundYouExploreView: View {
     private func selectRoute(
         _ route: TrainingRoute
     ) {
+        selectedEvent = nil
+        selectedPublicWorkout = nil
         withAnimation(
             .spring(
                 response: 0.34,
@@ -2946,6 +2977,8 @@ struct AroundYouExploreView: View {
 
         withAnimation(.easeInOut(duration: 0.16)) {
             selectedRoute = nil
+            selectedEvent = nil
+            selectedPublicWorkout = nil
         }
 
         await publicTrailDiscovery.refresh(
