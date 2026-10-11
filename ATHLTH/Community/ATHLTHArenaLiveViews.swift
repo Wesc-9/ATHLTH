@@ -489,6 +489,44 @@ struct ATHLTHArenaOnlineDetailView: View {
                     : ATHLTHLocalization.choose(english: "Pending agreement", norwegian: "Avventer enighet"))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(ATHLTHTheme.accentDeep)
+            if currentSeries.status == "active",
+               let endsAt = currentSeries.endsAt {
+                if Date() >= endsAt {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Competition ended · 48-hour result review",
+                            norwegian: "Treningsperioden er slutt · 48 timer resultatgodkjenning"
+                        ),
+                        systemImage: "clock.badge.checkmark"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    Text(endsAt.addingTimeInterval(48 * 3_600), style: .date)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                } else {
+                    HStack(spacing: 6) {
+                        Image(systemName: "calendar")
+                        Text(ATHLTHLocalization.choose(
+                            english: "Competition ends", norwegian: "Konkurransen slutter"
+                        ))
+                        Text(endsAt, style: .date)
+                    }
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+            } else if currentSeries.status == "completed",
+                      currentSeries.completionReason == "deadline_unresolved" {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Finished with unresolved rounds; no points for missing approvals.",
+                        norwegian: "Avsluttet med uavklarte runder – ingen poeng for manglende godkjenning."
+                    ),
+                    systemImage: "exclamationmark.circle"
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
             if outstandingInvitations > 0 {
                 Label(
                     "\(outstandingInvitations) " +
