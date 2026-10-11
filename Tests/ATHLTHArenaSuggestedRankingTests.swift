@@ -838,6 +838,55 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
         ))
     }
 
+    func testRelayLineupRequiresEqualTeamsAndUniqueStages() {
+        let first = [UUID(), UUID()]
+        let second = [UUID(), UUID()]
+        let route = UUID()
+        let order = Dictionary(uniqueKeysWithValues: zip(
+            first + second, [1, 2, 1, 2]
+        ))
+        XCTAssertTrue(ATHLTHArenaRelayPlanning.isValid(
+            firstTeam: first, secondTeam: second,
+            legOrders: order, routeRoundID: route,
+            availableRouteRoundIDs: [route]
+        ))
+        XCTAssertFalse(ATHLTHArenaRelayPlanning.isValid(
+            firstTeam: first, secondTeam: [second[0]],
+            legOrders: order, routeRoundID: route,
+            availableRouteRoundIDs: [route]
+        ))
+        XCTAssertFalse(ATHLTHArenaRelayPlanning.isValid(
+            firstTeam: first, secondTeam: [first[0], second[1]],
+            legOrders: order, routeRoundID: route,
+            availableRouteRoundIDs: [route]
+        ))
+        XCTAssertFalse(ATHLTHArenaRelayPlanning.isValid(
+            firstTeam: first, secondTeam: second,
+            legOrders: order, routeRoundID: UUID(),
+            availableRouteRoundIDs: [route]
+        ))
+    }
+
+    func testRelayLineupRejectsDuplicateOrMissingStageNumbers() {
+        let first = [UUID(), UUID()]
+        let second = [UUID(), UUID()]
+        let route = UUID()
+        let duplicate = Dictionary(uniqueKeysWithValues: zip(
+            first + second, [1, 1, 1, 2]
+        ))
+        XCTAssertFalse(ATHLTHArenaRelayPlanning.isValid(
+            firstTeam: first, secondTeam: second,
+            legOrders: duplicate, routeRoundID: route,
+            availableRouteRoundIDs: [route]
+        ))
+        let missing = [first[0]: 1, first[1]: 2, second[0]: 1]
+        XCTAssertFalse(ATHLTHArenaRelayPlanning.isValid(
+            firstTeam: first, secondTeam: second,
+            legOrders: missing, routeRoundID: route,
+            availableRouteRoundIDs: [route]
+        ))
+    }
+
     func testCustomRoundsDoNotInferUnsupportedResults() {
         let standings = ATHLTHArenaSuggestedRanking.standings(
             template: .custom,
