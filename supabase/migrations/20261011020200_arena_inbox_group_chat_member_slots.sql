@@ -169,6 +169,10 @@ SET search_path = pg_catalog, public, private AS $$
 BEGIN
  UPDATE public.arena_series_messages SET body='Melding fra slettet bruker'
   WHERE sender_id=old.id;
+ -- Notification previews are copies of group-chat text; anonymize those too.
+ UPDATE public.social_inbox_events
+ SET message='Melding fra slettet bruker', actor_id=NULL
+ WHERE entity_type='arena_series' AND kind='arena_chat' AND actor_id=old.id;
  RETURN old;
 END; $$;
 DROP TRIGGER IF EXISTS arena_redact_profile_messages ON public.profiles;
