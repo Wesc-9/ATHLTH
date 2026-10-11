@@ -741,14 +741,19 @@ struct ATHLTHArenaScoringSection: View {
 
     @MainActor
     private func start() async {
-        guard !writing else { return }
+        guard !writing, startReady else { return }
         writing = true
         defer { writing = false }
         do {
             try await cloud.startSeries(seriesID: series.id)
+            errorMessage = nil
             await onChanged()
         } catch {
+            // A participant may have changed their response or added a round
+            // after the organizer opened the confirmation. Refresh the server
+            // state instead of leaving an obsolete enabled Start button.
             errorMessage = error.localizedDescription
+            await onChanged()
         }
     }
 
