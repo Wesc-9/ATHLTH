@@ -9,6 +9,52 @@ struct ATHLTHArenaSuggestedStanding: Identifiable, Equatable {
     var id: UUID { slotID }
 }
 
+/// Informational Live Ghost result, not an Arena score or proof of route
+/// compliance. Both submitted times must be sane and match the server's
+/// announced winner (including its 0.5-second tie threshold).
+struct ATHLTHArenaLiveDuelCandidate: Equatable {
+    let winnerID: UUID?
+    let senderSeconds: TimeInterval
+    let recipientSeconds: TimeInterval
+    let marginSeconds: TimeInterval
+}
+
+enum ATHLTHArenaLiveDuelReview {
+    static func candidate(
+        senderID: UUID,
+        recipientID: UUID,
+        senderSeconds: TimeInterval?,
+        recipientSeconds: TimeInterval?,
+        reportedWinnerID: UUID?,
+        isFinished: Bool
+    ) -> ATHLTHArenaLiveDuelCandidate? {
+        guard isFinished,
+              senderID != recipientID,
+              let senderSeconds, let recipientSeconds,
+              senderSeconds.isFinite, recipientSeconds.isFinite,
+              (60...86_400).contains(senderSeconds),
+              (60...86_400).contains(recipientSeconds) else {
+            return nil
+        }
+
+        let difference = senderSeconds - recipientSeconds
+        let winner: UUID?
+        if abs(difference) < 0.5 {
+            winner = nil
+        } else {
+            winner = difference < 0 ? senderID : recipientID
+        }
+
+        guard winner == reportedWinnerID else { return nil }
+        return ATHLTHArenaLiveDuelCandidate(
+            winnerID: winner,
+            senderSeconds: senderSeconds,
+            recipientSeconds: recipientSeconds,
+            marginSeconds: abs(difference)
+        )
+    }
+}
+
 enum ATHLTHArenaSuggestedRanking {
     /// A suggested pace target only, never a verified result or a replay of
     /// someone else's private GPS trace. Based on an explicitly shared round
