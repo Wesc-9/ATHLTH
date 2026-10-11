@@ -5366,36 +5366,7 @@ struct SessionEditorView: View {
                 )
             }
             .task {
-                if !didLoadRunGuidanceDefaults {
-                    if existingWorkout?
-                        .routeAlertConfiguration == nil {
-                        routeGuardianDraft.load(
-                            from: settings
-                        )
-                    }
-
-                    if existingWorkout?
-                        .ghostTargetDurationSeconds == nil {
-                        ghostDraft.load(
-                            route: selectedRoute,
-                            settings: settings
-                        )
-                    }
-
-                    didLoadRunGuidanceDefaults =
-                        true
-                }
-
-                await gear.refresh()
-
-                if exerciseLibrary
-                    .allExercises
-                    .isEmpty {
-                    await exerciseLibrary
-                        .refresh()
-                }
-
-                applyDefaultRunningShoeIfNeeded()
+                await prepareSessionEditor()
             }
             .onChange(of: kind) { _, newKind in
                 if newKind == .running {
@@ -5403,6 +5374,39 @@ struct SessionEditorView: View {
                 }
             }
         }
+    }
+
+    private func prepareSessionEditor() async {
+            if !didLoadRunGuidanceDefaults {
+                if existingWorkout?
+                    .routeAlertConfiguration == nil {
+                    routeGuardianDraft.load(
+                        from: settings
+                    )
+                }
+
+                if existingWorkout?
+                    .ghostTargetDurationSeconds == nil {
+                    ghostDraft.load(
+                        route: selectedRoute,
+                        settings: settings
+                    )
+                }
+
+                didLoadRunGuidanceDefaults =
+                    true
+            }
+
+            await gear.refresh()
+
+            if exerciseLibrary
+                .allExercises
+                .isEmpty {
+                await exerciseLibrary
+                    .refresh()
+            }
+
+            applyDefaultRunningShoeIfNeeded()
     }
 
     @ViewBuilder
