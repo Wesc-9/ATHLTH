@@ -634,15 +634,21 @@ struct ChallengeCreationView: View {
 
     let preselectedFriends: [SocialProfileCard]
     let preselectedRouteID: UUID?
+    let preselectedDistanceKm: Double?
+    let preselectedSport: ATHLTHChallengeSport?
     let changeProposalFor: ATHLTHChallenge?
 
     init(
         preselectedFriends: [SocialProfileCard] = [],
         preselectedRouteID: UUID? = nil,
+        preselectedDistanceKm: Double? = nil,
+        preselectedSport: ATHLTHChallengeSport? = nil,
         changeProposalFor: ATHLTHChallenge? = nil
     ) {
         self.preselectedFriends = preselectedFriends
         self.preselectedRouteID = preselectedRouteID
+        self.preselectedDistanceKm = preselectedDistanceKm
+        self.preselectedSport = preselectedSport
         self.changeProposalFor = changeProposalFor
 
         _selectedRouteID = State(initialValue:
@@ -708,7 +714,24 @@ struct ChallengeCreationView: View {
             }
         }
 
-        if preselectedRouteID != nil {
+        if changeProposalFor == nil,
+           let distance = preselectedDistanceKm,
+           distance.isFinite,
+           (0.1...500).contains(distance) {
+            _targetDistanceKm = State(initialValue: distance)
+            _sport = State(initialValue: .running)
+            _scoring = State(initialValue: .fastestDistance)
+            _verificationPolicy = State(initialValue: .verifiedRequired)
+        }
+
+        if changeProposalFor == nil, preselectedSport == .strength {
+            _sport = State(initialValue: .strength)
+            _scoring = State(initialValue: .heaviestWeight)
+            _selectedCoverArtworkName = State(initialValue: "GoalStrength")
+            _verificationPolicy = State(initialValue: .verifiedPreferredManualAllowed)
+        }
+
+        if changeProposalFor == nil, preselectedRouteID != nil {
             _step = State(initialValue: 0)
             _sport = State(initialValue: .running)
             _scoring = State(initialValue: .fastestDistance)
