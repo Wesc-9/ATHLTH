@@ -167,8 +167,7 @@ struct ATHLTHArenaInboxSection: View {
             entries = next
             onVisibleCountChanged(visible.count)
             error = nil
-        } catch {
-            error = error.localizedDescription
+        } catch { self.error = error.localizedDescription
         }
     }
 }
