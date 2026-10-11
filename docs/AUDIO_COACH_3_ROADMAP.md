@@ -75,7 +75,7 @@ Audio Coach skal være integrert i alle støttede økter fra planlegging til opp
 
 **Avgrensning:** 2A gir *lokal* duplikatkontroll for utvalgte typer, ikke global exactly-once-garanti på tvers av enheter. Markører inneholder kun type og intervall-/steg-ID, ikke selve talemeldingen eller brukerens helsehistorikk.
 
-### 3. Oppdagbarhet og premiumdesign — STEG 3A/3B KODE IMPLEMENTERT, VERIFISERING GJENSTÅR
+### 3. Oppdagbarhet og premiumdesign — STEG 3A/3B/3C KODE IMPLEMENTERT, VERIFISERING GJENSTÅR
 
 - [x] Audio Coach kan åpnes fra **både enkel og avansert** styrkestart; den er ikke lenger skjult bak Avansert.
 - [x] Ved enkel styrkestart bevares valgt coach-konfigurasjon gjennom lokalt opptak, invitert treningsøkt og iPad-relay, uten automatisk å aktivere øvrige avanserte treningsvalg.
@@ -93,7 +93,14 @@ Audio Coach skal være integrert i alle støttede økter fra planlegging til opp
 - [x] «Status nå» bruker oppdatert øktinformasjon uten å flytte varslingsterskler eller endre øktplan; klokken avviser gammel puls.
 - [x] Automatiske tester for talemute/på, uendrede intervaller og uavhengig kritisk haptikk/lyd.
 - [ ] Fysisk QA av «Status nå» via AirPods/Watch, audio interruptions, Spotify, gjentatt trykk og rute-/Ghost-varsler.
-- [ ] Resten av 3B: systematisk siste coach-beskjed, status i alle aktive økttyper, forhåndslytt fra livevisning, og virkelig lydutgangsrute.
+- [x] **Steg 3C:** `ATHLTHCoachReplayMemory` holder kun siste ordinære coachbeskjed i RAM, og gir mulighet til «Hør igjen» i maks **45 sekunder**; slettes ved ny økt. Kritiske Route Guardian-/mål- og Ghost-beskjeder lagres ikke for reprise.
+- [x] iPhone livepanelet viser siste coachbeskjed, tidsbegrenset replay-knapp, navnet på systemets aktive lydutgang når kjent, og eksisterende **Apple AVRoutePickerView** for AirPods/AirPlay/andre systemruter.
+- [x] Apple Watch-kontrollsiden viser siste Watch-genererte coachbeskjed, «Hør igjen», lydutgang når kjent og veiledning til Kontrollsenter; kontrollsiden kan scrolles på små klokker.
+- [x] Speilede Apple Watch-økter: iPhone-visningen viser om **iPhone eller Watch eier talemeldingene**, og siste iPhone-beskjed kan kun repeteres dersom iPhone faktisk har aktivt lydansvar.
+- [x] Repetisjon endrer **ikke** automatiske distanse-/tidsintervaller og forlenger ikke utløpstiden for siste beskjed.
+- [x] Tester for 45-sekundersgrense, ugyldig/fremtidig melding, nullstilling og at kritiske/Ghost-varsler ikke legges i replay-historikk.
+- [ ] Manuell gjennomgang av lydutgang under Spotify/AirPods, bluetooth fra/til, bakgrunn, Live Ghost, variasjoner i Watch voice lease og lange talemeldinger. Systemrapportert lydrute er ikke en garanti for hørbar avspilling.
+- [ ] Resten: coach-status og live-replay i **styrketrening**, global talestil/frekvens, og eventuelt forhåndslytt fra livepanelet.
 - [ ] Utvid tilsvarende til styrke, strukturert plan og Watch uten regresjon.
 
 **Omfang:** Innholdsnivåene gjenbruker eksisterende `WatchAudioCoachConfiguration` og krever ingen nye serverfelter eller databaseendringer. Nye avanserte treningsfunksjoner skal ikke aktiveres bare fordi et enkelt coach-nivå er valgt.
