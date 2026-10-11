@@ -672,7 +672,7 @@ struct ATHLTHArenaOnlineDetailView: View {
                     members: members,
                     rounds: rounds,
                     isOrganizer: isOrganizer,
-                    liveOutcomeDraft: pendingLiveOutcome,
+                    liveOutcomeDraft: $pendingLiveOutcome,
                     onChanged: { await refresh() },
                     approvedRules: Dictionary(grouping: approvals, by: \.roundID)
                 )
