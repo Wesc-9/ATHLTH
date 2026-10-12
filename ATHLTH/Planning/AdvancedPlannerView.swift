@@ -69,12 +69,14 @@ struct AdvancedPlannerView: View {
                     planQualityPanel(plan)
                     if let week = selectedWeek(in: plan) {
                         weekSelector(plan)
+                        weekBalanceCard(week)
                         weekOverview(plan, week: week)
                     }
                     standaloneScheduleCard
                 case .week:
                     if let week = selectedWeek(in: plan) {
                         weekSelector(plan)
+                        weekBalanceCard(week)
                         weekOverview(plan, week: week)
                     }
                 case .day:
@@ -844,6 +846,134 @@ struct AdvancedPlannerView: View {
                 norwegian: "Målene ble nådd med dokumentert overskudd. En forsiktig progresjon kan være aktuell."
             )
         }
+    }
+
+    private func weekBalanceCard(_ week: TrainingPlanWeek) -> some View {
+        let report = ATHLTHPlanWeekBalanceAdvisor.inspect(week)
+        return ATHLTHPlanSurface {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "figure.run.circle")
+                    .font(.system(size: 21, weight: .regular))
+                    .foregroundStyle(ATHLTHPlanDesign.accent)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Weekly balance", norwegian: "Ukens balanse"
+                    ))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Text(ATHLTHLocalization.choose(
+                        english: "A review of your schedule, not a recovery or injury-risk score.",
+                        norwegian: "En gjennomgang av oppsettet, ikke en restitusjons- eller skaderisikoscore."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 15) {
+                balanceStatistic(
+                    value: report.runningCount,
+                    label: ATHLTHLocalization.choose(english: "Runs", norwegian: "Løp")
+                )
+                balanceStatistic(
+                    value: report.strengthCount,
+                    label: ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke")
+                )
+                balanceStatistic(
+                    value: report.scheduledDays,
+                    label: ATHLTHLocalization.choose(english: "Days", norwegian: "Dager")
+                )
+                Spacer(minLength: 0)
+            }
+
+            if report.sessionCount > 0 {
+                if let minutes = report.completePlannedMinutes {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "\(minutes) planned minutes this week",
+                            norwegian: "\(minutes) planlagte minutter denne uken"
+                        ),
+                        systemImage: "clock"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                } else {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Total duration unavailable: \(report.sessionsWithoutDuration) workouts have no time target.",
+                        norwegian: "Samlet varighet ukjent: \(report.sessionsWithoutDuration) økter mangler tidsmål."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+            }
+
+            if report.findings.isEmpty {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "No basic scheduling patterns to review.",
+                        norwegian: "Ingen åpenbare mønstre å undersøke i ukeoppsettet."
+                    ),
+                    systemImage: "checkmark.circle"
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            } else {
+                ForEach(report.findings.prefix(3)) { finding in
+                    Button {
+                        if let day = week.days.first(where: {
+                            $0.dayIndex == finding.dayIndex
+                        }) {
+                            selectedWeekID = week.id
+                            selectedDayID = day.id
+                            studioSection = .day
+                        }
+                    } label: {
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "calendar.badge.clock")
+                                .font(.subheadline)
+                                .foregroundStyle(ATHLTHPlanDesign.accent)
+                                .frame(width: 22)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(finding.title)
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                Text(finding.detail)
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                .accessibilityHidden(true)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(ATHLTHLocalization.choose(
+                        english: "Open the related day to review this workout.",
+                        norwegian: "Åpne tilhørende dag for å vurdere økten."
+                    ))
+                }
+            }
+        }
+    }
+
+    private func balanceStatistic(value: Int, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("\(value)")
+                .font(.system(size: 22, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private func planQualityPanel(_ plan: TrainingPlan) -> some View {
