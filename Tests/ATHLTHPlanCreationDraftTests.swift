@@ -88,4 +88,48 @@ final class ATHLTHPlanCreationDraftTests: XCTestCase {
         XCTAssertEqual(store.load(userID: user)?.weekCount, 52)
         XCTAssertEqual(store.load(userID: user)?.title.count, 40)
     }
+    func testAdvancedScheduleCheckpointPreservesOnlyStructuralPreferences() throws {
+        let prefs = ATHLTHPlanCreationDraft(
+            title: "Hybrid plan",
+            weekCount: 12,
+            startDate: Date().addingTimeInterval(86400),
+            advanced: true,
+            source: "scratch",
+            stage: "week",
+            preferredDayIndexes: [5, 1, 3, 3, 12],
+            equipmentContext: "both",
+            weeklyTimeBudgetMinutes: 600
+        )
+        XCTAssertEqual(prefs.preferredDayIndexes, [1, 3, 5])
+        XCTAssertEqual(prefs.equipmentContext, "both")
+        XCTAssertEqual(prefs.weeklyTimeBudgetMinutes, 600)
+        let encoded = try JSONEncoder().encode(prefs)
+        let restored = try JSONDecoder().decode(
+            ATHLTHPlanCreationDraft.self, from: encoded
+        )
+        XCTAssertEqual(restored, prefs)
+        let persistedText = String(decoding: encoded, as: UTF8.self)
+        XCTAssertFalse(persistedText.contains("injuriesOrLimitations"))
+        XCTAssertFalse(persistedText.contains("goalDetail"))
+        XCTAssertFalse(persistedText.contains("healthData"))
+    }
+
+    func testLegacyDraftWithoutAdvancedFieldsStillDecodes() throws {
+        let oldDraft = ATHLTHPlanCreationDraft(
+            title: "Previous checkpoint",
+            weekCount: 6,
+            startDate: Date(),
+            advanced: true,
+            source: "scratch",
+            stage: "profile"
+        )
+        let json = try JSONEncoder().encode(oldDraft)
+        let restored = try JSONDecoder().decode(
+            ATHLTHPlanCreationDraft.self, from: json
+        )
+        XCTAssertNil(restored.preferredDayIndexes)
+        XCTAssertNil(restored.equipmentContext)
+        XCTAssertNil(restored.weeklyTimeBudgetMinutes)
+    }
+
 }
