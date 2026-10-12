@@ -46,6 +46,26 @@ enum LiveGhostRaceReentry {
     }
 }
 
+/// Countdown validity must come from a fresh server snapshot just before
+/// launching HealthKit. Never infer a new workout from a stale race screen.
+enum LiveGhostSynchronizedLaunchGate {
+    static func mayLaunch(
+        status: LiveGhostRaceRoomStatus?,
+        startsAt: Date?,
+        ownReady: Bool,
+        opponentReady: Bool,
+        now: Date = Date()
+    ) -> Bool {
+        guard let startsAt,
+              status == .countdown || status == .racing,
+              ownReady, opponentReady else { return false }
+        let elapsed = now.timeIntervalSince(startsAt)
+        // The synchronized window is short; reopening much later should
+        // reconnect an existing workout, not start an unrelated new one.
+        return elapsed >= 0 && elapsed <= 15
+    }
+}
+
 enum LiveGhostRacePhase:
     Equatable
 {
@@ -471,6 +491,62 @@ final class LiveGhostRaceStore:
 
             errorMessage =
                 error.localizedDescription
+        }
+    }
+
+    /// Re-fetch both room and athletes before starting a recording.
+    /// Realtime is fast but not authoritative when a cancellation or an
+    /// opposing READY change races with the local countdown.
+    func confirmSynchronizedStart(
+        challengeID: UUID,
+        senderID: UUID,
+        recipientID: UUID,
+        now: Date = Date()
+    ) async -> Bool {
+        guard activeChallengeID == challengeID,
+              let userID = currentUserID,
+              userID == senderID || userID == recipientID else {
+            return false
+        }
+        do {
+            async let freshRooms: [LiveGhostRaceRoomRecord] = client
+                .from("live_ghost_race_rooms")
+                .select()
+                .eq("challenge_id", value: challengeID)
+                .limit(1)
+                .execute().value
+            async let freshParticipants: [LiveGhostRaceParticipantRecord] = client
+                .from("live_ghost_race_participants")
+                .select()
+                .eq("challenge_id", value: challengeID)
+                .execute().value
+            let rooms = try await freshRooms
+            let athleteRows = try await freshParticipants
+            guard !Task.isCancelled,
+                  activeChallengeID == challengeID,
+                  let latest = rooms.first,
+                  latest.challengeID == challengeID,
+                  athleteRows.count == 2,
+                  let sender = athleteRows.first(where: { $0.userID == senderID }),
+                  let recipient = athleteRows.first(where: { $0.userID == recipientID }),
+                  sender.userID != recipient.userID,
+                  sender.deviceType != nil,
+                  recipient.deviceType != nil else { return false }
+
+            room = latest
+            participants = athleteRows
+            return LiveGhostSynchronizedLaunchGate.mayLaunch(
+                status: latest.status,
+                startsAt: latest.startsAt,
+                ownReady: (userID == senderID ? sender : recipient).ready,
+                opponentReady: (userID == senderID ? recipient : sender).ready,
+                now: now
+            )
+        } catch {
+            // Fail closed. A network outage must not start a new local
+            // workout from unverified readiness; retry through the lobby.
+            errorMessage = error.localizedDescription
+            return false
         }
     }
 
