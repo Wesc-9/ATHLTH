@@ -103,6 +103,51 @@ private final class IPhoneWorkoutActivityLock:
     }
 }
 
+// Reply, failure and timeout may race. Complete the continuation only once.
+private final class WatchWorkoutActivityProbeContinuation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation:
+        CheckedContinuation<WatchWorkoutActivityState?, Never>?
+
+    init(
+        _ continuation:
+            CheckedContinuation<WatchWorkoutActivityState?, Never>
+    ) {
+        self.continuation = continuation
+    }
+
+    func complete(_ activity: WatchWorkoutActivityState?) {
+        lock.lock()
+        let waiting = continuation
+        continuation = nil
+        lock.unlock()
+        waiting?.resume(returning: activity)
+    }
+
+    nonisolated func makeReplyHandler() -> ([String: Any]) -> Void {
+        { [self] reply in
+            guard reply[WatchTransferMetadataKey.kind] as? String ==
+                    WatchTransferKind.workoutActivityState.rawValue,
+                  let data = reply[WatchTransferMetadataKey.payload] as? Data,
+                  let activity = try? JSONDecoder().decode(
+                      WatchWorkoutActivityState.self,
+                      from: data
+                  )
+            else {
+                complete(nil)
+                return
+            }
+            complete(activity)
+        }
+    }
+
+    nonisolated func makeErrorHandler() -> (Error) -> Void {
+        { [self] _ in
+            complete(nil)
+        }
+    }
+}
+
 private struct IncomingWatchPayload: Sendable {
     let kind: String?
     let probeID: String?
@@ -270,6 +315,48 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
             .isActive == true
     }
 
+    /// Recheck a cached Watch activity flag before blocking a new workout.
+    /// Never clear an active lock based on age or an unreachable Watch:
+    /// those cases might still represent an actual HealthKit recording.
+    func confirmNoActiveWatchWorkout() async -> Bool {
+        guard let session,
+              session.activationState == .activated,
+              session.isReachable
+        else {
+            return !hasActiveWatchWorkout
+        }
+
+        let activity: WatchWorkoutActivityState? =
+            await withCheckedContinuation { continuation in
+                let gate = WatchWorkoutActivityProbeContinuation(
+                    continuation
+                )
+                session.sendMessage([
+                    WatchTransferMetadataKey.kind:
+                        WatchTransferKind.workoutActivityQuery.rawValue,
+                    WatchTransferMetadataKey.sentAt:
+                        Date().timeIntervalSince1970
+                ], replyHandler: gate.makeReplyHandler(),
+                   errorHandler: gate.makeErrorHandler())
+
+                Task {
+                    try? await Task.sleep(for: .seconds(2))
+                    gate.complete(nil)
+                }
+            }
+
+        if let activity {
+            let timestamp = activity.updatedAt.timeIntervalSince1970
+            if timestamp >= lastWatchWorkoutActivitySentAt {
+                lastWatchWorkoutActivitySentAt = timestamp
+                watchWorkoutActivityState = activity
+            }
+        }
+
+        // A timeout is not proof that the workout has finished.
+        return !hasActiveWatchWorkout
+    }
+
     // The iPhone is authoritative for locally recorded workouts. Both
     // direct Watch launches and starts initiated from the iPhone must
     // respect the same activity lock; otherwise a second HealthKit
@@ -376,7 +463,7 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 .launchAlreadyInProgress
         }
 
-        guard !hasActiveWatchWorkout,
+        guard await confirmNoActiveWatchWorkout(),
               !hasActiveIPhoneWorkout
         else {
             throw AppleWatchWorkoutLaunchError
