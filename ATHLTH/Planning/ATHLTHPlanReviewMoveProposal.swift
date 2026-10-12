@@ -23,7 +23,8 @@ enum ATHLTHPlanReviewMoveProposal {
         for suggestion: ATHLTHPlanReviewAdvisor.Suggestion,
         in plan: TrainingPlan,
         referenceDate: Date = Date(),
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        eligibleWorkoutIDs: Set<UUID>? = nil
     ) -> Proposal? {
         guard let startDate = plan.startDate,
               let weekIndex = plan.weeks.firstIndex(where: {
@@ -96,6 +97,9 @@ enum ATHLTHPlanReviewMoveProposal {
         }
         var candidates: [Candidate] = []
         for workout in sourceCandidates {
+            guard eligibleWorkoutIDs?.contains(workout.id) ?? true else {
+                continue
+            }
             // Do not trust an imported session with a conflicting date.
             if let scheduled = workout.scheduledStart,
                !calendar.isDate(scheduled, inSameDayAs: sourceDate) {

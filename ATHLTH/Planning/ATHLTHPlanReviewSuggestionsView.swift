@@ -25,7 +25,16 @@ struct ATHLTHPlanReviewSuggestionsView: View {
     }
 
     var body: some View {
-        let suggestions = ATHLTHPlanReviewAdvisor.inspect(plan)
+        let editableIDs = ATHLTHPlanReviewEligibility.editableIDs(
+            in: plan, store: session,
+            healthWorkouts: health.workouts,
+            strengthHistory: strength.workoutHistory
+        )
+        let suggestions = ATHLTHPlanReviewAdvisor.inspect(plan).filter {
+            ATHLTHPlanReviewEligibility.isRelevant(
+                $0, in: plan, editableIDs: editableIDs
+            )
+        }
 
         ATHLTHPlanSurface {
             HStack(alignment: .top, spacing: 11) {
@@ -70,11 +79,13 @@ struct ATHLTHPlanReviewSuggestionsView: View {
                     ))) { suggestion in
                         Button {
                             if let preview = ATHLTHPlanReviewDurationProposal.suggest(
-                                for: suggestion, in: plan
+                                for: suggestion, in: plan,
+                                eligibleWorkoutIDs: editableIDs
                             ) {
                                 pendingReview = .duration(preview)
                             } else if let move = ATHLTHPlanReviewMoveProposal.suggest(
-                                for: suggestion, in: plan
+                                for: suggestion, in: plan,
+                                eligibleWorkoutIDs: editableIDs
                             ) {
                                 pendingReview = .move(move)
                             } else {

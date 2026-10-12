@@ -23,7 +23,8 @@ enum ATHLTHPlanReviewDurationProposal {
         for suggestion: ATHLTHPlanReviewAdvisor.Suggestion,
         in plan: TrainingPlan,
         referenceDate: Date = Date(),
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        eligibleWorkoutIDs: Set<UUID>? = nil
     ) -> Proposal? {
         guard suggestion.kind == .missingDuration,
               let start = plan.startDate,
@@ -46,7 +47,8 @@ enum ATHLTHPlanReviewDurationProposal {
         let today = calendar.startOfDay(for: referenceDate)
 
         guard let workout = day.sessions.first(where: { workout in
-            (workout.durationMinutes ?? 0) <= 0 &&
+            (eligibleWorkoutIDs?.contains(workout.id) ?? true) &&
+                (workout.durationMinutes ?? 0) <= 0 &&
                 calendar.startOfDay(
                     for: workout.scheduledStart ?? fallbackDate
                 ) >= today
