@@ -117,6 +117,17 @@ enum ATHLTHArenaArchivePresentation {
     }
 }
 
+/// A finished Arena row is private to the account that fetched it. Do not
+/// render cached results while a new user/session is being loaded.
+enum ATHLTHArenaArchiveAccountScope {
+    static func mayDisplay(
+        loadedForUserID: UUID?,
+        currentUserID: UUID
+    ) -> Bool {
+        loadedForUserID == currentUserID
+    }
+}
+
 /// Shared Arena series with live invitations, consensual scoring and
 /// deadline-based completion. Club and Weekly Challenges remain separate.
 struct ATHLTHArenaOnlineSection: View {
@@ -124,23 +135,32 @@ struct ATHLTHArenaOnlineSection: View {
     @EnvironmentObject private var session: AppSessionStore
 
     @State private var series: [ATHLTHArenaRemoteSeries] = []
+    @State private var loadedForUserID: UUID?
     @State private var loading = false
+    @State private var refreshQueued = false
     @State private var errorMessage: String?
 
     private let cloud = ATHLTHArenaCloudService()
     @State private var showsAllCompleted = false
     @State private var archiveFilter: ATHLTHArenaArchivePresentation.Filter = .all
 
+    private var visibleSeries: [ATHLTHArenaRemoteSeries] {
+        ATHLTHArenaArchiveAccountScope.mayDisplay(
+            loadedForUserID: loadedForUserID,
+            currentUserID: session.profile.userID
+        ) ? series : []
+    }
+
     private var activeSeries: [ATHLTHArenaRemoteSeries] {
-        ATHLTHArenaSeriesOverview.orderedActive(series)
+        ATHLTHArenaSeriesOverview.orderedActive(visibleSeries)
     }
 
     private var awaitingSeries: [ATHLTHArenaRemoteSeries] {
-        series.filter { $0.status == "draft" }
+        visibleSeries.filter { $0.status == "draft" }
     }
 
     private var finishedSeries: [ATHLTHArenaRemoteSeries] {
-        ATHLTHArenaSeriesOverview.orderedCompleted(series)
+        ATHLTHArenaSeriesOverview.orderedCompleted(visibleSeries)
     }
 
     private var displayedArchive: [ATHLTHArenaRemoteSeries] {
@@ -154,7 +174,7 @@ struct ATHLTHArenaOnlineSection: View {
     }
 
     private var otherSeries: [ATHLTHArenaRemoteSeries] {
-        series.filter { !["active", "draft", "completed"].contains($0.status) }
+        visibleSeries.filter { !["active", "draft", "completed"].contains($0.status) }
     }
 
     var body: some View {
@@ -188,7 +208,7 @@ struct ATHLTHArenaOnlineSection: View {
                     .foregroundStyle(.red)
             }
 
-            if series.isEmpty && !loading {
+            if visibleSeries.isEmpty && !loading {
                 Text(ATHLTHLocalization.choose(
                     english: "Published series and received invitations will appear here.",
                     norwegian: "Publiserte serier og invitasjoner vises her."
@@ -505,15 +525,48 @@ struct ATHLTHArenaOnlineSection: View {
 
     @MainActor
     private func refresh() async {
-        guard !loading else { return }
+        if loading {
+            // An account switch or realtime refresh may happen while a
+            // previous response is still in flight. It must not win.
+            refreshQueued = true
+            return
+        }
+
         loading = true
         defer { loading = false }
-        do {
-            series = try await cloud.loadSeries()
-            errorMessage = nil
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        repeat {
+            refreshQueued = false
+            let requestingUserID = session.profile.userID
+
+            if loadedForUserID != requestingUserID {
+                loadedForUserID = requestingUserID
+                series = []
+                errorMessage = nil
+                showsAllCompleted = false
+                archiveFilter = .all
+            }
+
+            do {
+                let fetched = try await cloud.loadSeries()
+                guard !Task.isCancelled else { return }
+                guard session.profile.userID == requestingUserID else {
+                    refreshQueued = true
+                    continue
+                }
+                series = fetched
+                errorMessage = nil
+            } catch {
+                if session.profile.userID != requestingUserID {
+                    refreshQueued = true
+                    continue
+                }
+                if Task.isCancelled { return }
+                // Never reuse an outdated set of potentially private
+                // competition rows after a failed server refresh.
+                series = []
+                errorMessage = error.localizedDescription
+            }
+        } while refreshQueued && !Task.isCancelled
     }
 }
 
