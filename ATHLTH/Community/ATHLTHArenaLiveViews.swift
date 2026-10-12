@@ -102,14 +102,23 @@ enum ATHLTHArenaArchivePresentation {
             series.completionReason == "deadline_unresolved"
     }
 
+    /// Nordic ø and æ are independent Unicode letters and do not fold
+    /// away with diacriticInsensitive. Match everyday keyboard spellings
+    /// such as "Tromso" when the recorded title contains "Tromsø".
+    static func searchKey(_ input: String) -> String {
+        input.trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive],
+                     locale: Locale(identifier: "nb_NO"))
+            .replacingOccurrences(of: "ø", with: "o")
+            .replacingOccurrences(of: "æ", with: "ae")
+    }
+
     static func visible(
         _ completed: [ATHLTHArenaRemoteSeries],
         filter: Filter,
         search: String = ""
     ) -> [ATHLTHArenaRemoteSeries] {
-        let term = search.trimmingCharacters(in: .whitespacesAndNewlines)
-            .folding(options: [.caseInsensitive, .diacriticInsensitive],
-                     locale: Locale(identifier: "nb_NO"))
+        let term = searchKey(search)
         return completed.filter { series in
             guard series.status == "completed" else { return false }
             let statusMatches: Bool
@@ -120,10 +129,7 @@ enum ATHLTHArenaArchivePresentation {
             }
             guard statusMatches else { return false }
             if term.isEmpty { return true }
-            return series.title.folding(
-                options: [.caseInsensitive, .diacriticInsensitive],
-                locale: Locale(identifier: "nb_NO")
-            ).contains(term)
+            return searchKey(series.title).contains(term)
         }
     }
 }
