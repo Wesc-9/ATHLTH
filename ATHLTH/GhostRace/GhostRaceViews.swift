@@ -3316,17 +3316,19 @@ struct ATHLTHGhostRuntimeObserver: View {
         _ session:
             ATHLTHLiveWorkoutSession
     ) -> String {
-        social.visibleProfiles
-            .first {
-                $0.userID ==
-                    session.ownerID
-            }?
+        guard let opponentID = ATHLTHLiveGhostRacingTelemetry.opponentID(
+            ownerID: session.ownerID,
+            otherID: session.opponentUserID,
+            viewerID: realtime.currentUserID
+        ) else { return session.title }
+        return social.visibleProfiles
+            .first { $0.userID == opponentID }?
             .resolvedName ??
         social.following
-            .first {
-                $0.userID ==
-                    session.ownerID
-            }?
+            .first { $0.userID == opponentID }?
+            .resolvedName ??
+        social.mutualFollows
+            .first { $0.userID == opponentID }?
             .resolvedName ??
         session.title
     }
