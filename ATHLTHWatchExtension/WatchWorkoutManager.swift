@@ -3345,6 +3345,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         strengthStatusCoachTask = nil
 
         clearPersistedWorkoutState()
+        reportWorkoutActivityStateToPhone(.idle, force: true)
     }
 
     private func start(
