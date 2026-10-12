@@ -190,7 +190,7 @@ final class ATHLTHArenaResultHistoryPresentationTests: XCTestCase {
             eligibleIDs: [viewer],
             votes: [vote]
         )
-        XCTAssertEqual(filtered.map(\\.id), [pending.id])
+        XCTAssertEqual(filtered.map(\.id), [pending.id])
     }
 
     func testOutsiderNeverGetsPersonalVotingReminder() {
@@ -222,7 +222,7 @@ final class ATHLTHArenaResultHistoryPresentationTests: XCTestCase {
             eligibleIDs: [viewer],
             votes: [vote]
         )
-        XCTAssertEqual(filtered.map(\\.id), [approved.id])
+        XCTAssertEqual(filtered.map(\.id), [approved.id])
     }
 
     func testAllFilterPreservesHistoricalRejectedProposals() {
@@ -235,7 +235,7 @@ final class ATHLTHArenaResultHistoryPresentationTests: XCTestCase {
             eligibleIDs: [],
             votes: []
         )
-        XCTAssertEqual(filtered.map(\\.id), [a.id, b.id])
+        XCTAssertEqual(filtered.map(\.id), [a.id, b.id])
     }
 
     func testFilteredHistoryCanBeLimitedWithoutLosingVoteActions() {
