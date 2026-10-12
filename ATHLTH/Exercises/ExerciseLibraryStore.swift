@@ -167,8 +167,9 @@ final class ExerciseLibraryStore: ObservableObject {
         )
     }
 
-    // These 20 exercises are ORIGINAL additions to ATHLTH's Supabase
-    // exercise_catalog. Never pass off RepDB's existing exercises as new.
+    // Preserve the 20 retired catalog identifiers to exclude only these
+    // entries from NEW exercise selection. Keep the underlying records and
+    // translations intact for previously saved workouts on older versions.
     static let originalCoreSlugs: [String] = [
         "athlth-core-plank-shoulder-tap",
         "athlth-core-plank-jack",
@@ -192,21 +193,11 @@ final class ExerciseLibraryStore: ObservableObject {
         "athlth-core-standing-knee-elbow-crunch"
     ]
 
-    var featuredCoreExercises: [ExerciseLibraryEntry] {
-        let bySlug = Dictionary(
-            athlthCatalogExercises.compactMap { entry -> (String, ExerciseLibraryEntry)? in
-                guard entry.source == .athlthCatalog,
-                      let slug = entry.sourceIdentifier,
-                      slug.hasPrefix("athlth-core-") else { return nil }
-                return (slug, entry)
-            }, uniquingKeysWith: { first, _ in first }
-        )
-        let repDBNames = Set(repDBExercises.map {
-            $0.canonicalName.lowercased()
-        })
-        return Self.originalCoreSlugs
-            .compactMap { bySlug[$0] }
-            .filter { !repDBNames.contains($0.canonicalName.lowercased()) }
+    private static let retiredCoreSlugSet = Set(originalCoreSlugs)
+
+    static func isRetiredOriginalCoreSlug(_ slug: String?) -> Bool {
+        guard let slug else { return false }
+        return retiredCoreSlugSet.contains(slug)
     }
 
     // Local aliases make Norwegian searches work without altering or
@@ -388,6 +379,12 @@ final class ExerciseLibraryStore: ObservableObject {
                 athlthCatalogExercises +
                 repDBExercises
             )
+            .filter { entry in
+                // Retire only the 20 ATHLTH-original core items; keep
+                // existing RepDB and user-created exercises available.
+                entry.source != .athlthCatalog ||
+                    !Self.isRetiredOriginalCoreSlug(entry.sourceIdentifier)
+            }
             .reduce(
                 into:
                     [UUID:
@@ -687,8 +684,9 @@ final class ExerciseLibraryStore: ObservableObject {
                 Date()
 
             if !rows.isEmpty {
-                let refreshed =
-                    rows.map(mapATHLTHCatalog)
+                let refreshed = rows
+                    .filter { !Self.isRetiredOriginalCoreSlug($0.slug) }
+                    .map(mapATHLTHCatalog)
 
                 let currentSignature =
                     athlthCatalogExercises.map {
