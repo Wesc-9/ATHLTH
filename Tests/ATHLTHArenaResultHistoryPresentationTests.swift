@@ -100,8 +100,8 @@ final class ATHLTHArenaResultHistoryPresentationTests: XCTestCase {
         XCTAssertEqual(recent.count, 4)
         XCTAssertEqual(full.count, 9)
         XCTAssertEqual(
-            Set(full.map(\\.id)),
-            Set(rows.map(\\.id))
+            Set(full.map(\.id)),
+            Set(rows.map(\.id))
         )
     }
 
