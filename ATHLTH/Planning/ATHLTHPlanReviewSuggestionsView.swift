@@ -10,7 +10,19 @@ struct ATHLTHPlanReviewSuggestionsView: View {
     let plan: TrainingPlan
     let onSelect: (UUID, UUID?) -> Void
     @State private var showAll = false
-    @State private var proposedDuration: ATHLTHPlanReviewDurationProposal.Proposal?
+    @State private var pendingReview: PendingReview?
+
+    private enum PendingReview: Identifiable {
+        case duration(ATHLTHPlanReviewDurationProposal.Proposal)
+        case move(ATHLTHPlanReviewMoveProposal.Proposal)
+
+        var id: String {
+            switch self {
+            case .duration(let proposal): return "duration-\(proposal.id)"
+            case .move(let proposal): return "move-\(proposal.id)"
+            }
+        }
+    }
 
     var body: some View {
         let suggestions = ATHLTHPlanReviewAdvisor.inspect(plan)
@@ -60,7 +72,11 @@ struct ATHLTHPlanReviewSuggestionsView: View {
                             if let preview = ATHLTHPlanReviewDurationProposal.suggest(
                                 for: suggestion, in: plan
                             ) {
-                                proposedDuration = preview
+                                pendingReview = .duration(preview)
+                            } else if let move = ATHLTHPlanReviewMoveProposal.suggest(
+                                for: suggestion, in: plan
+                            ) {
+                                pendingReview = .move(move)
                             } else {
                                 onSelect(suggestion.weekID, suggestion.dayID)
                             }
@@ -150,20 +166,37 @@ struct ATHLTHPlanReviewSuggestionsView: View {
                 }
             }
         }
-        .sheet(item: $proposedDuration) { proposal in
-            ATHLTHPlanReviewDurationPreviewSheet(
-                proposal: proposal,
-                onApprove: {
-                    session.applyPlanReviewDurationProposal(
-                        proposal,
-                        healthWorkouts: health.workouts,
-                        strengthHistory: strength.workoutHistory
-                    )
-                },
-                onOpenEditor: {
-                    onSelect(proposal.weekID, proposal.dayID)
-                }
-            )
+        .sheet(item: $pendingReview) { selection in
+            switch selection {
+            case .duration(let proposal):
+                ATHLTHPlanReviewDurationPreviewSheet(
+                    proposal: proposal,
+                    onApprove: {
+                        session.applyPlanReviewDurationProposal(
+                            proposal,
+                            healthWorkouts: health.workouts,
+                            strengthHistory: strength.workoutHistory
+                        )
+                    },
+                    onOpenEditor: {
+                        onSelect(proposal.weekID, proposal.dayID)
+                    }
+                )
+            case .move(let proposal):
+                ATHLTHPlanReviewMovePreviewSheet(
+                    proposal: proposal,
+                    onApprove: {
+                        session.applyPlanReviewMoveProposal(
+                            proposal,
+                            healthWorkouts: health.workouts,
+                            strengthHistory: strength.workoutHistory
+                        )
+                    },
+                    onOpenEditor: {
+                        onSelect(proposal.weekID, proposal.sourceDayID)
+                    }
+                )
+            }
         }
     }
 
