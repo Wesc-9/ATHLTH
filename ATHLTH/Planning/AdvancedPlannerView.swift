@@ -65,6 +65,7 @@ struct AdvancedPlannerView: View {
                 switch studioSection {
                 case .program:
                     planOverview(plan)
+                    recentStrengthEvidence(plan)
                     planQualityPanel(plan)
                     if let week = selectedWeek(in: plan) {
                         weekSelector(plan)
@@ -744,6 +745,104 @@ struct AdvancedPlannerView: View {
                 }
                 .buttonStyle(.plain)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func recentStrengthEvidence(_ plan: TrainingPlan) -> some View {
+        let advice = TrainingPlanLoadAdvisor.evaluate(
+            plan: plan,
+            strengthHistory: strength.workoutHistory,
+            limit: 3
+        )
+        if !advice.isEmpty {
+            ATHLTHPlanSurface {
+                HStack(spacing: 10) {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .foregroundStyle(ATHLTHPlanDesign.accent)
+                        .font(.system(size: 18, weight: .medium))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "What your workouts show",
+                            norwegian: "Dette viser treningsøktene dine"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Based only on completed strength workouts connected to this plan.",
+                            norwegian: "Kun basert på gjennomførte styrkeøkter knyttet til denne planen."
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    Spacer(minLength: 0)
+                }
+                ForEach(advice) { item in
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack {
+                            Text(item.exerciseName)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Spacer()
+                            Text("\(item.completedWorkSets)/\(item.plannedWorkSets) " +
+                                ATHLTHLocalization.choose(
+                                    english: "sets", norwegian: "sett"
+                                ))
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        Text(strengthFeedbackText(item))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(item.workoutDate.formatted(date: .abbreviated, time: .omitted))
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    .padding(.vertical, 4)
+                }
+                Button {
+                    showingPlanProgress = true
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "See all plan insights",
+                            norwegian: "Se all planinnsikt"
+                        ),
+                        systemImage: "arrow.up.right"
+                    )
+                    .font(.subheadline.weight(.medium))
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+    }
+
+    private func strengthFeedbackText(
+        _ advice: TrainingPlanLoadAdvisor.Advice
+    ) -> String {
+        switch advice.verdict {
+        case .reviewTargets:
+            return ATHLTHLocalization.choose(
+                english: "Some planned work sets were not met. Review the next workout's targets.",
+                norwegian: "Noen planlagte arbeidssett ble ikke fullført som planlagt. Vurder målene for neste økt."
+            )
+        case .targetMet:
+            return ATHLTHLocalization.choose(
+                english: "The logged work sets reached the planned targets.",
+                norwegian: "De loggede arbeidssettene nådde de planlagte målene."
+            )
+        case .considerIncrease:
+            if let weight = advice.suggestedNextWeightKilograms {
+                return ATHLTHLocalization.choose(
+                    english: "Targets met with documented reserve. Consider \(weight.formatted()) kg next time if it feels appropriate.",
+                    norwegian: "Målene ble nådd med dokumentert overskudd. Vurder \(weight.formatted()) kg neste gang hvis det passer."
+                )
+            }
+            return ATHLTHLocalization.choose(
+                english: "Targets met with documented reserve. A modest progression may be reasonable.",
+                norwegian: "Målene ble nådd med dokumentert overskudd. En forsiktig progresjon kan være aktuell."
+            )
         }
     }
 
