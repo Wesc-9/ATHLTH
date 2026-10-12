@@ -103,6 +103,22 @@ final class ATHLTHArenaSeriesScorePresentationTests: XCTestCase {
         XCTAssertEqual(table.map(\.slotID), [early.slotID, later.slotID])
     }
 
+    func testFractionalServerPointsSortPredictablyNearTieThreshold() {
+        let lower = entry(5.0004, order: 0)
+        let upper = entry(5.0009, order: 10)
+        let table = ATHLTHArenaSeriesScorePresentation.ordered(
+            [lower, upper]
+        )
+        XCTAssertEqual(table.map(\.slotID), [upper.slotID, lower.slotID])
+        // Results this close share the displayed competition position,
+        // but the sort itself must still have a strict stable order.
+        XCTAssertEqual(
+            ATHLTHArenaSeriesScorePresentation.competitionRank(
+                for: lower, among: table
+            ), 1
+        )
+    }
+
     func testUnlistedAthleteCannotAcquireACompetitiveRank() {
         let shown = entry(6)
         let outsider = entry(10)
