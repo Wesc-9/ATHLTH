@@ -118,6 +118,26 @@ enum ATHLTHArenaResultHistoryPresentation {
         }
     }
 
+    /// Only stored, server-awarded points from this approved proposal's
+    /// exact round are displayed. Never calculate points from a provisional
+    /// Live Ghost finish, a vote or a ranking suggestion.
+    static func awardedPoints(
+        for result: ATHLTHArenaRoundResult,
+        slotID: UUID?,
+        recorded: [ATHLTHArenaRoundPoints]
+    ) -> Double? {
+        guard State.resolve(result.status) == .approved,
+              let slotID else { return nil }
+        let matching = recorded.filter {
+            $0.roundID == result.roundID && $0.slotID == slotID
+        }
+        // A missing or conflicting record is not evidence of zero points.
+        guard matching.count == 1,
+              matching[0].points.isFinite,
+              matching[0].points >= 0 else { return nil }
+        return matching[0].points
+    }
+
     static func recent(
         _ results: [ATHLTHArenaRoundResult],
         for roundIDs: Set<UUID>,
@@ -159,6 +179,7 @@ struct ATHLTHArenaScoringSection: View {
     @State private var resultsLoaded = false
     @State private var votes: [ATHLTHArenaRoundResultVote] = []
     @State private var linkedWorkouts: [ATHLTHArenaWorkoutEvidence] = []
+    @State private var awardedPoints: [ATHLTHArenaRoundPoints] = []
     @State private var loading = false
     @State private var refreshQueued = false
     @State private var showsAllResultHistory = false
@@ -646,6 +667,24 @@ struct ATHLTHArenaScoringSection: View {
                             .font(.caption.weight(.medium))
                             .foregroundStyle(historyColor(state))
 
+                        if state == .approved,
+                           let personalSlotID = personalStanding?.slotID,
+                           let points = ATHLTHArenaResultHistoryPresentation.awardedPoints(
+                               for: result,
+                               slotID: personalSlotID,
+                               recorded: awardedPoints
+                           ) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Your approved points",
+                                    norwegian: "Dine godkjente poeng"
+                                ) + ": +\(points.formatted()) p",
+                                systemImage: "checkmark.seal.fill"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                        }
+
                         if state == .pending {
                             let approved = ATHLTHArenaResultHistoryPresentation.approvalCount(
                                 resultID: result.id,
@@ -1119,7 +1158,14 @@ struct ATHLTHArenaScoringSection: View {
                 let loadedWorkouts = try await cloud.loadWorkoutEvidence(
                     seriesID: series.id
                 )
+                // Points are a separately RLS-protected resource. An
+                // unavailable points query must not hide valid result
+                // approvals, and must never reuse old cached rewards.
+                let currentPoints = (try? await cloud.loadAwardedPoints(
+                    seriesID: series.id
+                )) ?? []
                 guard !Task.isCancelled else { return }
+                awardedPoints = currentPoints
                 results = loaded
                 votes = loadedVotes
                 linkedWorkouts = loadedWorkouts
@@ -1130,6 +1176,7 @@ struct ATHLTHArenaScoringSection: View {
                 // Never present old result approvals as current after a
                 // network error. A queued read may still recover the data.
                 resultsLoaded = false
+                awardedPoints = []
                 errorMessage = error.localizedDescription
             }
         } while refreshQueued && !Task.isCancelled
