@@ -2675,6 +2675,13 @@ struct ATHLTHGhostRuntimeObserver: View {
                     await syncPhoneRuntime()
                 }
             }
+            .onChange(of: phoneWorkout.active?.resumedAt) { _, _ in
+                // Pausing may change workout state without creating a GPS
+                // point. Hide the old lead immediately on pause/resume.
+                Task { @MainActor in
+                    await syncPhoneRuntime()
+                }
+            }
             .onChange(
                 of:
                     realtime
@@ -2929,7 +2936,12 @@ struct ATHLTHGhostRuntimeObserver: View {
         guard snapshot.state == .running,
               ATHLTHWatchLiveTelemetryFreshness.isFresh(
                   capturedAt: snapshot.capturedAt
-              ) else { return }
+              ) else {
+            if snapshot.state == .paused {
+                invalidateLiveGhostGap(sendToWatch: true)
+            }
+            return
+        }
 
         guard let comparison =
                 realtime
@@ -3015,7 +3027,11 @@ struct ATHLTHGhostRuntimeObserver: View {
 
         // A paused phone workout must not fire Ghost overtakes from
         // stale distance while the rival continues running.
-        guard workout.resumedAt != nil else { return }
+        guard workout.resumedAt != nil else {
+            phoneWorkout.clearLiveGhostGap()
+            invalidateLiveGhostGap(sendToWatch: false)
+            return
+        }
 
         guard let comparison =
                 realtime
