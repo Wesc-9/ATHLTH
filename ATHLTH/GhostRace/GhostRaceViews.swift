@@ -2708,7 +2708,8 @@ struct ATHLTHGhostRuntimeObserver: View {
                         .id
             ) { _, activeID in
                 guard activeID == nil,
-                      !mirroring.hasActiveMirroredWorkout
+                      !mirroring.hasActiveMirroredWorkout,
+                      !watchConnection.hasActiveWatchWorkout
                 else {
                     // The Watch may still own the synchronized workout.
                     // A phone recorder finishing must never tear it down.
