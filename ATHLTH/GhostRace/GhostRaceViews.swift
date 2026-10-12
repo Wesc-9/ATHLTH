@@ -2693,6 +2693,13 @@ struct ATHLTHGhostRuntimeObserver: View {
                     await syncGhostComparisons()
                 }
             }
+            .onChange(of: realtime.liveGhostConnectionState) { _, _ in
+                // A loss of GPS may change only the connection state.
+                // Propagate that state to Watch even without a new point.
+                Task { @MainActor in
+                    await syncGhostComparisons()
+                }
+            }
             .onChange(
                 of:
                     phoneWorkout
