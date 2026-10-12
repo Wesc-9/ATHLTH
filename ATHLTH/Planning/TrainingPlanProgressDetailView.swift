@@ -119,7 +119,7 @@ struct TrainingPlanProgressDetailView: View {
     }
 
     private func overallCard(_ progress: TrainingPlanProgressSnapshot) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(alignment: .leading, spacing: 13) {
                 Label(
                     ATHLTHLocalization.choose(
@@ -177,7 +177,7 @@ struct TrainingPlanProgressDetailView: View {
 
 
     private var recoveryContextCard: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(alignment: .leading, spacing: 12) {
                 Label(
                     ATHLTHLocalization.choose(
@@ -238,7 +238,7 @@ struct TrainingPlanProgressDetailView: View {
     }
 
     private func strengthCard(_ report: TrainingPlanStrengthReport) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(alignment: .leading, spacing: 12) {
                 Label(
                     ATHLTHLocalization.choose(
@@ -287,7 +287,7 @@ struct TrainingPlanProgressDetailView: View {
     }
 
     private func exerciseCard(_ report: TrainingPlanStrengthReport) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(alignment: .leading, spacing: 12) {
                 Label(
                     ATHLTHLocalization.choose(
@@ -396,7 +396,7 @@ struct TrainingPlanProgressDetailView: View {
     private func adjustmentCard(
         _ advice: [TrainingPlanLoadAdvisor.Advice]
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(alignment: .leading, spacing: 13) {
                 Label(
                     ATHLTHLocalization.choose(
@@ -517,7 +517,7 @@ struct TrainingPlanProgressDetailView: View {
     }
 
     private func muscleCard(_ report: TrainingPlanStrengthReport) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(alignment: .leading, spacing: 12) {
                 Label(
                     ATHLTHLocalization.choose(
@@ -652,7 +652,7 @@ struct TrainingPlanProgressDetailView: View {
         _ report: TrainingPlanStrengthReport,
         currentWeek: Int
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(alignment: .leading, spacing: 12) {
                 Label(
                     ATHLTHLocalization.choose(
