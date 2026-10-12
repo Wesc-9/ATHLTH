@@ -183,11 +183,12 @@ enum ATHLTHLiveGhostWatchSignal: Equatable {
         guard let distance = context.distanceDeltaMeters,
               distance.isFinite,
               abs(distance) <= 500_000,
-              let own = context.ownProgressPercent,
-              let rival = context.opponentProgressPercent,
-              own.isFinite, rival.isFinite,
-              (0...100).contains(own),
-              (0...100).contains(rival)
+              context.ownProgressPercent.map {
+                  $0.isFinite && (0...100).contains($0)
+              } ?? true,
+              context.opponentProgressPercent.map {
+                  $0.isFinite && (0...100).contains($0)
+              } ?? true
         else {
             // A live socket without a trustworthy race gap remains waiting
             // for a route comparison rather than inventing a lead.
