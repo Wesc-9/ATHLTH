@@ -500,8 +500,7 @@ final class LiveGhostRaceStore:
     func confirmSynchronizedStart(
         challengeID: UUID,
         senderID: UUID,
-        recipientID: UUID,
-        now: Date = Date()
+        recipientID: UUID
     ) async -> Bool {
         guard activeChallengeID == challengeID,
               let userID = currentUserID,
@@ -540,7 +539,7 @@ final class LiveGhostRaceStore:
                 startsAt: latest.startsAt,
                 ownReady: (userID == senderID ? sender : recipient).ready,
                 opponentReady: (userID == senderID ? recipient : sender).ready,
-                now: now
+                now: Date()
             )
         } catch {
             // Fail closed. A network outage must not start a new local
