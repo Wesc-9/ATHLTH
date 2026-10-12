@@ -290,10 +290,65 @@ struct WatchTrainingAlwaysOnDashboard: View {
             }
 
             Spacer(minLength: 0)
+            if workout.kind == .running,
+               workout.liveSurfaceContext.liveGhost != nil {
+                alwaysOnGhostStatus
+            }
             footer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity,
                alignment: .topLeading)
+    }
+
+    // Keep pace, distance, heart rate and time as the main AOD metrics.
+    // Only a tiny low-power race indicator is added; never display a stale
+    // advantage as live when WatchConnectivity stops delivering updates.
+    private var alwaysOnGhostStatus: some View {
+        TimelineView(.periodic(from: .now, by: 5)) { timeline in
+            let ghost = workout.liveSurfaceContext.liveGhost
+            let signal = ATHLTHLiveGhostWatchSignal.resolve(
+                context: ghost,
+                isPaused: workout.state == .paused ||
+                    workout.automaticPauseActive,
+                now: timeline.date
+            )
+            HStack(spacing: 5) {
+                Image(systemName: signal == .live
+                      ? "figure.run" : "wifi.exclamationmark")
+                .font(.system(size: 9, weight: .semibold))
+
+                if signal == .live,
+                   let delta = ghost?.distanceDeltaMeters,
+                   delta.isFinite {
+                    Text(abs(delta) < 8
+                        ? ATHLTHLocalization.choose(
+                            english: "SIDE BY SIDE", norwegian: "JEVNT LØP"
+                        )
+                        : (delta > 0
+                            ? ATHLTHLocalization.choose(
+                                english: "YOU LEAD", norwegian: "DU LEDER"
+                              )
+                            : ATHLTHLocalization.choose(
+                                english: "RIVAL LEADS", norwegian: "MOTSTANDER LEDER"
+                              )))
+                    Text("\(Int(abs(delta).rounded())) m")
+                        .monospacedDigit()
+                } else {
+                    Text(signal == .paused
+                        ? ATHLTHLocalization.choose(
+                            english: "GHOST PAUSED", norwegian: "GHOST PAUSE"
+                          )
+                        : ATHLTHLocalization.choose(
+                            english: "GHOST SIGNAL DELAYED", norwegian: "GHOST FORSINKET"
+                          ))
+                }
+                Spacer(minLength: 0)
+            }
+            .font(.system(size: 9, weight: .bold))
+            .foregroundStyle(signal == .live ? accent : secondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
+        }
     }
 
     private func distanceMetric(fontSize: CGFloat) -> some View {
