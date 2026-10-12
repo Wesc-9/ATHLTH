@@ -53,10 +53,13 @@ enum LiveGhostRaceReentry {
         challengeID: UUID,
         roomStatus: LiveGhostRaceRoomStatus?,
         mirroredWorkoutActive: Bool,
-        isRunningOrPaused: Bool
+        isRunningOrPaused: Bool,
+        snapshotAgeSeconds: TimeInterval
     ) -> Bool {
         mirroredWorkoutActive &&
         isRunningOrPaused &&
+        snapshotAgeSeconds.isFinite &&
+        (-30...120).contains(snapshotAgeSeconds) &&
         comparisonRouteID == challengeID &&
         roomStatus == .racing
     }
