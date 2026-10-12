@@ -24,6 +24,7 @@ type ProgramRequest = {
   startDate?: string;
   weekCount?: number;
   sessionsPerWeek?: number;
+  aiChoosesFrequency?: boolean;
   preferredDays?: number[];
   sessionDurationMinutes?: number;
   userNotes?: string;
@@ -453,6 +454,7 @@ Deno.serve(async (req: Request) => {
     clampInteger(body.sessionsPerWeek, 1, 7, 4),
     preferredDays.length,
   );
+  const aiChoosesFrequency = mode === "generate" && body.aiChoosesFrequency === true;
   const sessionDurationMinutes = clampInteger(
     body.sessionDurationMinutes,
     20,
@@ -473,6 +475,7 @@ Deno.serve(async (req: Request) => {
     startDate: body.startDate ?? null,
     weekCount,
     sessionsPerWeek,
+    aiChoosesFrequency,
     preferredDays,
     preferredDayNames: preferredDays.map((day) => DAY_NAMES[day - 1]),
     sessionDurationMinutes,
@@ -489,6 +492,8 @@ Hard rules:
 - Return exactly the requested number of weeks.
 - Every week must contain all seven days, dayIndex 1=Monday through 7=Sunday.
 - Schedule at most one workout on a day and no more than sessionsPerWeek workouts per week.
+- If aiChoosesFrequency is true, sessionsPerWeek is a strict MAXIMUM, not a required target. Select a sustainable weekly frequency yourself based on the stated experience, current training, goal, time and available days. Do not assume all available days should be training days. Explain the chosen frequency in the summary and leave recovery days.
+- If aiChoosesFrequency is false, aim for the requested sessionsPerWeek unless the user constraints make that unsafe or impossible.
 - Schedule workouts only on preferredDays.
 - In complete mode, days that already contain existingSessions are locked: return zero generated sessions for those days.
 - Do not invent personal medical conditions, diagnoses, injuries, medications, or lab values.
