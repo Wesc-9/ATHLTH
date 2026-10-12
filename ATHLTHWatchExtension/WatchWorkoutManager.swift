@@ -2713,6 +2713,26 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         return true
     }
 
+    // Query actual HealthKit state before starting another workout.
+    func currentWorkoutActivityForProbe() -> WatchWorkoutActivityState {
+        let recording: Bool
+        switch state {
+        case .preparing, .running, .paused, .ending:
+            recording = true
+        case .idle, .completed, .failed:
+            recording = false
+        }
+        let healthKitActive =
+            workoutSession?.state == .running ||
+            workoutSession?.state == .paused
+        let active = recording || healthKitActive || recoveryInProgress
+        return WatchWorkoutActivityState(
+            isActive: active,
+            title: active ? kind.title : nil,
+            updatedAt: Date()
+        )
+    }
+
     func syncWorkoutActivityStateToPhone() {
         reportWorkoutActivityStateToPhone(
             state,
@@ -2823,6 +2843,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                         .recoverActiveWorkoutSession()
             else {
                 clearPersistedWorkoutState()
+                reportWorkoutActivityStateToPhone(.idle, force: true)
                 return
             }
 
