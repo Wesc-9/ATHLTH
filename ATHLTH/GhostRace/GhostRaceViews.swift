@@ -2788,9 +2788,11 @@ struct ATHLTHGhostRuntimeObserver: View {
             return
         }
 
-        await publishWatchLocation(
-            snapshot
-        )
+        if snapshot.state == .running {
+            await publishWatchLocation(
+                snapshot
+            )
+        }
         await syncWatchLiveGhost(
             snapshot
         )
@@ -2847,7 +2849,8 @@ struct ATHLTHGhostRuntimeObserver: View {
             )
         }
 
-        if let latestLocation {
+        if let latestLocation,
+           workout.resumedAt != nil {
             await publishPhoneLocation(
                 workout,
                 location:
