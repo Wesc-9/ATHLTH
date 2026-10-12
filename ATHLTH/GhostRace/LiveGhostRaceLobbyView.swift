@@ -97,7 +97,8 @@ struct LiveGhostRaceLobbyView: View {
                 if (didLaunch || canReconnectRecoveredPhoneRace ||
                     canReconnectRecoveredWatchRace) &&
                    LiveGhostRaceReentry.canReconnectSharedSession(
-                       roomStatus: liveRace.room?.status
+                       roomStatus: liveRace.room?.status,
+                       startsAt: liveRace.room?.startsAt
                    ) &&
                    realtime.currentSession?.ghostChallengeID != challenge.id {
                     ATHLTHCard {
@@ -1311,7 +1312,8 @@ struct LiveGhostRaceLobbyView: View {
         guard didLaunch || canReconnectRecoveredPhoneRace ||
                   canReconnectRecoveredWatchRace,
               LiveGhostRaceReentry.canReconnectSharedSession(
-                  roomStatus: liveRace.room?.status
+                  roomStatus: liveRace.room?.status,
+                  startsAt: liveRace.room?.startsAt
               ),
               !isConnectingLiveSession,
               realtime.currentSession?.ghostChallengeID != challenge.id else {
