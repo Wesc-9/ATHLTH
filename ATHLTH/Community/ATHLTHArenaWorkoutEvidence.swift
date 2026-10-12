@@ -480,17 +480,18 @@ struct ATHLTHArenaEvidenceSection: View {
 
         let targetMeters = snapshot.distanceKilometers * 1_000
         var matches: [ATHLTHArenaEvidenceCandidate] = []
-        for summary in health.workouts
-            .filter({
+        let eligibleWorkouts = health.workouts
+            .filter { summary in
                 ATHLTHArenaRouteEvidencePolicy.eligibleWorkout(
-                    SocialPublishableWorkout(summary: $0),
+                    SocialPublishableWorkout(summary: summary),
                     plannedDistanceMeters: targetMeters,
                     startsAt: startsAt,
                     endsAt: endsAt
                 )
-            })
-            .sorted { $0.endDate > $1.endDate }
-            .prefix(25) {
+            }
+            .sorted(by: { $0.endDate > $1.endDate })
+            .prefix(25)
+        for summary in eligibleWorkouts {
             if Task.isCancelled { return }
 
             let workout = SocialPublishableWorkout(summary: summary)
