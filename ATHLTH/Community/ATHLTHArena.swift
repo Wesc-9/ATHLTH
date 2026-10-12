@@ -702,19 +702,28 @@ struct ATHLTHArenaHomeView: View {
     @State private var remoteRevision = UUID()
 
     var body: some View {
+        ScrollViewReader { scrollProxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 introduction
+                arenaQuickNavigation(scrollProxy)
                 quickStart
+                    .id("arena-create")
 
-                ATHLTHArenaOnlineSection()
-                    .id(remoteRevision)
+                Group {
+                    ATHLTHArenaOnlineSection()
+                        .id(remoteRevision)
+                }
+                .id("arena-online")
 
                 ATHLTHArenaLiveDuelsSection()
+                    .id("arena-duels")
 
                 ATHLTHArenaChallengeOverviewSection()
+                    .id("arena-challenges")
 
                 ATHLTHArenaSeasonsSection()
+                    .id("arena-seasons")
 
                 Group {
                     if dynamicTypeSize.isAccessibilitySize {
@@ -739,6 +748,7 @@ struct ATHLTHArenaHomeView: View {
                         .font(.caption.weight(.bold))
                         .foregroundStyle(ATHLTHTheme.mutedText)
                 }
+                .id("arena-drafts")
 
                 if drafts.isEmpty {
                     ContentUnavailableView(
@@ -856,6 +866,73 @@ struct ATHLTHArenaHomeView: View {
                 pendingDelete = nil
             }
         }
+        }
+    }
+
+    /// Quick jumps keep the premium Arena front page simple while allowing
+    /// users to reach shared competitions, Live Ghost and results without
+    /// scrolling through several independent modules.
+    private func arenaQuickNavigation(_ proxy: ScrollViewProxy) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                arenaJump(
+                    ATHLTHLocalization.choose(english: "Create", norwegian: "Opprett"),
+                    icon: "plus.circle",
+                    target: "arena-create",
+                    proxy: proxy
+                )
+                arenaJump(
+                    ATHLTHLocalization.choose(english: "Competitions", norwegian: "Konkurranser"),
+                    icon: "trophy",
+                    target: "arena-online",
+                    proxy: proxy
+                )
+                arenaJump(
+                    ATHLTHLocalization.choose(english: "Live duels", norwegian: "Live-dueller"),
+                    icon: "bolt.fill",
+                    target: "arena-duels",
+                    proxy: proxy
+                )
+                arenaJump(
+                    ATHLTHLocalization.choose(english: "Challenges", norwegian: "Utfordringer"),
+                    icon: "flag.checkered",
+                    target: "arena-challenges",
+                    proxy: proxy
+                )
+                arenaJump(
+                    ATHLTHLocalization.choose(english: "History", norwegian: "Historikk"),
+                    icon: "clock.arrow.circlepath",
+                    target: "arena-seasons",
+                    proxy: proxy
+                )
+            }
+            .padding(.vertical, 2)
+        }
+        .accessibilityLabel(ATHLTHLocalization.choose(
+            english: "Arena quick navigation",
+            norwegian: "Hurtignavigering i Arena"
+        ))
+    }
+
+    private func arenaJump(
+        _ title: String,
+        icon: String,
+        target: String,
+        proxy: ScrollViewProxy
+    ) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.24)) {
+                proxy.scrollTo(target, anchor: .top)
+            }
+        } label: {
+            Label(title, systemImage: icon)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .padding(.horizontal, 13)
+                .frame(minHeight: 42)
+                .background(ATHLTHArenaLightStyle.card(14))
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
