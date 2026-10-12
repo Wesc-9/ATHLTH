@@ -98,4 +98,119 @@ final class ATHLTHPlanDraftValidatorTests: XCTestCase {
         XCTAssertTrue(problems.contains("invalid_exercise"))
         XCTAssertTrue(problems.contains("missing_workout_title"))
     }
+
+    func testStrictApprovalRejectsUnavailableDayAndWeeklyOverload() {
+        let draft = AIProgramDraft(
+            title: "Busy draft",
+            summary: "",
+            weeks: [
+                AIProgramDraftWeek(
+                    weekNumber: 1,
+                    title: "Week 1",
+                    days: (1...7).map { day in
+                        AIProgramDraftDay(
+                            dayIndex: day,
+                            title: "Day \(day)",
+                            sessions: day <= 3 ? [workout()] : []
+                        )
+                    }
+                )
+            ]
+        )
+        let issues = ATHLTHPlanDraftValidator.issues(
+            in: draft,
+            expectedWeeks: 1,
+            allowedDayIndexes: [1, 3, 5],
+            maximumSessionsPerWeek: 2,
+            requireFullWeeks: true
+        )
+        XCTAssertTrue(issues.contains("outside_available_days"))
+        XCTAssertTrue(issues.contains("exceeds_weekly_session_limit"))
+        XCTAssertFalse(issues.contains("incomplete_week_days"))
+    }
+
+    func testStrictApprovalPreservesLockedExistingDay() {
+        let draft = AIProgramDraft(
+            title: "Fill gaps only",
+            summary: "",
+            weeks: [
+                AIProgramDraftWeek(
+                    weekNumber: 1,
+                    title: "Week 1",
+                    days: (1...7).map { day in
+                        AIProgramDraftDay(
+                            dayIndex: day,
+                            title: "Day \(day)",
+                            sessions: day == 1 ? [workout()] : []
+                        )
+                    }
+                )
+            ]
+        )
+        let issues = ATHLTHPlanDraftValidator.issues(
+            in: draft,
+            expectedWeeks: 1,
+            allowedDayIndexes: [1, 3, 5],
+            maximumSessionsPerWeek: 3,
+            lockedDayKeys: ["1:1"],
+            requireFullWeeks: true
+        )
+        XCTAssertTrue(issues.contains("overwrites_existing_workout"))
+    }
+
+    func testStrictApprovalRejectsIncompleteWeekAndMultipleSessions() {
+        let draft = AIProgramDraft(
+            title: "Incomplete",
+            summary: "",
+            weeks: [
+                AIProgramDraftWeek(
+                    weekNumber: 1,
+                    title: "Week 1",
+                    days: [
+                        AIProgramDraftDay(
+                            dayIndex: 1,
+                            title: "Monday",
+                            sessions: [workout(), workout()]
+                        )
+                    ]
+                )
+            ]
+        )
+        let issues = ATHLTHPlanDraftValidator.issues(
+            in: draft,
+            expectedWeeks: 1,
+            requireFullWeeks: true
+        )
+        XCTAssertTrue(issues.contains("incomplete_week_days"))
+        XCTAssertTrue(issues.contains("multiple_sessions_on_day"))
+    }
+
+    func testStrictApprovalAcceptsCompleteWeekWithConstrainedSchedule() {
+        let draft = AIProgramDraft(
+            title: "Available days",
+            summary: "",
+            weeks: [
+                AIProgramDraftWeek(
+                    weekNumber: 1,
+                    title: "Week 1",
+                    days: (1...7).map { day in
+                        AIProgramDraftDay(
+                            dayIndex: day,
+                            title: "Day \(day)",
+                            sessions: [1, 3, 5].contains(day) ? [workout()] : []
+                        )
+                    }
+                )
+            ]
+        )
+        XCTAssertTrue(ATHLTHPlanDraftValidator.issues(
+            in: draft,
+            expectedWeeks: 1,
+            allowedDayIndexes: [1, 3, 5],
+            maximumSessionsPerWeek: 3,
+            lockedDayKeys: ["1:2"],
+            requireFullWeeks: true
+        ).isEmpty)
+    }
+
 }
