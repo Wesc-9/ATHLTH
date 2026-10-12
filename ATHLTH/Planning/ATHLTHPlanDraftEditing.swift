@@ -57,9 +57,11 @@ enum ATHLTHPlanDraftEditing {
     static func moving(
         in draft: AIProgramDraft,
         selection: ATHLTHPlanDraftWorkoutSelection,
-        toDayIndex: Int
+        toDayIndex: Int,
+        allowedDayIndexes: Set<Int>? = nil
     ) -> AIProgramDraft? {
         guard (1...7).contains(toDayIndex),
+              allowedDayIndexes.map({ $0.contains(toDayIndex) }) ?? true,
               selection.dayIndex != toDayIndex,
               let sourceWorkout = workout(in: draft, selection: selection),
               let week = draft.weeks.first(where: { $0.weekNumber == selection.weekNumber }),
