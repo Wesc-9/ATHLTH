@@ -1110,12 +1110,16 @@ struct AIProgramBuilderView: View {
                                         .controlSize(.small)
                                         if mode == .generate,
                                            week.days.contains(where: {
-                                               $0.dayIndex != day.dayIndex && $0.sessions.isEmpty
+                                               $0.dayIndex != day.dayIndex &&
+                                               $0.sessions.isEmpty &&
+                                               availableDays.contains($0.dayIndex)
                                            }) {
                                             Menu {
                                                 ForEach(
                                                     week.days.filter {
-                                                        $0.dayIndex != day.dayIndex && $0.sessions.isEmpty
+                                                        $0.dayIndex != day.dayIndex &&
+                                                        $0.sessions.isEmpty &&
+                                                        availableDays.contains($0.dayIndex)
                                                     }, id: \.dayIndex
                                                 ) { target in
                                                     Button(target.title) {
@@ -1127,7 +1131,8 @@ struct AIProgramBuilderView: View {
                                                         guard let moved = ATHLTHPlanDraftEditing.moving(
                                                             in: draft,
                                                             selection: selection,
-                                                            toDayIndex: target.dayIndex
+                                                            toDayIndex: target.dayIndex,
+                                                            allowedDayIndexes: availableDays
                                                         ), ATHLTHPlanDraftValidator.issues(
                                                             in: moved,
                                                             expectedWeeks: resolvedWeeks
