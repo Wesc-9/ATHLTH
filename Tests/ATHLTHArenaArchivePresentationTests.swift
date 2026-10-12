@@ -6,12 +6,13 @@ import XCTest
 /// completed series has independently verified GPS or newly awarded points.
 final class ATHLTHArenaArchivePresentationTests: XCTestCase {
     private func series(
+        id: UUID = UUID(),
         status: String = "completed",
         completionReason: String? = nil,
         date: Date? = Date(timeIntervalSince1970: 1_800_000_000)
     ) -> ATHLTHArenaRemoteSeries {
         ATHLTHArenaRemoteSeries(
-            id: UUID(),
+            id: id,
             ownerID: UUID(),
             clubID: nil,
             title: "Arena route",
@@ -151,6 +152,45 @@ final class ATHLTHArenaArchivePresentationTests: XCTestCase {
                 [finished], filter: .all
             ).count, 1
         )
+    }
+
+    func testArchivePagesKeepExistingCompetitionIDsUnique() {
+        let present = series()
+        let older = series()
+        let duplicate = series(id: present.id)
+        let merged = ATHLTHArenaArchivePresentation.merge(
+            recent: [present], older: [duplicate, older, older]
+        )
+        XCTAssertEqual(merged.map(\.id), [present.id, older.id])
+    }
+
+    func testFreshServerRowOverridesStaleArchivedStatus() {
+        let id = UUID()
+        let newlyActive = series(id: id, status: "active")
+        let oldCompleted = series(id: id, status: "completed")
+        let combined = ATHLTHArenaArchivePresentation.merge(
+            recent: [newlyActive], older: [oldCompleted]
+        )
+        XCTAssertEqual(combined.count, 1)
+        XCTAssertEqual(combined.first?.status, "active")
+        XCTAssertTrue(ATHLTHArenaArchivePresentation.visible(
+            combined, filter: .all
+        ).isEmpty)
+    }
+
+    func testArchivePaginationPreservesAllRecentDraftsAndActiveSeries() {
+        let active = series(status: "active")
+        let invited = series(status: "draft")
+        let historical = series()
+        let merged = ATHLTHArenaArchivePresentation.merge(
+            recent: [active, invited], older: [historical]
+        )
+        XCTAssertEqual(merged.count, 3)
+        XCTAssertTrue(merged.contains(where: { $0.id == active.id }))
+        XCTAssertTrue(merged.contains(where: { $0.id == invited.id }))
+        XCTAssertEqual(ATHLTHArenaArchivePresentation.visible(
+            merged, filter: .all
+        ).map(\.id), [historical.id])
     }
 
     func testArchiveFilterPreservesNewestFirstSourceOrdering() {
