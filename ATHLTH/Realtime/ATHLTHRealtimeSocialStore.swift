@@ -182,6 +182,22 @@ enum ATHLTHLiveGhostRacingTelemetry {
         return ownerID
     }
 
+    /// A synchronized duel must be backed by its exact Ghost challenge ID.
+    /// Route-less legacy live follows keep their original fallback behavior.
+    static func matchesWorkout(
+        challengeID: UUID?,
+        selectedRouteKey: UUID?,
+        localComparisonRouteID: UUID?
+    ) -> Bool {
+        if let challengeID {
+            return localComparisonRouteID == challengeID &&
+                (selectedRouteKey == nil || selectedRouteKey == challengeID)
+        }
+        return localComparisonRouteID == nil ||
+            selectedRouteKey == nil ||
+            localComparisonRouteID == selectedRouteKey
+    }
+
     static func acceptableDeviation(
         _ meters: Double?,
         maximum: Double
@@ -1217,11 +1233,11 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
               ownDistanceMeters >= 0,
               ownElapsedSeconds.isFinite,
               ownElapsedSeconds >= 0,
-              // An unrelated route is never equivalent just because its
-              // accumulated distance happens to be the same.
-              ownRouteKey == nil ||
-                selectedSession.routeKey == nil ||
-                ownRouteKey == selectedSession.routeKey
+              ATHLTHLiveGhostRacingTelemetry.matchesWorkout(
+                  challengeID: selectedSession.ghostChallengeID,
+                  selectedRouteKey: selectedSession.routeKey,
+                  localComparisonRouteID: ownRouteKey
+              )
         else {
             return nil
         }
