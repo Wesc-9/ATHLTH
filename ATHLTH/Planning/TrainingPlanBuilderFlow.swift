@@ -403,6 +403,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .onChange(of: startDate) { _, _ in saveResumableDraft() }
         .onChange(of: mode) { _, _ in saveResumableDraft() }
         .onChange(of: selectedSource) { _, _ in saveResumableDraft() }
+        .onChange(of: selectedDays) { _, _ in saveResumableDraft() }
+        .onChange(of: equipment) { _, _ in saveResumableDraft() }
+        .onChange(of: weeklyTimeBudgetMinutes) { _, _ in saveResumableDraft() }
         .onChange(of: step) { _, _ in saveResumableDraft() }
         .confirmationDialog(
             ATHLTHLocalization.choose(
@@ -426,8 +429,21 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     case "saved": selectedSource = .saved
                     default: selectedSource = .scratch
                     }
-                    // Only the nonsensitive basics are retained. Reconfirm
-                    // goals, limitations, available days and any AI permissions.
+                    if draft.advanced {
+                        if let days = draft.preferredDayIndexes, !days.isEmpty {
+                            selectedDays = Set(days)
+                            sessionsPerWeek = days.count
+                        }
+                        if let savedEquipment = draft.equipmentContext,
+                           let restoredEquipment = EquipmentContext(rawValue: savedEquipment) {
+                            equipment = restoredEquipment
+                        }
+                        if let minutes = draft.weeklyTimeBudgetMinutes {
+                            weeklyTimeBudgetMinutes = minutes
+                        }
+                    }
+                    // We intentionally resume the basics step so any goals,
+                    // limitations and AI permissions must be reconfirmed.
                     step = .basics
                 }
                 resumablePlanDraft = nil
@@ -443,8 +459,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
         } message: {
             Text(ATHLTHLocalization.choose(
-                english: "We saved the name, start date and duration on this device. Sensitive notes were not saved.",
-                norwegian: "Vi har lagret navn, startdato og varighet på denne enheten. Sensitive notater er ikke lagret."
+                english: "This device saved your plan basics and non-sensitive schedule choices. Health notes and personal goals were not saved.",
+                norwegian: "Denne enheten lagret grunninfo og treningsdager. Helsedata og personlige mål ble ikke lagret."
             ))
         }
         .onChange(
@@ -3911,7 +3927,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             startDate: startDate,
             advanced: mode == .advanced,
             source: selectedSource.rawValue,
-            stage: String(describing: step)
+            stage: String(describing: step),
+            preferredDayIndexes: mode == .advanced ? selectedDays.sorted() : nil,
+            equipmentContext: mode == .advanced ? equipment.rawValue : nil,
+            weeklyTimeBudgetMinutes: mode == .advanced
+                ? weeklyTimeBudgetMinutes : nil
         )
         draftStore.save(draft, userID: session.profile.userID)
     }
