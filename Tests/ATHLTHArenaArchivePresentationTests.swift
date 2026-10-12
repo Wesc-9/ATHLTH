@@ -99,6 +99,60 @@ final class ATHLTHArenaArchivePresentationTests: XCTestCase {
         ))
     }
 
+    func testArchiveSearchFindsCompletedCompetitionCaseInsensitively() {
+        let saved = series()
+        let results = ATHLTHArenaArchivePresentation.visible(
+            [saved], filter: .all, search: "ARENA ROUTE"
+        )
+        XCTAssertEqual(results.map(\\.id), [saved.id])
+    }
+
+    func testArchiveSearchNormalizesNorwegianDiacritics() {
+        let saved = ATHLTHArenaRemoteSeries(
+            id: UUID(),
+            ownerID: UUID(),
+            clubID: nil,
+            title: "Løpeøkt i Tromsø",
+            scope: .duel,
+            scoring: .winner,
+            durationDays: 7,
+            status: "completed",
+            startsAt: nil,
+            endsAt: nil,
+            completedAt: nil,
+            completionReason: "all_results_approved"
+        )
+        XCTAssertEqual(
+            ATHLTHArenaArchivePresentation.visible(
+                [saved], filter: .all, search: "Tromso"
+            ).map(\\.id), [saved.id]
+        )
+    }
+
+    func testArchiveSearchDoesNotOverrideStatusFilter() {
+        let unresolved = series(completionReason: "deadline_unresolved")
+        XCTAssertTrue(ATHLTHArenaArchivePresentation.visible(
+            [unresolved], filter: .completed, search: "Arena"
+        ).isEmpty)
+        XCTAssertEqual(
+            ATHLTHArenaArchivePresentation.visible(
+                [unresolved], filter: .unresolved, search: "ARENA"
+            ).map(\\.id), [unresolved.id]
+        )
+    }
+
+    func testUnknownArchiveSearchReturnsEmptyWithoutChangingSource() {
+        let finished = series()
+        XCTAssertTrue(ATHLTHArenaArchivePresentation.visible(
+            [finished], filter: .all, search: "Unavailable event"
+        ).isEmpty)
+        XCTAssertEqual(
+            ATHLTHArenaArchivePresentation.visible(
+                [finished], filter: .all
+            ).count, 1
+        )
+    }
+
     func testArchiveFilterPreservesNewestFirstSourceOrdering() {
         let newer = series(completionReason: "deadline_unresolved")
         let older = series(completionReason: "deadline_unresolved")
