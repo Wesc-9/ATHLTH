@@ -60,7 +60,7 @@ struct ATHLTHPlanProgramTrendView: View {
             }
 
             if actual.totalPlanned > 0 {
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .firstTextBaseline) {
                         Text("\(actual.totalCompleted) / \(actual.totalPlanned)")
                             .font(.system(size: 27, weight: .semibold, design: .rounded))
@@ -73,6 +73,28 @@ struct ATHLTHPlanProgramTrendView: View {
                         .font(.caption)
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         Spacer(minLength: 0)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        kindSummary(
+                            title: ATHLTHLocalization.choose(
+                                english: "Running", norwegian: "Løping"
+                            ),
+                            progress: actual.running
+                        )
+                        kindSummary(
+                            title: ATHLTHLocalization.choose(
+                                english: "Strength", norwegian: "Styrke"
+                            ),
+                            progress: actual.strength
+                        )
+                        if actual.other.planned > 0 {
+                            kindSummary(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Other", norwegian: "Annet"
+                                ),
+                                progress: actual.other
+                            )
+                        }
                     }
                     ProgressView(
                         value: Double(actual.totalCompleted),
@@ -209,6 +231,22 @@ struct ATHLTHPlanProgramTrendView: View {
                                         .font(.caption2.weight(.medium))
                                         .monospacedDigit()
                                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                        if finished.running.planned > 0 {
+                                            kindDetail(
+                                                title: ATHLTHLocalization.choose(
+                                                    english: "Running", norwegian: "Løping"
+                                                ),
+                                                progress: finished.running
+                                            )
+                                        }
+                                        if finished.strength.planned > 0 {
+                                            kindDetail(
+                                                title: ATHLTHLocalization.choose(
+                                                    english: "Strength", norwegian: "Styrke"
+                                                ),
+                                                progress: finished.strength
+                                            )
+                                        }
                                     }
 
                                     HStack(spacing: 8) {
@@ -299,6 +337,48 @@ struct ATHLTHPlanProgramTrendView: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func kindSummary(
+        title: String,
+        progress: ATHLTHPlanActualProgress.KindProgress
+    ) -> some View {
+        if progress.planned > 0 {
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                Text("\(progress.completed)/\(progress.planned)")
+                    .font(.caption.weight(.medium))
+                    .monospacedDigit()
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                Spacer(minLength: 0)
+                Text(ATHLTHLocalization.choose(
+                    english: "\(progress.recorded) recorded · \(progress.manuallyMarked) manually",
+                    norwegian: "\(progress.recorded) registrert · \(progress.manuallyMarked) manuelt"
+                ))
+                .font(.caption2)
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    private func kindDetail(
+        title: String,
+        progress: ATHLTHPlanActualProgress.KindProgress
+    ) -> some View {
+        Text(title + ": \(progress.completed)/\(progress.planned) · " +
+            ATHLTHLocalization.choose(
+                english: "\(progress.recorded) recorded, \(progress.manuallyMarked) manual",
+                norwegian: "\(progress.recorded) registrert, \(progress.manuallyMarked) manuelt"
+            ))
+            .font(.caption2)
+            .monospacedDigit()
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func metric(value: Int, title: String) -> some View {

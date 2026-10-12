@@ -107,6 +107,55 @@ final class ATHLTHPlanActualProgressTests: XCTestCase {
     }
 
     @MainActor
+    func testBreakdownSeparatesRunningStrengthAndManualEvidence() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let start = Calendar.current.startOfDay(for: Date())
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Category breakdown", summary: "",
+            weekCount: 1, startDate: start
+        ))
+        let run = plannedRun(title: "Run")
+        var lift = plannedRun(title: "Strength")
+        lift.kind = .strength
+        var walk = plannedRun(title: "Walk")
+        walk.kind = .walking
+        store.addSession(run, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(lift, toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
+        store.addSession(walk, toDay: plan.weeks[0].days[2].id, inPlan: plan.id)
+        store.setPlanSessionManuallyCompleted(
+            planID: plan.id, sessionID: lift.id, completed: true
+        )
+        store.setPlanSessionSkipped(
+            planID: plan.id, sessionID: walk.id, skipped: true
+        )
+        let healthWorkout = healthRun(on: start)
+        XCTAssertTrue(store.linkHealthWorkout(
+            healthWorkout, toPlan: plan.id, sessionID: run.id
+        ))
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let report = ATHLTHPlanActualProgress.inspect(
+            plan: saved, store: store, healthWorkouts: [healthWorkout],
+            strengthHistory: []
+        )
+        let week = try XCTUnwrap(report.weeks.first)
+        XCTAssertEqual(week.running.planned, 1)
+        XCTAssertEqual(week.running.recorded, 1)
+        XCTAssertEqual(week.running.manuallyMarked, 0)
+        XCTAssertEqual(week.strength.planned, 1)
+        XCTAssertEqual(week.strength.recorded, 0)
+        XCTAssertEqual(week.strength.manuallyMarked, 1)
+        XCTAssertEqual(week.other.planned, 1)
+        XCTAssertEqual(week.other.skipped, 1)
+        XCTAssertEqual(report.totalCompleted, 2)
+        XCTAssertEqual(report.totalPlanned, 3)
+        XCTAssertEqual(report.totalRecorded, 1)
+        XCTAssertEqual(report.totalManuallyMarked, 1)
+        XCTAssertEqual(report.running.completed, 1)
+        XCTAssertEqual(report.strength.completed, 1)
+    }
+
+    @MainActor
     func testUnlinkedHealthAndFuturePlannedWorkoutsRemainIncomplete() throws {
         let (store, defaults, suite) = makeStore()
         defer { defaults.removePersistentDomain(forName: suite) }
