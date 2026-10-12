@@ -174,7 +174,9 @@ enum ATHLTHLiveGhostRacingTelemetry {
         otherID: UUID?,
         viewerID: UUID?
     ) -> UUID? {
-        guard let viewerID else { return ownerID }
+        // Without authentication we cannot know which athlete is the
+        // opponent. Never accidentally compare the owner to themselves.
+        guard let viewerID else { return nil }
         if viewerID == ownerID { return otherID }
         // Spectators may watch a map, but must not compare their own
         // workout against someone else's private synchronized duel.
@@ -490,7 +492,9 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
 
     private let onlineHeartbeatInterval: Duration = .seconds(90)
     private let liveRefreshInterval: Duration = .seconds(3)
-    private let liveGhostFreshAge: TimeInterval = 8
+    // Match the 18-second actionable GPS policy shared by the Watch and
+    // server. Otherwise the UI can say DELAYED while still calculating leads.
+    private let liveGhostFreshAge: TimeInterval = 18
     private let liveGhostDelayedAge: TimeInterval = 25
     private let liveGhostMaximumUsableAge: TimeInterval = 90
     private let routeAwareMaximumDeviationMeters = 120.0
@@ -2014,13 +2018,20 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             return
         }
 
-        let age =
-            max(
-                Date().timeIntervalSince(
-                    point.updatedAt
-                ),
-                0
-            )
+        let now = Date()
+        guard point.expiresAt > now,
+              point.updatedAt <= now.addingTimeInterval(5),
+              point.distanceMeters.isFinite,
+              point.distanceMeters >= 0,
+              point.elapsedSeconds.isFinite,
+              (0...86_400).contains(point.elapsedSeconds),
+              point.distanceMeters <=
+                max(120, point.elapsedSeconds * 15)
+        else {
+            liveGhostConnectionState = .waiting
+            return
+        }
+        let age = max(now.timeIntervalSince(point.updatedAt), 0)
         let roundedAge =
             max(
                 Int(age.rounded()),
