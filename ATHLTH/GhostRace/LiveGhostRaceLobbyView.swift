@@ -13,6 +13,7 @@ private struct LiveGhostArenaRoundLink: Decodable {
 /// the launch task whenever either readiness state changes.
 private struct LiveGhostStartTrigger: Equatable {
     let startsAt: Date?
+    let status: LiveGhostRaceRoomStatus?
     let ownReady: Bool
     let opponentReady: Bool
 }
@@ -227,6 +228,7 @@ struct LiveGhostRaceLobbyView: View {
         }
         .task(id: LiveGhostStartTrigger(
             startsAt: liveRace.room?.startsAt,
+            status: liveRace.room?.status,
             ownReady: ownParticipant?.ready == true,
             opponentReady: opponentParticipant?.ready == true
         )) {
@@ -1162,19 +1164,35 @@ struct LiveGhostRaceLobbyView: View {
         }
 
         if delay > 0 {
-            try? await Task.sleep(
-                for: .seconds(delay)
-            )
+            do {
+                try await Task.sleep(for: .seconds(delay))
+            } catch {
+                // A READY or room-state change has superseded this timer.
+                return
+            }
         }
 
-        guard
-            !Task.isCancelled,
-            scenePhase == .active,
-            !didLaunch,
-            ownParticipant?.ready == true,
-            liveRace.participant(userID: opponentID)?.ready == true,
-            liveRace.room?.phase() == .racing
-        else {
+        guard !Task.isCancelled,
+              scenePhase == .active,
+              !didLaunch,
+              !isLaunching else { return }
+
+        // Validate the race immediately before starting HealthKit/Watch.
+        // Two participant snapshots from a realtime socket can be stale
+        // when the other athlete withdraws during the final second.
+        let confirmed = await liveRace.confirmSynchronizedStart(
+            challengeID: challenge.id,
+            senderID: challenge.senderID,
+            recipientID: challenge.recipientID
+        )
+        guard !Task.isCancelled,
+              scenePhase == .active,
+              !didLaunch else { return }
+        guard confirmed else {
+            launchError = ATHLTHLocalization.choose(
+                english: "The race start changed or could not be verified. Check both athletes are ready before trying again. No workout was started.",
+                norwegian: "Starten ble endret eller kunne ikke bekreftes. Kontroller at begge er klare før du prøver igjen. Ingen treningsøkt ble startet."
+            )
             return
         }
 
