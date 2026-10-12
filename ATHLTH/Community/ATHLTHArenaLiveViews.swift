@@ -104,15 +104,26 @@ enum ATHLTHArenaArchivePresentation {
 
     static func visible(
         _ completed: [ATHLTHArenaRemoteSeries],
-        filter: Filter
+        filter: Filter,
+        search: String = ""
     ) -> [ATHLTHArenaRemoteSeries] {
-        completed.filter { series in
+        let term = search.trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive],
+                     locale: Locale(identifier: "nb_NO"))
+        return completed.filter { series in
             guard series.status == "completed" else { return false }
+            let statusMatches: Bool
             switch filter {
-            case .all: return true
-            case .completed: return !isUnresolved(series)
-            case .unresolved: return isUnresolved(series)
+            case .all: statusMatches = true
+            case .completed: statusMatches = !isUnresolved(series)
+            case .unresolved: statusMatches = isUnresolved(series)
             }
+            guard statusMatches else { return false }
+            if term.isEmpty { return true }
+            return series.title.folding(
+                options: [.caseInsensitive, .diacriticInsensitive],
+                locale: Locale(identifier: "nb_NO")
+            ).contains(term)
         }
     }
 }
@@ -142,6 +153,7 @@ struct ATHLTHArenaOnlineSection: View {
 
     private let cloud = ATHLTHArenaCloudService()
     @State private var showsAllCompleted = false
+    @State private var archiveSearchText = ""
     @State private var archiveFilter: ATHLTHArenaArchivePresentation.Filter = .all
 
     private var visibleSeries: [ATHLTHArenaRemoteSeries] {
@@ -165,7 +177,9 @@ struct ATHLTHArenaOnlineSection: View {
 
     private var displayedArchive: [ATHLTHArenaRemoteSeries] {
         ATHLTHArenaArchivePresentation.visible(
-            finishedSeries, filter: archiveFilter
+            finishedSeries,
+            filter: archiveFilter,
+            search: archiveSearchText
         )
     }
 
@@ -256,7 +270,8 @@ struct ATHLTHArenaOnlineSection: View {
                         icon: "clock.arrow.circlepath"
                     )
                     Spacer(minLength: 8)
-                    if archiveFilter == .all && finishedSeries.count > 2 {
+                    if archiveSearchText.isEmpty && archiveFilter == .all &&
+                       finishedSeries.count > 2 {
                         Button {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 showsAllCompleted.toggle()
@@ -274,6 +289,42 @@ struct ATHLTHArenaOnlineSection: View {
                             .foregroundStyle(ATHLTHTheme.accentDeep)
                         }
                     }
+                }
+                if finishedSeries.count >= 4 {
+                    HStack(spacing: 9) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        TextField(
+                            ATHLTHLocalization.choose(
+                                english: "Search competition history",
+                                norwegian: "Søk i konkurransehistorikken"
+                            ),
+                            text: $archiveSearchText
+                        )
+                        .font(.subheadline)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Search completed competitions",
+                            norwegian: "Søk i avsluttede konkurranser"
+                        ))
+                        if !archiveSearchText.isEmpty {
+                            Button {
+                                archiveSearchText = ""
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(ATHLTHLocalization.choose(
+                                english: "Clear archive search",
+                                norwegian: "Tøm søk i konkurransehistorikken"
+                            ))
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 44)
+                    .background(ATHLTHArenaLightStyle.card(13))
                 }
                 if unresolvedArchiveCount > 0 {
                     HStack(spacing: 6) {
@@ -300,9 +351,19 @@ struct ATHLTHArenaOnlineSection: View {
                         )
                     }
                 }
+                if displayedArchive.isEmpty {
+                    Text(ATHLTHLocalization.choose(
+                        english: "No completed competitions match this search and filter.",
+                        norwegian: "Ingen avsluttede konkurranser samsvarer med søket og filteret."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 ForEach(Array(displayedArchive.prefix(
-                    archiveFilter == .all && !showsAllCompleted
-                        ? 2 : displayedArchive.count
+                    archiveSearchText.isEmpty && archiveFilter == .all &&
+                    !showsAllCompleted ? 2 : displayedArchive.count
                 ))) { item in
                     seriesRow(item)
                 }
@@ -552,6 +613,7 @@ struct ATHLTHArenaOnlineSection: View {
                 series = []
                 errorMessage = nil
                 showsAllCompleted = false
+                archiveSearchText = ""
                 archiveFilter = .all
             }
 
