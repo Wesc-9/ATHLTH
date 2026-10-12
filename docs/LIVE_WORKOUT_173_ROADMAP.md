@@ -7,7 +7,7 @@ Baseline: `release/v1.7.3`. Keep recording engines, workout ownership, iPhone/Wa
 1. **Shared live presentation policy (in progress)** — Shared, testable hierarchy for workout phase, primary/secondary metrics, and context-dependent watch pages. AOD can consume it without touching workout recording.
 2. **Apple Watch strength (in progress)** — Distinct active-set, countdown, rest, exercise-queue and status pages; Crown input and explicit set completion; preserve warm-up, zero weight, resistance-level and RPE/RIR rules.
 3. **Apple Watch running** — Readable pace/distance, structured interval, pulse/zone, route, Ghost/Arena, Audio Coach and controls; only relevant pages shown; no surprise auto-swipes.
-4. **Always-On** — Single low-power, read-only presentation selected by activity and phase, including accurate rest countdown. No animations, sensitive details policy, stale-data treatment and small-screen testing.
+4. **Always-On (in progress)** — Single low-power, read-only presentation selected by activity and phase, including accurate rest countdown. No animations, sensitive details policy, stale-data treatment and small-screen testing.
 5. **iPhone live workout** — Activity-first hero metric and details, aligned with Watch; strength, run, treadmill, intervals and companion mode.
 6. **Lock Screen / Dynamic Island** — Use existing Live Activity infrastructure and phase-specific compact/expanded variants; terminate cleanly when workout ends.
 7. **Other workout modes** — Walking, HIIT, cycling, functional, rowing, stairs, yoga; never show irrelevant or unmeasured metrics.
@@ -92,3 +92,28 @@ Baseline: `release/v1.7.3`. Keep recording engines, workout ownership, iPhone/Wa
   HealthKit/route/Ghost engines.
 - Review actual watchOS/iPhone compilation and device-size layouts before
   treating step 3 as completed.
+
+
+## Step 4 — contextual Always-On implementation
+
+- One low-power, read-only Watch dashboard. Workout, HealthKit and
+  WatchConnectivity ownership are unchanged.
+- Shared, testable resolver chooses current-set reps, completed-exercise
+  status, strength rest, strength timed countdown, structured running
+  interval (time/distance/open), run pace/distance, walk distance/pace or
+  elapsed time for other activities.
+- Strength rest and timed sets derive remaining seconds from absolute
+  reference dates; never automatically advance sets or start a second timer.
+- Structured running interval reads current step progress from the existing
+  Watch workout engine; open steps never receive a fabricated countdown.
+- The low-luminance surface retains pace/distance and workout elapsed time
+  where relevant. Ghost only displays a verified, recent gap outside of
+  structured-interval priority.
+- The footer shows only fresh heart rate, with a small zone marker when a
+  valid current sensor sample and configured zone are available.
+- No maps, photos, gradients, rapid animations, sound, touch controls or
+  persistent additional workout-session work in the Always-On view.
+- Final release gate: successful Watch/iOS build, simulator screens for
+  small/large watches, physical wrist-down power/refresh checks and
+  Watch/phone offline continuity. Do not call battery performance
+  validated without physical measurement.

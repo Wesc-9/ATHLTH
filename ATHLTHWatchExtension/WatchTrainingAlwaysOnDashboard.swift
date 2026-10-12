@@ -11,33 +11,20 @@ struct WatchTrainingAlwaysOnDashboard: View {
     private let quiet = Color.white.opacity(0.47)
     private let accent = Color(red: 0.48, green: 0.77, blue: 0.78)
 
-    private var presentationPlan: ATHLTHLivePresentationPlan {
-        let state: WatchWorkoutMirrorState
-        switch workout.state {
-        case .idle, .preparing: state = .preparing
-        case .running: state = .running
-        case .paused: state = .paused
-        case .ending: state = .ending
-        case .completed: state = .completed
-        case .failed: state = .failed
-        }
-        return ATHLTHLivePresentationResolver.resolve(
+    /// Select one information hierarchy for each workout phase.
+    /// The lowered-wrist view stays read-only and uses no extra workout timer.
+    private var alwaysOnFocus: ATHLTHAlwaysOnFocus {
+        ATHLTHAlwaysOnFocusResolver.resolve(
             .init(
                 kind: workout.kind,
-                state: state,
-                isStrengthResting: workout.strengthSession?.isResting ?? false,
+                hasStrengthSession: workout.strengthSession != nil,
+                isStrengthResting: workout.strengthSession?.isResting == true,
                 isTimedStrengthSet:
                     workout.strengthSession?.targetKindRaw == "time",
-                // Watch currently receives the time target, not an active
-                // countdown. Never label that target as elapsed/remaining.
-                hasStructuredRunningStep:
-                    workout.currentStructuredRunningStep != nil,
-                hasHeartRateTarget:
-                    workout.targetAlertConfiguration?.heartRateEnabled == true,
-                hasRoute: workout.plannedRoute != nil,
-                hasGhost: workout.ghostRaceTitle != nil,
-                hasAudioCoach: workout.audioCoachConfiguration.enabled,
-                hasTreadmillIncline: workout.treadmillInclinePercent != nil
+                isStrengthExerciseComplete:
+                    workout.strengthSession?.currentExerciseComplete == true,
+                currentRunningStepMeasure:
+                    workout.currentStructuredRunningStep?.measure
             )
         )
     }
@@ -50,12 +37,15 @@ struct WatchTrainingAlwaysOnDashboard: View {
             VStack(alignment: .leading, spacing: compact ? 5 : 8) {
                 header(compact: compact)
 
-                if workout.kind == .strength {
+                switch alwaysOnFocus {
+                case .strengthRest, .strengthTime, .strengthReps,
+                     .strengthComplete:
                     strengthDashboard(compact: compact)
-                } else if workout.kind == .running ||
-                            workout.kind == .walking {
+                case .intervalTime, .intervalDistance, .intervalOpen:
+                    intervalDashboard(compact: compact)
+                case .paceAndDistance, .distanceAndPace:
                     distanceDashboard(compact: compact)
-                } else {
+                case .elapsed:
                     genericDashboard(compact: compact)
                 }
             }
@@ -149,7 +139,7 @@ struct WatchTrainingAlwaysOnDashboard: View {
                         TimelineView(.periodic(from: .now, by: 5)) { timeline in
                             let seconds = restEndsAt.timeIntervalSince(timeline.date)
                             Text(seconds > 0
-                                 ? timeString(seconds)
+                                 ? timeString(ceil(seconds))
                                  : ATHLTHLocalization.choose(
                                     english: "READY", norwegian: "KLAR"
                                  ))
@@ -172,6 +162,26 @@ struct WatchTrainingAlwaysOnDashboard: View {
                     ))
                     .font(.system(size: compact ? 9 : 10))
                     .foregroundStyle(secondary)
+                } else if current.currentExerciseComplete {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Image(systemName: "checkmark.circle")
+                            .font(.system(size: compact ? 23 : 28))
+                            .foregroundStyle(accent)
+                        Text(current.allExercisesComplete
+                            ? ATHLTHLocalization.choose(
+                                english: "WORKOUT COMPLETE",
+                                norwegian: "ØKT FULLFØRT"
+                              )
+                            : ATHLTHLocalization.choose(
+                                english: "EXERCISE COMPLETE",
+                                norwegian: "ØVELSE FULLFØRT"
+                              ))
+                            .font(.system(size: compact ? 18 : 22,
+                                          weight: .bold, design: .rounded))
+                            .foregroundStyle(primary)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.8)
+                    }
                 } else if current.targetKindRaw == "time" {
                     // Same absolute-date timer as the interactive Watch
                     // screen and iPhone; never use a screen-owned counter.
@@ -180,7 +190,7 @@ struct WatchTrainingAlwaysOnDashboard: View {
                             .remaining(at: timeline.date)
                             ?? Double(current.draftDurationSeconds ?? 0)
                         HStack(alignment: .firstTextBaseline, spacing: 5) {
-                            Text(timeString(remaining))
+                            Text(timeString(ceil(remaining)))
                                 .font(.system(
                                     size: compact ? 38 : 44,
                                     weight: .bold, design: .rounded
@@ -272,7 +282,7 @@ struct WatchTrainingAlwaysOnDashboard: View {
                 .foregroundStyle(secondary)
                 .lineLimit(1)
 
-            if presentationPlan.primary == .distance {
+            if alwaysOnFocus == .distanceAndPace {
                 distanceMetric(fontSize: compact ? 37 : 44)
                 Text(ATHLTHLocalization.choose(
                     english: "DISTANCE", norwegian: "DISTANSE"
@@ -298,6 +308,118 @@ struct WatchTrainingAlwaysOnDashboard: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity,
                alignment: .topLeading)
+    }
+
+    /// Only the current step matters when wrist-down. Keep the main
+    /// countdown or distance dominant; do not show a cached Ghost lead in
+    /// place of the current training instruction.
+    private func intervalDashboard(compact: Bool) -> some View {
+        VStack(alignment: .leading, spacing: compact ? 4 : 6) {
+            if let step = workout.currentStructuredRunningStep {
+                Text(step.title)
+                    .font(.system(size: compact ? 11 : 13,
+                                  weight: .semibold, design: .rounded))
+                    .foregroundStyle(primary)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.75)
+
+                HStack(spacing: 5) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "INTERVAL", norwegian: "INTERVALL"
+                    ))
+                    if let structured = workout.structuredRunningWorkout {
+                        Text(
+                            "\(min(workout.structuredStepIndex + 1, structured.steps.count))/\(structured.steps.count)"
+                        )
+                        .monospacedDigit()
+                    }
+                    Spacer(minLength: 0)
+                }
+                .font(.system(size: compact ? 8 : 9, weight: .bold))
+                .foregroundStyle(accent)
+                .lineLimit(1)
+
+                let readout = ATHLTHRunIntervalReadout.resolve(
+                    step: step,
+                    elapsedSeconds: workout.currentStructuredStepElapsedTime,
+                    distanceMeters: workout.currentStructuredStepDistanceMeters
+                )
+
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    Text(intervalValue(readout))
+                        .font(.system(size: compact ? 37 : 44,
+                                      weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.70)
+                    if readout.unit == .meters,
+                       let meters = readout.remaining {
+                        Text(meters >= 1_000 ? "km" : "m")
+                            .font(.system(size: compact ? 11 : 12,
+                                          weight: .semibold))
+                            .foregroundStyle(accent)
+                    }
+                    Spacer(minLength: 0)
+                }
+
+                Text(intervalCaption(readout))
+                    .font(.system(size: compact ? 8 : 9,
+                                  weight: .semibold))
+                    .foregroundStyle(secondary)
+                    .lineLimit(1)
+
+                HStack(spacing: 6) {
+                    Text(paceString + "/km")
+                    Spacer(minLength: 0)
+                    Text(String(format: "%.2f km",
+                                max(workout.distanceMeters, 0) / 1_000))
+                }
+                .font(.system(size: compact ? 11 : 12,
+                              weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(secondary)
+                .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+            footer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity,
+               alignment: .topLeading)
+    }
+
+    private func intervalValue(_ readout: ATHLTHRunIntervalReadout)
+        -> String {
+        guard let remaining = readout.remaining else { return "—" }
+        switch readout.unit {
+        case .seconds:
+            return timeString(ceil(remaining))
+        case .meters:
+            return remaining >= 1_000
+                ? String(format: "%.2f", remaining / 1_000)
+                : String(Int(remaining.rounded(.up)))
+        case .open:
+            return "—"
+        }
+    }
+
+    private func intervalCaption(_ readout: ATHLTHRunIntervalReadout)
+        -> String {
+        switch readout.unit {
+        case .seconds:
+            return ATHLTHLocalization.choose(
+                english: "TIME LEFT", norwegian: "TID IGJEN"
+            )
+        case .meters:
+            return ATHLTHLocalization.choose(
+                english: "DISTANCE LEFT", norwegian: "DISTANSE IGJEN"
+            )
+        case .open:
+            return ATHLTHLocalization.choose(
+                english: "OPEN INTERVAL", norwegian: "ÅPENT INTERVALL"
+            )
+        }
     }
 
     // Keep pace, distance, heart rate and time as the main AOD metrics.
@@ -399,8 +521,25 @@ struct WatchTrainingAlwaysOnDashboard: View {
                 .font(.system(size: 8, weight: .bold))
                 .foregroundStyle(accent)
             Spacer(minLength: 0)
-            footer()
+            genericFooter()
         }
+    }
+
+    private func genericFooter() -> some View {
+        HStack(spacing: 6) {
+            Label(workout.hasFreshHeartRate
+                  ? String(Int(workout.heartRate.rounded()))
+                  : "—", systemImage: "heart.fill")
+            Spacer(minLength: 0)
+            if workout.activeCalories > 0 {
+                Label(String(Int(workout.activeCalories.rounded())),
+                      systemImage: "flame")
+            }
+        }
+        .font(.system(size: 11, weight: .semibold,
+                      design: .rounded))
+        .monospacedDigit()
+        .foregroundStyle(quiet)
     }
 
     private func footer() -> some View {
@@ -410,10 +549,19 @@ struct WatchTrainingAlwaysOnDashboard: View {
             Label(workout.hasFreshHeartRate
                   ? String(Int(workout.heartRate.rounded()))
                   : "—", systemImage: "heart.fill")
+
+            if workout.hasFreshHeartRate,
+               workout.targetAlertConfiguration?.heartRateEnabled == true,
+               let zone = workout.targetAlertConfiguration?.heartRateZone {
+                Text("S\(zone)")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(accent)
+            }
         }
         .font(.system(size: 11, weight: .semibold,
                       design: .rounded))
         .monospacedDigit()
+        .lineLimit(1)
         .foregroundStyle(quiet)
     }
 
