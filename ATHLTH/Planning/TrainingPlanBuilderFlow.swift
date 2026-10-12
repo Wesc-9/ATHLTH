@@ -1467,7 +1467,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             spacing: 8
         ) {
             ForEach(
-                [4, 6, 8, 12, 16],
+                [1, 2, 4, 6, 8, 12],
                 id: \.self
             ) { value in
                 Button {
@@ -1477,10 +1477,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         Text("\(value)")
                             .font(.headline)
                         Text(
-                            ATHLTHLocalization.choose(
-                                english: "weeks",
-                                norwegian: "uker"
-                            )
+                            value == 1
+                                ? ATHLTHLocalization.choose(
+                                    english: "week",
+                                    norwegian: "uke"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "weeks",
+                                    norwegian: "uker"
+                                )
                         )
                         .font(.caption2)
                     }
@@ -1512,9 +1517,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     Button(
                         ATHLTHLocalization.choose(
                             english:
-                                "\(value) weeks",
+                                value == 1 ? "1 week" : "\(value) weeks",
                             norwegian:
-                                "\(value) uker"
+                                value == 1 ? "1 uke" : "\(value) uker"
                         )
                     ) {
                         weekCount = value
@@ -1531,13 +1536,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     Text(
                         ATHLTHLocalization.choose(
                             english: "Custom",
-                            norwegian: "Annet"
+                            norwegian: "Egendefinert"
                         )
                     )
                     .font(.caption2)
                 }
                 .foregroundStyle(
-                    [4, 6, 8, 12, 16]
+                    [1, 2, 4, 6, 8, 12]
                         .contains(weekCount)
                         ? ATHLTHTheme.mutedText
                         : ATHLTHTheme.accentDeep
