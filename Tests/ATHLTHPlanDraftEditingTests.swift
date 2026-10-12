@@ -81,4 +81,70 @@ final class ATHLTHPlanDraftEditingTests: XCTestCase {
             with: draft.weeks[0].days[0].sessions[0]
         ))
     }
+
+    func testMovingDraftWorkoutDoesNotAffectOtherWeeksOrSaveThePlan() throws {
+        let initial = makeDraft()
+        let expanded = AIProgramDraft(
+            title: initial.title,
+            summary: initial.summary,
+            weeks: initial.weeks.map { week in
+                AIProgramDraftWeek(
+                    weekNumber: week.weekNumber,
+                    title: week.title,
+                    days: week.days + [
+                        AIProgramDraftDay(dayIndex: 2, title: "Tuesday", sessions: [])
+                    ]
+                )
+            }
+        )
+        let selection = ATHLTHPlanDraftWorkoutSelection(
+            weekNumber: 2, dayIndex: 1, sessionIndex: 0
+        )
+        let moved = try XCTUnwrap(ATHLTHPlanDraftEditing.moving(
+            in: expanded, selection: selection, toDayIndex: 2
+        ))
+        XCTAssertEqual(expanded.weeks[1].days[0].sessions.count, 1)
+        XCTAssertTrue(moved.weeks[1].days[0].sessions.isEmpty)
+        XCTAssertEqual(moved.weeks[1].days[1].sessions.first?.title, "Gym 2")
+        XCTAssertEqual(moved.weeks[0], expanded.weeks[0])
+        XCTAssertEqual(moved.weeks[2], expanded.weeks[2])
+        XCTAssertEqual(moved.sessionCount, expanded.sessionCount)
+        XCTAssertTrue(ATHLTHPlanDraftValidator.issues(
+            in: moved, expectedWeeks: 3
+        ).isEmpty)
+    }
+
+    func testMoveRejectsAnOccupiedOrInvalidDestination() {
+        let before = makeDraft()
+        let selected = ATHLTHPlanDraftWorkoutSelection(
+            weekNumber: 1, dayIndex: 1, sessionIndex: 0
+        )
+        XCTAssertNil(ATHLTHPlanDraftEditing.moving(
+            in: before, selection: selected, toDayIndex: 1
+        ))
+        XCTAssertNil(ATHLTHPlanDraftEditing.moving(
+            in: before, selection: selected, toDayIndex: 12
+        ))
+        let occupied = AIProgramDraft(
+            title: before.title,
+            summary: before.summary,
+            weeks: before.weeks.map { week in
+                AIProgramDraftWeek(
+                    weekNumber: week.weekNumber,
+                    title: week.title,
+                    days: week.days + [
+                        AIProgramDraftDay(
+                            dayIndex: 2,
+                            title: "Tuesday",
+                            sessions: week.days[0].sessions
+                        )
+                    ]
+                )
+            }
+        )
+        XCTAssertNil(ATHLTHPlanDraftEditing.moving(
+            in: occupied, selection: selected, toDayIndex: 2
+        ))
+    }
+
 }
