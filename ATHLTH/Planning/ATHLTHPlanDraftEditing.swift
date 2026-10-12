@@ -52,6 +52,49 @@ enum ATHLTHPlanDraftEditing {
             weeks: weeks
         )
     }
+    /// Move a draft workout inside the same week without touching a real plan.
+    /// The target day must be empty to preserve one planned workout per day.
+    static func moving(
+        in draft: AIProgramDraft,
+        selection: ATHLTHPlanDraftWorkoutSelection,
+        toDayIndex: Int
+    ) -> AIProgramDraft? {
+        guard (1...7).contains(toDayIndex),
+              selection.dayIndex != toDayIndex,
+              let sourceWorkout = workout(in: draft, selection: selection),
+              let week = draft.weeks.first(where: { $0.weekNumber == selection.weekNumber }),
+              let destination = week.days.first(where: { $0.dayIndex == toDayIndex }),
+              destination.sessions.isEmpty else {
+            return nil
+        }
+
+        let updatedWeeks = draft.weeks.map { week -> AIProgramDraftWeek in
+            guard week.weekNumber == selection.weekNumber else { return week }
+            let days = week.days.map { day -> AIProgramDraftDay in
+                var sessions = day.sessions
+                if day.dayIndex == selection.dayIndex {
+                    sessions.remove(at: selection.sessionIndex)
+                } else if day.dayIndex == toDayIndex {
+                    sessions.append(sourceWorkout)
+                }
+                return AIProgramDraftDay(
+                    dayIndex: day.dayIndex,
+                    title: day.title,
+                    sessions: sessions
+                )
+            }
+            return AIProgramDraftWeek(
+                weekNumber: week.weekNumber,
+                title: week.title,
+                days: days
+            )
+        }
+        return AIProgramDraft(
+            title: draft.title,
+            summary: draft.summary,
+            weeks: updatedWeeks
+        )
+    }
 }
 
 private extension Array {
