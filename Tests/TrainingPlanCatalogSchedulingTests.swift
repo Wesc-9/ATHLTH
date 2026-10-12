@@ -3,6 +3,55 @@ import XCTest
 
 final class TrainingPlanCatalogSchedulingTests: XCTestCase {
     @MainActor
+    func testShortOneAndTwoWeekProgramsUseActualSelectedDuration() {
+        for weeks in [1, 2] {
+            let suite = "TrainingPlanShortDurationTests.\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName: suite)!
+            defer { defaults.removePersistentDomain(forName: suite) }
+
+            let store = AppSessionStore(defaults: defaults)
+            let profile = TrainingPlanBuilderProfile(
+                mode: .basic,
+                primaryFocus: .generalFitness,
+                secondaryFocus: nil,
+                primaryFocusWeightPercent: nil,
+                goal: .improveFitness,
+                goalDetail: nil,
+                competitionDate: nil,
+                sessionsPerWeek: 3,
+                preferredDayIndexes: [1, 3, 5],
+                injuriesOrLimitations: nil,
+                priorityMuscles: [],
+                equipmentContext: "gym",
+                weeklyTimeBudgetMinutes: 180,
+                preferredWorkoutKindsByDay: [:]
+            )
+
+            let start = Calendar.current.date(
+                from: DateComponents(year: 2030, month: 1, day: 8)
+            )!
+            let result = store.createConfiguredTrainingPlan(
+                title: "Short program",
+                summary: "",
+                weekCount: weeks,
+                startDate: start,
+                builderProfile: profile,
+                seedSuggestedWeek: false
+            )
+
+            XCTAssertEqual(result?.weeks.count, weeks)
+            XCTAssertEqual(
+                result?.endDate,
+                Calendar.current.date(
+                    byAdding: .day,
+                    value: weeks * 7 - 1,
+                    to: start
+                )
+            )
+        }
+    }
+
+    @MainActor
     func testSchedulingSameCatalogPlanTwiceReturnsExistingPlan() {
         let suiteName =
             "TrainingPlanCatalogSchedulingTests.\(UUID().uuidString)"
