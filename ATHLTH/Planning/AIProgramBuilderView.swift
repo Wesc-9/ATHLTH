@@ -135,6 +135,30 @@ struct AIProgramBuilderView: View {
         ) ?? startDate
     }
 
+    private func draftValidationIssues(_ draft: AIProgramDraft) -> [String] {
+        let lockedDays: Set<String>
+        if mode == .complete {
+            lockedDays = Set(
+                existingDays
+                    .filter { !$0.existingSessions.isEmpty }
+                    .map { "\($0.weekNumber):\($0.dayIndex)" }
+            )
+        } else {
+            lockedDays = []
+        }
+        let limit = aiChoosesFrequency && mode == .generate
+            ? availableDays.count
+            : sessionsPerWeek
+        return ATHLTHPlanDraftValidator.issues(
+            in: draft,
+            expectedWeeks: resolvedWeeks,
+            allowedDayIndexes: availableDays,
+            maximumSessionsPerWeek: limit,
+            lockedDayKeys: lockedDays,
+            requireFullWeeks: true
+        )
+    }
+
     private var canGenerate: Bool {
         questionsAnswered &&
         !availableDays.isEmpty &&
@@ -220,9 +244,7 @@ struct AIProgramBuilderView: View {
                 ATHLTHPlanDraftWorkoutEditor(workout: workout) { modifiedWorkout in
                     guard let changed = ATHLTHPlanDraftEditing.replacing(
                         in: draft, selection: selection, with: modifiedWorkout
-                    ), ATHLTHPlanDraftValidator.issues(
-                        in: changed, expectedWeeks: resolvedWeeks
-                    ).isEmpty else {
+                    ), draftValidationIssues(changed).isEmpty else {
                         errorMessage = ATHLTHLocalization.choose(
                             english: "This change is not valid. The draft was not modified.",
                             norwegian: "Endringen er ugyldig. Utkastet ble ikke endret."
@@ -1133,10 +1155,7 @@ struct AIProgramBuilderView: View {
                                                             selection: selection,
                                                             toDayIndex: target.dayIndex,
                                                             allowedDayIndexes: availableDays
-                                                        ), ATHLTHPlanDraftValidator.issues(
-                                                            in: moved,
-                                                            expectedWeeks: resolvedWeeks
-                                                        ).isEmpty else {
+                                                        ), draftValidationIssues(moved).isEmpty else {
                                                             errorMessage = ATHLTHLocalization.choose(
                                                                 english: "Could not move this workout in the draft.",
                                                                 norwegian: "Kunne ikke flytte økten i utkastet."
@@ -1228,9 +1247,7 @@ struct AIProgramBuilderView: View {
         do {
             let result = try await service.generate(request)
             guard session.signedIn, session.profile.userID == requestOwnerID else { return }
-            let validationIssues = ATHLTHPlanDraftValidator.issues(
-                in: result, expectedWeeks: resolvedWeeks
-            )
+            let validationIssues = draftValidationIssues(result)
             guard validationIssues.isEmpty else {
                 preview = nil
                 errorMessage = ATHLTHLocalization.choose(
@@ -1284,9 +1301,7 @@ struct AIProgramBuilderView: View {
 
     @MainActor
     private func applyPreview(_ draft: AIProgramDraft) {
-        guard ATHLTHPlanDraftValidator.issues(
-            in: draft, expectedWeeks: resolvedWeeks
-        ).isEmpty else {
+        guard draftValidationIssues(draft).isEmpty else {
             errorMessage = ATHLTHLocalization.choose(
                 english: "Review the draft; it contains an invalid workout. Nothing has been saved.",
                 norwegian: "Kontroller utkastet. En økt er ugyldig. Ingenting er lagret."
