@@ -113,6 +113,23 @@ enum ATHLTHArenaArchivePresentation {
             .replacingOccurrences(of: "æ", with: "ae")
     }
 
+    /// Merge fetched archive pages without duplicating an item already
+    /// present in the main list. Current server rows win if they changed
+    /// status since an older archive page was loaded.
+    static func merge(
+        recent: [ATHLTHArenaRemoteSeries],
+        older: [ATHLTHArenaRemoteSeries]
+    ) -> [ATHLTHArenaRemoteSeries] {
+        let seen = Set(recent.map(\.id))
+        var found = seen
+        var merged = recent
+        for row in older where !found.contains(row.id) {
+            merged.append(row)
+            found.insert(row.id)
+        }
+        return merged
+    }
+
     static func visible(
         _ completed: [ATHLTHArenaRemoteSeries],
         filter: Filter,
@@ -161,12 +178,19 @@ struct ATHLTHArenaOnlineSection: View {
     @State private var showsAllCompleted = false
     @State private var archiveSearchText = ""
     @State private var archiveFilter: ATHLTHArenaArchivePresentation.Filter = .all
+    @State private var olderCompletedSeries: [ATHLTHArenaRemoteSeries] = []
+    @State private var loadingOlderArchive = false
+    @State private var hasMoreArchive = true
+    @State private var archiveLoadError: String?
 
     private var visibleSeries: [ATHLTHArenaRemoteSeries] {
         ATHLTHArenaArchiveAccountScope.mayDisplay(
             loadedForUserID: loadedForUserID,
             currentUserID: session.profile.userID
-        ) ? series : []
+        ) ? ATHLTHArenaArchivePresentation.merge(
+            recent: series,
+            older: olderCompletedSeries
+        ) : []
     }
 
     private var activeSeries: [ATHLTHArenaRemoteSeries] {
@@ -266,7 +290,7 @@ struct ATHLTHArenaOnlineSection: View {
                 }
             }
 
-            if !finishedSeries.isEmpty {
+            if !finishedSeries.isEmpty || hasMoreArchive {
                 HStack {
                     sectionHeading(
                         title: ATHLTHLocalization.choose(
@@ -373,6 +397,42 @@ struct ATHLTHArenaOnlineSection: View {
                 ))) { item in
                     seriesRow(item)
                 }
+
+                if hasMoreArchive {
+                    Button {
+                        Task { await loadMoreArchive() }
+                    } label: {
+                        HStack(spacing: 8) {
+                            if loadingOlderArchive {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Image(systemName: "clock.arrow.circlepath")
+                            }
+                            Text(ATHLTHLocalization.choose(
+                                english: "Load older competitions",
+                                norwegian: "Hent eldre konkurranser"
+                            ))
+                            Spacer(minLength: 0)
+                            Image(systemName: "arrow.down.circle")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .padding(13)
+                        .background(ATHLTHArenaLightStyle.card(14))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(loadingOlderArchive || loading)
+                    .accessibilityHint(ATHLTHLocalization.choose(
+                        english: "Loads up to 40 earlier completed competitions without changing scores.",
+                        norwegian: "Henter inntil 40 eldre avsluttede konkurranser uten å endre poeng."
+                    ))
+                }
+
+                if let archiveLoadError {
+                    Text(archiveLoadError)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
             }
 
             if !otherSeries.isEmpty {
@@ -397,6 +457,9 @@ struct ATHLTHArenaOnlineSection: View {
             // rows; cached rows are hidden by the account-scope gate.
             series = []
             loadedForUserID = nil
+            olderCompletedSeries = []
+            hasMoreArchive = true
+            archiveLoadError = nil
             errorMessage = nil
             Task { await refresh() }
         }
@@ -409,6 +472,42 @@ struct ATHLTHArenaOnlineSection: View {
                 if Task.isCancelled { break }
                 await refresh()
             }
+        }
+    }
+
+    /// Paginate just the completed rows rather than increasing the
+    /// cost of each 60-second refresh for active competitions.
+    @MainActor
+    private func loadMoreArchive() async {
+        guard !loadingOlderArchive, !loading,
+              ATHLTHArenaArchiveAccountScope.mayDisplay(
+                  loadedForUserID: loadedForUserID,
+                  currentUserID: session.profile.userID
+              ) else { return }
+
+        let requestingUser = session.profile.userID
+        let offset = finishedSeries.count
+        loadingOlderArchive = true
+        defer { loadingOlderArchive = false }
+
+        do {
+            let rows = try await cloud.loadCompletedSeriesPage(
+                offset: offset, pageSize: 40
+            )
+            guard !Task.isCancelled,
+                  session.profile.userID == requestingUser,
+                  loadedForUserID == requestingUser else { return }
+
+            olderCompletedSeries = ATHLTHArenaArchivePresentation.merge(
+                recent: olderCompletedSeries,
+                older: rows
+            )
+            hasMoreArchive = rows.count == 40
+            archiveLoadError = nil
+            showsAllCompleted = true
+        } catch {
+            guard session.profile.userID == requestingUser else { return }
+            archiveLoadError = error.localizedDescription
         }
     }
 
