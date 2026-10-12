@@ -74,6 +74,7 @@ struct AIProgramBuilderView: View {
         to: Calendar.current.startOfDay(for: Date())
     ) ?? Date()
     @State private var sessionsPerWeek = 4
+    @State private var aiChoosesFrequency = false
     @State private var sessionDurationMinutes = 60
     @State private var availableDays: Set<Int> = Set(1...7)
     @State private var userNotes = ""
@@ -354,13 +355,47 @@ struct AIProgramBuilderView: View {
             )
 
             coachCard {
-                Stepper(
-                    "\(sessionsPerWeek) sessions per week",
-                    value: $sessionsPerWeek,
-                    in: 1...max(availableDays.count, 1)
-                )
-                .onChange(of: sessionsPerWeek) { _, _ in
-                    preview = nil
+                if mode == .generate {
+                    Toggle(isOn: $aiChoosesFrequency) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Let AI suggest workout frequency",
+                                norwegian: "La AI foreslå antall økter"
+                            ))
+                            .font(.subheadline.weight(.semibold))
+                            Text(ATHLTHLocalization.choose(
+                                english: "Coach chooses a reasonable number of workouts based on your current level, goals and available days. Review everything before saving.",
+                                norwegian: "Coach foreslår antall økter ut fra nivå, mål og tilgjengelige dager. Du kontrollerer alt før lagring."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                    }
+                    .tint(ATHLTHTheme.accentDeep)
+                    .onChange(of: aiChoosesFrequency) { _, _ in preview = nil }
+                    Divider()
+                }
+
+                if aiChoosesFrequency && mode == .generate {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "At most \(availableDays.count) workouts per week, only on your available days.",
+                            norwegian: "Maks \(availableDays.count) økter per uke, kun på valgte dager."
+                        ),
+                        systemImage: "calendar.badge.clock"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                } else {
+                    Stepper(
+                        ATHLTHLocalization.choose(
+                            english: "\(sessionsPerWeek) workouts per week",
+                            norwegian: "\(sessionsPerWeek) økter per uke"
+                        ),
+                        value: $sessionsPerWeek,
+                        in: 1...max(availableDays.count, 1)
+                    )
+                    .onChange(of: sessionsPerWeek) { _, _ in preview = nil }
                 }
 
                 Divider()
@@ -1129,7 +1164,9 @@ struct AIProgramBuilderView: View {
             mode: mode.rawValue,
             startDate: ISO8601DateFormatter().string(from: startDate),
             weekCount: resolvedWeeks,
-            sessionsPerWeek: sessionsPerWeek,
+            sessionsPerWeek: aiChoosesFrequency && mode == .generate
+                ? availableDays.count : sessionsPerWeek,
+            aiChoosesFrequency: aiChoosesFrequency && mode == .generate,
             preferredDays: availableDays.sorted(),
             sessionDurationMinutes: sessionDurationMinutes,
             userNotes: historyContext + String(coachContext.prefix(1900)) + "\nAdditional preferences: " + String(userNotes.prefix(500)),
