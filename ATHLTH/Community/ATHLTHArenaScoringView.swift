@@ -151,6 +151,9 @@ struct ATHLTHArenaScoringSection: View {
     let isOrganizer: Bool
     @Binding var liveOutcomeDraft: ATHLTHArenaLiveOutcomeDraft?
     let onChanged: () async -> Void
+    /// Navigates to the existing unanimous vote controls. This callback
+    /// never casts a vote or modifies approved points.
+    let onReviewRound: (UUID) -> Void
 
     @State private var results: [ATHLTHArenaRoundResult] = []
     @State private var resultsLoaded = false
@@ -663,15 +666,34 @@ struct ATHLTHArenaScoringSection: View {
                                 eligibleIDs: acceptedIDs,
                                 votes: votes
                             ) {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Your vote is needed – review the round below",
-                                        norwegian: "Din stemme mangler – se runden nedenfor"
-                                    ),
-                                    systemImage: "exclamationmark.circle"
-                                )
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(.orange)
+                                Button {
+                                    onReviewRound(result.roundID)
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Review and vote",
+                                                norwegian: "Se og stem"
+                                            ),
+                                            systemImage: "checkmark.shield"
+                                        )
+                                        Spacer(minLength: 0)
+                                        Image(systemName: "arrow.down.right")
+                                    }
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    .padding(.horizontal, 10)
+                                    .frame(minHeight: 36)
+                                    .background(
+                                        ATHLTHTheme.vitalitySoft.opacity(0.56),
+                                        in: RoundedRectangle(cornerRadius: 10)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityHint(ATHLTHLocalization.choose(
+                                    english: "Opens this round's result for manual approval or rejection. No vote is cast automatically.",
+                                    norwegian: "Åpner rundens resultat for manuell godkjenning eller avvisning. Ingen stemme sendes automatisk."
+                                ))
                             }
                         }
 
