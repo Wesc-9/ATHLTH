@@ -300,6 +300,19 @@ private struct ATHLTHLiveWorkoutLocationWrite: Encodable {
 }
 
 
+/// Only the workout belonging to this Live Ghost challenge may send
+/// its GPS updates or trigger shared-session completion. General live
+/// workout sharing is unaffected by this restriction.
+enum ATHLTHLiveGhostWorkoutBinding {
+    static func accepts(
+        ghostChallengeID: UUID?,
+        comparisonRouteID: UUID?
+    ) -> Bool {
+        guard let ghostChallengeID else { return true }
+        return comparisonRouteID == ghostChallengeID
+    }
+}
+
 /// Prevents duplicate iPhone/Apple Watch completion events from racing
 /// to submit the same Live Ghost result. The database remains authoritative.
 struct ATHLTHLiveGhostFinishGate {
@@ -738,7 +751,11 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         guard let session = currentSession,
               session.isActive,
               isSharingLiveLocation,
-              let currentUserID
+              let currentUserID,
+              ATHLTHLiveGhostWorkoutBinding.accepts(
+                  ghostChallengeID: session.ghostChallengeID,
+                  comparisonRouteID: routeKey
+              )
         else {
             return
         }
@@ -845,6 +862,10 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
               session.isActive,
               isSharingLiveLocation,
               let currentUserID,
+              ATHLTHLiveGhostWorkoutBinding.accepts(
+                  ghostChallengeID: session.ghostChallengeID,
+                  comparisonRouteID: snapshot.routeComparisonID
+              ),
               let latitude = snapshot.currentLatitude,
               let longitude = snapshot.currentLongitude,
               latitude.isFinite,
