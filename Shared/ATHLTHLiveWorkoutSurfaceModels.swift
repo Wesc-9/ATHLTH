@@ -58,6 +58,13 @@ struct ATHLTHLiveWorkoutSurfaceConfiguration: Codable, Hashable {
     var liveChallengeEnabled: Bool
     var liveShareEnabled: Bool
 
+    // Additive preferences: nil preserves older persisted and transferred
+    // configurations. They only affect visual presentation on Apple Watch.
+    var preferredRunMetricRaw: String? = nil
+    var preferredRunPageRaw: String? = nil
+    var strongWatchContrast: Bool? = nil
+    var privateAlwaysOn: Bool? = nil
+
     static let standard = ATHLTHLiveWorkoutSurfaceConfiguration(
         dynamicIslandEnabled: true,
         watchEnabled: true,

@@ -111,6 +111,8 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
                     isOn: $liveConfiguration.audioAlertsEnabled
                 )
 
+                watchPersonalizationSettings
+
                 Text(
                     "These are the same master alert controls shown under Workout Guidance. They affect Route Guardian, target and Ghost alerts on iPhone and Apple Watch; Audio Coach remains separately configurable."
                 )
@@ -139,6 +141,101 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
                     }
                 }
             }
+        }
+    }
+
+    private var watchPersonalizationSettings: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Divider()
+
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Apple Watch display",
+                    norwegian: "Apple Watch-visning"
+                ),
+                systemImage: "applewatch"
+            )
+            .font(.subheadline.weight(.bold))
+            .foregroundStyle(ATHLTHTheme.primaryText)
+
+            Text(ATHLTHLocalization.choose(
+                english: "Choose the main metric and the first page of your run. Automatic keeps the current run/walk defaults.",
+                norwegian: "Velg hovedmåling og startsiden for løping. Automatisk beholder dagens standardvalg for løping og gåtur."
+            ))
+            .font(.caption)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Picker(
+                ATHLTHLocalization.choose(
+                    english: "Primary running metric",
+                    norwegian: "Hovedmåling"
+                ),
+                selection: Binding(
+                    get: { liveConfiguration.preferredRunMetricRaw ?? "automatic" },
+                    set: { liveConfiguration.preferredRunMetricRaw = $0 }
+                )
+            ) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Automatic", norwegian: "Automatisk"
+                )).tag("automatic")
+                Text(ATHLTHLocalization.choose(
+                    english: "Pace", norwegian: "Tempo"
+                )).tag("pace")
+                Text(ATHLTHLocalization.choose(
+                    english: "Distance", norwegian: "Distanse"
+                )).tag("distance")
+            }
+            .pickerStyle(.menu)
+
+            Picker(
+                ATHLTHLocalization.choose(
+                    english: "Run start page", norwegian: "Startside for løping"
+                ),
+                selection: Binding(
+                    get: { liveConfiguration.preferredRunPageRaw ?? "metrics" },
+                    set: { liveConfiguration.preferredRunPageRaw = $0 }
+                )
+            ) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Live metrics", norwegian: "Live målinger"
+                )).tag("metrics")
+                Text(ATHLTHLocalization.choose(
+                    english: "Heart rate", norwegian: "Puls"
+                )).tag("pulse")
+                Text("Audio Coach").tag("coach")
+            }
+            .pickerStyle(.menu)
+
+            Toggle(
+                ATHLTHLocalization.choose(
+                    english: "High contrast on Watch",
+                    norwegian: "Høy kontrast på klokken"
+                ),
+                isOn: Binding(
+                    get: { liveConfiguration.strongWatchContrast == true },
+                    set: { liveConfiguration.strongWatchContrast = $0 }
+                )
+            )
+
+            Toggle(
+                ATHLTHLocalization.choose(
+                    english: "Private Always-On screen",
+                    norwegian: "Privat Always-On-skjerm"
+                ),
+                isOn: Binding(
+                    get: { liveConfiguration.privateAlwaysOn == true },
+                    set: { liveConfiguration.privateAlwaysOn = $0 }
+                )
+            )
+
+            Text(ATHLTHLocalization.choose(
+                english: "Privacy mode shows only activity type and elapsed time while your wrist is down. Detailed workout data is still available when the Watch wakes. Changes sync to the Watch when connected.",
+                norwegian: "Personvernmodus viser bare treningsform og økttid når håndleddet er senket. Detaljene vises igjen når klokken vekkes. Valgene synkroniseres når klokken er tilkoblet."
+            ))
+            .font(.caption2)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 

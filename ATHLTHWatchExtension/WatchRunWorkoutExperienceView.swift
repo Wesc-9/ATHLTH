@@ -14,6 +14,24 @@ struct WatchRunWorkoutExperienceView: View {
     private var isLuminanceReduced
 
     @State private var selectedPage = 0
+
+    private var prefersDistanceFirst: Bool {
+        ATHLTHWatchDisplayPreferences.prefersDistance(
+            kind: workoutManager.kind,
+            configuration: workoutManager.liveSurfaceConfiguration
+        )
+    }
+
+    private var strongContrast: Bool {
+        ATHLTHWatchDisplayPreferences.prefersStrongContrast(
+            workoutManager.liveSurfaceConfiguration
+        )
+    }
+
+    private var secondaryLiveText: Color {
+        Color.white.opacity(strongContrast ? 0.96 : 0.77)
+    }
+
     @State private var coachOutputName: String?
     @State private var confirmingEnd = false
     @State private var ghostMapPosition:
@@ -91,8 +109,18 @@ struct WatchRunWorkoutExperienceView: View {
             WatchTheme.textPrimary
         )
         .onAppear {
+            selectedPage = ATHLTHWatchDisplayPreferences.startingRunPage(
+                configuration: workoutManager.liveSurfaceConfiguration,
+                audioCoachAvailable: workoutManager.audioCoachConfigured
+            )
             coachOutputName = AVAudioSession.sharedInstance()
                 .currentRoute.outputs.first?.portName
+        }
+        .onChange(of: workoutManager.liveSurfaceConfiguration.preferredRunPageRaw) { _, _ in
+            selectedPage = ATHLTHWatchDisplayPreferences.startingRunPage(
+                configuration: workoutManager.liveSurfaceConfiguration,
+                audioCoachAvailable: workoutManager.audioCoachConfigured
+            )
         }
         .onReceive(
             NotificationCenter.default.publisher(
@@ -1821,7 +1849,7 @@ struct WatchRunWorkoutExperienceView: View {
                     Text(liveWorkoutStepTitle)
                         .font(.system(size: compact ? 10 : 11,
                                       weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.77))
+                        .foregroundStyle(secondaryLiveText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                 } else if workoutManager.liveSurfaceContext.liveGhost != nil {
@@ -1835,9 +1863,7 @@ struct WatchRunWorkoutExperienceView: View {
                         .minimumScaleFactor(0.8)
                 }
 
-                if ATHLTHLivePresentationResolver.resolve(
-                    .init(kind: workoutManager.kind, state: .running)
-                ).primary == .distance {
+                if prefersDistanceFirst {
                     // Walking: distance is more useful than running pace.
                     liveHeroMetric(
                         title: ATHLTHLocalization.choose(
@@ -1884,7 +1910,7 @@ struct WatchRunWorkoutExperienceView: View {
                         durationText(workoutManager.elapsedTime),
                         systemImage: "clock"
                     )
-                    .foregroundStyle(Color.white.opacity(0.88))
+                    .foregroundStyle(Color.white.opacity(strongContrast ? 1 : 0.88))
                     Spacer(minLength: 4)
                     Label(heartRateText, systemImage: "heart.fill")
                         .foregroundStyle(WatchTheme.liveHeart)

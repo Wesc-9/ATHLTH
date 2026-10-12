@@ -261,3 +261,27 @@ Baseline: `release/v1.7.3`. Keep recording engines, workout ownership, iPhone/Wa
 - Final phase 8 gate: compile/watchOS and iOS tests, physical Watch
   screenshots, VoiceOver navigation, high-contrast checks,
   large Dynamic Type, reduced-motion and wrist-down battery behavior.
+
+## Phase 8 — personalized Watch views and Always-On privacy (increment 2)
+
+- Reuse the existing Live Workout surface configuration and its normal
+  iPhone → Watch transfer. Four optional, backwards-compatible settings:
+  preferred run primary metric (automatic/pace/distance), preferred initial
+  run page (live/pulse/audio), high contrast and private Always-On.
+- Default settings preserve the current run pace-first, walk distance-first
+  and live-metrics initial page hierarchy. If Audio Coach is not configured,
+  requesting its first page safely falls back to live metrics.
+- In the existing Widgets & Surfaces settings, display all four options
+  with immediate persistence and the established WatchConnectivity send.
+  Older persisted JSON safely decodes with nil optionals and default behavior.
+- The interactive Watch run hero orders the two metrics according to the
+  preference. Initial page selection changes only navigation, never
+  workout recording/elapsed time or sensor ownership.
+- Contrast opt-in strengthens labels on the Watch live metrics and
+  low-power Always-On screen.
+- Always-On privacy mode, opt-in, shows only activity category and workout
+  elapsed time while the wrist is down. It hides exercise names, interval
+  targets, heart rate, route names and ghost gap until the Watch wakes.
+- Tests cover defaults, custom priority, unavailable Audio Coach fallback,
+  privacy/contrast and old configuration decoding. Device and battery
+  acceptance gates still apply before a release is declared validated.

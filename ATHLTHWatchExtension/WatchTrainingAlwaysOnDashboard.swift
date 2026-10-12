@@ -6,9 +6,27 @@ import SwiftUI
 struct WatchTrainingAlwaysOnDashboard: View {
     @EnvironmentObject private var workout: WatchWorkoutManager
 
-    private let primary = Color.white.opacity(0.88)
-    private let secondary = Color.white.opacity(0.64)
-    private let quiet = Color.white.opacity(0.47)
+    private var strongContrast: Bool {
+        ATHLTHWatchDisplayPreferences.prefersStrongContrast(
+            workout.liveSurfaceConfiguration
+        )
+    }
+
+    private var isPrivateAlwaysOn: Bool {
+        ATHLTHWatchDisplayPreferences.hidesAlwaysOnDetails(
+            workout.liveSurfaceConfiguration
+        )
+    }
+
+    private var primary: Color {
+        Color.white.opacity(strongContrast ? 1 : 0.88)
+    }
+    private var secondary: Color {
+        Color.white.opacity(strongContrast ? 0.93 : 0.64)
+    }
+    private var quiet: Color {
+        Color.white.opacity(strongContrast ? 0.80 : 0.47)
+    }
     private let accent = Color(red: 0.48, green: 0.77, blue: 0.78)
 
     /// Select one information hierarchy for each workout phase.
@@ -38,18 +56,22 @@ struct WatchTrainingAlwaysOnDashboard: View {
             VStack(alignment: .leading, spacing: compact ? 5 : 8) {
                 header(compact: compact)
 
-                switch alwaysOnFocus {
-                case .strengthRest, .strengthTime, .strengthReps,
-                     .strengthComplete:
-                    strengthDashboard(compact: compact)
-                case .intervalTime, .intervalDistance, .intervalOpen:
-                    intervalDashboard(compact: compact)
-                case .paceAndDistance, .distanceAndPace:
-                    distanceDashboard(compact: compact)
-                case .cyclingDistance:
-                    cyclingDashboard(compact: compact)
-                case .elapsed:
-                    genericDashboard(compact: compact)
+                if isPrivateAlwaysOn {
+                    privateWorkoutDashboard(compact: compact)
+                } else {
+                    switch alwaysOnFocus {
+                    case .strengthRest, .strengthTime, .strengthReps,
+                         .strengthComplete:
+                        strengthDashboard(compact: compact)
+                    case .intervalTime, .intervalDistance, .intervalOpen:
+                        intervalDashboard(compact: compact)
+                    case .paceAndDistance, .distanceAndPace:
+                        distanceDashboard(compact: compact)
+                    case .cyclingDistance:
+                        cyclingDashboard(compact: compact)
+                    case .elapsed:
+                        genericDashboard(compact: compact)
+                    }
                 }
             }
             .padding(.horizontal, compact ? 10 : 13)
@@ -90,6 +112,51 @@ struct WatchTrainingAlwaysOnDashboard: View {
             }
         }
         .font(.system(size: 9, weight: .bold))
+    }
+
+    /// Privacy is opt-in and only affects the lowered-wrist display.
+    /// Activity recording continues normally and interactive pages
+    /// retain their usual detailed metrics when the user raises the Watch.
+    private func privateWorkoutDashboard(compact: Bool) -> some View {
+        VStack(alignment: .leading, spacing: compact ? 8 : 12) {
+            Label(
+                workout.kind.title,
+                systemImage: workout.kind.systemImage
+            )
+            .font(.system(size: compact ? 12 : 15, weight: .bold))
+            .foregroundStyle(secondary)
+            .lineLimit(1)
+
+            Text(timeString(workout.elapsedTime))
+                .font(.system(
+                    size: compact ? 39 : 46,
+                    weight: .bold,
+                    design: .rounded
+                ))
+                .monospacedDigit()
+                .foregroundStyle(primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
+
+            Text(ATHLTHLocalization.choose(
+                english: "WORKOUT TIME", norwegian: "ØKTTID"
+            ))
+            .font(.system(size: compact ? 9 : 10, weight: .bold))
+            .foregroundStyle(accent)
+
+            Spacer(minLength: 0)
+
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Private display", norwegian: "Privat visning"
+                ),
+                systemImage: "lock.shield"
+            )
+            .font(.system(size: compact ? 9 : 10, weight: .semibold))
+            .foregroundStyle(secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity,
+               alignment: .topLeading)
     }
 
     private func strengthDashboard(compact: Bool) -> some View {
