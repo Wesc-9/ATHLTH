@@ -259,6 +259,71 @@ final class ATHLTHArenaResultHistoryPresentationTests: XCTestCase {
         )
     }
 
+    func testNextVotePrioritizesOldestEligiblePendingProposal() {
+        let viewer = UUID(), roundID = UUID()
+        let first = result(roundID: roundID, status: "pending", age: 50)
+        let newer = result(roundID: roundID, status: "pending", age: 1)
+        let approved = result(roundID: roundID, status: "approved", age: 150)
+        let fromOtherSeries = result(
+            roundID: UUID(), status: "pending", age: 500
+        )
+        XCTAssertEqual(
+            ATHLTHArenaResultHistoryPresentation.nextVote(
+                results: [newer, approved, fromOtherSeries, first],
+                roundIDs: [roundID],
+                viewerID: viewer,
+                eligibleIDs: [viewer],
+                votes: []
+            )?.id,
+            first.id
+        )
+    }
+
+    func testNextVoteSkipsAlreadyVotedAndRejectsOutsiders() {
+        let viewer = UUID(), roundID = UUID()
+        let previous = result(roundID: roundID, status: "pending", age: 40)
+        let current = result(roundID: roundID, status: "pending", age: 10)
+        let myVote = ATHLTHArenaRoundResultVote(
+            resultID: previous.id, userID: viewer, accepted: true
+        )
+        XCTAssertEqual(
+            ATHLTHArenaResultHistoryPresentation.nextVote(
+                results: [previous, current],
+                roundIDs: [roundID],
+                viewerID: viewer,
+                eligibleIDs: [viewer],
+                votes: [myVote]
+            )?.id,
+            current.id
+        )
+        XCTAssertNil(
+            ATHLTHArenaResultHistoryPresentation.nextVote(
+                results: [current],
+                roundIDs: [roundID],
+                viewerID: UUID(),
+                eligibleIDs: [viewer],
+                votes: []
+            )
+        )
+    }
+
+    func testNextVoteDoesNotTreatExpiredOrSettledAsActionable() {
+        let viewer = UUID(), roundID = UUID()
+        let statuses = ["expired", "approved", "rejected", "cancelled"]
+        let history = statuses.map {
+            result(roundID: roundID, status: $0, age: 20)
+        }
+        XCTAssertNil(
+            ATHLTHArenaResultHistoryPresentation.nextVote(
+                results: history,
+                roundIDs: [roundID],
+                viewerID: viewer,
+                eligibleIDs: [viewer],
+                votes: []
+            )
+        )
+    }
+
     func testDeterministicOrderForEqualTimestamps() {
         let roundID = UUID()
         let firstID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
