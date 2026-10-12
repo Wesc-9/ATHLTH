@@ -5449,13 +5449,12 @@ private struct ATHLTHArenaRelaySection: View {
         let targetMeters = route.distanceKilometers * 1_000
         let recent = health.workouts
             .filter { summary in
-                summary.activity == .running &&
-                summary.startDate >= startsAt &&
-                summary.endDate <= endsAt &&
-                summary.endDate <= Date() &&
-                (summary.distanceMeters ?? 0).isFinite &&
-                abs((summary.distanceMeters ?? 0) - targetMeters) <=
-                    targetMeters * 0.05
+                ATHLTHArenaRouteEvidencePolicy.eligibleWorkout(
+                    SocialPublishableWorkout(summary: summary),
+                    plannedDistanceMeters: targetMeters,
+                    startsAt: startsAt,
+                    endsAt: endsAt
+                )
             }
             .sorted { $0.endDate > $1.endDate }
             .prefix(20)
@@ -5472,6 +5471,11 @@ private struct ATHLTHArenaRelaySection: View {
                 routeMatchPercent: analysis.routeMatchPercent,
                 startGapMeters: analysis.startDistanceMeters,
                 endGapMeters: analysis.endDistanceMeters
+            ), ATHLTHArenaRouteEvidencePolicy.analysisMatchesWorkout(
+                analyzedDistanceMeters: analysis.distanceMeters,
+                analyzedDurationSeconds: analysis.durationSeconds,
+                workoutDistanceMeters: summary.distanceMeters,
+                workoutDurationSeconds: summary.duration
             ) else {
                 continue
             }
@@ -5480,7 +5484,9 @@ private struct ATHLTHArenaRelaySection: View {
                 slotID: ownLeg.slotID,
                 routeRoundID: routeRoundID,
                 startedAt: summary.startDate,
-                elapsedSeconds: analysis.durationSeconds,
+                // Show the source workout duration, not a possibly different
+                // track-analysis segment duration.
+                elapsedSeconds: summary.duration,
                 routeMatchPercent: analysis.routeMatchPercent
             ))
         }
