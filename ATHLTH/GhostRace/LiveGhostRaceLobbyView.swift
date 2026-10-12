@@ -45,6 +45,7 @@ struct LiveGhostRaceLobbyView: View {
     @State private var didLaunch = false
     @State private var isLaunching = false
     @State private var isConnectingLiveSession = false
+    @State private var lastAutoWatchReconnectAt: Date?
     @State private var rematchSent = false
     @State private var confirmCancelDuel = false
     @State private var accessibleArenaSeries: ATHLTHArenaRemoteSeries?
@@ -253,10 +254,20 @@ struct LiveGhostRaceLobbyView: View {
             }
         }
         .onChange(of: mirroring.snapshot?.capturedAt) { _, _ in
-            // If the Watch reconnects while this lobby remains visible,
-            // resume only the matching already-running duel. Never start
-            // HealthKit again and never adopt a stale mirrored snapshot.
-            guard canReconnectRecoveredWatchRace else { return }
+            // A recovering Watch can deliver dozens of snapshots quickly.
+            // Retry the shared connection at most once per 20 seconds, and
+            // only while this scene is active; never start another workout.
+            guard scenePhase == .active,
+                  canReconnectRecoveredWatchRace,
+                  !isConnectingLiveSession,
+                  realtime.currentSession?.ghostChallengeID != challenge.id
+            else { return }
+            let now = Date()
+            if let lastAutoWatchReconnectAt,
+               now.timeIntervalSince(lastAutoWatchReconnectAt) < 20 {
+                return
+            }
+            lastAutoWatchReconnectAt = now
             Task { await connectLiveSession() }
         }
         .onChange(of: liveRace.room?.status) { _, status in
