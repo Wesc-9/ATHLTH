@@ -333,6 +333,28 @@ struct ATHLTHLiveGhostFinishGate {
     }
 }
 
+/// The server preserves the first recorded finish. An HTTP 200 on a
+/// repeated UPDATE cannot prove that the requested time was accepted.
+enum ATHLTHLiveGhostFinishConfirmation {
+    static func matches(
+        challengeID: UUID,
+        expectedChallengeID: UUID,
+        finishedAt: Date?,
+        recordedSeconds: TimeInterval?,
+        submittedSeconds: TimeInterval
+    ) -> Bool {
+        guard challengeID == expectedChallengeID,
+              finishedAt != nil,
+              let recordedSeconds,
+              recordedSeconds.isFinite,
+              submittedSeconds.isFinite,
+              (5...86_400).contains(recordedSeconds),
+              (5...86_400).contains(submittedSeconds)
+        else { return false }
+        return abs(recordedSeconds - submittedSeconds) <= 0.05
+    }
+}
+
 private struct BeginGhostLiveSessionParams: Encodable {
     let challengeID: UUID
 
@@ -1611,8 +1633,23 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
 
         struct FinishReceipt: Decodable {
             let challengeID: UUID
+            let finishedAt: Date?
+            let elapsedSeconds: TimeInterval?
+
             enum CodingKeys: String, CodingKey {
                 case challengeID = "challenge_id"
+                case finishedAt = "finished_at"
+                case elapsedSeconds = "elapsed_seconds"
+            }
+
+            func confirms(_ submitted: TimeInterval, for challengeID: UUID) -> Bool {
+                ATHLTHLiveGhostFinishConfirmation.matches(
+                    challengeID: self.challengeID,
+                    expectedChallengeID: challengeID,
+                    finishedAt: finishedAt,
+                    recordedSeconds: elapsedSeconds,
+                    submittedSeconds: submitted
+                )
             }
         }
 
@@ -1643,10 +1680,11 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                     .update(finishPayload)
                     .eq("challenge_id", value: challengeID)
                     .eq("user_id", value: currentUserID)
-                    .select("challenge_id")
+                    .select("challenge_id,finished_at,elapsed_seconds")
                     .execute()
                     .value
-                guard receipts.contains(where: { $0.challengeID == challengeID }) else {
+                guard receipts.count == 1,
+                      receipts[0].confirms(elapsedSeconds, for: challengeID) else {
                     throw NSError(
                         domain: "ATHLTH.LiveGhost",
                         code: 409,
@@ -1664,6 +1702,22 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             } catch is CancellationError {
                 return
             } catch {
+                // If the first write committed but its HTTP response was
+                // lost, query the immutable server result before retrying.
+                // A different persisted time is NOT accepted as ours.
+                let recorded: [FinishReceipt] = (try? await client
+                    .from("live_ghost_race_participants")
+                    .select("challenge_id,finished_at,elapsed_seconds")
+                    .eq("challenge_id", value: challengeID)
+                    .eq("user_id", value: currentUserID)
+                    .limit(1)
+                    .execute().value) ?? []
+                if recorded.count == 1,
+                   recorded[0].confirms(elapsedSeconds, for: challengeID) {
+                    succeeded = true
+                    errorMessage = nil
+                    return
+                }
                 // Keep the last server error visible if every attempt fails.
                 // Do not report success or award Arena points locally.
                 errorMessage = error.localizedDescription
