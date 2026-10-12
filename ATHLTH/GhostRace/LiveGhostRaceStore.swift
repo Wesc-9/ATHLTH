@@ -44,6 +44,22 @@ enum LiveGhostRaceReentry {
     ) -> Bool {
         comparisonRouteID == challengeID && roomStatus == .racing
     }
+
+    /// A recovered Watch workout may reconnect only when the latest
+    /// mirrored session is still recording this exact duel. No HealthKit
+    /// session or additional workout is started by this path.
+    static func canReconnectWatchWorkout(
+        comparisonRouteID: UUID?,
+        challengeID: UUID,
+        roomStatus: LiveGhostRaceRoomStatus?,
+        mirroredWorkoutActive: Bool,
+        isRunningOrPaused: Bool
+    ) -> Bool {
+        mirroredWorkoutActive &&
+        isRunningOrPaused &&
+        comparisonRouteID == challengeID &&
+        roomStatus == .racing
+    }
 }
 
 /// Countdown validity must come from a fresh server snapshot just before
