@@ -27,7 +27,10 @@ enum ATHLTHArenaSeriesScorePresentation {
             .sorted { left, right in
                 let lhs = visiblePoints(left.points)
                 let rhs = visiblePoints(right.points)
-                if abs(lhs - rhs) > 0.001 { return lhs > rhs }
+                // Sorting must remain strictly ordered even for tiny
+                // fractional score differences. Tie display is handled by
+                // competitionRank, not by an epsilon-based sort comparator.
+                if lhs != rhs { return lhs > rhs }
                 if left.createdAt != right.createdAt {
                     return left.createdAt < right.createdAt
                 }
