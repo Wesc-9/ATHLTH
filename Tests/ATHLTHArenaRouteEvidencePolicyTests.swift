@@ -103,6 +103,71 @@ final class ATHLTHArenaRouteEvidencePolicyTests: XCTestCase {
         ))
     }
 
+    func testGPSAnalysisAndOriginalWorkoutMustBeConsistent() {
+        XCTAssertTrue(ATHLTHArenaRouteEvidencePolicy.analysisMatchesWorkout(
+            analyzedDistanceMeters: 4_980,
+            analyzedDurationSeconds: 1_480,
+            workoutDistanceMeters: 5_000,
+            workoutDurationSeconds: 1_500
+        ))
+    }
+
+    func testGPSAnalysisRejectsUnrelatedPartialTrack() {
+        XCTAssertFalse(ATHLTHArenaRouteEvidencePolicy.analysisMatchesWorkout(
+            analyzedDistanceMeters: 2_000,
+            analyzedDurationSeconds: 700,
+            workoutDistanceMeters: 5_000,
+            workoutDurationSeconds: 1_500
+        ))
+    }
+
+    func testGPSAnalysisRejectsInconsistentWorkoutTiming() {
+        XCTAssertFalse(ATHLTHArenaRouteEvidencePolicy.analysisMatchesWorkout(
+            analyzedDistanceMeters: 5_000,
+            analyzedDurationSeconds: 1_000,
+            workoutDistanceMeters: 5_000,
+            workoutDurationSeconds: 1_600
+        ))
+    }
+
+    func testGPSAnalysisAllowsReasonableRecordingPauseDifference() {
+        XCTAssertTrue(ATHLTHArenaRouteEvidencePolicy.analysisMatchesWorkout(
+            analyzedDistanceMeters: 4_900,
+            analyzedDurationSeconds: 1_350,
+            workoutDistanceMeters: 5_000,
+            workoutDurationSeconds: 1_500
+        ))
+    }
+
+    func testGPSAnalysisRejectsMissingAndInvalidMeasurements() {
+        XCTAssertFalse(ATHLTHArenaRouteEvidencePolicy.analysisMatchesWorkout(
+            analyzedDistanceMeters: 5_000,
+            analyzedDurationSeconds: 1_500,
+            workoutDistanceMeters: nil,
+            workoutDurationSeconds: 1_500
+        ))
+        XCTAssertFalse(ATHLTHArenaRouteEvidencePolicy.analysisMatchesWorkout(
+            analyzedDistanceMeters: .infinity,
+            analyzedDurationSeconds: 1_500,
+            workoutDistanceMeters: 5_000,
+            workoutDurationSeconds: 1_500
+        ))
+    }
+
+    func testRouteProofCannotBeReusedForAnotherRound() {
+        let round = UUID()
+        let proof = ATHLTHArenaRouteProof(
+            roundID: round,
+            matchPercent: 95,
+            startGapMeters: 10,
+            endGapMeters: 15,
+            analyzedDistanceMeters: 4_950,
+            analyzedDurationSeconds: 1_450
+        )
+        XCTAssertTrue(proof.belongs(to: round))
+        XCTAssertFalse(proof.belongs(to: UUID()))
+    }
+
     private func proof(
         match: Double, startGap: Double, endGap: Double
     ) -> Bool {
