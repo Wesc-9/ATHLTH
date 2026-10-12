@@ -95,6 +95,7 @@ struct AIProgramBuilderView: View {
 
     @State private var preview: AIProgramDraft?
     @State private var expandedPreviewWeeks: Set<Int> = []
+    @State private var editingDraftWorkout: ATHLTHPlanDraftWorkoutSelection?
     @State private var isGenerating = false
     @State private var errorMessage: String?
     @State private var didLoadDefaults = false
@@ -209,6 +210,25 @@ struct AIProgramBuilderView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(errorMessage ?? "")
+            }
+        }
+        .sheet(item: $editingDraftWorkout) { selection in
+            if let draft = preview,
+               let workout = ATHLTHPlanDraftEditing.workout(in: draft, selection: selection) {
+                ATHLTHPlanDraftWorkoutEditor(workout: workout) { modifiedWorkout in
+                    guard let changed = ATHLTHPlanDraftEditing.replacing(
+                        in: draft, selection: selection, with: modifiedWorkout
+                    ), ATHLTHPlanDraftValidator.issues(
+                        in: changed, expectedWeeks: resolvedWeeks
+                    ).isEmpty else {
+                        errorMessage = ATHLTHLocalization.choose(
+                            english: "This change is not valid. The draft was not modified.",
+                            norwegian: "Endringen er ugyldig. Utkastet ble ikke endret."
+                        )
+                        return
+                    }
+                    preview = changed
+                }
             }
         }
     }
@@ -1019,6 +1039,21 @@ struct AIProgramBuilderView: View {
                                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                                             .fixedSize(horizontal: false, vertical: true)
                                         }
+                                        Button {
+                                            editingDraftWorkout = ATHLTHPlanDraftWorkoutSelection(
+                                                weekNumber: week.weekNumber,
+                                                dayIndex: day.dayIndex,
+                                                sessionIndex: sessionIndex
+                                            )
+                                        } label: {
+                                            Label(
+                                                ATHLTHLocalization.choose(english: "Edit workout", norwegian: "Rediger økt"),
+                                                systemImage: "pencil"
+                                            )
+                                            .font(.caption.weight(.semibold))
+                                        }
+                                        .buttonStyle(.bordered)
+                                        .controlSize(.small)
                                     }
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                 }
@@ -1144,6 +1179,15 @@ struct AIProgramBuilderView: View {
 
     @MainActor
     private func applyPreview(_ draft: AIProgramDraft) {
+        guard ATHLTHPlanDraftValidator.issues(
+            in: draft, expectedWeeks: resolvedWeeks
+        ).isEmpty else {
+            errorMessage = ATHLTHLocalization.choose(
+                english: "Review the draft; it contains an invalid workout. Nothing has been saved.",
+                norwegian: "Kontroller utkastet. En økt er ugyldig. Ingenting er lagret."
+            )
+            return
+        }
         var generated = draft.makeTrainingPlan(
             ownerID: session.profile.userID,
             startDate: startDate
