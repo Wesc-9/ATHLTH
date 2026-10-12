@@ -6,7 +6,11 @@ import Foundation
 enum ATHLTHPlanDraftValidator {
     static func issues(
         in draft: AIProgramDraft,
-        expectedWeeks: Int? = nil
+        expectedWeeks: Int? = nil,
+        allowedDayIndexes: Set<Int>? = nil,
+        maximumSessionsPerWeek: Int? = nil,
+        lockedDayKeys: Set<String> = [],
+        requireFullWeeks: Bool = false
     ) -> [String] {
         var issues: [String] = []
         if draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -28,12 +32,31 @@ enum ATHLTHPlanDraftValidator {
             }
 
             let indices = week.days.map(\.dayIndex)
+            if requireFullWeeks && Set(indices) != Set(1...7) {
+                issues.append("incomplete_week_days")
+            }
+            let weekSessionCount = week.days.reduce(0) { $0 + $1.sessions.count }
+            if let maximumSessionsPerWeek, weekSessionCount > maximumSessionsPerWeek {
+                issues.append("exceeds_weekly_session_limit")
+            }
             if Set(indices).count != indices.count ||
                 indices.contains(where: { !(1...7).contains($0) }) {
                 issues.append("invalid_day_indices")
             }
 
             for day in week.days {
+                if !day.sessions.isEmpty,
+                   let allowedDayIndexes,
+                   !allowedDayIndexes.contains(day.dayIndex) {
+                    issues.append("outside_available_days")
+                }
+                if !day.sessions.isEmpty,
+                   lockedDayKeys.contains("\(week.weekNumber):\(day.dayIndex)") {
+                    issues.append("overwrites_existing_workout")
+                }
+                if requireFullWeeks && day.sessions.count > 1 {
+                    issues.append("multiple_sessions_on_day")
+                }
                 if day.sessions.count > 5 {
                     issues.append("too_many_daily_sessions")
                 }
