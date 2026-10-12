@@ -153,6 +153,9 @@ enum ATHLTHArenaRouteEvidencePolicy {
 }
 
 struct ATHLTHArenaRouteProof {
+    /// Binds the locally analyzed workout to this specific agreed Arena
+    /// round. Never reuse a cached result in a different route round.
+    let roundID: UUID
     let matchPercent: Double
     let startGapMeters: Double
     let endGapMeters: Double
@@ -493,6 +496,7 @@ struct ATHLTHArenaEvidenceSection: View {
                 ),
                 sourceCheck: localCheck,
                 routeProof: ATHLTHArenaRouteProof(
+                    roundID: round.id,
                     matchPercent: analysis.routeMatchPercent,
                     startGapMeters: analysis.startDistanceMeters,
                     endGapMeters: analysis.endDistanceMeters
@@ -558,6 +562,7 @@ struct ATHLTHArenaEvidenceSection: View {
         if round.template == .fastestRoute {
             guard let snapshot = round.routeSnapshot,
                   let proof = candidate.routeProof,
+                  proof.roundID == round.id,
                   ATHLTHArenaRouteEvidencePolicy.eligibleWorkout(
                     candidate.workout,
                     plannedDistanceMeters: snapshot.distanceKilometers * 1_000,
@@ -589,6 +594,23 @@ struct ATHLTHArenaEvidenceSection: View {
         submitting = true
         defer { submitting = false }
         do {
+            // Other devices may have shared this workout or its mirrored
+            // HealthKit copy since the picker was opened. Fail closed if the
+            // latest competition evidence cannot be loaded.
+            let latestEntries = try await cloud.loadWorkoutEvidence(seriesID: series.id)
+            entries = latestEntries
+            guard !ATHLTHArenaWorkoutIdentity.alreadyShared(
+                candidate.workout,
+                entries: latestEntries,
+                userID: session.profile.userID
+            ) else {
+                errorMessage = ATHLTHLocalization.choose(
+                    english: "This workout is already shared in this competition. Choose another workout.",
+                    norwegian: "Denne økten er allerede delt i konkurransen. Velg en annen økt."
+                )
+                routeCandidates[round.id] = nil
+                return
+            }
             if let proof = candidate.routeProof {
                 try await cloud.shareRouteWorkoutEvidence(
                     roundID: round.id,
