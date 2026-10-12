@@ -627,13 +627,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         VStack(spacing: 22) {
             HStack(spacing: 8) {
                 Button {
-                    dismiss()
+                    if step == .mode { dismiss() } else { goBack() }
                 } label: {
                     Text(
-                        ATHLTHLocalization.choose(
-                            english: "Close",
-                            norwegian: "Lukk"
-                        )
+                        step == .mode
+                        ? ATHLTHLocalization.choose(english: "Close", norwegian: "Lukk")
+                        : ATHLTHLocalization.choose(english: "Back", norwegian: "Tilbake")
                     )
                     .font(.subheadline)
                     .foregroundStyle(sourceInk)
@@ -650,10 +649,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(
-                    ATHLTHLocalization.choose(
-                        english: "Close plan builder",
-                        norwegian: "Lukk planbygger"
-                    )
+                    step == .mode
+                    ? ATHLTHLocalization.choose(english: "Close plan builder", norwegian: "Lukk planbygger")
+                    : ATHLTHLocalization.choose(english: "Previous step", norwegian: "Forrige steg")
                 )
 
                 Spacer(minLength: 0)
