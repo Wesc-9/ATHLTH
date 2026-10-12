@@ -461,7 +461,9 @@ struct ATHLTHArenaEvidenceSection: View {
         guard routeSearchingID == nil,
               let snapshot = round.routeSnapshot,
               let route = ATHLTHArenaCompetitionCourse.route(
-                from: snapshot, ownerID: session.profile.userID
+                from: snapshot,
+                ownerID: session.profile.userID,
+                fallbackRouteID: round.id
               ),
               let startsAt = series.startsAt,
               let endsAt = series.endsAt else {
