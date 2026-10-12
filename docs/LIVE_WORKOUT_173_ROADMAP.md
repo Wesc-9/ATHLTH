@@ -57,3 +57,18 @@ Baseline: `release/v1.7.3`. Keep recording engines, workout ownership, iPhone/Wa
   recording when the countdown expires.
 - Validation gate: compile both targets and regression tests, then check
   offline/reconnect and device behavior before TestFlight.
+
+## Step 3 — incremental Watch run pages
+
+- Preserve the existing primary metrics, structured step, treadmill incline,
+  route navigation, live Ghost/Arena, Spotify and workout-control pages.
+- Add a dedicated pulse screen with current, average and maximum values,
+  plus the configured heart-rate target when available.
+- Add a first-class Audio Coach screen when configured, using existing
+  enable/mute/status/replay actions without changing the coach engine.
+- Follow the shared presentation policy on the live hero: pace before distance
+  when running; distance before pace when walking.
+- No new HealthKit session, no new WatchConnectivity ownership and no
+  automatic changes to active workout phase or user-selected page.
+- Next acceptance gate: successful iOS and watchOS compilation, followed
+  by Watch screen-size and wrist-down tests.

@@ -37,6 +37,14 @@ struct WatchRunWorkoutExperienceView: View {
                     planPage
                         .tag(1)
 
+                    WatchRunHeartRateDetailPage()
+                        .tag(7)
+
+                    if workoutManager.audioCoachConfigured {
+                        WatchRunAudioCoachDetailPage()
+                            .tag(8)
+                    }
+
                     if workoutManager
                         .treadmillInclinePercent != nil {
                         treadmillInclinePage
@@ -1814,23 +1822,47 @@ struct WatchRunWorkoutExperienceView: View {
                         .minimumScaleFactor(0.8)
                 }
 
-                liveHeroMetric(
-                    title: livePaceIsAverage ? "AVG PACE" : "PACE",
-                    value: paceText(liveDisplayedPace),
-                    unit: "/km",
-                    tint: WatchTheme.liveLime,
-                    fontSize: compact ? 35 : 42
-                )
+                if ATHLTHLivePresentationResolver.resolve(
+                    .init(kind: workoutManager.kind, state: .running)
+                ).primary == .distance {
+                    // Walking: distance is more useful than running pace.
+                    liveHeroMetric(
+                        title: ATHLTHLocalization.choose(
+                            english: "DISTANCE", norwegian: "DISTANSE"
+                        ),
+                        value: distanceKilometersText,
+                        unit: "km",
+                        tint: WatchTheme.liveCyan,
+                        fontSize: compact ? 35 : 42
+                    )
 
-                liveHeroMetric(
-                    title: ATHLTHLocalization.choose(
-                        english: "DISTANCE", norwegian: "DISTANSE"
-                    ),
-                    value: distanceKilometersText,
-                    unit: "km",
-                    tint: WatchTheme.liveCyan,
-                    fontSize: compact ? 31 : 37
-                )
+                    liveHeroMetric(
+                        title: livePaceIsAverage ? "AVG PACE" : "PACE",
+                        value: paceText(liveDisplayedPace),
+                        unit: "/km",
+                        tint: WatchTheme.liveLime,
+                        fontSize: compact ? 31 : 37
+                    )
+                } else {
+                    // Running: pace first, then distance.
+                    liveHeroMetric(
+                        title: livePaceIsAverage ? "AVG PACE" : "PACE",
+                        value: paceText(liveDisplayedPace),
+                        unit: "/km",
+                        tint: WatchTheme.liveLime,
+                        fontSize: compact ? 35 : 42
+                    )
+
+                    liveHeroMetric(
+                        title: ATHLTHLocalization.choose(
+                            english: "DISTANCE", norwegian: "DISTANSE"
+                        ),
+                        value: distanceKilometersText,
+                        unit: "km",
+                        tint: WatchTheme.liveCyan,
+                        fontSize: compact ? 31 : 37
+                    )
+                }
 
                 Spacer(minLength: 0)
 
