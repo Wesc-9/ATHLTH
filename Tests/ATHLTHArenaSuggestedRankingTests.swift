@@ -1176,6 +1176,30 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
         ))
     }
 
+    func testArenaGhostRejectsConflictingFrozenTargetAndRouteDistance() {
+        XCTAssertFalse(ATHLTHArenaLiveRoundCompatibility.permitsPrefilledResult(
+            template: .fastestRoute,
+            targetDistanceMeters: 7_000,
+            routeDistanceKilometers: 5,
+            sharedCourseDistanceMeters: 5_000,
+            sourceKind: "planned_route"
+        ))
+        XCTAssertFalse(ATHLTHArenaLiveRoundCompatibility.permitsPrefilledResult(
+            template: .fastestRoute,
+            targetDistanceMeters: nil,
+            routeDistanceKilometers: 5,
+            sharedCourseDistanceMeters: 5_000,
+            sourceKind: "planned_route"
+        ))
+        XCTAssertTrue(ATHLTHArenaLiveRoundCompatibility.permitsPrefilledResult(
+            template: .fastestRoute,
+            targetDistanceMeters: 5_000,
+            routeDistanceKilometers: 5,
+            sharedCourseDistanceMeters: 5_015,
+            sourceKind: "planned_route"
+        ))
+    }
+
     func testArenaLiveRouteRequiresCorrectFrozenGeometry() {
         let coordinates = (0..<31).map { index in
             RouteCoordinate(
