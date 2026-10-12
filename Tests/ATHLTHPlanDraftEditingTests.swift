@@ -147,4 +147,38 @@ final class ATHLTHPlanDraftEditingTests: XCTestCase {
         ))
     }
 
+
+    func testMoveRespectsUserAvailableDays() {
+        let draft = makeDraft()
+        let week = draft.weeks[0]
+        let editable = AIProgramDraft(
+            title: draft.title,
+            summary: draft.summary,
+            weeks: [
+                AIProgramDraftWeek(
+                    weekNumber: week.weekNumber,
+                    title: week.title,
+                    days: week.days + [
+                        AIProgramDraftDay(dayIndex: 2, title: "Tuesday", sessions: [])
+                    ]
+                )
+            ]
+        )
+        let selection = ATHLTHPlanDraftWorkoutSelection(
+            weekNumber: 1, dayIndex: 1, sessionIndex: 0
+        )
+        XCTAssertNil(ATHLTHPlanDraftEditing.moving(
+            in: editable,
+            selection: selection,
+            toDayIndex: 2,
+            allowedDayIndexes: [1, 3, 5]
+        ))
+        XCTAssertNotNil(ATHLTHPlanDraftEditing.moving(
+            in: editable,
+            selection: selection,
+            toDayIndex: 2,
+            allowedDayIndexes: [1, 2, 3]
+        ))
+    }
+
 }
