@@ -303,6 +303,15 @@ private struct ATHLTHLiveWorkoutLocationWrite: Encodable {
 /// Only the workout belonging to this Live Ghost challenge may send
 /// its GPS updates or trigger shared-session completion. General live
 /// workout sharing is unaffected by this restriction.
+enum ATHLTHWatchLiveTelemetryFreshness {
+    /// Prevent delayed watch messages from being re-timestamped as LIVE GPS.
+    /// A stale packet must not update the shared route or imply connectivity.
+    static func isFresh(capturedAt: Date, now: Date = Date()) -> Bool {
+        let age = now.timeIntervalSince(capturedAt)
+        return age.isFinite && (-10...30).contains(age)
+    }
+}
+
 enum ATHLTHLiveGhostWorkoutBinding {
     static func accepts(
         ghostChallengeID: UUID?,
@@ -865,6 +874,9 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
               ATHLTHLiveGhostWorkoutBinding.accepts(
                   ghostChallengeID: session.ghostChallengeID,
                   comparisonRouteID: snapshot.routeComparisonID
+              ),
+              ATHLTHWatchLiveTelemetryFreshness.isFresh(
+                  capturedAt: snapshot.capturedAt
               ),
               let latitude = snapshot.currentLatitude,
               let longitude = snapshot.currentLongitude,
