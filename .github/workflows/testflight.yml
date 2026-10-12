@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - release/v1.7.3
+      - release/v1.7.4
     paths:
       - .github/testflight-trigger
 
