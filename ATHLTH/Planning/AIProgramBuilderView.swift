@@ -94,6 +94,7 @@ struct AIProgramBuilderView: View {
     ]
 
     @State private var preview: AIProgramDraft?
+    @State private var expandedPreviewWeeks: Set<Int> = []
     @State private var isGenerating = false
     @State private var errorMessage: String?
     @State private var didLoadDefaults = false
@@ -434,30 +435,9 @@ struct AIProgramBuilderView: View {
     private func coachCard<Content: View>(
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        ATHLTHPlanSurface {
             content()
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            Color.white.opacity(0.84),
-            in: RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-            .stroke(Color.white.opacity(0.88), lineWidth: 0.8)
-        }
-        .shadow(
-            color: Color.black.opacity(0.045),
-            radius: 12,
-            y: 5
-        )
     }
 
     private var intakePreferences: CoachIntakePreferences {
@@ -918,7 +898,10 @@ struct AIProgramBuilderView: View {
     @ViewBuilder
     private func previewSection(_ draft: AIProgramDraft) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            coachSectionHeading(eyebrow: "YOUR PLAN", title: "Coach draft")
+            coachSectionHeading(
+                eyebrow: ATHLTHLocalization.choose(english: "YOUR PLAN", norwegian: "DIN PLAN"),
+                title: ATHLTHLocalization.choose(english: "Coach draft", norwegian: "Forslag fra coach")
+            )
             coachCard {
             Text(draft.title)
                 .font(.headline)
@@ -938,48 +921,129 @@ struct AIProgramBuilderView: View {
                 value: "\(draft.sessionCount)"
             )
 
-            ForEach(
-                Array(draft.weeks.prefix(4)),
-                id: \.weekNumber
-            ) { week in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(
-                        week.title.isEmpty
-                            ? "Week \(week.weekNumber)"
-                            : week.title
-                    )
-                    .font(.subheadline.weight(.semibold))
+            Text(ATHLTHLocalization.choose(
+                english: "Inspect every week before accepting. Tap a week for days, sessions and exercise targets.",
+                norwegian: "Kontroller alle ukene før du godkjenner. Trykk på en uke for å se dager, økter og øvelsesmål."
+            ))
+            .font(.caption)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
 
-                    let sessions = week.days.flatMap(\.sessions)
-                    Text(
-                        sessions.isEmpty
-                            ? "Recovery / no sessions"
-                            : sessions.map(\.title).joined(separator: " · ")
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(3)
+            Button {
+                if expandedPreviewWeeks.count == draft.weeks.count {
+                    expandedPreviewWeeks.removeAll()
+                } else {
+                    expandedPreviewWeeks = Set(draft.weeks.map(\.weekNumber))
                 }
-                .padding(.vertical, 3)
+            } label: {
+                Label(
+                    expandedPreviewWeeks.count == draft.weeks.count
+                        ? ATHLTHLocalization.choose(english: "Collapse all weeks", norwegian: "Lukk alle uker")
+                        : ATHLTHLocalization.choose(english: "Show all workout details", norwegian: "Vis alle øktdetaljer"),
+                    systemImage: "rectangle.expand.vertical"
+                )
+                .font(.subheadline.weight(.medium))
+            }
+            .buttonStyle(.bordered)
+
+            ForEach(draft.weeks, id: \.weekNumber) { week in
+                VStack(alignment: .leading, spacing: 8) {
+                    Button {
+                        if expandedPreviewWeeks.contains(week.weekNumber) {
+                            expandedPreviewWeeks.remove(week.weekNumber)
+                        } else {
+                            expandedPreviewWeeks.insert(week.weekNumber)
+                        }
+                    } label: {
+                        HStack(alignment: .center, spacing: 10) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(week.title.isEmpty
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Week \(week.weekNumber)",
+                                        norwegian: "Uke \(week.weekNumber)"
+                                    )
+                                    : week.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                                Text(
+                                    "\(week.days.reduce(0) { $0 + $1.sessions.count }) " +
+                                    ATHLTHLocalization.choose(english: "workouts", norwegian: "økter")
+                                )
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+                            Spacer()
+                            Image(systemName: expandedPreviewWeeks.contains(week.weekNumber)
+                                ? "chevron.up" : "chevron.down")
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        .padding(11)
+                        .background(
+                            ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: ATHLTHPlanDesign.fieldRadius)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(ATHLTHLocalization.choose(
+                        english: "Show or hide this week's planned workouts",
+                        norwegian: "Vis eller skjul ukens planlagte økter"
+                    ))
+
+                    if expandedPreviewWeeks.contains(week.weekNumber) {
+                        ForEach(week.days.filter { !$0.sessions.isEmpty }, id: \.dayIndex) { day in
+                            VStack(alignment: .leading, spacing: 7) {
+                                Text(day.title)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                ForEach(day.sessions.indices, id: \.self) { sessionIndex in
+                                    let workout = day.sessions[sessionIndex]
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(workout.title)
+                                            .font(.subheadline.weight(.medium))
+                                        if let duration = workout.durationMinutes {
+                                            Text("\(duration) min")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        if let distance = workout.targetDistanceKilometers {
+                                            Text("\(distance.formatted()) km")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        ForEach(workout.exercises.indices, id: \.self) { exerciseIndex in
+                                            let exercise = workout.exercises[exerciseIndex]
+                                            Text(
+                                                "• \(exercise.name) · \(exercise.sets) × " +
+                                                (exercise.reps.map(String.init) ?? "–")
+                                            )
+                                            .font(.caption2)
+                                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                        }
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                            }
+                            .padding(.leading, 12)
+                            .padding(.vertical, 5)
+                        }
+                    }
+                }
             }
 
-            if draft.weeks.count > 4 {
-                Text(ATHLTHLocalization.format(
-                            english: "+ %d more weeks",
-                            norwegian: "+ %d uker til",
-                            draft.weeks.count - 4
-                        ))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
+            Text(ATHLTHLocalization.choose(
+                english: "No changes are saved until you approve the draft below.",
+                norwegian: "Ingen endringer lagres før du godkjenner utkastet nedenfor."
+            ))
+            .font(.caption2)
+            .foregroundStyle(.secondary)
 
             Button {
                 applyPreview(draft)
             } label: {
                 Label(
                     mode == .generate
-                        ? "Use Program"
-                        : "Fill Empty Days",
+                        ? ATHLTHLocalization.choose(english: "Use program", norwegian: "Bruk program")
+                        : ATHLTHLocalization.choose(english: "Fill empty days", norwegian: "Fyll tomme dager"),
                     systemImage: "checkmark.circle.fill"
                 )
                 .frame(maxWidth: .infinity)
@@ -991,7 +1055,7 @@ struct AIProgramBuilderView: View {
                 preview = nil
                 Task { await generatePreview() }
             } label: {
-                Label("Regenerate", systemImage: "arrow.clockwise")
+                Label(ATHLTHLocalization.choose(english: "Regenerate", norwegian: "Generer på nytt"), systemImage: "arrow.clockwise")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
@@ -1024,6 +1088,18 @@ struct AIProgramBuilderView: View {
         do {
             let result = try await service.generate(request)
             guard session.signedIn, session.profile.userID == requestOwnerID else { return }
+            let validationIssues = ATHLTHPlanDraftValidator.issues(
+                in: result, expectedWeeks: resolvedWeeks
+            )
+            guard validationIssues.isEmpty else {
+                preview = nil
+                errorMessage = ATHLTHLocalization.choose(
+                    english: "AI returned an incomplete or invalid plan. No changes have been saved. Try again.",
+                    norwegian: "AI leverte en ufullstendig eller ugyldig plan. Ingenting er lagret. Prøv på nytt."
+                )
+                return
+            }
+            expandedPreviewWeeks.removeAll()
             preview = result
             errorMessage = nil
         } catch {
