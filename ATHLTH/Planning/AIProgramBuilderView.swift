@@ -1108,6 +1108,50 @@ struct AIProgramBuilderView: View {
                                         }
                                         .buttonStyle(.bordered)
                                         .controlSize(.small)
+                                        if mode == .generate,
+                                           week.days.contains(where: {
+                                               $0.dayIndex != day.dayIndex && $0.sessions.isEmpty
+                                           }) {
+                                            Menu {
+                                                ForEach(
+                                                    week.days.filter {
+                                                        $0.dayIndex != day.dayIndex && $0.sessions.isEmpty
+                                                    }, id: \.dayIndex
+                                                ) { target in
+                                                    Button(target.title) {
+                                                        let selection = ATHLTHPlanDraftWorkoutSelection(
+                                                            weekNumber: week.weekNumber,
+                                                            dayIndex: day.dayIndex,
+                                                            sessionIndex: sessionIndex
+                                                        )
+                                                        guard let moved = ATHLTHPlanDraftEditing.moving(
+                                                            in: draft,
+                                                            selection: selection,
+                                                            toDayIndex: target.dayIndex
+                                                        ), ATHLTHPlanDraftValidator.issues(
+                                                            in: moved,
+                                                            expectedWeeks: resolvedWeeks
+                                                        ).isEmpty else {
+                                                            errorMessage = ATHLTHLocalization.choose(
+                                                                english: "Could not move this workout in the draft.",
+                                                                norwegian: "Kunne ikke flytte økten i utkastet."
+                                                            )
+                                                            return
+                                                        }
+                                                        preview = moved
+                                                    }
+                                                }
+                                            } label: {
+                                                Label(
+                                                    ATHLTHLocalization.choose(
+                                                        english: "Move to another day",
+                                                        norwegian: "Flytt til annen dag"
+                                                    ),
+                                                    systemImage: "calendar.badge.clock"
+                                                )
+                                                .font(.caption.weight(.semibold))
+                                            }
+                                        }
                                     }
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                 }
