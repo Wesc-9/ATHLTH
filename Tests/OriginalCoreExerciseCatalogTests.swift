@@ -1,8 +1,8 @@
 import XCTest
 @testable import ATHLTH
 
-/// Regression checks for ATHLTH's 20 ORIGINAL movements, not the
-/// separate third-party RepDB exercise records.
+/// Regression checks for the 20 retired ATHLTH-original core movements.
+/// Existing RepDB exercises must remain available.
 final class OriginalCoreExerciseCatalogTests: XCTestCase {
     @MainActor
     func testOriginalCoreExerciseIdentifiersAreTwentyUniqueATHLTHSlugs() {
@@ -10,6 +10,20 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
         XCTAssertEqual(slugs.count, 20)
         XCTAssertEqual(Set(slugs).count, slugs.count)
         XCTAssertTrue(slugs.allSatisfy { $0.hasPrefix("athlth-core-") })
+
+        // All 20 additions are now retired from new selections.
+        XCTAssertTrue(slugs.allSatisfy {
+            ExerciseLibraryStore.isRetiredOriginalCoreSlug($0)
+        })
+        XCTAssertFalse(
+            ExerciseLibraryStore.isRetiredOriginalCoreSlug("plank")
+        )
+        XCTAssertFalse(
+            ExerciseLibraryStore.isRetiredOriginalCoreSlug("athlth-core-unknown")
+        )
+        XCTAssertFalse(
+            ExerciseLibraryStore.isRetiredOriginalCoreSlug(nil)
+        )
 
         let translated = slugs.compactMap {
             ExerciseLibraryStore.norwegianExerciseNames[$0]
