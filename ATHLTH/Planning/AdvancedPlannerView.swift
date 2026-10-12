@@ -48,8 +48,6 @@ struct AdvancedPlannerView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            standaloneScheduleCard
-
             if let plan = displayedPlan {
                 planOverview(plan)
 
@@ -70,6 +68,8 @@ struct AdvancedPlannerView: View {
             } else if showsEmptyState {
                 emptyPlanState
             }
+
+            standaloneScheduleCard
         }
         .onAppear {
             session.refreshActivePlanForToday()
@@ -543,7 +543,7 @@ struct AdvancedPlannerView: View {
     }
 
     private func planOverview(_ plan: TrainingPlan) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top, spacing: 14) {
                     Image(systemName: "calendar.badge.clock")
@@ -651,12 +651,36 @@ struct AdvancedPlannerView: View {
                         icon: "point.topleft.down.to.point.bottomright.curvepath"
                     )
                 }
+
+                Button {
+                    showingPlanProgress = true
+                } label: {
+                    HStack(spacing: 9) {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "View training progress",
+                                norwegian: "Se treningsutviklingen"
+                            ),
+                            systemImage: "chart.xyaxis.line"
+                        )
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .padding(13)
+                    .background(
+                        ATHLTHPlanDesign.selectedSurface,
+                        in: RoundedRectangle(cornerRadius: ATHLTHPlanDesign.fieldRadius)
+                    )
+                }
+                .buttonStyle(.plain)
             }
         }
     }
 
     private func weekSelector(_ plan: TrainingPlan) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
@@ -1046,7 +1070,7 @@ struct AdvancedPlannerView: View {
         week: TrainingPlanWeek,
         day: TrainingPlanDay
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 3) {
@@ -1137,7 +1161,7 @@ struct AdvancedPlannerView: View {
         _ plan: TrainingPlan,
         week: TrainingPlanWeek
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
