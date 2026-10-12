@@ -738,6 +738,8 @@ final class WatchRouteStore: NSObject, ObservableObject {
             }
 
             requestSpotifyPlaybackState()
+            WatchWorkoutManager.shared
+                .syncWorkoutActivityStateToPhone()
         } else if activated {
             companionLinked = false
             connectionText =
@@ -788,10 +790,13 @@ final class WatchRouteStore: NSObject, ObservableObject {
             if let replyHandler {
                 let reply = WatchWorkoutActivityQueryReply(replyHandler)
                 Task { @MainActor in
-                    reply.send(
-                        WatchWorkoutManager.shared
-                            .currentWorkoutActivityForProbe()
-                    )
+                    let manager = WatchWorkoutManager.shared
+                    // Check for a HealthKit session that has not yet been
+                    // restored into the Watch UI after process relaunch.
+                    if manager.state == .idle {
+                        await manager.recoverActiveWorkout()
+                    }
+                    reply.send(manager.currentWorkoutActivityForProbe())
                 }
             } else {
                 Task { @MainActor in
