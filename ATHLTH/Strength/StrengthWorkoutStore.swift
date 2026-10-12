@@ -1607,6 +1607,28 @@ final class StrengthWorkoutStore: ObservableObject {
 
                 startOrResumeTimedSet()
 
+            case .pauseTimedSet:
+                guard command.exerciseIndex == nil ||
+                        command.exerciseIndex == currentExerciseIndex,
+                      command.setIndex == nil ||
+                        command.setIndex == currentSetIndex,
+                      currentSet?.resolvedTargetKind == .time,
+                      currentSet?.isCompleted == false
+                else { continue }
+
+                pauseTimedSet()
+
+            case .resetTimedSet:
+                guard command.exerciseIndex == nil ||
+                        command.exerciseIndex == currentExerciseIndex,
+                      command.setIndex == nil ||
+                        command.setIndex == currentSetIndex,
+                      currentSet?.resolvedTargetKind == .time,
+                      currentSet?.isCompleted == false
+                else { continue }
+
+                resetTimedSet()
+
             case .updateDraft:
                 guard
                     command.exerciseIndex == nil ||
