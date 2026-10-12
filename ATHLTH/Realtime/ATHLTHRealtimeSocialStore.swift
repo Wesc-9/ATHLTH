@@ -163,6 +163,44 @@ struct ATHLTHLiveWorkoutLocation: Identifiable, Codable, Hashable {
     }
 }
 
+/// Live race comparisons are provisional: a delayed or implausible sample
+/// must never produce a new lead/pass announcement. Keep connection-state
+/// reporting separate so temporary packet loss does not end the workout.
+enum ATHLTHLiveGhostRacingTelemetry {
+    static let maximumActionableAge: TimeInterval = 18
+
+    static func opponentID(
+        ownerID: UUID,
+        otherID: UUID?,
+        viewerID: UUID?
+    ) -> UUID? {
+        guard let viewerID else { return ownerID }
+        if viewerID == ownerID { return otherID }
+        // Spectators may watch a map, but must not compare their own
+        // workout against someone else's private synchronized duel.
+        guard viewerID == otherID else { return nil }
+        return ownerID
+    }
+
+    static func canCompare(
+        updatedAt: Date,
+        expiresAt: Date,
+        distanceMeters: Double,
+        elapsedSeconds: TimeInterval,
+        now: Date = Date()
+    ) -> Bool {
+        let age = now.timeIntervalSince(updatedAt)
+        return age.isFinite &&
+            (-5...maximumActionableAge).contains(age) &&
+            expiresAt > now &&
+            distanceMeters.isFinite &&
+            distanceMeters >= 0 &&
+            elapsedSeconds.isFinite &&
+            (0...86_400).contains(elapsedSeconds) &&
+            distanceMeters <= max(120, elapsedSeconds * 15)
+    }
+}
+
 enum ATHLTHLiveGhostComparisonMode: Equatable {
     case routeAware
     case distanceFallback
@@ -1160,7 +1198,17 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                         $0.userID ==
                             opponentUserID
                     }
-                )
+                ),
+              ATHLTHLiveGhostRacingTelemetry.canCompare(
+                  updatedAt: livePoint.updatedAt,
+                  expiresAt: livePoint.expiresAt,
+                  distanceMeters: livePoint.distanceMeters,
+                  elapsedSeconds: livePoint.elapsedSeconds
+              ),
+              ownDistanceMeters.isFinite,
+              ownDistanceMeters >= 0,
+              ownElapsedSeconds.isFinite,
+              ownElapsedSeconds >= 0
         else {
             return nil
         }
@@ -1283,7 +1331,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         return ATHLTHLiveGhostComparison(
             sessionID: selectedSession.id,
             opponentUserID:
-                selectedSession.ownerID,
+                opponentUserID,
             opponentDistanceMeters:
                 livePoint.distanceMeters,
             opponentElapsedSeconds:
@@ -1315,17 +1363,11 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         in session:
             ATHLTHLiveWorkoutSession
     ) -> UUID? {
-        guard let currentUserID else {
-            return session.ownerID
-        }
-
-        if session.ownerID ==
-            currentUserID {
-            return session
-                .opponentUserID
-        }
-
-        return session.ownerID
+        ATHLTHLiveGhostRacingTelemetry.opponentID(
+            ownerID: session.ownerID,
+            otherID: session.opponentUserID,
+            viewerID: currentUserID
+        )
     }
 
     private func sanitizedRouteProgress(
@@ -1898,13 +1940,14 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             selectedLiveGhostSession
 
         guard let selected,
+              let opponentID = liveGhostOpponentUserID(in: selected),
               let point =
                 liveLocations.first(
                     where: {
                         $0.sessionID ==
                             selected.id &&
                         $0.userID ==
-                            selected.ownerID
+                            opponentID
                     }
                 )
         else {
