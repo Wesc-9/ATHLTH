@@ -30,9 +30,44 @@ struct WatchWorkoutStartView: View {
                 if route == nil {
                     workoutButton(.strength)
 
-                    DisclosureGroup(
-                        isExpanded: $showingMoreActivities
-                    ) {
+                    Button {
+                        showingMoreActivities.toggle()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "More activities",
+                                    norwegian: "Flere aktiviteter"
+                                ),
+                                systemImage: "square.grid.2x2"
+                            )
+                            .font(.system(size: 12, weight: .bold))
+                            Spacer(minLength: 0)
+                            Image(systemName:
+                                showingMoreActivities
+                                    ? "chevron.up" : "chevron.down"
+                            )
+                            .font(.system(size: 10, weight: .bold))
+                        }
+                        .foregroundStyle(WatchTheme.textPrimary)
+                        .padding(10)
+                        .watchSurface(radius: 16)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "More activities",
+                        norwegian: "Flere aktiviteter"
+                    ))
+                    .accessibilityValue(showingMoreActivities
+                        ? ATHLTHLocalization.choose(
+                            english: "Expanded", norwegian: "Utvidet"
+                          )
+                        : ATHLTHLocalization.choose(
+                            english: "Collapsed", norwegian: "Lukket"
+                          ))
+                    .accessibilityAddTraits(.isButton)
+
+                    if showingMoreActivities {
                         VStack(spacing: 8) {
                             workoutButton(.cycling)
                             workoutButton(.hiit)
@@ -42,20 +77,7 @@ struct WatchWorkoutStartView: View {
                             workoutButton(.yoga)
                             workoutButton(.other)
                         }
-                        .padding(.top, 6)
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "More activities",
-                                norwegian: "Flere aktiviteter"
-                            ),
-                            systemImage: "square.grid.2x2"
-                        )
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(WatchTheme.textPrimary)
                     }
-                    .padding(10)
-                    .watchSurface(radius: 16)
                 }
 
                 if let errorMessage = workoutManager.errorMessage {
