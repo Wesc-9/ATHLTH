@@ -434,8 +434,8 @@ enum WorkoutLaunchCoordinator {
             return
         }
 
-        guard !watchConnection
-            .hasActiveWatchWorkout
+        guard await watchConnection
+            .confirmNoActiveWatchWorkout()
         else {
             throw AppleWatchWorkoutLaunchError
                 .workoutAlreadyActive
@@ -767,8 +767,8 @@ enum WorkoutLaunchCoordinator {
             return
         }
 
-        guard !watchConnection
-            .hasActiveWatchWorkout
+        guard await watchConnection
+            .confirmNoActiveWatchWorkout()
         else {
             throw AppleWatchWorkoutLaunchError
                 .workoutAlreadyActive
@@ -917,8 +917,8 @@ enum WorkoutLaunchCoordinator {
         watchConnection: AppleWatchConnectionStore,
         spotify: SpotifyPlaybackStore
     ) async throws -> Bool {
-        guard !watchConnection
-            .hasActiveWatchWorkout
+        guard await watchConnection
+            .confirmNoActiveWatchWorkout()
         else {
             throw AppleWatchWorkoutLaunchError
                 .workoutAlreadyActive
