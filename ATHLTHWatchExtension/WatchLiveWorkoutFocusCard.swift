@@ -187,7 +187,8 @@ struct WatchLiveWorkoutFocusCard: View {
         let liveGhost = workoutManager.liveSurfaceContext.liveGhost
         let signal = ATHLTHLiveGhostWatchSignal.resolve(
             context: liveGhost,
-            isPaused: workoutManager.state == .paused,
+            isPaused: workoutManager.state == .paused ||
+                workoutManager.automaticPauseActive,
             now: now
         )
         let opponent = liveGhost?.opponentName ??
