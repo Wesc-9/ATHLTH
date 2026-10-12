@@ -581,6 +581,7 @@ struct ATHLTHArenaScoringSection: View {
                     norwegian: "Runderesultater · godkjennes av deltakerne"
                 ))
                 .font(.headline)
+                .id("arena-results")
 
                 ForEach(rounds) { round in
                     resultRow(round)
