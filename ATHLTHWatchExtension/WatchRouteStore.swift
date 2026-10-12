@@ -2,6 +2,31 @@ import Combine
 import Foundation
 import WatchConnectivity
 
+// A WatchConnectivity reply block can outlive its caller. Transport it
+// explicitly across the MainActor hop without capturing the delegate closure
+// in a potentially concurrently executing SwiftUI render transaction.
+private final class WatchWorkoutActivityQueryReply: @unchecked Sendable {
+    private let callback: ([String: Any]) -> Void
+
+    init(_ callback: @escaping ([String: Any]) -> Void) {
+        self.callback = callback
+    }
+
+    func send(_ activity: WatchWorkoutActivityState) {
+        guard let data = try? JSONEncoder().encode(activity) else {
+            callback([:])
+            return
+        }
+        callback([
+            WatchTransferMetadataKey.kind:
+                WatchTransferKind.workoutActivityState.rawValue,
+            WatchTransferMetadataKey.payload: data,
+            WatchTransferMetadataKey.sentAt:
+                activity.updatedAt.timeIntervalSince1970
+        ])
+    }
+}
+
 @MainActor
 final class WatchRouteStore: NSObject, ObservableObject {
     // One WCSession delegate and prepared-workout cache shared by the Watch
@@ -544,6 +569,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
 
         case .route,
              .workoutResult,
+             .workoutActivityQuery,
              .workoutStartGuard,
              .workoutCommand,
              .workoutRouteSelection,
@@ -755,6 +781,24 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 ] as? String
         else {
             replyHandler?([:])
+            return
+        }
+
+        if rawKind == WatchTransferKind.workoutActivityQuery.rawValue {
+            if let replyHandler {
+                let reply = WatchWorkoutActivityQueryReply(replyHandler)
+                Task { @MainActor in
+                    reply.send(
+                        WatchWorkoutManager.shared
+                            .currentWorkoutActivityForProbe()
+                    )
+                }
+            } else {
+                Task { @MainActor in
+                    WatchWorkoutManager.shared
+                        .syncWorkoutActivityStateToPhone()
+                }
+            }
             return
         }
 
