@@ -72,6 +72,12 @@ enum ATHLTHPlanMoveWeekPreview {
         let oldRun = longestStreak(in: week, kind: .running)
         let oldStrength = longestStreak(in: week, kind: .strength)
         let oldKind = longestStreak(in: week, kind: workout.kind)
+        // Keep the original recommendation selectable, even when its purpose
+        // is separating a crowded day rather than reducing a long streak.
+        let defaultKind = longestStreak(
+            in: week, kind: workout.kind,
+            moving: workout, from: source.id, to: proposal.targetDayID
+        )
 
         return week.days.compactMap { day -> Destination? in
             guard (1...7).contains(day.dayIndex),
@@ -94,13 +100,13 @@ enum ATHLTHPlanMoveWeekPreview {
                   newStrength <= max(oldStrength, 2)
             else { return nil }
 
-            // When a three-or-more-day streak is present for the moving
-            // session's type, an alternative should really shorten it.
-            if oldKind >= 3,
+            // When the original recommendation reduces a long streak,
+            // alternatives may not undo that specific improvement.
+            if oldKind >= 3 && defaultKind < oldKind,
                longestStreak(
                    in: week, kind: workout.kind,
                    moving: workout, from: source.id, to: day.id
-               ) >= oldKind {
+               ) > defaultKind {
                 return nil
             }
             return Destination(dayID: day.id, date: date)

@@ -111,6 +111,22 @@ final class ATHLTHPlanMoveWeekPreviewTests: XCTestCase {
         ).isEmpty)
     }
 
+    func testDefaultMoveRemainsSelectableWhenCrowdedDayIsMainIssue() {
+        let start = calendar.startOfDay(for: Date())
+        let (plan, preview) = make(
+            sessions: [
+                (1, [workout(.running), workout(.strength)]),
+                (2, [workout(.running)]),
+                (3, [workout(.running)])
+            ], start: start
+        )
+        let chosen = ATHLTHPlanMoveWeekPreview.choosing(
+            preview.targetDayID, from: preview, in: plan,
+            referenceDate: start, calendar: calendar
+        )
+        XCTAssertNotNil(chosen)
+    }
+
     func testNoDestinationCanCreateNewThreeDayRunStreak() {
         let start = calendar.startOfDay(for: Date())
         let (plan, preview) = make(
