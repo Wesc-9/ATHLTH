@@ -509,6 +509,78 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private let sourceGold = ATHLTHPlanDesign.accent
     private let sourceCanvas = ATHLTHPlanDesign.canvas
 
+    private var stepDisplayTotal: Int { mode == .basic ? 4 : 6 }
+
+    private var stepDisplayNumber: Int {
+        switch step {
+        case .mode: return 1
+        case .basics: return 2
+        case .source: return 3
+        case .profile: return 4
+        case .week: return 5
+        case .review: return mode == .basic ? 4 : 6
+        }
+    }
+
+    private var modeChoice: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                sourceChoiceHeader
+                    .padding(.bottom, 14)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "How would you like to plan?",
+                    norwegian: "Hvordan vil du planlegge?"
+                ))
+                .font(.system(size: 33, weight: .regular, design: .serif))
+                .foregroundStyle(sourceInk)
+                .fixedSize(horizontal: false, vertical: true)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Choose how much control you want. Both options lead to an editable training plan.",
+                    norwegian: "Velg hvor mye kontroll du ønsker. Begge alternativene gir deg en treningsplan du kan redigere."
+                ))
+                .font(.subheadline)
+                .foregroundStyle(sourceMuted)
+                .fixedSize(horizontal: false, vertical: true)
+
+                ATHLTHPlanSelectionCard(
+                    title: ATHLTHLocalization.choose(english: "Simple", norwegian: "Enkel"),
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Get started quickly with just the essentials.",
+                        norwegian: "Kom raskt i gang med kun det viktigste."
+                    ),
+                    symbol: "sparkles",
+                    selected: mode == .basic,
+                    accent: ATHLTHTheme.vitality
+                ) {
+                    mode = .basic
+                    goForward()
+                }
+
+                ATHLTHPlanSelectionCard(
+                    title: ATHLTHLocalization.choose(english: "Advanced", norwegian: "Avansert"),
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Choose goals, equipment, training days and detailed program structure.",
+                        norwegian: "Velg mål, utstyr, treningsdager og detaljert programstruktur."
+                    ),
+                    symbol: "slider.horizontal.3",
+                    selected: mode == .advanced
+                ) {
+                    mode = .advanced
+                    goForward()
+                }
+            }
+            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth, alignment: .leading)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 18)
+            .padding(.top, 15)
+            .padding(.bottom, 30)
+        }
+        .scrollIndicators(.hidden)
+        .background(sourceCanvas.ignoresSafeArea())
+    }
+
     private var sourceChoice: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
@@ -620,7 +692,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 ForEach(1...stepDisplayTotal, id: \.self) { index in
                     Capsule()
                         .fill(
-                            index == 1
+                            index <= stepDisplayNumber
                                 ? sourceGold
                                 : Color(red: 0.87, green: 0.85, blue: 0.82)
                         )
@@ -3784,14 +3856,14 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private func goForward() {
-        withAnimation(
-            .easeInOut(duration: 0.18)
-        ) {
+        withAnimation(.easeInOut(duration: 0.18)) {
             switch step {
-            case .source:
+            case .mode:
                 step = .basics
             case .basics:
-                step = .profile
+                step = .source
+            case .source:
+                step = mode == .basic ? .review : .profile
             case .profile:
                 step = .week
             case .week:
@@ -3803,24 +3875,20 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private func goBack() {
-        withAnimation(
-            .easeInOut(duration: 0.18)
-        ) {
+        withAnimation(.easeInOut(duration: 0.18)) {
             switch step {
-            case .source:
+            case .mode:
                 dismiss()
-
             case .basics:
-                step = .source
-
-            case .profile:
+                step = .mode
+            case .source:
                 step = .basics
-
+            case .profile:
+                step = .source
             case .week:
                 step = .profile
-
             case .review:
-                step = .week
+                step = mode == .basic ? .source : .week
             }
         }
     }
