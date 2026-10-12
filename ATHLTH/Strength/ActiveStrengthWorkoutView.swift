@@ -3244,9 +3244,13 @@ struct ActiveStrengthWorkoutView: View {
     ) -> String {
         switch phase {
         case .workingSet:
-            return ATHLTHLocalization.choose(
-                english: "Working set", norwegian: "Arbeidssett"
-            )
+            return strength.draftWarmUp
+                ? ATHLTHLocalization.choose(
+                    english: "Warm-up set", norwegian: "Oppvarmingssett"
+                  )
+                : ATHLTHLocalization.choose(
+                    english: "Working set", norwegian: "Arbeidssett"
+                  )
         case .timedReady:
             return ATHLTHLocalization.choose(
                 english: "Time target ready", norwegian: "Tidsmål klart"
