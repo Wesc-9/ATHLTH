@@ -19,6 +19,8 @@ struct ATHLTHWorkoutActivityAttributes: ActivityAttributes {
         var runningStepCount: Int? = nil
         var runningStepProgress: Double? = nil
         var runningNextStepTitle: String? = nil
+        var runningStepRemainingSeconds: TimeInterval? = nil
+        var runningStepRemainingMeters: Double? = nil
 
         var heartRateTargetZone: Int? = nil
         var heartRateTargetMinimumBPM: Double? = nil
@@ -35,6 +37,11 @@ struct ATHLTHWorkoutActivityAttributes: ActivityAttributes {
         var strengthReps: Int? = nil
         var strengthWeightKilograms: Double? = nil
         var strengthRestEndsAt: Date? = nil
+        var strengthTimedSetSecondsAtSnapshot: TimeInterval? = nil
+        var strengthTimedSetResumedAt: Date? = nil
+
+        /// Distinguishes run, walk, strength and generic workouts on lock screen.
+        var workoutKindRaw: String? = nil
 
         var surfaceConfiguration:
             ATHLTHLiveWorkoutSurfaceConfiguration = .standard

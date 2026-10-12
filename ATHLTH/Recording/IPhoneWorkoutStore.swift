@@ -4068,6 +4068,19 @@ final class IPhoneWorkoutStore:
                 workout.structuredStepIndex ?? 0
             ]
         }()
+        let runningStepReadout = currentStep.map {
+            ATHLTHRunIntervalReadout.resolve(
+                step: $0,
+                elapsedSeconds: max(
+                    workout.elapsed(at: Date()) -
+                        (workout.structuredStepStartElapsedTime ?? 0), 0
+                ),
+                distanceMeters: max(
+                    workout.distanceMeters -
+                        (workout.structuredStepStartDistanceMeters ?? 0), 0
+                )
+            )
+        }
         let runningStepProgress =
             currentStep.map {
                 ATHLTHRunningStepEngine
@@ -4170,6 +4183,12 @@ final class IPhoneWorkoutStore:
                     runningStepProgress,
                 runningNextStepTitle:
                     nextStepTitle,
+                runningStepRemainingSeconds:
+                    runningStepReadout?.unit == .seconds
+                        ? runningStepReadout?.remaining : nil,
+                runningStepRemainingMeters:
+                    runningStepReadout?.unit == .meters
+                        ? runningStepReadout?.remaining : nil,
                 ghostRaceTitle:
                     workout.ghostRaceTitle,
                 ghostDistanceDeltaMeters:

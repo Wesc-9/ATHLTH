@@ -510,7 +510,7 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.leading) {
                     Label(
                         focusTitle(context),
-                        systemImage: focusIcon(context)
+                        systemImage: primarySymbol(context)
                     )
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(focusTint(context))
@@ -525,18 +525,31 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                 }
 
                 DynamicIslandExpandedRegion(.bottom) {
-                    expandedBottom(context)
+                    VStack(alignment: .leading, spacing: 7) {
+                        mainWorkoutHeadline(context)
+                        if focus(context) != .workout {
+                            TimelineView(.periodic(from: .now, by: 15)) { tick in
+                                if ATHLTHLiveActivityDisplayPolicy.isRecent(
+                                    updatedAt: context.state.updatedAt,
+                                    now: tick.date
+                                ) {
+                                    expandedBottom(context)
+                                } else {
+                                    delayedUpdateLabel
+                                }
+                            }
+                        } else {
+                            supportingMetrics(context)
+                        }
+                    }
                 }
             } compactLeading: {
-                Image(systemName: focusIcon(context))
+                Image(systemName: primarySymbol(context))
                     .foregroundStyle(focusTint(context))
             } compactTrailing: {
-                Text(compactValue(context))
-                    .font(.caption2.weight(.bold))
-                    .monospacedDigit()
-                    .lineLimit(1)
+                compactTrainingValue(context)
             } minimal: {
-                Image(systemName: focusIcon(context))
+                Image(systemName: primarySymbol(context))
                     .foregroundStyle(focusTint(context))
             }
         }
@@ -564,8 +577,289 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                     .foregroundStyle(focusTint(context))
             }
 
-            expandedBottom(context)
+            mainWorkoutHeadline(context)
+            if focus(context) != .workout {
+                TimelineView(.periodic(from: .now, by: 15)) { tick in
+                    if ATHLTHLiveActivityDisplayPolicy.isRecent(
+                        updatedAt: context.state.updatedAt,
+                        now: tick.date
+                    ) {
+                        expandedBottom(context)
+                    } else {
+                        delayedUpdateLabel
+                    }
+                }
+            } else {
+                supportingMetrics(context)
+            }
         }
+    }
+
+    private func workoutFocus(
+        _ context: Context
+    ) -> ATHLTHLiveActivityDisplayFocus {
+        ATHLTHLiveActivityDisplayPolicy.resolve(
+            kindRaw: context.state.workoutKindRaw,
+            phase: context.state.phase,
+            hasStrengthExercise: context.state.strengthExerciseName != nil,
+            restEndsAt: context.state.strengthRestEndsAt,
+            hasTimedSetCountdown:
+                context.state.strengthTimedSetSecondsAtSnapshot != nil,
+            hasRunningStep: context.state.runningStepTitle != nil
+        )
+    }
+
+    private func primarySymbol(_ context: Context) -> String {
+        if isOffRoute(context) { return "exclamationmark.triangle.fill" }
+        switch workoutFocus(context) {
+        case .paused: return "pause.fill"
+        case .strengthRest, .strengthTimedSet: return "timer"
+        case .strengthSet: return "dumbbell.fill"
+        case .runningInterval, .running: return "figure.run"
+        case .walking: return "figure.walk"
+        case .elapsed: return context.attributes.systemImage
+        }
+    }
+
+    private func mainWorkoutHeadline(_ context: Context) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            switch workoutFocus(context) {
+            case .paused:
+                Label(
+                    localized("Workout paused", "Økten er pauset"),
+                    systemImage: "pause.circle.fill"
+                )
+                .font(.subheadline.weight(.bold))
+                Text(duration(context.state.elapsedTime))
+                    .font(.title3.weight(.bold))
+                    .monospacedDigit()
+
+            case .strengthRest:
+                Text(
+                    context.state.strengthExerciseName ??
+                        localized("Rest between sets", "Pause mellom sett")
+                )
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                if let end = context.state.strengthRestEndsAt {
+                    TimelineView(.periodic(from: .now, by: 5)) { timeline in
+                        let remaining = end.timeIntervalSince(timeline.date)
+                        Text(remaining > 0
+                            ? duration(ceil(remaining))
+                            : localized("READY", "KLAR"))
+                            .font(.title2.weight(.bold))
+                            .monospacedDigit()
+                    }
+                    Text(localized(
+                        "Continue manually when ready",
+                        "Fortsett manuelt når du er klar"
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.72))
+                }
+
+            case .strengthTimedSet:
+                Text(
+                    context.state.strengthExerciseName ??
+                        localized("Timed set", "Tidsbasert sett")
+                )
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                TimelineView(.periodic(from: .now, by: 5)) { timeline in
+                    let remaining = ATHLTHLiveActivityDisplayPolicy
+                        .remainingTimedSet(
+                            secondsAtSnapshot:
+                                context.state.strengthTimedSetSecondsAtSnapshot,
+                            resumedAt: context.state.strengthTimedSetResumedAt,
+                            now: timeline.date
+                        )
+                    Text(remaining.map { $0 > 0
+                        ? duration(ceil($0))
+                        : localized("READY", "KLAR")
+                    } ?? "—")
+                        .font(.title2.weight(.bold))
+                        .monospacedDigit()
+                }
+
+            case .strengthSet:
+                Text(context.state.strengthExerciseName ??
+                     localized("Strength", "Styrke"))
+                    .font(.subheadline.weight(.bold))
+                    .lineLimit(2)
+                HStack(spacing: 10) {
+                    if let reps = context.state.strengthReps {
+                        Text("\(reps) reps")
+                            .font(.title3.weight(.bold))
+                            .monospacedDigit()
+                    }
+                    if let set = context.state.strengthSetIndex,
+                       let count = context.state.strengthSetCount,
+                       count > 0 {
+                        Text(localized("Set", "Sett") +
+                             " \(min(max(set, 1), count))/\(count)")
+                            .font(.caption.weight(.semibold))
+                    }
+                }
+
+            case .runningInterval:
+                Text(context.state.runningStepTitle ??
+                     localized("Interval", "Intervall"))
+                    .font(.subheadline.weight(.bold))
+                    .lineLimit(2)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    if let seconds = context.state.runningStepRemainingSeconds,
+                       seconds.isFinite {
+                        Text(duration(ceil(max(seconds, 0))))
+                            .font(.title2.weight(.bold))
+                            .monospacedDigit()
+                        Text(localized("left", "igjen"))
+                            .font(.caption2)
+                    } else if let meters =
+                        context.state.runningStepRemainingMeters,
+                              meters.isFinite {
+                        Text(distance(meters))
+                            .font(.title2.weight(.bold))
+                            .monospacedDigit()
+                        Text(localized("left", "igjen"))
+                            .font(.caption2)
+                    } else if let progress =
+                        ATHLTHLiveActivityDisplayPolicy.safeProgress(
+                            context.state.runningStepProgress
+                        ) {
+                        Text("\(Int((progress * 100).rounded()))%")
+                            .font(.title2.weight(.bold))
+                            .monospacedDigit()
+                    } else {
+                        Text(localized("Open interval", "Åpent intervall"))
+                            .font(.caption.weight(.semibold))
+                    }
+                }
+
+            case .running:
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
+                    Text(validPace(context.state.currentPaceSecondsPerKilometer))
+                        .font(.title2.weight(.bold))
+                        .monospacedDigit()
+                    Text("/km")
+                        .font(.caption.weight(.semibold))
+                }
+                Text(distance(context.state.distanceMeters))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.72))
+
+            case .walking:
+                Text(distance(context.state.distanceMeters))
+                    .font(.title2.weight(.bold))
+                    .monospacedDigit()
+                Text(localized("Walking", "Gåtur"))
+                    .font(.caption.weight(.semibold))
+
+            case .elapsed:
+                Text(duration(context.state.elapsedTime))
+                    .font(.title2.weight(.bold))
+                    .monospacedDigit()
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func compactTrainingValue(_ context: Context) -> some View {
+        if workoutFocus(context) == .strengthRest,
+           let ends = context.state.strengthRestEndsAt {
+            TimelineView(.periodic(from: .now, by: 5)) { timeline in
+                Text(ends > timeline.date
+                    ? duration(ceil(ends.timeIntervalSince(timeline.date)))
+                    : localized("READY", "KLAR"))
+                    .font(.caption2.weight(.bold))
+                    .monospacedDigit()
+                    .lineLimit(1)
+            }
+        } else if workoutFocus(context) == .strengthTimedSet {
+            TimelineView(.periodic(from: .now, by: 5)) { timeline in
+                let left = ATHLTHLiveActivityDisplayPolicy.remainingTimedSet(
+                    secondsAtSnapshot:
+                        context.state.strengthTimedSetSecondsAtSnapshot,
+                    resumedAt: context.state.strengthTimedSetResumedAt,
+                    now: timeline.date
+                )
+                Text(left.map { $0 > 0
+                    ? duration(ceil($0))
+                    : localized("READY", "KLAR")
+                } ?? "—")
+                    .font(.caption2.weight(.bold))
+                    .monospacedDigit()
+                    .lineLimit(1)
+            }
+        } else {
+            TimelineView(.periodic(from: .now, by: 15)) { tick in
+                Text(
+                    workoutFocus(context) == .paused ||
+                    ATHLTHLiveActivityDisplayPolicy.isRecent(
+                        updatedAt: context.state.updatedAt,
+                        now: tick.date
+                    )
+                    ? compactValue(context)
+                    : "—"
+                )
+                .font(.caption2.weight(.bold))
+                .monospacedDigit()
+                .lineLimit(1)
+            }
+        }
+    }
+
+    private var delayedUpdateLabel: some View {
+        Label(
+            localized("Workout data delayed", "Treningsdata forsinket"),
+            systemImage: "wifi.exclamationmark"
+        )
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(.orange)
+    }
+
+    private func supportingMetrics(_ context: Context) -> some View {
+        TimelineView(.periodic(from: .now, by: 15)) { timeline in
+            HStack(spacing: 12) {
+                if ATHLTHLiveActivityDisplayPolicy.isRecent(
+                    updatedAt: context.state.updatedAt,
+                    now: timeline.date
+                ) {
+                    Label(
+                        duration(context.state.elapsedTime),
+                        systemImage: "clock"
+                    )
+                    if context.state.distanceMeters.isFinite,
+                       context.state.distanceMeters > 0 {
+                        Text(distance(context.state.distanceMeters))
+                    }
+                } else {
+                    Label(
+                        localized(
+                            "Workout data delayed",
+                            "Treningsdata forsinket"
+                        ),
+                        systemImage: "wifi.exclamationmark"
+                    )
+                }
+                Spacer(minLength: 0)
+            }
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.white.opacity(0.72))
+            .lineLimit(1)
+        }
+    }
+
+    private func validPace(_ value: Double?) -> String {
+        guard let value, value.isFinite, value >= 120, value <= 1_800
+        else { return "—:—" }
+        let seconds = Int(value.rounded())
+        return String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+
+    private func localized(_ en: String, _ no: String) -> String {
+        let code = Locale.current.language.languageCode?.identifier ?? "en"
+        return ["nb", "nn", "no"].contains(code) ? no : en
     }
 
     @ViewBuilder
@@ -1008,6 +1302,34 @@ struct ATHLTHWorkoutLiveActivity: Widget {
     private func compactValue(
         _ context: Context
     ) -> String {
+        switch workoutFocus(context) {
+        case .paused: return localized("PAUSED", "PAUSE")
+        case .strengthRest: return localized("REST", "PAUSE")
+        case .strengthTimedSet: return localized("SET TIME", "SETTID")
+        case .strengthSet:
+            if let reps = context.state.strengthReps { return "\(reps) reps" }
+            return localized("STRENGTH", "STYRKE")
+        case .runningInterval:
+            if let seconds = context.state.runningStepRemainingSeconds,
+               seconds.isFinite { return duration(ceil(max(seconds, 0))) }
+            if let meters = context.state.runningStepRemainingMeters,
+               meters.isFinite { return distance(meters) }
+            if let progress = ATHLTHLiveActivityDisplayPolicy.safeProgress(
+                context.state.runningStepProgress
+            ) { return "\(Int((progress * 100).rounded()))%" }
+            return localized("INTERVAL", "INTERVALL")
+        case .running:
+            return validPace(context.state.currentPaceSecondsPerKilometer)
+        case .walking:
+            return distance(context.state.distanceMeters)
+        case .elapsed:
+            return duration(context.state.elapsedTime)
+        }
+    }
+
+    private func legacyPriorityValue(
+        _ context: Context
+    ) -> String {
         switch focus(context) {
         case .routeGuardian:
             return isOffRoute(context)
@@ -1035,14 +1357,7 @@ struct ATHLTHWorkoutLiveActivity: Widget {
         case .liveShare:
             return "LIVE · \(max(context.state.liveContext.liveShare?.viewerCount ?? 0, 0))"
         case .workout:
-            if context.state.distanceMeters > 0 {
-                return String(
-                    format: "%.1f",
-                    context.state.distanceMeters / 1_000
-                )
-            }
-
-            return duration(context.state.elapsedTime)
+            return compactValue(context)
         }
     }
 
@@ -1134,21 +1449,11 @@ struct ATHLTHWorkoutLiveActivity: Widget {
     private func liveDuration(
         _ context: Context
     ) -> some View {
-        if let startedAt =
-            context.attributes.startedAt,
-           context.state.phase != "paused" {
-            Text(startedAt, style: .timer)
-                .font(.title3.weight(.bold))
-                .monospacedDigit()
-        } else {
-            Text(
-                duration(
-                    context.state.elapsedTime
-                )
-            )
+        // A timer starting at workout launch would incorrectly keep counting
+        // through pause periods. Use the HealthKit-recorded active elapsed.
+        Text(duration(context.state.elapsedTime))
             .font(.title3.weight(.bold))
             .monospacedDigit()
-        }
     }
 
     private func metric(

@@ -264,6 +264,10 @@ private final class ATHLTHLiveActivityController {
                     snapshot.runningStepProgress,
                 runningNextStepTitle:
                     snapshot.runningNextStepTitle,
+                runningStepRemainingSeconds:
+                    snapshot.runningStepRemainingSeconds,
+                runningStepRemainingMeters:
+                    snapshot.runningStepRemainingMeters,
                 heartRateTargetZone:
                     snapshot.heartRateTargetZone,
                 heartRateTargetMinimumBPM:
@@ -290,6 +294,11 @@ private final class ATHLTHLiveActivityController {
                     snapshot.strengthWeightKilograms,
                 strengthRestEndsAt:
                     snapshot.strengthRestEndsAt,
+                strengthTimedSetSecondsAtSnapshot:
+                    snapshot.strengthTimedSetSecondsAtSnapshot,
+                strengthTimedSetResumedAt:
+                    snapshot.strengthTimedSetResumedAt,
+                workoutKindRaw: snapshot.kind.rawValue,
                 surfaceConfiguration:
                     surfaceConfiguration,
                 liveContext:

@@ -6324,6 +6324,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             routePoints.last
         let currentRunningStep =
             currentStructuredRunningStep
+        let runningStepReadout = currentRunningStep.map {
+            ATHLTHRunIntervalReadout.resolve(
+                step: $0,
+                elapsedSeconds: currentStructuredStepElapsedTime,
+                distanceMeters: currentStructuredStepDistanceMeters
+            )
+        }
         let runningStepProgress =
             currentRunningStep.map {
                 ATHLTHRunningStepEngine.progress(
@@ -6397,6 +6404,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 runningStepProgress,
             runningNextStepTitle:
                 nextStructuredRunningStep?.title,
+            runningStepRemainingSeconds:
+                runningStepReadout?.unit == .seconds
+                    ? runningStepReadout?.remaining : nil,
+            runningStepRemainingMeters:
+                runningStepReadout?.unit == .meters
+                    ? runningStepReadout?.remaining : nil,
             heartRateTargetZone:
                 targetAlertConfiguration?.heartRateZone,
             heartRateTargetMinimumBPM:
@@ -6425,6 +6438,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 strengthSession?.draftWeightKilograms,
             strengthRestEndsAt:
                 strengthSession?.restEndsAt,
+            strengthTimedSetSecondsAtSnapshot:
+                strengthSession?.timedSetCountdown?.remaining(at: now),
+            strengthTimedSetResumedAt:
+                strengthSession?.timedSetCountdown?.isRunning == true
+                    ? now : nil,
             liveSurfaceConfiguration:
                 liveSurfaceConfiguration,
             liveSurfaceContext:

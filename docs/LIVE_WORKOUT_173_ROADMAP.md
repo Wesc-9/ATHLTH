@@ -9,7 +9,7 @@ Baseline: `release/v1.7.3`. Keep recording engines, workout ownership, iPhone/Wa
 3. **Apple Watch running** — Readable pace/distance, structured interval, pulse/zone, route, Ghost/Arena, Audio Coach and controls; only relevant pages shown; no surprise auto-swipes.
 4. **Always-On (in progress)** — Single low-power, read-only presentation selected by activity and phase, including accurate rest countdown. No animations, sensitive details policy, stale-data treatment and small-screen testing.
 5. **iPhone live workout (in progress)** — Activity-first hero metric and details, aligned with Watch; strength, run, treadmill, intervals and companion mode.
-6. **Lock Screen / Dynamic Island** — Use existing Live Activity infrastructure and phase-specific compact/expanded variants; terminate cleanly when workout ends.
+6. **Lock Screen / Dynamic Island (in progress)** — Use existing Live Activity infrastructure and phase-specific compact/expanded variants; terminate cleanly when workout ends.
 7. **Other workout modes** — Walking, HIIT, cycling, functional, rowing, stairs, yoga; never show irrelevant or unmeasured metrics.
 8. **Personalization and accessibility** — Primary metric, preferred pages, strong contrast, readable long exercise names, haptics and AOD privacy.
 9. **Regression and device validation** — HealthKit starts/stops, offline Watch operation, reconnect, no duplicated sets/workouts, battery tests, size classes, Always-On and TestFlight manual review.
@@ -158,3 +158,30 @@ Baseline: `release/v1.7.3`. Keep recording engines, workout ownership, iPhone/Wa
   advancement, stale/future Watch packets, mirrored running/paused clocks.
 - Remaining device gate: real Watch/iPhone reconnect, iPad/small iPhone
   screen-size checks, a complete Xcode build, and TestFlight review on request.
+
+
+## Step 6 — Lock Screen and Dynamic Island (increment 1)
+
+- A shared pure display policy chooses paused, strength rest, timed strength
+  set, reps, running interval, run pace, walk distance and generic elapsed.
+- Optional (backwards-compatible) snapshot fields carry the actual remaining
+  interval time/distance and timed-strength-set date anchor from the existing
+  workout engines. No new recording session or duplicate countdown.
+- The Widget extension links the shared policy explicitly in project.yml.
+- Compact and expanded Dynamic Island, and the Lock Screen activity, now
+  render the activity/phase headline before supplemental route, target,
+  Ghost and sharing details. Off-route warning icon stays prominent.
+- Paused workout time uses recorded active elapsed time: do not show a
+  continuous clock from workout start that includes paused minutes.
+- Timed set and strength rest show READY at zero without automatically
+  completing a set. Live Activity remains read-only.
+- Delayed widget snapshots suppress stale supplemental race/location
+  readings. When updates pause, display a delayed-data indicator rather
+  than silently showing an old verified Ghost gap as live.
+- Lifecycle remains with ATHLTHSurfaceCoordinator: updated by existing
+  Live Activity sync, ends on completed/failed/absent workout, respects
+  Dynamic Island enabled/disabled setting.
+- Device acceptance gate remains open: compile widget/app/Watch targets,
+  verify Lock Screen and each Dynamic Island size on real iPhones, pause,
+  resume, reconnect and battery/power behavior. Do not upload to TestFlight
+  unless explicitly requested.
