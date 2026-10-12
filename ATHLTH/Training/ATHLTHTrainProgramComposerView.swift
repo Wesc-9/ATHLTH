@@ -224,9 +224,11 @@ struct ATHLTHTrainProgramComposerView: View {
                     columns: [GridItem(.adaptive(minimum: 86), spacing: 8)],
                     spacing: 8
                 ) {
-                    ForEach([4, 6, 8, 12, 16], id: \.self) { count in
+                    ForEach([1, 2, 4, 6, 8, 12], id: \.self) { count in
                         tile(
-                            title: "\(count) " + tr("weeks", "uker"),
+                            title: "\(count) " + (count == 1
+                                ? tr("week", "uke")
+                                : tr("weeks", "uker")),
                             selected: !customWeeks && weeks == count
                         ) {
                             weeks = count
@@ -240,7 +242,9 @@ struct ATHLTHTrainProgramComposerView: View {
                 }
                 if customWeeks {
                     Stepper(
-                        "\(weeks) " + tr("weeks", "uker"),
+                        "\(weeks) " + (weeks == 1
+                            ? tr("week", "uke")
+                            : tr("weeks", "uker")),
                         value: $weeks,
                         in: 1...52
                     )
