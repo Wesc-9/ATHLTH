@@ -87,6 +87,9 @@ jobs:
           print(f"Swift syntax valid in {len(sources)} source files")
           PY
 
+      - name: Audit Watch Always-On visual and power rules
+        run: python3 scripts/audit_watch_visual_power.py
+
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Regenerate and validate approved app icons

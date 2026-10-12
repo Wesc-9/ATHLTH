@@ -315,3 +315,18 @@ Baseline: `release/v1.7.3`. Keep recording engines, workout ownership, iPhone/Wa
   different start time or sport, nil start, and stale delegate identity.
 - Complete the Xcode watchOS/iOS build and on-device disconnect/reconnect
   scenarios before claiming release readiness.
+
+## Visual QA and Watch battery gate (post-phase 9)
+
+- One static audit script (`scripts/audit_watch_visual_power.py`)
+  checks AOD refresh requests, no visual animation loops/timers,
+  compact Watch geometry, privacy and minimum label contrast.
+- The script runs automatically from the regular Build ATHLTH workflow.
+- AOD date-anchored rest/timed-set/Ghost timelines request at most one
+  view-owned refresh per minute. The bright-screen live view and HealthKit
+  capture are unchanged. watchOS may further control updates.
+- Visual device matrix and reproducible battery comparison protocol:
+  `docs/LIVE_WORKOUT_173_VISUAL_BATTERY_GATE.md`.
+- These checks catch regressions and guide review. Real Watch screenshots,
+  Xcode Instruments power logs and repeated physical battery measurements
+  remain OPEN; don't call battery life verified by static analysis.

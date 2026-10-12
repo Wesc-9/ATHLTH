@@ -3,6 +3,8 @@ import SwiftUI
 /// A single low-power, read-only workout dashboard for Apple Watch.
 /// The workout manager continues recording independently of the display.
 /// Do not add animations, photos, gradients or crown interaction here.
+/// Requested time-driven updates are limited to watchOS Always-On cadence;
+/// the HealthKit workout manager keeps recording independently.
 struct WatchTrainingAlwaysOnDashboard: View {
     @EnvironmentObject private var workout: WatchWorkoutManager
 
@@ -206,7 +208,7 @@ struct WatchTrainingAlwaysOnDashboard: View {
                     if let restEndsAt = current.restEndsAt {
                         // AOD is throttled by watchOS; recompute from the
                         // absolute end date instead of counting local ticks.
-                        TimelineView(.periodic(from: .now, by: 5)) { timeline in
+                        TimelineView(.periodic(from: .now, by: ATHLTHAlwaysOnRefreshPolicy.loweredWristInterval)) { timeline in
                             let seconds = restEndsAt.timeIntervalSince(timeline.date)
                             Text(seconds > 0
                                  ? timeString(ceil(seconds))
@@ -255,7 +257,7 @@ struct WatchTrainingAlwaysOnDashboard: View {
                 } else if current.targetKindRaw == "time" {
                     // Same absolute-date timer as the interactive Watch
                     // screen and iPhone; never use a screen-owned counter.
-                    TimelineView(.periodic(from: .now, by: 5)) { timeline in
+                    TimelineView(.periodic(from: .now, by: ATHLTHAlwaysOnRefreshPolicy.loweredWristInterval)) { timeline in
                         let remaining = current.timedSetCountdown?
                             .remaining(at: timeline.date)
                             ?? Double(current.draftDurationSeconds ?? 0)
@@ -496,7 +498,7 @@ struct WatchTrainingAlwaysOnDashboard: View {
     // Only a tiny low-power race indicator is added; never display a stale
     // advantage as live when WatchConnectivity stops delivering updates.
     private var alwaysOnGhostStatus: some View {
-        TimelineView(.periodic(from: .now, by: 5)) { timeline in
+        TimelineView(.periodic(from: .now, by: ATHLTHAlwaysOnRefreshPolicy.loweredWristInterval)) { timeline in
             let ghost = workout.liveSurfaceContext.liveGhost
             let signal = ATHLTHLiveGhostWatchSignal.resolve(
                 context: ghost,
