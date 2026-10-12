@@ -206,7 +206,19 @@ enum CommunityEventRegistrationPolicy {
         _ event: CommunityEventRecord,
         now: Date = Date()
     ) -> Bool {
-        event.status == "upcoming" && event.startsAt > now
+        canRegister(
+            status: event.status,
+            startsAt: event.startsAt,
+            now: now
+        )
+    }
+
+    static func canRegister(
+        status: String,
+        startsAt: Date,
+        now: Date = Date()
+    ) -> Bool {
+        status == "upcoming" && startsAt > now
     }
 
     static func unavailableMessage(
