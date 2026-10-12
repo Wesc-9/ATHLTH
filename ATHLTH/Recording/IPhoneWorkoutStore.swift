@@ -1974,6 +1974,23 @@ final class IPhoneWorkoutStore:
         }
     }
 
+    /// Leave the duellist and HealthKit session intact, but discard an
+    /// expired GPS advantage. This is a display/audio reset only.
+    func clearLiveGhostGap() {
+        guard var workout = active,
+              !workout.walking,
+              workout.ghostRaceTitle != nil,
+              workout.ghostDistanceDeltaMeters != nil ||
+                workout.ghostTimeDeltaSeconds != nil
+        else { return }
+
+        workout.ghostDistanceDeltaMeters = nil
+        workout.ghostTimeDeltaSeconds = nil
+        active = workout
+        persistActiveCheckpoint()
+        syncLiveActivity()
+    }
+
     func applyLiveGhostConnectionState(
         opponentName: String,
         state: String,
@@ -1982,6 +1999,9 @@ final class IPhoneWorkoutStore:
     ) {
         let normalized =
             state.uppercased()
+        if normalized != "LIVE" {
+            clearLiveGhostGap()
+        }
 
         guard configuration.enabled,
               configuration
