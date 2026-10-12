@@ -321,8 +321,17 @@ struct ATHLTHArenaOnlineSection: View {
                 }
             }
         }
-        .task(id: session.profile.userID) {
+        .task {
             await refresh()
+        }
+        .onChange(of: session.profile.userID) { _, _ in
+            // Do not cancel the in-flight refresh during an account change.
+            // It will drain the queued new-account fetch before presenting
+            // rows; cached rows are hidden by the account-scope gate.
+            series = []
+            loadedForUserID = nil
+            errorMessage = nil
+            Task { await refresh() }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await refresh() } }
