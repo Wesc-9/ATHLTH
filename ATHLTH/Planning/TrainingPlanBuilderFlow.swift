@@ -77,18 +77,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         )
     }
 
-    private enum BuilderStep: Int, CaseIterable {
-        case mode
-        case basics
-        case source
-        case profile
-        case week
-        case review
-
-        var number: Int {
-            rawValue + 1
-        }
-    }
+    private typealias BuilderStep = ATHLTHPlanJourneyStep
 
     private enum SourceOption: String, CaseIterable, Identifiable {
         case scratch
@@ -509,17 +498,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private let sourceGold = ATHLTHPlanDesign.accent
     private let sourceCanvas = ATHLTHPlanDesign.canvas
 
-    private var stepDisplayTotal: Int { mode == .basic ? 4 : 6 }
+    private var stepDisplayTotal: Int {
+        ATHLTHPlanJourney.sequence(advanced: mode == .advanced).count
+    }
 
     private var stepDisplayNumber: Int {
-        switch step {
-        case .mode: return 1
-        case .basics: return 2
-        case .source: return 3
-        case .profile: return 4
-        case .week: return 5
-        case .review: return mode == .basic ? 4 : 6
-        }
+        ATHLTHPlanJourney.position(of: step, advanced: mode == .advanced) ?? 1
     }
 
     private var modeChoice: some View {
@@ -3856,40 +3840,23 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private func goForward() {
+        guard let next = ATHLTHPlanJourney.next(
+            after: step, advanced: mode == .advanced
+        ) else { return }
         withAnimation(.easeInOut(duration: 0.18)) {
-            switch step {
-            case .mode:
-                step = .basics
-            case .basics:
-                step = .source
-            case .source:
-                step = mode == .basic ? .review : .profile
-            case .profile:
-                step = .week
-            case .week:
-                step = .review
-            case .review:
-                break
-            }
+            step = next
         }
     }
 
     private func goBack() {
+        guard let previous = ATHLTHPlanJourney.previous(
+            before: step, advanced: mode == .advanced
+        ) else {
+            dismiss()
+            return
+        }
         withAnimation(.easeInOut(duration: 0.18)) {
-            switch step {
-            case .mode:
-                dismiss()
-            case .basics:
-                step = .mode
-            case .source:
-                step = .basics
-            case .profile:
-                step = .source
-            case .week:
-                step = .profile
-            case .review:
-                step = mode == .basic ? .source : .week
-            }
+            step = previous
         }
     }
 
