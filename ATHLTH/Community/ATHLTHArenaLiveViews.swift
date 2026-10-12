@@ -90,6 +90,33 @@ enum ATHLTHArenaSeriesOverview {
     }
 }
 
+/// A completed Arena series may still contain unresolved round proposals.
+/// This is presentation-only and never treats completion as approval of points.
+enum ATHLTHArenaArchivePresentation {
+    enum Filter: String, CaseIterable {
+        case all, completed, unresolved
+    }
+
+    static func isUnresolved(_ series: ATHLTHArenaRemoteSeries) -> Bool {
+        series.status == "completed" &&
+            series.completionReason == "deadline_unresolved"
+    }
+
+    static func visible(
+        _ completed: [ATHLTHArenaRemoteSeries],
+        filter: Filter
+    ) -> [ATHLTHArenaRemoteSeries] {
+        completed.filter { series in
+            guard series.status == "completed" else { return false }
+            switch filter {
+            case .all: return true
+            case .completed: return !isUnresolved(series)
+            case .unresolved: return isUnresolved(series)
+            }
+        }
+    }
+}
+
 /// Shared Arena series with live invitations, consensual scoring and
 /// deadline-based completion. Club and Weekly Challenges remain separate.
 struct ATHLTHArenaOnlineSection: View {
@@ -102,6 +129,7 @@ struct ATHLTHArenaOnlineSection: View {
 
     private let cloud = ATHLTHArenaCloudService()
     @State private var showsAllCompleted = false
+    @State private var archiveFilter: ATHLTHArenaArchivePresentation.Filter = .all
 
     private var activeSeries: [ATHLTHArenaRemoteSeries] {
         ATHLTHArenaSeriesOverview.orderedActive(series)
@@ -113,6 +141,16 @@ struct ATHLTHArenaOnlineSection: View {
 
     private var finishedSeries: [ATHLTHArenaRemoteSeries] {
         ATHLTHArenaSeriesOverview.orderedCompleted(series)
+    }
+
+    private var displayedArchive: [ATHLTHArenaRemoteSeries] {
+        ATHLTHArenaArchivePresentation.visible(
+            finishedSeries, filter: archiveFilter
+        )
+    }
+
+    private var unresolvedArchiveCount: Int {
+        finishedSeries.filter(ATHLTHArenaArchivePresentation.isUnresolved).count
     }
 
     private var otherSeries: [ATHLTHArenaRemoteSeries] {
@@ -192,13 +230,13 @@ struct ATHLTHArenaOnlineSection: View {
                 HStack {
                     sectionHeading(
                         title: ATHLTHLocalization.choose(
-                            english: "Completed", norwegian: "Fullførte"
+                            english: "Competition archive", norwegian: "Konkurransehistorikk"
                         ),
                         count: finishedSeries.count,
-                        icon: "trophy.fill"
+                        icon: "clock.arrow.circlepath"
                     )
                     Spacer(minLength: 8)
-                    if finishedSeries.count > 2 {
+                    if archiveFilter == .all && finishedSeries.count > 2 {
                         Button {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 showsAllCompleted.toggle()
@@ -217,8 +255,34 @@ struct ATHLTHArenaOnlineSection: View {
                         }
                     }
                 }
-                ForEach(Array(finishedSeries.prefix(
-                    showsAllCompleted ? finishedSeries.count : 2
+                if unresolvedArchiveCount > 0 {
+                    HStack(spacing: 6) {
+                        archiveFilterButton(
+                            .all,
+                            title: ATHLTHLocalization.choose(
+                                english: "All", norwegian: "Alle"
+                            ),
+                            count: finishedSeries.count
+                        )
+                        archiveFilterButton(
+                            .completed,
+                            title: ATHLTHLocalization.choose(
+                                english: "Finished", norwegian: "Avsluttet"
+                            ),
+                            count: finishedSeries.count - unresolvedArchiveCount
+                        )
+                        archiveFilterButton(
+                            .unresolved,
+                            title: ATHLTHLocalization.choose(
+                                english: "Unresolved", norwegian: "Uavklart"
+                            ),
+                            count: unresolvedArchiveCount
+                        )
+                    }
+                }
+                ForEach(Array(displayedArchive.prefix(
+                    archiveFilter == .all && !showsAllCompleted
+                        ? 2 : displayedArchive.count
                 ))) { item in
                     seriesRow(item)
                 }
@@ -250,6 +314,36 @@ struct ATHLTHArenaOnlineSection: View {
                 await refresh()
             }
         }
+    }
+
+    private func archiveFilterButton(
+        _ filter: ATHLTHArenaArchivePresentation.Filter,
+        title: String,
+        count: Int
+    ) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                archiveFilter = filter
+            }
+        } label: {
+            Text("\(title) \(count)")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(
+                    archiveFilter == filter
+                        ? Color.white : ATHLTHTheme.accentDeep
+                )
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
+                .background(
+                    archiveFilter == filter
+                        ? ATHLTHTheme.accentDeep
+                        : ATHLTHTheme.vitalitySoft.opacity(0.55),
+                    in: Capsule()
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(archiveFilter == filter ? .isSelected : [])
     }
 
     private func sectionHeading(
@@ -286,18 +380,27 @@ struct ATHLTHArenaOnlineSection: View {
             for: item, at: Date()
         )
         let deadlinePassed = urgency == .review
+        let unresolved = ATHLTHArenaArchivePresentation.isUnresolved(item)
         let statusLabel: String = deadlinePassed
             ? ATHLTHLocalization.choose(
                 english: "REVIEW", norwegian: "KONTROLL"
             )
             : isActive
             ? ATHLTHLocalization.choose(english: "ACTIVE", norwegian: "AKTIV")
-            : isCompleted
-                ? ATHLTHLocalization.choose(english: "FINISHED", norwegian: "FERDIG")
-                : item.status == "draft"
-                    ? ATHLTHLocalization.choose(english: "AGREEMENT", norwegian: "ENIGHET")
-                    : item.status.uppercased()
-        let accent: Color = deadlinePassed
+            : unresolved
+                ? ATHLTHLocalization.choose(
+                    english: "UNRESOLVED", norwegian: "UAVKLART"
+                  )
+                : isCompleted
+                    ? ATHLTHLocalization.choose(
+                        english: "FINISHED", norwegian: "FERDIG"
+                      )
+                    : item.status == "draft"
+                        ? ATHLTHLocalization.choose(
+                            english: "AGREEMENT", norwegian: "ENIGHET"
+                          )
+                        : item.status.uppercased()
+        let accent: Color = (deadlinePassed || unresolved)
             ? .orange
             : isActive ? ATHLTHTheme.accentDeep
             : isCompleted ? .secondary : .orange
