@@ -1698,7 +1698,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         let liveSignal = ATHLTHLiveGhostWatchSignal.resolve(
             context: liveGhost,
-            isPaused: state == .paused
+            isPaused: state == .paused || automaticPauseActive
         )
         publish {
             self.ghostRaceTitle =
@@ -1717,7 +1717,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             ghostAudioConfiguration(
                 from: liveGhost.audio
             )
-        if state == .running {
+        if state == .running && !automaticPauseActive {
             announceLiveGhostConnectionChangeIfNeeded(
                 previous: previousConnection,
             current:
@@ -1731,6 +1731,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         guard isActive,
               state == .running,
+              !automaticPauseActive,
               kind == .running,
               liveSignal.mayAnnouncePassing,
               let distanceDelta =
