@@ -41,4 +41,11 @@ final class ProfileHeroIdentityLayoutTests: XCTestCase {
             }
         }
     }
+
+    @MainActor
+    func testIdentityReservesLessSpaceAboveFixedStatRow() {
+        // The compact 108pt slot lowers the entire bottom-aligned identity
+        // by 12pt compared with the old 120pt profile header.
+        XCTAssertEqual(ATHLTHProfileHeroIdentityView.reservedHeight, 108)
+    }
 }
