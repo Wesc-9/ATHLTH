@@ -2910,15 +2910,26 @@ struct ATHLTHGhostRuntimeObserver: View {
             return
         }
 
+        guard ATHLTHLiveGhostRacingTelemetry.matchesWorkout(
+            challengeID: selected.ghostChallengeID,
+            selectedRouteKey: selected.routeKey,
+            localComparisonRouteID: snapshot.routeComparisonID
+        ) else {
+            clearLiveGhostContext(sendToWatch: true)
+            return
+        }
+
         syncLiveGhostConnectionContext(
             session: selected,
             sendToWatch: true
         )
 
-        // Do not generate a new passing / audio cue from a paused
-        // watch. The local workout is still shown as paused while the
-        // connection status keeps updating independently.
-        guard snapshot.state == .running else { return }
+        // A resumed/stale mirrored Watch snapshot is not an updated
+        // position. Keep HealthKit running and wait for a fresh sample.
+        guard snapshot.state == .running,
+              ATHLTHWatchLiveTelemetryFreshness.isFresh(
+                  capturedAt: snapshot.capturedAt
+              ) else { return }
 
         guard let comparison =
                 realtime
@@ -2981,6 +2992,18 @@ struct ATHLTHGhostRuntimeObserver: View {
                     sendToWatch: false
                 )
             }
+            return
+        }
+
+        guard ATHLTHLiveGhostRacingTelemetry.matchesWorkout(
+            challengeID: selected.ghostChallengeID,
+            selectedRouteKey: selected.routeKey,
+            localComparisonRouteID: workout.plannedComparisonRouteID
+        ) else {
+            phoneWorkout.applyGhostComparison(
+                nil, title: nil, configuration: nil
+            )
+            clearLiveGhostContext(sendToWatch: false)
             return
         }
 
