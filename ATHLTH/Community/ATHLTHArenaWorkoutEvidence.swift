@@ -123,6 +123,29 @@ enum ATHLTHArenaRouteEvidencePolicy {
         return true
     }
 
+    /// Cross-check that the GPS trace analyzed belongs to the *whole*
+    /// selected workout, not an unrelated fragment with a similar route.
+    /// GPS route times can differ slightly from workout elapsed time during
+    /// pauses, but large discrepancies require manual review.
+    static func analysisMatchesWorkout(
+        analyzedDistanceMeters: Double,
+        analyzedDurationSeconds: Double,
+        workoutDistanceMeters: Double?,
+        workoutDurationSeconds: Double
+    ) -> Bool {
+        guard let workoutDistanceMeters,
+              analyzedDistanceMeters.isFinite, analyzedDistanceMeters > 0,
+              analyzedDurationSeconds.isFinite, analyzedDurationSeconds > 0,
+              workoutDistanceMeters.isFinite, workoutDistanceMeters > 0,
+              workoutDurationSeconds.isFinite, workoutDurationSeconds > 0,
+              abs(analyzedDistanceMeters - workoutDistanceMeters)
+                <= max(100, workoutDistanceMeters * 0.05),
+              abs(analyzedDurationSeconds - workoutDurationSeconds)
+                <= max(180, workoutDurationSeconds * 0.15)
+        else { return false }
+        return true
+    }
+
     static func eligibleProof(
         matchPercent: Double,
         startGapMeters: Double,
@@ -159,6 +182,12 @@ struct ATHLTHArenaRouteProof {
     let matchPercent: Double
     let startGapMeters: Double
     let endGapMeters: Double
+    let analyzedDistanceMeters: Double
+    let analyzedDurationSeconds: Double
+
+    func belongs(to roundID: UUID) -> Bool {
+        self.roundID == roundID
+    }
 }
 
 /// The route proof is evaluated locally from HealthKit GPS data.
@@ -475,6 +504,12 @@ struct ATHLTHArenaEvidenceSection: View {
                     measuredDistanceMeters: analysis.distanceMeters,
                     plannedDistanceMeters: targetMeters,
                     elapsedSeconds: analysis.durationSeconds
+                  ),
+                  ATHLTHArenaRouteEvidencePolicy.analysisMatchesWorkout(
+                    analyzedDistanceMeters: analysis.distanceMeters,
+                    analyzedDurationSeconds: analysis.durationSeconds,
+                    workoutDistanceMeters: workout.distanceMeters,
+                    workoutDurationSeconds: workout.duration
                   ) else { continue }
 
             let localCheck = ATHLTHArenaLocalEvidenceCheck.verify(
@@ -499,7 +534,9 @@ struct ATHLTHArenaEvidenceSection: View {
                     roundID: round.id,
                     matchPercent: analysis.routeMatchPercent,
                     startGapMeters: analysis.startDistanceMeters,
-                    endGapMeters: analysis.endDistanceMeters
+                    endGapMeters: analysis.endDistanceMeters,
+                    analyzedDistanceMeters: analysis.distanceMeters,
+                    analyzedDurationSeconds: analysis.durationSeconds
                 )
             ))
         }
@@ -562,7 +599,13 @@ struct ATHLTHArenaEvidenceSection: View {
         if round.template == .fastestRoute {
             guard let snapshot = round.routeSnapshot,
                   let proof = candidate.routeProof,
-                  proof.roundID == round.id,
+                  proof.belongs(to: round.id),
+                  ATHLTHArenaRouteEvidencePolicy.analysisMatchesWorkout(
+                    analyzedDistanceMeters: proof.analyzedDistanceMeters,
+                    analyzedDurationSeconds: proof.analyzedDurationSeconds,
+                    workoutDistanceMeters: candidate.workout.distanceMeters,
+                    workoutDurationSeconds: candidate.workout.duration
+                  ),
                   ATHLTHArenaRouteEvidencePolicy.eligibleWorkout(
                     candidate.workout,
                     plannedDistanceMeters: snapshot.distanceKilometers * 1_000,
