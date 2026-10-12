@@ -1696,33 +1696,43 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             )
         }
 
+        let liveSignal = ATHLTHLiveGhostWatchSignal.resolve(
+            context: liveGhost,
+            isPaused: state == .paused
+        )
         publish {
             self.ghostRaceTitle =
                 liveGhost.title
+            // Keep the opponent's name while delayed, but never carry a
+            // previous lead into the next audio cue or active Watch metric.
             self.ghostDistanceDeltaMeters =
-                liveGhost.distanceDeltaMeters
+                liveSignal.mayAnnouncePassing
+                    ? liveGhost.distanceDeltaMeters : nil
             self.ghostTimeDeltaSeconds =
-                liveGhost
-                    .estimatedTimeDeltaSeconds
+                liveSignal.mayAnnouncePassing
+                    ? liveGhost.estimatedTimeDeltaSeconds : nil
         }
 
         let liveAudio =
             ghostAudioConfiguration(
                 from: liveGhost.audio
             )
-        announceLiveGhostConnectionChangeIfNeeded(
-            previous: previousConnection,
+        if state == .running {
+            announceLiveGhostConnectionChangeIfNeeded(
+                previous: previousConnection,
             current:
                 liveGhost.connectionText,
             opponentName:
                 liveGhost.opponentName ??
                 liveGhost.title,
-            configuration:
-                liveAudio
-        )
+                configuration: liveAudio
+            )
+        }
 
         guard isActive,
+              state == .running,
               kind == .running,
+              liveSignal.mayAnnouncePassing,
               let distanceDelta =
                     liveGhost
                         .distanceDeltaMeters
