@@ -900,8 +900,8 @@ struct ATHLTHArenaHomeView: View {
                     proxy: proxy
                 )
                 arenaJump(
-                    ATHLTHLocalization.choose(english: "History", norwegian: "Historikk"),
-                    icon: "clock.arrow.circlepath",
+                    ATHLTHLocalization.choose(english: "Seasons", norwegian: "Sesonger"),
+                    icon: "trophy",
                     target: "arena-seasons",
                     proxy: proxy
                 )
