@@ -2707,8 +2707,11 @@ struct ATHLTHGhostRuntimeObserver: View {
                         .active?
                         .id
             ) { _, activeID in
-                guard activeID == nil
+                guard activeID == nil,
+                      !mirroring.hasActiveMirroredWorkout
                 else {
+                    // The Watch may still own the synchronized workout.
+                    // A phone recorder finishing must never tear it down.
                     return
                 }
 
@@ -2748,6 +2751,20 @@ struct ATHLTHGhostRuntimeObserver: View {
 
         if snapshot.state == .completed ||
             snapshot.state == .failed {
+            guard ATHLTHLiveGhostWorkoutBinding.accepts(
+                ghostChallengeID: realtime.currentSession?.ghostChallengeID,
+                comparisonRouteID: snapshot.routeComparisonID
+            ) else {
+                // A delayed finish from a different Watch workout cannot
+                // end the current Live Ghost race or clear its comparisons.
+                return
+            }
+
+            guard phoneWorkout.active == nil else {
+                // Keep iPhone-owned sessions when the Watch merely
+                // completed a separate mirrored workout.
+                return
+            }
             if realtime.currentSession != nil {
                 await realtime
                     .leaveCurrentLiveWorkout()
@@ -2863,6 +2880,10 @@ struct ATHLTHGhostRuntimeObserver: View {
         _ snapshot:
             WatchWorkoutLiveSnapshot
     ) async {
+        guard ATHLTHLiveGhostWorkoutBinding.accepts(
+            ghostChallengeID: realtime.currentSession?.ghostChallengeID,
+            comparisonRouteID: snapshot.routeComparisonID
+        ) else { return }
         guard ghostRace.reference == nil,
               snapshot.kind == .running,
               let selected =
@@ -2923,6 +2944,10 @@ struct ATHLTHGhostRuntimeObserver: View {
     private func syncPhoneLiveGhost(
         _ workout: PhoneWorkout
     ) {
+        guard ATHLTHLiveGhostWorkoutBinding.accepts(
+            ghostChallengeID: realtime.currentSession?.ghostChallengeID,
+            comparisonRouteID: workout.plannedComparisonRouteID
+        ) else { return }
         guard !workout.walking,
               let selected =
                 realtime
