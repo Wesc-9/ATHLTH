@@ -252,6 +252,13 @@ struct LiveGhostRaceLobbyView: View {
                 await waitForSynchronizedStart()
             }
         }
+        .onChange(of: mirroring.snapshot?.capturedAt) { _, _ in
+            // If the Watch reconnects while this lobby remains visible,
+            // resume only the matching already-running duel. Never start
+            // HealthKit again and never adopt a stale mirrored snapshot.
+            guard canReconnectRecoveredWatchRace else { return }
+            Task { await connectLiveSession() }
+        }
         .onChange(of: liveRace.room?.status) { _, status in
             guard status == .finished || status == .cancelled,
                   realtime.currentSession?.ghostChallengeID == challenge.id
