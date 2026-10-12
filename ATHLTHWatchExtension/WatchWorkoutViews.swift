@@ -2316,6 +2316,30 @@ struct WatchActiveWorkoutView: View {
             }
             .padding(.top, 4)
 
+            if workoutManager.liveSurfaceContext.liveGhost != nil {
+                VStack(alignment: .leading, spacing: 5) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Live Ghost workout saved",
+                            norwegian: "Live Ghost-økt lagret"
+                        ),
+                        systemImage: "checkmark.shield"
+                    )
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(WatchTheme.green)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Your recorded workout is safe. The shared race result is confirmed separately on iPhone after both athletes finish. Arena points still require approval.",
+                        norwegian: "Økten din er lagret. Fellesresultatet bekreftes separat på iPhone når begge er ferdige. Arena-poeng krever fortsatt godkjenning."
+                    ))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(WatchTheme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(9)
+                .watchSurface(radius: 14)
+            }
+
             if let result = workoutManager.completedResult {
                 Text(durationText(result.duration))
                     .font(.system(size: 28, weight: .semibold, design: .rounded))
