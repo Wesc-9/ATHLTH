@@ -24,7 +24,8 @@ struct WatchTrainingAlwaysOnDashboard: View {
                 isStrengthExerciseComplete:
                     workout.strengthSession?.currentExerciseComplete == true,
                 currentRunningStepMeasure:
-                    workout.currentStructuredRunningStep?.measure
+                    workout.currentStructuredRunningStep?.measure,
+                recordedDistanceMeters: workout.distanceMeters
             )
         )
     }
@@ -45,6 +46,8 @@ struct WatchTrainingAlwaysOnDashboard: View {
                     intervalDashboard(compact: compact)
                 case .paceAndDistance, .distanceAndPace:
                     distanceDashboard(compact: compact)
+                case .cyclingDistance:
+                    cyclingDashboard(compact: compact)
                 case .elapsed:
                     genericDashboard(compact: compact)
                 }
@@ -501,6 +504,48 @@ struct WatchTrainingAlwaysOnDashboard: View {
                 .foregroundStyle(secondary)
             Spacer(minLength: 0)
         }
+    }
+
+    private func cyclingDashboard(compact: Bool) -> some View {
+        VStack(alignment: .leading, spacing: compact ? 5 : 7) {
+            Label(workout.kind.title, systemImage: workout.kind.systemImage)
+                .font(.system(size: compact ? 11 : 13, weight: .semibold))
+                .foregroundStyle(secondary)
+                .lineLimit(1)
+
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(String(format: "%.2f",
+                    max(workout.distanceMeters, 0) / 1_000))
+                    .font(.system(
+                        size: compact ? 38 : 45,
+                        weight: .bold,
+                        design: .rounded
+                    ))
+                    .monospacedDigit()
+                    .foregroundStyle(primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.68)
+                Text("km")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(accent)
+            }
+            Text(ATHLTHLocalization.choose(
+                english: "RECORDED DISTANCE", norwegian: "MÅLT DISTANSE"
+            ))
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(accent)
+
+            Text(timeString(workout.elapsedTime))
+                .font(.system(size: compact ? 20 : 24,
+                              weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(secondary)
+
+            Spacer(minLength: 0)
+            genericFooter()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity,
+               alignment: .topLeading)
     }
 
     private func genericDashboard(compact: Bool) -> some View {

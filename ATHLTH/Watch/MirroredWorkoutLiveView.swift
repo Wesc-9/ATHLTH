@@ -44,8 +44,19 @@ struct MirroredWorkoutLiveView: View {
                         } else {
                             if snapshot.kind == .strength {
                                 mirroredStrengthSummary(snapshot)
+                            } else {
+                                mirroredOtherSportHeader(snapshot)
                             }
-                            timer(snapshot)
+
+                            if snapshot.kind == .cycling,
+                               ATHLTHOtherSportLiveResolver.resolve(
+                                   kind: .cycling,
+                                   distanceMeters: snapshot.distanceMeters
+                               ) == .measuredDistance {
+                                mirroredCyclingDistance(snapshot)
+                            } else {
+                                timer(snapshot)
+                            }
 
                             HStack(
                                 spacing: 12
@@ -54,9 +65,10 @@ struct MirroredWorkoutLiveView: View {
                                     title:
                                         "Heart rate",
                                     value:
-                                        snapshot
-                                            .heartRate >
-                                        0
+                                        ATHLTHCoachSensorFreshness.validHeartRate(
+                                            snapshot.heartRate,
+                                            sampledAt: snapshot.coachHeartRateSampleAt
+                                        )
                                             ? "\(Int(snapshot.heartRate.rounded()))"
                                             : "—",
                                     unit: "bpm",
@@ -1024,6 +1036,66 @@ struct MirroredWorkoutLiveView: View {
                 .foregroundStyle(ATHLTHTheme.mutedText)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func mirroredOtherSportHeader(
+        _ snapshot: WatchWorkoutLiveSnapshot
+    ) -> some View {
+        if snapshot.kind != .strength {
+            HStack(spacing: 9) {
+                Label(snapshot.kind.title,
+                      systemImage: snapshot.kind.systemImage)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                Spacer(minLength: 0)
+                Text(statusTitle(snapshot.state))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(statusColor(snapshot.state))
+            }
+            .padding(.horizontal, 4)
+        }
+    }
+
+    private func mirroredCyclingDistance(
+        _ snapshot: WatchWorkoutLiveSnapshot
+    ) -> some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(ATHLTHLocalization.choose(
+                    english: "RECORDED DISTANCE",
+                    norwegian: "MÅLT DISTANSE"
+                ))
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
+                    Text(String(
+                        format: "%.2f",
+                        max(snapshot.distanceMeters, 0) / 1_000
+                    ))
+                        .font(.system(size: 62, weight: .bold,
+                                      design: .rounded))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.60)
+                    Text("km")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+                TimelineView(.periodic(from: .now, by: 1)) { timeline in
+                    Label(
+                        durationText(displayedElapsedTime(
+                            snapshot: snapshot, now: timeline.date
+                        )),
+                        systemImage: "clock"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 

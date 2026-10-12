@@ -12,6 +12,7 @@ enum ATHLTHAlwaysOnFocus: Equatable {
     case intervalOpen
     case paceAndDistance
     case distanceAndPace
+    case cyclingDistance
     case elapsed
 }
 
@@ -22,6 +23,7 @@ struct ATHLTHAlwaysOnContext {
     var isTimedStrengthSet = false
     var isStrengthExerciseComplete = false
     var currentRunningStepMeasure: WatchRunningStepMeasure? = nil
+    var recordedDistanceMeters: Double = 0
 }
 
 enum ATHLTHAlwaysOnFocusResolver {
@@ -46,8 +48,15 @@ enum ATHLTHAlwaysOnFocusResolver {
                 ? .distanceAndPace : .paceAndDistance
         }
 
-        // Other sports do not pretend to have pace, distance or rep data
-        // until that sport's recording/display engine explicitly supports it.
+        // Cycling may be distance-first when recorded distance exists;
+        // other activities never synthesize stroke count, pace or steps.
+        if context.kind == .cycling,
+           ATHLTHOtherSportLiveResolver.resolve(
+               kind: .cycling,
+               distanceMeters: context.recordedDistanceMeters
+           ) == .measuredDistance {
+            return .cyclingDistance
+        }
         return .elapsed
     }
 }

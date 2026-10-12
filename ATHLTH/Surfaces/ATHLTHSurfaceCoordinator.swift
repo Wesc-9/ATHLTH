@@ -197,16 +197,22 @@ private final class ATHLTHLiveActivityController {
 
     private var lastUpdateAt: Date?
     private var lastPhase: WatchWorkoutMirrorState?
+    private var lastSessionIdentity: ATHLTHLiveActivitySessionIdentity?
+    private var syncRevision: UInt64 = 0
 
     private init() {}
 
     func sync(
         with snapshot: WatchWorkoutLiveSnapshot?
     ) async {
+        syncRevision &+= 1
+        let revision = syncRevision
+
         guard let snapshot else {
             await endExistingActivities()
             lastPhase = nil
             lastUpdateAt = nil
+            lastSessionIdentity = nil
             return
         }
         guard ActivityAuthorizationInfo()
@@ -221,7 +227,30 @@ private final class ATHLTHLiveActivityController {
 
         if !surfaceConfiguration.dynamicIslandEnabled {
             await endExistingActivities()
+            lastPhase = nil
+            lastUpdateAt = nil
+            lastSessionIdentity = nil
             return
+        }
+
+        let identity = ATHLTHLiveActivitySessionIdentity(
+            systemImage: snapshot.kind.systemImage,
+            startedAt: snapshot.startedAt,
+            fallbackTitle: snapshot.workoutDisplayTitle ??
+                snapshot.kind.title
+        )
+
+        // A delayed completion from the previous session cannot finish the
+        // Live Activity of a newly started workout.
+        if (snapshot.state == .completed || snapshot.state == .failed),
+           let previous = lastSessionIdentity,
+           !previous.matches(identity) {
+            return
+        }
+
+        if lastSessionIdentity.map({ !$0.matches(identity) }) ?? true {
+            lastUpdateAt = nil
+            lastPhase = nil
         }
 
         let storedLiveContext =
@@ -328,22 +357,42 @@ private final class ATHLTHLiveActivityController {
         lastPhase = snapshot.state
         lastUpdateAt = Date()
 
+        let activities =
+            Activity<ATHLTHWorkoutActivityAttributes>.activities
+        func belongsToSession(
+            _ activity: Activity<ATHLTHWorkoutActivityAttributes>
+        ) -> Bool {
+            identity.matches(
+                ATHLTHLiveActivitySessionIdentity(
+                    systemImage: activity.attributes.systemImage,
+                    startedAt: activity.attributes.startedAt,
+                    fallbackTitle: activity.attributes.workoutTitle
+                )
+            )
+        }
+
         switch snapshot.state {
         case .preparing, .running, .paused, .ending:
-            if let activity =
-                Activity<ATHLTHWorkoutActivityAttributes>
-                    .activities.first {
+            // Never hand a new workout the old workout's ongoing activity.
+            // End obsolete activities before publishing the new snapshot.
+            for activity in activities where !belongsToSession(activity) {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
+            let matching = activities.filter(belongsToSession)
+            for duplicate in matching.dropFirst() {
+                await duplicate.end(nil, dismissalPolicy: .immediate)
+            }
+            guard revision == syncRevision else { return }
+
+            lastSessionIdentity = identity
+            if let activity = matching.first {
                 await activity.update(content)
             } else {
-                let attributes =
-                    ATHLTHWorkoutActivityAttributes(
-                        workoutTitle:
-                            snapshot.workoutDisplayTitle ??
-                            snapshot.kind.title,
-                        systemImage: snapshot.kind.systemImage,
-                        startedAt: snapshot.startedAt
-                    )
-
+                let attributes = ATHLTHWorkoutActivityAttributes(
+                    workoutTitle: identity.fallbackTitle,
+                    systemImage: identity.systemImage,
+                    startedAt: identity.startedAt
+                )
                 do {
                     _ = try Activity.request(
                         attributes: attributes,
@@ -357,11 +406,8 @@ private final class ATHLTHLiveActivityController {
             }
 
         case .completed, .failed:
-            let activities =
-                Activity<ATHLTHWorkoutActivityAttributes>
-                    .activities
-
-            for activity in activities {
+            // A delayed completion may only dismiss its own workout.
+            for activity in activities where belongsToSession(activity) {
                 await activity.end(
                     content,
                     dismissalPolicy: .after(
@@ -369,6 +415,10 @@ private final class ATHLTHLiveActivityController {
                     )
                 )
             }
+            guard revision == syncRevision else { return }
+            lastSessionIdentity = nil
+            lastPhase = nil
+            lastUpdateAt = nil
         }
     }
 

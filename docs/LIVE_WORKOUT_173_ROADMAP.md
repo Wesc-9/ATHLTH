@@ -10,7 +10,7 @@ Baseline: `release/v1.7.3`. Keep recording engines, workout ownership, iPhone/Wa
 4. **Always-On (in progress)** — Single low-power, read-only presentation selected by activity and phase, including accurate rest countdown. No animations, sensitive details policy, stale-data treatment and small-screen testing.
 5. **iPhone live workout (in progress)** — Activity-first hero metric and details, aligned with Watch; strength, run, treadmill, intervals and companion mode.
 6. **Lock Screen / Dynamic Island (in progress)** — Use existing Live Activity infrastructure and phase-specific compact/expanded variants; terminate cleanly when workout ends.
-7. **Other workout modes** — Walking, HIIT, cycling, functional, rowing, stairs, yoga; never show irrelevant or unmeasured metrics.
+7. **Other workout modes (in progress)** — Walking, HIIT, cycling, functional, rowing, stairs, yoga; never show irrelevant or unmeasured metrics.
 8. **Personalization and accessibility** — Primary metric, preferred pages, strong contrast, readable long exercise names, haptics and AOD privacy.
 9. **Regression and device validation** — HealthKit starts/stops, offline Watch operation, reconnect, no duplicated sets/workouts, battery tests, size classes, Always-On and TestFlight manual review.
 
@@ -185,3 +185,32 @@ Baseline: `release/v1.7.3`. Keep recording engines, workout ownership, iPhone/Wa
   verify Lock Screen and each Dynamic Island size on real iPhones, pause,
   resume, reconnect and battery/power behavior. Do not upload to TestFlight
   unless explicitly requested.
+
+## Phase 6 — session-lifecycle safety
+
+- A dedicated session identity (activity icon and workout start, with a
+  conservative fallback for legacy nil start dates) prevents the next workout
+  from reusing the previous Live Activity.
+- Reuse only an activity with matching identity. Obsolete activities are ended
+  immediately; duplicate activities for the same workout are collapsed.
+- Completed/failed snapshots may only finish activities belonging to their
+  original workout; a delayed completion cannot close a newer session.
+- A revision check stops an older in-flight update from publishing after a
+  newer update replaced it. Temporary Watch disconnection leaves the
+  recording workout alone, and the user-facing surfaces mark stale data.
+- Final release testing still requires iOS simulator compilation plus real
+  disconnect/reconnect, quick back-to-back starts and Live Activity dismissal.
+
+## Phase 7 — measured, activity-specific Watch and iPhone displays
+
+- Cycling: distance becomes the headline only when a finite, positive
+  recorded distance exists. Otherwise elapsed time remains the primary.
+- Walking/running retain their pace/distance hierarchy from phase 3–5.
+- HIIT, functional, rowing, stairs, yoga and other workouts prioritize
+  elapsed time, with fresh pulse/recorded calories as secondary values.
+  No fabricated strokes, flights, speed, repetitions or route distances.
+- Watch wrist-down cycling gets a low-power measured-distance variant.
+  iPhone mirrored cycling gets a matching activity-first panel.
+- Presentation-only changes: existing HealthKit session, mirroring,
+  pause/end commands and sensors are untouched.
+- Physical layout, Xcode/watchOS and battery validations remain pending.
