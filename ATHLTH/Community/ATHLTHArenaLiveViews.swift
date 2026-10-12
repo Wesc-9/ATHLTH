@@ -3391,6 +3391,14 @@ struct ATHLTHArenaOnlineDetailView: View {
                     isOrganizer: isOrganizer,
                     liveOutcomeDraft: $pendingLiveOutcome,
                     onChanged: { await refresh() },
+                    onReviewRound: { roundID in
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            scrollProxy.scrollTo(
+                                "arena-review-\(roundID.uuidString)",
+                                anchor: .top
+                            )
+                        }
+                    },
                     approvedRules: Dictionary(grouping: approvals, by: \.roundID)
                 )
                 .id("arena-standings")
