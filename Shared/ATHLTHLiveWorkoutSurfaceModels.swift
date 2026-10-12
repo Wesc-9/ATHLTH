@@ -147,6 +147,15 @@ struct ATHLTHLiveGhostContext: Codable, Hashable {
     // Platform-neutral so iPhone, Watch and Widget targets can all decode it.
     var audio:
         ATHLTHLiveGhostAudioContext? = nil
+
+    /// Drops only the provisional GPS advantage. Opponent identity and
+    /// original sample time survive reconnection and remain auditable.
+    func withoutUnverifiedGap() -> Self {
+        var revised = self
+        revised.distanceDeltaMeters = nil
+        revised.estimatedTimeDeltaSeconds = nil
+        return revised
+    }
 }
 
 /// Presentation-only validity for synchronized Ghost telemetry on Watch.
