@@ -135,4 +135,79 @@ final class ATHLTHArenaSeriesScorePresentationTests: XCTestCase {
             ), 0
         )
     }
+    func testChampionRequiresEveryRoundToBeApproved() {
+        XCTAssertTrue(ATHLTHArenaSeriesScorePresentation.mayDeclareChampion(
+            seriesStatus: "completed",
+            completionReason: nil,
+            resultsLoaded: true,
+            progress: ATHLTHArenaRoundProgress(total: 3, approved: 3, pending: 0),
+            leaderPoints: 9
+        ))
+        XCTAssertFalse(ATHLTHArenaSeriesScorePresentation.mayDeclareChampion(
+            seriesStatus: "completed",
+            completionReason: nil,
+            resultsLoaded: true,
+            progress: ATHLTHArenaRoundProgress(total: 3, approved: 2, pending: 1),
+            leaderPoints: 9
+        ))
+    }
+
+    func testChampionCannotBeDeclaredForUnresolvedOrMissingRounds() {
+        for progress in [
+            ATHLTHArenaRoundProgress(total: 0, approved: 0, pending: 0),
+            ATHLTHArenaRoundProgress(total: 3, approved: 2, pending: 0),
+            ATHLTHArenaRoundProgress(total: 3, approved: 0, pending: 3)
+        ] {
+            XCTAssertFalse(ATHLTHArenaSeriesScorePresentation.mayDeclareChampion(
+                seriesStatus: "completed",
+                completionReason: nil,
+                resultsLoaded: true,
+                progress: progress,
+                leaderPoints: 9
+            ))
+        }
+    }
+
+    func testChampionRequiresCurrentAuthoritativeResults() {
+        let settled = ATHLTHArenaRoundProgress(
+            total: 2, approved: 2, pending: 0
+        )
+        XCTAssertFalse(ATHLTHArenaSeriesScorePresentation.mayDeclareChampion(
+            seriesStatus: "completed",
+            completionReason: nil,
+            resultsLoaded: false,
+            progress: settled,
+            leaderPoints: 6
+        ))
+        XCTAssertFalse(ATHLTHArenaSeriesScorePresentation.mayDeclareChampion(
+            seriesStatus: "active",
+            completionReason: nil,
+            resultsLoaded: true,
+            progress: settled,
+            leaderPoints: 6
+        ))
+        XCTAssertFalse(ATHLTHArenaSeriesScorePresentation.mayDeclareChampion(
+            seriesStatus: "completed",
+            completionReason: "deadline_unresolved",
+            resultsLoaded: true,
+            progress: settled,
+            leaderPoints: 6
+        ))
+    }
+
+    func testChampionNeverFromEmptyOrInvalidLeaderPoints() {
+        let settled = ATHLTHArenaRoundProgress(
+            total: 1, approved: 1, pending: 0
+        )
+        for points: Double in [0, -3, .nan, .infinity] {
+            XCTAssertFalse(ATHLTHArenaSeriesScorePresentation.mayDeclareChampion(
+                seriesStatus: "completed",
+                completionReason: nil,
+                resultsLoaded: true,
+                progress: settled,
+                leaderPoints: points
+            ))
+        }
+    }
+
 }
