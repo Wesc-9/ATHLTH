@@ -74,6 +74,31 @@ final class ATHLTHArenaArchivePresentationTests: XCTestCase {
         ).isEmpty)
     }
 
+    func testArchiveNeverDisplaysRowsFetchedForAnotherAccount() {
+        let originalUser = UUID()
+        let nextUser = UUID()
+        XCTAssertTrue(ATHLTHArenaArchiveAccountScope.mayDisplay(
+            loadedForUserID: originalUser,
+            currentUserID: originalUser
+        ))
+        XCTAssertFalse(ATHLTHArenaArchiveAccountScope.mayDisplay(
+            loadedForUserID: originalUser,
+            currentUserID: nextUser
+        ))
+    }
+
+    func testArchiveFailsClosedBeforeFirstLoadAndAfterLogout() {
+        let userID = UUID()
+        XCTAssertFalse(ATHLTHArenaArchiveAccountScope.mayDisplay(
+            loadedForUserID: nil,
+            currentUserID: userID
+        ))
+        XCTAssertFalse(ATHLTHArenaArchiveAccountScope.mayDisplay(
+            loadedForUserID: userID,
+            currentUserID: UUID()
+        ))
+    }
+
     func testArchiveFilterPreservesNewestFirstSourceOrdering() {
         let newer = series(completionReason: "deadline_unresolved")
         let older = series(completionReason: "deadline_unresolved")
