@@ -11,6 +11,61 @@ struct ATHLTHArenaLiveOutcomeDraft: Identifiable {
     let evidenceNote: String
 }
 
+/// Presentation-only ranking of already approved server points.
+/// Tied positive totals share the same competition position (1, 1, 3).
+/// Zero, invalid or negative totals are unranked, never a race victory.
+enum ATHLTHArenaSeriesScorePresentation {
+    static func visiblePoints(_ raw: Double) -> Double {
+        raw.isFinite ? max(raw, 0) : 0
+    }
+
+    static func ordered(
+        _ members: [ATHLTHArenaRemoteMember]
+    ) -> [ATHLTHArenaRemoteMember] {
+        members
+            .filter { $0.response == "accepted" || $0.response == "deleted" }
+            .sorted { left, right in
+                let lhs = visiblePoints(left.points)
+                let rhs = visiblePoints(right.points)
+                if abs(lhs - rhs) > 0.001 { return lhs > rhs }
+                if left.createdAt != right.createdAt {
+                    return left.createdAt < right.createdAt
+                }
+                return left.slotID.uuidString < right.slotID.uuidString
+            }
+    }
+
+    static func competitionRank(
+        for member: ATHLTHArenaRemoteMember,
+        among standings: [ATHLTHArenaRemoteMember]
+    ) -> Int? {
+        let points = visiblePoints(member.points)
+        guard points > 0,
+              standings.contains(where: { $0.slotID == member.slotID })
+        else { return nil }
+        return standings.filter {
+            visiblePoints($0.points) > points + 0.001
+        }.count + 1
+    }
+
+    static func approvedLeaderPoints(
+        among standings: [ATHLTHArenaRemoteMember]
+    ) -> Double {
+        standings.map { visiblePoints($0.points) }.max() ?? 0
+    }
+
+    static func gapToLeader(
+        for member: ATHLTHArenaRemoteMember,
+        among standings: [ATHLTHArenaRemoteMember]
+    ) -> Double {
+        guard standings.contains(where: { $0.slotID == member.slotID }) else {
+            return 0
+        }
+        return max(0, approvedLeaderPoints(among: standings) -
+                   visiblePoints(member.points))
+    }
+}
+
 /// Arena scoring is confirmed by the whole group. Manual evidence is never
 /// labelled as HealthKit/GPS verified; there is no silent point allocation.
 struct ATHLTHArenaScoringSection: View {
@@ -50,11 +105,11 @@ struct ATHLTHArenaScoringSection: View {
     }
 
     private var rankedMembers: [ATHLTHArenaRemoteMember] {
-        members.filter { $0.response == "accepted" || $0.response == "deleted" }
-            .sorted {
-                if $0.points != $1.points { return $0.points > $1.points }
-                return $0.createdAt < $1.createdAt
-            }
+        ATHLTHArenaSeriesScorePresentation.ordered(members)
+    }
+
+    private var personalStanding: ATHLTHArenaRemoteMember? {
+        rankedMembers.first { $0.userID == session.profile.userID }
     }
 
     private var startReady: Bool {
@@ -103,24 +158,27 @@ struct ATHLTHArenaScoringSection: View {
 
             if series.status != "draft", !rounds.isEmpty, resultsLoaded {
                 roundProgressCard
+                if personalStanding != nil { personalScoreCard }
             }
 
             ForEach(rankedMembers) { member in
-                let index = rankedMembers.firstIndex { $0.id == member.id } ?? 0
+                let rank = ATHLTHArenaSeriesScorePresentation.competitionRank(
+                    for: member, among: rankedMembers
+                )
                 HStack(spacing: 12) {
-                    Text("\(index + 1).")
+                    Text(rank.map { "\($0)." } ?? "–")
                         .font(.headline.monospacedDigit())
                         .foregroundStyle(ATHLTHTheme.mutedText)
                         .frame(width: 27)
                     Image(systemName: member.isDeleted
                           ? "person.crop.circle.badge.xmark"
-                          : index == 0 ? "trophy.fill" : "person.crop.circle.fill")
+                          : rank == 1 ? "trophy.fill" : "person.crop.circle.fill")
                         .foregroundStyle(member.isDeleted ? Color.gray : ATHLTHTheme.accentDeep)
                     Text(memberName(member))
                         .font(.subheadline.weight(index == 0 ? .semibold : .regular))
                         .foregroundStyle(member.isDeleted ? Color.gray : ATHLTHTheme.primaryText)
                     Spacer()
-                    Text("\(member.points.formatted()) p")
+                    Text("\(ATHLTHArenaSeriesScorePresentation.visiblePoints(member.points).formatted()) p")
                         .font(.subheadline.weight(.bold).monospacedDigit())
                         .foregroundStyle(member.isDeleted ? Color.gray : ATHLTHTheme.primaryText)
                 }
