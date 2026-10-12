@@ -200,6 +200,50 @@ enum CommunityEventAttendance: String, Codable, Hashable {
     case maybe
 }
 
+/// Keep the join button consistent with the database RSVP policy.
+enum CommunityEventRegistrationPolicy {
+    static func canRegister(
+        _ event: CommunityEventRecord,
+        now: Date = Date()
+    ) -> Bool {
+        event.status == "upcoming" && event.startsAt > now
+    }
+
+    static func unavailableMessage(
+        _ event: CommunityEventRecord,
+        now: Date = Date()
+    ) -> String {
+        switch event.status {
+        case "cancelled":
+            return ATHLTHLocalization.choose(
+                english: "This event has been cancelled.",
+                norwegian: "Arrangementet er avlyst."
+            )
+        case "completed":
+            return ATHLTHLocalization.choose(
+                english: "This event is finished. Registration is closed.",
+                norwegian: "Arrangementet er avsluttet. Påmeldingen er stengt."
+            )
+        case "live":
+            return ATHLTHLocalization.choose(
+                english: "The organizer has started this event. Registration is closed.",
+                norwegian: "Arrangøren har startet arrangementet. Påmeldingen er stengt."
+            )
+        default:
+            if event.startsAt <= now {
+                return ATHLTHLocalization.choose(
+                    english: "Registration is closed because the start time has passed. The organizer can move the start time to reopen registration.",
+                    norwegian: "Påmeldingen er stengt fordi starttidspunktet er passert. Arrangøren kan endre starttidspunktet for å åpne igjen."
+                )
+            }
+            return ATHLTHLocalization.choose(
+                english: "Registration is not available for this event.",
+                norwegian: "Påmelding er ikke tilgjengelig for dette arrangementet."
+            )
+        }
+    }
+}
+
 enum CommunityEventCompetitionMetric:
     String,
     Codable,
@@ -767,6 +811,22 @@ private struct CommunityParticipantWrite: Encodable {
     }
 }
 
+private struct CommunityParticipantPresence: Decodable {
+    let userID: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case userID = "user_id"
+    }
+}
+
+private struct CommunityAttendanceStatusWrite: Encodable {
+    let attendanceStatus: String
+
+    enum CodingKeys: String, CodingKey {
+        case attendanceStatus = "attendance_status"
+    }
+}
+
 private struct CommunityEventLifecycleParams:
     Encodable
 {
@@ -1310,16 +1370,42 @@ final class SupabaseCommunityService {
             throw CommunityEventError.notAuthenticated
         }
 
-        try await client
+        // Postgres only grants UPDATE on attendance_status and check_in_method.
+        // A generic upsert also updates the conflict key (event_id, user_id),
+        // causing permission denied even when the INSERT itself is allowed.
+        // Change only the attendance_status for existing members.
+        let existing: [CommunityParticipantPresence] = try await client
             .from("community_event_participants")
-            .upsert(
-                CommunityParticipantWrite(
-                    eventID: eventID,
-                    userID: currentUserID,
-                    attendanceStatus: status.rawValue
-                )
-            )
+            .select("user_id")
+            .eq("event_id", value: eventID)
+            .eq("user_id", value: currentUserID)
+            .limit(1)
             .execute()
+            .value
+
+        if existing.isEmpty {
+            try await client
+                .from("community_event_participants")
+                .insert(
+                    CommunityParticipantWrite(
+                        eventID: eventID,
+                        userID: currentUserID,
+                        attendanceStatus: status.rawValue
+                    )
+                )
+                .execute()
+        } else {
+            try await client
+                .from("community_event_participants")
+                .update(
+                    CommunityAttendanceStatusWrite(
+                        attendanceStatus: status.rawValue
+                    )
+                )
+                .eq("event_id", value: eventID)
+                .eq("user_id", value: currentUserID)
+                .execute()
+        }
     }
 
     func join(eventID: UUID) async throws {
@@ -1445,6 +1531,7 @@ enum CommunityEventError: LocalizedError {
     case notAuthenticated
     case invalidEvent
     case eventFull
+    case registrationClosed
     case invalidCompetitionResult
 
     var errorDescription: String? {
@@ -1454,7 +1541,15 @@ enum CommunityEventError: LocalizedError {
         case .invalidEvent:
             return "Add an event name and choose a future start time."
         case .eventFull:
-            return "This event is full."
+            return ATHLTHLocalization.choose(
+                english: "This event is full.",
+                norwegian: "Arrangementet er fullt."
+            )
+        case .registrationClosed:
+            return ATHLTHLocalization.choose(
+                english: "Registration is closed for this event.",
+                norwegian: "Påmeldingen er stengt for dette arrangementet."
+            )
         case .invalidCompetitionResult:
             return ATHLTHLocalization.choose(
                 english:
@@ -1682,27 +1777,44 @@ final class CommunityEventStore: ObservableObject {
         }
     }
 
-    func join(_ item: CommunityEventItem) async {
+    @discardableResult
+    func join(_ item: CommunityEventItem) async -> Bool {
+        guard CommunityEventRegistrationPolicy.canRegister(item.event) else {
+            errorMessage =
+                CommunityEventRegistrationPolicy.unavailableMessage(item.event)
+            return false
+        }
         if let maximum = item.event.maxParticipants,
            item.participantCount >= maximum {
             errorMessage = CommunityEventError.eventFull.localizedDescription
-            return
+            return false
         }
 
         do {
             try await service.join(eventID: item.id)
             await refresh(force: true)
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
-    func maybe(_ item: CommunityEventItem) async {
+    @discardableResult
+    func maybe(_ item: CommunityEventItem) async -> Bool {
+        guard CommunityEventRegistrationPolicy.canRegister(item.event) else {
+            errorMessage =
+                CommunityEventRegistrationPolicy.unavailableMessage(item.event)
+            return false
+        }
+
         do {
             try await service.maybe(eventID: item.id)
             await refresh(force: true)
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
@@ -1792,12 +1904,15 @@ final class CommunityEventStore: ObservableObject {
         }
     }
 
-    func leave(_ item: CommunityEventItem) async {
+    @discardableResult
+    func leave(_ item: CommunityEventItem) async -> Bool {
         do {
             try await service.leave(eventID: item.id)
             await refresh(force: true)
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
@@ -2184,6 +2299,7 @@ struct CommunityEventDetailView: View {
         false
     @State private var eventActionMessage:
         String?
+    @State private var isUpdatingAttendance = false
     @StateObject private var checkInLocation =
         ChallengeLocationStore()
     @StateObject private var eventWeather =
@@ -4088,6 +4204,14 @@ struct CommunityEventDetailView: View {
             eventQuickActions(item)
 
             actionButton(item)
+
+            if let eventActionMessage {
+                Label(eventActionMessage, systemImage: "exclamationmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.updatesFrequently)
+            }
         }
         .padding(18)
         .background(
@@ -4427,74 +4551,103 @@ struct CommunityEventDetailView: View {
             }
             .padding(.top, 4)
         } else {
-            HStack(spacing: 10) {
-                Button {
-                    Task {
-                        await community.join(
-                            item
-                        )
-                    }
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Going",
-                            norwegian: "Delta"
-                        ),
-                        systemImage:
-                            "person.badge.plus"
-                    )
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(
-                    .borderedProminent
-                )
-                .tint(
-                    ATHLTHTheme.vitality
-                )
-                .disabled(
-                    item.event
-                        .maxParticipants
-                        .map {
-                            item.participantCount >=
-                                $0
-                        } ?? false
-                )
-
-                Button {
-                    Task {
-                        if community.isMaybe(
-                            item
-                        ) {
-                            await community.leave(
-                                item
+            // Refresh the registration state while the details sheet is open.
+            // It must not offer a functional RSVP after the database deadline.
+            TimelineView(.periodic(from: .now, by: 30)) { context in
+                if CommunityEventRegistrationPolicy.canRegister(
+                    item.event,
+                    now: context.date
+                ) {
+                    HStack(spacing: 10) {
+                        Button {
+                            Task {
+                                await updateAttendance(item, choosing: .going)
+                            }
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Going",
+                                    norwegian: "Delta"
+                                ),
+                                systemImage: "person.badge.plus"
                             )
-                        } else {
-                            await community.maybe(
-                                item
-                            )
+                            .frame(maxWidth: .infinity)
                         }
-                    }
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Maybe",
-                            norwegian: "Kanskje"
-                        ),
-                        systemImage:
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHTheme.vitality)
+                        .disabled(
+                            isUpdatingAttendance ||
+                            (item.event.maxParticipants.map {
+                                item.participantCount >= $0
+                            } ?? false)
+                        )
+
+                        Button {
+                            Task {
+                                await updateAttendance(item, choosing: .maybe)
+                            }
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Maybe",
+                                    norwegian: "Kanskje"
+                                ),
+                                systemImage: community.isMaybe(item)
+                                    ? "questionmark.circle.fill"
+                                    : "questionmark.circle"
+                            )
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(
                             community.isMaybe(item)
-                                ? "questionmark.circle.fill"
-                                : "questionmark.circle"
+                                ? ATHLTHTheme.vitality
+                                : .secondary
+                        )
+                        .disabled(isUpdatingAttendance)
+                    }
+                    .padding(.top, 4)
+                } else {
+                    Label(
+                        CommunityEventRegistrationPolicy.unavailableMessage(
+                            item.event,
+                            now: context.date
+                        ),
+                        systemImage: "calendar.badge.exclamationmark"
                     )
-                    .frame(maxWidth: .infinity)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 6)
                 }
-                .buttonStyle(.bordered)
-                .tint(
-                    community.isMaybe(item)
-                        ? ATHLTHTheme.vitality
-                        : .secondary
-                )
             }
-            .padding(.top, 4)
+        }
+    }
+
+    private func updateAttendance(
+        _ item: CommunityEventItem,
+        choosing status: CommunityEventAttendance
+    ) async {
+        guard !isUpdatingAttendance else { return }
+        isUpdatingAttendance = true
+        defer { isUpdatingAttendance = false }
+        eventActionMessage = nil
+
+        let success: Bool
+        if status == .going {
+            success = await community.join(item)
+        } else if community.isMaybe(item) {
+            success = await community.leave(item)
+        } else {
+            success = await community.maybe(item)
+        }
+
+        if !success {
+            eventActionMessage = community.errorMessage ??
+                ATHLTHLocalization.choose(
+                    english: "ATHLTH could not save your registration. Try again.",
+                    norwegian: "ATHLTH klarte ikke å lagre påmeldingen. Prøv igjen."
+                )
         }
     }
 
