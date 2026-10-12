@@ -56,6 +56,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var didApplySuggestedStartDate = false
     @State private var showingPlanDesignLab = false
     @State private var resumablePlanDraft: ATHLTHPlanCreationDraft?
+    @State private var showingResumePlanDialog = false
     @State private var completedPlanCreation = false
 
     private let draftStore = ATHLTHPlanCreationDraftStore()
@@ -378,6 +379,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
             if let unfinished = draftStore.load(userID: session.profile.userID) {
                 resumablePlanDraft = unfinished
+                showingResumePlanDialog = true
                 return
             }
 
@@ -407,12 +409,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 english: "Continue your unfinished plan?",
                 norwegian: "Fortsette på treningsplanen?"
             ),
-            isPresented: Binding(
-                get: { resumablePlanDraft != nil },
-                set: { presented in
-                    if !presented { resumablePlanDraft = nil }
-                }
-            ),
+            isPresented: $showingResumePlanDialog,
             titleVisibility: .visible
         ) {
             Button(ATHLTHLocalization.choose(
@@ -434,6 +431,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     step = .basics
                 }
                 resumablePlanDraft = nil
+                showingResumePlanDialog = false
                 saveResumableDraft()
             }
             Button(ATHLTHLocalization.choose(
@@ -441,6 +439,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             ), role: .destructive) {
                 draftStore.clear(userID: session.profile.userID)
                 resumablePlanDraft = nil
+                showingResumePlanDialog = false
             }
         } message: {
             Text(ATHLTHLocalization.choose(
