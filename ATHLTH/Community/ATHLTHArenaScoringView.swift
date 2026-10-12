@@ -66,6 +66,48 @@ enum ATHLTHArenaSeriesScorePresentation {
     }
 }
 
+/// Immutable read-only timeline built from result proposals returned by
+/// Supabase. A proposal isn't proof of a completed workout and never awards
+/// Arena points without the separate unanimous vote/settlement flow.
+enum ATHLTHArenaResultHistoryPresentation {
+    enum State: Equatable {
+        case approved
+        case pending
+        case rejected
+        case expired
+        case unresolved
+
+        static func resolve(_ raw: String) -> Self {
+            switch raw {
+            case "approved": return .approved
+            case "pending": return .pending
+            case "rejected": return .rejected
+            case "expired": return .expired
+            default: return .unresolved
+            }
+        }
+    }
+
+    static func recent(
+        _ results: [ATHLTHArenaRoundResult],
+        for roundIDs: Set<UUID>,
+        limit: Int = 4
+    ) -> [ATHLTHArenaRoundResult] {
+        guard limit > 0 else { return [] }
+        return Array(
+            results
+                .filter { roundIDs.contains($0.roundID) }
+                .sorted { left, right in
+                    if left.createdAt != right.createdAt {
+                        return left.createdAt > right.createdAt
+                    }
+                    return left.id.uuidString < right.id.uuidString
+                }
+                .prefix(limit)
+        )
+    }
+}
+
 /// Arena scoring is confirmed by the whole group. Manual evidence is never
 /// labelled as HealthKit/GPS verified; there is no silent point allocation.
 struct ATHLTHArenaScoringSection: View {
@@ -110,6 +152,13 @@ struct ATHLTHArenaScoringSection: View {
 
     private var personalStanding: ATHLTHArenaRemoteMember? {
         rankedMembers.first { $0.userID == session.profile.userID }
+    }
+
+    private var recentResultHistory: [ATHLTHArenaRoundResult] {
+        ATHLTHArenaResultHistoryPresentation.recent(
+            results,
+            for: Set(rounds.map(\.id))
+        )
     }
 
     private var startReady: Bool {
@@ -159,6 +208,7 @@ struct ATHLTHArenaScoringSection: View {
             if series.status != "draft", !rounds.isEmpty, resultsLoaded {
                 roundProgressCard
                 if personalStanding != nil { personalScoreCard }
+                if !recentResultHistory.isEmpty { recentResultHistoryCard }
             }
 
             ForEach(rankedMembers) { member in
@@ -475,6 +525,115 @@ struct ATHLTHArenaScoringSection: View {
                 in: RoundedRectangle(cornerRadius: 18)
             )
             .accessibilityElement(children: .combine)
+        }
+    }
+
+    /// A compact activity timeline, not a second leaderboard. Every date
+    /// is the proposal creation date, never inferred as an approval date.
+    private var recentResultHistoryCard: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(spacing: 8) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                Text(ATHLTHLocalization.choose(
+                    english: "Recent round results",
+                    norwegian: "Nylige runderesultater"
+                ))
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                Spacer(minLength: 0)
+                Text(ATHLTHLocalization.choose(
+                    english: "Last proposals",
+                    norwegian: "Siste forslag"
+                ))
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+
+            ForEach(recentResultHistory) { result in
+                let state = ATHLTHArenaResultHistoryPresentation.State.resolve(
+                    result.status
+                )
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: historyIcon(state))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(historyColor(state))
+                        .frame(width: 23)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(
+                            rounds.first(where: { $0.id == result.roundID })?.title ??
+                            ATHLTHLocalization.choose(
+                                english: "Competition round",
+                                norwegian: "Konkurranserunde"
+                            )
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(2)
+
+                        Text(historyTitle(state))
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(historyColor(state))
+
+                        Text(result.createdAt.formatted(
+                            date: .abbreviated, time: .shortened
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .accessibilityElement(children: .combine)
+            }
+
+            Text(ATHLTHLocalization.choose(
+                english: "These are submitted result proposals. Only unanimously approved results can award Arena points.",
+                norwegian: "Dette er innsendte resultatforslag. Bare enstemmig godkjente resultater kan gi Arena-poeng."
+            ))
+            .font(.caption2)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(15)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    private func historyTitle(
+        _ state: ATHLTHArenaResultHistoryPresentation.State
+    ) -> String {
+        switch state {
+        case .approved:
+            ATHLTHLocalization.choose(english: "Approved", norwegian: "Godkjent")
+        case .pending:
+            ATHLTHLocalization.choose(english: "Awaiting approval", norwegian: "Avventer godkjenning")
+        case .rejected:
+            ATHLTHLocalization.choose(english: "Rejected", norwegian: "Avvist")
+        case .expired:
+            ATHLTHLocalization.choose(english: "Expired", norwegian: "Utløpt")
+        case .unresolved:
+            ATHLTHLocalization.choose(english: "Unresolved", norwegian: "Uavklart")
+        }
+    }
+
+    private func historyIcon(
+        _ state: ATHLTHArenaResultHistoryPresentation.State
+    ) -> String {
+        switch state {
+        case .approved: "checkmark.seal.fill"
+        case .pending: "clock.fill"
+        case .rejected: "xmark.circle.fill"
+        case .expired: "clock.badge.exclamationmark"
+        case .unresolved: "questionmark.circle"
+        }
+    }
+
+    private func historyColor(
+        _ state: ATHLTHArenaResultHistoryPresentation.State
+    ) -> Color {
+        switch state {
+        case .approved: .green
+        case .pending: .orange
+        case .rejected, .expired, .unresolved: ATHLTHTheme.mutedText
         }
     }
 
