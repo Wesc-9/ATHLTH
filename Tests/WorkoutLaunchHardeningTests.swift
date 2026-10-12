@@ -75,6 +75,39 @@ final class WorkoutLaunchHardeningTests: XCTestCase {
         XCTAssertFalse(connection.hasActiveIPhoneWorkout)
     }
 
+    func testWatchActivityQueryUsesExplicitTransportAndCurrentSnapshot() throws {
+        XCTAssertEqual(
+            WatchTransferKind.workoutActivityQuery.rawValue,
+            "workoutActivityQuery"
+        )
+        let finished = WatchWorkoutActivityState(
+            isActive: false,
+            title: nil,
+            updatedAt: Date(timeIntervalSince1970: 1_800_000_000)
+        )
+        let restored = try JSONDecoder().decode(
+            WatchWorkoutActivityState.self,
+            from: JSONEncoder().encode(finished)
+        )
+        XCTAssertFalse(restored.isActive)
+        XCTAssertNil(restored.title)
+        XCTAssertEqual(restored.updatedAt, finished.updatedAt)
+    }
+
+    func testWatchActiveSnapshotRemainsActiveAfterLongWorkout() throws {
+        let active = WatchWorkoutActivityState(
+            isActive: true,
+            title: "Long run",
+            updatedAt: Date(timeIntervalSince1970: 1_800_000_000)
+        )
+        let decoded = try JSONDecoder().decode(
+            WatchWorkoutActivityState.self,
+            from: JSONEncoder().encode(active)
+        )
+        XCTAssertTrue(decoded.isActive)
+        XCTAssertEqual(decoded.title, "Long run")
+    }
+
     func testWorkoutKindMappingIsCentralized() {
         XCTAssertEqual(
             PlannedWorkoutWatchBuilder.watchKind(
