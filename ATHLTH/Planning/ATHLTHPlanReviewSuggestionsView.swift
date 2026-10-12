@@ -3,9 +3,14 @@ import SwiftUI
 /// A consent-first review surface. Tapping only navigates to the exact
 /// day or week; applying any training-plan edit remains in the normal editor.
 struct ATHLTHPlanReviewSuggestionsView: View {
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var strength: StrengthWorkoutStore
+
     let plan: TrainingPlan
     let onSelect: (UUID, UUID?) -> Void
     @State private var showAll = false
+    @State private var proposedDuration: ATHLTHPlanReviewDurationProposal.Proposal?
 
     var body: some View {
         let suggestions = ATHLTHPlanReviewAdvisor.inspect(plan)
@@ -52,7 +57,13 @@ struct ATHLTHPlanReviewSuggestionsView: View {
                         showAll ? suggestions.count : 3
                     ))) { suggestion in
                         Button {
-                            onSelect(suggestion.weekID, suggestion.dayID)
+                            if let preview = ATHLTHPlanReviewDurationProposal.suggest(
+                                for: suggestion, in: plan
+                            ) {
+                                proposedDuration = preview
+                            } else {
+                                onSelect(suggestion.weekID, suggestion.dayID)
+                            }
                         } label: {
                             HStack(alignment: .top, spacing: 11) {
                                 Image(systemName: symbol(for: suggestion.kind))
@@ -138,6 +149,21 @@ struct ATHLTHPlanReviewSuggestionsView: View {
                     .buttonStyle(.bordered)
                 }
             }
+        }
+        .sheet(item: $proposedDuration) { proposal in
+            ATHLTHPlanReviewDurationPreviewSheet(
+                proposal: proposal,
+                onApprove: {
+                    session.applyPlanReviewDurationProposal(
+                        proposal,
+                        healthWorkouts: health.workouts,
+                        strengthHistory: strength.workoutHistory
+                    )
+                },
+                onOpenEditor: {
+                    onSelect(proposal.weekID, proposal.dayID)
+                }
+            )
         }
     }
 
