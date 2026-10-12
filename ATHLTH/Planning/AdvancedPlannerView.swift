@@ -65,6 +65,7 @@ struct AdvancedPlannerView: View {
                 switch studioSection {
                 case .program:
                     planOverview(plan)
+                    planQualityPanel(plan)
                     if let week = selectedWeek(in: plan) {
                         weekSelector(plan)
                         weekOverview(plan, week: week)
@@ -742,6 +743,74 @@ struct AdvancedPlannerView: View {
                     )
                 }
                 .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func planQualityPanel(_ plan: TrainingPlan) -> some View {
+        let findings = ATHLTHPlanStructureAdvisor.inspect(plan)
+        return ATHLTHPlanSurface {
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.shield")
+                    .foregroundStyle(ATHLTHPlanDesign.accent)
+                    .font(.system(size: 18, weight: .medium))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Plan structure check", norwegian: "Sjekk av planstruktur"
+                    ))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Checks scheduling and workout identity, not medical safety.",
+                        norwegian: "Kontrollerer planoppsett og øktidentitet, ikke medisinsk sikkerhet."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                Spacer(minLength: 0)
+            }
+
+            if findings.isEmpty {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "No basic structural issues found.",
+                        norwegian: "Ingen enkle strukturavvik funnet."
+                    ),
+                    systemImage: "checkmark.circle"
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.vitality)
+            } else {
+                ForEach(Array(findings.prefix(4))) { item in
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: item.symbol)
+                            .font(.subheadline)
+                            .foregroundStyle(
+                                item.severity == .attention
+                                ? ATHLTHPlanDesign.accent
+                                : ATHLTHTheme.accent
+                            )
+                            .frame(width: 22, alignment: .center)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(item.title)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Text(item.detail)
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                }
+                if findings.count > 4 {
+                    Text(ATHLTHLocalization.choose(
+                        english: "\(findings.count - 4) additional notes",
+                        norwegian: "\(findings.count - 4) flere merknader"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
             }
         }
     }
