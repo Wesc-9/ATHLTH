@@ -55,6 +55,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var dismissAfterAI = false
     @State private var didApplySuggestedStartDate = false
     @State private var showingPlanDesignLab = false
+    @State private var resumablePlanDraft: ATHLTHPlanCreationDraft?
+    @State private var completedPlanCreation = false
+
+    private let draftStore = ATHLTHPlanCreationDraftStore()
 
     init(
         startsAtSourceChoice: Bool,
@@ -372,6 +376,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
             didApplySuggestedStartDate = true
 
+            if let unfinished = draftStore.load(userID: session.profile.userID) {
+                resumablePlanDraft = unfinished
+                return
+            }
+
             let suggested =
                 session
                     .suggestedTrainingPlanStartDate
@@ -386,6 +395,58 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             for: suggested
                         )
                 )
+        }
+        .onChange(of: title) { _, _ in saveResumableDraft() }
+        .onChange(of: weekCount) { _, _ in saveResumableDraft() }
+        .onChange(of: startDate) { _, _ in saveResumableDraft() }
+        .onChange(of: mode) { _, _ in saveResumableDraft() }
+        .onChange(of: selectedSource) { _, _ in saveResumableDraft() }
+        .onChange(of: step) { _, _ in saveResumableDraft() }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Continue your unfinished plan?",
+                norwegian: "Fortsette på treningsplanen?"
+            ),
+            isPresented: Binding(
+                get: { resumablePlanDraft != nil },
+                set: { presented in
+                    if !presented { resumablePlanDraft = nil }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Continue plan", norwegian: "Fortsett på planen"
+            )) {
+                if let draft = resumablePlanDraft {
+                    mode = draft.advanced ? .advanced : .basic
+                    title = draft.title
+                    weekCount = draft.weekCount
+                    // A stale date must never point back in time.
+                    startDate = max(Calendar.current.startOfDay(for: Date()), draft.startDate)
+                    switch draft.source {
+                    case "library": selectedSource = .library
+                    case "saved": selectedSource = .saved
+                    default: selectedSource = .scratch
+                    }
+                    // Only the nonsensitive basics are retained. Reconfirm
+                    // goals, limitations, available days and any AI permissions.
+                    step = .basics
+                }
+                resumablePlanDraft = nil
+                saveResumableDraft()
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Start a new plan", norwegian: "Start ny plan"
+            ), role: .destructive) {
+                draftStore.clear(userID: session.profile.userID)
+                resumablePlanDraft = nil
+            }
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "We saved the name, start date and duration on this device. Sensitive notes were not saved.",
+                norwegian: "Vi har lagret navn, startdato og varighet på denne enheten. Sensitive notater er ikke lagret."
+            ))
         }
         .onChange(
             of: sessionsPerWeek
@@ -435,6 +496,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 mode: .generate,
                 seed: aiBuilderSeed,
                 onProgramCreated: {
+                    completedPlanCreation = true
+                    draftStore.clear(userID: session.profile.userID)
                     dismissAfterAI = true
                 }
             )
@@ -3837,6 +3900,23 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .joined(separator: ", ")
     }
 
+    private func saveResumableDraft() {
+        guard didApplySuggestedStartDate,
+              !completedPlanCreation,
+              resumablePlanDraft == nil else {
+            return
+        }
+        let draft = ATHLTHPlanCreationDraft(
+            title: title,
+            weekCount: weekCount,
+            startDate: startDate,
+            advanced: mode == .advanced,
+            source: selectedSource.rawValue,
+            stage: String(describing: step)
+        )
+        draftStore.save(draft, userID: session.profile.userID)
+    }
+
     private func goForward() {
         guard let next = ATHLTHPlanJourney.next(
             after: step, advanced: mode == .advanced
@@ -4410,6 +4490,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         // Open the real day-by-day planner directly after saving so the
         // user can immediately add exercises, edit days and review the week.
         createdPlanID = created.id
+        completedPlanCreation = true
+        draftStore.clear(userID: session.profile.userID)
         onCreated?(created.id)
         showingCreatedPlan = true
     }
