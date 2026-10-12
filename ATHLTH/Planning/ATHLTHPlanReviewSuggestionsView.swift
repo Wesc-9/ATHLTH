@@ -185,9 +185,10 @@ struct ATHLTHPlanReviewSuggestionsView: View {
             case .move(let proposal):
                 ATHLTHPlanReviewMovePreviewSheet(
                     proposal: proposal,
-                    onApprove: {
+                    plan: plan,
+                    onApprove: { selectedProposal in
                         session.applyPlanReviewMoveProposal(
-                            proposal,
+                            selectedProposal,
                             healthWorkouts: health.workouts,
                             strengthHistory: strength.workoutHistory
                         )

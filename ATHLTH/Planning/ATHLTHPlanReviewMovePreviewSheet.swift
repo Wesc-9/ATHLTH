@@ -4,12 +4,25 @@ import SwiftUI
 struct ATHLTHPlanReviewMovePreviewSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showFailed = false
+    @State private var selectedDayID: UUID?
 
     let proposal: ATHLTHPlanReviewMoveProposal.Proposal
-    let onApprove: () -> Bool
+    let plan: TrainingPlan
+    let onApprove: (ATHLTHPlanReviewMoveProposal.Proposal) -> Bool
     let onOpenEditor: () -> Void
 
     var body: some View {
+        let alternatives = ATHLTHPlanMoveWeekPreview.destinations(
+            proposal, in: plan
+        )
+        let adjusted = ATHLTHPlanMoveWeekPreview.choosing(
+            selectedDayID ?? proposal.targetDayID,
+            from: proposal, in: plan
+        )
+        let impact = adjusted.flatMap {
+            ATHLTHPlanMoveWeekPreview.summarize($0, in: plan)
+        }
+
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
@@ -44,8 +57,35 @@ struct ATHLTHPlanReviewMovePreviewSheet: View {
                                 label: ATHLTHLocalization.choose(
                                     english: "To", norwegian: "Til"
                                 ),
-                                date: proposal.targetDate
+                                date: adjusted?.targetDate ?? proposal.targetDate
                             )
+                        }
+
+                        if alternatives.count > 1 {
+                            Menu {
+                                ForEach(alternatives) { destination in
+                                    Button(
+                                        destination.date.formatted(
+                                            .dateTime.weekday(.wide).day().month()
+                                        )
+                                    ) {
+                                        selectedDayID = destination.dayID
+                                    }
+                                }
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Choose another free day",
+                                        norwegian: "Velg en annen ledig dag"
+                                    ),
+                                    systemImage: "calendar"
+                                )
+                                .font(.subheadline.weight(.medium))
+                            }
+                        }
+
+                        if let impact {
+                            weekImpact(impact)
                         }
 
                         Label(
@@ -66,7 +106,7 @@ struct ATHLTHPlanReviewMovePreviewSheet: View {
                     }
 
                     Button {
-                        if onApprove() {
+                        if let adjusted, onApprove(adjusted) {
                             dismiss()
                         } else {
                             showFailed = true
@@ -84,6 +124,7 @@ struct ATHLTHPlanReviewMovePreviewSheet: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(ATHLTHTheme.accentDeep)
+                    .disabled(adjusted == nil)
 
                     Button {
                         dismiss()
@@ -142,6 +183,82 @@ struct ATHLTHPlanReviewMovePreviewSheet: View {
                 ))
             }
         }
+    }
+
+    private func weekImpact(
+        _ impact: ATHLTHPlanMoveWeekPreview.Summary
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(ATHLTHLocalization.choose(
+                english: "The whole week · before and after",
+                norwegian: "Hele uken · før og etter"
+            ))
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+
+            HStack {
+                Text(ATHLTHLocalization.choose(
+                    english: "Days with workouts",
+                    norwegian: "Dager med økter"
+                ))
+                Spacer(minLength: 0)
+                Text("\(impact.activeDaysBefore) → \(impact.activeDaysAfter)")
+                    .monospacedDigit()
+            }
+            .font(.caption.weight(.medium))
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+
+            ForEach(impact.days) { day in
+                HStack(spacing: 10) {
+                    Text(day.date.formatted(.dateTime.weekday(.abbreviated)))
+                        .frame(width: 43, alignment: .leading)
+                    Text("\(day.beforeCount)")
+                        .frame(width: 23)
+                    Image(systemName: "arrow.right")
+                        .font(.caption2)
+                        .accessibilityHidden(true)
+                    Text("\(day.afterCount)")
+                        .fontWeight(day.changed ? .semibold : .regular)
+                        .frame(width: 23)
+                    if day.changed {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Changed", norwegian: "Endres"
+                        ))
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .accessibilityElement(children: .combine)
+            }
+            Text(ATHLTHLocalization.choose(
+                english: "Numbers are workout counts, not training load.",
+                norwegian: "Tallene viser antall økter, ikke treningsbelastning."
+            ))
+            .font(.caption2)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+            if impact.usesFreeDay {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "This move uses a previously workout-free day. Consider whether you want to keep it for rest.",
+                        norwegian: "Flyttingen bruker en tidligere treningsfri dag. Vurder om du heller ønsker å beholde den som hviledag."
+                    ),
+                    systemImage: "info.circle"
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(12)
+        .background(
+            ATHLTHPlanDesign.selectedSurface,
+            in: RoundedRectangle(cornerRadius: ATHLTHPlanDesign.fieldRadius)
+        )
     }
 
     private func dateBlock(label: String, date: Date) -> some View {
