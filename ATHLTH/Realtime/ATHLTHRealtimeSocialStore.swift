@@ -1256,6 +1256,17 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                 (livePoint.horizontalAccuracy ?? 0) <= 50
             )
 
+        // If both athletes report progress on the same route but either
+        // GPS projection is unreliable, do NOT silently switch to raw
+        // distance and announce a spurious overtake. Wait for valid route
+        // samples instead.
+        if sameRoute,
+           ownProgress != nil,
+           opponentProgress != nil,
+           !routeAccuracyOK {
+            return nil
+        }
+
         if sameRoute,
            routeAccuracyOK,
            let ownProgress,
