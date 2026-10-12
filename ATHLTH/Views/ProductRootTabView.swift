@@ -15464,7 +15464,9 @@ struct ATHLTHProfileView: View {
                     )
                 )
             }
-            .padding(.top, 72)
+            // Follow the lowered profile identity while keeping the hero
+            // height and statistics card positions unchanged.
+            .padding(.top, 84)
             .padding(.trailing, 18)
         }
         .frame(height: 236)
