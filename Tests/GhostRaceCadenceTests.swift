@@ -48,23 +48,29 @@ final class GhostRaceCadenceTests:
     }
 
     func testLiveGhostSharedReconnectStopsAfterRaceSettles() {
-        XCTAssertTrue(LiveGhostRaceReentry.canReconnectSharedSession(
-            roomStatus: nil
-        ))
-        XCTAssertTrue(LiveGhostRaceReentry.canReconnectSharedSession(
-            roomStatus: .lobby
-        ))
-        XCTAssertTrue(LiveGhostRaceReentry.canReconnectSharedSession(
-            roomStatus: .countdown
-        ))
-        XCTAssertTrue(LiveGhostRaceReentry.canReconnectSharedSession(
-            roomStatus: .racing
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        XCTAssertFalse(LiveGhostRaceReentry.canReconnectSharedSession(
+            roomStatus: nil, startsAt: start, now: start
         ))
         XCTAssertFalse(LiveGhostRaceReentry.canReconnectSharedSession(
-            roomStatus: .finished
+            roomStatus: .lobby, startsAt: start, now: start
         ))
         XCTAssertFalse(LiveGhostRaceReentry.canReconnectSharedSession(
-            roomStatus: .cancelled
+            roomStatus: .countdown,
+            startsAt: start,
+            now: start.addingTimeInterval(-1)
+        ))
+        XCTAssertTrue(LiveGhostRaceReentry.canReconnectSharedSession(
+            roomStatus: .countdown, startsAt: start, now: start
+        ))
+        XCTAssertTrue(LiveGhostRaceReentry.canReconnectSharedSession(
+            roomStatus: .racing, startsAt: start, now: start
+        ))
+        XCTAssertFalse(LiveGhostRaceReentry.canReconnectSharedSession(
+            roomStatus: .finished, startsAt: start, now: start
+        ))
+        XCTAssertFalse(LiveGhostRaceReentry.canReconnectSharedSession(
+            roomStatus: .cancelled, startsAt: start, now: start
         ))
     }
 
