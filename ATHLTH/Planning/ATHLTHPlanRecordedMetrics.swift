@@ -10,6 +10,9 @@ enum ATHLTHPlanRecordedMetrics {
         var actual: Double = 0
         var sessions: Int = 0
 
+        /// Actual minus planned, using only directly paired sessions.
+        var difference: Double { actual - planned }
+
         mutating func append(planned: Double, actual: Double) {
             self.planned += planned
             self.actual += actual
@@ -37,10 +40,16 @@ enum ATHLTHPlanRecordedMetrics {
         let strengthMinutes: Paired
         let runningKilometers: Paired
 
+        var comparableWeeks: [Week] {
+            weeks.filter {
+                $0.runningMinutes.sessions > 0 ||
+                $0.strengthMinutes.sessions > 0 ||
+                $0.runningKilometers.sessions > 0
+            }
+        }
+
         var hasComparisons: Bool {
-            runningMinutes.sessions > 0 ||
-            strengthMinutes.sessions > 0 ||
-            runningKilometers.sessions > 0
+            !comparableWeeks.isEmpty
         }
     }
 

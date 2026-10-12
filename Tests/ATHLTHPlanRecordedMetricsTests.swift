@@ -97,6 +97,8 @@ final class ATHLTHPlanRecordedMetricsTests: XCTestCase {
         XCTAssertEqual(report.runningMinutes.sessions, 1)
         XCTAssertEqual(report.runningMinutes.planned, 40, accuracy: 0.01)
         XCTAssertEqual(report.runningMinutes.actual, 45, accuracy: 0.01)
+        XCTAssertEqual(report.runningMinutes.difference, 5, accuracy: 0.01)
+        XCTAssertEqual(report.comparableWeeks.count, 1)
         // The synthetic HKWorkout may not expose a distance statistic on
         // every simulator runtime. ATHLTH intentionally reads the quantity
         // statistics, not a guessed target or the deprecated totalDistance.
@@ -146,6 +148,7 @@ final class ATHLTHPlanRecordedMetricsTests: XCTestCase {
         XCTAssertEqual(report.strengthMinutes.sessions, 1)
         XCTAssertEqual(report.strengthMinutes.planned, 60, accuracy: 0.01)
         XCTAssertEqual(report.strengthMinutes.actual, 50, accuracy: 0.01)
+        XCTAssertEqual(report.strengthMinutes.difference, -10, accuracy: 0.01)
         XCTAssertEqual(report.runningKilometers.sessions, 0)
         XCTAssertEqual(report.runningMinutes.sessions, 0)
     }
@@ -171,6 +174,7 @@ final class ATHLTHPlanRecordedMetricsTests: XCTestCase {
             healthWorkouts: [activity], strengthHistory: []
         )
         XCTAssertFalse(report.hasComparisons)
+        XCTAssertTrue(report.comparableWeeks.isEmpty)
         XCTAssertEqual(report.runningMinutes.sessions, 0)
         XCTAssertEqual(report.runningKilometers.sessions, 0)
     }

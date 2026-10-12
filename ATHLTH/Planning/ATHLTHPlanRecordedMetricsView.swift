@@ -19,6 +19,7 @@ struct ATHLTHPlanRecordedMetricsView: View {
             healthWorkouts: health.workouts,
             strengthHistory: strength.workoutHistory
         )
+        let comparableWeeks = report.comparableWeeks
 
         ATHLTHPlanSurface {
             HStack(alignment: .top, spacing: 11) {
@@ -84,8 +85,8 @@ struct ATHLTHPlanRecordedMetricsView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
                 VStack(spacing: 8) {
-                    ForEach(Array(report.weeks.prefix(
-                        showAllWeeks ? report.weeks.count : 5
+                    ForEach(Array(comparableWeeks.prefix(
+                        showAllWeeks ? comparableWeeks.count : 5
                     ))) { week in
                         if week.runningMinutes.sessions > 0 ||
                             week.strengthMinutes.sessions > 0 ||
@@ -137,7 +138,7 @@ struct ATHLTHPlanRecordedMetricsView: View {
                     }
                 }
 
-                if report.weeks.count > 5 {
+                if comparableWeeks.count > 5 {
                     Button {
                         showAllWeeks.toggle()
                     } label: {
@@ -193,10 +194,18 @@ struct ATHLTHPlanRecordedMetricsView: View {
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     Spacer(minLength: 0)
                 }
-                Text(ATHLTHLocalization.choose(
-                    english: "Planned → recorded",
-                    norwegian: "Planlagt → registrert"
-                ))
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Planned → recorded",
+                        norwegian: "Planlagt → registrert"
+                    ))
+                    Spacer(minLength: 0)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Difference",
+                        norwegian: "Differanse"
+                    ) + ": " + signedValue(pair.difference, decimals: decimals) + " " + unit)
+                    .monospacedDigit()
+                }
                 .font(.caption2)
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
@@ -235,5 +244,13 @@ struct ATHLTHPlanRecordedMetricsView: View {
 
     private func formatted(_ number: Double, decimals: Int) -> String {
         number.formatted(.number.precision(.fractionLength(decimals)))
+    }
+
+    private func signedValue(_ number: Double, decimals: Int) -> String {
+        // Avoid showing -0 from floating-point rounding.
+        let factor = pow(10.0, Double(decimals))
+        let rounded = (number * factor).rounded() / factor
+        let prefix = rounded > 0 ? "+" : ""
+        return prefix + formatted(rounded, decimals: decimals)
     }
 }
