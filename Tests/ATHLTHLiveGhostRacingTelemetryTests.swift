@@ -126,6 +126,38 @@ final class ATHLTHLiveGhostRacingTelemetryTests: XCTestCase {
         ))
     }
 
+    func testNoSignedInAthleteCannotResolveAnOpponent() {
+        XCTAssertNil(ATHLTHLiveGhostRacingTelemetry.opponentID(
+            ownerID: UUID(),
+            otherID: UUID(),
+            viewerID: nil
+        ))
+    }
+
+    func testPhoneLocationMustBeFreshAtSourceBeforeSharing() {
+        XCTAssertTrue(ATHLTHLiveGhostRacingTelemetry.freshLocalLocation(
+            capturedAt: now.addingTimeInterval(-2), now: now
+        ))
+        XCTAssertTrue(ATHLTHLiveGhostRacingTelemetry.freshLocalLocation(
+            capturedAt: now.addingTimeInterval(-25), now: now
+        ))
+        XCTAssertFalse(ATHLTHLiveGhostRacingTelemetry.freshLocalLocation(
+            capturedAt: now.addingTimeInterval(-26), now: now
+        ))
+        XCTAssertFalse(ATHLTHLiveGhostRacingTelemetry.freshLocalLocation(
+            capturedAt: now.addingTimeInterval(-300), now: now
+        ))
+    }
+
+    func testFutureOrInvalidPhoneLocationDoesNotBecomeLiveAgain() {
+        XCTAssertFalse(ATHLTHLiveGhostRacingTelemetry.freshLocalLocation(
+            capturedAt: now.addingTimeInterval(6), now: now
+        ))
+        XCTAssertFalse(ATHLTHLiveGhostRacingTelemetry.freshLocalLocation(
+            capturedAt: Date(timeIntervalSince1970: .infinity), now: now
+        ))
+    }
+
     func testRouteDeviationMustBePlausibleOrAbsent() {
         XCTAssertTrue(ATHLTHLiveGhostRacingTelemetry.acceptableDeviation(
             15, maximum: 120
