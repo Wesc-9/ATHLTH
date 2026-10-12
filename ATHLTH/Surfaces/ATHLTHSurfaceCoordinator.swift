@@ -210,6 +210,10 @@ private final class ATHLTHLiveActivityController {
 
         guard let snapshot else {
             await endExistingActivities()
+            // A newer workout may have started while ActivityKit was
+            // dismissing the previous Live Activity. Do not erase the
+            // newer session's controller state after this suspension.
+            guard revision == syncRevision else { return }
             lastPhase = nil
             lastUpdateAt = nil
             lastSessionIdentity = nil
@@ -227,6 +231,7 @@ private final class ATHLTHLiveActivityController {
 
         if !surfaceConfiguration.dynamicIslandEnabled {
             await endExistingActivities()
+            guard revision == syncRevision else { return }
             lastPhase = nil
             lastUpdateAt = nil
             lastSessionIdentity = nil

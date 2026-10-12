@@ -285,3 +285,19 @@ Baseline: `release/v1.7.3`. Keep recording engines, workout ownership, iPhone/Wa
 - Tests cover defaults, custom priority, unavailable Audio Coach fallback,
   privacy/contrast and old configuration decoding. Device and battery
   acceptance gates still apply before a release is declared validated.
+
+## Phase 9 — cross-device validation and safe Live Activity handoff
+
+- Release acceptance matrix: `docs/LIVE_WORKOUT_173_RELEASE_GATE.md`.
+  Individual P0 and P1 device cases remain pending until a physical test.
+- One shared snapshot selector makes iPhone recording the fallback when
+  Watch mirroring is absent, including in the observer's Live Activity
+  update (not only the other external surfaces).
+- Live Activity controller revision guards protect both the no-snapshot
+  and disabled-presentation asynchronous dismissal paths. A late
+  dismissal must not clear the newer session's controller identity.
+- Unit tests cover Watch priority, iPhone fallback, no active workout and
+  preservation of the original workout identity/timestamps.
+- Do not infer successful Xcode/watchOS compilation or actual device
+  connectivity from passing backend tests. Complete the workflow build
+  and simulator tests first, then the physical checklist, before release.

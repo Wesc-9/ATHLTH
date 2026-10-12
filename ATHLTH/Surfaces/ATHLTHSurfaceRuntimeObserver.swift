@@ -37,10 +37,12 @@ struct ATHLTHSurfaceRuntimeObserver: View {
             .onChange(of: workoutMirroring.snapshot) { _, snapshot in
                 publishSurface()
                 ATHLTHSurfaceCoordinator.syncLiveActivity(
-                    with:
-                        enrichedWorkoutSnapshot(
-                            snapshot
+                    with: enrichedWorkoutSnapshot(
+                        ATHLTHLiveWorkoutSnapshotSelection.resolve(
+                            mirroredWatch: snapshot,
+                            phoneWorkout: phoneWorkout.currentLiveSnapshot()
                         )
+                    )
                 )
                 ghostRace.update(with: snapshot)
             }
@@ -109,9 +111,10 @@ struct ATHLTHSurfaceRuntimeObserver: View {
             goals: goals,
             workout:
                 enrichedWorkoutSnapshot(
-                    workoutMirroring.snapshot ??
-                    phoneWorkout
-                        .currentLiveSnapshot()
+                    ATHLTHLiveWorkoutSnapshotSelection.resolve(
+                        mirroredWatch: workoutMirroring.snapshot,
+                        phoneWorkout: phoneWorkout.currentLiveSnapshot()
+                    )
                 )
         )
 
