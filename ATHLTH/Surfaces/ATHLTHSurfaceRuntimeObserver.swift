@@ -122,10 +122,11 @@ struct ATHLTHSurfaceRuntimeObserver: View {
     }
 
     private func syncPhoneWorkoutGuidance() {
-        guard workoutMirroring.snapshot == nil,
-              let snapshot =
-                phoneWorkout
-                    .currentLiveSnapshot()
+        guard let snapshot = phoneWorkout.currentLiveSnapshot(),
+              ATHLTHLiveWorkoutSnapshotSelection.resolve(
+                  mirroredWatch: workoutMirroring.snapshot,
+                  phoneWorkout: snapshot
+              ) == snapshot
         else {
             return
         }

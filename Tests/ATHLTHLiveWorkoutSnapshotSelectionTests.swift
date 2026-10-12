@@ -7,12 +7,13 @@ final class ATHLTHLiveWorkoutSnapshotSelectionTests: XCTestCase {
     private func snapshot(
         kind: WatchWorkoutKind,
         elapsed: TimeInterval,
-        at date: Date
+        at date: Date,
+        state: WatchWorkoutMirrorState = .running
     ) -> WatchWorkoutLiveSnapshot {
         WatchWorkoutLiveSnapshot(
             kind: kind,
-            state: .running,
-            startedAt: now,
+            state: state,
+            startedAt: date,
             capturedAt: date,
             elapsedTime: elapsed,
             heartRate: 120,
@@ -40,15 +41,63 @@ final class ATHLTHLiveWorkoutSnapshotSelectionTests: XCTestCase {
         let phone = snapshot(
             kind: .running, elapsed: 120, at: now.addingTimeInterval(1)
         )
-        let selected = try XCTUnwrap(
+        XCTAssertEqual(
             ATHLTHLiveWorkoutSnapshotSelection.resolve(
                 mirroredWatch: watch, phoneWorkout: phone
-            )
+            ),
+            watch
         )
-        XCTAssertEqual(selected, watch)
     }
 
-    func testNoWorkoutEndsPresentationInsteadOfInventingSession() {
+    func testTerminalWatchCannotHideNewPhoneWorkout() {
+        for terminal: WatchWorkoutMirrorState in [
+            .ending, .completed, .failed
+        ] {
+            for active: WatchWorkoutMirrorState in [
+                .preparing, .running, .paused
+            ] {
+                let phone = snapshot(
+                    kind: .running, elapsed: 24,
+                    at: now.addingTimeInterval(600), state: active
+                )
+                let oldWatch = snapshot(
+                    kind: .strength, elapsed: 360,
+                    at: now, state: terminal
+                )
+                XCTAssertEqual(
+                    ATHLTHLiveWorkoutSnapshotSelection.resolve(
+                        mirroredWatch: oldWatch, phoneWorkout: phone
+                    ),
+                    phone
+                )
+            }
+        }
+    }
+
+    func testTerminalWatchRemainsWhenThereIsNoNewActivePhoneWorkout() {
+        let watch = snapshot(
+            kind: .walking, elapsed: 540,
+            at: now, state: .completed
+        )
+        let oldPhone = snapshot(
+            kind: .running, elapsed: 900,
+            at: now, state: .completed
+        )
+        XCTAssertEqual(
+            ATHLTHLiveWorkoutSnapshotSelection.resolve(
+                mirroredWatch: watch, phoneWorkout: oldPhone
+            ),
+            watch
+        )
+        XCTAssertEqual(
+            ATHLTHLiveWorkoutSnapshotSelection.resolve(
+                mirroredWatch: watch, phoneWorkout: nil
+            ),
+            watch
+        )
+    }
+
+    func testNoWorkoutDoesNotInventSession() {
         XCTAssertNil(
             ATHLTHLiveWorkoutSnapshotSelection.resolve(
                 mirroredWatch: nil, phoneWorkout: nil
@@ -56,11 +105,18 @@ final class ATHLTHLiveWorkoutSnapshotSelectionTests: XCTestCase {
         )
     }
 
-    func testChangedSourceDoesNotChangeWorkoutIdentity() throws {
-        let phone = snapshot(kind: .walking, elapsed: 50, at: now)
+    func testHandoffPreservesPhoneWorkoutIdentity() throws {
+        let phone = snapshot(
+            kind: .walking, elapsed: 50,
+            at: now.addingTimeInterval(700)
+        )
+        let oldWatch = snapshot(
+            kind: .strength, elapsed: 1_000,
+            at: now, state: .completed
+        )
         let selected = try XCTUnwrap(
             ATHLTHLiveWorkoutSnapshotSelection.resolve(
-                mirroredWatch: nil, phoneWorkout: phone
+                mirroredWatch: oldWatch, phoneWorkout: phone
             )
         )
         XCTAssertEqual(selected.startedAt, phone.startedAt)

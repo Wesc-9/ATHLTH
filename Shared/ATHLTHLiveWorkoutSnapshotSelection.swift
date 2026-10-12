@@ -1,14 +1,26 @@
 import Foundation
 
-/// Selects the authoritative live presentation snapshot without starting,
-/// stopping, merging or duplicating a HealthKit recording.
+/// Selects a workout for presentation only. Recording and HealthKit session
+/// ownership stay with their individual Watch/iPhone workout engines.
 enum ATHLTHLiveWorkoutSnapshotSelection {
     static func resolve(
         mirroredWatch: WatchWorkoutLiveSnapshot?,
         phoneWorkout: WatchWorkoutLiveSnapshot?
     ) -> WatchWorkoutLiveSnapshot? {
-        // If mirroring has disconnected or ended, a still-active phone
-        // workout remains eligible for its own Live Activity and widgets.
-        mirroredWatch ?? phoneWorkout
+        guard let mirroredWatch else { return phoneWorkout }
+
+        // A completed, failed or ending Watch workout may remain cached for
+        // results reconciliation while a newly started iPhone workout is
+        // active. It cannot replace that new workout's Live Activity.
+        if let phoneWorkout,
+           [.completed, .failed, .ending].contains(mirroredWatch.state),
+           [.preparing, .running, .paused].contains(phoneWorkout.state) {
+            return phoneWorkout
+        }
+
+        // During an active mirrored workout, Watch is authoritative.
+        // Terminal Watch snapshots are retained if no new phone workout is
+        // present, so its completed Live Activity can close correctly.
+        return mirroredWatch
     }
 }
