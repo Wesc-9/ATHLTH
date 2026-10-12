@@ -18,6 +18,18 @@ struct AdvancedPlannerView: View {
     @State private var showingPlanProgress = false
     @State private var showingAllPlans = false
     @State private var showingProgramCreation = false
+    @State private var studioSection: PlanStudioSection = .program
+
+    private enum PlanStudioSection: Int, CaseIterable {
+        case program, week, day
+        var title: String {
+            switch self {
+            case .program: return ATHLTHLocalization.choose(english: "Program", norwegian: "Program")
+            case .week: return ATHLTHLocalization.choose(english: "Week", norwegian: "Uke")
+            case .day: return ATHLTHLocalization.choose(english: "Day", norwegian: "Dag")
+            }
+        }
+    }
     @State private var weekPendingRemoval: TrainingPlanWeek?
     @State private var pendingWeekCopy: PendingWeekCopy?
 
@@ -47,29 +59,35 @@ struct AdvancedPlannerView: View {
     }
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: ATHLTHPlanDesign.Density.comfortable.stackSpacing) {
             if let plan = displayedPlan {
-                planOverview(plan)
-
-                if let week = selectedWeek(in: plan) {
-                    weekSelector(plan)
-                    daySelector(plan, week: week)
-
-                    if let day = selectedDay(in: week) {
-                        selectedDayCard(
-                            plan: plan,
-                            week: week,
-                            day: day
-                        )
+                studioNavigator(plan)
+                switch studioSection {
+                case .program:
+                    planOverview(plan)
+                    if let week = selectedWeek(in: plan) {
+                        weekSelector(plan)
+                        weekOverview(plan, week: week)
                     }
-
-                    weekOverview(plan, week: week)
+                    standaloneScheduleCard
+                case .week:
+                    if let week = selectedWeek(in: plan) {
+                        weekSelector(plan)
+                        weekOverview(plan, week: week)
+                    }
+                case .day:
+                    if let week = selectedWeek(in: plan) {
+                        weekSelector(plan)
+                        daySelector(plan, week: week)
+                        if let day = selectedDay(in: week) {
+                            selectedDayCard(plan: plan, week: week, day: day)
+                        }
+                    }
                 }
-            } else if showsEmptyState {
-                emptyPlanState
+            } else {
+                if showsEmptyState { emptyPlanState }
+                standaloneScheduleCard
             }
-
-            standaloneScheduleCard
         }
         .onAppear {
             session.refreshActivePlanForToday()
@@ -225,6 +243,55 @@ struct AdvancedPlannerView: View {
                     )
                 )
             }
+        }
+    }
+
+    private func studioNavigator(_ plan: TrainingPlan) -> some View {
+        ATHLTHPlanSurface {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("ATHLTH / PLAN STUDIO")
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(1.8)
+                        .foregroundStyle(ATHLTHPlanDesign.accent)
+                    Text(plan.title)
+                        .font(.system(size: 26, weight: .semibold, design: .serif))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Move freely between your program, week and day.",
+                        norwegian: "Bytt fritt mellom program, uke og dag."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                Spacer(minLength: 0)
+                Button {
+                    showingPlanProgress = true
+                } label: {
+                    Image(systemName: "chart.xyaxis.line")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .frame(width: 44, height: 44)
+                        .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Plan insights", norwegian: "Planinnsikt"
+                ))
+            }
+            Picker(
+                ATHLTHLocalization.choose(english: "Plan view", norwegian: "Planvisning"),
+                selection: $studioSection
+            ) {
+                ForEach(PlanStudioSection.allCases, id: \.self) { option in
+                    Text(option.title).tag(option)
+                }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Plan view", norwegian: "Planvisning"
+            ))
         }
     }
 
@@ -1192,6 +1259,7 @@ struct AdvancedPlannerView: View {
                     ) { index, day in
                         Button {
                             selectedDayID = day.id
+                            studioSection = .day
                         } label: {
                             HStack(spacing: 12) {
                                 Text(
