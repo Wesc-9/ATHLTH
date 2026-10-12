@@ -51,6 +51,24 @@ enum ATHLTHArenaSeriesScorePresentation {
         }.count + 1
     }
 
+    /// Finished does not mean every round has received unanimous approval.
+    /// Only fully resolved competitions may advertise an Arena champion.
+    static func mayDeclareChampion(
+        seriesStatus: String,
+        completionReason: String?,
+        resultsLoaded: Bool,
+        progress: ATHLTHArenaRoundProgress,
+        leaderPoints: Double
+    ) -> Bool {
+        seriesStatus == "completed" &&
+        completionReason != "deadline_unresolved" &&
+        resultsLoaded &&
+        progress.total > 0 &&
+        progress.approved == progress.total &&
+        leaderPoints.isFinite &&
+        leaderPoints > 0
+    }
+
     static func approvedLeaderPoints(
         among standings: [ATHLTHArenaRemoteMember]
     ) -> Double {
@@ -275,6 +293,18 @@ struct ATHLTHArenaScoringSection: View {
         rankedMembers.first { $0.userID == session.profile.userID }
     }
 
+    private var confirmedChampionAvailable: Bool {
+        ATHLTHArenaSeriesScorePresentation.mayDeclareChampion(
+            seriesStatus: series.status,
+            completionReason: series.completionReason,
+            resultsLoaded: resultsLoaded,
+            progress: roundProgress,
+            leaderPoints: ATHLTHArenaSeriesScorePresentation.approvedLeaderPoints(
+                among: rankedMembers
+            )
+        )
+    }
+
     private var filteredResultHistory: [ATHLTHArenaRoundResult] {
         ATHLTHArenaResultHistoryPresentation.filtered(
             results,
@@ -438,17 +468,16 @@ struct ATHLTHArenaScoringSection: View {
                     Image(systemName: series.status == "completed"
                           ? "trophy.fill" : "timer")
                     Text(series.status == "completed"
-                         ? ATHLTHLocalization.choose(english: "Final results", norwegian: "Sluttresultat")
+                         ? (confirmedChampionAvailable
+                            ? ATHLTHLocalization.choose(english: "Final results", norwegian: "Sluttresultat")
+                            : ATHLTHLocalization.choose(english: "Results under review", norwegian: "Resultater under kontroll"))
                          : ATHLTHLocalization.choose(english: "Competition active", norwegian: "Konkurransen pågår"))
                     .font(.subheadline.weight(.semibold))
                 }
                 .foregroundStyle(ATHLTHTheme.accentDeep)
             }
 
-            if series.status == "completed",
-               series.completionReason != "deadline_unresolved",
-               let first = rankedMembers.first,
-               ATHLTHArenaSeriesScorePresentation.visiblePoints(first.points) > 0 {
+            if confirmedChampionAvailable {
                 let champions = rankedMembers.filter {
                     ATHLTHArenaSeriesScorePresentation.competitionRank(
                         for: $0, among: rankedMembers
@@ -497,20 +526,20 @@ struct ATHLTHArenaScoringSection: View {
             }
 
             if series.status == "completed",
-               series.completionReason == "deadline_unresolved" {
+               !confirmedChampionAvailable {
                 VStack(alignment: .leading, spacing: 8) {
                     Label(
                         ATHLTHLocalization.choose(
-                            english: "Finished with unresolved rounds",
-                            norwegian: "Avsluttet med uavklarte runder"
+                            english: "Competition finished – results under review",
+                            norwegian: "Avsluttet – resultatkontroll gjenstår"
                         ),
                         systemImage: "clock.badge.exclamationmark"
                     )
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHTheme.accentDeep)
                     Text(ATHLTHLocalization.choose(
-                        english: "Only unanimously approved results received points. Missing or disputed results received no points; the table shows approved results only.",
-                        norwegian: "Bare enstemmig godkjente resultater har fått poeng. Manglende eller omstridte runder gir ingen poeng. Tabellen viser godkjente resultater."
+                        english: "No champion can be declared until all rounds have approved results. Only previously approved points appear in standings.",
+                        norwegian: "Ingen Arena-mester kåres før alle runder har godkjente resultater. Stillingen viser kun poeng som allerede er godkjent."
                     ))
                     .font(.caption)
                     .foregroundStyle(ATHLTHTheme.mutedText)
