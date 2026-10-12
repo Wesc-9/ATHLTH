@@ -4,6 +4,11 @@ import SwiftUI
 /// Reads HealthKit-derived data from the existing WatchWorkoutManager.
 struct WatchRunHeartRateDetailPage: View {
     @EnvironmentObject private var workout: WatchWorkoutManager
+    @ScaledMetric(relativeTo: .largeTitle) private var pulseSize: CGFloat = 48
+
+    private var spokenNorwegian: Bool {
+        ATHLTHLocalization.choose(english: "en", norwegian: "no") == "no"
+    }
 
     private var target: WatchWorkoutTargetAlertConfiguration? {
         workout.targetAlertConfiguration?.heartRateEnabled == true
@@ -26,7 +31,7 @@ struct WatchRunHeartRateDetailPage: View {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(bpm(workout.hasFreshHeartRate ? workout.heartRate : nil))
                             .font(.system(
-                                size: 48, weight: .bold, design: .rounded
+                                size: pulseSize, weight: .bold, design: .rounded
                             ))
                             .monospacedDigit()
                             .lineLimit(1)
@@ -51,6 +56,17 @@ struct WatchRunHeartRateDetailPage: View {
                 .padding(11)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .watchSurface(radius: 17)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Current heart rate", norwegian: "Nåværende puls"
+                ))
+                .accessibilityValue(
+                    ATHLTHWorkoutAccessibleMetric.pulse(
+                        workout.heartRate,
+                        isFresh: workout.hasFreshHeartRate,
+                        norwegian: spokenNorwegian
+                    )
+                )
 
                 HStack(spacing: 7) {
                     readout(

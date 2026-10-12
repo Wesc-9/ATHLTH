@@ -240,3 +240,24 @@ Baseline: `release/v1.7.3`. Keep recording engines, workout ownership, iPhone/Wa
   HealthKit exercise-type capture, Live Activity continuity, phone
   mirroring and on-device battery checks. None are claimed complete solely
   from this source change.
+
+## Phase 8 — accessibility and readability (increment 1)
+
+- Replace the unsupported watchOS disclosure control in the start flow
+  with an accessible expand/collapse button. Keep running, walking and
+  strength prominent while exposing all other HealthKit activity types.
+- Add a Foundation-only spoken metric formatter for duration, distance
+  and pulse; screen readers get meaningful units rather than unexplained
+  clock punctuation and bpm abbreviations.
+- Do not announce invalid, unrecorded or stale sensor values as zero or
+  as live measurements. Unit tests cover Norwegian/English spoken values,
+  empty pulse, NaN and infinity.
+- Make Watch sport, interval, Ghost gap and running pulse headline fonts
+  scale with the user's preferred Dynamic Type size.
+- Give key metric surfaces explicit VoiceOver labels/values while
+  preserving the visual presentation for users without assistive tech.
+- This is a presentation-only increment: workout timing, HealthKit,
+  transfer commands, route/Ghost logic and existing controls remain intact.
+- Final phase 8 gate: compile/watchOS and iOS tests, physical Watch
+  screenshots, VoiceOver navigation, high-contrast checks,
+  large Dynamic Type, reduced-motion and wrist-down battery behavior.

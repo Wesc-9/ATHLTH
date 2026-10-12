@@ -5,6 +5,11 @@ import SwiftUI
 /// This page neither creates a session nor advances a phase.
 struct WatchOtherSportFocusPage: View {
     @EnvironmentObject private var workout: WatchWorkoutManager
+    @ScaledMetric(relativeTo: .largeTitle) private var headlineSize: CGFloat = 41
+
+    private var spokenNorwegian: Bool {
+        ATHLTHLocalization.choose(english: "en", norwegian: "no") == "no"
+    }
 
     private var measuredDistance: Bool {
         ATHLTHOtherSportLiveResolver.resolve(
@@ -57,7 +62,7 @@ struct WatchOtherSportFocusPage: View {
                              ? String(format: "%.2f",
                                  max(workout.distanceMeters, 0) / 1_000)
                              : timeText(workout.elapsedTime))
-                            .font(.system(size: 41, weight: .bold,
+                            .font(.system(size: headlineSize, weight: .bold,
                                           design: .rounded))
                             .monospacedDigit()
                             .minimumScaleFactor(0.62)
@@ -75,6 +80,15 @@ struct WatchOtherSportFocusPage: View {
                             timeText(workout.elapsedTime),
                             systemImage: "clock"
                         )
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Workout time", norwegian: "Økttid"
+                        ))
+                        .accessibilityValue(
+                            ATHLTHWorkoutAccessibleMetric.duration(
+                                workout.elapsedTime,
+                                norwegian: spokenNorwegian
+                            )
+                        )
                         .font(.system(size: 14, weight: .semibold,
                                       design: .rounded))
                         .monospacedDigit()
@@ -89,6 +103,25 @@ struct WatchOtherSportFocusPage: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(11)
                 .watchSurface(radius: 18)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(
+                    measuredDistance
+                        ? ATHLTHLocalization.choose(
+                            english: "Recorded distance", norwegian: "Målt distanse"
+                          )
+                        : ATHLTHLocalization.choose(
+                            english: "Workout time", norwegian: "Økttid"
+                          )
+                )
+                .accessibilityValue(
+                    measuredDistance
+                        ? ATHLTHWorkoutAccessibleMetric.distance(
+                            workout.distanceMeters, norwegian: spokenNorwegian
+                          )
+                        : ATHLTHWorkoutAccessibleMetric.duration(
+                            workout.elapsedTime, norwegian: spokenNorwegian
+                          )
+                )
 
                 HStack(spacing: 7) {
                     metric(
@@ -196,6 +229,24 @@ struct WatchOtherSportFocusPage: View {
         .padding(9)
         .frame(maxWidth: .infinity, alignment: .leading)
         .watchSurface(radius: 16)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue(
+            unit == "bpm"
+                ? ATHLTHWorkoutAccessibleMetric.pulse(
+                    workout.heartRate,
+                    isFresh: workout.hasFreshHeartRate,
+                    norwegian: spokenNorwegian
+                  )
+                : value == "—"
+                    ? ATHLTHLocalization.choose(
+                        english: "Energy not available",
+                        norwegian: "Energi ikke tilgjengelig"
+                      )
+                    : "\(value) " + ATHLTHLocalization.choose(
+                        english: "kilocalories", norwegian: "kilokalorier"
+                      )
+        )
     }
 
     private func timeText(_ seconds: TimeInterval) -> String {
@@ -211,6 +262,11 @@ struct WatchOtherSportFocusPage: View {
 /// A secondary read-only pulse page for non-running workout types.
 struct WatchOtherSportPulsePage: View {
     @EnvironmentObject private var workout: WatchWorkoutManager
+    @ScaledMetric(relativeTo: .largeTitle) private var pulseSize: CGFloat = 48
+
+    private var spokenNorwegian: Bool {
+        ATHLTHLocalization.choose(english: "en", norwegian: "no") == "no"
+    }
 
     var body: some View {
         ScrollView {
@@ -229,7 +285,7 @@ struct WatchOtherSportPulsePage: View {
                         Text(workout.hasFreshHeartRate
                              ? String(Int(workout.heartRate.rounded()))
                              : "—")
-                            .font(.system(size: 48, weight: .bold,
+                            .font(.system(size: pulseSize, weight: .bold,
                                           design: .rounded))
                             .monospacedDigit()
                             .minimumScaleFactor(0.7)
@@ -254,6 +310,17 @@ struct WatchOtherSportPulsePage: View {
                 .padding(11)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .watchSurface(radius: 18)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Current heart rate", norwegian: "Nåværende puls"
+                ))
+                .accessibilityValue(
+                    ATHLTHWorkoutAccessibleMetric.pulse(
+                        workout.heartRate,
+                        isFresh: workout.hasFreshHeartRate,
+                        norwegian: spokenNorwegian
+                    )
+                )
 
                 HStack(spacing: 7) {
                     pulseMetric(
@@ -328,6 +395,19 @@ struct WatchOtherSportPulsePage: View {
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .watchSurface(radius: 16)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue(
+            value.map {
+                ATHLTHWorkoutAccessibleMetric.pulse(
+                    $0, isFresh: $0.isFinite && $0 > 0,
+                    norwegian: spokenNorwegian
+                )
+            } ?? ATHLTHLocalization.choose(
+                english: "No measurement",
+                norwegian: "Ingen måling"
+            )
+        )
     }
 
     private func statusText(_ status: ATHLTHRunPulseTargetStatus) -> String {

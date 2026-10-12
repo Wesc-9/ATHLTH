@@ -4,6 +4,11 @@ import SwiftUI
 /// advanced by the Watch workout engine, so no second timer can drift.
 struct WatchRunIntervalFocusPage: View {
     @EnvironmentObject private var workout: WatchWorkoutManager
+    @ScaledMetric(relativeTo: .largeTitle) private var countdownSize: CGFloat = 42
+
+    private var spokenNorwegian: Bool {
+        ATHLTHLocalization.choose(english: "en", norwegian: "no") == "no"
+    }
 
     var body: some View {
         ScrollView {
@@ -45,7 +50,7 @@ struct WatchRunIntervalFocusPage: View {
 
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             Text(metricValue(readout))
-                                .font(.system(size: 42, weight: .bold,
+                                .font(.system(size: countdownSize, weight: .bold,
                                               design: .rounded))
                                 .monospacedDigit()
                                 .lineLimit(1)
@@ -72,6 +77,9 @@ struct WatchRunIntervalFocusPage: View {
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .watchSurface(radius: 17)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(metricTitle(readout))
+                    .accessibilityValue(accessibleRemaining(readout))
 
                     if let pace = targetPace(step) {
                         HStack(spacing: 6) {
@@ -147,6 +155,31 @@ struct WatchRunIntervalFocusPage: View {
         .background(WatchTheme.canvas.ignoresSafeArea())
     }
 
+    private func accessibleRemaining(
+        _ readout: ATHLTHRunIntervalReadout
+    ) -> String {
+        guard let value = readout.remaining else {
+            return ATHLTHLocalization.choose(
+                english: "Open interval without a countdown",
+                norwegian: "Åpent intervall uten nedtelling"
+            )
+        }
+        switch readout.unit {
+        case .seconds:
+            return ATHLTHWorkoutAccessibleMetric.duration(
+                ceil(value), norwegian: spokenNorwegian
+            )
+        case .meters:
+            return ATHLTHWorkoutAccessibleMetric.distance(
+                value, norwegian: spokenNorwegian
+            )
+        case .open:
+            return ATHLTHLocalization.choose(
+                english: "Open interval", norwegian: "Åpent intervall"
+            )
+        }
+    }
+
     private func metricTitle(_ readout: ATHLTHRunIntervalReadout) -> String {
         switch readout.unit {
         case .seconds:
@@ -216,6 +249,7 @@ struct WatchRunIntervalFocusPage: View {
 /// shown as a current lead, even if cached coordinates remain available.
 struct WatchRunGhostFocusPage: View {
     @EnvironmentObject private var workout: WatchWorkoutManager
+    @ScaledMetric(relativeTo: .largeTitle) private var leadSize: CGFloat = 45
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 5)) { timeline in
@@ -266,13 +300,26 @@ struct WatchRunGhostFocusPage: View {
 
                             HStack(alignment: .firstTextBaseline, spacing: 4) {
                                 Text("\(Int(abs(meters).rounded()))")
-                                    .font(.system(size: 45, weight: .bold,
+                                    .font(.system(size: leadSize, weight: .bold,
                                                   design: .rounded))
                                     .monospacedDigit()
                                 Text("m")
                                     .font(.system(size: 13, weight: .semibold))
                                     .foregroundStyle(WatchTheme.textSecondary)
                             }
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(ATHLTHLocalization.choose(
+                                english: "Live Ghost gap",
+                                norwegian: "Avstand til motstander"
+                            ))
+                            .accessibilityValue(
+                                ATHLTHWorkoutAccessibleMetric.distance(
+                                    abs(meters),
+                                    norwegian: ATHLTHLocalization.choose(
+                                        english: "en", norwegian: "no"
+                                    ) == "no"
+                                )
+                            )
 
                             if let time = ghost?.estimatedTimeDeltaSeconds,
                                time.isFinite {
