@@ -65,6 +65,13 @@ struct AdvancedPlannerView: View {
                 switch studioSection {
                 case .program:
                     planOverview(plan)
+                    ATHLTHPlanProgramTrendView(plan: plan) { weekID in
+                        selectedWeekID = weekID
+                        if let week = plan.weeks.first(where: { $0.id == weekID }) {
+                            selectedDayID = week.days.first?.id
+                        }
+                        studioSection = .week
+                    }
                     recentStrengthEvidence(plan)
                     planQualityPanel(plan)
                     if let week = selectedWeek(in: plan) {
