@@ -100,7 +100,7 @@ final class ATHLTHArenaSeriesScorePresentationTests: XCTestCase {
         let early = entry(4, order: 1)
         let later = entry(4, order: 2)
         let table = ATHLTHArenaSeriesScorePresentation.ordered([later, early])
-        XCTAssertEqual(table.map(\\.slotID), [early.slotID, later.slotID])
+        XCTAssertEqual(table.map(\.slotID), [early.slotID, later.slotID])
     }
 
     func testUnlistedAthleteCannotAcquireACompetitiveRank() {
