@@ -69,6 +69,63 @@ final class ATHLTHLiveGhostRacingTelemetryTests: XCTestCase {
         XCTAssertFalse(eligible(age: 2, distance: 50, elapsed: 90_000))
     }
 
+    func testSynchronizedRaceMustMatchItsExactChallenge() {
+        let duel = UUID()
+        XCTAssertTrue(ATHLTHLiveGhostRacingTelemetry.matchesWorkout(
+            challengeID: duel,
+            selectedRouteKey: duel,
+            localComparisonRouteID: duel
+        ))
+        XCTAssertTrue(ATHLTHLiveGhostRacingTelemetry.matchesWorkout(
+            challengeID: duel,
+            selectedRouteKey: nil,
+            localComparisonRouteID: duel
+        ))
+    }
+
+    func testSynchronizedRaceNeverComparesUnknownOrOtherWorkout() {
+        let duel = UUID()
+        XCTAssertFalse(ATHLTHLiveGhostRacingTelemetry.matchesWorkout(
+            challengeID: duel,
+            selectedRouteKey: duel,
+            localComparisonRouteID: nil
+        ))
+        XCTAssertFalse(ATHLTHLiveGhostRacingTelemetry.matchesWorkout(
+            challengeID: duel,
+            selectedRouteKey: nil,
+            localComparisonRouteID: UUID()
+        ))
+        XCTAssertFalse(ATHLTHLiveGhostRacingTelemetry.matchesWorkout(
+            challengeID: duel,
+            selectedRouteKey: UUID(),
+            localComparisonRouteID: duel
+        ))
+    }
+
+    func testLegacyLiveFollowRetainsDistanceOnlyFallback() {
+        XCTAssertTrue(ATHLTHLiveGhostRacingTelemetry.matchesWorkout(
+            challengeID: nil,
+            selectedRouteKey: nil,
+            localComparisonRouteID: nil
+        ))
+        XCTAssertTrue(ATHLTHLiveGhostRacingTelemetry.matchesWorkout(
+            challengeID: nil,
+            selectedRouteKey: UUID(),
+            localComparisonRouteID: nil
+        ))
+        let route = UUID()
+        XCTAssertTrue(ATHLTHLiveGhostRacingTelemetry.matchesWorkout(
+            challengeID: nil,
+            selectedRouteKey: route,
+            localComparisonRouteID: route
+        ))
+        XCTAssertFalse(ATHLTHLiveGhostRacingTelemetry.matchesWorkout(
+            challengeID: nil,
+            selectedRouteKey: route,
+            localComparisonRouteID: UUID()
+        ))
+    }
+
     func testRouteDeviationMustBePlausibleOrAbsent() {
         XCTAssertTrue(ATHLTHLiveGhostRacingTelemetry.acceptableDeviation(
             15, maximum: 120
