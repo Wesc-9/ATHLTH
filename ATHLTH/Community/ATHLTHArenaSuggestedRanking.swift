@@ -623,8 +623,15 @@ enum ATHLTHArenaLiveRoundCompatibility {
         case .fastestRoute:
             // A previously recorded run with the same length need not follow
             // the agreed route. Keep those attempts on the manual review path.
+            // Both structured fields must describe the same frozen course:
+            // a corrupted or outdated target must not qualify by distance.
             guard sourceKind == "planned_route",
-                  let routeDistanceKilometers else { return false }
+                  let routeDistanceKilometers,
+                  let targetDistanceMeters,
+                  routeDistanceKilometers.isFinite,
+                  targetDistanceMeters.isFinite,
+                  abs(targetDistanceMeters - routeDistanceKilometers * 1_000) <= 1
+            else { return false }
             requiredMeters = routeDistanceKilometers * 1_000
         default:
             return false
