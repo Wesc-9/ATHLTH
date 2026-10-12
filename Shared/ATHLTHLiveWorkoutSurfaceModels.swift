@@ -169,6 +169,11 @@ enum ATHLTHLiveGhostWatchSignal: Equatable {
 
     var mayAnnouncePassing: Bool { self == .live }
 
+    private static func validProgress(_ value: Double?) -> Bool {
+        guard let value else { return true }
+        return value.isFinite && (0...100).contains(value)
+    }
+
     static func resolve(
         context: ATHLTHLiveGhostContext?,
         isPaused: Bool,
@@ -192,12 +197,8 @@ enum ATHLTHLiveGhostWatchSignal: Equatable {
         guard let distance = context.distanceDeltaMeters,
               distance.isFinite,
               abs(distance) <= 500_000,
-              context.ownProgressPercent.map {
-                  $0.isFinite && (0...100).contains($0)
-              } ?? true,
-              context.opponentProgressPercent.map {
-                  $0.isFinite && (0...100).contains($0)
-              } ?? true
+              validProgress(context.ownProgressPercent),
+              validProgress(context.opponentProgressPercent)
         else {
             // A live socket without a trustworthy race gap remains waiting
             // for a route comparison rather than inventing a lead.
