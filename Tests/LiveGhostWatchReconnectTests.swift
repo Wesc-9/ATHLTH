@@ -101,6 +101,32 @@ final class LiveGhostWatchReconnectTests: XCTestCase {
         ))
     }
 
+    func testLiveMapRejectsStaleWatchGPSAfterConnectivityLoss() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        XCTAssertTrue(ATHLTHWatchLiveTelemetryFreshness.isFresh(
+            capturedAt: now.addingTimeInterval(-2), now: now
+        ))
+        XCTAssertTrue(ATHLTHWatchLiveTelemetryFreshness.isFresh(
+            capturedAt: now.addingTimeInterval(-30), now: now
+        ))
+        XCTAssertFalse(ATHLTHWatchLiveTelemetryFreshness.isFresh(
+            capturedAt: now.addingTimeInterval(-31), now: now
+        ))
+        XCTAssertFalse(ATHLTHWatchLiveTelemetryFreshness.isFresh(
+            capturedAt: now.addingTimeInterval(-300), now: now
+        ))
+    }
+
+    func testClockSkewOrNonFiniteWatchTimestampCannotFakeLiveGPS() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        XCTAssertFalse(ATHLTHWatchLiveTelemetryFreshness.isFresh(
+            capturedAt: now.addingTimeInterval(11), now: now
+        ))
+        XCTAssertFalse(ATHLTHWatchLiveTelemetryFreshness.isFresh(
+            capturedAt: Date(timeIntervalSince1970: .infinity), now: now
+        ))
+    }
+
     func testPausedWatchRaceCanReconnect() {
         let duel = UUID()
         XCTAssertTrue(LiveGhostRaceReentry.canReconnectWatchWorkout(
