@@ -407,7 +407,7 @@ struct WatchTrainingAlwaysOnDashboard: View {
         HStack(spacing: 6) {
             Label(timeString(workout.elapsedTime), systemImage: "clock")
             Spacer(minLength: 0)
-            Label(workout.heartRate > 0
+            Label(workout.hasFreshHeartRate
                   ? String(Int(workout.heartRate.rounded()))
                   : "—", systemImage: "heart.fill")
         }

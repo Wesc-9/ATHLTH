@@ -4017,7 +4017,7 @@ struct WatchRunWorkoutExperienceView: View {
     }
 
     private var heartRateText: String {
-        guard workoutManager.heartRate > 0
+        guard workoutManager.hasFreshHeartRate
         else {
             return "—"
         }

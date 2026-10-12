@@ -24,7 +24,7 @@ struct WatchRunHeartRateDetailPage: View {
 
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(bpm(workout.heartRate))
+                        Text(bpm(workout.hasFreshHeartRate ? workout.heartRate : nil))
                             .font(.system(
                                 size: 48, weight: .bold, design: .rounded
                             ))
@@ -36,7 +36,7 @@ struct WatchRunHeartRateDetailPage: View {
                             .foregroundStyle(WatchTheme.muted)
                     }
 
-                    Text(workout.heartRate > 0
+                    Text(workout.hasFreshHeartRate
                          ? ATHLTHLocalization.choose(
                             english: "CURRENT PULSE",
                             norwegian: "NÅVÆRENDE PULS"
@@ -95,7 +95,8 @@ struct WatchRunHeartRateDetailPage: View {
                         }
 
                         let guidance = ATHLTHRunPulseTargetStatus.resolve(
-                            heartRate: workout.heartRate,
+                            heartRate: workout.hasFreshHeartRate
+                                ? workout.heartRate : nil,
                             minimum: target.heartRateMinimumBPM,
                             maximum: target.heartRateMaximumBPM
                         )

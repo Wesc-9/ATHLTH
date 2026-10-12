@@ -256,6 +256,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var healthKitDistanceLastUpdatedAt: Date?
     private var coachHeartRateSampleAt: Date?
     private var coachPaceSampleAt: Date?
+
+    /// The same sensor freshness gate used by live target alerts and coach.
+    /// A disconnected/stale pulse must not be rendered as a live zone.
+    var hasFreshHeartRate: Bool {
+        ATHLTHCoachSensorFreshness.validHeartRate(
+            heartRate,
+            sampledAt: coachHeartRateSampleAt
+        )
+    }
     private var autoPauseDetector =
         OutdoorAutoPauseDetector()
     private var manualPauseActive = false
