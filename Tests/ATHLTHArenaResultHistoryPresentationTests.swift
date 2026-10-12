@@ -86,6 +86,93 @@ final class ATHLTHArenaResultHistoryPresentationTests: XCTestCase {
         XCTAssertEqual(state.resolve(""), .unresolved)
     }
 
+    func testExpandedHistoryShowsAllVisibleProposals() {
+        let roundID = UUID()
+        let rows = (0..<9).map {
+            result(roundID: roundID, status: "rejected", age: Double($0))
+        }
+        let recent = ATHLTHArenaResultHistoryPresentation.recent(
+            rows, for: [roundID]
+        )
+        let full = ATHLTHArenaResultHistoryPresentation.recent(
+            rows, for: [roundID], limit: rows.count
+        )
+        XCTAssertEqual(recent.count, 4)
+        XCTAssertEqual(full.count, 9)
+        XCTAssertEqual(
+            Set(full.map(\\.id)),
+            Set(rows.map(\\.id))
+        )
+    }
+
+    func testApprovedVotesCountOnlyUniqueEligibleAthletes() {
+        let resultID = UUID()
+        let first = UUID()
+        let second = UUID()
+        let removed = UUID()
+        let votes: [ATHLTHArenaRoundResultVote] = [
+            .init(resultID: resultID, userID: first, accepted: true),
+            .init(resultID: resultID, userID: first, accepted: true),
+            .init(resultID: resultID, userID: second, accepted: false),
+            .init(resultID: resultID, userID: removed, accepted: true),
+            .init(resultID: UUID(), userID: second, accepted: true)
+        ]
+        XCTAssertEqual(
+            ATHLTHArenaResultHistoryPresentation.approvalCount(
+                resultID: resultID,
+                eligibleIDs: [first, second],
+                votes: votes
+            ),
+            1
+        )
+    }
+
+    func testOnlyPendingEligibleUnvotedResultsRequestMyApproval() {
+        let roundID = UUID()
+        let viewerID = UUID()
+        let outsiderID = UUID()
+        let pending = result(roundID: roundID, status: "pending", age: 1)
+        let approved = result(roundID: roundID, status: "approved", age: 1)
+        let otherVote = ATHLTHArenaRoundResultVote(
+            resultID: UUID(), userID: viewerID, accepted: true
+        )
+        XCTAssertTrue(
+            ATHLTHArenaResultHistoryPresentation.needsYourVote(
+                result: pending,
+                viewerID: viewerID,
+                eligibleIDs: [viewerID],
+                votes: [otherVote]
+            )
+        )
+        XCTAssertFalse(
+            ATHLTHArenaResultHistoryPresentation.needsYourVote(
+                result: pending,
+                viewerID: outsiderID,
+                eligibleIDs: [viewerID],
+                votes: []
+            )
+        )
+        XCTAssertFalse(
+            ATHLTHArenaResultHistoryPresentation.needsYourVote(
+                result: approved,
+                viewerID: viewerID,
+                eligibleIDs: [viewerID],
+                votes: []
+            )
+        )
+        let rejectedVote = ATHLTHArenaRoundResultVote(
+            resultID: pending.id, userID: viewerID, accepted: false
+        )
+        XCTAssertFalse(
+            ATHLTHArenaResultHistoryPresentation.needsYourVote(
+                result: pending,
+                viewerID: viewerID,
+                eligibleIDs: [viewerID],
+                votes: [rejectedVote]
+            )
+        )
+    }
+
     func testDeterministicOrderForEqualTimestamps() {
         let roundID = UUID()
         let firstID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
