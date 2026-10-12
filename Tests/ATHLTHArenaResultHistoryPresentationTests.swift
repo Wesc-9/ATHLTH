@@ -173,6 +173,92 @@ final class ATHLTHArenaResultHistoryPresentationTests: XCTestCase {
         )
     }
 
+    func testNeedsMyVoteFilterExcludesOtherVotesAndOtherStatuses() {
+        let viewer = UUID()
+        let round = UUID()
+        let pending = result(roundID: round, status: "pending", age: 4)
+        let alreadyVoted = result(roundID: round, status: "pending", age: 3)
+        let approved = result(roundID: round, status: "approved", age: 2)
+        let rejected = result(roundID: round, status: "rejected", age: 1)
+        let vote = ATHLTHArenaRoundResultVote(
+            resultID: alreadyVoted.id, userID: viewer, accepted: false
+        )
+        let filtered = ATHLTHArenaResultHistoryPresentation.filtered(
+            [approved, alreadyVoted, pending, rejected],
+            filter: .requiresMyVote,
+            viewerID: viewer,
+            eligibleIDs: [viewer],
+            votes: [vote]
+        )
+        XCTAssertEqual(filtered.map(\\.id), [pending.id])
+    }
+
+    func testOutsiderNeverGetsPersonalVotingReminder() {
+        let pending = result(
+            roundID: UUID(), status: "pending", age: 1
+        )
+        XCTAssertTrue(
+            ATHLTHArenaResultHistoryPresentation.filtered(
+                [pending],
+                filter: .requiresMyVote,
+                viewerID: UUID(),
+                eligibleIDs: [UUID()],
+                votes: []
+            ).isEmpty
+        )
+    }
+
+    func testApprovedFilterDoesNotInferApprovalFromVotes() {
+        let viewer = UUID()
+        let pending = result(roundID: UUID(), status: "pending", age: 3)
+        let approved = result(roundID: UUID(), status: "approved", age: 1)
+        let vote = ATHLTHArenaRoundResultVote(
+            resultID: pending.id, userID: viewer, accepted: true
+        )
+        let filtered = ATHLTHArenaResultHistoryPresentation.filtered(
+            [pending, approved],
+            filter: .approved,
+            viewerID: viewer,
+            eligibleIDs: [viewer],
+            votes: [vote]
+        )
+        XCTAssertEqual(filtered.map(\\.id), [approved.id])
+    }
+
+    func testAllFilterPreservesHistoricalRejectedProposals() {
+        let a = result(roundID: UUID(), status: "rejected", age: 3)
+        let b = result(roundID: UUID(), status: "expired", age: 2)
+        let filtered = ATHLTHArenaResultHistoryPresentation.filtered(
+            [a, b],
+            filter: .all,
+            viewerID: UUID(),
+            eligibleIDs: [],
+            votes: []
+        )
+        XCTAssertEqual(filtered.map(\\.id), [a.id, b.id])
+    }
+
+    func testFilteredHistoryCanBeLimitedWithoutLosingVoteActions() {
+        let viewer = UUID(), round = UUID()
+        let waiting = (0..<8).map {
+            result(roundID: round, status: "pending", age: Double($0))
+        }
+        let matching = ATHLTHArenaResultHistoryPresentation.filtered(
+            waiting,
+            filter: .requiresMyVote,
+            viewerID: viewer,
+            eligibleIDs: [viewer],
+            votes: []
+        )
+        XCTAssertEqual(matching.count, 8)
+        XCTAssertEqual(
+            ATHLTHArenaResultHistoryPresentation.recent(
+                matching, for: [round]
+            ).count,
+            4
+        )
+    }
+
     func testDeterministicOrderForEqualTimestamps() {
         let roundID = UUID()
         let firstID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
