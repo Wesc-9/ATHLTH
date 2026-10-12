@@ -97,70 +97,14 @@ struct ATHLTHTrainProgramComposerView: View {
         session.trainingPlanConflict(startDate: startDate, endDate: endingDate)
     }
 
+    /// Preserve existing callers while using one shared plan builder.
+    /// No second persistence or scheduling implementation is introduced.
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                progressHeader
-
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 23) {
-                        switch step {
-                        case .identity: identityStep
-                        case .source: sourceStep
-                        case .goals: goalStep
-                        case .schedule: scheduleStep
-                        case .confirm: confirmationStep
-                        }
-                    }
-                    .frame(maxWidth: 650, alignment: .leading)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 19)
-                    .padding(.top, 20)
-                    .padding(.bottom, 26)
-                }
-                .scrollIndicators(.hidden)
-
-                bottomControls
-            }
-            .background(paper.ignoresSafeArea())
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(tr("Close", "Lukk")) { dismiss() }
-                        .foregroundStyle(charcoal)
-                }
-                ToolbarItem(placement: .principal) {
-                    Text("ATHLTH / PLAN")
-                        .font(.system(size: 11, weight: .semibold))
-                        .tracking(2)
-                        .foregroundStyle(ink)
-                }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .task { await catalog.refresh() }
-            .onAppear {
-                guard !didResolveDate else { return }
-                didResolveDate = true
-                startDate = max(
-                    startDate,
-                    session.suggestedTrainingPlanStartDate
-                )
-            }
-            .onChange(of: sessionsPerWeek) { _, count in
-                if sessionDays.count != count {
-                    sessionDays = suggestedDays(for: count)
-                }
-            }
-            .alert(tr("Could not create plan", "Kunne ikke opprette planen"),
-                   isPresented: Binding(
-                    get: { errorText != nil },
-                    set: { if !$0 { errorText = nil } }
-                   )) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(errorText ?? "")
-            }
-        }
-        .preferredColorScheme(.light)
+        ATHLTHTrainingPlanBuilderFlow(
+            startsAtSourceChoice: true,
+            initialAdvanced: advancedMode,
+            onCreated: onCreated
+        )
     }
 
     private var progressHeader: some View {
