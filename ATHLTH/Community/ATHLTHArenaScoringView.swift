@@ -73,6 +73,12 @@ enum ATHLTHArenaSeriesScorePresentation {
 /// Supabase. A proposal isn't proof of a completed workout and never awards
 /// Arena points without the separate unanimous vote/settlement flow.
 enum ATHLTHArenaResultHistoryPresentation {
+    enum Filter: String, CaseIterable, Hashable {
+        case all
+        case requiresMyVote
+        case approved
+    }
+
     enum State: Equatable {
         case approved
         case pending
@@ -115,6 +121,35 @@ enum ATHLTHArenaResultHistoryPresentation {
         eligibleIDs.contains(viewerID) &&
         !votes.contains {
             $0.resultID == result.id && $0.userID == viewerID
+        }
+    }
+
+    /// A pending proposal is actionable only for an accepted athlete who
+    /// has not already voted. Neither a pending proposal nor this filter
+    /// grants points or changes the result.
+    static func filtered(
+        _ results: [ATHLTHArenaRoundResult],
+        filter: Filter,
+        viewerID: UUID,
+        eligibleIDs: Set<UUID>,
+        votes: [ATHLTHArenaRoundResultVote]
+    ) -> [ATHLTHArenaRoundResult] {
+        switch filter {
+        case .all:
+            return results
+        case .requiresMyVote:
+            return results.filter {
+                needsYourVote(
+                    result: $0,
+                    viewerID: viewerID,
+                    eligibleIDs: eligibleIDs,
+                    votes: votes
+                )
+            }
+        case .approved:
+            return results.filter {
+                State.resolve($0.status) == .approved
+            }
         }
     }
 
@@ -183,6 +218,8 @@ struct ATHLTHArenaScoringSection: View {
     @State private var loading = false
     @State private var refreshQueued = false
     @State private var showsAllResultHistory = false
+    @State private var resultHistoryFilter:
+        ATHLTHArenaResultHistoryPresentation.Filter = .all
     @State private var writing = false
     @State private var errorMessage: String?
     @State private var confirmStart = false
@@ -210,20 +247,48 @@ struct ATHLTHArenaScoringSection: View {
         rankedMembers.first { $0.userID == session.profile.userID }
     }
 
+    private var filteredResultHistory: [ATHLTHArenaRoundResult] {
+        ATHLTHArenaResultHistoryPresentation.filtered(
+            results,
+            filter: resultHistoryFilter,
+            viewerID: session.profile.userID,
+            eligibleIDs: acceptedIDs,
+            votes: votes
+        )
+    }
+
     private var recentResultHistory: [ATHLTHArenaRoundResult] {
         ATHLTHArenaResultHistoryPresentation.recent(
-            results,
+            filteredResultHistory,
             for: Set(rounds.map(\.id)),
-            limit: showsAllResultHistory ? results.count : 4
+            limit: showsAllResultHistory ? filteredResultHistory.count : 4
         )
     }
 
     private var hasMoreResultHistory: Bool {
         ATHLTHArenaResultHistoryPresentation.recent(
-            results,
+            filteredResultHistory,
             for: Set(rounds.map(\.id)),
             limit: 5
         ).count > 4
+    }
+
+    private var resultProposalsInSeries: Bool {
+        results.contains { result in
+            rounds.contains { $0.id == result.roundID }
+        }
+    }
+
+    private var resultsNeedingMyVote: Int {
+        ATHLTHArenaResultHistoryPresentation.filtered(
+            results.filter { result in
+                rounds.contains { $0.id == result.roundID }
+            },
+            filter: .requiresMyVote,
+            viewerID: session.profile.userID,
+            eligibleIDs: acceptedIDs,
+            votes: votes
+        ).count
     }
 
     private var startReady: Bool {
@@ -273,7 +338,7 @@ struct ATHLTHArenaScoringSection: View {
             if series.status != "draft", !rounds.isEmpty, resultsLoaded {
                 roundProgressCard
                 if personalStanding != nil { personalScoreCard }
-                if !recentResultHistory.isEmpty { recentResultHistoryCard }
+                if resultProposalsInSeries { recentResultHistoryCard }
             }
 
             ForEach(rankedMembers) { member in
@@ -640,6 +705,53 @@ struct ATHLTHArenaScoringSection: View {
                     .font(.caption2)
                     .foregroundStyle(ATHLTHTheme.mutedText)
                 }
+            }
+
+            Picker(
+                ATHLTHLocalization.choose(
+                    english: "History filter", norwegian: "Historikkfilter"
+                ),
+                selection: $resultHistoryFilter
+            ) {
+                Text(ATHLTHLocalization.choose(
+                    english: "All", norwegian: "Alle"
+                ))
+                .tag(ATHLTHArenaResultHistoryPresentation.Filter.all)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Vote", norwegian: "Stem"
+                ) + (resultsNeedingMyVote > 0
+                    ? " (\(resultsNeedingMyVote))" : ""))
+                .tag(ATHLTHArenaResultHistoryPresentation.Filter.requiresMyVote)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Approved", norwegian: "Godkjent"
+                ))
+                .tag(ATHLTHArenaResultHistoryPresentation.Filter.approved)
+            }
+            .pickerStyle(.segmented)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Filter competition result history",
+                norwegian: "Filtrer konkurransens resultathistorikk"
+            ))
+            .onChange(of: resultHistoryFilter) { _, _ in
+                showsAllResultHistory = false
+            }
+
+            if recentResultHistory.isEmpty {
+                Text(resultHistoryFilter == .requiresMyVote
+                    ? ATHLTHLocalization.choose(
+                        english: "You have no results awaiting your vote.",
+                        norwegian: "Du har ingen resultater som venter på din stemme."
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "No approved results are available in this view.",
+                        norwegian: "Ingen godkjente resultater vises her ennå."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 8)
             }
 
             ForEach(recentResultHistory) { result in
