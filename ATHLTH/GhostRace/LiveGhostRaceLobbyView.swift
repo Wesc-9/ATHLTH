@@ -28,6 +28,7 @@ struct LiveGhostRaceLobbyView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
+    @EnvironmentObject private var mirroring: WorkoutMirroringStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
 
@@ -92,7 +93,8 @@ struct LiveGhostRaceLobbyView: View {
                     ))
                 }
 
-                if (didLaunch || canReconnectRecoveredPhoneRace) &&
+                if (didLaunch || canReconnectRecoveredPhoneRace ||
+                    canReconnectRecoveredWatchRace) &&
                    LiveGhostRaceReentry.canReconnectSharedSession(
                        roomStatus: liveRace.room?.status
                    ) &&
@@ -225,7 +227,7 @@ struct LiveGhostRaceLobbyView: View {
             guard !Task.isCancelled else { return }
             // A recovered iPhone workout for this exact duel may reconnect
             // to its shared location session without starting HealthKit again.
-            if canReconnectRecoveredPhoneRace {
+            if canReconnectRecoveredPhoneRace || canReconnectRecoveredWatchRace {
                 await connectLiveSession()
             }
         }
@@ -244,7 +246,7 @@ struct LiveGhostRaceLobbyView: View {
             guard phase == .active else { return }
             Task {
                 await liveRace.refresh(challengeID: challenge.id)
-                if canReconnectRecoveredPhoneRace {
+                if canReconnectRecoveredPhoneRace || canReconnectRecoveredWatchRace {
                     await connectLiveSession()
                 }
                 await waitForSynchronizedStart()
@@ -1062,6 +1064,19 @@ struct LiveGhostRaceLobbyView: View {
         )
     }
 
+    private var canReconnectRecoveredWatchRace: Bool {
+        guard let snapshot = mirroring.snapshot,
+              phoneWorkout.active == nil else { return false }
+        return LiveGhostRaceReentry.canReconnectWatchWorkout(
+            comparisonRouteID: snapshot.routeComparisonID,
+            challengeID: challenge.id,
+            roomStatus: liveRace.room?.status,
+            mirroredWorkoutActive: mirroring.hasActiveMirroredWorkout,
+            isRunningOrPaused: snapshot.state == .running || snapshot.state == .paused,
+            snapshotAgeSeconds: Date().timeIntervalSince(snapshot.capturedAt)
+        )
+    }
+
     private var deviceCanStart: Bool {
         switch captureDevice {
         case .iPhone:
@@ -1275,7 +1290,8 @@ struct LiveGhostRaceLobbyView: View {
 
     @MainActor
     private func connectLiveSession() async {
-        guard didLaunch || canReconnectRecoveredPhoneRace,
+        guard didLaunch || canReconnectRecoveredPhoneRace ||
+                  canReconnectRecoveredWatchRace,
               LiveGhostRaceReentry.canReconnectSharedSession(
                   roomStatus: liveRace.room?.status
               ),
