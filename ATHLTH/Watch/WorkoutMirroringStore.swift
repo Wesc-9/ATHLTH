@@ -399,23 +399,36 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     }
 
     private func attach(_ session: HKWorkoutSession) {
+        // A reconnected Watch session can reuse its own last measured data.
+        // A different workout must never inherit cached heart rate, calories
+        // or distance from the previous session while awaiting live samples.
+        let incomingKind = workoutKind(
+            for: session.workoutConfiguration.activityType
+        )
+        let carry = ATHLTHWorkoutMirrorContinuity.mayCarryRecordedMetrics(
+            previous: snapshot,
+            newKind: incomingKind,
+            newStartedAt: session.startDate
+        )
+        let previous = carry ? snapshot : nil
+
         session.delegate = self
         mirroredSession = session
         ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive = true
         ATHLTHWatchWorkoutRuntime.lastMirrorDetectedAt = Date()
 
         let initialSnapshot = WatchWorkoutLiveSnapshot(
-            kind: workoutKind(for: session.workoutConfiguration.activityType),
+            kind: incomingKind,
             state: mirrorState(for: session.state),
             startedAt: session.startDate,
             capturedAt: Date(),
             elapsedTime: elapsedTime(for: session),
-            heartRate: snapshot?.heartRate ?? 0,
-            activeCalories: snapshot?.activeCalories ?? 0,
-            distanceMeters: snapshot?.distanceMeters ?? 0,
-            averageHeartRate: snapshot?.averageHeartRate,
-            maxHeartRate: snapshot?.maxHeartRate,
-            routePointCount: snapshot?.routePointCount ?? 0
+            heartRate: previous?.heartRate ?? 0,
+            activeCalories: previous?.activeCalories ?? 0,
+            distanceMeters: previous?.distanceMeters ?? 0,
+            averageHeartRate: previous?.averageHeartRate,
+            maxHeartRate: previous?.maxHeartRate,
+            routePointCount: previous?.routePointCount ?? 0
         )
 
         if let preparedAt =
@@ -710,9 +723,14 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
         let rawState = toState.rawValue
         let startedAt = workoutSession.startDate
         let endedAt = workoutSession.endDate
+        let sessionID = ObjectIdentifier(workoutSession)
 
         Task { @MainActor [weak self] in
             guard let self,
+                  ATHLTHWorkoutMirrorContinuity.acceptsDelegateCallback(
+                      activeSession: self.mirroredSession.map(ObjectIdentifier.init),
+                      incomingSession: sessionID
+                  ),
                   let sessionState = HKWorkoutSessionState(rawValue: rawState)
             else {
                 return
@@ -772,9 +790,15 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
         didFailWithError error: Error
     ) {
         let message = error.localizedDescription
+        let sessionID = ObjectIdentifier(workoutSession)
 
         Task { @MainActor [weak self] in
-            guard let self else { return }
+            guard let self,
+                  ATHLTHWorkoutMirrorContinuity.acceptsDelegateCallback(
+                      activeSession: self.mirroredSession.map(ObjectIdentifier.init),
+                      incomingSession: sessionID
+                  )
+            else { return }
 
             self.errorMessage = message
 
@@ -800,8 +824,15 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
         _ workoutSession: HKWorkoutSession,
         didReceiveDataFromRemoteWorkoutSession data: [Data]
     ) {
+        let sessionID = ObjectIdentifier(workoutSession)
         Task { @MainActor [weak self] in
-            self?.handle(data)
+            guard let self,
+                  ATHLTHWorkoutMirrorContinuity.acceptsDelegateCallback(
+                      activeSession: self.mirroredSession.map(ObjectIdentifier.init),
+                      incomingSession: sessionID
+                  )
+            else { return }
+            self.handle(data)
         }
     }
 
@@ -810,9 +841,15 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
         didDisconnectFromRemoteDeviceWithError error: Error?
     ) {
         let message = error?.localizedDescription
+        let sessionID = ObjectIdentifier(workoutSession)
 
         Task { @MainActor [weak self] in
-            guard let self else { return }
+            guard let self,
+                  ATHLTHWorkoutMirrorContinuity.acceptsDelegateCallback(
+                      activeSession: self.mirroredSession.map(ObjectIdentifier.init),
+                      incomingSession: sessionID
+                  )
+            else { return }
 
             self.mirroredSession = nil
             self.clearIPhoneAudioCoach()

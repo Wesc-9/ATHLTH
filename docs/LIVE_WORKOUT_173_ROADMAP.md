@@ -301,3 +301,17 @@ Baseline: `release/v1.7.3`. Keep recording engines, workout ownership, iPhone/Wa
 - Do not infer successful Xcode/watchOS compilation or actual device
   connectivity from passing backend tests. Complete the workflow build
   and simulator tests first, then the physical checklist, before release.
+
+## Phase 9 — mirrored session identity (increment 2)
+
+- Watch reconnect carries cached metrics only for the *same* HealthKit
+  workout identity, not merely the same sport or a similar session title.
+- New mirroring sessions begin without stale pulse, calories, distance,
+  average/max pulse or route-point count inherited from an old session.
+- Every HealthKit mirroring delegate (state, failure, incoming samples,
+  disconnect) rejects callbacks belonging to a previous session that
+  are delivered after a newer session has attached.
+- Regression tests cover same-workout reconnect, completed workout,
+  different start time or sport, nil start, and stale delegate identity.
+- Complete the Xcode watchOS/iOS build and on-device disconnect/reconnect
+  scenarios before claiming release readiness.

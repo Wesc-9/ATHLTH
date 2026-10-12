@@ -32,6 +32,8 @@ and record outcome/screenshots on the next authorized TestFlight build.
 | P0 | Start on phone, attempt a second Watch start | No duplicated workout or HealthKit entry |
 | P0 | Disconnect Watch/phone mid-run for several minutes | Watch records independently; phone labels stale data |
 | P0 | Reconnect while interval or Ghost is running | Correct session resumes mirroring; no elapsed-distance reset or duplicate |
+| P0 | Reconnect a different Watch workout of the same type | Old pulse, calories, distance and Audio Coach data cannot appear as initial data for the new workout |
+| P0 | Deliver delayed HealthKit events from the previous mirrored session | New session status, live metrics and mirroring connection state remain unchanged |
 | P0 | Complete Watch session while offline, then reconnect | Exactly one final activity; no reappearance of active session |
 | P0 | Start workout B immediately after finishing A | Live Activity from A must never show B's data or dismiss B |
 | P0 | Pause and resume running workout | Active elapsed time does not include pause period |
@@ -69,3 +71,18 @@ and record outcome/screenshots on the next authorized TestFlight build.
   controller state of a newer Live Activity after an `await`.
 - These rules are independently unit-tested where the logic is pure; actual
   cross-device connectivity and ActivityKit UI remain on the physical gate.
+
+## Phase 9 — Watch mirroring identity hardening
+
+- After a Watch mirror reconnect, retain cached pulse, calories and
+  distance only if the previous snapshot belongs to the identical
+  workout (same sport, same start time, active/preparing/paused phase).
+- A new workout starts without inherited sensor values; new Watch samples
+  then update the display normally.
+- The HealthKit delegate checks the currently attached session identity
+  before applying state, error, remote data or disconnection callbacks.
+  Events queued from a previous session cannot mutate the new one.
+- Unit tests cover reattach vs new session, completed/stale sessions,
+  cross-sport handoffs, missing start dates and stale delegate IDs.
+- Successful compilation and real reconnect/quick-restart tests are still
+  required; a unit test does not prove WatchConnectivity runtime behavior.
