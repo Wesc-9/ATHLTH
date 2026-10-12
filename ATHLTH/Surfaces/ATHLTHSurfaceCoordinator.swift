@@ -357,37 +357,37 @@ private final class ATHLTHLiveActivityController {
         lastPhase = snapshot.state
         lastUpdateAt = Date()
 
+        // Read each Activity only once. Filtering into a second array
+        // aliases non-Sendable ActivityKit handles across suspension points
+        // under Swift 6 strict concurrency.
         let activities =
             Activity<ATHLTHWorkoutActivityAttributes>.activities
-        func belongsToSession(
-            _ activity: Activity<ATHLTHWorkoutActivityAttributes>
-        ) -> Bool {
-            identity.matches(
-                ATHLTHLiveActivitySessionIdentity(
-                    systemImage: activity.attributes.systemImage,
-                    startedAt: activity.attributes.startedAt,
-                    fallbackTitle: activity.attributes.workoutTitle
-                )
-            )
-        }
 
         switch snapshot.state {
         case .preparing, .running, .paused, .ending:
-            // Never hand a new workout the old workout's ongoing activity.
-            // End obsolete activities before publishing the new snapshot.
-            for activity in activities where !belongsToSession(activity) {
-                await activity.end(nil, dismissalPolicy: .immediate)
+            // Only the matching session can be reused. Close obsolete or
+            // duplicate activities without retaining copied handle arrays.
+            var reusedExistingActivity = false
+            for activity in activities {
+                let matches = identity.matches(
+                    ATHLTHLiveActivitySessionIdentity(
+                        systemImage: activity.attributes.systemImage,
+                        startedAt: activity.attributes.startedAt,
+                        fallbackTitle: activity.attributes.workoutTitle
+                    )
+                )
+
+                if matches && !reusedExistingActivity {
+                    reusedExistingActivity = true
+                    await activity.update(content)
+                } else {
+                    await activity.end(nil, dismissalPolicy: .immediate)
+                }
+                guard revision == syncRevision else { return }
             }
-            let matching = activities.filter(belongsToSession)
-            for duplicate in matching.dropFirst() {
-                await duplicate.end(nil, dismissalPolicy: .immediate)
-            }
-            guard revision == syncRevision else { return }
 
             lastSessionIdentity = identity
-            if let activity = matching.first {
-                await activity.update(content)
-            } else {
+            if !reusedExistingActivity {
                 let attributes = ATHLTHWorkoutActivityAttributes(
                     workoutTitle: identity.fallbackTitle,
                     systemImage: identity.systemImage,
@@ -400,22 +400,31 @@ private final class ATHLTHLiveActivityController {
                         pushType: nil
                     )
                 } catch {
-                    // Live Activities are a presentation surface only.
-                    // A request failure must never affect the workout.
+                    // Live Activities are presentation only. Recording is
+                    // still owned exclusively by the workout engine.
                 }
             }
 
         case .completed, .failed:
-            // A delayed completion may only dismiss its own workout.
-            for activity in activities where belongsToSession(activity) {
-                await activity.end(
-                    content,
-                    dismissalPolicy: .after(
-                        Date().addingTimeInterval(60)
+            // Delayed completion must not close a different active workout.
+            for activity in activities {
+                let matches = identity.matches(
+                    ATHLTHLiveActivitySessionIdentity(
+                        systemImage: activity.attributes.systemImage,
+                        startedAt: activity.attributes.startedAt,
+                        fallbackTitle: activity.attributes.workoutTitle
                     )
                 )
+                if matches {
+                    await activity.end(
+                        content,
+                        dismissalPolicy: .after(
+                            Date().addingTimeInterval(60)
+                        )
+                    )
+                    guard revision == syncRevision else { return }
+                }
             }
-            guard revision == syncRevision else { return }
             lastSessionIdentity = nil
             lastPhase = nil
             lastUpdateAt = nil
