@@ -85,6 +85,7 @@ struct AIProgramBuilderView: View {
     @State private var homeEquipment: Set<String> = []
     @State private var otherEquipment = ""
     @State private var limitations = ""
+    @State private var shareLimitationsWithAI = false
     @State private var currentSessionsPerWeek = 0
     @State private var useProfileInterests = true
 
@@ -422,6 +423,24 @@ struct AIProgramBuilderView: View {
             }
             .buttonStyle(.plain)
             .disabled(!canGenerate)
+            if !limitations.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Toggle(isOn: $shareLimitationsWithAI) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Share training limitations with AI",
+                            norwegian: "Del treningshensyn med AI"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        Text(ATHLTHLocalization.choose(
+                            english: "Optional: these notes may contain sensitive health information. Send them to the AI service only when you enable this choice. Always review suggested workouts.",
+                            norwegian: "Valgfritt: Disse notatene kan inneholde sensitive helseopplysninger. De sendes bare til AI-tjenesten når du aktiverer dette valget. Kontroller alltid øktforslagene."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                }
+                .tint(ATHLTHTheme.accentDeep)
+            }
         }
     }
 
@@ -488,7 +507,7 @@ struct AIProgramBuilderView: View {
         Gym access: \(gymAccess).
         Home equipment: \(equipment.isEmpty ? "Bodyweight only" : equipment).
         Other available equipment: \(String(otherEquipment.prefix(300))).
-        Limitations or movements to avoid: \(limitations.isEmpty ? "None reported" : String(limitations.prefix(500))).
+        Limitations or movements to avoid: \(shareLimitationsWithAI && !limitations.isEmpty ? String(limitations.prefix(500)) : "Not shared").
         Profile interests: \(interests).
         Athlete's own focus request: \(coachFocusNotes.isEmpty ? "No additional focus request" : String(coachFocusNotes.prefix(700))).
         Only prescribe equipment the user can access. With no gym or listed home equipment, use bodyweight or outdoor sessions.
