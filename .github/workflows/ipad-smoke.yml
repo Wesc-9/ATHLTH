@@ -32,6 +32,9 @@ permissions:
 jobs:
   ipad-smoke:
     runs-on: xcode-27
+    # Fail visibly if the shared macOS runner stalls compiling Swift.
+    # Previous iPad smoke builds could remain in_progress for hours.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -74,6 +77,8 @@ jobs:
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -jobs 3 \
+            -showBuildTimingSummary \
             CODE_SIGNING_ALLOWED=NO \
             build
 
