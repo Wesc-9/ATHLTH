@@ -1235,6 +1235,117 @@ final class ATHLTHArenaSuggestedRankingTests: XCTestCase {
         ))
     }
 
+    func testLiveGhostLegacyRouteUsesStableRoundID() {
+        let selectedRound = UUID()
+        let snapshot = ChallengeRouteSnapshot(
+            routeID: nil,
+            title: "Legacy imported route",
+            distanceKilometers: 1.5,
+            coordinates: [
+                RouteCoordinate(latitude: 63.43, longitude: 10.40,
+                                altitude: nil, sequence: 0),
+                RouteCoordinate(latitude: 63.44, longitude: 10.41,
+                                altitude: nil, sequence: 1)
+            ]
+        )
+        let round = ATHLTHArenaRemoteProposal(
+            id: selectedRound,
+            seriesID: UUID(),
+            proposedBy: nil,
+            template: .fastestRoute,
+            title: "Legacy route",
+            rules: "Use the agreed route",
+            position: 0,
+            targetDistanceMeters: 1_500,
+            routeSnapshot: snapshot
+        )
+        let route = ATHLTHArenaCompetitionCourse.route(
+            from: snapshot, ownerID: UUID(), fallbackRouteID: selectedRound
+        )
+        XCTAssertEqual(route?.id, selectedRound)
+        XCTAssertEqual(
+            ATHLTHArenaLiveRoundSelection.linkedRoundID(
+                selectedRoundID: selectedRound,
+                selectedRouteID: route?.id,
+                rounds: [round]
+            ),
+            selectedRound
+        )
+        XCTAssertNil(
+            ATHLTHArenaLiveRoundSelection.linkedRoundID(
+                selectedRoundID: selectedRound,
+                selectedRouteID: UUID(),
+                rounds: [round]
+            )
+        )
+    }
+
+    func testArenaGhostRejectsDetourHiddenBetweenSparseAnchorSamples() {
+        let coordinates = (0..<49).map { index in
+            RouteCoordinate(
+                latitude: 63.42 + Double(index) * 0.0001,
+                longitude: 10.39 + Double(index) * 0.0001,
+                altitude: nil, sequence: index
+            )
+        }
+        let frozen = ChallengeRouteSnapshot(
+            routeID: UUID(),
+            title: "Agreed straight route",
+            distanceKilometers: 0.75,
+            coordinates: coordinates
+        )
+        // The old 17-point sampler checked indices 0, 3, 6, ... and 48,
+        // missing this detour at indices 1 and 2.
+        let points: [GhostFriendRacePoint] = coordinates.enumerated().map { i, point in
+            GhostFriendRacePoint(
+                latitude: point.latitude + ((i == 1 || i == 2) ? 0.01 : 0),
+                longitude: point.longitude,
+                elapsedTime: Double(i) * 12,
+                cumulativeMeters: Double(i) * 15,
+                sequence: i
+            )
+        }
+        XCTAssertFalse(
+            ATHLTHArenaLiveRoundCompatibility.matchesFrozenRoute(
+                snapshot: frozen,
+                sharedPoints: points,
+                privacyTrimmed: false
+            )
+        )
+    }
+
+    func testArenaGhostAcceptsFullMatchingFrozenCourse() {
+        let coordinates = (0..<49).map { index in
+            RouteCoordinate(
+                latitude: 63.42 + Double(index) * 0.0001,
+                longitude: 10.39 + Double(index) * 0.0001,
+                altitude: nil, sequence: index
+            )
+        }
+        let frozen = ChallengeRouteSnapshot(
+            routeID: UUID(),
+            title: "Agreed course",
+            distanceKilometers: 0.75,
+            coordinates: coordinates
+        )
+        let points = coordinates.enumerated().map { i, point in
+            GhostFriendRacePoint(
+                latitude: point.latitude,
+                longitude: point.longitude,
+                elapsedTime: Double(i) * 12,
+                cumulativeMeters: Double(i) * 15,
+                sequence: i
+            )
+        }
+        XCTAssertTrue(
+            ATHLTHArenaLiveRoundCompatibility.matchesFrozenRoute(
+                snapshot: frozen,
+                sharedPoints: points,
+                privacyTrimmed: false
+            )
+        )
+    }
+
     func testArenaLiveRouteRejectsBadGPSAndMissingEnd() {
         let course = (0..<11).map { index in
             RouteCoordinate(
