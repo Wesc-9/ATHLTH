@@ -153,6 +153,34 @@ enum ATHLTHArenaResultHistoryPresentation {
         }
     }
 
+    /// An explicit pending vote is prioritized by oldest proposal first,
+    /// without touching a settled/expired round or another competition.
+    static func nextVote(
+        results: [ATHLTHArenaRoundResult],
+        roundIDs: Set<UUID>,
+        viewerID: UUID,
+        eligibleIDs: Set<UUID>,
+        votes: [ATHLTHArenaRoundResultVote]
+    ) -> ATHLTHArenaRoundResult? {
+        results
+            .filter { result in
+                roundIDs.contains(result.roundID) &&
+                needsYourVote(
+                    result: result,
+                    viewerID: viewerID,
+                    eligibleIDs: eligibleIDs,
+                    votes: votes
+                )
+            }
+            .sorted { lhs, rhs in
+                if lhs.createdAt != rhs.createdAt {
+                    return lhs.createdAt < rhs.createdAt
+                }
+                return lhs.id.uuidString < rhs.id.uuidString
+            }
+            .first
+    }
+
     /// Only stored, server-awarded points from this approved proposal's
     /// exact round are displayed. Never calculate points from a provisional
     /// Live Ghost finish, a vote or a ranking suggestion.
@@ -279,6 +307,16 @@ struct ATHLTHArenaScoringSection: View {
         }
     }
 
+    private var nextResultNeedingMyVote: ATHLTHArenaRoundResult? {
+        ATHLTHArenaResultHistoryPresentation.nextVote(
+            results: results,
+            roundIDs: Set(rounds.map(\.id)),
+            viewerID: session.profile.userID,
+            eligibleIDs: acceptedIDs,
+            votes: votes
+        )
+    }
+
     private var resultsNeedingMyVote: Int {
         ATHLTHArenaResultHistoryPresentation.filtered(
             results.filter { result in
@@ -336,6 +374,9 @@ struct ATHLTHArenaScoringSection: View {
             }
 
             if series.status != "draft", !rounds.isEmpty, resultsLoaded {
+                if let nextResultNeedingMyVote {
+                    pendingResultAction(nextResultNeedingMyVote)
+                }
                 roundProgressCard
                 if personalStanding != nil { personalScoreCard }
                 if resultProposalsInSeries { recentResultHistoryCard }
@@ -567,6 +608,69 @@ struct ATHLTHArenaScoringSection: View {
                 norwegian: "Regler og deltakere låses til konkurransen avsluttes, bortsett fra enstemmig godkjente erstatninger for slettede brukere."
             ))
         }
+    }
+
+    /// Opens the existing review/vote controls for the oldest waiting
+    /// proposal. No vote is cast from this card; server confirmation remains
+    /// mandatory before a leaderboard change.
+    private func pendingResultAction(
+        _ result: ATHLTHArenaRoundResult
+    ) -> some View {
+        HStack(alignment: .top, spacing: 11) {
+            Image(systemName: "checkmark.shield.fill")
+                .font(.title3)
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(width: 34, height: 34)
+                .background(
+                    ATHLTHTheme.vitalitySoft.opacity(0.65),
+                    in: RoundedRectangle(cornerRadius: 11)
+                )
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Your approval is needed",
+                    norwegian: "Din godkjenning mangler"
+                ))
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+
+                Text(
+                    rounds.first(where: { $0.id == result.roundID })?.title ??
+                    ATHLTHLocalization.choose(
+                        english: "Competition round",
+                        norwegian: "Konkurranserunde"
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .lineLimit(2)
+
+                Button {
+                    onReviewRound(result.roundID)
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Review result",
+                        norwegian: "Kontroller resultat"
+                    ), systemImage: "arrow.right")
+                    .font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.bordered)
+                .tint(ATHLTHTheme.accentDeep)
+                .accessibilityHint(ATHLTHLocalization.choose(
+                    english: "Opens the round's review controls; no vote is sent automatically.",
+                    norwegian: "Åpner stemmevalgene for runden uten å sende en stemme automatisk."
+                ))
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(
+            ATHLTHTheme.vitalitySoft.opacity(0.36),
+            in: RoundedRectangle(cornerRadius: 18)
+        )
+        .accessibilityElement(children: .contain)
     }
 
     /// Read-only personal snapshot. Member points are server-settled:
@@ -856,7 +960,9 @@ struct ATHLTHArenaScoringSection: View {
                     }
                     Spacer(minLength: 0)
                 }
-                .accessibilityElement(children: .combine)
+                // Keep embedded Review/Vote buttons individually focusable
+                // for VoiceOver instead of merging them into one static row.
+                .accessibilityElement(children: .contain)
             }
 
             Text(ATHLTHLocalization.choose(
