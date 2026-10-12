@@ -48,14 +48,14 @@ struct MirroredWorkoutLiveView: View {
                                 mirroredOtherSportHeader(snapshot)
                             }
 
-                            if snapshot.kind == .cycling,
-                               ATHLTHOtherSportLiveResolver.resolve(
-                                   kind: .cycling,
-                                   distanceMeters: snapshot.distanceMeters
-                               ) == .measuredDistance {
-                                mirroredCyclingDistance(snapshot)
-                            } else {
+                            if snapshot.kind == .strength {
                                 timer(snapshot)
+                            } else if snapshot.kind == .cycling,
+                                      ATHLTHOtherSportLiveResolver.resolve(
+                                          kind: .cycling,
+                                          distanceMeters: snapshot.distanceMeters
+                                      ) == .measuredDistance {
+                                mirroredCyclingDistance(snapshot)
                             }
 
                             HStack(
@@ -1045,17 +1045,119 @@ struct MirroredWorkoutLiveView: View {
         _ snapshot: WatchWorkoutLiveSnapshot
     ) -> some View {
         if snapshot.kind != .strength {
-            HStack(spacing: 9) {
-                Label(snapshot.kind.title,
-                      systemImage: snapshot.kind.systemImage)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                Spacer(minLength: 0)
-                Text(statusTitle(snapshot.state))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(statusColor(snapshot.state))
+            let measuredCycling =
+                ATHLTHOtherSportLiveResolver.resolve(
+                    kind: snapshot.kind,
+                    distanceMeters: snapshot.distanceMeters
+                ) == .measuredDistance
+
+            ATHLTHCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 9) {
+                        Label(
+                            snapshot.kind.title,
+                            systemImage: snapshot.kind.systemImage
+                        )
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                        Spacer(minLength: 0)
+
+                        TimelineView(.periodic(from: .now, by: 5)) { tick in
+                            let delayed = snapshot.state == .running &&
+                                !ATHLTHPhoneMirroredClock.isFresh(
+                                    snapshotAt: snapshot.capturedAt,
+                                    now: tick.date
+                                )
+                            Label(
+                                delayed
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Delayed",
+                                        norwegian: "Forsinket"
+                                      )
+                                    : statusTitle(snapshot.state),
+                                systemImage: delayed
+                                    ? "wifi.exclamationmark"
+                                    : statusIcon(snapshot.state)
+                            )
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(
+                                delayed
+                                    ? Color.orange
+                                    : statusColor(snapshot.state)
+                            )
+                            .lineLimit(1)
+                        }
+                    }
+
+                    if !measuredCycling {
+                        Text(ATHLTHLocalization.choose(
+                            english: "WORKOUT TIME", norwegian: "ØKTTID"
+                        ))
+                        .font(.caption2.weight(.bold))
+                        .tracking(0.8)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                        TimelineView(.periodic(from: .now, by: 1)) { tick in
+                            Text(durationText(displayedElapsedTime(
+                                snapshot: snapshot, now: tick.date
+                            )))
+                            .font(.system(size: 62, weight: .bold,
+                                          design: .rounded))
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.60)
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                        }
+
+                        Text(otherSportSubtitle(snapshot.kind))
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    } else {
+                        Text(otherSportSubtitle(snapshot.kind))
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, 4)
+        }
+    }
+
+    private func otherSportSubtitle(_ kind: WatchWorkoutKind) -> String {
+        switch kind {
+        case .hiit:
+            return ATHLTHLocalization.choose(
+                english: "High-intensity session",
+                norwegian: "Høyintensiv økt"
+            )
+        case .functional:
+            return ATHLTHLocalization.choose(
+                english: "Functional training",
+                norwegian: "Funksjonell trening"
+            )
+        case .rowing:
+            return ATHLTHLocalization.choose(
+                english: "Rowing workout",
+                norwegian: "Roøkt"
+            )
+        case .stairClimbing:
+            return ATHLTHLocalization.choose(
+                english: "Stair climbing",
+                norwegian: "Trappetrening"
+            )
+        case .yoga:
+            return ATHLTHLocalization.choose(
+                english: "Yoga session", norwegian: "Yogaøkt"
+            )
+        case .cycling:
+            return ATHLTHLocalization.choose(
+                english: "Cycling workout", norwegian: "Sykkeløkt"
+            )
+        case .other, .running, .walking, .strength:
+            return ATHLTHLocalization.choose(
+                english: "Workout", norwegian: "Treningsøkt"
+            )
         }
     }
 

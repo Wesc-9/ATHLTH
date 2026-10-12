@@ -6,6 +6,7 @@ struct WatchWorkoutStartView: View {
     @EnvironmentObject private var workoutManager: WatchWorkoutManager
 
     let route: WatchRouteTransfer?
+    @State private var showingMoreActivities = false
 
     var body: some View {
         ScrollView {
@@ -28,6 +29,33 @@ struct WatchWorkoutStartView: View {
 
                 if route == nil {
                     workoutButton(.strength)
+
+                    DisclosureGroup(
+                        isExpanded: $showingMoreActivities
+                    ) {
+                        VStack(spacing: 8) {
+                            workoutButton(.cycling)
+                            workoutButton(.hiit)
+                            workoutButton(.functional)
+                            workoutButton(.rowing)
+                            workoutButton(.stairClimbing)
+                            workoutButton(.yoga)
+                            workoutButton(.other)
+                        }
+                        .padding(.top, 6)
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "More activities",
+                                norwegian: "Flere aktiviteter"
+                            ),
+                            systemImage: "square.grid.2x2"
+                        )
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(WatchTheme.textPrimary)
+                    }
+                    .padding(10)
+                    .watchSurface(radius: 16)
                 }
 
                 if let errorMessage = workoutManager.errorMessage {

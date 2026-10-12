@@ -214,3 +214,29 @@ Baseline: `release/v1.7.3`. Keep recording engines, workout ownership, iPhone/Wa
 - Presentation-only changes: existing HealthKit session, mirroring,
   pause/end commands and sensors are untouched.
 - Physical layout, Xcode/watchOS and battery validations remain pending.
+
+
+## Phase 7 — dedicated other-sport pages (increment 2)
+
+- Non-running/strength Apple Watch workouts now open a dedicated,
+  activity-labelled focus page (HIIT, functional, rowing, stairs, yoga,
+  cycling, other), with a large recorded workout time or verified cycling
+  distance, plus fresh pulse and recorded energy.
+- A second pulse page shows current/average/max measurements and configured
+  target zone when available, without reporting a stale sensor sample as
+  current.
+- The vertical Watch pager still includes native Now Playing and the
+  existing pause/end controls. Reduced-luminance Always-On remains the
+  separate low-power read-only dashboard.
+- Optional Watch launch disclosure "More activities" exposes cycling, HIIT,
+  functional, rowing, stairs, yoga and generic activity types supported
+  by WatchWorkoutManager's existing HealthKit configuration pathway.
+- iPhone Watch-mirroring shows activity-specific heading and workout-time
+  hero for these modes, keeping measured cycling distance dominant.
+  Active Watch session ownership and all workout controls are unchanged.
+- The UI deliberately avoids fabricated HIIT rounds, rowing strokes,
+  exercise reps, stairs and unmeasured movement speeds.
+- Release gate: macOS Xcode watch/iOS build, small/large Watch layout,
+  HealthKit exercise-type capture, Live Activity continuity, phone
+  mirroring and on-device battery checks. None are claimed complete solely
+  from this source change.
