@@ -80,6 +80,47 @@ final class LiveGhostSynchronizedLaunchGateTests: XCTestCase {
         ))
     }
 
+    func testSharedReconnectRejectsLobbyAndFutureCountdown() {
+        for status: LiveGhostRaceRoomStatus? in [nil, .lobby, .finished, .cancelled] {
+            XCTAssertFalse(LiveGhostRaceReentry.canReconnectSharedSession(
+                roomStatus: status,
+                startsAt: start,
+                now: start
+            ))
+        }
+        XCTAssertFalse(LiveGhostRaceReentry.canReconnectSharedSession(
+            roomStatus: .countdown,
+            startsAt: start,
+            now: start.addingTimeInterval(-0.001)
+        ))
+    }
+
+    func testSharedReconnectRequiresServerStartTime() {
+        XCTAssertFalse(LiveGhostRaceReentry.canReconnectSharedSession(
+            roomStatus: .racing,
+            startsAt: nil,
+            now: start
+        ))
+        XCTAssertFalse(LiveGhostRaceReentry.canReconnectSharedSession(
+            roomStatus: .countdown,
+            startsAt: nil,
+            now: start
+        ))
+    }
+
+    func testSharedReconnectAllowedAfterStartEvenIfRoomStillCountdown() {
+        XCTAssertTrue(LiveGhostRaceReentry.canReconnectSharedSession(
+            roomStatus: .countdown,
+            startsAt: start,
+            now: start
+        ))
+        XCTAssertTrue(LiveGhostRaceReentry.canReconnectSharedSession(
+            roomStatus: .racing,
+            startsAt: start,
+            now: start.addingTimeInterval(3_600)
+        ))
+    }
+
     func testMissingRoomOrStartTimeCannotLaunch() {
         XCTAssertFalse(LiveGhostSynchronizedLaunchGate.mayLaunch(
             status: nil,
