@@ -752,7 +752,7 @@ final class MirroredWorkoutAudioCoach:
         }
         if let event,
            let workoutStartedAt {
-            onSpokenEventAttempt(event, workoutStartedAt)
+            onSpokenEventAttempt?(event, workoutStartedAt)
         }
     }
 
