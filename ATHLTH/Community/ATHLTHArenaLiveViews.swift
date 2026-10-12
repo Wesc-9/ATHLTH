@@ -8,7 +8,8 @@ import Supabase
 enum ATHLTHArenaCompetitionCourse {
     static func route(
         from snapshot: ChallengeRouteSnapshot,
-        ownerID: UUID
+        ownerID: UUID,
+        fallbackRouteID: UUID? = nil
     ) -> TrainingRoute? {
         guard snapshot.distanceKilometers.isFinite,
               (0.1...500).contains(snapshot.distanceKilometers),
@@ -20,7 +21,7 @@ enum ATHLTHArenaCompetitionCourse {
               }) else { return nil }
 
         return TrainingRoute(
-            id: snapshot.routeID ?? UUID(),
+            id: snapshot.routeID ?? fallbackRouteID ?? UUID(),
             ownerID: ownerID,
             title: snapshot.title,
             visibility: .privateOnly,
@@ -3886,11 +3887,13 @@ struct ATHLTHArenaOnlineDetailView: View {
     /// independent workout recorder. A round only contains a shared course,
     /// never another athlete's private GPS workout.
     private func arenaTrainingRoute(
-        from snapshot: ChallengeRouteSnapshot
+        from snapshot: ChallengeRouteSnapshot,
+        roundID: UUID
     ) -> TrainingRoute? {
         ATHLTHArenaCompetitionCourse.route(
             from: snapshot,
-            ownerID: session.profile.userID
+            ownerID: session.profile.userID,
+            fallbackRouteID: roundID
         )
     }
 
@@ -4144,7 +4147,9 @@ struct ATHLTHArenaOnlineDetailView: View {
                 .foregroundStyle(ATHLTHTheme.accentDeep)
 
                 if currentSeries.status == "active", canParticipate,
-                   let route = arenaTrainingRoute(from: snapshot) {
+                   let route = arenaTrainingRoute(
+                       from: snapshot, roundID: round.id
+                   ) {
                     NavigationLink {
                         TargetGhostSetupView(
                             route: route,
@@ -4887,7 +4892,8 @@ private struct ATHLTHArenaRelaySection: View {
                                    })?.routeSnapshot,
                                    let workoutRoute = ATHLTHArenaCompetitionCourse.route(
                                        from: agreedRoute,
-                                       ownerID: session.profile.userID
+                                       ownerID: session.profile.userID,
+                                       fallbackRouteID: ownLeg.routeRoundID
                                    ) {
                                     NavigationLink {
                                         TargetGhostSetupView(
@@ -4940,7 +4946,8 @@ private struct ATHLTHArenaRelaySection: View {
                                    })?.routeSnapshot,
                                    let route = ATHLTHArenaCompetitionCourse.route(
                                        from: snapshot,
-                                       ownerID: session.profile.userID
+                                       ownerID: session.profile.userID,
+                                       fallbackRouteID: ownLeg.routeRoundID
                                    ) {
                                     Button {
                                         Task { await suggestOwnLegTime(from: route) }
