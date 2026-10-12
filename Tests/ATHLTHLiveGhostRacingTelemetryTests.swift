@@ -1,0 +1,89 @@
+import Foundation
+import XCTest
+@testable import ATHLTH
+
+/// Synchronized duel telemetry is advisory, never authoritative scoring.
+final class ATHLTHLiveGhostRacingTelemetryTests: XCTestCase {
+    private let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+    private func eligible(
+        age: TimeInterval,
+        distance: Double = 2_000,
+        elapsed: Double = 700,
+        expiresIn: TimeInterval = 90
+    ) -> Bool {
+        ATHLTHLiveGhostRacingTelemetry.canCompare(
+            updatedAt: now.addingTimeInterval(-age),
+            expiresAt: now.addingTimeInterval(expiresIn),
+            distanceMeters: distance,
+            elapsedSeconds: elapsed,
+            now: now
+        )
+    }
+
+    func testBothAthletesResolveDifferentCorrectOpponents() {
+        let host = UUID(), guest = UUID()
+        XCTAssertEqual(ATHLTHLiveGhostRacingTelemetry.opponentID(
+            ownerID: host, otherID: guest, viewerID: host
+        ), guest)
+        XCTAssertEqual(ATHLTHLiveGhostRacingTelemetry.opponentID(
+            ownerID: host, otherID: guest, viewerID: guest
+        ), host)
+    }
+
+    func testUnrelatedUserCannotUsePrivateDuelAsWorkoutComparison() {
+        XCTAssertNil(ATHLTHLiveGhostRacingTelemetry.opponentID(
+            ownerID: UUID(), otherID: UUID(), viewerID: UUID()
+        ))
+    }
+
+    func testHostWithoutOpponentCannotInventRunner() {
+        let host = UUID()
+        XCTAssertNil(ATHLTHLiveGhostRacingTelemetry.opponentID(
+            ownerID: host, otherID: nil, viewerID: host
+        ))
+    }
+
+    func testFreshOpponentPositionPermitsGapComparison() {
+        XCTAssertTrue(eligible(age: 2))
+        XCTAssertTrue(eligible(age: 18))
+    }
+
+    func testDelayedOrExpiredOpponentsNeverProducePassing() {
+        XCTAssertFalse(eligible(age: 18.1))
+        XCTAssertFalse(eligible(age: 120))
+        XCTAssertFalse(eligible(age: 1, expiresIn: -1))
+    }
+
+    func testFutureOrCorruptedGPSNeverProducesPassing() {
+        XCTAssertFalse(eligible(age: -6))
+        XCTAssertFalse(eligible(age: .infinity))
+        XCTAssertFalse(eligible(age: 2, distance: .nan))
+        XCTAssertFalse(eligible(age: 2, distance: -5))
+    }
+
+    func testImpossibleDistanceAndWorkoutTimeCannotProducePassing() {
+        XCTAssertFalse(eligible(age: 2, distance: 5_000, elapsed: 10))
+        XCTAssertFalse(eligible(age: 2, distance: 50, elapsed: -1))
+        XCTAssertFalse(eligible(age: 2, distance: 50, elapsed: .infinity))
+        XCTAssertFalse(eligible(age: 2, distance: 50, elapsed: 90_000))
+    }
+
+    func testRouteDeviationMustBePlausibleOrAbsent() {
+        XCTAssertTrue(ATHLTHLiveGhostRacingTelemetry.acceptableDeviation(
+            15, maximum: 120
+        ))
+        XCTAssertTrue(ATHLTHLiveGhostRacingTelemetry.acceptableDeviation(
+            nil, maximum: 120
+        ))
+        XCTAssertFalse(ATHLTHLiveGhostRacingTelemetry.acceptableDeviation(
+            121, maximum: 120
+        ))
+        XCTAssertFalse(ATHLTHLiveGhostRacingTelemetry.acceptableDeviation(
+            -1, maximum: 120
+        ))
+        XCTAssertFalse(ATHLTHLiveGhostRacingTelemetry.acceptableDeviation(
+            .nan, maximum: 120
+        ))
+    }
+}
