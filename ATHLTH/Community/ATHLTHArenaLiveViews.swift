@@ -90,6 +90,40 @@ enum ATHLTHArenaSeriesOverview {
     }
 }
 
+/// Presents rule agreement from server-loaded round approvals only.
+/// This does not approve competition results or award any points.
+enum ATHLTHArenaRuleAgreementPresentation {
+    static func agreedCount(
+        roundIDs: [UUID],
+        acceptedUserIDs: Set<UUID>,
+        pendingInvitations: Int,
+        approvals: [ATHLTHArenaRemoteApproval]
+    ) -> Int {
+        guard acceptedUserIDs.count >= 2,
+              pendingInvitations == 0 else { return 0 }
+        let votesByRound = Dictionary(grouping: approvals, by: \.roundID)
+        return Set(roundIDs).filter { roundID in
+            let approvers = Set((votesByRound[roundID] ?? []).map(\.userID))
+            return acceptedUserIDs.isSubset(of: approvers)
+        }.count
+    }
+
+    static func allAgreed(
+        roundIDs: [UUID],
+        acceptedUserIDs: Set<UUID>,
+        pendingInvitations: Int,
+        approvals: [ATHLTHArenaRemoteApproval]
+    ) -> Bool {
+        !roundIDs.isEmpty &&
+        agreedCount(
+            roundIDs: roundIDs,
+            acceptedUserIDs: acceptedUserIDs,
+            pendingInvitations: pendingInvitations,
+            approvals: approvals
+        ) == Set(roundIDs).count
+    }
+}
+
 /// A completed Arena series may still contain unresolved round proposals.
 /// This is presentation-only and never treats completion as approval of points.
 enum ATHLTHArenaArchivePresentation {
@@ -3405,6 +3439,15 @@ struct ATHLTHArenaOnlineDetailView: View {
         members.count > 2
     }
 
+    private var agreedRuleCount: Int {
+        ATHLTHArenaRuleAgreementPresentation.agreedCount(
+            roundIDs: rounds.map(\.id),
+            acceptedUserIDs: Set(acceptedMembers.compactMap(\.userID)),
+            pendingInvitations: outstandingInvitations,
+            approvals: approvals
+        )
+    }
+
     /// A live race linked to a specific round requires exactly the agreed
     /// 1v1 pair. A generic Live Ghost race remains available separately.
     private var linkedLiveDuelOpponentID: UUID? {
@@ -3428,13 +3471,12 @@ struct ATHLTHArenaOnlineDetailView: View {
         let ownApprovals = Set(approvals.filter {
             $0.userID == session.profile.userID
         }.map(\.roundID))
-        let allApproved = !rounds.isEmpty && activeIDs.count >= 2 &&
-            rounds.allSatisfy { round in
-                let approved = Set(approvals.filter {
-                    $0.roundID == round.id
-                }.map(\.userID))
-                return activeIDs.isSubset(of: approved)
-            }
+        let allApproved = ATHLTHArenaRuleAgreementPresentation.allAgreed(
+            roundIDs: rounds.map(\.id),
+            acceptedUserIDs: activeIDs,
+            pendingInvitations: outstandingInvitations,
+            approvals: approvals
+        )
         return ATHLTHArenaNextAction.resolve(
             status: currentSeries.status,
             response: ownMembership?.response,
@@ -4334,6 +4376,22 @@ struct ATHLTHArenaOnlineDetailView: View {
             Label(series.scoring.title, systemImage: "medal")
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.88))
+            if !rounds.isEmpty {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Rules agreed",
+                        norwegian: "Regler godkjent"
+                    ) + ": \(agreedRuleCount)/\(rounds.count)",
+                    systemImage: agreedRuleCount == rounds.count
+                        ? "checkmark.shield.fill" : "shield.lefthalf.filled"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.92))
+                .accessibilityHint(ATHLTHLocalization.choose(
+                    english: "Round rules are approved separately from competition results. Approved rules do not award points.",
+                    norwegian: "Rundereglene godkjennes separat fra konkurranseresultatene. Godkjente regler gir ikke poeng."
+                ))
+            }
             Text(currentSeries.status == "completed"
                 ? ATHLTHLocalization.choose(english: "Completed", norwegian: "Fullført")
                 : currentSeries.status == "active"
