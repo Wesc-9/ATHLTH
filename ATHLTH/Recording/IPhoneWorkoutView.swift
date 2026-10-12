@@ -954,10 +954,7 @@ struct IPhoneWorkoutView: View {
                     )
 
                     if let ghostTitle =
-                            workout.ghostRaceTitle,
-                       let distanceDelta =
-                            workout
-                                .ghostDistanceDeltaMeters {
+                            workout.ghostRaceTitle {
                         Section("Ghost") {
                             HStack(
                                 alignment:
@@ -986,25 +983,30 @@ struct IPhoneWorkoutView: View {
 
                                 Spacer()
 
-                                Text(
-                                    liveGhostText(
-                                        distanceDelta
-                                    )
-                                )
-                                .font(
-                                    .title3
-                                        .weight(.bold)
-                                )
-                                .monospacedDigit()
-                                .foregroundStyle(
-                                    abs(distanceDelta) <
-                                        8
-                                        ? .secondary
-                                        : distanceDelta >= 0
-                                            ? ATHLTHTheme
-                                                .vitality
-                                            : .orange
-                                )
+                                if let distanceDelta =
+                                        workout.ghostDistanceDeltaMeters,
+                                   distanceDelta.isFinite {
+                                    Text(liveGhostText(distanceDelta))
+                                        .font(.title3.weight(.bold))
+                                        .monospacedDigit()
+                                        .foregroundStyle(
+                                            abs(distanceDelta) < 8
+                                                ? .secondary
+                                                : distanceDelta >= 0
+                                                    ? ATHLTHTheme.vitality : .orange
+                                        )
+                                } else if realtime.selectedLiveGhostSessionID != nil {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Waiting for fresh GPS",
+                                        norwegian: "Venter på fersk GPS"
+                                    ))
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.orange)
+                                    .multilineTextAlignment(.trailing)
+                                } else {
+                                    Text("—")
+                                        .foregroundStyle(.secondary)
+                                }
                             }
 
                             if let timeDelta =
