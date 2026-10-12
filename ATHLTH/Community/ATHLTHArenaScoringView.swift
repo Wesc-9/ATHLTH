@@ -385,6 +385,95 @@ struct ATHLTHArenaScoringSection: View {
         }
     }
 
+    /// Read-only personal snapshot. Member points are server-settled:
+    /// a Live Ghost finish or a pending vote cannot contribute.
+    @ViewBuilder
+    private var personalScoreCard: some View {
+        if let member = personalStanding {
+            let points = ATHLTHArenaSeriesScorePresentation.visiblePoints(member.points)
+            let position = ATHLTHArenaSeriesScorePresentation.competitionRank(
+                for: member, among: rankedMembers
+            )
+            let behind = ATHLTHArenaSeriesScorePresentation.gapToLeader(
+                for: member, among: rankedMembers
+            )
+
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "person.crop.circle.fill")
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Your Arena standing",
+                        norwegian: "Din Arena-stilling"
+                    ))
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    Spacer(minLength: 0)
+                    Text(series.status == "completed"
+                        ? ATHLTHLocalization.choose(
+                            english: "Final", norwegian: "Avsluttet"
+                          )
+                        : ATHLTHLocalization.choose(
+                            english: "Provisional", norwegian: "Foreløpig"
+                          ))
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                HStack(alignment: .firstTextBaseline, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(position.map { "#\($0)" } ?? "–")
+                            .font(.system(.title2, design: .rounded, weight: .bold))
+                            .monospacedDigit()
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Position", norwegian: "Plassering"
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(points.formatted()) p")
+                            .font(.system(.title2, design: .rounded, weight: .bold))
+                            .monospacedDigit()
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Approved points", norwegian: "Godkjente poeng"
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    Spacer(minLength: 0)
+                }
+
+                Text(points == 0
+                    ? ATHLTHLocalization.choose(
+                        english: "No approved points yet. Pending Live Ghost times and result proposals do not affect the standings.",
+                        norwegian: "Ingen godkjente poeng ennå. Ventende Live Ghost-tider og resultatforslag påvirker ikke stillingen."
+                      )
+                    : behind > 0.001
+                        ? ATHLTHLocalization.choose(
+                            english: "\(behind.formatted()) points behind the lead. Only participant-approved results count.",
+                            norwegian: "\(behind.formatted()) poeng bak ledelsen. Kun deltaker-godkjente resultater teller."
+                          )
+                        : ATHLTHLocalization.choose(
+                            english: "You share or hold the lead on approved points.",
+                            norwegian: "Du leder eller deler ledelsen basert på godkjente poeng."
+                          )
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(15)
+            .background(
+                ATHLTHTheme.vitalitySoft.opacity(0.42),
+                in: RoundedRectangle(cornerRadius: 18)
+            )
+            .accessibilityElement(children: .combine)
+        }
+    }
+
     /// Uses only authoritative round proposals and voted result status.
     /// A GPS activity or a pending result never turns the progress ring green.
     private var roundProgressCard: some View {
