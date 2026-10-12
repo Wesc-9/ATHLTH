@@ -184,6 +184,16 @@ enum ATHLTHLiveGhostRacingTelemetry {
 
     /// A synchronized duel must be backed by its exact Ghost challenge ID.
     /// Route-less legacy live follows keep their original fallback behavior.
+    /// Re-uploading an old CLLocation with a new server timestamp can
+    /// manufacture a live leader and permanent passing statistics.
+    static func freshLocalLocation(
+        capturedAt: Date,
+        now: Date = Date()
+    ) -> Bool {
+        let age = now.timeIntervalSince(capturedAt)
+        return age.isFinite && (-5...25).contains(age)
+    }
+
     static func matchesWorkout(
         challengeID: UUID?,
         selectedRouteKey: UUID?,
@@ -826,7 +836,11 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
               ATHLTHLiveGhostWorkoutBinding.accepts(
                   ghostChallengeID: session.ghostChallengeID,
                   comparisonRouteID: routeKey
-              )
+              ),
+              (session.ghostChallengeID == nil ||
+                ATHLTHLiveGhostRacingTelemetry.freshLocalLocation(
+                    capturedAt: location.timestamp
+                ))
         else {
             return
         }
