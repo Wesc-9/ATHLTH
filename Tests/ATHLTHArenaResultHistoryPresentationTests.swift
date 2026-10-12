@@ -337,4 +337,78 @@ final class ATHLTHArenaResultHistoryPresentationTests: XCTestCase {
             [firstID, secondID]
         )
     }
+    func testVoteControlsRequireFreshAcceptedActiveSeries() {
+        let roundID = UUID()
+        let viewer = UUID()
+        let proposal = result(roundID: roundID, status: "pending", age: 2)
+        let eligible: Set<UUID> = [viewer, UUID()]
+        XCTAssertTrue(ATHLTHArenaResultHistoryPresentation.canReviewVote(
+            result: proposal,
+            seriesStatus: "active",
+            resultsLoaded: true,
+            viewerID: viewer,
+            eligibleIDs: eligible,
+            votes: []
+        ))
+        XCTAssertFalse(ATHLTHArenaResultHistoryPresentation.canReviewVote(
+            result: proposal,
+            seriesStatus: "active",
+            resultsLoaded: false,
+            viewerID: viewer,
+            eligibleIDs: eligible,
+            votes: []
+        ))
+    }
+
+    func testCompletedOrDraftCompetitionCannotOfferStaleVote() {
+        let viewer = UUID()
+        let proposal = result(roundID: UUID(), status: "pending", age: 10)
+        for state in ["completed", "draft", "cancelled"] {
+            XCTAssertFalse(ATHLTHArenaResultHistoryPresentation.canReviewVote(
+                result: proposal,
+                seriesStatus: state,
+                resultsLoaded: true,
+                viewerID: viewer,
+                eligibleIDs: [viewer],
+                votes: []
+            ))
+        }
+    }
+
+    func testHistoricalApprovedOrExpiredProposalsCannotBeVotedAgain() {
+        let viewer = UUID()
+        for state in ["approved", "rejected", "expired", "unknown"] {
+            let proposal = result(roundID: UUID(), status: state, age: 20)
+            XCTAssertFalse(ATHLTHArenaResultHistoryPresentation.canReviewVote(
+                result: proposal,
+                seriesStatus: "active",
+                resultsLoaded: true,
+                viewerID: viewer,
+                eligibleIDs: [viewer],
+                votes: []
+            ))
+        }
+    }
+
+    func testAlreadyVotedOrIneligibleAthleteCannotReviewVote() {
+        let viewer = UUID()
+        let proposal = result(roundID: UUID(), status: "pending", age: 10)
+        XCTAssertFalse(ATHLTHArenaResultHistoryPresentation.canReviewVote(
+            result: proposal,
+            seriesStatus: "active",
+            resultsLoaded: true,
+            viewerID: viewer,
+            eligibleIDs: [UUID()],
+            votes: []
+        ))
+        XCTAssertFalse(ATHLTHArenaResultHistoryPresentation.canReviewVote(
+            result: proposal,
+            seriesStatus: "active",
+            resultsLoaded: true,
+            viewerID: viewer,
+            eligibleIDs: [viewer],
+            votes: [.init(resultID: proposal.id, userID: viewer, accepted: false)]
+        ))
+    }
+
 }
