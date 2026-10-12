@@ -132,4 +132,22 @@ final class ATHLTHAlwaysOnFocusTests: XCTestCase {
         XCTAssertEqual(readout.remaining ?? -1, 90, accuracy: 0.001)
         XCTAssertEqual(readout.progress ?? -1, 0.625, accuracy: 0.001)
     }
+    func testCyclingUsesMeasuredDistanceWithoutInventingIt() {
+        XCTAssertEqual(
+            ATHLTHAlwaysOnFocusResolver.resolve(
+                .init(kind: .cycling, recordedDistanceMeters: 3800)
+            ), .cyclingDistance
+        )
+        XCTAssertEqual(
+            ATHLTHAlwaysOnFocusResolver.resolve(
+                .init(kind: .cycling, recordedDistanceMeters: 0)
+            ), .elapsed
+        )
+        XCTAssertEqual(
+            ATHLTHAlwaysOnFocusResolver.resolve(
+                .init(kind: .cycling, recordedDistanceMeters: .nan)
+            ), .elapsed
+        )
+    }
+
 }

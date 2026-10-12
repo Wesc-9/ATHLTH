@@ -605,7 +605,8 @@ struct ATHLTHWorkoutLiveActivity: Widget {
             restEndsAt: context.state.strengthRestEndsAt,
             hasTimedSetCountdown:
                 context.state.strengthTimedSetSecondsAtSnapshot != nil,
-            hasRunningStep: context.state.runningStepTitle != nil
+            hasRunningStep: context.state.runningStepTitle != nil,
+            recordedDistanceMeters: context.state.distanceMeters
         )
     }
 
@@ -617,6 +618,7 @@ struct ATHLTHWorkoutLiveActivity: Widget {
         case .strengthSet: return "dumbbell.fill"
         case .runningInterval, .running: return "figure.run"
         case .walking: return "figure.walk"
+        case .cycling: return "figure.outdoor.cycle"
         case .elapsed: return context.attributes.systemImage
         }
     }
@@ -752,6 +754,13 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                     .font(.title2.weight(.bold))
                     .monospacedDigit()
                 Text(localized("Walking", "Gåtur"))
+                    .font(.caption.weight(.semibold))
+
+            case .cycling:
+                Text(distance(context.state.distanceMeters))
+                    .font(.title2.weight(.bold))
+                    .monospacedDigit()
+                Text(localized("Recorded cycling distance", "Målt sykkeldistanse"))
                     .font(.caption.weight(.semibold))
 
             case .elapsed:
@@ -1321,6 +1330,8 @@ struct ATHLTHWorkoutLiveActivity: Widget {
         case .running:
             return validPace(context.state.currentPaceSecondsPerKilometer)
         case .walking:
+            return distance(context.state.distanceMeters)
+        case .cycling:
             return distance(context.state.distanceMeters)
         case .elapsed:
             return duration(context.state.elapsedTime)

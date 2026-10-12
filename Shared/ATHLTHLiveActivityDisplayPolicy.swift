@@ -10,6 +10,7 @@ enum ATHLTHLiveActivityDisplayFocus: Equatable {
     case runningInterval
     case running
     case walking
+    case cycling
     case elapsed
 }
 
@@ -20,7 +21,8 @@ enum ATHLTHLiveActivityDisplayPolicy {
         hasStrengthExercise: Bool,
         restEndsAt: Date?,
         hasTimedSetCountdown: Bool,
-        hasRunningStep: Bool
+        hasRunningStep: Bool,
+        recordedDistanceMeters: Double? = nil
     ) -> ATHLTHLiveActivityDisplayFocus {
         if phase == "paused" { return .paused }
 
@@ -38,6 +40,12 @@ enum ATHLTHLiveActivityDisplayPolicy {
         switch kindRaw {
         case "running": return .running
         case "walking": return .walking
+        case "cycling":
+            if let meters = recordedDistanceMeters,
+               meters.isFinite, meters > 0 {
+                return .cycling
+            }
+            return .elapsed
         default: return .elapsed
         }
     }

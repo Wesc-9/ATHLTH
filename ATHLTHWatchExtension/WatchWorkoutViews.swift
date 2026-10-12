@@ -573,7 +573,7 @@ struct WatchActiveWorkoutView: View {
             HStack(spacing: 0) {
                 metric(
                     icon: "heart.fill",
-                    value: workoutManager.heartRate > 0
+                    value: workoutManager.hasFreshHeartRate
                         ? "\(Int(workoutManager.heartRate.rounded()))"
                         : "—",
                     label: "BPM"

@@ -103,4 +103,31 @@ final class ATHLTHLiveActivityDisplayPolicyTests: XCTestCase {
             ), 0
         )
     }
+    func testCyclingNeedsMeasuredDistanceForPrimaryMetric() {
+        XCTAssertEqual(
+            ATHLTHLiveActivityDisplayPolicy.resolve(
+                kindRaw: "cycling", phase: "running",
+                hasStrengthExercise: false, restEndsAt: nil,
+                hasTimedSetCountdown: false, hasRunningStep: false,
+                recordedDistanceMeters: 3250
+            ), .cycling
+        )
+        XCTAssertEqual(
+            ATHLTHLiveActivityDisplayPolicy.resolve(
+                kindRaw: "cycling", phase: "running",
+                hasStrengthExercise: false, restEndsAt: nil,
+                hasTimedSetCountdown: false, hasRunningStep: false,
+                recordedDistanceMeters: 0
+            ), .elapsed
+        )
+        XCTAssertEqual(
+            ATHLTHLiveActivityDisplayPolicy.resolve(
+                kindRaw: "cycling", phase: "running",
+                hasStrengthExercise: false, restEndsAt: nil,
+                hasTimedSetCountdown: false, hasRunningStep: false,
+                recordedDistanceMeters: .nan
+            ), .elapsed
+        )
+    }
+
 }

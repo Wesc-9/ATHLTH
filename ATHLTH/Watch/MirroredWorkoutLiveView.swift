@@ -87,7 +87,8 @@ struct MirroredWorkoutLiveView: View {
                                 )
 
                                 if snapshot.kind
-                                    .supportsDistanceMetric {
+                                    .supportsDistanceMetric &&
+                                    snapshot.kind != .cycling {
                                     metricCard(
                                         title:
                                             "Distance",
