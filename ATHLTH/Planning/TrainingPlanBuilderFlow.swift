@@ -7,6 +7,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     let startsAtSourceChoice: Bool
     let initialAdvanced: Bool
+    var onCreated: ((UUID) -> Void)? = nil
 
     @State private var step: BuilderStep
     @State private var mode: TrainingPlanBuilderMode
@@ -53,18 +54,21 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var showingAIBuilder = false
     @State private var dismissAfterAI = false
     @State private var didApplySuggestedStartDate = false
+    @State private var showingPlanDesignLab = false
 
     init(
         startsAtSourceChoice: Bool,
-        initialAdvanced: Bool
+        initialAdvanced: Bool,
+        onCreated: ((UUID) -> Void)? = nil
     ) {
+        self.onCreated = onCreated
         self.startsAtSourceChoice =
             startsAtSourceChoice
         self.initialAdvanced =
             initialAdvanced
         // The entry screen always offers three clear starting paths.
         // The existing basics/profile/week/review steps remain intact.
-        _step = State(initialValue: .source)
+        _step = State(initialValue: .mode)
         _mode = State(
             initialValue:
                 initialAdvanced
@@ -74,8 +78,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private enum BuilderStep: Int, CaseIterable {
-        case source
+        case mode
         case basics
+        case source
         case profile
         case week
         case review
@@ -295,9 +300,19 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 )
             )
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar(step == .source ? .hidden : .visible, for: .navigationBar)
+            .toolbar(step == .source || step == .mode ? .hidden : .visible, for: .navigationBar)
             .toolbar {
-                if step != .source {
+                #if DEBUG
+                if step != .source && step != .mode {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { showingPlanDesignLab = true } label: {
+                            Image(systemName: "paintpalette")
+                        }
+                        .accessibilityLabel("Plan Design Lab")
+                    }
+                }
+                #endif
+                if step != .source && step != .mode {
                     ToolbarItem(placement: .cancellationAction) {
                         Button(backButtonTitle) {
                             goBack()
@@ -308,7 +323,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             .safeAreaInset(edge: .bottom) {
                 if step == .source {
                     sourceContinueBar
-                } else {
+                } else if step != .mode {
                     bottomActionBar
                 }
             }
@@ -416,6 +431,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         } message: {
             Text(creationError ?? "")
         }
+        .sheet(isPresented: $showingPlanDesignLab) {
+            ATHLTHPlanDesignLabView()
+        }
         .sheet(
             isPresented: $showingAIBuilder,
             onDismiss: {
@@ -442,6 +460,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @ViewBuilder
     private var content: some View {
         switch step {
+        case .mode:
+            modeChoice
         case .source:
             sourceChoice
         case .basics:
@@ -473,7 +493,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 spacing: 16
             ) {
                 progressHeader
-                modeControl
                 content()
             }
             .padding(.horizontal, 18)
@@ -485,10 +504,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .scrollIndicators(.hidden)
     }
 
-    private let sourceInk = Color(red: 0.16, green: 0.16, blue: 0.16)
-    private let sourceMuted = Color(red: 0.43, green: 0.42, blue: 0.41)
-    private let sourceGold = Color(red: 0.64, green: 0.51, blue: 0.34)
-    private let sourceCanvas = Color(red: 0.991, green: 0.986, blue: 0.979)
+    private let sourceInk = ATHLTHPlanDesign.ink
+    private let sourceMuted = ATHLTHPlanDesign.secondaryInk
+    private let sourceGold = ATHLTHPlanDesign.accent
+    private let sourceCanvas = ATHLTHPlanDesign.canvas
 
     private var sourceChoice: some View {
         ScrollView {
@@ -523,12 +542,18 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 .padding(.bottom, 18)
                 .padding(.horizontal, 10)
 
-                sourceModePicker
-                    .padding(.bottom, 18)
-
-                HStack(alignment: .top, spacing: 7) {
+                VStack(spacing: 12) {
                     ForEach(SourceOption.allCases) { option in
-                        sourceSelectionCard(option)
+                        ATHLTHPlanSelectionCard(
+                            title: option.title,
+                            subtitle: option.subtitle,
+                            symbol: option.symbol,
+                            selected: selectedSource == option
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.16)) {
+                                selectedSource = option
+                            }
+                        }
                     }
                 }
             }
@@ -584,7 +609,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
                 Spacer(minLength: 0)
 
-                Text("1 / 5")
+                Text("\(stepDisplayNumber) / \(stepDisplayTotal)")
                     .font(.subheadline)
                     .monospacedDigit()
                     .foregroundStyle(sourceInk)
@@ -592,7 +617,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
 
             HStack(spacing: 5) {
-                ForEach(1...5, id: \.self) { index in
+                ForEach(1...stepDisplayTotal, id: \.self) { index in
                     Capsule()
                         .fill(
                             index == 1
@@ -1052,9 +1077,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 Text(
                     ATHLTHLocalization.choose(
                         english:
-                            "STEP \(step.number) OF 5",
+                            "STEP \(stepDisplayNumber) OF \(stepDisplayTotal)",
                         norwegian:
-                            "STEG \(step.number) AV 5"
+                            "STEG \(stepDisplayNumber) AV \(stepDisplayTotal)"
                     )
                 )
                 .font(.system(size: 9, weight: .bold))
@@ -1073,11 +1098,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
 
             HStack(spacing: 6) {
-                ForEach(1...5, id: \.self) {
+                ForEach(1...stepDisplayTotal, id: \.self) {
                     index in
                     Capsule()
                         .fill(
-                            index <= step.number
+                            index <= stepDisplayNumber
                                 ? ATHLTHTheme.accentDeep
                                 : ATHLTHTheme.accent
                                     .opacity(0.10)
@@ -1090,6 +1115,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     private var stepTitle: String {
         switch step {
+        case .mode:
+            return ATHLTHLocalization.choose(english: "Planning mode", norwegian: "Detaljnivå")
         case .source:
             return ATHLTHLocalization.choose(
                 english: "Choose a starting point",
@@ -3658,6 +3685,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     private var canContinue: Bool {
         switch step {
+        case .mode:
+            return true
         case .source:
             return true
         case .basics:
@@ -4348,6 +4377,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         // Open the real day-by-day planner directly after saving so the
         // user can immediately add exercises, edit days and review the week.
         createdPlanID = created.id
+        onCreated?(created.id)
         showingCreatedPlan = true
     }
 }
