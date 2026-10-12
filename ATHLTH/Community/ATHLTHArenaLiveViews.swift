@@ -3675,9 +3675,9 @@ struct ATHLTHArenaOnlineDetailView: View {
                 )
                 .id(remoteRevision)
 
-                if isGroupSeries && canParticipate {
+                if canParticipate {
                     NavigationLink {
-                        ATHLTHArenaGroupChatView(series: series)
+                        ATHLTHArenaGroupChatView(series: currentSeries)
                     } label: {
                         HStack(spacing: 12) {
                             Image(systemName: "bubble.left.and.bubble.right.fill")
@@ -3685,13 +3685,13 @@ struct ATHLTHArenaOnlineDetailView: View {
                                 .font(.title3)
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(ATHLTHLocalization.choose(
-                                    english: "Competition group chat",
-                                    norwegian: "Konkurransens gruppechat"
+                                    english: isGroupSeries ? "Competition group chat" : "Competition chat",
+                                    norwegian: isGroupSeries ? "Konkurransens gruppechat" : "Konkurransechat"
                                 ))
                                 .font(.subheadline.weight(.semibold))
                                 Text(ATHLTHLocalization.choose(
-                                    english: "Discuss proposals with the group",
-                                    norwegian: "Diskuter forslag med gruppen"
+                                    english: isGroupSeries ? "Discuss proposals with the group" : "Discuss the duel and approve results together",
+                                    norwegian: isGroupSeries ? "Diskuter forslag med gruppen" : "Diskuter duellen og godkjenn resultatet sammen"
                                 ))
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
@@ -4181,7 +4181,7 @@ struct ATHLTHArenaOnlineDetailView: View {
                         proxy: proxy
                     )
                 }
-                if isGroupSeries && canParticipate {
+                if canParticipate {
                     NavigationLink {
                         ATHLTHArenaGroupChatView(series: currentSeries)
                     } label: {
