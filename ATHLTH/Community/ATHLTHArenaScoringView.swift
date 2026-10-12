@@ -91,6 +91,33 @@ enum ATHLTHArenaResultHistoryPresentation {
         }
     }
 
+    /// Read-only count of distinct eligible athletes who accepted this
+    /// proposal. Old votes, rejected votes and former members do not count.
+    static func approvalCount(
+        resultID: UUID,
+        eligibleIDs: Set<UUID>,
+        votes: [ATHLTHArenaRoundResultVote]
+    ) -> Int {
+        Set(votes.filter {
+            $0.resultID == resultID &&
+            $0.accepted &&
+            eligibleIDs.contains($0.userID)
+        }.map(\.userID)).count
+    }
+
+    static func needsYourVote(
+        result: ATHLTHArenaRoundResult,
+        viewerID: UUID,
+        eligibleIDs: Set<UUID>,
+        votes: [ATHLTHArenaRoundResultVote]
+    ) -> Bool {
+        State.resolve(result.status) == .pending &&
+        eligibleIDs.contains(viewerID) &&
+        !votes.contains {
+            $0.resultID == result.id && $0.userID == viewerID
+        }
+    }
+
     static func recent(
         _ results: [ATHLTHArenaRoundResult],
         for roundIDs: Set<UUID>,
@@ -616,6 +643,38 @@ struct ATHLTHArenaScoringSection: View {
                             .font(.caption.weight(.medium))
                             .foregroundStyle(historyColor(state))
 
+                        if state == .pending {
+                            let approved = ATHLTHArenaResultHistoryPresentation.approvalCount(
+                                resultID: result.id,
+                                eligibleIDs: acceptedIDs,
+                                votes: votes
+                            )
+                            Text("\(approved)/\(acceptedIDs.count) " +
+                                ATHLTHLocalization.choose(
+                                    english: "approvals",
+                                    norwegian: "godkjenninger"
+                                ))
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+
+                            if ATHLTHArenaResultHistoryPresentation.needsYourVote(
+                                result: result,
+                                viewerID: session.profile.userID,
+                                eligibleIDs: acceptedIDs,
+                                votes: votes
+                            ) {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Your vote is needed – review the round below",
+                                        norwegian: "Din stemme mangler – se runden nedenfor"
+                                    ),
+                                    systemImage: "exclamationmark.circle"
+                                )
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.orange)
+                            }
+                        }
+
                         Text(result.createdAt.formatted(
                             date: .abbreviated, time: .shortened
                         ))
@@ -804,7 +863,7 @@ struct ATHLTHArenaScoringSection: View {
                     .foregroundStyle(ATHLTHTheme.mutedText)
                 evidenceConsistencyNotice(for: result, round: round)
                 if result.status == "pending" {
-                    Text("\(votes.filter { $0.resultID == result.id && $0.accepted && acceptedIDs.contains($0.userID) }.count)/\(acceptedIDs.count) " +
+                    Text("\(ATHLTHArenaResultHistoryPresentation.approvalCount(resultID: result.id, eligibleIDs: acceptedIDs, votes: votes))/\(acceptedIDs.count) " +
                          ATHLTHLocalization.choose(english: "approvals", norwegian: "godkjenninger"))
                         .font(.caption2)
                         .foregroundStyle(ATHLTHTheme.mutedText)
