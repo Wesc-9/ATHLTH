@@ -850,6 +850,28 @@ final class ATHLTHArenaCloudService: Sendable {
             .value
     }
 
+    /// Older completed series are loaded only when the athlete requests
+    /// more history. Keep the main Home/Community refresh at 100 entries
+    /// rather than querying the user's entire lifetime archive every minute.
+    func loadCompletedSeriesPage(
+        offset: Int,
+        pageSize: Int = 40
+    ) async throws -> [ATHLTHArenaRemoteSeries] {
+        guard currentUserID != nil else {
+            throw ATHLTHArenaCloudError.signInRequired
+        }
+        let start = max(0, offset)
+        let count = min(max(1, pageSize), 50)
+        return try await client
+            .from("arena_series")
+            .select()
+            .eq("status", value: "completed")
+            .order("created_at", ascending: false)
+            .range(from: start, to: start + count - 1)
+            .execute()
+            .value
+    }
+
     func loadClubSeasons() async throws -> [ATHLTHArenaClubSeason] {
         guard currentUserID != nil else { return [] }
         return try await client.from("arena_club_seasons")
