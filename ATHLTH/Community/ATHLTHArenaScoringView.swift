@@ -130,6 +130,8 @@ struct ATHLTHArenaScoringSection: View {
     @State private var votes: [ATHLTHArenaRoundResultVote] = []
     @State private var linkedWorkouts: [ATHLTHArenaWorkoutEvidence] = []
     @State private var loading = false
+    @State private var refreshQueued = false
+    @State private var showsAllResultHistory = false
     @State private var writing = false
     @State private var errorMessage: String?
     @State private var confirmStart = false
@@ -160,8 +162,17 @@ struct ATHLTHArenaScoringSection: View {
     private var recentResultHistory: [ATHLTHArenaRoundResult] {
         ATHLTHArenaResultHistoryPresentation.recent(
             results,
-            for: Set(rounds.map(\.id))
+            for: Set(rounds.map(\.id)),
+            limit: showsAllResultHistory ? results.count : 4
         )
+    }
+
+    private var hasMoreResultHistory: Bool {
+        ATHLTHArenaResultHistoryPresentation.recent(
+            results,
+            for: Set(rounds.map(\.id)),
+            limit: 5
+        ).count > 4
     }
 
     private var startReady: Bool {
@@ -545,12 +556,39 @@ struct ATHLTHArenaScoringSection: View {
                 .font(.subheadline.weight(.bold))
                 .foregroundStyle(ATHLTHTheme.primaryText)
                 Spacer(minLength: 0)
-                Text(ATHLTHLocalization.choose(
-                    english: "Last proposals",
-                    norwegian: "Siste forslag"
-                ))
-                .font(.caption2)
-                .foregroundStyle(ATHLTHTheme.mutedText)
+                if hasMoreResultHistory {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showsAllResultHistory.toggle()
+                        }
+                    } label: {
+                        Text(showsAllResultHistory
+                            ? ATHLTHLocalization.choose(
+                                english: "Show less", norwegian: "Vis færre"
+                              )
+                            : ATHLTHLocalization.choose(
+                                english: "View all", norwegian: "Se alle"
+                              ))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(showsAllResultHistory
+                        ? ATHLTHLocalization.choose(
+                            english: "Show only recent result proposals",
+                            norwegian: "Vis kun nylige resultatforslag"
+                          )
+                        : ATHLTHLocalization.choose(
+                            english: "Show complete result proposal history",
+                            norwegian: "Vis hele historikken over resultatforslag"
+                          ))
+                } else {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Last proposals", norwegian: "Siste forslag"
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
             }
 
             ForEach(recentResultHistory) { result in
@@ -980,24 +1018,40 @@ struct ATHLTHArenaScoringSection: View {
 
     @MainActor
     private func reload() async {
-        guard !loading else { return }
+        if loading {
+            // A vote may arrive during the in-flight read. Re-read once
+            // afterward rather than silently dropping the notification.
+            refreshQueued = true
+            return
+        }
+
         loading = true
         defer { loading = false }
-        do {
-            let loaded = try await cloud.loadRoundResults(seriesID: series.id)
-            let loadedVotes = try await cloud.loadResultVotes(resultIDs: loaded.map(\.id))
-            let loadedWorkouts = try await cloud.loadWorkoutEvidence(seriesID: series.id)
-            guard !Task.isCancelled else { return }
-            results = loaded
-            votes = loadedVotes
-            linkedWorkouts = loadedWorkouts
-            resultsLoaded = true
-            errorMessage = nil
-        } catch {
-            // Do not present last-known points progress as fresh on errors.
-            resultsLoaded = false
-            errorMessage = error.localizedDescription
-        }
+
+        repeat {
+            refreshQueued = false
+            do {
+                let loaded = try await cloud.loadRoundResults(seriesID: series.id)
+                let loadedVotes = try await cloud.loadResultVotes(
+                    resultIDs: loaded.map(\.id)
+                )
+                let loadedWorkouts = try await cloud.loadWorkoutEvidence(
+                    seriesID: series.id
+                )
+                guard !Task.isCancelled else { return }
+                results = loaded
+                votes = loadedVotes
+                linkedWorkouts = loadedWorkouts
+                resultsLoaded = true
+                errorMessage = nil
+            } catch {
+                if Task.isCancelled { return }
+                // Never present old result approvals as current after a
+                // network error. A queued read may still recover the data.
+                resultsLoaded = false
+                errorMessage = error.localizedDescription
+            }
+        } while refreshQueued && !Task.isCancelled
     }
 
     /// A newly completed Live Ghost race can only prepare a draft.
