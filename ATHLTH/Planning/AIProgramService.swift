@@ -89,6 +89,7 @@ struct AIProgramRequest: Encodable {
     let startDate: String
     let weekCount: Int
     let sessionsPerWeek: Int
+    let aiChoosesFrequency: Bool
     let preferredDays: [Int]
     let sessionDurationMinutes: Int
     let userNotes: String
