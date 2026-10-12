@@ -2905,6 +2905,11 @@ struct ATHLTHGhostRuntimeObserver: View {
             sendToWatch: true
         )
 
+        // Do not generate a new passing / audio cue from a paused
+        // watch. The local workout is still shown as paused while the
+        // connection status keeps updating independently.
+        guard snapshot.state == .running else { return }
+
         guard let comparison =
                 realtime
                     .liveGhostComparison(
@@ -2973,6 +2978,10 @@ struct ATHLTHGhostRuntimeObserver: View {
             session: selected,
             sendToWatch: false
         )
+
+        // A paused phone workout must not fire Ghost overtakes from
+        // stale distance while the rival continues running.
+        guard workout.resumedAt != nil else { return }
 
         guard let comparison =
                 realtime
