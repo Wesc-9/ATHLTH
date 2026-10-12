@@ -94,13 +94,28 @@ struct WatchRunHeartRateDetailPage: View {
                                 .monospacedDigit()
                         }
 
-                        if let status = workout.liveTargetStatus,
-                           !status.isEmpty {
-                            Text(status)
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(WatchTheme.textSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+                        let guidance = ATHLTHRunPulseTargetStatus.resolve(
+                            heartRate: workout.heartRate,
+                            minimum: target.heartRateMinimumBPM,
+                            maximum: target.heartRateMaximumBPM
+                        )
+                        Label(
+                            guidanceText(guidance),
+                            systemImage: guidance == .within
+                                ? "checkmark.circle.fill"
+                                : guidance == .below || guidance == .above
+                                    ? "exclamationmark.circle.fill"
+                                    : "waveform.path.ecg"
+                        )
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(
+                            guidance == .within
+                                ? WatchTheme.liveAction
+                                : guidance == .below || guidance == .above
+                                    ? WatchTheme.warning
+                                    : WatchTheme.muted
+                        )
+                        .fixedSize(horizontal: false, vertical: true)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(10)
@@ -131,6 +146,37 @@ struct WatchRunHeartRateDetailPage: View {
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .watchSurface(radius: 16)
+    }
+
+    private func guidanceText(_ status: ATHLTHRunPulseTargetStatus)
+        -> String {
+        switch status {
+        case .unavailable:
+            return ATHLTHLocalization.choose(
+                english: "Target not configured",
+                norwegian: "Pulsmål ikke konfigurert"
+            )
+        case .waiting:
+            return ATHLTHLocalization.choose(
+                english: "Waiting for heart rate",
+                norwegian: "Venter på puls"
+            )
+        case .below:
+            return ATHLTHLocalization.choose(
+                english: "Below target zone",
+                norwegian: "Under målsonen"
+            )
+        case .within:
+            return ATHLTHLocalization.choose(
+                english: "Within target zone",
+                norwegian: "Innenfor målsonen"
+            )
+        case .above:
+            return ATHLTHLocalization.choose(
+                english: "Above target zone",
+                norwegian: "Over målsonen"
+            )
+        }
     }
 
     private func bpm(_ value: Double?) -> String {

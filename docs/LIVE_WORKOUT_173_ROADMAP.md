@@ -72,3 +72,23 @@ Baseline: `release/v1.7.3`. Keep recording engines, workout ownership, iPhone/Wa
   automatic changes to active workout phase or user-selected page.
 - Next acceptance gate: successful iOS and watchOS compilation, followed
   by Watch screen-size and wrist-down tests.
+
+## Step 3 — interval, zone and Ghost/Arena focus
+
+- Structured running step gets a dedicated performance page showing step
+  name, remaining time/distance, progress, pace target, step time/distance and
+  next interval. Remaining value is resolved from existing Watch workout
+  elapsed time/distance, not a separately scheduled timer.
+- Open-ended intervals show an explicit untimed state, never a fabricated
+  countdown. Missing or invalid targets stay unavailable.
+- Watch pulse target screen shows below/within/above target only when the
+  range and measured heart rate are usable.
+- A separate Ghost/Arena page shows opponent identity, validated gap and
+  optionally verified progress. Paused, stale or unverified Ghost telemetry
+  cannot display the last known distance as a current lead.
+- Main metrics page preserves the current structured running step label even
+  when a Ghost/Arena opponent is connected.
+- Preserve navigation, Spotify, treadmill incline, audio coach and existing
+  HealthKit/route/Ghost engines.
+- Review actual watchOS/iPhone compilation and device-size layouts before
+  treating step 3 as completed.

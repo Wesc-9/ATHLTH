@@ -37,6 +37,12 @@ struct WatchRunWorkoutExperienceView: View {
                     planPage
                         .tag(1)
 
+                    if workoutManager.ghostRaceTitle != nil ||
+                       workoutManager.liveSurfaceContext.liveGhost != nil {
+                        WatchRunGhostFocusPage()
+                            .tag(9)
+                    }
+
                     WatchRunHeartRateDetailPage()
                         .tag(7)
 
@@ -1809,14 +1815,21 @@ struct WatchRunWorkoutExperienceView: View {
                         )
                 }
 
-                if workoutManager.liveSurfaceContext.liveGhost != nil {
+                if workoutManager.currentStructuredRunningStep != nil {
+                    // During intervals always keep the current step visible.
+                    // Ghost has a separate detailed page.
+                    Text(liveWorkoutStepTitle)
+                        .font(.system(size: compact ? 10 : 11,
+                                      weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.77))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                } else if workoutManager.liveSurfaceContext.liveGhost != nil {
                     liveGhostHeadline
                 } else {
                     Text(liveWorkoutStepTitle)
-                        .font(.system(
-                            size: compact ? 10 : 11,
-                            weight: .semibold
-                        ))
+                        .font(.system(size: compact ? 10 : 11,
+                                      weight: .semibold))
                         .foregroundStyle(Color.white.opacity(0.72))
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
@@ -2154,10 +2167,8 @@ struct WatchRunWorkoutExperienceView: View {
                 workoutManager
                     .currentStructuredRunningStep,
            !workout.steps.isEmpty {
-            structuredPlanPage(
-                workout: workout,
-                step: step
-            )
+            WatchRunIntervalFocusPage()
+                .environmentObject(workoutManager)
         } else {
             freeRunPage
         }
