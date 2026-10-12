@@ -74,6 +74,24 @@ final class ATHLTHLiveGhostWatchSignalTests: XCTestCase {
         XCTAssertEqual(signal(context(progress: nil, opponentProgress: nil)), .live)
     }
 
+    func testInvalidatingGapKeepsOpponentAndOriginalTimestamp() {
+        let initial = context()
+        let invalid = initial.withoutUnverifiedGap()
+        XCTAssertNil(invalid.distanceDeltaMeters)
+        XCTAssertNil(invalid.estimatedTimeDeltaSeconds)
+        XCTAssertEqual(invalid.opponentName, initial.opponentName)
+        XCTAssertEqual(invalid.connectionText, initial.connectionText)
+        XCTAssertEqual(invalid.updatedAt, initial.updatedAt)
+        XCTAssertEqual(signal(invalid), .waiting)
+    }
+
+    func testInvalidatingGapIsIdempotentDuringRepeatedReconnect() {
+        let initial = context()
+        let once = initial.withoutUnverifiedGap()
+        XCTAssertEqual(once, once.withoutUnverifiedGap())
+        XCTAssertFalse(signal(once).mayAnnouncePassing)
+    }
+
     func testClockSkewAndMissingUpdatesNeverShowLivePass() {
         XCTAssertEqual(signal(context(age: -6)), .delayed)
         XCTAssertEqual(signal(context(age: .infinity)), .delayed)
