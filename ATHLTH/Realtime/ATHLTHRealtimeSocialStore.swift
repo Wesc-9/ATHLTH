@@ -1208,7 +1208,12 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
               ownDistanceMeters.isFinite,
               ownDistanceMeters >= 0,
               ownElapsedSeconds.isFinite,
-              ownElapsedSeconds >= 0
+              ownElapsedSeconds >= 0,
+              // An unrelated route is never equivalent just because its
+              // accumulated distance happens to be the same.
+              ownRouteKey == nil ||
+                selectedSession.routeKey == nil ||
+                ownRouteKey == selectedSession.routeKey
         else {
             return nil
         }
@@ -1230,9 +1235,9 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             ownRouteKey ==
                 selectedSession.routeKey
         let routeAccuracyOK =
-            (ownRouteDeviationMeters ?? 0) <=
+            (ownRouteDeviationMeters.flatMap { $0.isFinite ? $0 : nil } ?? 0) <=
                 routeAwareMaximumDeviationMeters &&
-            (livePoint.routeDeviationMeters ?? 0) <=
+            (livePoint.routeDeviationMeters.flatMap { $0.isFinite ? $0 : nil } ?? 0) <=
                 routeAwareMaximumDeviationMeters &&
             (
                 livePoint.horizontalAccuracy == nil ||
