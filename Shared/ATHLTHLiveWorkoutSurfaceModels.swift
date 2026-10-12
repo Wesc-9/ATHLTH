@@ -149,6 +149,54 @@ struct ATHLTHLiveGhostContext: Codable, Hashable {
         ATHLTHLiveGhostAudioContext? = nil
 }
 
+/// Presentation-only validity for synchronized Ghost telemetry on Watch.
+/// A previously shown lead is not live evidence after a pause or a lost
+/// connection. HealthKit recording and any final result remain independent.
+enum ATHLTHLiveGhostWatchSignal: Equatable {
+    case live
+    case paused
+    case delayed
+    case waiting
+
+    var mayAnnouncePassing: Bool { self == .live }
+
+    static func resolve(
+        context: ATHLTHLiveGhostContext?,
+        isPaused: Bool,
+        now: Date = Date()
+    ) -> Self {
+        guard let context else { return .waiting }
+        if isPaused { return .paused }
+
+        let connection = context.connectionText?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased()
+        guard connection == "LIVE" else {
+            return connection == nil || connection == "WAITING"
+                ? .waiting : .delayed
+        }
+
+        let age = now.timeIntervalSince(context.updatedAt)
+        guard age.isFinite, (-5...18).contains(age) else {
+            return .delayed
+        }
+        guard let distance = context.distanceDeltaMeters,
+              distance.isFinite,
+              abs(distance) <= 500_000,
+              let own = context.ownProgressPercent,
+              let rival = context.opponentProgressPercent,
+              own.isFinite, rival.isFinite,
+              (0...100).contains(own),
+              (0...100).contains(rival)
+        else {
+            // A live socket without a trustworthy race gap remains waiting
+            // for a route comparison rather than inventing a lead.
+            return .waiting
+        }
+        return .live
+    }
+}
+
 struct ATHLTHLiveWorkoutContext: Codable, Hashable {
     var challenge: ATHLTHLiveChallengeContext?
     var liveShare: ATHLTHLiveShareContext?
