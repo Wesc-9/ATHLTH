@@ -8,7 +8,7 @@ Baseline: `release/v1.7.3`. Keep recording engines, workout ownership, iPhone/Wa
 2. **Apple Watch strength (in progress)** — Distinct active-set, countdown, rest, exercise-queue and status pages; Crown input and explicit set completion; preserve warm-up, zero weight, resistance-level and RPE/RIR rules.
 3. **Apple Watch running** — Readable pace/distance, structured interval, pulse/zone, route, Ghost/Arena, Audio Coach and controls; only relevant pages shown; no surprise auto-swipes.
 4. **Always-On (in progress)** — Single low-power, read-only presentation selected by activity and phase, including accurate rest countdown. No animations, sensitive details policy, stale-data treatment and small-screen testing.
-5. **iPhone live workout** — Activity-first hero metric and details, aligned with Watch; strength, run, treadmill, intervals and companion mode.
+5. **iPhone live workout (in progress)** — Activity-first hero metric and details, aligned with Watch; strength, run, treadmill, intervals and companion mode.
 6. **Lock Screen / Dynamic Island** — Use existing Live Activity infrastructure and phase-specific compact/expanded variants; terminate cleanly when workout ends.
 7. **Other workout modes** — Walking, HIIT, cycling, functional, rowing, stairs, yoga; never show irrelevant or unmeasured metrics.
 8. **Personalization and accessibility** — Primary metric, preferred pages, strong contrast, readable long exercise names, haptics and AOD privacy.
@@ -117,3 +117,24 @@ Baseline: `release/v1.7.3`. Keep recording engines, workout ownership, iPhone/Wa
   small/large watches, physical wrist-down power/refresh checks and
   Watch/phone offline continuity. Do not call battery performance
   validated without physical measurement.
+
+
+## Step 5 — iPhone hierarchy and mirrored strength (increment 1)
+
+- Mirror mode: run pace is the primary hero measurement; walking uses
+  distance. Current step name/progress remain close to the hero.
+- Mirrored Watch time, distance/pace, pulse and optional treadmill incline
+  are secondary cards, not oversized headline figures.
+- Watch sample timestamps gate live heart rate and current pace on the phone.
+  If live pace is unavailable, an appropriately labelled measured average is
+  used only when the workout has recorded distance/time.
+- Mirrored strength gets a noninteractive current exercise panel with set,
+  reps/weight or rest-ready countdown. Only the Watch/strength engine owns
+  recording and completion.
+- Phone-owned running panel promotes pace, retains distance/time as secondary
+  metrics, and presents treadmill incline as contextual information.
+- Small, reversible presentation-only changes; HealthKit, GPS, sets,
+  Ghost, navigation, audio and workout controls remain owned by their
+  existing stores. No TestFlight deployment requested.
+- Remaining before completion: focused iPhone strength layout physical QA,
+  shared interval phase consistency, iPad sizing, and compile/test gates.

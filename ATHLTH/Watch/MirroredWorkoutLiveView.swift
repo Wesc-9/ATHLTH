@@ -38,12 +38,13 @@ struct MirroredWorkoutLiveView: View {
                             )
                         }
 
-                        if snapshot.kind ==
-                            .running {
-                            runningDashboard(
-                                snapshot
-                            )
+                        if snapshot.kind == .running ||
+                           snapshot.kind == .walking {
+                            runningDashboard(snapshot)
                         } else {
+                            if snapshot.kind == .strength {
+                                mirroredStrengthSummary(snapshot)
+                            }
                             timer(snapshot)
 
                             HStack(
@@ -815,216 +816,277 @@ struct MirroredWorkoutLiveView: View {
 
     @ViewBuilder
     private func runningDashboard(
-        _ snapshot:
-            WatchWorkoutLiveSnapshot
+        _ snapshot: WatchWorkoutLiveSnapshot
     ) -> some View {
-        VStack(spacing: 12) {
+        let hierarchy = ATHLTHPhoneLiveHierarchyResolver.resolve(
+            kind: snapshot.kind
+        )
+        let walkFirst = hierarchy.primary == .distance
+        let freshPace = ATHLTHCoachSensorFreshness.validPace(
+            snapshot.currentPaceSecondsPerKilometer,
+            sampledAt: snapshot.coachPaceSampleAt
+        )
+        let currentPace = freshPace
+            ? snapshot.currentPaceSecondsPerKilometer : nil
+        let averagePace = averageRunningPaceText(snapshot)
+        let paceLabel = currentPace != nil
+            ? ATHLTHLocalization.choose(
+                english: "PACE", norwegian: "TEMPO"
+              )
+            : ATHLTHLocalization.choose(
+                english: "AVERAGE PACE", norwegian: "SNITTEMPO"
+              )
+        let paceValue = currentPace.map(paceText) ?? averagePace
+        let distance = snapshot.distanceMeters.isFinite
+            ? max(snapshot.distanceMeters, 0) : 0
+
+        return VStack(spacing: 12) {
             ATHLTHCard {
-                VStack(spacing: 4) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "TIME",
-                            norwegian: "TID"
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Label(
+                            walkFirst
+                                ? ATHLTHLocalization.choose(
+                                    english: "WALKING", norwegian: "GÅTUR"
+                                  )
+                                : ATHLTHLocalization.choose(
+                                    english: "RUNNING", norwegian: "LØPING"
+                                  ),
+                            systemImage: walkFirst ? "figure.walk" : "figure.run"
                         )
-                    )
-                    .font(
-                        .caption
-                            .weight(.bold)
-                    )
-                    .tracking(1.4)
-                    .foregroundStyle(
-                        .secondary
-                    )
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
 
-                    TimelineView(
-                        .periodic(
-                            from: .now,
-                            by: 1
+                        Spacer(minLength: 5)
+
+                        Label(
+                            statusTitle(snapshot.state),
+                            systemImage: statusIcon(snapshot.state)
                         )
-                    ) { context in
-                        Text(
-                            durationText(
-                                displayedElapsedTime(
-                                    snapshot:
-                                        snapshot,
-                                    now:
-                                        context.date
-                                )
-                            )
-                        )
-                        .font(
-                            .system(
-                                size: 80,
-                                weight: .bold,
-                                design:
-                                    .rounded
-                            )
-                        )
-                        .monospacedDigit()
-                        .minimumScaleFactor(
-                            0.72
-                        )
-                        .lineLimit(1)
-                        .frame(
-                            maxWidth:
-                                .infinity
-                        )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(statusColor(snapshot.state))
                     }
-                }
-                .padding(.vertical, 8)
-            }
 
-            HStack(spacing: 12) {
-                runningMetric(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english:
-                                "DISTANCE",
-                            norwegian:
-                                "DISTANSE"
-                        ),
-                    value:
-                        String(
-                            format: "%.2f",
-                            snapshot
-                                .distanceMeters /
-                            1_000
-                        ),
-                    unit: "km"
-                )
+                    if let step = snapshot.runningStepTitle,
+                       !step.isEmpty {
+                        HStack(spacing: 7) {
+                            Image(systemName: "timer")
+                                .foregroundStyle(ATHLTHTheme.accent)
+                            Text(step)
+                                .lineLimit(1)
+                            Spacer(minLength: 0)
+                            if let index = snapshot.runningStepIndex,
+                               let count = snapshot.runningStepCount,
+                               count > 0 {
+                                Text("\(min(max(index + 1, 1), count))/\(count)")
+                                    .monospacedDigit()
+                            }
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
 
-                runningMetric(
-                    title:
-                        snapshot.currentPaceSecondsPerKilometer == nil &&
-                        snapshot.distanceMeters >= 20 &&
-                        snapshot.elapsedTime > 0
+                        if let progress = snapshot.runningStepProgress,
+                           progress.isFinite {
+                            ProgressView(value: min(max(progress, 0), 1))
+                                .tint(ATHLTHTheme.accent)
+                        }
+                    }
+
+                    Text(
+                        walkFirst
                             ? ATHLTHLocalization.choose(
-                                english: "AVERAGE PACE",
-                                norwegian: "SNITTEMPO"
-                            )
-                            : ATHLTHLocalization.choose(
-                                english: "PACE",
-                                norwegian: "TEMPO"
-                            ),
-                    value:
-                        runningPaceText(
-                            snapshot
-                        ),
-                    unit: "/km"
-                )
+                                english: "DISTANCE", norwegian: "DISTANSE"
+                              )
+                            : paceLabel
+                    )
+                    .font(.caption.weight(.bold))
+                    .tracking(1.1)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    HStack(alignment: .firstTextBaseline, spacing: 7) {
+                        Text(
+                            walkFirst
+                                ? String(format: "%.2f", distance / 1_000)
+                                : paceValue
+                        )
+                        .font(.system(size: 67, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .minimumScaleFactor(0.55)
+                        .lineLimit(1)
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        Text(walkFirst ? "km" : "/km")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+
+                    Text(
+                        snapshot.treadmillInclinePercent != nil
+                            ? ATHLTHLocalization.choose(
+                                english: "Live from Watch · treadmill",
+                                norwegian: "Direkte fra klokke · tredemølle"
+                              )
+                            : mirroring.connectionText
+                    )
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 4)
             }
 
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 runningMetric(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english:
-                                "HEART RATE",
-                            norwegian:
-                                "PULS"
-                        ),
-                    value:
-                        snapshot.heartRate >
-                            0
-                            ? "\(Int(snapshot.heartRate.rounded()))"
-                            : "—",
+                    title: walkFirst ? paceLabel : ATHLTHLocalization.choose(
+                        english: "DISTANCE", norwegian: "DISTANSE"
+                    ),
+                    value: walkFirst
+                        ? paceValue : String(format: "%.2f", distance / 1_000),
+                    unit: walkFirst ? "/km" : "km"
+                )
+
+                ATHLTHCard {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "ELAPSED", norwegian: "TID"
+                        ))
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                        TimelineView(.periodic(from: .now, by: 1)) { context in
+                            Text(durationText(displayedElapsedTime(
+                                snapshot: snapshot, now: context.date
+                            )))
+                            .font(.system(size: 31, weight: .bold,
+                                          design: .rounded))
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                        }
+
+                        Text(ATHLTHLocalization.choose(
+                            english: "Workout time", norwegian: "Økttid"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 92,
+                           alignment: .leading)
+                }
+            }
+
+            HStack(spacing: 10) {
+                let heartFresh = ATHLTHCoachSensorFreshness.validHeartRate(
+                    snapshot.heartRate,
+                    sampledAt: snapshot.coachHeartRateSampleAt
+                )
+                runningMetric(
+                    title: ATHLTHLocalization.choose(
+                        english: "HEART RATE", norwegian: "PULS"
+                    ),
+                    value: heartFresh
+                        ? "\(Int(snapshot.heartRate.rounded()))" : "—",
                     unit: "bpm"
                 )
 
-                if let incline =
-                        snapshot
-                            .treadmillInclinePercent {
+                if let incline = snapshot.treadmillInclinePercent {
                     Button {
-                        treadmillInclineDraft =
-                            incline
-                        showingTreadmillInclineEditor =
-                            true
+                        treadmillInclineDraft = incline
+                        showingTreadmillInclineEditor = true
                     } label: {
                         runningMetric(
-                            title:
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "INCLINE",
-                                    norwegian:
-                                        "STIGNING"
-                                ),
-                            value:
-                                String(
-                                    format: "%.1f",
-                                    incline
-                                ),
+                            title: ATHLTHLocalization.choose(
+                                english: "INCLINE", norwegian: "STIGNING"
+                            ),
+                            value: String(format: "%.1f", incline),
                             unit: "%"
                         )
                     }
                     .buttonStyle(.plain)
                     .accessibilityHint(
                         ATHLTHLocalization.choose(
-                            english:
-                                "Adjust treadmill incline",
-                            norwegian:
-                                "Juster stigning på tredemøllen"
+                            english: "Adjust treadmill incline",
+                            norwegian: "Juster stigning"
                         )
                     )
                 }
             }
 
-            HStack(spacing: 7) {
-                Image(
-                    systemName:
-                        snapshot
-                            .treadmillInclinePercent !=
-                            nil
-                            ? "figure.run.treadmill"
-                            : "applewatch"
-                )
-
-                Text(
-                    snapshot
-                        .treadmillInclinePercent !=
-                        nil
-                        ? ATHLTHLocalization.choose(
-                            english:
-                                "Treadmill · live from Apple Watch",
-                            norwegian:
-                                "Tredemølle · live fra Apple Watch"
-                        )
-                        : mirroring
-                            .connectionText
-                )
-                .font(
-                    .caption
-                        .weight(
-                            .semibold
-                        )
-                )
-
-                Spacer()
-
+            if let next = snapshot.runningNextStepTitle, !next.isEmpty {
                 Label(
-                    statusTitle(
-                        snapshot.state
+                    ATHLTHLocalization.choose(
+                        english: "Next: \(next)", norwegian: "Neste: \(next)"
                     ),
-                    systemImage:
-                        statusIcon(
-                            snapshot.state
-                        )
+                    systemImage: "arrow.forward.circle"
                 )
-                .font(
-                    .caption
-                        .weight(
-                            .semibold
-                        )
-                )
-                .foregroundStyle(
-                    statusColor(
-                        snapshot.state
-                    )
-                )
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .foregroundStyle(
-                .secondary
-            )
-            .padding(.horizontal, 4)
+        }
+    }
+
+    @ViewBuilder
+    private func mirroredStrengthSummary(
+        _ snapshot: WatchWorkoutLiveSnapshot
+    ) -> some View {
+        if let exercise = snapshot.strengthExerciseName {
+            ATHLTHCard {
+                VStack(alignment: .leading, spacing: 9) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "CURRENT EXERCISE",
+                            norwegian: "AKTUELL ØVELSE"
+                        ),
+                        systemImage: "dumbbell.fill"
+                    )
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                    Text(exercise)
+                        .font(.title2.weight(.bold))
+                        .lineLimit(2)
+
+                    if let ends = snapshot.strengthRestEndsAt {
+                        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+                            let remaining = max(ends.timeIntervalSince(timeline.date), 0)
+                            Text(remaining > 0
+                                ? durationText(remaining)
+                                : ATHLTHLocalization.choose(
+                                    english: "READY", norwegian: "KLAR"
+                                  ))
+                                .font(.system(size: 44, weight: .bold,
+                                              design: .rounded))
+                                .monospacedDigit()
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                        }
+                    } else if let reps = snapshot.strengthReps {
+                        Text("\(reps) reps")
+                            .font(.system(size: 43, weight: .bold,
+                                          design: .rounded))
+                            .monospacedDigit()
+                    }
+
+                    HStack {
+                        if let index = snapshot.strengthSetIndex,
+                           let count = snapshot.strengthSetCount,
+                           count > 0 {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Set \(min(max(index + 1, 1), count)) of \(count)",
+                                norwegian: "Sett \(min(max(index + 1, 1), count)) av \(count)"
+                            ))
+                        }
+                        Spacer(minLength: 0)
+                        if let weight = snapshot.strengthWeightKilograms {
+                            Text(String(format: "%.1f kg", weight))
+                        }
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
     }
 
@@ -1055,7 +1117,7 @@ struct MirroredWorkoutLiveView: View {
                 Text(value)
                     .font(
                         .system(
-                            size: 58,
+                            size: 31,
                             weight: .bold,
                             design: .rounded
                         )
@@ -1079,7 +1141,7 @@ struct MirroredWorkoutLiveView: View {
             }
             .frame(
                 maxWidth: .infinity,
-                minHeight: 148,
+                minHeight: 92,
                 alignment: .leading
             )
         }
