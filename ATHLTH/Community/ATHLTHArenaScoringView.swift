@@ -1135,9 +1135,6 @@ struct ATHLTHArenaScoringSection: View {
     @ViewBuilder
     private func resultRow(_ round: ATHLTHArenaRemoteProposal) -> some View {
         let result = results.first { $0.roundID == round.id && $0.status != "rejected" }
-        let myVote = result.flatMap { record in
-            votes.first { $0.resultID == record.id && $0.userID == session.profile.userID }
-        }
         VStack(alignment: .leading, spacing: 9) {
             HStack {
                 Text(round.title)
