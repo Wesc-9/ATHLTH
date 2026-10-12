@@ -9,7 +9,9 @@ struct ATHLTHProfileHeroIdentityView: View {
     let trainingFocus: String?
     let bio: String?
 
-    static let reservedHeight: CGFloat = 120
+    // Compact the unused bio space so the bottom-aligned hero identity
+    // sits lower, clear of Dynamic Island, without moving the stat row.
+    static let reservedHeight: CGFloat = 108
 
     private var visibleFocus: String? {
         let text = trainingFocus?
@@ -67,7 +69,7 @@ struct ATHLTHProfileHeroIdentityView: View {
             }
             .font(.caption)
             .lineLimit(2)
-            .frame(height: 44, alignment: .topLeading)
+            .frame(height: 32, alignment: .topLeading)
             .clipped()
         }
         .frame(height: Self.reservedHeight, alignment: .topLeading)
