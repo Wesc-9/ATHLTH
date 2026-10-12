@@ -2232,11 +2232,60 @@ private struct CommunityEventListRow: View {
     }
 }
 
+/// Lightweight translucent glass styling for Community event detail surfaces.
+/// No blur-heavy bitmap processing: uses SwiftUI material and gradients.
+private struct CommunityEventGhostSurface: ViewModifier {
+    var cornerRadius: CGFloat = 24
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(
+            cornerRadius: cornerRadius,
+            style: .continuous
+        )
+
+        content
+            .background {
+                shape
+                    .fill(.ultraThinMaterial)
+                    .overlay {
+                        shape.fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.68),
+                                    Color.white.opacity(0.32),
+                                    ATHLTHTheme.vitality.opacity(0.045)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    }
+            }
+            .overlay {
+                shape.strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.96),
+                            Color.white.opacity(0.46)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+            }
+            .shadow(
+                color: ATHLTHTheme.accentDeep.opacity(0.09),
+                radius: 14,
+                x: 0,
+                y: 6
+            )
+    }
+}
+
 struct CommunityEventDetailView: View {
     @EnvironmentObject private var community: CommunityEventStore
     @EnvironmentObject private var session: AppSessionStore
-    @EnvironmentObject private var calendarSync:
-        AppleCalendarSyncStore
 
     let eventID: UUID
 
@@ -2325,8 +2374,6 @@ struct CommunityEventDetailView: View {
         false
     @State private var meetingDistanceMeters:
         CLLocationDistance?
-    @State private var calendarSaved = false
-    @State private var calendarMessage: String?
 
     var body: some View {
         ScrollView {
@@ -2377,32 +2424,32 @@ struct CommunityEventDetailView: View {
             .hidden,
             for: .navigationBar
         )
-        .alert(
-            ATHLTHLocalization.choose(
-                english:
-                    "Calendar",
-                norwegian:
-                    "Kalender"
-            ),
-            isPresented:
-                Binding(
-                    get: {
-                        calendarMessage != nil
-                    },
-                    set: { presented in
-                        if !presented {
-                            calendarMessage = nil
-                        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                if let item = community.item(id: eventID) {
+                    ShareLink(item: eventShareText(item)) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .frame(width: 44, height: 44)
+                            .background(.ultraThinMaterial, in: Circle())
+                            .overlay {
+                                Circle()
+                                    .strokeBorder(
+                                        Color.white.opacity(0.88),
+                                        lineWidth: 1
+                                    )
+                            }
                     }
-                )
-        ) {
-            Button("OK", role: .cancel) {
-                calendarMessage = nil
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        ATHLTHLocalization.choose(
+                            english: "Share event",
+                            norwegian: "Del arrangement"
+                        )
+                    )
+                }
             }
-        } message: {
-            Text(
-                calendarMessage ?? ""
-            )
         }
         .sheet(
             isPresented: $showingEditEvent
@@ -2557,6 +2604,19 @@ struct CommunityEventDetailView: View {
         return tabs
     }
 
+    /// Consistent ghost treatment for the event overview, weather, route,
+    /// check-in, competition and participant surfaces.
+    private func eventGhostCard<Content: View>(
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            content()
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .modifier(CommunityEventGhostSurface(cornerRadius: 24))
+    }
+
     private func eventTabBar(
         _ item: CommunityEventItem
     ) -> some View {
@@ -2612,16 +2672,25 @@ struct CommunityEventDetailView: View {
                     )
                     .background(
                         selectedTab == tab
-                            ? ATHLTHTheme
-                                .vitalitySoft
+                            ? ATHLTHTheme.vitality.opacity(0.15)
                             : Color.clear,
-                        in:
+                        in: RoundedRectangle(
+                            cornerRadius: 14,
+                            style: .continuous
+                        )
+                    )
+                    .overlay {
+                        if selectedTab == tab {
                             RoundedRectangle(
                                 cornerRadius: 14,
-                                style:
-                                    .continuous
+                                style: .continuous
                             )
-                    )
+                            .strokeBorder(
+                                Color.white.opacity(0.9),
+                                lineWidth: 0.9
+                            )
+                        }
+                    }
                     .contentShape(
                         Rectangle()
                     )
@@ -2633,30 +2702,7 @@ struct CommunityEventDetailView: View {
             }
         }
         .padding(5)
-        .background(
-            Color.white.opacity(0.97),
-            in:
-                RoundedRectangle(
-                    cornerRadius: 19,
-                    style: .continuous
-                )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 19,
-                style: .continuous
-            )
-            .stroke(
-                Color.black.opacity(0.055),
-                lineWidth: 0.7
-            )
-        }
-        .shadow(
-            color:
-                Color.black.opacity(0.055),
-            radius: 9,
-            y: 4
-        )
+        .modifier(CommunityEventGhostSurface(cornerRadius: 19))
     }
 
     @ViewBuilder
@@ -2864,7 +2910,7 @@ struct CommunityEventDetailView: View {
         _ item: CommunityEventItem
     ) -> some View {
         if eventWeatherCoordinate(item) != nil {
-            ATHLTHCard {
+            eventGhostCard {
                 HStack(
                     alignment: .top,
                     spacing: 12
@@ -3052,7 +3098,7 @@ struct CommunityEventDetailView: View {
            let metric =
                 item.event
                     .competitionMetric {
-            ATHLTHCard {
+            eventGhostCard {
                 HStack(
                     alignment: .top,
                     spacing: 12
@@ -3180,7 +3226,7 @@ struct CommunityEventDetailView: View {
                 alignment: .leading,
                 spacing: 16
             ) {
-                ATHLTHCard {
+                eventGhostCard {
                     HStack(
                         alignment: .top,
                         spacing: 12
@@ -3379,7 +3425,7 @@ struct CommunityEventDetailView: View {
                     }
                 }
 
-                ATHLTHCard {
+                eventGhostCard {
                     HStack {
                         Text(
                             ATHLTHLocalization.choose(
@@ -3667,7 +3713,7 @@ struct CommunityEventDetailView: View {
         _ item: CommunityEventItem
     ) -> some View {
         if let route = eventRoute(item) {
-            ATHLTHCard {
+            eventGhostCard {
                 HStack(
                     alignment: .firstTextBaseline
                 ) {
@@ -3746,7 +3792,7 @@ struct CommunityEventDetailView: View {
                     item.event
                         .routeTitle?
                         .nilIfBlank {
-            ATHLTHCard {
+            eventGhostCard {
                 Text(
                     ATHLTHLocalization.choose(
                         english: "The route",
@@ -3777,7 +3823,7 @@ struct CommunityEventDetailView: View {
                 alignment: .leading,
                 spacing: 16
             ) {
-                ATHLTHCard {
+                eventGhostCard {
                     HStack {
                         VStack(
                             alignment: .leading,
@@ -3850,7 +3896,7 @@ struct CommunityEventDetailView: View {
                 alignment: .leading,
                 spacing: 16
             ) {
-                ATHLTHCard {
+                eventGhostCard {
                     Text(
                         ATHLTHLocalization.choose(
                             english: "Event route",
@@ -3903,7 +3949,7 @@ struct CommunityEventDetailView: View {
                 profiles.prefix(4)
             )
 
-        return ATHLTHCard {
+        return eventGhostCard {
             HStack {
                 VStack(
                     alignment: .leading,
@@ -4213,8 +4259,6 @@ struct CommunityEventDetailView: View {
             .font(.caption.weight(.semibold))
             .foregroundStyle(.secondary)
 
-            eventQuickActions(item)
-
             actionButton(item)
 
             if let eventActionMessage {
@@ -4226,123 +4270,7 @@ struct CommunityEventDetailView: View {
             }
         }
         .padding(18)
-        .background(
-            ATHLTHTheme.surfaceSage,
-            in:
-                RoundedRectangle(
-                    cornerRadius: 24,
-                    style: .continuous
-                )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-            .stroke(
-                Color.white.opacity(0.72),
-                lineWidth: 0.8
-            )
-        }
-        .shadow(
-            color:
-                Color.black.opacity(0.045),
-            radius: 12,
-            y: 5
-        )
-    }
-
-    private func eventQuickActions(
-        _ item: CommunityEventItem
-    ) -> some View {
-        HStack(spacing: 8) {
-            Button {
-                Task {
-                    let saved =
-                        await calendarSync
-                            .addCommunityEvent(
-                                item,
-                                currentUserID:
-                                    session.profile
-                                        .userID
-                            )
-
-                    calendarSaved = saved
-
-                    if !saved {
-                        calendarMessage =
-                            calendarSync
-                                .errorMessage ??
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "ATHLTH could not add this event to Calendar.",
-                                norwegian:
-                                    "ATHLTH klarte ikke å legge arrangementet til i Kalender."
-                            )
-                    }
-                }
-            } label: {
-                Label(
-                    calendarSaved
-                        ? ATHLTHLocalization.choose(
-                            english:
-                                "Added",
-                            norwegian:
-                                "Lagt til"
-                        )
-                        : ATHLTHLocalization.choose(
-                            english:
-                                "Calendar",
-                            norwegian:
-                                "Kalender"
-                        ),
-                    systemImage:
-                        calendarSaved
-                            ? "calendar.badge.checkmark"
-                            : "calendar.badge.plus"
-                )
-                .font(
-                    .caption
-                        .weight(.semibold)
-                )
-                .frame(
-                    maxWidth: .infinity
-                )
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .tint(
-                ATHLTHTheme.vitality
-            )
-
-            ShareLink(
-                item:
-                    eventShareText(
-                        item
-                    )
-            ) {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "Share",
-                        norwegian: "Del"
-                    ),
-                    systemImage:
-                        "square.and.arrow.up"
-                )
-                .font(
-                    .caption
-                        .weight(.semibold)
-                )
-                .frame(
-                    maxWidth: .infinity
-                )
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .tint(
-                ATHLTHTheme.vitality
-            )
-        }
+        .modifier(CommunityEventGhostSurface(cornerRadius: 24))
     }
 
     private func eventShareText(
@@ -4667,7 +4595,7 @@ struct CommunityEventDetailView: View {
         _ item: CommunityEventItem,
         includeRoute: Bool = true
     ) -> some View {
-        ATHLTHCard {
+        eventGhostCard {
             Text("Details")
                 .font(.headline)
 
@@ -4841,7 +4769,7 @@ struct CommunityEventDetailView: View {
                 )
             }
 
-            ATHLTHCard {
+            eventGhostCard {
                 HStack {
                     Text(
                         ATHLTHLocalization.choose(
@@ -4897,7 +4825,7 @@ struct CommunityEventDetailView: View {
                 }
             }
 
-            ATHLTHCard {
+            eventGhostCard {
                 HStack {
                     Text(
                         ATHLTHLocalization.choose(
@@ -4984,7 +4912,7 @@ struct CommunityEventDetailView: View {
             }
 
             if !checkedIn.isEmpty {
-                ATHLTHCard {
+                eventGhostCard {
                     HStack {
                         Text(
                             ATHLTHLocalization.choose(
@@ -5047,7 +4975,7 @@ struct CommunityEventDetailView: View {
             }
 
             if !maybe.isEmpty {
-                ATHLTHCard {
+                eventGhostCard {
                     HStack {
                         Text(
                             ATHLTHLocalization.choose(
@@ -5320,7 +5248,7 @@ struct CommunityEventDetailView: View {
         if isHost ||
             hasResponse ||
             item.checkedInCount > 0 {
-            ATHLTHCard {
+            eventGhostCard {
                 HStack {
                     VStack(
                         alignment: .leading,
@@ -6042,7 +5970,7 @@ struct CommunityEventDetailView: View {
                 }
                 .count
 
-        ATHLTHCard {
+        eventGhostCard {
             HStack {
                 VStack(
                     alignment: .leading,
@@ -6649,7 +6577,7 @@ struct CommunityEventDetailView: View {
                     8
                 )
 
-            ATHLTHCard {
+            eventGhostCard {
                 HStack {
                     VStack(
                         alignment: .leading,
@@ -6911,7 +6839,7 @@ struct CommunityEventDetailView: View {
                     1_000
             )
 
-        return ATHLTHCard {
+        return eventGhostCard {
             VStack(
                 alignment: .leading,
                 spacing: 14
