@@ -2951,6 +2951,7 @@ struct ATHLTHGhostRuntimeObserver: View {
                                 .routeDeviationMeters
                     )
         else {
+            invalidateLiveGhostGap(sendToWatch: true)
             return
         }
 
@@ -3038,6 +3039,8 @@ struct ATHLTHGhostRuntimeObserver: View {
                                 .routeDeviationMeters
                     )
         else {
+            phoneWorkout.clearLiveGhostGap()
+            invalidateLiveGhostGap(sendToWatch: false)
             return
         }
 
@@ -3443,6 +3446,26 @@ struct ATHLTHGhostRuntimeObserver: View {
                 .sendLiveSurfaceContext(
                     context
                 )
+        }
+    }
+
+    /// An unavailable or untrusted GPS match is not a lead. Keep the
+    /// live opponent and connection-state card while removing obsolete
+    /// distances/time deltas, including cached Watch surface context.
+    @MainActor
+    private func invalidateLiveGhostGap(sendToWatch: Bool) {
+        var context = ATHLTHLiveWorkoutContextStore.load()
+        guard var liveGhost = context.liveGhost,
+              liveGhost.distanceDeltaMeters != nil ||
+                liveGhost.estimatedTimeDeltaSeconds != nil
+        else { return }
+
+        liveGhost.distanceDeltaMeters = nil
+        liveGhost.estimatedTimeDeltaSeconds = nil
+        context.liveGhost = liveGhost
+        ATHLTHLiveWorkoutContextStore.save(context)
+        if sendToWatch {
+            watchConnection.sendLiveSurfaceContext(context)
         }
     }
 
