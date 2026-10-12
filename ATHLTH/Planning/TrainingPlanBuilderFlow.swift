@@ -3227,9 +3227,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         subtitle:
                             ATHLTHLocalization.choose(
                                 english:
-                                    "ATHLTH Coach starts with your focus, goal, training days, limitations and available time.",
+                                    "ATHLTH Coach uses your focus, goal, available days and time. Training limitations are shared with AI only if you opt in.",
                                 norwegian:
-                                    "ATHLTH Coach starter med fokus, mål, treningsdager, hensyn og tiden du har tilgjengelig."
+                                    "ATHLTH Coach bruker fokus, mål, tilgjengelige dager og tid. Treningshensyn deles kun med AI dersom du godkjenner dette."
                             ),
                         icon: "sparkles",
                         prominent: true
