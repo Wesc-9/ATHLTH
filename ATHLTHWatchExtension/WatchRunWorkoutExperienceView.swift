@@ -1801,14 +1801,18 @@ struct WatchRunWorkoutExperienceView: View {
                         )
                 }
 
-                Text(liveWorkoutStepTitle)
-                    .font(.system(
-                        size: compact ? 10 : 11,
-                        weight: .semibold
-                    ))
-                    .foregroundStyle(Color.white.opacity(0.72))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                if workoutManager.liveSurfaceContext.liveGhost != nil {
+                    liveGhostHeadline
+                } else {
+                    Text(liveWorkoutStepTitle)
+                        .font(.system(
+                            size: compact ? 10 : 11,
+                            weight: .semibold
+                        ))
+                        .foregroundStyle(Color.white.opacity(0.72))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
 
                 liveHeroMetric(
                     title: livePaceIsAverage ? "AVG PACE" : "PACE",
@@ -1858,6 +1862,55 @@ struct WatchRunWorkoutExperienceView: View {
             .background(WatchTheme.liveCanvas)
         }
         .background(WatchTheme.liveCanvas.ignoresSafeArea())
+    }
+
+    /// One scan-friendly line replaces the workout subtitle during a duel.
+    /// Pace and distance keep their full-size positions on compact Watches.
+    private var liveGhostHeadline: some View {
+        TimelineView(.periodic(from: .now, by: 5)) { timeline in
+            let ghost = workoutManager.liveSurfaceContext.liveGhost
+            let signal = ATHLTHLiveGhostWatchSignal.resolve(
+                context: ghost,
+                isPaused: workoutManager.state == .paused ||
+                    workoutManager.automaticPauseActive,
+                now: timeline.date
+            )
+            HStack(spacing: 4) {
+                Image(systemName: signal == .live
+                    ? "figure.run" : "wifi.exclamationmark")
+                if signal == .live,
+                   let gap = ghost?.distanceDeltaMeters,
+                   gap.isFinite {
+                    Text(abs(gap) < 8
+                        ? ATHLTHLocalization.choose(
+                            english: "SIDE BY SIDE", norwegian: "JEVNT LØP"
+                          )
+                        : (gap > 0
+                            ? ATHLTHLocalization.choose(
+                                english: "YOU LEAD", norwegian: "DU LEDER"
+                              )
+                            : ATHLTHLocalization.choose(
+                                english: "RIVAL LEADS", norwegian: "MOTSTANDER LEDER"
+                              )))
+                    Text("\(Int(abs(gap).rounded())) m")
+                        .monospacedDigit()
+                } else {
+                    Text(signal == .paused
+                        ? ATHLTHLocalization.choose(
+                            english: "DUEL PAUSED", norwegian: "DUELL PAUSET"
+                          )
+                        : ATHLTHLocalization.choose(
+                            english: "RIVAL GPS DELAYED", norwegian: "MOTSTANDERS GPS FORSINKET"
+                          ))
+                }
+                Spacer(minLength: 0)
+            }
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(signal == .live
+                ? WatchTheme.liveLime : Color.orange)
+            .lineLimit(1)
+            .minimumScaleFactor(0.74)
+        }
     }
 
     private var liveDisplayedPace: TimeInterval? {
@@ -3348,75 +3401,75 @@ struct WatchRunWorkoutExperienceView: View {
     }
 
     private var ghostCard: some View {
-        VStack(
-            alignment: .leading,
-            spacing: 5
-        ) {
-            HStack {
-                Label(
-                    "GHOST",
-                    systemImage:
-                        "figure.run.circle.fill"
-                )
-                .font(
-                    .system(
-                        size: 9,
-                        weight: .bold
+        TimelineView(.periodic(from: .now, by: 5)) { timeline in
+            let liveGhost = workoutManager.liveSurfaceContext.liveGhost
+            let signal = ATHLTHLiveGhostWatchSignal.resolve(
+                context: liveGhost,
+                isPaused: workoutManager.state == .paused ||
+                    workoutManager.automaticPauseActive,
+                now: timeline.date
+            )
+            let showGap = liveGhost == nil || signal == .live
+            VStack(alignment: .leading, spacing: 5) {
+                HStack {
+                    Label(
+                        liveGhost == nil
+                            ? "GHOST"
+                            : (signal == .live
+                                ? ATHLTHLocalization.choose(
+                                    english: "LIVE DUEL", norwegian: "LIVE DUELL"
+                                  )
+                                : ATHLTHLocalization.choose(
+                                    english: "RIVAL GPS DELAYED", norwegian: "GPS FORSINKET"
+                                  )),
+                        systemImage: showGap
+                            ? "figure.run.circle.fill" : "wifi.exclamationmark"
                     )
-                )
-                .foregroundStyle(
-                    WatchTheme.accent
-                )
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(showGap ? WatchTheme.accent : .orange)
 
-                Spacer()
+                    Spacer()
 
-                if let timeDelta =
-                        workoutManager
-                            .ghostTimeDeltaSeconds {
-                    Text(
-                        ghostTimeText(
-                            timeDelta
-                        )
-                    )
-                    .font(
-                        .system(
-                            size: 11,
-                            weight: .bold
-                        )
-                    )
-                    .monospacedDigit()
+                    if showGap,
+                       let timeDelta = workoutManager.ghostTimeDeltaSeconds,
+                       timeDelta.isFinite {
+                        Text(ghostTimeText(timeDelta))
+                            .font(.system(size: 11, weight: .bold))
+                            .monospacedDigit()
+                    }
                 }
+
+                if showGap,
+                   let gap = workoutManager.ghostDistanceDeltaMeters,
+                   gap.isFinite {
+                    Text(ghostDistanceText(gap))
+                        .font(.system(
+                            size: 20, weight: .bold, design: .rounded
+                        ))
+                        .monospacedDigit()
+                } else {
+                    Text(signal == .paused
+                        ? ATHLTHLocalization.choose(
+                            english: "Workout paused", norwegian: "Økten er pauset"
+                          )
+                        : ATHLTHLocalization.choose(
+                            english: "Waiting for fresh GPS", norwegian: "Venter på fersk GPS"
+                          ))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.orange)
+                }
+
+                Text(
+                    liveGhost?.opponentName ??
+                    workoutManager.ghostRaceTitle ?? "Target"
+                )
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(WatchTheme.muted)
+                .lineLimit(1)
             }
-
-            Text(
-                ghostDistanceText(
-                    workoutManager
-                        .ghostDistanceDeltaMeters
-                )
-            )
-            .font(
-                .system(
-                    size: 18,
-                    weight: .bold,
-                    design: .rounded
-                )
-            )
-
-            Text(
-                workoutManager
-                    .ghostRaceTitle ??
-                    "Target"
-            )
-            .font(
-                .system(size: 8)
-            )
-            .foregroundStyle(
-                WatchTheme.muted
-            )
-            .lineLimit(1)
+            .padding(10)
+            .watchSurface(radius: 17)
         }
-        .padding(10)
-        .watchSurface(radius: 17)
     }
 
     // MARK: - Page 5: controls
