@@ -1531,6 +1531,7 @@ enum WatchTransferKind: String {
     case route
     case workoutResult
     case workoutActivityState
+    case workoutActivityQuery
     case workoutStartGuard
     case workoutCommand
     case workoutRouteSelection
