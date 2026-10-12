@@ -182,6 +182,14 @@ enum ATHLTHLiveGhostRacingTelemetry {
         return ownerID
     }
 
+    static func acceptableDeviation(
+        _ meters: Double?,
+        maximum: Double
+    ) -> Bool {
+        guard let meters else { return true }
+        return meters.isFinite && (0...maximum).contains(meters)
+    }
+
     static func canCompare(
         updatedAt: Date,
         expiresAt: Date,
@@ -1235,10 +1243,14 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             ownRouteKey ==
                 selectedSession.routeKey
         let routeAccuracyOK =
-            (ownRouteDeviationMeters.flatMap { $0.isFinite ? $0 : nil } ?? 0) <=
-                routeAwareMaximumDeviationMeters &&
-            (livePoint.routeDeviationMeters.flatMap { $0.isFinite ? $0 : nil } ?? 0) <=
-                routeAwareMaximumDeviationMeters &&
+            ATHLTHLiveGhostRacingTelemetry.acceptableDeviation(
+                ownRouteDeviationMeters,
+                maximum: routeAwareMaximumDeviationMeters
+            ) &&
+            ATHLTHLiveGhostRacingTelemetry.acceptableDeviation(
+                livePoint.routeDeviationMeters,
+                maximum: routeAwareMaximumDeviationMeters
+            ) &&
             (
                 livePoint.horizontalAccuracy == nil ||
                 (livePoint.horizontalAccuracy ?? 0) <= 50
