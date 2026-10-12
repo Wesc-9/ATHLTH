@@ -175,7 +175,7 @@ struct ATHLTHArenaScoringSection: View {
                           : rank == 1 ? "trophy.fill" : "person.crop.circle.fill")
                         .foregroundStyle(member.isDeleted ? Color.gray : ATHLTHTheme.accentDeep)
                     Text(memberName(member))
-                        .font(.subheadline.weight(index == 0 ? .semibold : .regular))
+                        .font(.subheadline.weight(rank == 1 ? .semibold : .regular))
                         .foregroundStyle(member.isDeleted ? Color.gray : ATHLTHTheme.primaryText)
                     Spacer()
                     Text("\(ATHLTHArenaSeriesScorePresentation.visiblePoints(member.points).formatted()) p")
@@ -227,8 +227,12 @@ struct ATHLTHArenaScoringSection: View {
             if series.status == "completed",
                series.completionReason != "deadline_unresolved",
                let first = rankedMembers.first,
-               first.points > 0 {
-                let champions = rankedMembers.filter { $0.points == first.points }
+               ATHLTHArenaSeriesScorePresentation.visiblePoints(first.points) > 0 {
+                let champions = rankedMembers.filter {
+                    ATHLTHArenaSeriesScorePresentation.competitionRank(
+                        for: $0, among: rankedMembers
+                    ) == 1
+                }
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 12) {
                         Image(systemName: "crown.fill")
