@@ -1,0 +1,202 @@
+import SwiftUI
+
+/// Transparently separates completed, skipped, upcoming and unreviewed past
+/// workouts, without guessing completion or changing saved workouts.
+struct ATHLTHPlanWeeklyFollowThroughView: View {
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var strength: StrengthWorkoutStore
+
+    let plan: TrainingPlan
+    let onSelect: (UUID, UUID?) -> Void
+    @State private var showsAll = false
+
+    var body: some View {
+        let report = ATHLTHPlanWeeklyFollowThrough.inspect(
+            plan: plan,
+            store: session,
+            healthWorkouts: health.workouts,
+            strengthHistory: strength.workoutHistory
+        )
+        let relevant = report.relevantWeeks
+
+        ATHLTHPlanSurface {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("ATHLTH / WEEKLY REVIEW")
+                    .font(.caption2.weight(.semibold))
+                    .tracking(1.8)
+                    .foregroundStyle(ATHLTHPlanDesign.accent)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "What happened this week?",
+                    norwegian: "Hva har skjedd i treningsuken?"
+                ))
+                .font(.system(size: 23, weight: .semibold, design: .serif))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Confirmed activity, skipped workouts and future sessions are separated. Past sessions without a recorded result are shown for review, not marked as failures.",
+                    norwegian: "Fullførte økter, økter du har hoppet over og kommende økter holdes adskilt. Tidligere økter uten registrert resultat vises for gjennomgang, ikke som mislykkede."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if report.total == 0 {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "No planned workouts to review yet.",
+                        norwegian: "Ingen planlagte økter å gjennomgå ennå."
+                    ),
+                    systemImage: "calendar"
+                )
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            } else {
+                VStack(alignment: .leading, spacing: 11) {
+                    HStack(spacing: 13) {
+                        metric(
+                            report.completed,
+                            label: ATHLTHLocalization.choose(
+                                english: "Completed", norwegian: "Fullført"
+                            )
+                        )
+                        metric(
+                            report.upcoming,
+                            label: ATHLTHLocalization.choose(
+                                english: "Upcoming", norwegian: "Kommende"
+                            )
+                        )
+                        metric(
+                            report.needsReview,
+                            label: ATHLTHLocalization.choose(
+                                english: "Review", norwegian: "Gjennomgå"
+                            )
+                        )
+                        Spacer(minLength: 0)
+                    }
+                    .padding(12)
+                    .background(
+                        ATHLTHPlanDesign.selectedSurface,
+                        in: RoundedRectangle(
+                            cornerRadius: ATHLTHPlanDesign.fieldRadius
+                        )
+                    )
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "\(report.skipped) skipped · \(report.unknownDate) without plan dates. Today's unfinished sessions are still upcoming.",
+                        norwegian: "\(report.skipped) hoppet over · \(report.unknownDate) uten plandato. Dagens ufullførte økter regnes fortsatt som kommende."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                    if report.needsReview > 0 {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "\(report.needsReview) past sessions have no confirmed result. Review these days to decide whether a recording needs linking or the plan needs updating.",
+                                norwegian: "\(report.needsReview) tidligere økter mangler bekreftet resultat. Gå gjennom dagene for å se om en registrering må kobles eller planen bør oppdateres."
+                            ),
+                            systemImage: "info.circle"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    ForEach(Array(relevant.prefix(
+                        showsAll ? relevant.count : 4
+                    ))) { week in
+                        Button {
+                            onSelect(week.id, week.firstReviewDayID)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "W\(week.number)",
+                                    norwegian: "U\(week.number)"
+                                ))
+                                .font(.subheadline.weight(.semibold))
+                                .monospacedDigit()
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                                .frame(width: 40, alignment: .leading)
+
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "\(week.completed) completed · \(week.upcoming) upcoming",
+                                        norwegian: "\(week.completed) fullført · \(week.upcoming) kommende"
+                                    ))
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                                    if week.needsReview > 0 {
+                                        Text(ATHLTHLocalization.choose(
+                                            english: "\(week.needsReview) to review · open related day",
+                                            norwegian: "\(week.needsReview) til gjennomgang · åpne dagen"
+                                        ))
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    } else {
+                                        Text(ATHLTHLocalization.choose(
+                                            english: "\(week.skipped) skipped · \(week.unknownDate) undated",
+                                            norwegian: "\(week.skipped) hoppet over · \(week.unknownDate) uten dato"
+                                        ))
+                                        .font(.caption2)
+                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                    }
+                                }
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                    .accessibilityHidden(true)
+                            }
+                            .padding(.vertical, 8)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint(ATHLTHLocalization.choose(
+                            english: "Open this week or a past workout day to review, without changing the plan.",
+                            norwegian: "Åpne uken eller en tidligere økt til gjennomgang, uten å endre planen."
+                        ))
+                    }
+
+                    if relevant.count > 4 {
+                        Button {
+                            showsAll.toggle()
+                        } label: {
+                            Label(
+                                showsAll
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Show fewer weeks",
+                                        norwegian: "Vis færre uker"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Show all \(relevant.count) weeks",
+                                        norwegian: "Vis alle \(relevant.count) uker"
+                                    ),
+                                systemImage: showsAll
+                                    ? "chevron.up" : "chevron.down"
+                            )
+                        }
+                        .font(.subheadline.weight(.medium))
+                        .buttonStyle(.bordered)
+                    }
+                }
+            }
+        }
+    }
+
+    private func metric(_ number: Int, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("\(number)")
+                .font(.system(size: 24, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}

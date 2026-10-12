@@ -79,6 +79,19 @@ struct AdvancedPlannerView: View {
                         }
                         studioSection = .week
                     }
+                    ATHLTHPlanWeeklyFollowThroughView(plan: plan) { weekID, dayID in
+                        selectedWeekID = weekID
+                        if let week = plan.weeks.first(where: { $0.id == weekID }) {
+                            if let dayID,
+                               week.days.contains(where: { $0.id == dayID }) {
+                                selectedDayID = dayID
+                                studioSection = .day
+                            } else {
+                                selectedDayID = week.days.first?.id
+                                studioSection = .week
+                            }
+                        }
+                    }
                     recentStrengthEvidence(plan)
                     ATHLTHPlanReviewSuggestionsView(plan: plan) { weekID, dayID in
                         selectedWeekID = weekID
