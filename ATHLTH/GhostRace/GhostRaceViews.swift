@@ -3455,14 +3455,12 @@ struct ATHLTHGhostRuntimeObserver: View {
     @MainActor
     private func invalidateLiveGhostGap(sendToWatch: Bool) {
         var context = ATHLTHLiveWorkoutContextStore.load()
-        guard var liveGhost = context.liveGhost,
+        guard let liveGhost = context.liveGhost,
               liveGhost.distanceDeltaMeters != nil ||
                 liveGhost.estimatedTimeDeltaSeconds != nil
         else { return }
 
-        liveGhost.distanceDeltaMeters = nil
-        liveGhost.estimatedTimeDeltaSeconds = nil
-        context.liveGhost = liveGhost
+        context.liveGhost = liveGhost.withoutUnverifiedGap()
         ATHLTHLiveWorkoutContextStore.save(context)
         if sendToWatch {
             watchConnection.sendLiveSurfaceContext(context)
