@@ -217,14 +217,6 @@ struct ExerciseLibraryView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 10) {
-                            if selectedSection == .library &&
-                               query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-                               selectedBodyPart == "All" &&
-                               selectedEquipment == "All" &&
-                               !favoritesOnly {
-                                coreEssentialsSection
-                            }
-
                             ForEach(
                                 displayedResults
                             ) { entry in
@@ -675,119 +667,6 @@ struct ExerciseLibraryView: View {
                     .opacity(0.72),
             in: Capsule()
         )
-    }
-
-    // A shelf of 20 NEW ATHLTH-authored core movements from the ATHLTH
-    // catalog. Illustrations are locally rendered original vectors, not
-    // copies of RepDB photographs or third-party image assets.
-    private var coreEssentialsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 6) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "NEW IN ATHLTH",
-                        norwegian: "NYTT I ATHLTH"
-                    ))
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.3)
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-
-                    Text(ATHLTHLocalization.choose(
-                        english: "20 new core exercises",
-                        norwegian: "20 nye mageøvelser"
-                    ))
-                    .font(.headline.weight(.bold))
-                    .foregroundStyle(.primary)
-                }
-
-                Spacer(minLength: 0)
-
-                VStack(alignment: .trailing, spacing: 3) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "New exercises",
-                        norwegian: "Nye øvelser"
-                    ))
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    Text("\(library.featuredCoreExercises.count) / 20")
-                        .font(.caption.weight(.semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                }
-            }
-            .padding(.horizontal, 6)
-
-            if !library.featuredCoreExercises.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 10) {
-                        ForEach(library.featuredCoreExercises) { entry in
-                            NavigationLink {
-                                ExerciseDetailView(
-                                    entry: entry,
-                                    selectionTitle: selectionTitle,
-                                    onSelect: onSelect
-                                )
-                            } label: {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    ExerciseArtwork(entry: entry, size: 94)
-                                        .frame(maxWidth: .infinity)
-
-                                    Text(library.localizedExerciseName(entry))
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(.primary)
-                                        .lineLimit(2)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                                    Text(library.localizedBodyPartTitle(entry.bodyPart ?? "Core"))
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
-                                }
-                                .padding(10)
-                                .frame(width: 142, height: 169, alignment: .topLeading)
-                                .background(
-                                    ATHLTHTheme.card,
-                                    in: RoundedRectangle(
-                                        cornerRadius: 19, style: .continuous
-                                    )
-                                )
-                                .overlay {
-                                    RoundedRectangle(
-                                        cornerRadius: 19, style: .continuous
-                                    )
-                                    .stroke(Color.white.opacity(0.78), lineWidth: 0.8)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.horizontal, 4)
-                }
-                .contentMargins(.horizontal, 2)
-            } else {
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.down.circle")
-                    Text(ATHLTHLocalization.choose(
-                        english: "New ATHLTH exercises will appear when the ATHLTH catalog refreshes. Pull down to retry.",
-                        norwegian: "De nye ATHLTH-øvelsene vises når øvelseskatalogen er oppdatert. Dra ned for å prøve igjen."
-                    ))
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(12)
-            }
-
-            if let url = URL(string: "https://repdb.co") {
-                Link(destination: url) {
-                    Label("Exercise data by RepDB", systemImage: "arrow.up.right")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 6)
-            }
-        }
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func recordExerciseSelection(_ entry: ExerciseLibraryEntry) {
