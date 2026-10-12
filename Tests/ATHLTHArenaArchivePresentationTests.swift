@@ -104,7 +104,7 @@ final class ATHLTHArenaArchivePresentationTests: XCTestCase {
         let results = ATHLTHArenaArchivePresentation.visible(
             [saved], filter: .all, search: "ARENA ROUTE"
         )
-        XCTAssertEqual(results.map(\\.id), [saved.id])
+        XCTAssertEqual(results.map(\.id), [saved.id])
     }
 
     func testArchiveSearchNormalizesNorwegianDiacritics() {
@@ -125,7 +125,7 @@ final class ATHLTHArenaArchivePresentationTests: XCTestCase {
         XCTAssertEqual(
             ATHLTHArenaArchivePresentation.visible(
                 [saved], filter: .all, search: "Tromso"
-            ).map(\\.id), [saved.id]
+            ).map(\.id), [saved.id]
         )
     }
 
@@ -137,7 +137,7 @@ final class ATHLTHArenaArchivePresentationTests: XCTestCase {
         XCTAssertEqual(
             ATHLTHArenaArchivePresentation.visible(
                 [unresolved], filter: .unresolved, search: "ARENA"
-            ).map(\\.id), [unresolved.id]
+            ).map(\.id), [unresolved.id]
         )
     }
 
