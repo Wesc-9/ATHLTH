@@ -68,6 +68,8 @@ struct ActiveStrengthWorkoutView: View {
                                 workout: workout,
                                 exercise: exercise
                             )
+                            .frame(maxWidth: 720)
+                            .frame(maxWidth: .infinity)
                             .padding(
                                 .horizontal,
                                 16
@@ -3135,70 +3137,167 @@ struct ActiveStrengthWorkoutView: View {
     private func focusedWorkoutStatus(
         _ workout: StrengthWorkoutLog
     ) -> some View {
-        HStack(spacing: 10) {
-            VStack(
-                alignment: .leading,
-                spacing: 2
-            ) {
-                Text(workout.title)
-                    .font(
-                        .subheadline
-                            .weight(.semibold)
+        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+            let timer = strength.currentTimedSetCountdown
+            let totalSets = max(
+                workout.exercises.reduce(0) { $0 + $1.sets.count }, 1
+            )
+            let completed = min(max(workout.totalCompletedSets, 0), totalSets)
+            let phase = ATHLTHPhoneStrengthPhaseResolver.resolve(
+                workoutComplete: workout.exercises.allSatisfy { $0.isCompleted },
+                exerciseComplete: strength.currentExerciseAllSetsCompleted,
+                isResting: strength.isResting,
+                restEndsAt: strength.restEndsAt,
+                isTimedSet: strength.currentSet?.resolvedTargetKind == .time,
+                timerStarted: timer != nil,
+                timerRunning: timer?.isRunning == true,
+                timerRemaining: timer.map {
+                    TimeInterval($0.secondsRemaining(at: timeline.date))
+                },
+                now: timeline.date
+            )
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .center, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(workout.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+
+                        Label(
+                            max(0, timeline.date.timeIntervalSince(workout.startedAt))
+                                .clockDuration,
+                            systemImage: "clock"
+                        )
+                        .font(.system(size: 15, weight: .bold,
+                                      design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                    }
+
+                    Spacer(minLength: 3)
+
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Label(
+                            workout.captureDevice.title,
+                            systemImage: workout.captureDevice == .appleWatch
+                                ? "applewatch" : "iphone"
+                        )
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                        Text(ATHLTHLocalization.format(
+                            english: "%d/%d sets",
+                            norwegian: "%d/%d sett",
+                            completed,
+                            totalSets
+                        ))
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .monospacedDigit()
+                    }
+                }
+
+                HStack(spacing: 7) {
+                    Label(
+                        strengthPhaseTitle(phase),
+                        systemImage: strengthPhaseSymbol(phase)
                     )
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(
-                        ATHLTHTheme
-                            .primaryText
+                        phase == .resting || phase == .restReady
+                            ? ATHLTHTheme.premiumGold
+                            : ATHLTHTheme.accentDeep
                     )
                     .lineLimit(1)
-
-                TimelineView(
-                    .periodic(
-                        from: .now,
-                        by: 1
-                    )
-                ) { context in
-                    Text(
-                        context.date
-                            .timeIntervalSince(
-                                workout.startedAt
-                            )
-                            .clockDuration
-                    )
-                    .font(
-                        .title3
-                            .monospacedDigit()
-                            .weight(.bold)
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .primaryText
-                    )
+                    .minimumScaleFactor(0.75)
+                    Spacer(minLength: 0)
                 }
+
+                ProgressView(
+                    value: Double(completed),
+                    total: Double(totalSets)
+                )
+                .tint(ATHLTHTheme.accentDeep)
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english: "Completed sets",
+                        norwegian: "Fullførte sett"
+                    )
+                )
+                .accessibilityValue("\(completed) / \(totalSets)")
             }
-
-            Spacer()
-
-            Label(
-                workout.captureDevice.title,
-                systemImage:
-                    workout.captureDevice ==
-                        .appleWatch
-                        ? "applewatch"
-                        : "iphone"
-            )
-            .font(
-                .caption
-                    .weight(.semibold)
-            )
-            .foregroundStyle(
-                ATHLTHTheme
-                    .mutedText
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                ATHLTHTheme.card,
+                in: RoundedRectangle(cornerRadius: 19, style: .continuous)
             )
         }
-        .padding(
-            .horizontal,
-            4
-        )
+    }
+
+    private func strengthPhaseTitle(
+        _ phase: ATHLTHPhoneStrengthPhase
+    ) -> String {
+        switch phase {
+        case .workingSet:
+            return ATHLTHLocalization.choose(
+                english: "Working set", norwegian: "Arbeidssett"
+            )
+        case .timedReady:
+            return ATHLTHLocalization.choose(
+                english: "Time target ready", norwegian: "Tidsmål klart"
+            )
+        case .timedRunning:
+            return ATHLTHLocalization.choose(
+                english: "Set countdown running", norwegian: "Nedtelling pågår"
+            )
+        case .timedPaused:
+            return ATHLTHLocalization.choose(
+                english: "Set countdown paused", norwegian: "Nedtelling pauset"
+            )
+        case .timedFinished:
+            return ATHLTHLocalization.choose(
+                english: "Time complete · finish set",
+                norwegian: "Tiden er ute · fullfør settet"
+            )
+        case .resting:
+            return ATHLTHLocalization.choose(
+                english: "Rest between sets", norwegian: "Pause mellom sett"
+            )
+        case .restReady:
+            return ATHLTHLocalization.choose(
+                english: "Ready · continue when you choose",
+                norwegian: "Klar · fortsett når du ønsker"
+            )
+        case .exerciseComplete:
+            return ATHLTHLocalization.choose(
+                english: "Exercise complete", norwegian: "Øvelse fullført"
+            )
+        case .workoutComplete:
+            return ATHLTHLocalization.choose(
+                english: "All exercises complete",
+                norwegian: "Alle øvelser fullført"
+            )
+        }
+    }
+
+    private func strengthPhaseSymbol(
+        _ phase: ATHLTHPhoneStrengthPhase
+    ) -> String {
+        switch phase {
+        case .resting, .restReady:
+            return "timer"
+        case .timedReady, .timedRunning, .timedPaused, .timedFinished:
+            return "stopwatch"
+        case .exerciseComplete, .workoutComplete:
+            return "checkmark.circle.fill"
+        case .workingSet:
+            return "dumbbell.fill"
+        }
     }
 
     private func focusedExerciseHero(

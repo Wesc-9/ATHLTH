@@ -1048,6 +1048,25 @@ struct MirroredWorkoutLiveView: View {
                         .font(.title2.weight(.bold))
                         .lineLimit(2)
 
+                    if snapshot.state == .running {
+                        TimelineView(.periodic(from: .now, by: 5)) { timeline in
+                            if !ATHLTHPhoneMirroredClock.isFresh(
+                                snapshotAt: snapshot.capturedAt,
+                                now: timeline.date
+                            ) {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Watch data delayed",
+                                        norwegian: "Klokkedata forsinket"
+                                    ),
+                                    systemImage: "wifi.exclamationmark"
+                                )
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.orange)
+                            }
+                        }
+                    }
+
                     if let ends = snapshot.strengthRestEndsAt {
                         TimelineView(.periodic(from: .now, by: 1)) { timeline in
                             let remaining = max(ends.timeIntervalSince(timeline.date), 0)

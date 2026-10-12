@@ -138,3 +138,23 @@ Baseline: `release/v1.7.3`. Keep recording engines, workout ownership, iPhone/Wa
   existing stores. No TestFlight deployment requested.
 - Remaining before completion: focused iPhone strength layout physical QA,
   shared interval phase consistency, iPad sizing, and compile/test gates.
+
+## Step 5 — focused strength, responsive phone and data freshness (increment 2)
+
+- Focused strength status now displays workout duration, completed/total
+  sets, a compact progress bar and a phase indicator: working set, timed-set
+  target/running/paused/completed, planned/rest-ready, exercise complete
+  and workout complete. This is presentation-only; it cannot skip rest or
+  complete a set.
+- Main focused strength content is centered with a sensible width limit on
+  iPad; primary exercise cards, Crown/Watch input, set logging and timers
+  retain their existing functions. Phone-owned running metrics are likewise
+  width-limited for large displays.
+- Mirrored iPhone workout elapsed time extrapolates only from fresh Watch
+  snapshots. After the freshness window the last measured elapsed value is
+  held and a delayed-data indicator is shown for both run and strength.
+  Recording continues on Watch independently; reconnect reconciles display.
+- Unit tests cover strength phases, expired rest without automatic
+  advancement, stale/future Watch packets, mirrored running/paused clocks.
+- Remaining device gate: real Watch/iPhone reconnect, iPad/small iPhone
+  screen-size checks, a complete Xcode build, and TestFlight review on request.

@@ -907,6 +907,8 @@ struct IPhoneWorkoutView: View {
                                     .measurementPreference ==
                                 .metric
                         )
+                        .frame(maxWidth: 720)
+                        .frame(maxWidth: .infinity)
 
                         if let message =
                             recorder.message,
