@@ -175,117 +175,143 @@ struct WatchLiveWorkoutFocusCard: View {
         }
     }
 
+    /// Periodic evaluation also works when the iPhone stops sending
+    /// contexts entirely. A stale Ghost lead must expire on Watch itself.
     private var ghostContent: some View {
-        let liveGhost =
-            workoutManager
-                .liveSurfaceContext
-                .liveGhost
-        let title =
-            workoutManager
-                .ghostRaceTitle ??
-            liveGhost?.title ??
-            "Ghost"
-        let distance =
-            workoutManager
-                .ghostDistanceDeltaMeters ??
-            liveGhost?
-                .distanceDeltaMeters
-        let time =
-            workoutManager
-                .ghostTimeDeltaSeconds ??
-            liveGhost?
-                .estimatedTimeDeltaSeconds
-        let liveGhostAge =
-            liveGhost.map {
-                max(
-                    Date().timeIntervalSince(
-                        $0.updatedAt
-                    ),
-                    0
-                )
-            }
-        let liveGhostIsStale =
-            liveGhostAge.map {
-                $0 > 10
-            } ?? false
-        let liveConnection =
-            liveGhost?.connectionText
-        let liveGhostNeedsAttention =
-            liveGhost != nil &&
-            (
-                liveGhostIsStale ||
-                (
-                    liveConnection != nil &&
-                    liveConnection != "LIVE"
-                )
-            )
+        TimelineView(.periodic(from: .now, by: 5)) { timeline in
+            ghostContent(at: timeline.date)
+        }
+    }
 
-        return VStack(
-            alignment: .leading,
-            spacing: 6
-        ) {
+    private func ghostContent(at now: Date) -> some View {
+        let liveGhost = workoutManager.liveSurfaceContext.liveGhost
+        let signal = ATHLTHLiveGhostWatchSignal.resolve(
+            context: liveGhost,
+            isPaused: workoutManager.state == .paused,
+            now: now
+        )
+        let opponent = liveGhost?.opponentName ??
+            workoutManager.ghostRaceTitle ??
+            liveGhost?.title ?? "Ghost"
+        let isLiveDuel = liveGhost != nil
+        let distance = isLiveDuel
+            ? (signal == .live ? liveGhost?.distanceDeltaMeters : nil)
+            : workoutManager.ghostDistanceDeltaMeters
+        let time = isLiveDuel
+            ? (signal == .live ? liveGhost?.estimatedTimeDeltaSeconds : nil)
+            : workoutManager.ghostTimeDeltaSeconds
+        let status: String = {
+            if !isLiveDuel { return "GHOST GAP" }
+            switch signal {
+            case .live: return ATHLTHLocalization.choose(
+                english: "LIVE DUEL", norwegian: "LIVE DUELL"
+            )
+            case .paused: return ATHLTHLocalization.choose(
+                english: "RACE PAUSED", norwegian: "DUELL PAUSET"
+            )
+            case .delayed: return ATHLTHLocalization.choose(
+                english: "GPS DELAYED", norwegian: "GPS FORSINKET"
+            )
+            case .waiting: return ATHLTHLocalization.choose(
+                english: "WAITING FOR GPS", norwegian: "VENTER PÅ GPS"
+            )
+            }
+        }()
+        let color: Color = isLiveDuel && signal != .live
+            ? (signal == .paused ? WatchTheme.muted : .orange)
+            : WatchTheme.green
+
+        return VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Label(
-                    liveGhost != nil
-                        ? (
-                            liveGhostNeedsAttention
-                                ? (
-                                    liveConnection ??
-                                    "GHOST STALE"
-                                )
-                                .uppercased()
-                                : "LIVE GHOST"
-                        )
-                        : "GHOST GAP",
-                    systemImage:
-                        liveGhostNeedsAttention
-                            ? "arrow.triangle.2.circlepath"
-                            : "figure.run"
+                    status,
+                    systemImage: isLiveDuel && signal != .live
+                        ? (signal == .paused ? "pause.circle.fill" : "wifi.exclamationmark")
+                        : "figure.run"
                 )
                 .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(
-                    liveGhostNeedsAttention
-                        ? .orange
-                        : WatchTheme.green
-                )
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
 
-                Spacer()
+                Spacer(minLength: 4)
 
-                if let time {
+                if let time, time.isFinite {
                     Text(ghostTime(time))
                         .font(.system(size: 11, weight: .bold))
                         .monospacedDigit()
                 }
             }
 
-            if let distance {
-                Text(ghostDistance(distance))
-                    .font(.system(
-                        size: 20,
-                        weight: .bold,
-                        design: .rounded
-                    ))
-                    .minimumScaleFactor(0.72)
-
-                Text(
-                    liveGhost != nil
-                        ? [
-                            title,
-                            liveConnection
-                        ]
-                        .compactMap { $0 }
-                        .joined(
-                            separator: " · "
+            if let distance, distance.isFinite {
+                if isLiveDuel {
+                    Text(abs(distance) < 8
+                        ? ATHLTHLocalization.choose(
+                            english: "SIDE BY SIDE", norwegian: "SIDE OM SIDE"
                         )
-                        : title
+                        : (distance > 0
+                            ? ATHLTHLocalization.choose(
+                                english: "YOU LEAD", norwegian: "DU LEDER"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "RIVAL LEADS", norwegian: "MOTSTANDER LEDER"
+                            )
+                        )
+                    )
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(WatchTheme.muted)
+
+                    Text("\(Int(abs(distance).rounded())) m")
+                        .font(.system(
+                            size: 27, weight: .bold, design: .rounded
+                        ))
+                        .monospacedDigit()
+                        .minimumScaleFactor(0.7)
+                        .lineLimit(1)
+                } else {
+                    Text(ghostDistance(distance))
+                        .font(.system(
+                            size: 22, weight: .bold, design: .rounded
+                        ))
+                        .minimumScaleFactor(0.72)
+                        .lineLimit(1)
+                }
+            } else if isLiveDuel {
+                Text(
+                    signal == .paused
+                        ? ATHLTHLocalization.choose(
+                            english: "Workout paused", norwegian: "Økten er pauset"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "No current race gap", norwegian: "Ingen fersk avstand"
+                        )
                 )
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(WatchTheme.muted)
-                .lineLimit(1)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(color)
+                .lineLimit(2)
             } else {
-                Text(title)
+                Text(opponent)
                     .font(.system(size: 14, weight: .bold))
                     .lineLimit(1)
+            }
+
+            if isLiveDuel {
+                Text(opponent)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(WatchTheme.muted)
+                    .lineLimit(1)
+
+                if signal == .live,
+                   let own = liveGhost?.ownProgressPercent,
+                   let rival = liveGhost?.opponentProgressPercent,
+                   own.isFinite, rival.isFinite {
+                    ProgressView(value: min(max(own / 100, 0), 1))
+                        .tint(WatchTheme.green)
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Your route progress",
+                            norwegian: "Din fremdrift på ruten"
+                        ))
+                }
             }
         }
     }
