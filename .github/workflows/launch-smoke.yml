@@ -13,6 +13,7 @@ on:
       - release/v1.6.9
       - release/v1.7.2
       - release/v1.7.3
+      - release/v1.7.4
     paths:
       - ATHLTH/**/*.swift
       - ATHLTH/Assets.xcassets/**
