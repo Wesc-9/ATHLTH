@@ -3,12 +3,22 @@ import SwiftUI
 /// A compact, navigable overview of the *planned* program. All metrics come
 /// from ATHLTHPlanProgramTrendAdvisor, not a separate UI calculation.
 struct ATHLTHPlanProgramTrendView: View {
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var strength: StrengthWorkoutStore
+
     let plan: TrainingPlan
     let onSelectWeek: (UUID) -> Void
     @State private var showsAllWeeks = false
 
     var body: some View {
         let report = ATHLTHPlanProgramTrendAdvisor.inspect(plan)
+        let actual = ATHLTHPlanActualProgress.inspect(
+            plan: plan,
+            store: session,
+            healthWorkouts: health.workouts,
+            strengthHistory: strength.workoutHistory
+        )
 
         ATHLTHPlanSurface {
             VStack(alignment: .leading, spacing: 5) {
@@ -25,8 +35,8 @@ struct ATHLTHPlanProgramTrendView: View {
                 .foregroundStyle(ATHLTHPlanDesign.ink)
 
                 Text(ATHLTHLocalization.choose(
-                    english: "Planned workouts by week — not measured training stress, readiness or completed activity.",
-                    norwegian: "Planlagte økter uke for uke – ikke målt belastning, dagsform eller utført trening."
+                    english: "Planned workouts and confirmed or manually marked completion by week. Not a measure of exercise intensity or recovery.",
+                    norwegian: "Planlagte økter og registrert eller manuelt markert gjennomføring per uke. Ikke et mål på intensitet eller restitusjon."
                 ))
                 .font(.caption)
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -47,6 +57,41 @@ struct ATHLTHPlanProgramTrendView: View {
                     title: ATHLTHLocalization.choose(english: "Other", norwegian: "Annet")
                 )
                 Spacer(minLength: 0)
+            }
+
+            if actual.totalPlanned > 0 {
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("\(actual.totalCompleted) / \(actual.totalPlanned)")
+                            .font(.system(size: 27, weight: .semibold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                        Text(ATHLTHLocalization.choose(
+                            english: "completed or marked",
+                            norwegian: "registrert eller markert fullført"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        Spacer(minLength: 0)
+                    }
+                    ProgressView(
+                        value: Double(actual.totalCompleted),
+                        total: Double(max(actual.totalPlanned, 1))
+                    )
+                    .tint(ATHLTHPlanDesign.accent)
+                    Text(ATHLTHLocalization.choose(
+                        english: "\(actual.totalRecorded) linked recordings · \(actual.totalManuallyMarked) manually marked · \(actual.totalSkipped) skipped. Future sessions remain planned, not missed.",
+                        norwegian: "\(actual.totalRecorded) registrerte økter · \(actual.totalManuallyMarked) manuelt markert · \(actual.totalSkipped) hoppet over. Fremtidige økter er planlagt, ikke mislykket."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(12)
+                .background(
+                    ATHLTHPlanDesign.selectedSurface,
+                    in: RoundedRectangle(cornerRadius: ATHLTHPlanDesign.fieldRadius)
+                )
             }
 
             if report.weeks.isEmpty {
@@ -143,6 +188,29 @@ struct ATHLTHPlanProgramTrendView: View {
                                         in: Capsule()
                                     )
 
+                                    if let finished = actual.week(id: week.id),
+                                       finished.planned > 0 {
+                                        HStack(spacing: 5) {
+                                            Image(systemName: "checkmark.circle")
+                                                .font(.caption2)
+                                                .accessibilityHidden(true)
+                                            Text("\(finished.completed)/\(finished.planned) " +
+                                                ATHLTHLocalization.choose(
+                                                    english: "completed", norwegian: "fullført"
+                                                ))
+                                            if finished.skipped > 0 {
+                                                Text("· \(finished.skipped) " +
+                                                    ATHLTHLocalization.choose(
+                                                        english: "skipped", norwegian: "hoppet over"
+                                                    ))
+                                            }
+                                            Spacer(minLength: 0)
+                                        }
+                                        .font(.caption2.weight(.medium))
+                                        .monospacedDigit()
+                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                    }
+
                                     HStack(spacing: 8) {
                                         if let minutes = week.plannedMinutes,
                                            week.sessionCount > 0 {
@@ -172,7 +240,9 @@ struct ATHLTHPlanProgramTrendView: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel(weekAccessibilityLabel(week))
+                         .accessibilityLabel(
+                            weekAccessibilityLabel(week, actual: actual.week(id: week.id))
+                        )
                         .accessibilityHint(ATHLTHLocalization.choose(
                             english: "Open week details", norwegian: "Åpne detaljer for uken"
                         ))
@@ -276,11 +346,17 @@ struct ATHLTHPlanProgramTrendView: View {
     }
 
     private func weekAccessibilityLabel(
-        _ week: ATHLTHPlanProgramTrendAdvisor.Week
+        _ week: ATHLTHPlanProgramTrendAdvisor.Week,
+        actual: ATHLTHPlanActualProgress.Week?
     ) -> String {
-        ATHLTHLocalization.choose(
+        let prefix = ATHLTHLocalization.choose(
             english: "Week \(week.number), \(week.running) runs, \(week.strength) strength, \(week.other) other workouts",
             norwegian: "Uke \(week.number), \(week.running) løpeøkter, \(week.strength) styrkeøkter, \(week.other) andre økter"
+        )
+        guard let actual else { return prefix }
+        return prefix + ". " + ATHLTHLocalization.choose(
+            english: "\(actual.completed) completed of \(actual.planned), \(actual.skipped) skipped",
+            norwegian: "\(actual.completed) av \(actual.planned) fullført, \(actual.skipped) hoppet over"
         )
     }
 }
