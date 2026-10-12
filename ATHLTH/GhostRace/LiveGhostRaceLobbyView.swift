@@ -222,6 +222,12 @@ struct LiveGhostRaceLobbyView: View {
             await liveRace.open(
                 challenge: challenge
             )
+            guard !Task.isCancelled else { return }
+            // A recovered iPhone workout for this exact duel may reconnect
+            // to its shared location session without starting HealthKit again.
+            if canReconnectRecoveredPhoneRace {
+                await connectLiveSession()
+            }
         }
         .task(id: challenge.arenaRoundID) {
             await resolveAccessibleArenaSeries()
@@ -238,6 +244,9 @@ struct LiveGhostRaceLobbyView: View {
             guard phase == .active else { return }
             Task {
                 await liveRace.refresh(challengeID: challenge.id)
+                if canReconnectRecoveredPhoneRace {
+                    await connectLiveSession()
+                }
                 await waitForSynchronizedStart()
             }
         }
