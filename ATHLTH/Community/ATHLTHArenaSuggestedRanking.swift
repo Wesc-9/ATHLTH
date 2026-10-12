@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 
 /// Separate active duels from immutable race history. A completed or
@@ -54,7 +55,11 @@ enum ATHLTHArenaLiveRoundSelection {
                   $0.id == selectedRoundID
               }),
               selected.template == .fastestRoute,
-              selected.routeSnapshot?.routeID == selectedRouteID else {
+              let snapshot = selected.routeSnapshot,
+              // Imported legacy route snapshots can lack an original route ID.
+              // The stable fallback is the explicitly selected Arena round,
+              // never a fresh random UUID or an inferred neighbouring round.
+              (snapshot.routeID ?? selected.id) == selectedRouteID else {
             return nil
         }
         return selected.id
@@ -542,6 +547,9 @@ enum ATHLTHArenaLiveRoundCompatibility {
             return false
         }
 
+        // Check sparse anchor points first, then inspect both full paths.
+        // Checking anchors alone can miss a long diversion between samples.
+        // This remains a local suggestion only, not a server GPS attestation.
         // Check up to 17 positions along the shared race against the actual
         // frozen course *segments*, not merely the published distance.
         let checks = min(17, trace.count)
@@ -573,6 +581,25 @@ enum ATHLTHArenaLiveRoundCompatibility {
                 )
             }
             guard nearestSquared <= 80 * 80 else { return false }
+        }
+
+        // A shortcut may stay close to the planned line while omitting a
+        // substantial part of the course. A detour may leave and rejoin it
+        // entirely between the 17 anchors. Use the shared bidirectional,
+        // distance-weighted matcher to reject both cases.
+        let referenceLocations = course.map {
+            CLLocation(latitude: $0.latitude, longitude: $0.longitude)
+        }
+        let actualLocations = trace.map {
+            CLLocation(latitude: $0.latitude, longitude: $0.longitude)
+        }
+        guard let analysis = RoutePerformanceMatcher.analyze(
+            reference: referenceLocations,
+            actual: actualLocations
+        ), analysis.routeMatchPercent.isFinite,
+           analysis.routeMatchPercent >= 90,
+           analysis.averageDeviationMeters.isFinite else {
+            return false
         }
         return true
     }
