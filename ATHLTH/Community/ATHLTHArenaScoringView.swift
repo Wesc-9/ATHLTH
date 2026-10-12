@@ -142,6 +142,26 @@ enum ATHLTHArenaResultHistoryPresentation {
         }
     }
 
+    /// Never invite a vote based on a failed refresh or a terminal series.
+    /// The server also independently validates every submitted vote.
+    static func canReviewVote(
+        result: ATHLTHArenaRoundResult,
+        seriesStatus: String,
+        resultsLoaded: Bool,
+        viewerID: UUID,
+        eligibleIDs: Set<UUID>,
+        votes: [ATHLTHArenaRoundResultVote]
+    ) -> Bool {
+        resultsLoaded &&
+        seriesStatus == "active" &&
+        needsYourVote(
+            result: result,
+            viewerID: viewerID,
+            eligibleIDs: eligibleIDs,
+            votes: votes
+        )
+    }
+
     /// A pending proposal is actionable only for an accepted athlete who
     /// has not already voted. Neither a pending proposal nor this filter
     /// grants points or changes the result.
@@ -258,6 +278,7 @@ struct ATHLTHArenaScoringSection: View {
 
     @State private var results: [ATHLTHArenaRoundResult] = []
     @State private var resultsLoaded = false
+    @State private var loadedSeriesID: UUID?
     @State private var votes: [ATHLTHArenaRoundResultVote] = []
     @State private var linkedWorkouts: [ATHLTHArenaWorkoutEvidence] = []
     @State private var awardedPoints: [ATHLTHArenaRoundPoints] = []
@@ -306,7 +327,10 @@ struct ATHLTHArenaScoringSection: View {
     }
 
     private var filteredResultHistory: [ATHLTHArenaRoundResult] {
-        ATHLTHArenaResultHistoryPresentation.filtered(
+        if resultHistoryFilter == .requiresMyVote && series.status != "active" {
+            return []
+        }
+        return ATHLTHArenaResultHistoryPresentation.filtered(
             results,
             filter: resultHistoryFilter,
             viewerID: session.profile.userID,
@@ -338,7 +362,8 @@ struct ATHLTHArenaScoringSection: View {
     }
 
     private var nextResultNeedingMyVote: ATHLTHArenaRoundResult? {
-        ATHLTHArenaResultHistoryPresentation.nextVote(
+        guard resultsLoaded, series.status == "active" else { return nil }
+        return ATHLTHArenaResultHistoryPresentation.nextVote(
             results: results,
             roundIDs: Set(rounds.map(\.id)),
             viewerID: session.profile.userID,
@@ -348,7 +373,8 @@ struct ATHLTHArenaScoringSection: View {
     }
 
     private var resultsNeedingMyVote: Int {
-        ATHLTHArenaResultHistoryPresentation.filtered(
+        guard resultsLoaded, series.status == "active" else { return 0 }
+        return ATHLTHArenaResultHistoryPresentation.filtered(
             results.filter { result in
                 rounds.contains { $0.id == result.roundID }
             },
@@ -944,8 +970,10 @@ struct ATHLTHArenaScoringSection: View {
                                 .font(.caption2.weight(.medium))
                                 .foregroundStyle(ATHLTHTheme.mutedText)
 
-                            if ATHLTHArenaResultHistoryPresentation.needsYourVote(
+                            if ATHLTHArenaResultHistoryPresentation.canReviewVote(
                                 result: result,
+                                seriesStatus: series.status,
+                                resultsLoaded: resultsLoaded,
                                 viewerID: session.profile.userID,
                                 eligibleIDs: acceptedIDs,
                                 votes: votes
@@ -1175,7 +1203,14 @@ struct ATHLTHArenaScoringSection: View {
                          ATHLTHLocalization.choose(english: "approvals", norwegian: "godkjenninger"))
                         .font(.caption2)
                         .foregroundStyle(ATHLTHTheme.mutedText)
-                    if acceptedIDs.contains(session.profile.userID) && myVote == nil {
+                    if ATHLTHArenaResultHistoryPresentation.canReviewVote(
+                        result: result,
+                        seriesStatus: series.status,
+                        resultsLoaded: resultsLoaded,
+                        viewerID: session.profile.userID,
+                        eligibleIDs: acceptedIDs,
+                        votes: votes
+                    ) {
                         HStack {
                             Button {
                                 Task { await vote(result.id, accept: true) }
@@ -1395,6 +1430,15 @@ struct ATHLTHArenaScoringSection: View {
         loading = true
         defer { loading = false }
 
+        if loadedSeriesID != series.id {
+            loadedSeriesID = series.id
+            resultsLoaded = false
+            results = []
+            votes = []
+            linkedWorkouts = []
+            awardedPoints = []
+        }
+
         repeat {
             refreshQueued = false
             do {
@@ -1423,6 +1467,9 @@ struct ATHLTHArenaScoringSection: View {
                 // Never present old result approvals as current after a
                 // network error. A queued read may still recover the data.
                 resultsLoaded = false
+                results = []
+                votes = []
+                linkedWorkouts = []
                 awardedPoints = []
                 errorMessage = error.localizedDescription
             }
