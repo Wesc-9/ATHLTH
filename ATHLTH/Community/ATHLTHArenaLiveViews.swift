@@ -4198,13 +4198,27 @@ struct ATHLTHArenaOnlineDetailView: View {
                     )
                 }
                 navigationButton(
-                    title: ATHLTHLocalization.choose(english: "Standings", norwegian: "Stilling"),
+                    title: ATHLTHLocalization.choose(
+                        english: "Standings", norwegian: "Stilling"
+                    ),
                     icon: "chart.bar.fill",
                     target: "arena-standings",
                     proxy: proxy
                 )
+                if currentSeries.status != "draft" {
+                    navigationButton(
+                        title: ATHLTHLocalization.choose(
+                            english: "Results", norwegian: "Resultater"
+                        ),
+                        icon: "checkmark.seal",
+                        target: "arena-results",
+                        proxy: proxy
+                    )
+                }
                 navigationButton(
-                    title: ATHLTHLocalization.choose(english: "Rounds", norwegian: "Runder"),
+                    title: ATHLTHLocalization.choose(
+                        english: "Rounds & rules", norwegian: "Runder og regler"
+                    ),
                     icon: "flag.checkered",
                     target: "arena-rounds",
                     proxy: proxy
