@@ -30,9 +30,16 @@ enum LiveGhostRaceReentry {
     /// Keep the client UI consistent so athletes are never invited to
     /// reconnect after the competition has ended.
     static func canReconnectSharedSession(
-        roomStatus: LiveGhostRaceRoomStatus?
+        roomStatus: LiveGhostRaceRoomStatus?,
+        startsAt: Date?,
+        now: Date = Date()
     ) -> Bool {
-        roomStatus != .finished && roomStatus != .cancelled
+        // The server accepts a shared session only once both athletes'
+        // synchronized start has actually begun. Do not offer a reconnect
+        // button while the room is absent, in lobby or still counting down.
+        guard roomStatus == .countdown || roomStatus == .racing,
+              let startsAt else { return false }
+        return startsAt <= now
     }
 
     /// Only a locally recovered recording from this exact challenge may
