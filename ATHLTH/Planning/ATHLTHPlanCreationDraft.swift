@@ -14,6 +14,11 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
     var advanced: Bool
     var source: String
     var stage: String
+    // Optional so v1 snapshots made before the advanced-fields update still decode.
+    // Only structural preferences; health, injuries and private notes are excluded.
+    var preferredDayIndexes: [Int]?
+    var equipmentContext: String?
+    var weeklyTimeBudgetMinutes: Int?
     var savedAt: Date
 
     init(
@@ -23,6 +28,9 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         advanced: Bool,
         source: String,
         stage: String,
+        preferredDayIndexes: [Int]? = nil,
+        equipmentContext: String? = nil,
+        weeklyTimeBudgetMinutes: Int? = nil,
         savedAt: Date = Date()
     ) {
         self.schemaVersion = Self.schemaVersion
@@ -32,6 +40,16 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         self.advanced = advanced
         self.source = source
         self.stage = stage
+        if let preferredDayIndexes {
+            let valid = Set(preferredDayIndexes.filter { (1...7).contains($0) })
+            self.preferredDayIndexes = valid.isEmpty ? nil : valid.sorted()
+        } else {
+            self.preferredDayIndexes = nil
+        }
+        self.equipmentContext = equipmentContext
+        self.weeklyTimeBudgetMinutes = weeklyTimeBudgetMinutes.map {
+            min(max($0, 60), 1200)
+        }
         self.savedAt = savedAt
     }
 
