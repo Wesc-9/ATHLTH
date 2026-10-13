@@ -4658,22 +4658,27 @@ struct ChallengeCreationView: View {
         }
     }
 
-    private func creationSection<
-        Content: View
-    >(
+    private func creationSection<Content: View>(
         title: String,
         icon: String,
-        @ViewBuilder content:
-            () -> Content
+        @ViewBuilder content: () -> Content
     ) -> some View {
-        ATHLTHPremiumFormSection(
-            title: title,
-            icon: icon,
-            tint:
-                ATHLTHTheme
-                    .vitality
-        ) {
-            content()
+        ATHLTHPlanSurface {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 9) {
+                    Capsule()
+                        .fill(ChallengePlanTheme.gold)
+                        .frame(width: 3, height: 20)
+                    Image(systemName: icon)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(ChallengePlanTheme.gold)
+                    Text(title)
+                        .font(.system(size: 23, weight: .regular, design: .serif))
+                        .foregroundStyle(ChallengePlanTheme.ink)
+                    Spacer(minLength: 0)
+                }
+                content()
+            }
         }
     }
 
