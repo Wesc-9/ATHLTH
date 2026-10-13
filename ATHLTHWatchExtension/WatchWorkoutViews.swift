@@ -4429,23 +4429,99 @@ private struct WatchRunWalkWorkoutPager: View {
 
 struct WatchAudioCoachLiveSettingsView: View {
     @ObservedObject var workoutManager: WatchWorkoutManager
+    @State private var showAdvancedSettings = false
+
+    private var selectedExperience: ATHLTHCoachExperiencePreset? {
+        ATHLTHCoachExperiencePreset.allCases.first {
+            $0.matches(configuration, kind: workoutManager.kind)
+        }
+    }
 
     var body: some View {
         Form {
             Section("Audio Coach") {
                 Toggle(
-                    "Enabled",
+                    ATHLTHLocalization.choose(
+                        english: "Voice guidance",
+                        norwegian: "Taleveiledning"
+                    ),
                     isOn: boolBinding(\.enabled)
                 )
-
-                Text(
-                    "Changes apply immediately to this workout only."
-                )
+                Text(ATHLTHLocalization.choose(
+                    english: "Only this workout. Training and safety alerts keep working.",
+                    norwegian: "Kun denne økten. Trening og sikkerhetsvarsler fortsetter."
+                ))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             }
 
             if configuration.enabled {
+                Section {
+                    ForEach(ATHLTHCoachExperiencePreset.allCases) { preset in
+                        Button {
+                            update { value in
+                                value = preset.applying(
+                                    to: value,
+                                    kind: workoutManager.kind
+                                )
+                            }
+                        } label: {
+                            HStack(spacing: 7) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(preset.title)
+                                        .font(.subheadline.weight(.semibold))
+                                    Text(preset.subtitle)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer(minLength: 2)
+                                if selectedExperience == preset {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(WatchTheme.accent)
+                                }
+                            }
+                        }
+                        .accessibilityAddTraits(
+                            selectedExperience == preset ? .isSelected : []
+                        )
+                    }
+                    if selectedExperience == nil {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Custom settings active",
+                            norwegian: "Tilpassede innstillinger er aktive"
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "How much guidance?",
+                        norwegian: "Hvor mye veiledning?"
+                    ))
+                }
+
+                Section {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showAdvancedSettings.toggle()
+                        }
+                    } label: {
+                        HStack {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "More settings",
+                                    norwegian: "Flere innstillinger"
+                                ),
+                                systemImage: "slider.horizontal.3"
+                            )
+                            Spacer()
+                            Image(systemName: showAdvancedSettings
+                                ? "chevron.up" : "chevron.down")
+                        }
+                    }
+                }
+
+                if showAdvancedSettings {
                 Section {
                     Picker(
                         ATHLTHLocalization.choose(
@@ -4474,7 +4550,10 @@ struct WatchAudioCoachLiveSettingsView: View {
                     ))
                 }
 
-                Section("When to speak") {
+                if workoutManager.kind != .strength {
+                Section(ATHLTHLocalization.choose(
+                    english: "When to speak", norwegian: "Når skal den snakke"
+                )) {
                     Toggle(
                         "Distance",
                         isOn: distanceTriggerBinding
@@ -4568,7 +4647,81 @@ struct WatchAudioCoachLiveSettingsView: View {
                     )
                 }
 
-                Section("Music") {
+                }
+
+                if workoutManager.kind == .strength {
+                    Section(ATHLTHLocalization.choose(
+                        english: "Strength updates", norwegian: "Styrkemeldinger"
+                    )) {
+                        Toggle(
+                            ATHLTHLocalization.choose(
+                                english: "Set completed", norwegian: "Sett fullført"
+                            ),
+                            isOn: optionalBoolBinding(
+                                \.announceStrengthSetComplete,
+                                defaultValue: false
+                            )
+                        )
+                        Toggle(
+                            ATHLTHLocalization.choose(
+                                english: "Rest started", norwegian: "Hvile startet"
+                            ),
+                            isOn: optionalBoolBinding(
+                                \.announceStrengthRestStarted,
+                                defaultValue: false
+                            )
+                        )
+                        Toggle(
+                            ATHLTHLocalization.choose(
+                                english: "Rest countdown", norwegian: "Nedtelling av hvile"
+                            ),
+                            isOn: optionalBoolBinding(
+                                \.announceStrengthRestCountdown,
+                                defaultValue: false
+                            )
+                        )
+                        Toggle(
+                            ATHLTHLocalization.choose(
+                                english: "Rest complete", norwegian: "Hvile ferdig"
+                            ),
+                            isOn: optionalBoolBinding(
+                                \.announceStrengthRestComplete,
+                                defaultValue: false
+                            )
+                        )
+                        Toggle(
+                            ATHLTHLocalization.choose(
+                                english: "Next exercise", norwegian: "Neste øvelse"
+                            ),
+                            isOn: optionalBoolBinding(
+                                \.announceStrengthNextExercise,
+                                defaultValue: false
+                            )
+                        )
+                        Toggle(
+                            ATHLTHLocalization.choose(
+                                english: "Next set", norwegian: "Neste sett"
+                            ),
+                            isOn: optionalBoolBinding(
+                                \.announceStrengthNextSetDetails,
+                                defaultValue: true
+                            )
+                        )
+                        Toggle(
+                            ATHLTHLocalization.choose(
+                                english: "Progress", norwegian: "Fremdrift"
+                            ),
+                            isOn: optionalBoolBinding(
+                                \.announceStrengthExerciseProgress,
+                                defaultValue: false
+                            )
+                        )
+                    }
+                }
+
+                Section(ATHLTHLocalization.choose(
+                    english: "Music", norwegian: "Musikk"
+                )) {
                     Toggle(
                         "Lower music for coach",
                         isOn: duckOtherAudioBinding
@@ -4583,7 +4736,11 @@ struct WatchAudioCoachLiveSettingsView: View {
                     .foregroundStyle(.secondary)
                 }
 
-                Section("Voice") {
+                }
+
+                Section(ATHLTHLocalization.choose(
+                    english: "Voice", norwegian: "Stemme"
+                )) {
                     Picker(
                         "Language",
                         selection: languageBinding
@@ -4600,6 +4757,18 @@ struct WatchAudioCoachLiveSettingsView: View {
             }
         }
         .navigationTitle("Audio Coach")
+    }
+
+    private func optionalBoolBinding(
+        _ keyPath: WritableKeyPath<WatchAudioCoachConfiguration, Bool?>,
+        defaultValue: Bool
+    ) -> Binding<Bool> {
+        Binding(
+            get: { configuration[keyPath: keyPath] ?? defaultValue },
+            set: { newValue in
+                update { $0[keyPath: keyPath] = newValue }
+            }
+        )
     }
 
     private var configuration:
@@ -4644,6 +4813,7 @@ struct WatchAudioCoachLiveSettingsView: View {
             set: { value in
                 update {
                     $0.language = value
+                    $0.voiceIdentifier = nil
                 }
             }
         )

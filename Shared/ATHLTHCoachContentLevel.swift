@@ -151,3 +151,93 @@ enum ATHLTHCoachExperiencePreset: String, CaseIterable, Identifiable {
         }
     }
 }
+
+
+extension ATHLTHCoachExperiencePreset {
+    /// Watch-facing preset. Preserves audio route, voice, safety notifications
+    /// and active HealthKit session settings. Does not require new wire fields.
+    func applying(
+        to original: WatchAudioCoachConfiguration,
+        kind: WatchWorkoutKind
+    ) -> WatchAudioCoachConfiguration {
+        var value = original
+        if kind == .strength {
+            value.announceStrengthRestComplete = true
+            value.announceStrengthNextExercise = true
+            switch self {
+            case .calm:
+                value.announceStrengthSetComplete = false
+                value.announceStrengthRestStarted = false
+                value.announceStrengthRestCountdown = false
+                value.announceStrengthNextSetDetails = false
+                value.announceStrengthExerciseProgress = false
+                value.strengthStatusIntervalSeconds = nil
+            case .balanced:
+                value.announceStrengthSetComplete = true
+                value.announceStrengthRestStarted = false
+                value.announceStrengthRestCountdown = true
+                value.announceStrengthNextSetDetails = true
+                value.announceStrengthExerciseProgress = false
+                value.strengthStatusIntervalSeconds = nil
+            case .active:
+                value.announceStrengthSetComplete = true
+                value.announceStrengthRestStarted = true
+                value.announceStrengthRestCountdown = true
+                value.announceStrengthNextSetDetails = true
+                value.announceStrengthExerciseProgress = true
+                value.strengthStatusIntervalSeconds = 15 * 60
+            }
+        } else {
+            value = contentLevel.applying(to: value)
+            if kind == .running || kind == .walking {
+                value.distanceIntervalMeters = distanceIntervalKilometers * 1_000
+                value.timeIntervalSeconds = nil
+            } else {
+                // No GPS distance requirement for HIIT, yoga or other sports.
+                value.distanceIntervalMeters = nil
+                switch self {
+                case .calm: value.timeIntervalSeconds = 15 * 60
+                case .balanced: value.timeIntervalSeconds = 10 * 60
+                case .active: value.timeIntervalSeconds = 5 * 60
+                }
+            }
+        }
+        value.enabled = true
+        value.speechStyle = speechStyle
+        return value
+    }
+
+    func matches(
+        _ configuration: WatchAudioCoachConfiguration,
+        kind: WatchWorkoutKind
+    ) -> Bool {
+        guard configuration.enabled,
+              (configuration.speechStyle ?? .balanced) == speechStyle
+        else { return false }
+
+        let expected = applying(to: configuration, kind: kind)
+        if kind == .strength {
+            return configuration.shouldAnnounceStrengthSetComplete ==
+                expected.shouldAnnounceStrengthSetComplete
+                && configuration.shouldAnnounceStrengthRestStarted ==
+                expected.shouldAnnounceStrengthRestStarted
+                && configuration.shouldAnnounceStrengthRestCountdown ==
+                expected.shouldAnnounceStrengthRestCountdown
+                && configuration.shouldAnnounceStrengthRestComplete ==
+                expected.shouldAnnounceStrengthRestComplete
+                && configuration.shouldAnnounceStrengthNextExercise ==
+                expected.shouldAnnounceStrengthNextExercise
+                && configuration.shouldAnnounceStrengthNextSetDetails ==
+                expected.shouldAnnounceStrengthNextSetDetails
+                && configuration.shouldAnnounceStrengthExerciseProgress ==
+                expected.shouldAnnounceStrengthExerciseProgress
+                && configuration.strengthStatusIntervalSeconds ==
+                expected.strengthStatusIntervalSeconds
+        }
+        return ATHLTHCoachContentLevel.matching(configuration) == contentLevel
+            && configuration.distanceIntervalMeters ==
+                expected.distanceIntervalMeters
+            && configuration.timeIntervalSeconds ==
+                expected.timeIntervalSeconds
+    }
+}

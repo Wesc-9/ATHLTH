@@ -132,6 +132,51 @@ final class AudioCoachContentLevelTests: XCTestCase {
         }
     }
 
+
+    func testWatchExperiencePresetsPreserveDeliveryAndUseSportSpecificCues() {
+        var original = WatchAudioCoachConfiguration.disabled
+        original.language = .norwegian
+        original.voiceIdentifier = "chosen-voice"
+        original.speechRate = 0.55
+        original.speechVolume = 0.7
+        original.duckOtherAudio = false
+        original.preferIPhoneAudioWhenReachable = true
+        original.useAcknowledgedVoiceLease = true
+
+        for preset in ATHLTHCoachExperiencePreset.allCases {
+            for kind: WatchWorkoutKind in [.running, .walking, .strength, .hiit] {
+                let updated = preset.applying(to: original, kind: kind)
+                XCTAssertTrue(updated.enabled)
+                XCTAssertTrue(preset.matches(updated, kind: kind))
+                XCTAssertEqual(updated.language, .norwegian)
+                XCTAssertEqual(updated.voiceIdentifier, "chosen-voice")
+                XCTAssertEqual(updated.speechRate, 0.55)
+                XCTAssertEqual(updated.speechVolume, 0.7)
+                XCTAssertEqual(updated.duckOtherAudio, false)
+                XCTAssertEqual(updated.preferIPhoneAudioWhenReachable, true)
+                XCTAssertEqual(updated.useAcknowledgedVoiceLease, true)
+
+                if kind == .running || kind == .walking {
+                    XCTAssertEqual(
+                        updated.distanceIntervalMeters,
+                        preset.distanceIntervalKilometers * 1_000
+                    )
+                    XCTAssertNil(updated.timeIntervalSeconds)
+                } else if kind == .strength {
+                    XCTAssertNil(updated.distanceIntervalMeters)
+                    XCTAssertEqual(updated.announceStrengthNextExercise, true)
+                    XCTAssertEqual(
+                        updated.shouldAnnounceStrengthRestCountdown,
+                        preset != .calm
+                    )
+                } else {
+                    XCTAssertNil(updated.distanceIntervalMeters)
+                    XCTAssertNotNil(updated.timeIntervalSeconds)
+                }
+            }
+        }
+    }
+
     func testApplyingContentPresetNeverEnablesDisabledSession() {
         let original = WatchAudioCoachConfiguration.disabled
         for level in ATHLTHCoachContentLevel.allCases {
