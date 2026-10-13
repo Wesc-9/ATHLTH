@@ -303,6 +303,7 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suite) }
         let source = workout()
         store.addSession(source, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(workout(), toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
         let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
         let preview = try XCTUnwrap(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
             plan: saved, store: store, healthWorkouts: [],
@@ -326,6 +327,7 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suite) }
         let source = workout()
         store.addSession(source, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(workout(), toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
         let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
         let preview = try XCTUnwrap(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
             plan: saved, store: store, healthWorkouts: [],
@@ -372,6 +374,7 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suite) }
         let workout = workout()
         store.addSession(workout, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(workout(), toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
         let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
         let preview = try XCTUnwrap(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
             plan: saved, store: store, healthWorkouts: [],
@@ -401,6 +404,7 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suite) }
         let workout = workout()
         store.addSession(workout, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(workout(), toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
         let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
         let preview = try XCTUnwrap(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
             plan: saved, store: store, healthWorkouts: [],
@@ -423,6 +427,7 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suite) }
         let workout = workout()
         store.addSession(workout, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(workout(), toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
         let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
         let preview = try XCTUnwrap(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
             plan: saved, store: store, healthWorkouts: [],
@@ -444,15 +449,16 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
         let (store, defaults, suite, plan) = try prepared(weekCount: 1)
         defer { defaults.removePersistentDomain(forName: suite) }
         store.addSession(workout(), toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(workout(), toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
         store.addSession(workout(), toDay: plan.weeks[0].days[2].id, inPlan: plan.id)
         let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
         let preview = try XCTUnwrap(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
             plan: saved, store: store, healthWorkouts: [],
             strengthHistory: [], referenceDate: plan.startDate!
         ))
-        // Day 2 is free but bordered by workouts on both sides.
+        // Day 4 is free but borders the day 3 workout.
         // Day 5 has no adjacent workouts and is preferred.
-        XCTAssertEqual(preview.sourceDayIndex, 3)
+        XCTAssertEqual(preview.sourceDayIndex, 1)
         XCTAssertEqual(preview.destinationDayIndex, 5)
     }
 
