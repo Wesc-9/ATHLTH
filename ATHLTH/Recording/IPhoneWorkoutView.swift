@@ -3063,12 +3063,23 @@ struct IPhoneWorkoutView: View {
 
 private struct IPhoneAudioCoachLiveSheet: View {
     @State private var audioOutputName: String?
+    @State private var showDetailedOptions = false
     @EnvironmentObject private var recorder: IPhoneWorkoutStore
     @EnvironmentObject private var settings: AppSettingsStore
     @Environment(\.dismiss) private var dismiss
 
     private var configuration: WatchAudioCoachConfiguration {
         recorder.active?.audioCoachConfiguration ?? .disabled
+    }
+
+    private var selectedExperience: ATHLTHCoachExperiencePreset? {
+        ATHLTHCoachExperiencePreset.allCases.first { preset in
+            ATHLTHCoachContentLevel.matching(configuration) == preset.contentLevel
+                && (configuration.speechStyle ?? .balanced) == preset.speechStyle
+                && configuration.timeIntervalSeconds == nil
+                && abs((configuration.distanceIntervalMeters ?? -1)
+                    - preset.distanceIntervalKilometers * 1_000) < 0.01
+        }
     }
 
     var body: some View {
@@ -3271,60 +3282,80 @@ private struct IPhoneAudioCoachLiveSheet: View {
 
                             coachCard {
                                 VStack(alignment: .leading, spacing: 12) {
-                                    HStack {
+                                    HStack(spacing: 8) {
                                         Image(systemName: "waveform.path")
                                             .foregroundStyle(ATHLTHTheme.accentDeep)
                                         Text(ATHLTHLocalization.choose(
-                                            english: "Guidance level",
-                                            norwegian: "Veiledningsnivå"
+                                            english: "How much guidance?",
+                                            norwegian: "Hvor mye veiledning?"
                                         ))
                                         .font(.headline)
                                     }
                                     HStack(spacing: 7) {
-                                        ForEach(ATHLTHCoachContentLevel.allCases) { level in
+                                        ForEach(ATHLTHCoachExperiencePreset.allCases) { preset in
                                             Button {
                                                 update { value in
-                                                    value = level.applying(to: value)
+                                                    value = preset.contentLevel.applying(to: value)
+                                                    value.speechStyle = preset.speechStyle
+                                                    value.distanceIntervalMeters =
+                                                        preset.distanceIntervalKilometers * 1_000
+                                                    value.timeIntervalSeconds = nil
                                                 }
                                             } label: {
                                                 VStack(spacing: 4) {
-                                                    Text(level.title)
+                                                    Text(preset.title)
                                                         .font(.subheadline.weight(.semibold))
-                                                    Text(level.subtitle)
-                                                        .font(.system(size: 10))
+                                                    Text(preset.subtitle)
+                                                        .font(.caption2)
                                                         .lineLimit(2)
+                                                        .multilineTextAlignment(.center)
                                                         .minimumScaleFactor(0.85)
                                                 }
-                                                .frame(maxWidth: .infinity, minHeight: 65)
-                                                .foregroundStyle(
-                                                    ATHLTHCoachContentLevel.matching(configuration) == level
-                                                        ? Color.white
-                                                        : ATHLTHTheme.primaryText
-                                                )
-                                                .background(
-                                                    ATHLTHCoachContentLevel.matching(configuration) == level
-                                                        ? ATHLTHTheme.accentDeep
-                                                        : ATHLTHTheme.canvasBottom,
-                                                    in: RoundedRectangle(cornerRadius: 13)
-                                                )
+                                                .frame(maxWidth: .infinity, minHeight: 66)
+                                                .foregroundStyle(selectedExperience == preset
+                                                    ? Color.white : ATHLTHTheme.primaryText)
+                                                .background(selectedExperience == preset
+                                                    ? ATHLTHTheme.accentDeep : ATHLTHTheme.canvasBottom,
+                                                    in: RoundedRectangle(cornerRadius: 13))
                                             }
                                             .buttonStyle(.plain)
                                             .accessibilityAddTraits(
-                                                ATHLTHCoachContentLevel.matching(configuration) == level
-                                                    ? .isSelected
-                                                    : []
+                                                selectedExperience == preset ? .isSelected : []
                                             )
                                         }
                                     }
-                                    Text(ATHLTHLocalization.choose(
-                                        english: "Controls what you hear. The intervals below control how often.",
-                                        norwegian: "Styrer hva coachen sier. Intervallene nedenfor styrer hvor ofte."
-                                    ))
-                                    .font(.caption)
-                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                    if selectedExperience == nil {
+                                        Text(ATHLTHLocalization.choose(
+                                            english: "Your custom settings are preserved until you choose a level.",
+                                            norwegian: "Ditt tilpassede oppsett beholdes til du velger et nivå."
+                                        ))
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                    }
+                                    Button {
+                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                            showDetailedOptions.toggle()
+                                        }
+                                    } label: {
+                                        HStack {
+                                            Label(
+                                                ATHLTHLocalization.choose(
+                                                    english: "More settings",
+                                                    norwegian: "Flere innstillinger"
+                                                ),
+                                                systemImage: "slider.horizontal.3"
+                                            )
+                                            Spacer()
+                                            Image(systemName: showDetailedOptions
+                                                ? "chevron.up" : "chevron.down")
+                                        }
+                                        .font(.subheadline.weight(.semibold))
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                             }
 
+                            if showDetailedOptions {
                             coachCard {
                                 VStack(alignment: .leading, spacing: 12) {
                                     HStack(spacing: 8) {
@@ -3468,6 +3499,7 @@ private struct IPhoneAudioCoachLiveSheet: View {
                                     )
                                 }
                                 .tint(ATHLTHTheme.accentDeep)
+                            }
                             }
                         }
 
