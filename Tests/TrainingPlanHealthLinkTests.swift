@@ -282,4 +282,60 @@ final class TrainingPlanHealthLinkTests: XCTestCase {
         )
         XCTAssertEqual(progress.completedSessions, 0)
     }
+
+    @MainActor
+    func testOnlyExplicitIPhonePlanOriginAutoLinksAHealthRun() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let today = Calendar.current.startOfDay(for: Date())
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Plan-linked run", summary: "",
+            weekCount: 1, startDate: today
+        ))
+        let first = addRun(
+            store: store, planID: plan.id,
+            dayID: plan.weeks[0].days[0].id, time: today
+        )
+        let second = addRun(
+            store: store, planID: plan.id,
+            dayID: plan.weeks[0].days[1].id, time: today
+        )
+        let healthRun = workout(activity: .running, startedAt: today)
+        var phone = PhoneWorkout(
+            walking: false, start: today, lastCheckpoint: today
+        )
+        phone.end = today.addingTimeInterval(1_800)
+        phone.healthID = healthRun.id
+
+        // A same-day workout with no explicit plan origin must be ignored.
+        store.reconcilePlanLinkedPhoneWorkouts(
+            [phone], healthWorkouts: [healthRun]
+        )
+        XCTAssertNil(store.linkedHealthWorkoutID(
+            planID: plan.id, sessionID: first.id
+        ))
+        phone.plannedPlanID = plan.id
+        phone.plannedSessionID = first.id
+        store.reconcilePlanLinkedPhoneWorkouts(
+            [phone], healthWorkouts: [healthRun]
+        )
+        XCTAssertEqual(store.linkedHealthWorkoutID(
+            planID: plan.id, sessionID: first.id
+        ), healthRun.id)
+        XCTAssertNil(store.linkedHealthWorkoutID(
+            planID: plan.id, sessionID: second.id
+        ))
+        // Reprocessing on HealthKit refresh must not credit a second session.
+        store.reconcilePlanLinkedPhoneWorkouts(
+            [phone], healthWorkouts: [healthRun]
+        )
+        XCTAssertTrue(store.isPlanSessionCompleted(
+            planID: plan.id, sessionID: first.id,
+            healthWorkouts: [healthRun], strengthHistory: []
+        ))
+        XCTAssertFalse(store.isPlanSessionCompleted(
+            planID: plan.id, sessionID: second.id,
+            healthWorkouts: [healthRun], strengthHistory: []
+        ))
+    }
 }

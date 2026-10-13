@@ -5235,6 +5235,7 @@ struct ATHLTHTrainView: View {
     @State private var selectedStrengthSession: PlannedSession?
     @State private var selectedPlanWorkout: PlannedWorkoutSelection?
     @State private var pendingRunningTemplate: RunningWorkoutTemplate?
+    @State private var pendingPlannedEnduranceWorkout: PlannedWorkoutSelection?
     @State private var showingRunQuickStart = false
     @State private var showingWalkQuickStart = false
     @State private var showingStrengthQuickStart = false
@@ -5401,12 +5402,15 @@ struct ATHLTHTrainView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingRunQuickStart) {
+            .sheet(isPresented: $showingRunQuickStart, onDismiss: {
+                pendingPlannedEnduranceWorkout = nil
+            }) {
                 RunQuickStartSheet(
                     trainingDeviceProvider:
                         watchConnection.isReady ? .appleWatch : .none,
                     watchConnected: watchConnection.isReady
                 ) { configuration in
+                    let planOrigin = pendingPlannedEnduranceWorkout
                     Task { @MainActor in
                         guard await social.beginWorkoutWithFriends(
                             title: configuration.title,
@@ -5442,7 +5446,9 @@ struct ATHLTHTrainView: View {
                                     ghostRace:
                                         ghostRace,
                                     workoutMirroring:
-                                        workoutMirroring
+                                        workoutMirroring,
+                                    plannedPlanID: planOrigin?.planID,
+                                    plannedSessionID: planOrigin?.workout.id
                                 )
                             _ = await social
                                 .confirmCurrentJoinedWorkoutStarted()
@@ -5460,12 +5466,15 @@ struct ATHLTHTrainView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingWalkQuickStart) {
+            .sheet(isPresented: $showingWalkQuickStart, onDismiss: {
+                pendingPlannedEnduranceWorkout = nil
+            }) {
                 WalkQuickStartSheet(
                     trainingDeviceProvider:
                         watchConnection.isReady ? .appleWatch : .none,
                     watchConnected: watchConnection.isReady
                 ) { configuration in
+                    let planOrigin = pendingPlannedEnduranceWorkout
                     Task { @MainActor in
                         guard await social.beginWorkoutWithFriends(
                             title: "Walk",
@@ -5495,7 +5504,9 @@ struct ATHLTHTrainView: View {
                                     spotify:
                                         spotifyPlayback,
                                     workoutMirroring:
-                                        workoutMirroring
+                                        workoutMirroring,
+                                    plannedPlanID: planOrigin?.planID,
+                                    plannedSessionID: planOrigin?.workout.id
                                 )
                             _ = await social
                                 .confirmCurrentJoinedWorkoutStarted()
@@ -5572,7 +5583,9 @@ struct ATHLTHTrainView: View {
                     }
                 }
             }
-            .sheet(item: $pendingRunningTemplate) { workout in
+            .sheet(item: $pendingRunningTemplate, onDismiss: {
+                pendingPlannedEnduranceWorkout = nil
+            }) { workout in
                 RunQuickStartSheet(
                     trainingDeviceProvider:
                         watchConnection.isReady
@@ -5582,6 +5595,7 @@ struct ATHLTHTrainView: View {
                         watchConnection.isReady,
                     initialWorkout: workout
                 ) { configuration in
+                    let planOrigin = pendingPlannedEnduranceWorkout
                     Task { @MainActor in
                         guard await social
                             .beginWorkoutWithFriends(
@@ -5629,7 +5643,9 @@ struct ATHLTHTrainView: View {
                                     ghostRace:
                                         ghostRace,
                                     workoutMirroring:
-                                        workoutMirroring
+                                        workoutMirroring,
+                                    plannedPlanID: planOrigin?.planID,
+                                    plannedSessionID: planOrigin?.workout.id
                                 )
                             _ = await social
                                 .confirmCurrentJoinedWorkoutStarted()
@@ -5671,8 +5687,21 @@ struct ATHLTHTrainView: View {
             }
             .task {
                 session.refreshActivePlanForToday()
+                session.reconcilePlanLinkedPhoneWorkouts(
+                    phoneWorkout.history, healthWorkouts: health.workouts
+                )
                 await exerciseLibrary.refresh()
                 handleNavigationRequest()
+            }
+            .onReceive(phoneWorkout.$history) { history in
+                session.reconcilePlanLinkedPhoneWorkouts(
+                    history, healthWorkouts: health.workouts
+                )
+            }
+            .onReceive(health.$workouts) { workouts in
+                session.reconcilePlanLinkedPhoneWorkouts(
+                    phoneWorkout.history, healthWorkouts: workouts
+                )
             }
             .onChange(
                 of: navigationRequest?.id
@@ -7309,6 +7338,10 @@ struct ATHLTHTrainView: View {
         }
 
         if workout.kind == .running {
+            pendingPlannedEnduranceWorkout = PlannedWorkoutSelection(
+                planID: planID, workout: workout,
+                isHealthCompleted: false
+            )
             if let running = workout.resolvedRunningWorkouts.first {
                 pendingRunningTemplate = running
             } else {
@@ -7318,6 +7351,10 @@ struct ATHLTHTrainView: View {
         }
 
         if workout.kind == .walking {
+            pendingPlannedEnduranceWorkout = PlannedWorkoutSelection(
+                planID: planID, workout: workout,
+                isHealthCompleted: false
+            )
             showingWalkQuickStart = true
             return
         }
@@ -9848,6 +9885,7 @@ struct ATHLTHTrainView: View {
 
     private var libraryContent: some View {
         TrainingLibraryHomeView { workout in
+            pendingPlannedEnduranceWorkout = nil
             pendingRunningTemplate = workout
         }
     }
@@ -10062,6 +10100,7 @@ struct ATHLTHTrainView: View {
     }
 
     private func handleQuickStart(_ kind: WorkoutKind) {
+        pendingPlannedEnduranceWorkout = nil
         switch kind {
         case .running:
             if let active = phoneWorkout.active,

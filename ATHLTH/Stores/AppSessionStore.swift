@@ -684,8 +684,34 @@ final class AppSessionStore: ObservableObject {
         persistAccountContent()
     }
 
-    /// Links an already available Health workout only after an athlete
-    /// explicitly chooses it. Never guesses from activity type or date.
+    /// Links a recorded iPhone workout only to its explicit plan origin.
+    /// The persisted HealthKit UUID is required; we never match by date.
+    func reconcilePlanLinkedPhoneWorkouts(
+        _ phoneHistory: [PhoneWorkout],
+        healthWorkouts: [WorkoutSummary]
+    ) {
+        for recorded in phoneHistory where recorded.end != nil {
+            guard let planID = recorded.plannedPlanID,
+                  let sessionID = recorded.plannedSessionID,
+                  let healthID = recorded.healthID,
+                  linkedHealthWorkoutID(
+                      planID: planID, sessionID: sessionID
+                  ) == nil,
+                  !isPlanSessionSkipped(
+                      planID: planID, sessionID: sessionID
+                  ),
+                  let matching = healthWorkouts.first(where: {
+                      $0.id == healthID
+                  }) else { continue }
+            // The existing linker checks activity and prevents double credit.
+            _ = linkHealthWorkout(
+                matching, toPlan: planID, sessionID: sessionID
+            )
+        }
+    }
+
+    /// Links a Health workout after explicit selection or a confirmed
+    /// plan-origin recording, never based on matching dates.
     @discardableResult
     func linkHealthWorkout(
         _ workout: WorkoutSummary,
