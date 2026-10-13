@@ -101,6 +101,28 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
     }
 
     @ViewBuilder
+    private func reviewWorkoutButton(
+        title: String,
+        weekID: UUID,
+        dayID: UUID
+    ) -> some View {
+        Button {
+            onSelect(weekID, dayID)
+        } label: {
+            Label(ATHLTHLocalization.choose(
+                english: "Review \(title)",
+                norwegian: "Gjennomgå \(title)"
+            ), systemImage: "questionmark.circle")
+            .font(.caption.weight(.semibold))
+        }
+        .buttonStyle(.borderless)
+        .accessibilityHint(ATHLTHLocalization.choose(
+            english: "Open the planned day to review this workout",
+            norwegian: "Åpner plandagen for å gjennomgå økten"
+        ))
+    }
+
+    @ViewBuilder
     private func plannedDayButton(weekID: UUID, dayID: UUID) -> some View {
         Button {
             onSelect(weekID, dayID)
@@ -396,20 +418,11 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                         let needsReview = !completed && !skipped
                                             && (effectiveDate.map { calendar.startOfDay(for: $0) < today } ?? false)
                                         if needsReview {
-                                            Button {
-                                                onSelect(week.id, day.id)
-                                            } label: {
-                                                Label(ATHLTHLocalization.choose(
-                                                    english: "Review \(workout.title)",
-                                                    norwegian: "Gjennomgå \(workout.title)"
-                                                ), systemImage: "questionmark.circle")
-                                                .font(.caption.weight(.semibold))
-                                            }
-                                            .buttonStyle(.borderless)
-                                            .accessibilityHint(ATHLTHLocalization.choose(
-                                                english: "Open the planned day to review this workout",
-                                                norwegian: "Åpner plandagen for å gjennomgå økten"
-                                            ))
+                                            reviewWorkoutButton(
+                                                title: workout.title,
+                                                weekID: week.id,
+                                                dayID: day.id
+                                            )
                                         }
                                         let rowStatus = WorkoutRowStatus(
                                             completed: completed,
