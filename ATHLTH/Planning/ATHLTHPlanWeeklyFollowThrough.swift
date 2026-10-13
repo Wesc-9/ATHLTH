@@ -180,8 +180,18 @@ enum ATHLTHPlanWeeklyFollowThrough {
                               let neighborDay = plan.weeks[weekIndex].days.first(where: {
                                   $0.dayIndex == neighborDayIndex
                               }) else { return count }
-                        return count + neighborDay.sessions.filter {
-                            $0.id != workout.id
+                        // Finished or skipped workouts should not create
+                        // artificial pressure around future sessions.
+                        return count + neighborDay.sessions.filter { neighbor in
+                            neighbor.id != workout.id
+                                && !store.isPlanSessionSkipped(
+                                    planID: plan.id, sessionID: neighbor.id
+                                )
+                                && !store.isPlanSessionCompleted(
+                                    planID: plan.id, sessionID: neighbor.id,
+                                    healthWorkouts: healthWorkouts,
+                                    strengthHistory: strengthHistory
+                                )
                         }.count
                     }
                 }

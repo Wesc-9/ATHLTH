@@ -609,6 +609,42 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
     }
 
     @MainActor
+    func testSkippedNeighborDoesNotTriggerUnnecessaryMove() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let source = workout()
+        let neighbor = workout()
+        store.addSession(source, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(neighbor, toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
+        store.setPlanSessionSkipped(
+            planID: plan.id, sessionID: neighbor.id, skipped: true
+        )
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertNil(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: plan.startDate!
+        ))
+    }
+
+    @MainActor
+    func testCompletedNeighborDoesNotTriggerUnnecessaryMove() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let source = workout()
+        let neighbor = workout()
+        store.addSession(source, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(neighbor, toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
+        store.setPlanSessionManuallyCompleted(
+            planID: plan.id, sessionID: neighbor.id, completed: true
+        )
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertNil(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: plan.startDate!
+        ))
+    }
+
+    @MainActor
     func testDuplicateIdentitiesAreCountedOnlyOnce() throws {
         let (store, defaults, suite, plan) = try prepared(weekCount: 1)
         defer { defaults.removePersistentDomain(forName: suite) }
