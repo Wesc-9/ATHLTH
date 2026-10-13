@@ -514,10 +514,10 @@ struct ATHLTHArenaScoringSection: View {
                     HStack(spacing: 12) {
                         Image(systemName: "crown.fill")
                             .font(.title2.weight(.bold))
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
                             .frame(width: 50, height: 50)
                             .background(
-                                ATHLTHTheme.champagneSoft.opacity(0.27),
+                                ATHLTHArenaLightStyle.soft,
                                 in: Circle()
                             )
                         VStack(alignment: .leading, spacing: 3) {
@@ -529,10 +529,10 @@ struct ATHLTHArenaScoringSection: View {
                                     english: "Joint Arena champions", norwegian: "Delte Arena-mestere"
                                   ))
                                 .font(.caption.weight(.semibold))
-                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
                             Text(champions.map(memberName).joined(separator: " · "))
-                                .font(.title3.weight(.bold))
-                                .foregroundStyle(ATHLTHTheme.primaryText)
+                                .font(ATHLTHArenaLightStyle.editorialTitle(25))
+                                .foregroundStyle(ATHLTHArenaLightStyle.ink)
                         }
                         Spacer(minLength: 0)
                     }
@@ -541,15 +541,11 @@ struct ATHLTHArenaScoringSection: View {
                         norwegian: "Sluttresultatet er godkjent av alle stemmeberettigede deltakerne."
                     ))
                     .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                 }
                 .padding(18)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22)
-                        .stroke(ATHLTHTheme.accentDeep.opacity(0.15), lineWidth: 1)
-                )
+                .background(ATHLTHArenaLightStyle.card(21))
             }
 
             if series.status == "completed",
@@ -563,17 +559,16 @@ struct ATHLTHArenaScoringSection: View {
                         systemImage: "clock.badge.exclamationmark"
                     )
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
                     Text(ATHLTHLocalization.choose(
                         english: "No champion can be declared until all rounds have approved results. Only previously approved points appear in standings.",
                         norwegian: "Ingen Arena-mester kåres før alle runder har godkjente resultater. Stillingen viser kun poeng som allerede er godkjent."
                     ))
                     .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                 }
                 .padding(16)
-                .background(.regularMaterial,
-                            in: RoundedRectangle(cornerRadius: 18))
+                .background(ATHLTHArenaLightStyle.card(18))
             }
 
             if series.status != "draft" {
@@ -676,10 +671,10 @@ struct ATHLTHArenaScoringSection: View {
         HStack(alignment: .top, spacing: 11) {
             Image(systemName: "checkmark.shield.fill")
                 .font(.title3)
-                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
                 .frame(width: 34, height: 34)
                 .background(
-                    ATHLTHTheme.vitalitySoft.opacity(0.65),
+                    ATHLTHArenaLightStyle.soft,
                     in: RoundedRectangle(cornerRadius: 11)
                 )
                 .accessibilityHidden(true)
@@ -690,7 +685,7 @@ struct ATHLTHArenaScoringSection: View {
                     norwegian: "Din godkjenning mangler"
                 ))
                 .font(.subheadline.weight(.bold))
-                .foregroundStyle(ATHLTHTheme.primaryText)
+                .foregroundStyle(ATHLTHArenaLightStyle.ink)
 
                 Text(
                     rounds.first(where: { $0.id == result.roundID })?.title ??
@@ -700,7 +695,7 @@ struct ATHLTHArenaScoringSection: View {
                     )
                 )
                 .font(.caption)
-                .foregroundStyle(ATHLTHTheme.mutedText)
+                .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                 .lineLimit(2)
 
                 Button {
@@ -713,7 +708,7 @@ struct ATHLTHArenaScoringSection: View {
                     .font(.caption.weight(.semibold))
                 }
                 .buttonStyle(.bordered)
-                .tint(ATHLTHTheme.accentDeep)
+                .tint(ATHLTHArenaLightStyle.ink)
                 .accessibilityHint(ATHLTHLocalization.choose(
                     english: "Opens the round's review controls; no vote is sent automatically.",
                     norwegian: "Åpner stemmevalgene for runden uten å sende en stemme automatisk."
@@ -724,7 +719,7 @@ struct ATHLTHArenaScoringSection: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .background(
-            ATHLTHTheme.vitalitySoft.opacity(0.36),
+            ATHLTHArenaLightStyle.soft,
             in: RoundedRectangle(cornerRadius: 18)
         )
         .accessibilityElement(children: .contain)
@@ -746,13 +741,13 @@ struct ATHLTHArenaScoringSection: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
                     Image(systemName: "person.crop.circle.fill")
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
                     Text(ATHLTHLocalization.choose(
                         english: "Your Arena standing",
                         norwegian: "Din Arena-stilling"
                     ))
                     .font(.subheadline.weight(.bold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .foregroundStyle(ATHLTHArenaLightStyle.ink)
                     Spacer(minLength: 0)
                     Text(series.status == "completed"
                         ? ATHLTHLocalization.choose(
@@ -762,7 +757,7 @@ struct ATHLTHArenaScoringSection: View {
                             english: "Provisional", norwegian: "Foreløpig"
                           ))
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                 }
 
                 HStack(alignment: .firstTextBaseline, spacing: 18) {
@@ -770,23 +765,23 @@ struct ATHLTHArenaScoringSection: View {
                         Text(position.map { "#\($0)" } ?? "–")
                             .font(.system(.title2, design: .rounded, weight: .bold))
                             .monospacedDigit()
-                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .foregroundStyle(ATHLTHArenaLightStyle.ink)
                         Text(ATHLTHLocalization.choose(
                             english: "Position", norwegian: "Plassering"
                         ))
                         .font(.caption2)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                     }
                     VStack(alignment: .leading, spacing: 2) {
                         Text("\(points.formatted()) p")
                             .font(.system(.title2, design: .rounded, weight: .bold))
                             .monospacedDigit()
-                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .foregroundStyle(ATHLTHArenaLightStyle.ink)
                         Text(ATHLTHLocalization.choose(
                             english: "Approved points", norwegian: "Godkjente poeng"
                         ))
                         .font(.caption2)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                     }
                     Spacer(minLength: 0)
                 }
@@ -807,12 +802,12 @@ struct ATHLTHArenaScoringSection: View {
                           )
                 )
                 .font(.caption)
-                .foregroundStyle(ATHLTHTheme.mutedText)
+                .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
             .padding(15)
             .background(
-                ATHLTHTheme.vitalitySoft.opacity(0.42),
+                ATHLTHArenaLightStyle.soft,
                 in: RoundedRectangle(cornerRadius: 18)
             )
             .accessibilityElement(children: .combine)
