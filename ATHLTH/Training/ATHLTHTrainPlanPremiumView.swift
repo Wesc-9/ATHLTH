@@ -554,6 +554,19 @@ struct ATHLTHTrainPlanPremiumView: View {
             }
 
             if let selectedWeek {
+                if !advanced && (selectedWeekIndex ?? currentWeekIndex(plan)) != currentWeekIndex(plan) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            selectedWeekIndex = currentWeekIndex(plan)
+                        }
+                    } label: {
+                        Label(tr("Back to current week", "Tilbake til denne uken"),
+                              systemImage: "calendar")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(warmGold)
+                }
                 weekPager(plan, week: selectedWeek)
 
                 if advanced {
@@ -613,6 +626,15 @@ struct ATHLTHTrainPlanPremiumView: View {
     ) -> some View {
         let index = min(max(selectedWeekIndex ?? currentWeekIndex(plan), 0),
                         max(plan.weeks.count - 1, 0))
+        let workouts = week.days.flatMap(\.sessions)
+        let completedCount = workouts.filter {
+            session.isPlanSessionCompleted(
+                planID: plan.id,
+                sessionID: $0.id,
+                healthWorkouts: health.workouts,
+                strengthHistory: strength.workoutHistory
+            )
+        }.count
         return HStack(spacing: 9) {
             Button {
                 withAnimation(.easeInOut(duration: 0.18)) {
@@ -628,8 +650,11 @@ struct ATHLTHTrainPlanPremiumView: View {
                 Text(tr("Week \(index + 1) of \(plan.weeks.count)",
                         "Uke \(index + 1) av \(plan.weeks.count)"))
                     .font(.subheadline.weight(.semibold))
-                Text(tr("\(week.days.reduce(0) { $0 + $1.sessions.count }) planned workouts",
-                        "\(week.days.reduce(0) { $0 + $1.sessions.count }) planlagte økter"))
+                Text(advanced
+                     ? tr("\(workouts.count) planned workouts",
+                          "\(workouts.count) planlagte økter")
+                     : tr("\(completedCount) of \(workouts.count) completed",
+                          "\(completedCount) av \(workouts.count) gjennomført"))
                     .font(.caption2)
                     .foregroundStyle(secondaryInk)
             }
@@ -674,6 +699,10 @@ struct ATHLTHTrainPlanPremiumView: View {
                             healthWorkouts: health.workouts,
                             strengthHistory: strength.workoutHistory
                         )
+                        let isToday = Calendar.current.isDate(
+                            planDayDate(day.dayIndex, plan: plan),
+                            inSameDayAs: Date()
+                        )
                         Button {
                             openingWorkout = workout
                         } label: {
@@ -696,6 +725,12 @@ struct ATHLTHTrainPlanPremiumView: View {
                                         .font(.headline)
                                         .foregroundStyle(graphite)
                                         .multilineTextAlignment(.leading)
+                                    if isToday && !completed {
+                                        Label(tr("Today", "I dag"),
+                                              systemImage: "calendar")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(warmGold)
+                                    }
                                     if completed {
                                         Label(tr("Completed", "Gjennomført"),
                                               systemImage: "checkmark.circle.fill")
@@ -710,7 +745,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                             }
                             .padding(16)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.white.opacity(0.9),
+                            .background(isToday ? soft : Color.white.opacity(0.9),
                                 in: RoundedRectangle(cornerRadius: 18))
                         }
                         .buttonStyle(.plain)
@@ -718,7 +753,8 @@ struct ATHLTHTrainPlanPremiumView: View {
                             "\(simpleWorkoutDescription(workout)), " +
                             (completed
                                 ? tr("completed", "gjennomført")
-                                : tr("planned", "planlagt"))
+                                : isToday ? tr("today", "i dag")
+                                          : tr("planned", "planlagt"))
                         )
                         .accessibilityHint(tr(
                             "Opens workout details",
