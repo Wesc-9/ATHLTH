@@ -452,39 +452,47 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
             }
 
             if let nextWorkout {
-                VStack(alignment: .leading, spacing: 7) {
-                    Label(ATHLTHLocalization.choose(
-                        english: "Your next planned workout",
-                        norwegian: "Din neste planlagte økt"
-                    ), systemImage: "calendar.badge.clock")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    Text(nextWorkout.title)
-                        .font(.title3.weight(.semibold))
-                    Text(nextWorkout.date.formatted(
-                        .dateTime.weekday(.wide).day().month(.abbreviated)
-                    ))
-                    .font(.caption)
-                    if let minutes = nextWorkout.durationMinutes, minutes > 0 {
-                        Text(ATHLTHLocalization.choose(
-                            english: "\(minutes) planned minutes",
-                            norwegian: "\(minutes) planlagte minutter"
+                Button {
+                    onSelect(nextWorkout.weekID, nextWorkout.dayID)
+                } label: {
+                    VStack(alignment: .leading, spacing: 7) {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Your next planned workout",
+                            norwegian: "Din neste planlagte økt"
+                        ), systemImage: "calendar.badge.clock")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        Text(nextWorkout.title)
+                            .font(.title3.weight(.semibold))
+                        Text(nextWorkout.date.formatted(
+                            .dateTime.weekday(.wide).day().month(.abbreviated)
                         ))
                         .font(.caption)
-                    }
-                    Button {
-                        onSelect(nextWorkout.weekID, nextWorkout.dayID)
-                    } label: {
+                        if let minutes = nextWorkout.durationMinutes, minutes > 0 {
+                            Text(ATHLTHLocalization.choose(
+                                english: "\(minutes) planned minutes",
+                                norwegian: "\(minutes) planlagte minutter"
+                            ))
+                            .font(.caption)
+                        }
                         Label(ATHLTHLocalization.choose(
                             english: "View workout in plan",
                             norwegian: "Se økten i planen"
                         ), systemImage: "arrow.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accent)
                     }
-                    .buttonStyle(.bordered)
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .frame(maxWidth: .infinity, minHeight: 70, alignment: .leading)
+                    .padding(.vertical, 8)
+                    .contentShape(Rectangle())
                 }
-                .foregroundStyle(ATHLTHPlanDesign.ink)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 8)
+                .buttonStyle(.plain)
+                .accessibilityElement(children: .combine)
+                .accessibilityHint(ATHLTHLocalization.choose(
+                    english: "Open this workout in the training plan",
+                    norwegian: "Åpner økten i treningsplanen"
+                ))
             }
 
             if load.estimatedMinutes > 0 {
