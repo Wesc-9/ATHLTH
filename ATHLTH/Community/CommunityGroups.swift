@@ -4980,37 +4980,11 @@ struct CommunityGroupsView: View {
                 ) == nil
             }
 
-        let clean =
-            query
-                .trimmingCharacters(
-                    in:
-                        .whitespacesAndNewlines
-                )
-                .lowercased()
-
-        return publicGroups.filter {
-            group in
-
-            let matchesQuery: Bool
-            if clean.isEmpty {
-                matchesQuery = true
-            } else {
-                matchesQuery =
-                    group.name
-                        .lowercased()
-                        .contains(clean) ||
-                    group.locationName
-                        .lowercased()
-                        .contains(clean) ||
-                    group.summary
-                        .lowercased()
-                        .contains(clean)
-            }
-
-            return matchesQuery &&
-                discoverFilter.matches(
-                    group
-                )
+        return publicGroups.filter { group in
+            ATHLTHCommunityDiscoveryPolicy.matches(
+                query,
+                in: [group.name, group.locationName, group.summary]
+            ) && discoverFilter.matches(group)
         }
     }
 
