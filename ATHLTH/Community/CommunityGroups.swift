@@ -4855,6 +4855,10 @@ enum CommunityGroupsTab: String, CaseIterable, Identifiable {
 struct CommunityGroupsView: View {
     @EnvironmentObject private var groups: CommunityGroupStore
 
+    init(initialQuery: String = "") {
+        _query = State(initialValue: initialQuery)
+    }
+
     @State private var query = ""
     @State private var showingCreate = false
     @State private var discoverFilter:
