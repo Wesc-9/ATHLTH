@@ -3656,22 +3656,7 @@ private struct CommunityReferenceQuickActions: View {
             }
             .buttonStyle(.plain)
 
-            NavigationLink {
-                CommunityDiscoveryView()
-            } label: {
-                tile(
-                    title: ATHLTHLocalization.choose(
-                        english: "Explore", norwegian: "Utforsk"
-                    ),
-                    detail: ATHLTHLocalization.choose(
-                        english: "Clubs, events & challenges",
-                        norwegian: "Klubber, eventer og utfordringer"
-                    ),
-                    icon: "safari",
-                    tint: ATHLTHTheme.accentDeep
-                )
-            }
-            .buttonStyle(.plain)
+
         }
     }
 
