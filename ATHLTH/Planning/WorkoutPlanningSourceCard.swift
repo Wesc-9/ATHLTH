@@ -152,6 +152,9 @@ struct WorkoutPlanningSourceCard: View {
         .padding(.horizontal, 2)
     }
 
+    /// Full-bleed portrait photo cards matching the selected start design.
+    /// The bright upper gradient keeps titles legible over any goal artwork,
+    /// while the lower image stays visible all the way to the rounded edges.
     private func sourceTile(
         title: String,
         subtitle: String,
@@ -161,32 +164,8 @@ struct WorkoutPlanningSourceCard: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 0) {
-                Image(systemName: icon)
-                    .font(.system(size: 19, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .frame(width: 41, height: 41)
-                    .background(Color.white.opacity(0.9), in: Circle())
-
-                Text(title)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.85)
-                    .multilineTextAlignment(.leading)
-                    .padding(.top, 12)
-
-                Text(subtitle)
-                    .font(.system(size: 11, weight: .regular))
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                    .lineLimit(3)
-                    .minimumScaleFactor(0.9)
-                    .multilineTextAlignment(.leading)
-                    .padding(.top, 5)
-
-                Spacer(minLength: 10)
-
-                GeometryReader { geometry in
+            GeometryReader { geometry in
+                ZStack(alignment: .topLeading) {
                     Image(imageName)
                         .resizable()
                         .scaledToFill()
@@ -195,41 +174,89 @@ struct WorkoutPlanningSourceCard: View {
                             height: geometry.size.height
                         )
                         .clipped()
-                        .overlay(alignment: .bottomLeading) {
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(ATHLTHTheme.accentDeep)
-                                .frame(width: 34, height: 34)
-                                .background(Color.white.opacity(0.96), in: Circle())
-                                .padding(9)
-                        }
-                }
-                .frame(height: 115)
-                .clipShape(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                )
-            }
-            .padding(11)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: 275)
-            .background {
-                RoundedRectangle(cornerRadius: 21, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.96),
-                                tint.opacity(0.13),
-                                Color.white.opacity(0.89)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+
+                    LinearGradient(
+                        stops: [
+                            .init(color: Color.white.opacity(0.94), location: 0),
+                            .init(color: Color.white.opacity(0.91), location: 0.25),
+                            .init(color: Color.white.opacity(0.78), location: 0.44),
+                            .init(color: Color.white.opacity(0.26), location: 0.66),
+                            .init(color: Color.clear, location: 0.84)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
                     )
+
+                    LinearGradient(
+                        colors: [
+                            tint.opacity(0.07),
+                            Color.clear
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+
+                    VStack(alignment: .leading, spacing: 0) {
+                        Image(systemName: icon)
+                            .font(.system(size: 19, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 43, height: 43)
+                            .background(Color.white.opacity(0.94), in: Circle())
+
+                        Text(title)
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.85)
+                            .multilineTextAlignment(.leading)
+                            .padding(.top, 17)
+
+                        Text(subtitle)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(ATHLTHTheme.primaryText.opacity(0.78))
+                            .lineLimit(4)
+                            .minimumScaleFactor(0.86)
+                            .multilineTextAlignment(.leading)
+                            .padding(.top, 6)
+
+                        Spacer(minLength: 12)
+
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 43, height: 43)
+                            .background(
+                                Color.white.opacity(0.97),
+                                in: Circle()
+                            )
+                            .overlay {
+                                Circle()
+                                    .stroke(Color.white.opacity(0.8), lineWidth: 1)
+                            }
+                    }
+                    .padding(15)
+                    .frame(
+                        width: geometry.size.width,
+                        height: geometry.size.height,
+                        alignment: .topLeading
+                    )
+                }
+                .frame(
+                    width: geometry.size.width,
+                    height: geometry.size.height
+                )
+                .clipShape(
+                    RoundedRectangle(cornerRadius: 23, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 23, style: .continuous)
+                        .stroke(Color.white.opacity(0.75), lineWidth: 1)
+                }
             }
-            .overlay {
-                RoundedRectangle(cornerRadius: 21, style: .continuous)
-                    .stroke(Color.white.opacity(0.85), lineWidth: 1)
-            }
+            .frame(height: 315)
+            .contentShape(
+                RoundedRectangle(cornerRadius: 23, style: .continuous)
+            )
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
