@@ -1136,4 +1136,40 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
         XCTAssertEqual(report.unknownDate, 0)
         XCTAssertEqual(report.pastDated, 1)
     }
+    @MainActor
+    func testSeparatedLongDaysAreNotConsecutive() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var first = workout()
+        first.durationMinutes = 75
+        var second = workout()
+        second.durationMinutes = 80
+        store.addSession(first, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(second, toDay: plan.weeks[0].days[2].id, inPlan: plan.id)
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertEqual(ATHLTHPlanWeeklyFollowThrough.plannedLoadSummary(plan: saved).consecutiveLongDayPairs, 0)
+        XCTAssertEqual(ATHLTHPlanWeeklyFollowThrough.weeklyLoadSummaries(plan: saved)[0].adjacentLongDayPairs, 0)
+        XCTAssertEqual(ATHLTHPlanWeeklyFollowThrough.effortDistribution(
+            plan: saved, effortBySessionID: [first.id: .hard, second.id: .hard]
+        ).adjacentHardDayPairs, 0)
+    }
+
+    @MainActor
+    func testAdjacentLongAndHardDaysAreCounted() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var first = workout()
+        first.durationMinutes = 70
+        var second = workout()
+        second.durationMinutes = 70
+        store.addSession(first, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(second, toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertEqual(ATHLTHPlanWeeklyFollowThrough.plannedLoadSummary(plan: saved).consecutiveLongDayPairs, 1)
+        XCTAssertEqual(ATHLTHPlanWeeklyFollowThrough.weeklyLoadSummaries(plan: saved)[0].adjacentLongDayPairs, 1)
+        XCTAssertEqual(ATHLTHPlanWeeklyFollowThrough.effortDistribution(
+            plan: saved, effortBySessionID: [first.id: .hard, second.id: .hard]
+        ).adjacentHardDayPairs, 1)
+    }
+
 }
