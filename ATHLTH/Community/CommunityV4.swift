@@ -54,6 +54,21 @@ struct ATHLTHCommunityV4View: View {
         )
     }
 
+    private var pendingWorkoutInvitesCount: Int {
+        social.workoutInvites.filter {
+            $0.participant.state == .invited
+        }.count
+    }
+
+    private var pendingCommunityActionCount: Int {
+        messaging.unreadCount +
+        messaging.messageRequestCount +
+        social.incomingRequests.count +
+        pendingWorkoutInvitesCount +
+        challengeInvites.count +
+        groups.ownInvites.count
+    }
+
     private var onlineFollowing: [SocialProfileCard] {
         social.following.filter {
             realtime.isOnline($0.userID)
@@ -227,6 +242,17 @@ struct ATHLTHCommunityV4View: View {
 
                     // Four distinct destinations, no second Challenge/Arena shortcut.
                     CommunityReferenceQuickActions()
+
+                    if pendingCommunityActionCount > 0 {
+                        CommunityV4AttentionCard(
+                            unreadMessages: messaging.unreadCount,
+                            messageRequests: messaging.messageRequestCount,
+                            followRequests: social.incomingRequests.count,
+                            workoutInvites: pendingWorkoutInvitesCount,
+                            challengeInvites: challengeInvites.count,
+                            clubInvites: groups.ownInvites.count
+                        )
+                    }
 
                     referenceUpcomingSection
                     referenceWeeklyChallengeSection
@@ -5570,7 +5596,10 @@ private struct CommunityV4AttentionCard: View {
                     alignment: .leading,
                     spacing: 3
                 ) {
-                    Text("NEEDS ATTENTION")
+                    Text(ATHLTHLocalization.choose(
+                        english: "NEEDS ATTENTION",
+                        norwegian: "TRENGER OPPFØLGING"
+                    ))
                         .font(
                             .caption2.weight(
                                 .bold
@@ -5581,7 +5610,10 @@ private struct CommunityV4AttentionCard: View {
                             Color.orange
                         )
 
-                    Text("Social inbox")
+                    Text(ATHLTHLocalization.choose(
+                        english: "Social inbox",
+                        norwegian: "Sosial innboks"
+                    ))
                         .font(
                             .title3.weight(
                                 .bold
