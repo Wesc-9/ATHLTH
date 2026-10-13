@@ -645,6 +645,40 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
     }
 
     @MainActor
+    func testSkippedNeighborAcrossWeekBoundaryDoesNotCreatePressure() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 2)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let neighbor = workout()
+        store.addSession(neighbor, toDay: plan.weeks[0].days[6].id, inPlan: plan.id)
+        store.addSession(workout(), toDay: plan.weeks[1].days[0].id, inPlan: plan.id)
+        store.setPlanSessionSkipped(
+            planID: plan.id, sessionID: neighbor.id, skipped: true
+        )
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertNil(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: plan.startDate!
+        ))
+    }
+
+    @MainActor
+    func testCompletedNeighborAcrossWeekBoundaryDoesNotCreatePressure() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 2)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let neighbor = workout()
+        store.addSession(neighbor, toDay: plan.weeks[0].days[6].id, inPlan: plan.id)
+        store.addSession(workout(), toDay: plan.weeks[1].days[0].id, inPlan: plan.id)
+        store.setPlanSessionManuallyCompleted(
+            planID: plan.id, sessionID: neighbor.id, completed: true
+        )
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertNil(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: plan.startDate!
+        ))
+    }
+
+    @MainActor
     func testDuplicateIdentitiesAreCountedOnlyOnce() throws {
         let (store, defaults, suite, plan) = try prepared(weekCount: 1)
         defer { defaults.removePersistentDomain(forName: suite) }
