@@ -452,7 +452,7 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
         ))
         // Day 2 is free but bordered by workouts on both sides.
         // Day 5 has no adjacent workouts and is preferred.
-        XCTAssertEqual(preview.sourceDayIndex, 1)
+        XCTAssertEqual(preview.sourceDayIndex, 3)
         XCTAssertEqual(preview.destinationDayIndex, 5)
     }
 
@@ -474,6 +474,33 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
         XCTAssertEqual(preview.weekID, plan.weeks[1].id)
         XCTAssertEqual(preview.sourceDayIndex, 1)
         XCTAssertEqual(preview.destinationDayIndex, 5)
+    }
+
+    @MainActor
+    func testMovePreviewDoesNotProposeChangeWhenSpacingCannotImprove() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        store.addSession(workout(), toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertNil(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: plan.startDate!
+        ))
+    }
+
+    @MainActor
+    func testMovePreviewSuggestsOnlyStrictlyImprovedSpacing() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        store.addSession(workout(), toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(workout(), toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let preview = try XCTUnwrap(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: plan.startDate!
+        ))
+        XCTAssertEqual(preview.sourceDayIndex, 1)
+        XCTAssertEqual(preview.destinationDayIndex, 4)
     }
 
     @MainActor

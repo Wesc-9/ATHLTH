@@ -185,7 +185,12 @@ enum ATHLTHPlanWeeklyFollowThrough {
                         }.count
                     }
                 }
-                let ranked = eligible.sorted { lhs, rhs in
+                // A move must improve the schedule, not merely occupy a
+                // different free day. Never suggest equal or worse spacing.
+                let sourcePressure = adjacentWorkouts(day.dayIndex)
+                let ranked = eligible.filter {
+                    adjacentWorkouts($0.dayIndex) < sourcePressure
+                }.sorted { lhs, rhs in
                     let left = adjacentWorkouts(lhs.dayIndex)
                     let right = adjacentWorkouts(rhs.dayIndex)
                     return left == right
