@@ -651,7 +651,24 @@ struct ATHLTHTrainPlanPremiumView: View {
                     Spacer(minLength: 0)
                 }
                 .padding(13)
-                .background(soft, in: RoundedRectangle(cornerRadius: 12))
+                .background(soft, in: RoundedRectangle(cornerRadius: 14))
+                .accessibilityElement(children: .combine)
+
+                GeometryReader { geometry in
+                    Capsule()
+                        .fill(line.opacity(0.55))
+                        .overlay(alignment: .leading) {
+                            Capsule()
+                                .fill(warmGold)
+                                .frame(
+                                    width: geometry.size.width *
+                                        min(max(progress.completionFraction, 0), 1)
+                                )
+                        }
+                }
+                .frame(height: 5)
+                .accessibilityLabel(tr("Plan progress", "Fremdrift i planen"))
+                .accessibilityValue("\(Int((progress.completionFraction * 100).rounded())) %")
             }
 
             if advanced {
@@ -985,10 +1002,11 @@ struct ATHLTHTrainPlanPremiumView: View {
                                 Label(tr("Start workout", "Start økt"),
                                       systemImage: "play.fill")
                                     .font(.subheadline.weight(.semibold))
-                                    .frame(maxWidth: .infinity, minHeight: 42)
+                                    .frame(maxWidth: .infinity, minHeight: 48)
                             }
-                            .buttonStyle(.bordered)
-                            .tint(kindTint(workout.kind))
+                            .buttonStyle(.borderedProminent)
+                            .tint(graphite)
+                            .controlSize(.regular)
                             .accessibilityHint(tr(
                                 "Open the existing workout launcher",
                                 "Åpner den vanlige oppstarten av treningsøkter"
@@ -1011,10 +1029,10 @@ struct ATHLTHTrainPlanPremiumView: View {
                                 VStack(alignment: .leading, spacing: 5) {
                                     Text(planDayDate(day.dayIndex, plan: plan)
                                         .formatted(.dateTime.weekday(.wide).day().month(.abbreviated)))
-                                        .font(.caption)
-                                        .foregroundStyle(secondaryInk)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(isToday ? warmGold : secondaryInk)
                                     Text(simpleWorkoutDescription(workout))
-                                        .font(.headline)
+                                        .font(.system(size: 17, weight: .semibold))
                                         .foregroundStyle(graphite)
                                         .multilineTextAlignment(.leading)
                                     if let duration = workout.durationMinutes,
@@ -1052,8 +1070,17 @@ struct ATHLTHTrainPlanPremiumView: View {
                             }
                             .padding(16)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(isToday ? soft : Color.white.opacity(0.9),
-                                in: RoundedRectangle(cornerRadius: 18))
+                            .background(
+                                isToday ? soft : Color.white.opacity(0.94),
+                                in: RoundedRectangle(cornerRadius: 16)
+                            )
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .strokeBorder(
+                                        isToday ? warmGold.opacity(0.30) : line.opacity(0.70),
+                                        lineWidth: 1
+                                    )
+                            }
                         }
                         .buttonStyle(.plain)
                         .contextMenu {
