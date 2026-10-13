@@ -1184,7 +1184,20 @@ struct ATHLTHTrainPlanPremiumView: View {
                             workout.kind == .walking ||
                             workout.kind == .strength) {
                             Button {
-                                onStartWorkout(plan.id, workout)
+                                guard let persisted = session.trainingPlan(withID: plan.id)?
+                                    .weeks.flatMap(\.days).flatMap(\.sessions)
+                                    .first(where: { $0.id == workout.id }),
+                                    !persisted.isStructuredWorkout,
+                                    !session.isPlanSessionSkipped(
+                                        planID: plan.id, sessionID: persisted.id
+                                    ),
+                                    !session.isPlanSessionCompleted(
+                                        planID: plan.id, sessionID: persisted.id,
+                                        healthWorkouts: health.workouts,
+                                        strengthHistory: strength.workoutHistory
+                                    )
+                                else { return }
+                                onStartWorkout(plan.id, persisted)
                             } label: {
                                 Label(tr("Start workout", "Start økt"),
                                       systemImage: "play.fill")

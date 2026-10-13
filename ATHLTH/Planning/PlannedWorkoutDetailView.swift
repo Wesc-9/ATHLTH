@@ -126,7 +126,26 @@ struct PlannedWorkoutDetailView: View {
                                .weeks.flatMap(\.days).flatMap(\.sessions)
                                .contains(where: { $0.id == currentWorkout.id }) == true {
                             Button {
-                                onStartWorkout(planID, currentWorkout)
+                                // Revalidate all five launch prerequisites at tap time:
+                                // plan ownership, workout type, not skipped,
+                                // not completed, and a current persisted session.
+                                guard let persisted = session.trainingPlan(withID: planID)?
+                                    .weeks.flatMap(\.days).flatMap(\.sessions)
+                                    .first(where: { $0.id == currentWorkout.id }),
+                                    !persisted.isStructuredWorkout,
+                                    (persisted.kind == .running ||
+                                     persisted.kind == .walking ||
+                                     persisted.kind == .strength),
+                                    !session.isPlanSessionSkipped(
+                                        planID: planID, sessionID: persisted.id
+                                    ),
+                                    !session.isPlanSessionCompleted(
+                                        planID: planID, sessionID: persisted.id,
+                                        healthWorkouts: health.workouts,
+                                        strengthHistory: strength.workoutHistory
+                                    )
+                                else { return }
+                                onStartWorkout(planID, persisted)
                             } label: {
                                 Label(
                                     ATHLTHLocalization.choose(
