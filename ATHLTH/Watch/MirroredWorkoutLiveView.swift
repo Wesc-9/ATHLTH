@@ -1360,23 +1360,10 @@ struct MirroredWorkoutLiveView: View {
         _ snapshot:
             WatchWorkoutLiveSnapshot
     ) -> String {
-        guard snapshot.distanceMeters >=
-                20,
-              snapshot.elapsedTime > 0
-        else {
-            return "—"
-        }
-
-        let pace =
-            snapshot.elapsedTime /
-            snapshot.distanceMeters *
-            1_000
-
-        guard pace.isFinite,
-              pace > 0
-        else {
-            return "—"
-        }
+        guard let pace = ATHLTHRunningPace.average(
+            elapsedSeconds: snapshot.elapsedTime,
+            distanceMeters: snapshot.distanceMeters
+        ) else { return "—" }
 
         return paceText(pace)
     }
