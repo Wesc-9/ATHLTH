@@ -5408,9 +5408,17 @@ struct ATHLTHTrainView: View {
                 RunQuickStartSheet(
                     trainingDeviceProvider:
                         watchConnection.isReady ? .appleWatch : .none,
-                    watchConnected: watchConnection.isReady
+                    watchConnected: watchConnection.isReady,
+                    initialRoute: pendingPlannedEnduranceWorkout?.workout
+                        .routeID.flatMap { id in
+                            session.savedRoutes.first { $0.id == id }
+                        },
+                    plannedSession: pendingPlannedEnduranceWorkout?.workout
                 ) { configuration in
-                    let planOrigin = pendingPlannedEnduranceWorkout
+                    let planOrigin = matchedPlanOriginForRun(
+                        pendingPlannedEnduranceWorkout,
+                        configuration: configuration
+                    )
                     Task { @MainActor in
                         guard await social.beginWorkoutWithFriends(
                             title: configuration.title,
@@ -5472,7 +5480,8 @@ struct ATHLTHTrainView: View {
                 WalkQuickStartSheet(
                     trainingDeviceProvider:
                         watchConnection.isReady ? .appleWatch : .none,
-                    watchConnected: watchConnection.isReady
+                    watchConnected: watchConnection.isReady,
+                    plannedSession: pendingPlannedEnduranceWorkout?.workout
                 ) { configuration in
                     let planOrigin = pendingPlannedEnduranceWorkout
                     Task { @MainActor in
@@ -5593,9 +5602,13 @@ struct ATHLTHTrainView: View {
                             : .none,
                     watchConnected:
                         watchConnection.isReady,
-                    initialWorkout: workout
+                    initialWorkout: workout,
+                    plannedSession: pendingPlannedEnduranceWorkout?.workout
                 ) { configuration in
-                    let planOrigin = pendingPlannedEnduranceWorkout
+                    let planOrigin = matchedPlanOriginForRun(
+                        pendingPlannedEnduranceWorkout,
+                        configuration: configuration
+                    )
                     Task { @MainActor in
                         guard await social
                             .beginWorkoutWithFriends(
@@ -7271,6 +7284,34 @@ struct ATHLTHTrainView: View {
                     norwegian: "Se økten"
                 )
         }
+    }
+
+    // A change from the planned run to a different quick-start mode
+    // must not silently credit an unrelated workout to the plan.
+    private func matchedPlanOriginForRun(
+        _ origin: PlannedWorkoutSelection?,
+        configuration: RunQuickStartConfiguration
+    ) -> PlannedWorkoutSelection? {
+        guard let origin, origin.workout.kind == .running else {
+            return nil
+        }
+        let planned = origin.workout
+        if let expected = planned.resolvedRunningWorkouts.first {
+            guard configuration.mode == .structured,
+                  configuration.workout?.id == expected.id else {
+                return nil
+            }
+        } else if let routeID = planned.routeID {
+            guard configuration.mode == .route,
+                  configuration.route?.id == routeID else {
+                return nil
+            }
+        } else {
+            guard configuration.mode == .free else {
+                return nil
+            }
+        }
+        return origin
     }
 
     private func openTodayPrimaryWorkout(

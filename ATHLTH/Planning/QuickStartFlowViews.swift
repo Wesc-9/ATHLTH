@@ -955,6 +955,48 @@ struct QuickStartWorkoutDeviceCard: View {
     }
 }
 
+private struct PlannedQuickStartContextCard: View {
+    let workout: PlannedSession
+
+    var body: some View {
+        ATHLTHCard {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "calendar.badge.clock")
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 35, height: 35)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: RoundedRectangle(cornerRadius: 11)
+                    )
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "FROM YOUR TRAINING PLAN",
+                        norwegian: "FRA TRENINGSPLANEN"
+                    ))
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    Text(workout.title)
+                        .font(.subheadline.weight(.semibold))
+                    if let minutes = workout.durationMinutes,
+                       minutes > 0 {
+                        Label("\(minutes) min", systemImage: "clock")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    Text(ATHLTHLocalization.choose(
+                        english: "iPhone workouts link to this plan after they are saved in Apple Health.",
+                        norwegian: "iPhone-økter knyttes til planen når de er lagret i Apple Health."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+    }
+}
+
 struct RunQuickStartSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
@@ -967,6 +1009,7 @@ struct RunQuickStartSheet: View {
 
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
+    let plannedSession: PlannedSession?
     let onStart: (RunQuickStartConfiguration) -> Void
 
     @State private var mode: RunQuickStartMode
@@ -989,10 +1032,12 @@ struct RunQuickStartSheet: View {
         initialRoute: TrainingRoute? = nil,
         initialWorkout:
             RunningWorkoutTemplate? = nil,
+        plannedSession: PlannedSession? = nil,
         onStart: @escaping (RunQuickStartConfiguration) -> Void
     ) {
         self.trainingDeviceProvider = trainingDeviceProvider
         self.watchConnected = watchConnected
+        self.plannedSession = plannedSession
         self.onStart = onStart
 
         let initialMode:
@@ -1044,6 +1089,9 @@ struct RunQuickStartSheet: View {
             ScrollView {
                 VStack(spacing: 16) {
                     introCard
+                    if let plannedSession {
+                        PlannedQuickStartContextCard(workout: plannedSession)
+                    }
                     modeCard
                     runEnvironmentCard
 
@@ -2879,6 +2927,7 @@ struct WalkQuickStartSheet: View {
 
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
+    var plannedSession: PlannedSession? = nil
     let onStart: (WalkQuickStartConfiguration) -> Void
 
     @State private var selectedFriendIDs: Set<UUID> = []
@@ -2955,6 +3004,10 @@ struct WalkQuickStartSheet: View {
                             }
                             .buttonStyle(.plain)
                         }
+                    }
+
+                    if let plannedSession {
+                        PlannedQuickStartContextCard(workout: plannedSession)
                     }
 
                     QuickStartWorkoutDeviceCard(
