@@ -335,7 +335,7 @@ struct HomeActivityRunDetailView: View {
 
                 Spacer()
 
-                if let ascentText {
+                if !isTreadmillWorkout, let ascentText {
                     Label(
                         ascentText,
                         systemImage:
@@ -1013,7 +1013,7 @@ struct HomeActivityRunDetailView: View {
                     if let last =
                         routeCoordinates.last {
                         Marker(
-                            "Finish",
+                            tr("Finish", "Mål"),
                             coordinate: last
                         )
                         .tint(.black)
@@ -1203,7 +1203,8 @@ struct HomeActivityRunDetailView: View {
     }
 
     private var coachCard: some View {
-        VStack(
+        ATHLTHPlanSurface {
+            VStack(
             alignment: .leading,
             spacing: 12
         ) {
@@ -1215,7 +1216,7 @@ struct HomeActivityRunDetailView: View {
                 .font(
                     .caption.weight(.bold)
                 )
-                .foregroundStyle(.indigo)
+                .foregroundStyle(ATHLTHPlanDesign.accent)
 
                 Text("ATHLTH+")
                     .font(
@@ -1286,32 +1287,6 @@ struct HomeActivityRunDetailView: View {
                     )
             }
         }
-        .padding(16)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.indigo
-                        .opacity(0.07),
-                    ATHLTHTheme.card
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-            .stroke(
-                Color.indigo
-                    .opacity(0.10),
-                lineWidth: 1
-            )
         }
     }
 
