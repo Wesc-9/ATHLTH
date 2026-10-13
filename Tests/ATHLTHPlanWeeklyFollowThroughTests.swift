@@ -748,31 +748,43 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
         timed.scheduledStart = Calendar.current.date(
             byAdding: .hour, value: 18, to: plan.startDate!
         )
+        let flexible = workout()
         store.addSession(timed, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
-        store.addSession(workout(), toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
+        store.addSession(flexible, toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
         let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
-        XCTAssertNil(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
+        let preview = ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
             plan: saved, store: store, healthWorkouts: [],
             strengthHistory: [], referenceDate: plan.startDate!
-        ))
+        )
+        // Another flexible workout may still be eligible for a move.
+        // The fixed-time workout must never be the suggested source.
+        XCTAssertNotEqual(preview?.sessionID, timed.id)
+        if let preview {
+            XCTAssertEqual(preview.sessionID, flexible.id)
+        }
     }
 
     @MainActor
-    func testMovePreviewIsNotOfferedForPastWorkout() throws {
+    func testMovePreviewNeverSelectsPastWorkout() throws {
         let (store, defaults, suite, plan) = try prepared(weekCount: 1)
         defer { defaults.removePersistentDomain(forName: suite) }
-        store.addSession(workout(), toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
-        store.addSession(workout(), toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
+        let past = workout()
+        let future = workout()
+        store.addSession(past, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(future, toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
         let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
         let nextDay = try XCTUnwrap(Calendar.current.date(
             byAdding: .day, value: 1, to: plan.startDate!
         ))
-        // Day 1 is now in the past, and day 2 has no occupied
-        // neighboring day after excluding day 1 from consideration.
-        XCTAssertNil(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
+        let preview = ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
             plan: saved, store: store, healthWorkouts: [],
             strengthHistory: [], referenceDate: nextDay
-        ))
+        )
+        // A future session may still be suggested; the past one may not.
+        XCTAssertNotEqual(preview?.sessionID, past.id)
+        if let preview {
+            XCTAssertEqual(preview.sessionID, future.id)
+        }
     }
 
     @MainActor
