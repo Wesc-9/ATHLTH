@@ -909,6 +909,20 @@ struct LiveGhostRaceLobbyView: View {
                 .foregroundStyle(resultCandidate == nil
                     ? .orange : ATHLTHTheme.mutedText)
 
+                if raceClockNeedsReview {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "The reported finish times do not align with the shared start clock or are incomplete. Review the evidence in Arena before accepting a winner.",
+                            norwegian: "De registrerte sluttidene samsvarer ikke med felles startklokke, eller data mangler. Kontroller dokumentasjonen i Arena før en vinner godkjennes."
+                        ),
+                        systemImage: "clock.badge.exclamationmark"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityAddTraits(.isStaticText)
+                }
+
                 LazyVGrid(columns: resultMetricColumns, spacing: 9) {
                     resultMetric(
                         title:
@@ -1512,8 +1526,23 @@ struct LiveGhostRaceLobbyView: View {
 
     /// A missing, contradictory or malformed finish is never displayed as
     /// a win or tie. The Arena result review uses the same common validator.
+    private var raceClockNeedsReview: Bool {
+        guard liveRace.room?.status == .finished else { return false }
+        return !ATHLTHLiveGhostResultEvidence.bothFinishesPlausible(
+            synchronizedStart: liveRace.room?.startsAt,
+            firstFinish: liveRace.participant(userID: challenge.senderID)?.finishedAt,
+            firstElapsed: liveRace.participant(userID: challenge.senderID)?.elapsedSeconds,
+            secondFinish: liveRace.participant(userID: challenge.recipientID)?.finishedAt,
+            secondElapsed: liveRace.participant(userID: challenge.recipientID)?.elapsedSeconds
+        )
+    }
+
     private var resultCandidate: ATHLTHArenaLiveDuelCandidate? {
-        ATHLTHArenaLiveDuelReview.candidate(
+        // A server winner is provisional when uploaded workout clocks
+        // disagree with the synchronized race start. Keep the raw times
+        // visible for Arena review without celebrating a disputed winner.
+        guard !raceClockNeedsReview else { return nil }
+        return ATHLTHArenaLiveDuelReview.candidate(
             senderID: challenge.senderID,
             recipientID: challenge.recipientID,
             senderSeconds: liveRace.participant(userID: challenge.senderID)?.elapsedSeconds,
