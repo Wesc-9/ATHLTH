@@ -62,7 +62,10 @@ final class CommunityEventChatStore:
     var isLoading = false
     @Published private(set)
     var isSending = false
+    @Published private(set) var canLoadOlderMessages = false
     @Published var errorMessage: String?
+
+    private var messageLimit = 150
 
     let eventID: UUID
 
@@ -104,6 +107,12 @@ final class CommunityEventChatStore:
         return profiles[userID]
     }
 
+    func loadOlderMessages() async {
+        guard canLoadOlderMessages else { return }
+        messageLimit += 150
+        await refresh()
+    }
+
     func refresh(
         showLoading: Bool = false
     ) async {
@@ -129,10 +138,13 @@ final class CommunityEventChatStore:
                             "event_id",
                             value: eventID
                         )
+                        // Read the newest page, not the oldest 150 messages.
+                        // Older history remains accessible on explicit request.
                         .order(
                             "created_at",
-                            ascending: true
+                            ascending: false
                         )
+                        .limit(messageLimit + 1)
                         .execute()
                         .value
 
@@ -151,8 +163,9 @@ final class CommunityEventChatStore:
                         .execute()
                         .value
 
-            let loadedMessages =
-                try await messagesQuery
+            let page = try await messagesQuery
+            let loadedMessages = Array(page.prefix(messageLimit))
+            let hasOlderMessages = page.count > messageLimit
             let statuses =
                 try await statusQuery
 
@@ -190,7 +203,8 @@ final class CommunityEventChatStore:
                         .value
             }
 
-            messages = loadedMessages
+            messages = loadedMessages.reversed()
+            canLoadOlderMessages = hasOlderMessages
             profiles =
                 Dictionary(
                     uniqueKeysWithValues:
@@ -677,6 +691,27 @@ struct CommunityEventChatView: View {
                         .padding(.top, 52)
                     }
 
+                    if chat.canLoadOlderMessages {
+                        Button {
+                            Task {
+                                await chat.loadOlderMessages()
+                            }
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Show older messages",
+                                    norwegian: "Vis eldre meldinger"
+                                ),
+                                systemImage: "clock.arrow.circlepath"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: 42)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(ATHLTHTheme.accentDeep)
+                    }
+
                     ForEach(
                         chat.messages
                     ) { message in
@@ -713,8 +748,10 @@ struct CommunityEventChatView: View {
             .scrollDismissesKeyboard(
                 .interactively
             )
+            // Loading older history changes the count but not the newest
+            // message ID, so it must not snap the reader back to the bottom.
             .onChange(
-                of: chat.messages.count
+                of: chat.messages.last?.id
             ) { _, _ in
                 guard let last =
                         chat.messages.last
