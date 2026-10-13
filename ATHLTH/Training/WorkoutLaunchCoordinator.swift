@@ -497,6 +497,21 @@ enum WorkoutLaunchCoordinator {
             watchConnection.clearGhostRace()
         }
 
+        // A simple planned run may have a distance or duration target
+        // without a library template. Carry that target into the existing
+        // iPhone/Watch running transfer rather than launching an untargeted
+        // Free Run. The plan/session IDs come from an explicit plan launch.
+        let plannedRunningWorkout: PlannedSession? = {
+            guard let planID = plannedPlanID,
+                  let workoutID = plannedSessionID,
+                  let plan = session.trainingPlan(withID: planID)
+            else { return nil }
+            return plan.weeks.flatMap(\.days).flatMap(\.sessions)
+                .first(where: {
+                    $0.id == workoutID && $0.kind == .running
+                })
+        }()
+
         let structuredWorkout =
             configuration.workout.map {
                 PlannedWorkoutWatchBuilder
@@ -509,6 +524,12 @@ enum WorkoutLaunchCoordinator {
                             configuration
                                 .autoPauseEnabled
                     )
+            } ?? plannedRunningWorkout.map {
+                PlannedWorkoutWatchBuilder.runningTransfer(
+                    from: $0,
+                    routeAlerts: configuration.routeAlerts,
+                    autoPauseEnabled: configuration.autoPauseEnabled
+                )
             }
 
         if configuration.captureDevice == .iPhone {
@@ -520,7 +541,7 @@ enum WorkoutLaunchCoordinator {
             phoneWorkout.start(
                 walking: false,
                 route: selectedRoute,
-                title: configuration.title,
+                title: plannedRunningWorkout?.title ?? configuration.title,
                 environment:
                     configuration.environment,
                 treadmillInclinePercent:
@@ -544,7 +565,7 @@ enum WorkoutLaunchCoordinator {
             watchConnection
                 .updateLocalWorkoutActivity(
                     isActive: true,
-                    title: configuration.title
+                    title: plannedRunningWorkout?.title ?? configuration.title
                 )
             startQuickSpotifyIfNeeded(
                 playlist:
@@ -651,6 +672,16 @@ enum WorkoutLaunchCoordinator {
                     configuration.workout {
                 return workout.summary
             }
+            if let planned = plannedRunningWorkout,
+               let minutes = planned.durationMinutes,
+               minutes > 0 {
+                return "\(minutes) min"
+            }
+            if let planned = plannedRunningWorkout,
+               let distance = planned.targetDistanceKilometers,
+               distance > 0 {
+                return String(format: "%.1f km", distance)
+            }
 
             if let selectedRoute {
                 return String(
@@ -683,7 +714,7 @@ enum WorkoutLaunchCoordinator {
         watchConnection.sendPreparedWorkout(
             WatchPreparedWorkoutTransfer(
                 id: UUID(),
-                title: configuration.title,
+                title: plannedRunningWorkout?.title ?? configuration.title,
                 summary: preparedSummary,
                 kind: .running,
                 routeID:
