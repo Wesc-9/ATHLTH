@@ -56,27 +56,31 @@ enum ATHLTHCommunityAgendaPolicy {
         var result: [ATHLTHCommunityAgendaEntry] = []
         result.reserveCapacity(events.count + clubEvents.count + challenges.count)
 
-        for item in events where item.event.startsAt >= now &&
-            item.event.status != "cancelled" &&
-            item.event.status != "completed" {
+        for item in events {
+            let event = item.event
+            guard event.status != "cancelled",
+                  event.status != "completed",
+                  event.startsAt >= now || event.status == "live" else {
+                continue
+            }
             result.append(ATHLTHCommunityAgendaEntry(
                 id: "event:" + item.id.uuidString,
                 title: item.event.title,
                 context: ATHLTHLocalization.choose(
                     english: "Event", norwegian: "Arrangement"
                 ),
-                scheduledAt: item.event.startsAt,
+                scheduledAt: max(item.event.startsAt, now),
                 icon: "calendar",
                 destination: .event(item.id)
             ))
         }
 
         let clubsByID = Dictionary(uniqueKeysWithValues: clubs.map { ($0.id, $0) })
-        let rsvpByEvent = Dictionary(
-            uniqueKeysWithValues: clubRSVPs
-                .filter { $0.userID == userID }
-                .map { ($0.eventID, $0.status) }
-        )
+        // Malformed or duplicate server rows should never crash Community.
+        var rsvpByEvent: [UUID: String] = [:]
+        for rsvp in clubRSVPs where rsvp.userID == userID {
+            rsvpByEvent[rsvp.eventID] = rsvp.status
+        }
         for event in clubEvents {
             guard let club = clubsByID[event.groupID],
                   includesClubEvent(
@@ -98,8 +102,9 @@ enum ATHLTHCommunityAgendaPolicy {
             ))
         }
 
-        for challenge in challenges where
-            challenge.status == .active || challenge.status == .upcoming {
+        for challenge in challenges {
+            guard challenge.status == .active ||
+                    challenge.status == .upcoming else { continue }
             if let endsAt = challenge.rules.endsAt, endsAt < now {
                 continue
             }
