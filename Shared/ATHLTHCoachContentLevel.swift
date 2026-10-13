@@ -99,3 +99,55 @@ enum ATHLTHCoachContentLevel: String, CaseIterable, Identifiable, Codable {
         ]
     }
 }
+
+ 
+/// Consistent user-facing coaching intensity across supported workouts.
+/// The underlying content, voice, delivery and device models remain unchanged.
+enum ATHLTHCoachExperiencePreset: String, CaseIterable, Identifiable {
+    case calm, balanced, active
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .calm: return ATHLTHLocalization.choose(english: "Calm", norwegian: "Rolig")
+        case .balanced: return ATHLTHLocalization.choose(english: "Balanced", norwegian: "Balansert")
+        case .active: return ATHLTHLocalization.choose(english: "Active", norwegian: "Aktiv")
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .calm: return ATHLTHLocalization.choose(
+            english: "Key moments only", norwegian: "Bare det viktigste")
+        case .balanced: return ATHLTHLocalization.choose(
+            english: "Regular guidance", norwegian: "Passe mye veiledning")
+        case .active: return ATHLTHLocalization.choose(
+            english: "More detailed updates", norwegian: "Tett oppfølging")
+        }
+    }
+
+    var contentLevel: ATHLTHCoachContentLevel {
+        switch self {
+        case .calm: return .simple
+        case .balanced: return .standard
+        case .active: return .advanced
+        }
+    }
+
+    var speechStyle: ATHLTHCoachSpeechStyle {
+        switch self {
+        case .calm: return .minimal
+        case .balanced: return .balanced
+        case .active: return .motivating
+        }
+    }
+
+    var distanceIntervalKilometers: Double {
+        switch self {
+        case .calm: return 2.0
+        case .balanced: return 1.0
+        case .active: return 0.5
+        }
+    }
+}

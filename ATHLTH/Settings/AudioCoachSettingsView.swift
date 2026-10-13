@@ -198,6 +198,7 @@ private final class ATHLTHAudioCoachPreviewSpeaker:
 
 struct ATHLTHAudioCoachSettingsView: View {
     @EnvironmentObject private var settings: AppSettingsStore
+    @State private var showAdvancedSettings = false
 
     var body: some View {
         ZStack {
@@ -223,14 +224,18 @@ struct ATHLTHAudioCoachSettingsView: View {
                 ) {
                     VStack(spacing: 0) {
                         defaultsSection
-                        contentLevelSection
-                        speechStyleSection
+                        experienceSection
                         voiceSection
-                        triggerSection
-                        updateSection
-                        eventSection
-                        routeAndStructureSection
-                        musicSection
+                        advancedOptionsToggle
+                        if showAdvancedSettings {
+                            contentLevelSection
+                            speechStyleSection
+                            triggerSection
+                            updateSection
+                            eventSection
+                            routeAndStructureSection
+                            musicSection
+                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 16)
@@ -287,9 +292,9 @@ struct ATHLTHAudioCoachSettingsView: View {
                     title:
                         ATHLTHLocalization.choose(
                             english:
-                                "Enable by default",
+                                "Use Audio Coach for my workouts",
                             norwegian:
-                                "Aktiver som standard"
+                                "Bruk Audio Coach på øktene mine"
                         ),
                     subtitle:
                         ATHLTHLocalization.choose(
@@ -310,6 +315,108 @@ struct ATHLTHAudioCoachSettingsView: View {
                 }
             }
         }
+    }
+
+    private var selectedExperience: ATHLTHCoachExperiencePreset? {
+        ATHLTHCoachExperiencePreset.allCases.first { preset in
+            currentContentLevel == preset.contentLevel
+                && settings.audioCoachSpeechStyle == preset.speechStyle
+                && settings.audioCoachDistanceTriggerEnabled
+                && !settings.audioCoachTimeTriggerEnabled
+                && abs(settings.audioCoachDistanceIntervalKilometers
+                       - preset.distanceIntervalKilometers) < 0.001
+        }
+    }
+
+    private func applyExperience(_ preset: ATHLTHCoachExperiencePreset) {
+        // Intentional selection; never resets language, voice, volume or output.
+        selectContentLevel(preset.contentLevel)
+        settings.audioCoachSpeechStyle = preset.speechStyle
+        settings.audioCoachDistanceTriggerEnabled = true
+        settings.audioCoachTimeTriggerEnabled = false
+        settings.audioCoachDistanceIntervalKilometers =
+            preset.distanceIntervalKilometers
+        settings.audioCoachEnabledByDefault = true
+    }
+
+    private var experienceSection: some View {
+        premiumSection(ATHLTHLocalization.choose(
+            english: "How much guidance?",
+            norwegian: "Hvor mye veiledning?"
+        )) {
+            premiumCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose a level. ATHLTH adapts messages to the workout.",
+                        norwegian: "Velg et nivå. ATHLTH tilpasser meldingene til treningen."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    HStack(spacing: 7) {
+                        ForEach(ATHLTHCoachExperiencePreset.allCases) { preset in
+                            Button {
+                                applyExperience(preset)
+                            } label: {
+                                VStack(spacing: 5) {
+                                    Text(preset.title)
+                                        .font(.subheadline.weight(.semibold))
+                                    Text(preset.subtitle)
+                                        .font(.caption2)
+                                        .multilineTextAlignment(.center)
+                                        .lineLimit(2)
+                                        .minimumScaleFactor(0.85)
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 75)
+                                .foregroundStyle(selectedExperience == preset
+                                    ? Color.white : ATHLTHTheme.primaryText)
+                                .background(selectedExperience == preset
+                                    ? ATHLTHTheme.accentDeep : ATHLTHTheme.accentSoft,
+                                    in: RoundedRectangle(cornerRadius: 15))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(
+                                selectedExperience == preset ? .isSelected : []
+                            )
+                        }
+                    }
+                    if selectedExperience == nil {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Custom settings are kept until you select a preset.",
+                            norwegian: "Ditt tilpassede oppsett beholdes til du velger et nivå."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                }
+                .padding(16)
+            }
+        }
+    }
+
+    private var advancedOptionsToggle: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showAdvancedSettings.toggle()
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "slider.horizontal.3")
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                Text(ATHLTHLocalization.choose(
+                    english: "More settings", norwegian: "Flere innstillinger"
+                ))
+                .font(.subheadline.weight(.semibold))
+                Spacer()
+                Image(systemName: showAdvancedSettings ? "chevron.up" : "chevron.down")
+                    .font(.caption.bold())
+            }
+            .foregroundStyle(ATHLTHTheme.primaryText)
+            .padding(16)
+            .background(Color.white.opacity(0.84),
+                in: RoundedRectangle(cornerRadius: 18))
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 12)
     }
 
     private var currentContentLevel: ATHLTHCoachContentLevel? {
@@ -515,6 +622,7 @@ struct ATHLTHAudioCoachSettingsView: View {
                     alignment: .leading,
                     spacing: 18
                 ) {
+                    if showAdvancedSettings {
                     sliderSetting(
                         title:
                             ATHLTHLocalization.choose(
@@ -550,6 +658,8 @@ struct ATHLTHAudioCoachSettingsView: View {
                             0.3...1.0,
                         step: 0.05
                     )
+
+                    }
 
                     Button {
                         ATHLTHAudioCoachPreviewSpeaker

@@ -1516,6 +1516,7 @@ private struct StrengthAudioCoachSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var configuration:
         StrengthAudioCoachConfiguration
+    @State private var showDetailedOptions = false
 
     var body: some View {
         NavigationStack {
@@ -1527,6 +1528,75 @@ private struct StrengthAudioCoachSettingsView: View {
                     )
                 }
 
+                Section {
+                    HStack(spacing: 7) {
+                        ForEach(ATHLTHCoachExperiencePreset.allCases) { preset in
+                            Button {
+                                applyExperience(preset)
+                            } label: {
+                                VStack(spacing: 5) {
+                                    Text(preset.title)
+                                        .font(.subheadline.weight(.semibold))
+                                    Text(preset.subtitle)
+                                        .font(.caption2)
+                                        .multilineTextAlignment(.center)
+                                        .lineLimit(2)
+                                        .minimumScaleFactor(0.85)
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 64)
+                                .padding(.horizontal, 5)
+                                .foregroundStyle(selectedExperience == preset
+                                    ? Color.white : ATHLTHTheme.primaryText)
+                                .background(selectedExperience == preset
+                                    ? ATHLTHTheme.accentDeep : ATHLTHTheme.accentSoft,
+                                    in: RoundedRectangle(cornerRadius: 13))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(
+                                selectedExperience == preset ? .isSelected : []
+                            )
+                        }
+                    }
+                    if selectedExperience == nil {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Your custom setup is kept until you choose a level.",
+                            norwegian: "Ditt tilpassede oppsett beholdes til du velger et nivå."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "How much guidance?", norwegian: "Hvor mye veiledning?"
+                    ))
+                } footer: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Speech adapts to sets and rest periods.",
+                        norwegian: "Talebeskjeder tilpasses sett og hvile."
+                    ))
+                }
+
+                Section {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showDetailedOptions.toggle()
+                        }
+                    } label: {
+                        HStack {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "More settings", norwegian: "Flere innstillinger"
+                                ),
+                                systemImage: "slider.horizontal.3"
+                            )
+                            Spacer()
+                            Image(systemName: showDetailedOptions
+                                ? "chevron.up" : "chevron.down")
+                        }
+                    }
+                }
+
+                if showDetailedOptions {
                 Section {
                     Picker(
                         ATHLTHLocalization.choose(
@@ -1724,6 +1794,7 @@ private struct StrengthAudioCoachSettingsView: View {
                                 .duckOtherAudio
                     )
                 }
+                }
             }
             .navigationTitle("Audio Coach")
             .navigationBarTitleDisplayMode(.inline)
@@ -1742,6 +1813,60 @@ private struct StrengthAudioCoachSettingsView: View {
                 }
             }
         }
+    }
+
+    private var selectedExperience: ATHLTHCoachExperiencePreset? {
+        ATHLTHCoachExperiencePreset.allCases.first { preset in
+            let expected = configurationForPreset(preset)
+            return configuration.announceSetComplete == expected.announceSetComplete
+                && configuration.announceRestStarted == expected.announceRestStarted
+                && configuration.announceRestCountdown == expected.announceRestCountdown
+                && configuration.announceRestComplete == expected.announceRestComplete
+                && configuration.announceNextExercise == expected.announceNextExercise
+                && configuration.shouldAnnounceNextSetDetails == expected.shouldAnnounceNextSetDetails
+                && configuration.shouldAnnounceExerciseProgress == expected.shouldAnnounceExerciseProgress
+                && configuration.announceWorkoutStatus == expected.announceWorkoutStatus
+                && (configuration.speechStyle ?? .balanced) == expected.speechStyle
+        }
+    }
+
+    private func applyExperience(_ preset: ATHLTHCoachExperiencePreset) {
+        configuration = configurationForPreset(preset)
+    }
+
+    private func configurationForPreset(
+        _ preset: ATHLTHCoachExperiencePreset
+    ) -> StrengthAudioCoachConfiguration {
+        var value = configuration
+        value.enabled = true
+        value.speechStyle = preset.speechStyle
+        value.announceRestComplete = true
+        value.announceNextExercise = true
+        switch preset {
+        case .calm:
+            value.announceSetComplete = false
+            value.announceRestStarted = false
+            value.announceRestCountdown = false
+            value.announceNextSetDetails = false
+            value.announceExerciseProgress = false
+            value.announceWorkoutStatus = false
+        case .balanced:
+            value.announceSetComplete = true
+            value.announceRestStarted = false
+            value.announceRestCountdown = true
+            value.announceNextSetDetails = true
+            value.announceExerciseProgress = false
+            value.announceWorkoutStatus = false
+        case .active:
+            value.announceSetComplete = true
+            value.announceRestStarted = true
+            value.announceRestCountdown = true
+            value.announceNextSetDetails = true
+            value.announceExerciseProgress = true
+            value.announceWorkoutStatus = true
+            value.workoutStatusIntervalMinutes = 15
+        }
+        return value
     }
 }
 
