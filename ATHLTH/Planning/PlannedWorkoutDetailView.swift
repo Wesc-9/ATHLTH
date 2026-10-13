@@ -12,6 +12,7 @@ struct PlannedWorkoutDetailView: View {
     let planID: UUID
     let workout: PlannedSession
     let isHealthCompleted: Bool
+    var simplePresentation = false
 
     @State private var showingEditor = false
     @State private var showingStructuredWorkout = false
@@ -101,25 +102,28 @@ struct PlannedWorkoutDetailView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     header
+                    if simplePresentation {
+                        simpleInstructions
+                    }
                     overviewCard
 
-                    if currentWorkout.kind == .running ||
-                        currentWorkout.kind == .walking {
+                    if !simplePresentation && (currentWorkout.kind == .running ||
+                        currentWorkout.kind == .walking) {
                         runGuidanceCard
                     }
 
-                    if !currentWorkout.exercises.isEmpty {
+                    if !simplePresentation && !currentWorkout.exercises.isEmpty {
                         strengthCard
                     }
 
-                    if !currentWorkout.resolvedRunningWorkouts.isEmpty {
+                    if !simplePresentation && !currentWorkout.resolvedRunningWorkouts.isEmpty {
                         runningCard(
                             currentWorkout.resolvedRunningWorkouts
                         )
                     }
 
                     if currentWorkout.isStructuredWorkout {
-                        structuredWorkoutCard
+                        if !simplePresentation { structuredWorkoutCard }
                         structuredWorkoutStartButton
                     }
 
@@ -145,17 +149,17 @@ struct PlannedWorkoutDetailView: View {
                 )
                 .ignoresSafeArea()
             )
-            .navigationTitle("Workout")
+            .navigationTitle(ATHLTHLocalization.choose(english: "Workout", norwegian: "Treningsøkt"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") {
+                    Button(ATHLTHLocalization.choose(english: "Done", norwegian: "Ferdig")) {
                         dismiss()
                     }
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Edit") {
+                    Button(ATHLTHLocalization.choose(english: "Edit", norwegian: "Rediger")) {
                         showingEditor = true
                     }
                 }
@@ -181,6 +185,63 @@ struct PlannedWorkoutDetailView: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+    }
+
+    private var simpleInstructions: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(ATHLTHLocalization.choose(
+                    english: "What you'll do",
+                    norwegian: "Dette skal du gjøre"
+                ))
+                .font(.headline)
+                let minutes = currentWorkout.durationMinutes
+                let activity: String
+                switch currentWorkout.kind {
+                case .walking:
+                    activity = ATHLTHLocalization.choose(
+                        english: "Go for a comfortable walk.",
+                        norwegian: "Gå en tur i et tempo som passer deg."
+                    )
+                case .running:
+                    activity = ATHLTHLocalization.choose(
+                        english: "Run at a pace that feels comfortable.",
+                        norwegian: "Løp i et tempo som føles behagelig."
+                    )
+                case .strength:
+                    activity = ATHLTHLocalization.choose(
+                        english: "Complete your strength session at your own pace.",
+                        norwegian: "Gjennomfør styrkeøkten i ditt eget tempo."
+                    )
+                default:
+                    activity = ATHLTHLocalization.choose(
+                        english: "Complete the planned workout at your own pace.",
+                        norwegian: "Gjennomfør den planlagte økten i ditt eget tempo."
+                    )
+                }
+                Text(activity)
+                    .font(.subheadline)
+                if let minutes, minutes > 0 {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "About \(minutes) minutes",
+                            norwegian: "Omtrent \(minutes) minutter"
+                        ),
+                        systemImage: "clock"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                }
+                if !currentWorkout.isStructuredWorkout && !isCompleted {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Start the workout from the Train tab. Return here to record completion.",
+                        norwegian: "Start treningen fra Tren-fanen. Kom tilbake hit for å registrere at økten er gjennomført."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     private var header: some View {
@@ -232,7 +293,7 @@ struct PlannedWorkoutDetailView: View {
     private var overviewCard: some View {
         ATHLTHCard {
             VStack(alignment: .leading, spacing: 14) {
-                sectionTitle("Plan details")
+                sectionTitle(ATHLTHLocalization.choose(english: "Plan details", norwegian: "Om økten"))
 
                 if let scheduledStart = currentWorkout.scheduledStart {
                     detailRow(
@@ -892,7 +953,7 @@ struct PlannedWorkoutDetailView: View {
             showingStructuredWorkout = true
         } label: {
             Label(
-                "Start Workout",
+                ATHLTHLocalization.choose(english: "Start workout", norwegian: "Start økt"),
                 systemImage: "play.fill"
             )
             .font(.headline)

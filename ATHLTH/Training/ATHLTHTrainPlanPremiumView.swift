@@ -159,7 +159,8 @@ struct ATHLTHTrainPlanPremiumView: View {
                     PlannedWorkoutDetailView(
                         planID: plan.id,
                         workout: workout,
-                        isHealthCompleted: false
+                        isHealthCompleted: false,
+                        simplePresentation: true
                     )
                 }
             }
