@@ -7446,13 +7446,17 @@ struct ATHLTHTrainView: View {
         _ plan: TrainingPlan
     ) -> String {
         let weekIndex = trainCurrentWeekIndex(in: plan)
-        let weekday =
-            Calendar.current.component(
-                .weekday,
-                from: Date()
-            )
-        let dayIndex =
-            ((weekday + 5) % 7) + 1
+        // Plan days are indexed from the plan start date, not from Monday.
+        // The previous calendar-weekday calculation reported the wrong day
+        // for plans starting on any other weekday.
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let planStart = calendar.startOfDay(for: plan.startDate ?? today)
+        let daysSinceStart = max(
+            calendar.dateComponents([.day], from: planStart, to: today).day ?? 0,
+            0
+        )
+        let dayIndex = (daysSinceStart % 7) + 1
 
         return ATHLTHLocalization.choose(
             english:
