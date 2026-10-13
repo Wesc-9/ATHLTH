@@ -9,7 +9,6 @@ struct ATHLTHTrainPlanPremiumView: View {
 
     // Optional deep link from "I dag" or the rebuilt library.
     var highlightedPlanID: UUID? = nil
-    var onStartWorkout: ((UUID, PlannedSession) -> Void)? = nil
     // The owning Train tab supplies its existing iPhone/Watch launch flow.
     // Embedded plan previews without that owner remain read-only for launch.
     var onStartWorkout: ((UUID, PlannedSession) -> Void)? = nil
