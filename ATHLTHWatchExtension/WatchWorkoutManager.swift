@@ -4188,22 +4188,16 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             speedMetersPerSecond: location.speed,
             isOutdoor: usesOutdoorGPS
         ) {
-                let smoothed: TimeInterval
-
-                if let existing =
-                        currentPaceSecondsPerKilometer {
-                    smoothed =
-                        existing * 0.72 +
-                        rawPace * 0.28
-                } else {
-                    smoothed = rawPace
-                }
-
-                coachPaceSampleAt = location.timestamp
-                publish {
-                    self.currentPaceSecondsPerKilometer =
-                        smoothed
-                }
+            let smoothed: TimeInterval
+            if let existing = currentPaceSecondsPerKilometer {
+                smoothed = existing * 0.72 + rawPace * 0.28
+            } else {
+                smoothed = rawPace
+            }
+            coachPaceSampleAt = location.timestamp
+            publish {
+                self.currentPaceSecondsPerKilometer = smoothed
+            }
         }
 
         updateRouteNavigation(
