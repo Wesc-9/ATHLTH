@@ -111,8 +111,10 @@ struct GhostRaceHubView: View {
     @State private var loading = false
     @State private var startingWorkoutID: UUID?
     @State private var liveStartingSessionID: UUID?
+    @AppStorage("athlth.ghostRace.advancedMode")
+    private var advancedMode = false
     @State private var selectedMode:
-        GhostRaceHubMode = .live
+        GhostRaceHubMode = .past
     @State private var replaySearch = ""
     @State private var replaySort: GhostReplaySort = .newest
     @State private var replayFavoritesOnly = false
@@ -142,13 +144,21 @@ struct GhostRaceHubView: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 14) {
-                modeOverview
+                ghostExperiencePicker
                 hero
+                if advancedMode {
+                    modeOverview
+                } else {
+                    basicStartChoices
+                }
                 modeContent
-                if selectedMode != .target {
+                if selectedMode != .target &&
+                    (advancedMode || watchConnection.isReady) {
                     workoutDeviceCard
                 }
-                audioCoachCard
+                if advancedMode {
+                    audioCoachCard
+                }
             }
             .padding()
             .padding(.bottom, 36)
@@ -363,6 +373,147 @@ struct GhostRaceHubView: View {
         )
     }
 
+    private var ghostExperiencePicker: some View {
+        HStack(spacing: 4) {
+            experienceButton(
+                title: ATHLTHLocalization.choose(
+                    english: "Basic", norwegian: "Enkel"
+                ),
+                symbol: "figure.run",
+                isAdvanced: false
+            )
+            experienceButton(
+                title: ATHLTHLocalization.choose(
+                    english: "Advanced", norwegian: "Avansert"
+                ),
+                symbol: "slider.horizontal.3",
+                isAdvanced: true
+            )
+        }
+        .padding(4)
+        .background(ATHLTHTheme.surfaceStone,
+                    in: RoundedRectangle(cornerRadius: 16))
+        .accessibilityElement(children: .contain)
+    }
+
+    private func experienceButton(
+        title: String,
+        symbol: String,
+        isAdvanced: Bool
+    ) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                advancedMode = isAdvanced
+                if !isAdvanced { selectedMode = .past }
+            }
+        } label: {
+            Label(title, systemImage: symbol)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(advancedMode == isAdvanced
+                    ? ATHLTHTheme.primaryText : ATHLTHTheme.mutedText)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(advancedMode == isAdvanced
+                    ? Color.white : Color.clear,
+                    in: RoundedRectangle(cornerRadius: 13))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(advancedMode == isAdvanced
+            ? .isSelected : [])
+    }
+
+    private var basicStartChoices: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(ATHLTHLocalization.choose(
+                    english: "How would you like to race?",
+                    norwegian: "Hva vil du konkurrere mot?"
+                ))
+                .font(.headline)
+                Text(ATHLTHLocalization.choose(
+                    english: "Choose one. The workout and Ghost are prepared together.",
+                    norwegian: "Velg ett alternativ. Treningsøkten og Ghost klargjøres sammen."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+
+                basicGhostChoice(
+                    mode: .past,
+                    symbol: "clock.arrow.circlepath",
+                    title: ATHLTHLocalization.choose(
+                        english: "My previous run", norwegian: "Mitt forrige løp"
+                    ),
+                    description: ATHLTHLocalization.choose(
+                        english: "Try to beat yourself", norwegian: "Prøv å slå din egen tid"
+                    )
+                )
+                basicGhostChoice(
+                    mode: .target,
+                    symbol: "timer",
+                    title: ATHLTHLocalization.choose(
+                        english: "A finish-time goal", norwegian: "En ønsket sluttid"
+                    ),
+                    description: ATHLTHLocalization.choose(
+                        english: "Run against your chosen pace", norwegian: "Løp mot ditt eget mål"
+                    )
+                )
+                basicGhostChoice(
+                    mode: .live,
+                    symbol: "person.2.fill",
+                    title: ATHLTHLocalization.choose(
+                        english: "Another runner", norwegian: "En annen løper"
+                    ),
+                    description: ATHLTHLocalization.choose(
+                        english: "Race together live", norwegian: "Konkurrer direkte sammen"
+                    )
+                )
+            }
+        }
+    }
+
+    private func basicGhostChoice(
+        mode: GhostRaceHubMode,
+        symbol: String,
+        title: String,
+        description: String
+    ) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                selectedMode = mode
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: symbol)
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 44, height: 44)
+                    .background(ATHLTHTheme.accentSoft,
+                                in: RoundedRectangle(cornerRadius: 13))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                    Text(description)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                Spacer(minLength: 2)
+                Image(systemName: selectedMode == mode
+                    ? "checkmark.circle.fill" : "chevron.right")
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+            }
+            .padding(11)
+            .background(
+                selectedMode == mode
+                    ? ATHLTHTheme.accentSoft.opacity(0.55)
+                    : ATHLTHTheme.surfaceStone.opacity(0.65),
+                in: RoundedRectangle(cornerRadius: 16)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selectedMode == mode ? .isSelected : [])
+    }
+
     private var modeOverview: some View {
         HStack(spacing: 5) {
             ForEach(
@@ -400,19 +551,21 @@ struct GhostRaceHubView: View {
 
         case .past:
             pastSelfSection
-            DisclosureGroup(
-                ATHLTHLocalization.choose(
-                    english: "Other ways to compete",
-                    norwegian: "Flere konkurransemuligheter"
-                )
-            ) {
-                routeSection
-                friendSection
+            if advancedMode {
+                DisclosureGroup(
+                    ATHLTHLocalization.choose(
+                        english: "Other ways to compete",
+                        norwegian: "Flere konkurransemuligheter"
+                    )
+                ) {
+                    routeSection
+                    friendSection
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .padding(14)
+                .background(Color.white, in: RoundedRectangle(cornerRadius: 18))
             }
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(ATHLTHTheme.accentDeep)
-            .padding(14)
-            .background(Color.white, in: RoundedRectangle(cornerRadius: 18))
 
         case .target:
             targetGhostSection
