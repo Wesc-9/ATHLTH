@@ -1224,7 +1224,7 @@ struct ATHLTHCommunityV4View: View {
 
 private struct CommunityReferenceHeader: View {
     let canManageWeekly: Bool
-    @State private var showingCreateEvent = false
+    @State private var showingCommunityCreate = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -1269,13 +1269,13 @@ private struct CommunityReferenceHeader: View {
                 ))
 
                 Button {
-                    showingCreateEvent = true
+                    showingCommunityCreate = true
                 } label: {
                     button(icon: "plus", badge: 0)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "Create event", norwegian: "Opprett arrangement"
+                    english: "Create in Community", norwegian: "Opprett i Community"
                 ))
 
                 if canManageWeekly {
@@ -1293,8 +1293,8 @@ private struct CommunityReferenceHeader: View {
             }
         }
         .padding(.bottom, 1)
-        .sheet(isPresented: $showingCreateEvent) {
-            CommunityEventCreateView()
+        .sheet(isPresented: $showingCommunityCreate) {
+            ATHLTHCommunityCreateHubView()
         }
     }
 
