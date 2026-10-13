@@ -147,6 +147,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     @Published private(set) var ghostRaceTitle: String?
     @Published private(set) var ghostDistanceDeltaMeters: Double?
     @Published private(set) var ghostTimeDeltaSeconds: TimeInterval?
+    @Published private(set) var ghostComparisonUpdatedAt: Date?
     @Published private(set) var ghostMapUserLatitude: Double?
     @Published private(set) var ghostMapUserLongitude: Double?
     @Published private(set) var ghostMapLatitude: Double?
@@ -501,6 +502,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.ghostMapLatitude = nil
             self.ghostMapLongitude = nil
             self.ghostMapRevision = 0
+            self.ghostComparisonUpdatedAt = nil
         }
 
         persistWorkoutRecoveryState()
@@ -3196,6 +3198,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.ghostMapLatitude = nil
             self.ghostMapLongitude = nil
             self.ghostMapRevision = 0
+            self.ghostComparisonUpdatedAt = nil
         }
 
         resetAudioCoachThresholds()
@@ -3317,6 +3320,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.ghostRaceTitle = nil
             self.ghostDistanceDeltaMeters = nil
             self.ghostTimeDeltaSeconds = nil
+            self.ghostComparisonUpdatedAt = nil
             self.lapCount = 0
             self.currentLapElapsedTime = 0
             self.currentLapDistanceMeters = 0
@@ -4308,83 +4312,40 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
-        let targetTime =
-            max(elapsedTime, 0)
+        let points = ghost.points
+        let targetTime = max(elapsedTime, 0)
+        let ghostAtTime = ATHLTHGhostTimeline.interpolate(
+            at: targetTime,
+            count: points.count,
+            position: { points[$0].elapsedTime },
+            value: { points[$0].cumulativeMeters }
+        )
+        let userDistance = min(max(traveledAlongRoute, 0),
+                               max(ghost.routeDistanceMeters, 1))
+        let ghostAtDistance = ATHLTHGhostTimeline.interpolate(
+            at: userDistance,
+            count: points.count,
+            position: { points[$0].cumulativeMeters },
+            value: { points[$0].elapsedTime }
+        )
 
-        var timeLow = 0
-        var timeHigh =
-            ghost.points.count - 1
+        guard let ghostAtTime, let ghostAtDistance,
+              ghostAtTime.isFinite, ghostAtDistance.isFinite
+        else { return }
 
-        while timeLow < timeHigh {
-            let mid =
-                (timeLow + timeHigh + 1) / 2
-
-            if ghost.points[mid]
-                .elapsedTime <= targetTime {
-                timeLow = mid
-            } else {
-                timeHigh = mid - 1
-            }
-        }
-
-        let ghostAtTime =
-            ghost.points[timeLow]
-
-        let userDistance =
-            min(
-                max(
-                    traveledAlongRoute,
-                    0
-                ),
-                max(
-                    ghost.routeDistanceMeters,
-                    1
-                )
-            )
-
-        var nearest =
-            ghost.points[0]
-        var nearestDifference =
-            abs(
-                nearest.cumulativeMeters -
-                userDistance
-            )
-
-        for point in ghost.points {
-            let difference =
-                abs(
-                    point.cumulativeMeters -
-                    userDistance
-                )
-
-            if difference <
-                nearestDifference {
-                nearest = point
-                nearestDifference =
-                    difference
-            }
-        }
-
-        let distanceDelta =
-            userDistance -
-            ghostAtTime.cumulativeMeters
-        let timeDelta =
-            nearest.elapsedTime -
-            self.elapsedTime
-
+        let distanceDelta = userDistance - ghostAtTime
+        let timeDelta = ghostAtDistance - elapsedTime
         publish {
-            self.ghostDistanceDeltaMeters =
-                distanceDelta
-            self.ghostTimeDeltaSeconds =
-                timeDelta
+            self.ghostDistanceDeltaMeters = distanceDelta
+            self.ghostTimeDeltaSeconds = timeDelta
+            self.ghostComparisonUpdatedAt = Date()
         }
 
         publishGhostMapPositionIfNeeded(
             userLocation:
                 userLocation,
             ghostDistanceMeters:
-                ghostAtTime
-                    .cumulativeMeters,
+                ghostAtTime,
             routeDistanceMeters:
                 ghost
                     .routeDistanceMeters
