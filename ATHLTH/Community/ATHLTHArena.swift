@@ -539,7 +539,8 @@ private struct ATHLTHArenaLiveDuelsSection: View {
                 Text(ATHLTHLocalization.choose(
                     english: "Live duels", norwegian: "Live-dueller"
                 ))
-                .font(.headline)
+                .font(ATHLTHArenaLightStyle.editorialTitle(23))
+                .foregroundStyle(ATHLTHArenaLightStyle.ink)
                 Spacer()
                 if races.isLoading {
                     ProgressView().controlSize(.small)
@@ -559,39 +560,36 @@ private struct ATHLTHArenaLiveDuelsSection: View {
             NavigationLink {
                 GhostFriendRaceHubView()
             } label: {
-                HStack(spacing: 11) {
-                    Image(systemName: "person.2.wave.2.fill")
-                        .font(.title3)
-                        .frame(width: 40, height: 40)
-                        .background(.white.opacity(0.14), in: Circle())
-                    VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 12) {
+                    Image(systemName: "figure.run")
+                        .font(.system(size: 19, weight: .medium))
+                        .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
+                        .frame(width: 44, height: 44)
+                        .background(ATHLTHArenaLightStyle.soft,
+                                    in: RoundedRectangle(cornerRadius: 13))
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(ATHLTHLocalization.choose(
-                            english: "Challenge a friend live",
-                            norwegian: "Utfordre en venn direkte"
+                            english: "Race a friend live",
+                            norwegian: "Konkurrer direkte med en venn"
                         ))
-                        .font(.subheadline.weight(.bold))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHArenaLightStyle.ink)
                         Text(ATHLTHLocalization.choose(
-                            english: "Invite, get ready and start together.",
-                            norwegian: "Inviter, bli klare og start sammen."
+                            english: "Invite, agree on the route, then start together.",
+                            norwegian: "Inviter, bli enige om ruten og start sammen."
                         ))
                         .font(.caption)
-                        .foregroundStyle(.white.opacity(0.82))
+                        .foregroundStyle(ATHLTHArenaLightStyle.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 3)
                     Image(systemName: "arrow.up.right")
-                        .font(.caption.weight(.bold))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
                 }
-                .foregroundStyle(.white)
                 .padding(15)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    LinearGradient(
-                        colors: [ATHLTHTheme.accentDeep, ATHLTHTheme.vitality],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    in: RoundedRectangle(cornerRadius: 19, style: .continuous)
-                )
+                .background(ATHLTHArenaLightStyle.card(19))
             }
             .buttonStyle(.plain)
 
@@ -607,20 +605,23 @@ private struct ATHLTHArenaLiveDuelsSection: View {
                 } label: {
                     HStack(spacing: 11) {
                         Image(systemName: "envelope.badge")
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                        Text(
-                            "\(incomingInvites.count) " +
-                            ATHLTHLocalization.choose(
-                                english: "live duel invitations to answer",
-                                norwegian: "invitasjoner til live-duell venter"
+                            .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(
+                                "\(incomingInvites.count) " +
+                                ATHLTHLocalization.choose(
+                                    english: "live duel invitations to answer",
+                                    norwegian: "invitasjoner til live-duell venter"
+                                )
                             )
-                        )
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(ATHLTHArenaLightStyle.ink)
+                            ATHLTHArenaStatusPill(kind: .needsReview)
+                        }
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.caption)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                     }
                     .padding(13)
                     .background(ATHLTHArenaLightStyle.card(17))
@@ -635,13 +636,13 @@ private struct ATHLTHArenaLiveDuelsSection: View {
                     HStack(spacing: 12) {
                         Image(systemName: "figure.run.circle.fill")
                             .font(.title3)
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
                             .frame(width: 38, height: 38)
-                            .background(ATHLTHTheme.vitalitySoft.opacity(0.65), in: Circle())
+                            .background(ATHLTHArenaLightStyle.soft, in: Circle())
                         VStack(alignment: .leading, spacing: 3) {
                             Text(race.title)
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ATHLTHTheme.primaryText)
+                                .foregroundStyle(ATHLTHArenaLightStyle.ink)
                                 .lineLimit(1)
                             Text(
                                 String(format: "%.1f km", race.distanceMeters / 1_000) +
@@ -652,12 +653,17 @@ private struct ATHLTHArenaLiveDuelsSection: View {
                                 )
                             )
                             .font(.caption)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .foregroundStyle(ATHLTHArenaLightStyle.secondary)
+                            ATHLTHArenaStatusPill(
+                                kind: ATHLTHArenaStatusPresentation.liveRace(
+                                    status: "accepted"
+                                )
+                            )
                         }
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.caption.weight(.medium))
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
                     }
                     .padding(12)
                     .background(ATHLTHArenaLightStyle.card(17))
