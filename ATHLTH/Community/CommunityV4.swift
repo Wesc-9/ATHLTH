@@ -240,8 +240,9 @@ struct ATHLTHCommunityV4View: View {
                     }
                     .buttonStyle(.plain)
 
+                    // Explore has a single clear entry in Quick Actions.
+                    // Avoid repeating the same discovery content below the feed.
                     referenceRecentActivitySection
-                    referenceDiscoverySection
                 }
                 .padding(.horizontal, 14)
                 .padding(.top, 10)
@@ -3663,7 +3664,8 @@ private struct CommunityReferenceQuickActions: View {
                         english: "Explore", norwegian: "Utforsk"
                     ),
                     detail: ATHLTHLocalization.choose(
-                        english: "Find something new", norwegian: "Oppdag mer"
+                        english: "Clubs, events & challenges",
+                        norwegian: "Klubber, eventer og utfordringer"
                     ),
                     icon: "safari",
                     tint: ATHLTHTheme.accentDeep
