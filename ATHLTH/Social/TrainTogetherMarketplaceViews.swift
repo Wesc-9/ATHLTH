@@ -1312,6 +1312,10 @@ struct TrainTogetherPostDetailView:
             if let post {
                 ScrollView {
                     VStack(spacing: 16) {
+                        ATHLTHCommunityContextRibbon(
+                            kind: .trainTogether,
+                            groupName: post.creatorDisplayName
+                        )
                         detailHero(post)
                         workoutCard(post)
 
@@ -1342,6 +1346,8 @@ struct TrainTogetherPostDetailView:
                     }
                     .padding(16)
                     .padding(.bottom, 28)
+                    .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+                    .frame(maxWidth: .infinity)
                 }
             } else {
                 ContentUnavailableView(
@@ -1356,16 +1362,11 @@ struct TrainTogetherPostDetailView:
                 )
             }
         }
-        .background(
-            ATHLTHPremiumCanvas(
-                accent:
-                    ATHLTHTheme
-                        .vitality
-                        .opacity(0.13)
-            )
-        )
+        .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
         .navigationTitle(
-            "Train Together"
+            ATHLTHLocalization.choose(
+                english: "Train Together", norwegian: "Tren sammen"
+            )
         )
         .navigationBarTitleDisplayMode(
             .inline
@@ -1540,7 +1541,7 @@ struct TrainTogetherPostDetailView:
     private func detailHero(
         _ post: TrainTogetherPost
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(
                 alignment: .leading,
                 spacing: 14
@@ -1666,7 +1667,7 @@ struct TrainTogetherPostDetailView:
     private func workoutCard(
         _ post: TrainTogetherPost
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(
                 alignment: .leading,
                 spacing: 12
@@ -1775,7 +1776,7 @@ struct TrainTogetherPostDetailView:
         _ post: TrainTogetherPost
     ) -> some View {
         VStack(spacing: 14) {
-            ATHLTHCard {
+            ATHLTHPlanSurface {
                 VStack(
                     alignment: .leading,
                     spacing: 12
@@ -1900,7 +1901,7 @@ struct TrainTogetherPostDetailView:
     private func guestControls(
         _ post: TrainTogetherPost
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(
                 alignment: .leading,
                 spacing: 12
@@ -2249,7 +2250,7 @@ struct TrainTogetherPostDetailView:
         _ meetup:
             TrainTogetherMeetup
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(
                 alignment: .leading,
                 spacing: 8
