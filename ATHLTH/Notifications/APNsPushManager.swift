@@ -576,67 +576,76 @@ final class ATHLTHAppDelegate: NSObject,
         APNsPushManager.shared.didFailToRegister(error)
     }
 
-    // APNs payloads are JSON. Serialize before crossing to MainActor so
-    // Swift 6 does not transfer a non-Sendable [AnyHashable: Any] dictionary.
-    // The original payload is reconstructed before dispatching notifications.
-    // UNUserNotificationCenter's async delegate completion must run on the
-    // main executor. A nonisolated async delegate can complete on a cooperative
-    // background executor and trigger UIKit's state-restoration assertion
-    // (_performBlockAfterCATransactionCommitSynchronizes) on iOS.
-    // Keep both async delegate entry points explicitly MainActor-isolated.
+    // UIKit's completion-handler delegate variants avoid the Swift 6
+    // non-Sendable async protocol-witness mismatch. Completion is delivered
+    // from MainActor even when UserNotifications invokes the delegate on a
+    // cooperative background executor.
+    //
+    // UIKit owns these escaping callbacks. They are transferred exactly once
+    // to MainActor rather than exposing UNNotification objects across actors.
+    private struct PresentationCompletion: @unchecked Sendable {
+        let finish: (UNNotificationPresentationOptions) -> Void
+    }
+
+    private struct TapCompletion: @unchecked Sendable {
+        let finish: () -> Void
+    }
+
     nonisolated private func notificationPayload(
         _ userInfo: [AnyHashable: Any]
     ) -> Data? {
         try? JSONSerialization.data(withJSONObject: userInfo)
     }
 
-    @MainActor func userNotificationCenter(
+    nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification
-    ) async -> UNNotificationPresentationOptions {
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler:
+            @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
         let payload = notificationPayload(notification.request.content.userInfo)
-
-        await MainActor.run {
-            guard let payload,
-                  let userInfo = try? JSONSerialization.jsonObject(with: payload)
-                    as? [AnyHashable: Any] else {
-                return
+        let completion = PresentationCompletion(finish: completionHandler)
+        Task { @MainActor in
+            if let payload,
+               let userInfo = try? JSONSerialization.jsonObject(with: payload)
+                    as? [AnyHashable: Any] {
+                NotificationCenter.default.post(
+                    name: .athlthRemoteNotificationReceived,
+                    object: nil,
+                    userInfo: userInfo
+                )
             }
-            NotificationCenter.default.post(
-                name: .athlthRemoteNotificationReceived,
-                object: nil,
-                userInfo: userInfo
-            )
+            completion.finish([.banner, .sound, .badge, .list])
         }
-
-        return [.banner, .sound, .badge, .list]
     }
 
-    @MainActor func userNotificationCenter(
+    nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
-        didReceive response: UNNotificationResponse
-    ) async {
-        let payload = notificationPayload(response.notification.request.content.userInfo)
-
-        await MainActor.run {
-            guard let payload,
-                  let userInfo = try? JSONSerialization.jsonObject(with: payload)
-                    as? [AnyHashable: Any] else {
-                return
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let payload = notificationPayload(
+            response.notification.request.content.userInfo
+        )
+        let completion = TapCompletion(finish: completionHandler)
+        Task { @MainActor in
+            if let payload,
+               let userInfo = try? JSONSerialization.jsonObject(with: payload)
+                    as? [AnyHashable: Any] {
+                APNsPushManager.shared.captureTappedNotification(userInfo)
+                NotificationCenter.default.post(
+                    name: .athlthRemoteNotificationReceived,
+                    object: nil,
+                    userInfo: userInfo
+                )
+                NotificationCenter.default.post(
+                    name: .athlthRemoteNotificationTapped,
+                    object: nil,
+                    userInfo: userInfo
+                )
             }
-
-            APNsPushManager.shared.captureTappedNotification(userInfo)
-
-            NotificationCenter.default.post(
-                name: .athlthRemoteNotificationReceived,
-                object: nil,
-                userInfo: userInfo
-            )
-            NotificationCenter.default.post(
-                name: .athlthRemoteNotificationTapped,
-                object: nil,
-                userInfo: userInfo
-            )
+            completion.finish()
         }
     }
+
 }
