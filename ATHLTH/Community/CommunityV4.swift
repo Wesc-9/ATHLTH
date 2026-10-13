@@ -2194,6 +2194,21 @@ private struct CommunityDiscoveryView: View {
                         }
                     }
 
+                    NavigationLink {
+                        CommunityGroupsView(initialQuery: searchText)
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "View all clubs",
+                                norwegian: "Se alle klubber"
+                            ),
+                            systemImage: "arrow.up.right"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accent)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
                     }
 
                     if selectedCategory == .all || selectedCategory == .events {
@@ -2249,6 +2264,21 @@ private struct CommunityDiscoveryView: View {
                         }
                     }
 
+                    NavigationLink {
+                        CommunityEventsView()
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "View all events",
+                                norwegian: "Se alle arrangementer"
+                            ),
+                            systemImage: "arrow.up.right"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accent)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
                     }
 
                     if selectedCategory == .all || selectedCategory == .challenges {
@@ -2304,6 +2334,21 @@ private struct CommunityDiscoveryView: View {
                             }
                         }
                     }
+                    NavigationLink {
+                        ChallengeHubView()
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "View all challenges",
+                                norwegian: "Se alle utfordringer"
+                            ),
+                            systemImage: "arrow.up.right"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accent)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 16)
