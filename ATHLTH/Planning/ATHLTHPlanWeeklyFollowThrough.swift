@@ -154,15 +154,30 @@ enum ATHLTHPlanWeeklyFollowThrough {
                           healthWorkouts: healthWorkouts,
                           strengthHistory: strengthHistory
                       ) else { continue }
-                for target in days.dropFirst(index + 1) {
+                // Prefer a free day with no planned workouts on either
+                // adjacent day. This is a spacing heuristic, not recovery advice.
+                let eligible = days.dropFirst(index + 1).filter { target in
                     guard (1...7).contains(target.dayIndex),
                           target.sessions.isEmpty,
                           let targetDate = calendar.date(
                               byAdding: .day,
                               value: offset * 7 + target.dayIndex - 1,
                               to: start
-                          ),
-                          targetDate > sourceDate else { continue }
+                          ) else { return false }
+                    return targetDate > sourceDate
+                }
+                let ranked = eligible.sorted { lhs, rhs in
+                    func adjacentWorkouts(_ dayIndex: Int) -> Int {
+                        days.filter { abs($0.dayIndex - dayIndex) == 1 }
+                            .reduce(0) { $0 + $1.sessions.count }
+                    }
+                    let left = adjacentWorkouts(lhs.dayIndex)
+                    let right = adjacentWorkouts(rhs.dayIndex)
+                    return left == right
+                        ? lhs.dayIndex < rhs.dayIndex
+                        : left < right
+                }
+                if let target = ranked.first {
                     return MovePreview(
                         weekID: week.id,
                         sessionID: workout.id,
