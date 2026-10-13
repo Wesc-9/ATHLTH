@@ -64,6 +64,37 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
         )
     }
 
+    func testExerciseStudioCanImportAndDiscardLocalDemoVideo() throws {
+        let source = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("mp4")
+        try Data(repeating: 0x31, count: 2_048).write(to: source)
+        defer { try? FileManager.default.removeItem(at: source) }
+
+        let imported = try ExerciseStudioVideoStorage.importVideo(from: source)
+        XCTAssertTrue(ExerciseStudioVideoStorage.isOwnedVideo(imported))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: imported.path))
+        XCTAssertNotEqual(imported, source)
+
+        ExerciseStudioVideoStorage.discardOwnedVideo(imported)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: imported.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: source.path))
+    }
+
+    func testExerciseStudioRejectsUnsupportedVideoAndDoesNotDeleteOtherFiles() throws {
+        let unrelated = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("txt")
+        try Data("not a movie".utf8).write(to: unrelated)
+        defer { try? FileManager.default.removeItem(at: unrelated) }
+
+        XCTAssertThrowsError(
+            try ExerciseStudioVideoStorage.importVideo(from: unrelated)
+        )
+        ExerciseStudioVideoStorage.discardOwnedVideo(unrelated)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: unrelated.path))
+    }
+
     func testRecoveryEngineClassifiesPreviouslyUnrecognizedRepDBAnatomy() {
         let cases: [(String, String)] = [
             ("erector_spinae", "Lower Back"),
