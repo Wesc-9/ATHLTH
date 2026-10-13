@@ -470,4 +470,45 @@ final class ATHLTHTrainPlanStudioIntegrationTests: XCTestCase {
         XCTAssertEqual(saved.weeks[0].days[2].sessions.first?.id, draft.id)
     }
 
+    @MainActor
+    func testPlanStudioEditKeepsWorkoutIdentityAndNormalizesTime() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Edit scheduled session", summary: "",
+            weekCount: 2, startDate: today
+        ))
+        let dayID = plan.weeks[0].days[1].id
+        let original = workout(name: "Original workout")
+        store.addSession(original, toDay: dayID, inPlan: plan.id)
+        let before = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        var changed = original
+        changed.title = "Updated workout"
+        let differentDay = try XCTUnwrap(calendar.date(
+            byAdding: .day, value: 8, to: today
+        ))
+        changed.scheduledStart = try XCTUnwrap(calendar.date(
+            bySettingHour: 19, minute: 15, second: 0, of: differentDay
+        ))
+        XCTAssertTrue(store.savePlanStudioWorkout(
+            changed, inPlan: plan.id, dayID: dayID,
+            editingWorkoutID: original.id, expectedPlanVersion: before.version,
+            healthWorkouts: [], strengthHistory: []
+        ))
+        let after = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let edited = try XCTUnwrap(after.weeks[0].days[1].sessions.first)
+        XCTAssertEqual(edited.id, original.id)
+        XCTAssertEqual(edited.title, "Updated workout")
+        XCTAssertEqual(after.weeks[0].days[1].sessions.count, 1)
+        let scheduled = try XCTUnwrap(edited.scheduledStart)
+        let expected = try XCTUnwrap(calendar.date(
+            byAdding: .day, value: 1, to: today
+        ))
+        XCTAssertTrue(calendar.isDate(scheduled, inSameDayAs: expected))
+        XCTAssertEqual(calendar.component(.hour, from: scheduled), 19)
+        XCTAssertEqual(calendar.component(.minute, from: scheduled), 15)
+    }
+
 }
