@@ -1,5 +1,6 @@
 import AVKit
 import PhotosUI
+import Supabase
 import SwiftUI
 import UIKit
 
@@ -1066,6 +1067,50 @@ struct ExerciseDetailView: View {
     }
 }
 
+// AI only drafts editable exercise metadata. It never publishes the exercise or
+// pretends that a demonstration video was generated.
+private struct ATHLTHAIExerciseDraft: Decodable {
+    let name: String
+    let primaryMuscles: [String]
+    let secondaryMuscles: [String]
+    let equipment: [String]
+    let instructions: [String]
+    let videoBrief: String
+}
+
+private struct ATHLTHAIExerciseRequest: Encodable {
+    let description: String
+    let language: String
+}
+
+@MainActor
+private final class ATHLTHAIExerciseDraftService {
+    private let client = SupabaseEnvironment.client
+
+    func generate(description: String) async throws -> ATHLTHAIExerciseDraft {
+        try await client.functions.invoke(
+            "generate-exercise-draft",
+            options: FunctionInvokeOptions(
+                body: ATHLTHAIExerciseRequest(
+                    description: description,
+                    language: ATHLTHLocalization.isNorwegian ? "no" : "en"
+                )
+            )
+        )
+    }
+}
+
+private enum ATHLTHAIDraftValidationError: LocalizedError {
+    case incompleteDraft
+
+    var errorDescription: String? {
+        ATHLTHLocalization.choose(
+            english: "The exercise suggestion was incomplete.",
+            norwegian: "Øvelsesforslaget var ufullstendig."
+        )
+    }
+}
+
 struct CustomExerciseEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var library: ExerciseLibraryStore
@@ -1082,6 +1127,12 @@ struct CustomExerciseEditorView: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedImageData: Data?
     @State private var videoURLText = ""
+    @State private var aiPrompt = ""
+    @State private var aiVideoBrief = ""
+    @State private var isGeneratingAIDraft = false
+    @State private var hasAIDraft = false
+    @State private var aiErrorMessage: String?
+    private let aiDraftService = ATHLTHAIExerciseDraftService()
 
     var body: some View {
         let photoButtonTitle =
@@ -1091,6 +1142,69 @@ struct CustomExerciseEditorView: View {
 
         return NavigationStack {
             Form {
+                Section {
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english: "Describe the movement, equipment and goal.",
+                            norwegian: "Beskriv bevegelsen, utstyret og formålet."
+                        ),
+                        text: $aiPrompt,
+                        axis: .vertical
+                    )
+                    .lineLimit(3...6)
+
+                    Button {
+                        Task { await generateAIDraft() }
+                    } label: {
+                        HStack(spacing: 9) {
+                            if isGeneratingAIDraft {
+                                ProgressView()
+                            } else {
+                                Image(systemName: "sparkles")
+                            }
+                            Text(ATHLTHLocalization.choose(
+                                english: "Create AI suggestion",
+                                norwegian: "Lag forslag med AI"
+                            ))
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 46)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accentDeep)
+                    .disabled(
+                        isGeneratingAIDraft ||
+                        aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines).count < 12
+                    )
+
+                    if let aiErrorMessage {
+                        Text(aiErrorMessage)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+
+                    if hasAIDraft {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Draft ready. Review all fields before saving.",
+                                norwegian: "Utkastet er klart. Kontroller alle feltene før du lagrer."
+                            ),
+                            systemImage: "checkmark.circle"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.vitality)
+                    }
+                    Text(ATHLTHLocalization.choose(
+                        english: "ATHLTH AI+ suggests text and muscle groups. You approve the result. The video storyboard is not a generated video.",
+                        norwegian: "ATHLTH AI+ foreslår tekst og muskelgrupper. Du godkjenner resultatet. Videoplanen er ikke en ferdig generert video."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                } header: {
+                    Label("ATHLTH AI", systemImage: "sparkles")
+                }
+
                 Section("Exercise") {
                     TextField("Name", text: $name)
 
@@ -1251,8 +1365,34 @@ struct CustomExerciseEditorView: View {
                         )
                     }
 
+                    if !aiVideoBrief.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Suggested video storyboard",
+                                    norwegian: "Forslag til demonstrasjonsvideo"
+                                ),
+                                systemImage: "video"
+                            )
+                            .font(.subheadline.weight(.semibold))
+
+                            Text(aiVideoBrief)
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(12)
+                        .background(
+                            ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 14)
+                        )
+                    }
+
                     TextField(
-                        "Direct video URL (optional)",
+                        ATHLTHLocalization.choose(
+                            english: "Direct video URL (optional)",
+                            norwegian: "Direkte videolenke (valgfritt)"
+                        ),
                         text: $videoURLText
                     )
                     .textInputAutocapitalization(.never)
@@ -1330,6 +1470,41 @@ struct CustomExerciseEditorView: View {
                     selectedImageData = try? await item.loadTransferable(type: Data.self)
                 }
             }
+        }
+    }
+
+    @MainActor
+    private func generateAIDraft() async {
+        let description = aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard description.count >= 12, !isGeneratingAIDraft else { return }
+        isGeneratingAIDraft = true
+        aiErrorMessage = nil
+        defer { isGeneratingAIDraft = false }
+        do {
+            let suggestion = try await aiDraftService.generate(description: description)
+            let primary = Set(ExerciseMuscleGroup.allCases.filter {
+                suggestion.primaryMuscles.contains($0.rawValue)
+            })
+            guard !primary.isEmpty,
+                  !suggestion.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  suggestion.instructions.count >= 2 else {
+                throw ATHLTHAIDraftValidationError.incompleteDraft
+            }
+            let secondary = Set(ExerciseMuscleGroup.allCases.filter {
+                suggestion.secondaryMuscles.contains($0.rawValue) && !primary.contains($0)
+            })
+            name = String(suggestion.name.prefix(90))
+            primaryMuscles = primary
+            secondaryMuscles = secondary
+            equipment = suggestion.equipment.joined(separator: ", ")
+            instructions = suggestion.instructions.joined(separator: "\n")
+            aiVideoBrief = suggestion.videoBrief
+            hasAIDraft = true
+        } catch {
+            aiErrorMessage = ATHLTHLocalization.choose(
+                english: "ATHLTH AI could not prepare this exercise. Check your ATHLTH+ access and try again. ",
+                norwegian: "ATHLTH AI klarte ikke å lage øvelsen. Kontroller ATHLTH+-tilgangen og prøv igjen. "
+            ) + error.localizedDescription
         }
     }
 
