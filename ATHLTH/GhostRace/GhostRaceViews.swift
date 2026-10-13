@@ -2839,7 +2839,9 @@ struct ATHLTHGhostRuntimeObserver: View {
                     state:
                         workout.resumedAt == nil
                             ? .paused
-                            : .running
+                            : .running,
+                    routeProgressPercent:
+                        workout.routeProgressPercent
                 )
 
             phoneWorkout
@@ -3262,7 +3264,9 @@ struct ATHLTHGhostRuntimeObserver: View {
                                 Date()
                         )
                     ),
-                state: .completed
+                state: .completed,
+                routeProgressPercent:
+                    workout.routeProgressPercent
             )
     }
 
