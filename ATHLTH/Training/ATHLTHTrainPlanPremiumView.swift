@@ -72,9 +72,15 @@ struct ATHLTHTrainPlanPremiumView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear {
             session.refreshActivePlanForToday()
+            if let plan {
+                advanced = plan.builderProfile?.mode == .advanced
+            }
         }
         .onChange(of: plan?.id) { _, _ in
             selectedWeekIndex = nil
+            if let plan {
+                advanced = plan.builderProfile?.mode == .advanced
+            }
         }
         .onChange(of: highlightedPlanID) { _, next in
             focusedPlanID = next
@@ -284,8 +290,8 @@ struct ATHLTHTrainPlanPremiumView: View {
                         "Bygg treningen du ønsker deg"))
                     .font(.system(size: 26, weight: .regular, design: .serif))
                 Text(tr(
-                    "Start with a name and duration. Add your goals and sessions only when you're ready.",
-                    "Start med navn og varighet. Velg deretter egne mål og økter – uten at AI eller ferdige opplegg er påkrevd."
+                    "Choose Simple for three quick questions, or Advanced for full control.",
+                    "Velg Enkel for tre raske spørsmål, eller Avansert for full kontroll."
                 ))
                 .font(.subheadline)
                 .foregroundStyle(secondaryInk)
