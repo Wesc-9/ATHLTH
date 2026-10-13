@@ -6,6 +6,7 @@ enum ATHLTHCommunityContentKind {
     case publicEvent
     case event
     case challenge
+    case trainTogether
 
     var localizedTitle: String {
         switch self {
@@ -24,6 +25,10 @@ enum ATHLTHCommunityContentKind {
                 english: "Club challenge",
                 norwegian: "Klubbutfordring"
             )
+        case .trainTogether:
+            ATHLTHLocalization.choose(
+                english: "Train together", norwegian: "Tren sammen"
+            )
         }
     }
 
@@ -32,6 +37,7 @@ enum ATHLTHCommunityContentKind {
         case .publicEvent: "calendar"
         case .event: "calendar.badge.clock"
         case .challenge: "trophy"
+        case .trainTogether: "figure.run.circle"
         }
     }
 }
