@@ -1582,6 +1582,35 @@ struct ATHLTHArenaCreateView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("ATHLTH · ARENA")
+                            .font(ATHLTHArenaLightStyle.eyebrow)
+                            .tracking(2)
+                            .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
+                        Text(teamMode
+                            ? ATHLTHLocalization.choose(
+                                english: "Build your team competition",
+                                norwegian: "Bygg din lagkonkurranse"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Create a competition",
+                                norwegian: "Opprett en konkurranse"
+                            ))
+                            .font(ATHLTHArenaLightStyle.editorialTitle(27))
+                            .foregroundStyle(ATHLTHArenaLightStyle.ink)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Start with a template or an empty series. Set the rounds and invite athletes before publishing.",
+                            norwegian: "Velg en mal eller start uten runder. Du bestemmer rundene og inviterer deltakerne før publisering."
+                        ))
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHArenaLightStyle.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.vertical, 9)
+                }
+                .listRowBackground(ATHLTHArenaLightStyle.soft)
+
                 if teamMode {
                     Section {
                         Label(ATHLTHLocalization.choose(
@@ -1594,7 +1623,7 @@ struct ATHLTHArenaCreateView: View {
                             norwegian: "Velg minst tre venner: du og de inviterte må bli et partall (4, 6, 8 …). Etter at invitasjonene er godtatt, fordeler du deltakerne på to like store lag i konkurranselobbyen. For stafett legger du først til en ruterunde og fordeler deretter etappene."
                         ))
                         .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                         Label(
                             ATHLTHArenaTeamStartRules.validInviteeCount(selectedFriendIDs.count)
                                 ? ATHLTHLocalization.choose(
@@ -1626,14 +1655,14 @@ struct ATHLTHArenaCreateView: View {
                             HStack(spacing: 11) {
                                 Image(systemName: preset == selectedPreset
                                     ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(preset.name)
                                         .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(ATHLTHTheme.primaryText)
+                                        .foregroundStyle(ATHLTHArenaLightStyle.ink)
                                     Text(preset.detail)
                                         .font(.caption)
-                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                        .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1714,11 +1743,11 @@ struct ATHLTHArenaCreateView: View {
                                 Task { await loadClubAthletes(choice.id) }
                             } label: {
                                 HStack {
-                                    Text(choice.name).foregroundStyle(ATHLTHTheme.primaryText)
+                                    Text(choice.name).foregroundStyle(ATHLTHArenaLightStyle.ink)
                                     Spacer()
                                     Image(systemName: selectedClubID == choice.id
                                           ? "checkmark.circle.fill" : "circle")
-                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                        .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
                                 }
                             }
                         }
@@ -1750,11 +1779,11 @@ struct ATHLTHArenaCreateView: View {
                             } label: {
                                 HStack {
                                     Text(athlete.displayName)
-                                        .foregroundStyle(ATHLTHTheme.primaryText)
+                                        .foregroundStyle(ATHLTHArenaLightStyle.ink)
                                     Spacer()
                                     Image(systemName: selectedFriendIDs.contains(athlete.id)
                                           ? "checkmark.circle.fill" : "circle")
-                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                        .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
                                 }
                             }
                         }
@@ -1792,12 +1821,12 @@ struct ATHLTHArenaCreateView: View {
                                 } label: {
                                     HStack {
                                         Text(friend.resolvedName)
-                                            .foregroundStyle(ATHLTHTheme.primaryText)
+                                            .foregroundStyle(ATHLTHArenaLightStyle.ink)
                                         Spacer()
                                         Image(systemName:
                                             selectedFriendIDs.contains(friend.userID)
                                             ? "checkmark.circle.fill" : "circle")
-                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                        .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
                                     }
                                 }
                             }
