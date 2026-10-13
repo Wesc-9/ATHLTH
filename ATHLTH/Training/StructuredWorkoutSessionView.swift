@@ -11,6 +11,8 @@ struct StructuredWorkoutCompletion: Identifiable, Codable, Hashable {
     let endedAt: Date
     let completedBlockCount: Int
     let totalBlockCount: Int
+    // Optional for compatibility with previously saved workout history.
+    var sourcePlanID: UUID? = nil
 
     var duration: TimeInterval {
         max(endedAt.timeIntervalSince(startedAt), 0)
@@ -62,6 +64,7 @@ struct StructuredWorkoutSessionView: View {
     @EnvironmentObject private var session: AppSessionStore
 
     let workout: PlannedSession
+    var linkedPlanID: UUID? = nil
 
     @State private var startedAt = Date()
     @State private var currentIndex = 0
@@ -613,7 +616,8 @@ struct StructuredWorkoutSessionView: View {
                 endedAt: Date(),
                 completedBlockCount:
                     completedBlockIDs.count,
-                totalBlockCount: blocks.count
+                totalBlockCount: blocks.count,
+                sourcePlanID: linkedPlanID
             )
 
         StructuredWorkoutCompletionStore.save(

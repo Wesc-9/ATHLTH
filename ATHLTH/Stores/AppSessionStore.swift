@@ -810,6 +810,7 @@ final class AppSessionStore: ObservableObject {
            StructuredWorkoutCompletionStore.load(userID: profile.userID)
                 .contains(where: {
                     $0.sourceWorkoutID == sessionID &&
+                    ($0.sourcePlanID == nil || $0.sourcePlanID == planID) &&
                     $0.completedBlockCount > 0
                 }) {
             return true

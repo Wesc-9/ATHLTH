@@ -215,7 +215,8 @@ struct PlannedWorkoutDetailView: View {
                     $showingStructuredWorkout
             ) {
                 StructuredWorkoutSessionView(
-                    workout: currentWorkout
+                    workout: currentWorkout,
+                    linkedPlanID: planID
                 )
                 .environmentObject(session)
             }
