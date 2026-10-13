@@ -244,14 +244,13 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                         if !day.sessions.isEmpty {
                             HStack(alignment: .top, spacing: 10) {
                                 Text(
-                                    currentPlan.startDate.flatMap { start in
-                                        guard (1...7).contains(day.dayIndex) else { return nil }
-                                        return calendar.date(
-                                            byAdding: .day,
-                                            value: currentWeekIndex * 7 + day.dayIndex - 1,
-                                            to: calendar.startOfDay(for: start)
-                                        )
-                                    }?.formatted(.dateTime.weekday(.abbreviated))
+                                    ATHLTHPlanWeeklyFollowThrough.effectiveDate(
+                                        scheduledStart: nil,
+                                        planStart: currentPlan.startDate,
+                                        weekIndex: currentWeekIndex,
+                                        dayIndex: day.dayIndex,
+                                        calendar: calendar
+                                    )?.formatted(.dateTime.weekday(.abbreviated))
                                     ?? ATHLTHLocalization.choose(
                                         english: "Day \(day.dayIndex)",
                                         norwegian: "Dag \(day.dayIndex)"
@@ -271,15 +270,20 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                             healthWorkouts: health.workouts,
                                             strengthHistory: strength.workoutHistory
                                         )
-                                        let dayDate = currentPlan.startDate.flatMap { start in
-                                            guard (1...7).contains(day.dayIndex) else { return nil }
-                                            return calendar.date(
-                                                byAdding: .day,
-                                                value: currentWeekIndex * 7 + day.dayIndex - 1,
-                                                to: calendar.startOfDay(for: start)
-                                            )
-                                        }
-                                        let effectiveDate = workout.scheduledStart ?? dayDate
+                                        let dayDate = ATHLTHPlanWeeklyFollowThrough.effectiveDate(
+                                            scheduledStart: nil,
+                                            planStart: currentPlan.startDate,
+                                            weekIndex: currentWeekIndex,
+                                            dayIndex: day.dayIndex,
+                                            calendar: calendar
+                                        )
+                                        let effectiveDate = ATHLTHPlanWeeklyFollowThrough.effectiveDate(
+                                            scheduledStart: workout.scheduledStart,
+                                            planStart: currentPlan.startDate,
+                                            weekIndex: currentWeekIndex,
+                                            dayIndex: day.dayIndex,
+                                            calendar: calendar
+                                        )
                                         let needsReview = !completed && !skipped
                                             && (effectiveDate.map { calendar.startOfDay(for: $0) < today } ?? false)
                                         if needsReview {

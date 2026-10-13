@@ -645,6 +645,24 @@ enum ATHLTHPlanWeeklyFollowThrough {
         )
     }
 
+    /// Resolve a workout date consistently in reporting and presentation.
+    /// An explicit scheduled date always overrides its original plan day.
+    static func effectiveDate(
+        scheduledStart: Date?,
+        planStart: Date?,
+        weekIndex: Int,
+        dayIndex: Int,
+        calendar: Calendar = .current
+    ) -> Date? {
+        if let scheduledStart { return scheduledStart }
+        guard let planStart, (1...7).contains(dayIndex) else { return nil }
+        return calendar.date(
+            byAdding: .day,
+            value: weekIndex * 7 + dayIndex - 1,
+            to: calendar.startOfDay(for: planStart)
+        )
+    }
+
     static func inspect(
         plan: TrainingPlan,
         store: AppSessionStore,
@@ -673,21 +691,16 @@ enum ATHLTHPlanWeeklyFollowThrough {
             var firstSkippedDayID: UUID?
 
             for day in week.days.sorted(by: { $0.dayIndex < $1.dayIndex }) {
-                let fallback: Date?
-                if let start, (1...7).contains(day.dayIndex) {
-                    fallback = calendar.date(
-                        byAdding: .day,
-                        value: weekOffset * 7 + day.dayIndex - 1,
-                        to: start
-                    )
-                } else {
-                    fallback = nil
-                }
-
                 for workout in day.sessions {
                     guard seen.insert(workout.id).inserted else { continue }
 
-                    let scheduled = workout.scheduledStart ?? fallback
+                    let scheduled = effectiveDate(
+                        scheduledStart: workout.scheduledStart,
+                        planStart: start,
+                        weekIndex: weekOffset,
+                        dayIndex: day.dayIndex,
+                        calendar: calendar
+                    )
                     let isPast = scheduled.map { calendar.startOfDay(for: $0) < today } ?? false
                     if isPast { pastDated += 1 }
                     if store.isPlanSessionSkipped(
