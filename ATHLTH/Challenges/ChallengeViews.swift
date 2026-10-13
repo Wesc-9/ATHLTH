@@ -10474,17 +10474,17 @@ struct ChallengeDetailView: View {
                             norwegian: "Forsøk"
                         ),
                     trailing:
-                        challenge.attempts.filter { challenge.countsAttempt($0) }.isEmpty
+                        challenge.attempts.filter { challenge.showsAttempt($0) }.isEmpty
                             ? nil
-                            : "\(challenge.attempts.filter { challenge.countsAttempt($0) }.count)"
+                            : "\(challenge.attempts.filter { challenge.showsAttempt($0) }.count)"
                 )
 
-            if challenge.attempts.filter({ challenge.countsAttempt($0) }).isEmpty {
+            if challenge.attempts.filter({ challenge.showsAttempt($0) }).isEmpty {
                 Text("No attempts yet.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(challenge.attempts.filter { challenge.countsAttempt($0) }.sorted { $0.submittedAt > $1.submittedAt }.prefix(10)) { attempt in
+                ForEach(challenge.attempts.filter { challenge.showsAttempt($0) }.sorted { $0.submittedAt > $1.submittedAt }.prefix(10)) { attempt in
                     HStack(alignment: .top, spacing: 10) {
                         Image(
                             systemName: attempt.isEligible
