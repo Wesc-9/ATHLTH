@@ -4617,8 +4617,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     ghostFinalPhaseAnnounced =
                         true
                     finalPhaseRemainingMeters =
-                        configuration
-                            .resolvedFinalPhaseStartMeters
+                        remaining
                 }
             }
         }
@@ -4802,6 +4801,26 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     norwegian: true
                 ) +
                 "."
+            )
+        }
+
+        // Explain the target instead of merely reading the gap. Only
+        // a fixed Replay/Target Ghost has a meaningful target finish clock.
+        // Live competitors can change pace and must not receive this cue.
+        if let finalPhaseRemainingMeters,
+           distanceDelta < -8,
+           let fixedGhost = ghostRaceConfiguration,
+           let targetPace = ATHLTHGhostFinishPaceCoach.requiredSecondsPerKilometre(
+                remainingMeters: finalPhaseRemainingMeters,
+                elapsedSeconds: elapsedTime,
+                ghostFinishSeconds: fixedGhost.referenceDuration
+           ) {
+            let formatted = ATHLTHGhostFinishPaceCoach.minuteSecondText(targetPace)
+            englishParts.append(
+                "To catch the Ghost, aim for about \(formatted) per kilometre."
+            )
+            norwegianParts.append(
+                "For å ta igjen Ghosten, sikt mot omtrent \(formatted) per kilometer."
             )
         }
 
