@@ -1368,8 +1368,8 @@ struct ATHLTHAudioCoachSettingsView: View {
                             .foregroundStyle(ATHLTHTheme.accentDeep)
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(ATHLTHLocalization.choose(
-                                    english: "Norwegian voice \\(index + 1)",
-                                    norwegian: "Norsk stemme \\(index + 1)"
+                                    english: "Norwegian voice \(index + 1)",
+                                    norwegian: "Norsk stemme \(index + 1)"
                                 ))
                                 .font(.subheadline.weight(.semibold))
                                 Text(voice.compactTitle)
@@ -1403,8 +1403,8 @@ struct ATHLTHAudioCoachSettingsView: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel(
                         ATHLTHLocalization.choose(
-                            english: "Preview \\(voice.name)",
-                            norwegian: "Forhåndslytt på \\(voice.name)"
+                            english: "Preview \(voice.name)",
+                            norwegian: "Forhåndslytt på \(voice.name)"
                         )
                     )
                 }
@@ -1417,8 +1417,8 @@ struct ATHLTHAudioCoachSettingsView: View {
 
             if norwegianVoiceChoices.count < 2 {
                 Text(ATHLTHLocalization.choose(
-                    english: "Only \\(norwegianVoiceChoices.count) distinct Norwegian voice(s) are installed. Add other Norwegian system voices under iPhone Settings → Accessibility → Spoken Content → Voices, then reopen ATHLTH.",
-                    norwegian: "Bare \\(norwegianVoiceChoices.count) ulike norske stemmer er installert. Legg til flere under iPhone-innstillinger → Tilgjengelighet → Opplest innhold → Stemmer, og åpne ATHLTH igjen."
+                    english: "Only \(norwegianVoiceChoices.count) distinct Norwegian voice(s) are installed. Add other Norwegian system voices under iPhone Settings → Accessibility → Spoken Content → Voices, then reopen ATHLTH.",
+                    norwegian: "Bare \(norwegianVoiceChoices.count) ulike norske stemmer er installert. Legg til flere under iPhone-innstillinger → Tilgjengelighet → Opplest innhold → Stemmer, og åpne ATHLTH igjen."
                 ))
                 .font(.caption)
                 .foregroundStyle(ATHLTHTheme.mutedText)
