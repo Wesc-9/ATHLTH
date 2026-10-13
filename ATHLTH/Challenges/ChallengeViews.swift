@@ -8169,7 +8169,7 @@ struct ChallengeDetailView: View {
                            let partnerID = invitedWorkoutPartnerID,
                            challenge.status != .cancelled,
                            challenge.status != .completed {
-                            ATHLTHCard {
+                            ATHLTHPlanSurface {
                                 VStack(alignment: .leading, spacing: 10) {
                                     Label(
                                         ATHLTHLocalization.choose(
@@ -8295,18 +8295,10 @@ struct ChallengeDetailView: View {
                     .frame(maxWidth: 760)
                     .frame(maxWidth: .infinity)
                 }
-                .background(
-                    LinearGradient(
-                        colors: [
-                            ATHLTHTheme.canvasTop,
-                            ATHLTHTheme.canvasBottom
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .ignoresSafeArea()
-                )
-                .navigationTitle("Challenge")
+                .background(ChallengePlanTheme.canvas.ignoresSafeArea())
+                .navigationTitle(ATHLTHLocalization.choose(
+                    english: "Challenge", norwegian: "Utfordring"
+                ))
                 .navigationBarTitleDisplayMode(.inline)
                 .task {
                     challenges.refreshStatuses()
@@ -8745,7 +8737,7 @@ struct ChallengeDetailView: View {
 
     private var heartRateProfileRequiredCard:
         some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(
                 alignment: .leading,
                 spacing: 12
@@ -8807,7 +8799,7 @@ struct ChallengeDetailView: View {
     private func publicJoinCard(
         _ challenge: ATHLTHChallenge
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(
                 alignment: .leading,
                 spacing: 12
@@ -8873,7 +8865,7 @@ struct ChallengeDetailView: View {
     private func invitationResponseCard(
         _ challenge: ATHLTHChallenge
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(
                 alignment: .leading,
                 spacing: 16
@@ -8992,7 +8984,7 @@ struct ChallengeDetailView: View {
     private func detailHero(
         _ challenge: ATHLTHChallenge
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(
                 alignment: .leading,
                 spacing: 16
@@ -9253,7 +9245,7 @@ struct ChallengeDetailView: View {
                 for: challenge.id
             )
 
-        return ATHLTHCard {
+        return ATHLTHPlanSurface {
             VStack(
                 alignment: .leading,
                 spacing: 14
@@ -9506,7 +9498,7 @@ struct ChallengeDetailView: View {
                 for: challenge
             )
 
-        return ATHLTHCard {
+        return ATHLTHPlanSurface {
             VStack(
                 alignment: .leading,
                 spacing: 14
@@ -9959,7 +9951,7 @@ struct ChallengeDetailView: View {
     private func targetGhostCard(
         _ challenge: ATHLTHChallenge
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {
                     Image(
@@ -10055,7 +10047,7 @@ struct ChallengeDetailView: View {
     private func rulesCard(
         _ challenge: ATHLTHChallenge
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(
                 alignment: .leading,
                 spacing: 0
@@ -10245,7 +10237,7 @@ struct ChallengeDetailView: View {
         _ challenge: ATHLTHChallenge,
         meetup: ChallengeMeetup
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(
                 alignment: .leading,
                 spacing: 12
@@ -10360,7 +10352,7 @@ struct ChallengeDetailView: View {
     private func participantsCard(
         _ challenge: ATHLTHChallenge
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(
                 alignment: .leading,
                 spacing: 12
@@ -10497,7 +10489,7 @@ struct ChallengeDetailView: View {
     private func attemptsCard(
         _ challenge: ATHLTHChallenge
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(
                 alignment: .leading,
                 spacing: 10
