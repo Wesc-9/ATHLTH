@@ -896,6 +896,45 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
     }
 
     @MainActor
+    func testIntensityPersistsAcrossReadsAndIgnoresRemovedSessions() throws {
+        let (_, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var modified = plan
+        let workoutOne = workout()
+        modified.weeks[0].days[0].sessions = [workoutOne]
+        ATHLTHPlanWeeklyFollowThrough.saveEfforts(
+            [workoutOne.id: .hard], plan: modified, defaults: defaults
+        )
+        let restored = ATHLTHPlanWeeklyFollowThrough.savedEfforts(
+            plan: modified, defaults: defaults
+        )
+        XCTAssertEqual(restored[workoutOne.id], .hard)
+        modified.weeks[0].days[0].sessions = []
+        XCTAssertTrue(ATHLTHPlanWeeklyFollowThrough.savedEfforts(
+            plan: modified, defaults: defaults
+        ).isEmpty)
+    }
+
+    @MainActor
+    func testWeeklyEffortBreakdownKeepsUnknownAndHardDaysSeparate() throws {
+        let (_, defaults, suite, plan) = try prepared(weekCount: 2)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var modified = plan
+        let hard = workout()
+        let unknown = workout()
+        modified.weeks[0].days[0].sessions = [hard]
+        modified.weeks[0].days[1].sessions = [unknown]
+        let result = ATHLTHPlanWeeklyFollowThrough.weeklyEffortSummaries(
+            plan: modified, effortBySessionID: [hard.id: .hard]
+        )
+        XCTAssertEqual(result.count, 2)
+        XCTAssertEqual(result[0].hardMinutes, 30)
+        XCTAssertEqual(result[0].unknownMinutes, 30)
+        XCTAssertEqual(result[0].hardDays, 1)
+        XCTAssertEqual(result[1].hardMinutes, 0)
+    }
+
+    @MainActor
     func testDuplicateIdentitiesAreCountedOnlyOnce() throws {
         let (store, defaults, suite, plan) = try prepared(weekCount: 1)
         defer { defaults.removePersistentDomain(forName: suite) }

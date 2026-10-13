@@ -307,6 +307,49 @@ enum ATHLTHPlanWeeklyFollowThrough {
         defaults.set(values, forKey: effortStorageKey(planID: plan.id))
     }
 
+    struct WeeklyEffortSummary: Identifiable {
+        let id: UUID
+        let weekNumber: Int
+        let easyMinutes: Int
+        let moderateMinutes: Int
+        let hardMinutes: Int
+        let unknownMinutes: Int
+        let hardDays: Int
+    }
+
+    /// Week-by-week intensity breakdown for the plan editor and review.
+    static func weeklyEffortSummaries(
+        plan: TrainingPlan, effortBySessionID: [UUID: PlannedEffort]
+    ) -> [WeeklyEffortSummary] {
+        plan.weeks.enumerated().map { index, week in
+            var easy = 0
+            var moderate = 0
+            var hard = 0
+            var unknown = 0
+            var hardDays = 0
+            for day in week.days {
+                var dayHasHard = false
+                for workout in day.sessions {
+                    let minutes = max(0, workout.durationMinutes ?? 0)
+                    switch effortBySessionID[workout.id] {
+                    case .easy?: easy += minutes
+                    case .moderate?: moderate += minutes
+                    case .hard?:
+                        hard += minutes
+                        dayHasHard = true
+                    case nil: unknown += minutes
+                    }
+                }
+                if dayHasHard { hardDays += 1 }
+            }
+            return WeeklyEffortSummary(
+                id: week.id, weekNumber: index + 1,
+                easyMinutes: easy, moderateMinutes: moderate,
+                hardMinutes: hard, unknownMinutes: unknown, hardDays: hardDays
+            )
+        }
+    }
+
     /// Conservative, non-mutating candidate for a future workout.
     /// The destination must be empty and later in the same week; explicitly
     /// timed, completed or skipped sessions are never offered for relocation.
