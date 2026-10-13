@@ -380,30 +380,26 @@ struct LiveGhostRaceLobbyView: View {
     }
 
     private var headerCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 13) {
             HStack(spacing: 9) {
-                Label(
-                    "LIVE GHOST",
-                    systemImage: "dot.radiowaves.left.and.right"
-                )
-                .font(.caption.weight(.bold))
-                .tracking(0.9)
-                .foregroundStyle(.white.opacity(0.94))
+                Label("ATHLTH · LIVE GHOST", systemImage: "figure.run")
+                    .font(ATHLTHArenaLightStyle.eyebrow)
+                    .tracking(1.7)
+                    .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
 
                 Spacer(minLength: 5)
 
                 Text(String(format: "%.1f km", challenge.distanceMeters / 1_000))
-                    .font(.subheadline.weight(.bold))
-                    .monospacedDigit()
-                    .foregroundStyle(.white)
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(ATHLTHArenaLightStyle.ink)
                     .padding(.horizontal, 11)
                     .padding(.vertical, 7)
-                    .background(.white.opacity(0.15), in: Capsule())
+                    .background(ATHLTHArenaLightStyle.soft, in: Capsule())
             }
 
             Text(challenge.title)
-                .font(.system(.title2, design: .rounded, weight: .bold))
-                .foregroundStyle(.white)
+                .font(ATHLTHArenaLightStyle.editorialTitle(29))
+                .foregroundStyle(ATHLTHArenaLightStyle.ink)
                 .fixedSize(horizontal: false, vertical: true)
 
             Label(
@@ -419,30 +415,28 @@ struct LiveGhostRaceLobbyView: View {
                 systemImage: challenge.sourceKind == "planned_route"
                     ? "map.fill" : "figure.run"
             )
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.white.opacity(0.95))
+            .font(.caption.weight(.medium))
+            .foregroundStyle(ATHLTHArenaLightStyle.ink)
             .padding(.horizontal, 11)
             .padding(.vertical, 8)
-            .background(.white.opacity(0.12), in: Capsule())
+            .background(ATHLTHArenaLightStyle.soft, in: Capsule())
 
             Rectangle()
-                .fill(.white.opacity(0.17))
+                .fill(ATHLTHArenaLightStyle.line)
                 .frame(height: 1)
                 .accessibilityHidden(true)
 
-            Text(
-                ATHLTHLocalization.choose(
-                    english: "Both athletes enter the same race lobby. Once both are ready, ATHLTH starts a single synchronized countdown.",
-                    norwegian: "Begge utøverne møtes i samme lobby. Når begge er klare, starter ATHLTH én felles nedtelling."
-                )
-            )
+            Text(ATHLTHLocalization.choose(
+                english: "Both athletes enter the same race lobby. When both are ready, ATHLTH starts one synchronized countdown.",
+                norwegian: "Begge utøverne møtes i samme lobby. Når begge er klare, starter ATHLTH én felles nedtelling."
+            ))
             .font(.subheadline)
-            .foregroundStyle(.white.opacity(0.86))
+            .foregroundStyle(ATHLTHArenaLightStyle.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(20)
+        .padding(19)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(ATHLTHArenaLightStyle.heroSurface(24))
+        .background(ATHLTHArenaLightStyle.card(22))
     }
 
     private var participantCard: some View {
@@ -881,14 +875,15 @@ struct LiveGhostRaceLobbyView: View {
                     )
                     .font(.title2.weight(.semibold))
                     .foregroundStyle(resultCandidate == nil
-                        ? .orange : ATHLTHTheme.accentDeep)
+                        ? .orange : ATHLTHArenaLightStyle.warmGold)
                     .frame(width: 46, height: 46)
                     .background(
-                        ATHLTHTheme.vitalitySoft.opacity(0.56),
+                        ATHLTHArenaLightStyle.soft,
                         in: Circle()
                     )
                     Text(resultTitle)
-                        .font(.system(.title2, design: .rounded, weight: .bold))
+                        .font(ATHLTHArenaLightStyle.editorialTitle(26))
+                        .foregroundStyle(ATHLTHArenaLightStyle.ink)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
