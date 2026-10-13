@@ -16,6 +16,7 @@ enum ATHLTHPlanWeeklyFollowThrough {
         let pastDated: Int
         let pastConfirmed: Int
         let pastCompleted: Int
+        let isFullyElapsed: Bool
         let firstReviewDayID: UUID?
 
         var pastSkipped: Int { pastConfirmed - pastCompleted }
@@ -73,7 +74,7 @@ enum ATHLTHPlanWeeklyFollowThrough {
         /// undated sessions are excluded to avoid misleading trends.
         var completedWeekTrend: (previous: Week, latest: Week, delta: Int)? {
             let eligible = weeks.filter {
-                $0.pastDated > 0 && $0.upcoming == 0 && $0.unknownDate == 0
+                $0.isFullyElapsed && $0.pastDated > 0 && $0.upcoming == 0 && $0.unknownDate == 0
                 && $0.pastDated == $0.planned
             }
             guard eligible.count >= 2,
@@ -189,6 +190,9 @@ enum ATHLTHPlanWeeklyFollowThrough {
                 pastDated: pastDated,
                 pastConfirmed: pastConfirmed,
                 pastCompleted: pastCompleted,
+                isFullyElapsed: start.flatMap {
+                    calendar.date(byAdding: .day, value: (weekOffset + 1) * 7, to: $0)
+                }.map { $0 <= today } ?? false,
                 firstReviewDayID: firstReviewDayID
             ))
         }

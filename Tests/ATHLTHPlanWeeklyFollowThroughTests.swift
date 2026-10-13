@@ -226,6 +226,30 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
     }
 
     @MainActor
+    func testTrendExcludesCurrentWeekEvenWhenAllItsSessionsAreInThePast() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 3)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let first = workout()
+        let second = workout()
+        store.addSession(first, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(second, toDay: plan.weeks[1].days[0].id, inPlan: plan.id)
+        store.setPlanSessionManuallyCompleted(
+            planID: plan.id, sessionID: second.id, completed: true
+        )
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let middleOfSecondWeek = Calendar.current.date(
+            byAdding: .day, value: 9, to: plan.startDate!
+        )!
+        let report = ATHLTHPlanWeeklyFollowThrough.inspect(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: middleOfSecondWeek
+        )
+        XCTAssertEqual(report.weeks[1].pastDated, 1)
+        XCTAssertFalse(report.weeks[1].isFullyElapsed)
+        XCTAssertNil(report.completedWeekTrend)
+    }
+
+    @MainActor
     func testReviewSuggestionIsReadOnlyAndRequiresRepeatedEvidence() throws {
         let (store, defaults, suite, plan) = try prepared(weekCount: 1)
         defer { defaults.removePersistentDomain(forName: suite) }
