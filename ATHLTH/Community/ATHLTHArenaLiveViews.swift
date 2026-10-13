@@ -4382,19 +4382,19 @@ struct ATHLTHArenaOnlineDetailView: View {
 
     private var summary: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("ATHLTH ARENA", systemImage: "trophy.fill")
-                .font(.caption.weight(.semibold))
-                .tracking(1.5)
-                .foregroundStyle(.white.opacity(0.88))
+            Text("ATHLTH · ARENA")
+                .font(ATHLTHArenaLightStyle.eyebrow)
+                .tracking(2.0)
+                .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
             Text(currentSeries.title)
-                .font(.system(.title2, design: .rounded, weight: .bold))
+                .font(ATHLTHArenaLightStyle.editorialTitle(30))
                 .fixedSize(horizontal: false, vertical: true)
-                .foregroundStyle(.white)
+                .foregroundStyle(ATHLTHArenaLightStyle.ink)
             Text(series.scope.title + " · " +
                  "\(series.durationDays) " +
                  ATHLTHLocalization.choose(english: "days", norwegian: "dager"))
                 .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.74))
+                .foregroundStyle(ATHLTHArenaLightStyle.secondary)
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 8) {
                     summaryMetric("\(rounds.count) " + ATHLTHLocalization.choose(
@@ -4415,7 +4415,7 @@ struct ATHLTHArenaOnlineDetailView: View {
             }
             Label(series.scoring.title, systemImage: "medal")
                 .font(.caption)
-                .foregroundStyle(.white.opacity(0.88))
+                .foregroundStyle(ATHLTHArenaLightStyle.secondary)
             if !rounds.isEmpty {
                 Label(
                     ATHLTHLocalization.choose(
@@ -4426,7 +4426,7 @@ struct ATHLTHArenaOnlineDetailView: View {
                         ? "checkmark.shield.fill" : "shield.lefthalf.filled"
                 )
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.92))
+                .foregroundStyle(ATHLTHArenaLightStyle.ink)
                 .accessibilityHint(ATHLTHLocalization.choose(
                     english: "Round rules are approved separately from competition results. Approved rules do not award points.",
                     norwegian: "Rundereglene godkjennes separat fra konkurranseresultatene. Godkjente regler gir ikke poeng."
@@ -4438,7 +4438,7 @@ struct ATHLTHArenaOnlineDetailView: View {
                     ? ATHLTHLocalization.choose(english: "Active", norwegian: "Aktiv")
                     : ATHLTHLocalization.choose(english: "Pending agreement", norwegian: "Avventer enighet"))
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.90))
+                .foregroundStyle(ATHLTHArenaLightStyle.secondary)
             if currentSeries.status == "active",
                let endsAt = currentSeries.endsAt {
                 if Date() >= endsAt {
@@ -4450,10 +4450,10 @@ struct ATHLTHArenaOnlineDetailView: View {
                         systemImage: "clock.badge.checkmark"
                     )
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.90))
+                    .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                     Text(endsAt.addingTimeInterval(48 * 3_600), style: .date)
                         .font(.caption)
-                        .foregroundStyle(.white.opacity(0.74))
+                        .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                 } else {
                     HStack(spacing: 6) {
                         Image(systemName: "calendar")
@@ -4463,7 +4463,7 @@ struct ATHLTHArenaOnlineDetailView: View {
                         Text(endsAt, style: .date)
                     }
                     .font(.caption)
-                    .foregroundStyle(.white.opacity(0.74))
+                    .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                 }
             } else if currentSeries.status == "completed",
                       currentSeries.completionReason == "deadline_unresolved" {
@@ -4475,7 +4475,7 @@ struct ATHLTHArenaOnlineDetailView: View {
                     systemImage: "exclamationmark.circle"
                 )
                 .font(.caption)
-                .foregroundStyle(.white.opacity(0.74))
+                .foregroundStyle(ATHLTHArenaLightStyle.secondary)
             }
             if outstandingInvitations > 0 {
                 Label(
@@ -4487,21 +4487,21 @@ struct ATHLTHArenaOnlineDetailView: View {
                     systemImage: "clock"
                 )
                 .font(.caption)
-                .foregroundStyle(.white.opacity(0.90))
+                .foregroundStyle(ATHLTHArenaLightStyle.secondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
-        .background(ATHLTHArenaLightStyle.heroSurface(24))
+        .background(ATHLTHArenaLightStyle.card(21))
     }
 
     private func summaryMetric(_ value: String, symbol: String) -> some View {
         Label(value, systemImage: symbol)
             .font(.caption.weight(.semibold))
-            .foregroundStyle(.white.opacity(0.94))
+            .foregroundStyle(ATHLTHArenaLightStyle.ink)
             .padding(.horizontal, 11)
             .padding(.vertical, 8)
-            .background(.white.opacity(0.12), in: Capsule())
+            .background(ATHLTHArenaLightStyle.soft, in: Capsule())
     }
 
     private var invitationActions: some View {
