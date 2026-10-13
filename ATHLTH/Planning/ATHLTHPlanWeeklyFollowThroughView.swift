@@ -293,12 +293,17 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                                 .font(.caption.weight(.semibold))
                                             }
                                             .buttonStyle(.borderless)
+                                            .accessibilityHint(ATHLTHLocalization.choose(
+                                                english: "Open the planned day to review this workout",
+                                                norwegian: "Åpner plandagen for å gjennomgå økten"
+                                            ))
                                         }
                                         HStack(spacing: 5) {
                                             Image(systemName: completed
                                                   ? "checkmark.circle.fill"
                                                   : skipped ? "minus.circle"
-                                                  : "circle")
+                                                  : effectiveDate == nil ? "calendar.badge.questionmark"
+                                                  : needsReview ? "questionmark.circle" : "circle")
                                                 .foregroundStyle(completed
                                                     ? ATHLTHPlanDesign.accent
                                                     : ATHLTHPlanDesign.secondaryInk)
@@ -311,11 +316,18 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                                    dayDate.map({
                                                        !calendar.isDate($0, inSameDayAs: scheduled)
                                                    }) ?? true {
-                                                    Text(scheduled.formatted(
-                                                        .dateTime.weekday(.abbreviated).day().month(.abbreviated)
-                                                    ))
+                                                    Label(
+                                                        scheduled.formatted(
+                                                            .dateTime.weekday(.abbreviated).day().month(.abbreviated)
+                                                        ),
+                                                        systemImage: "calendar.badge.clock"
+                                                    )
                                                     .font(.caption2)
                                                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                                    .accessibilityLabel(ATHLTHLocalization.choose(
+                                                        english: "Scheduled for \(scheduled.formatted(date: .abbreviated, time: .omitted))",
+                                                        norwegian: "Planlagt til \(scheduled.formatted(date: .abbreviated, time: .omitted))"
+                                                    ))
                                                 }
                                             }
                                             Spacer(minLength: 4)
