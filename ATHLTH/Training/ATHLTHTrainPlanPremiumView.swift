@@ -32,6 +32,11 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var openingWorkoutPlanID: UUID?
     @State private var queuedLaunchPlanID: UUID?
     @State private var queuedLaunchWorkout: PlannedSession?
+    @State private var deletingWorkout: PlannedSession?
+    @State private var deletingPlanID: UUID?
+    @State private var deletingDayID: UUID?
+    @State private var deletingPlanVersion: Int?
+    @State private var deleteError: String?
     @State private var movingWorkout: PlannedSession?
     @State private var movingPlanID: UUID?
     @State private var movingPlanVersion: Int?
@@ -210,6 +215,56 @@ struct ATHLTHTrainPlanPremiumView: View {
                 }
             }
         }
+        .confirmationDialog(
+            tr("Remove planned workout?", "Fjerne planlagt økt?"),
+            isPresented: Binding(
+                get: { deletingWorkout != nil },
+                set: { if !$0 { clearPendingDeletion() } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(tr("Remove workout", "Fjern økten"), role: .destructive) {
+                if let workout = deletingWorkout,
+                   let planID = deletingPlanID,
+                   let dayID = deletingDayID,
+                   let version = deletingPlanVersion {
+                    let removed = session.removePlanStudioWorkout(
+                        planID: planID,
+                        workoutID: workout.id,
+                        dayID: dayID,
+                        expectedVersion: version,
+                        healthWorkouts: health.workouts,
+                        strengthHistory: strength.workoutHistory
+                    )
+                    if !removed {
+                        deleteError = tr(
+                            "The workout could not be removed. The plan may have changed.",
+                            "Økten kunne ikke fjernes. Planen kan ha blitt endret."
+                        )
+                    }
+                }
+                clearPendingDeletion()
+            }
+            Button(tr("Cancel", "Avbryt"), role: .cancel) {
+                clearPendingDeletion()
+            }
+        } message: {
+            Text(tr(
+                "Only the planned workout is removed. Recorded training history is not deleted.",
+                "Bare den planlagte økten fjernes. Registrert treningshistorikk slettes ikke."
+            ))
+        }
+        .alert(
+            tr("Could not remove workout", "Kunne ikke fjerne økten"),
+            isPresented: Binding(
+                get: { deleteError != nil },
+                set: { if !$0 { deleteError = nil } }
+            )
+        ) {
+            Button("OK") { deleteError = nil }
+        } message: {
+            Text(deleteError ?? "")
+        }
         .sheet(item: $movingWorkout) { workout in
             if let movingPlanID,
                let plan = session.trainingPlan(withID: movingPlanID) {
@@ -338,6 +393,13 @@ struct ATHLTHTrainPlanPremiumView: View {
             queuedLaunchWorkout = workout
             openingWorkout = nil
         }
+    }
+
+    private func clearPendingDeletion() {
+        deletingWorkout = nil
+        deletingPlanID = nil
+        deletingDayID = nil
+        deletingPlanVersion = nil
     }
 
     private func workoutDayID(_ workout: PlannedSession, plan: TrainingPlan) -> UUID? {
@@ -1015,6 +1077,19 @@ struct ATHLTHTrainPlanPremiumView: View {
                                 } label: {
                                     Label(tr("Move to another day", "Flytt til en annen dag"),
                                           systemImage: "calendar.badge.clock")
+                                }
+                            }
+                            if !completed && !skipped &&
+                                planDayDate(day.dayIndex, plan: plan) >=
+                                    Calendar.current.startOfDay(for: Date()) {
+                                Button(role: .destructive) {
+                                    deletingWorkout = workout
+                                    deletingPlanID = plan.id
+                                    deletingDayID = day.id
+                                    deletingPlanVersion = plan.version
+                                } label: {
+                                    Label(tr("Remove from plan", "Fjern fra planen"),
+                                          systemImage: "trash")
                                 }
                             }
                             if !completed && !skipped {
