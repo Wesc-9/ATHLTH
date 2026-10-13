@@ -621,6 +621,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     accent: ATHLTHTheme.vitality
                 ) {
                     mode = .basic
+                    chooseSimpleActivity(.walking)
                     goForward()
                 }
 
@@ -4039,7 +4040,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         !selectedDays.isEmpty &&
         conflictingPlan == nil &&
         (
-            injuryFree ||
+            mode == .basic || injuryFree ||
             !injuriesOrLimitations
                 .trimmingCharacters(
                     in: .whitespacesAndNewlines
@@ -4592,6 +4593,14 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     ) {
         guard canCreatePlan else {
             return
+        }
+
+        if mode == .basic {
+            weekCount = 8
+            weeklyTimeBudgetMinutes = simpleMinutes * selectedDays.count
+            workoutKindOverridesByDay = Dictionary(
+                uniqueKeysWithValues: selectedDays.map { ($0, simpleActivity) }
+            )
         }
 
         let cleanLimitations =

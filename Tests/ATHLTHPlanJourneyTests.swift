@@ -4,10 +4,11 @@ import XCTest
 final class ATHLTHPlanJourneyTests: XCTestCase {
     func testSimpleStartsWithModeAndSkipsAdvancedQuestions() {
         let stages = ATHLTHPlanJourney.sequence(advanced: false)
-        XCTAssertEqual(stages, [.mode, .basics, .source, .review])
+        XCTAssertEqual(stages, [.mode, .basics])
         XCTAssertFalse(stages.contains(.profile))
         XCTAssertFalse(stages.contains(.week))
-        XCTAssertEqual(ATHLTHPlanJourney.position(of: .review, advanced: false), 4)
+        XCTAssertNil(ATHLTHPlanJourney.position(of: .review, advanced: false))
+        XCTAssertNil(ATHLTHPlanJourney.next(after: .basics, advanced: false))
     }
 
     func testAdvancedKeepsAllSixPlanningStages() {

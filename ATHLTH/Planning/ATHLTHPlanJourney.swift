@@ -16,7 +16,7 @@ enum ATHLTHPlanJourney {
         if advanced {
             return [.mode, .basics, .source, .profile, .week, .review]
         }
-        return [.mode, .basics, .source, .review]
+        return [.mode, .basics]
     }
 
     static func position(

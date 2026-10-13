@@ -325,7 +325,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                     Text(plan.title)
                         .font(.system(size: 26, weight: .regular, design: .serif))
                         .lineLimit(2)
-                    if !summary.isEmpty {
+                    if advanced && !summary.isEmpty {
                         Text(summary)
                             .font(.caption)
                             .foregroundStyle(secondaryInk)
@@ -344,6 +344,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                     } label: {
                         Label(tr("All plans", "Alle planer"), systemImage: "square.stack")
                     }
+                    if advanced {
                     Button {
                         showingGoals = true
                     } label: {
@@ -364,6 +365,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                     } label: {
                         Label(tr("Analyze", "Analyser"), systemImage: "chart.xyaxis.line")
                     }
+                    }
                 } label: {
                     Image(systemName: "ellipsis")
                         .foregroundStyle(graphite)
@@ -373,6 +375,17 @@ struct ATHLTHTrainPlanPremiumView: View {
                 .accessibilityLabel(tr("Plan options", "Planvalg"))
             }
 
+            if !advanced {
+                Text(tr(
+                    "Your plan is ready. Choose a day below to see your workout.",
+                    "Planen din er klar. Velg en dag nedenfor for å se økten din."
+                ))
+                .font(.subheadline)
+                .foregroundStyle(secondaryInk)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if advanced {
             HStack(spacing: 0) {
                 metric("\(current) / \(weeks)", tr("WEEKS", "UKER"))
                 Rectangle().fill(line).frame(width: 1, height: 35)
@@ -382,6 +395,28 @@ struct ATHLTHTrainPlanPremiumView: View {
                        tr("SESSIONS", "ØKTER"))
             }
 
+            } else {
+                HStack(spacing: 12) {
+                    Image(systemName: "checkmark.circle")
+                        .font(.title2)
+                        .foregroundStyle(warmGold)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(tr("Your progress", "Din fremgang"))
+                            .font(.subheadline.weight(.semibold))
+                        Text(tr(
+                            "\(completed) of \(total) workouts completed",
+                            "\(completed) av \(total) økter gjennomført"
+                        ))
+                        .font(.subheadline)
+                        .foregroundStyle(secondaryInk)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(13)
+                .background(soft, in: RoundedRectangle(cornerRadius: 12))
+            }
+
+            if advanced {
             VStack(alignment: .leading, spacing: 7) {
                 HStack {
                     Text(tr("Workout completion", "Gjennomførte økter"))
@@ -470,6 +505,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                 .background(soft, in: RoundedRectangle(cornerRadius: 11))
             }
             .buttonStyle(.plain)
+            }
         }
         .padding(17)
         .surface(line: line)
