@@ -41,6 +41,8 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
             }
         }
 
+        var isAttentionRequired: Bool { self == .needsReview }
+
         var title: String {
             switch self {
             case .completed:
@@ -67,7 +69,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
     ) -> some View {
         HStack(spacing: 5) {
             Image(systemName: status.symbol)
-                .foregroundStyle(status == .completed
+                .foregroundStyle(status == .completed || status.isAttentionRequired
                     ? ATHLTHPlanDesign.accent
                     : ATHLTHPlanDesign.secondaryInk)
                 .accessibilityHidden(true)
@@ -88,15 +90,17 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                     .font(.caption2)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "Scheduled for \(scheduled.formatted(date: .abbreviated, time: .omitted))",
-                        norwegian: "Planlagt til \(scheduled.formatted(date: .abbreviated, time: .omitted))"
+                        english: "Moved to \(scheduled.formatted(date: .abbreviated, time: .omitted))",
+                        norwegian: "Flyttet til \(scheduled.formatted(date: .abbreviated, time: .omitted))"
                     ))
                 }
             }
             Spacer(minLength: 4)
             Text(status.title)
-                .font(.caption2)
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .font(.caption2.weight(status.isAttentionRequired ? .semibold : .regular))
+                .foregroundStyle(status.isAttentionRequired
+                    ? ATHLTHPlanDesign.ink
+                    : ATHLTHPlanDesign.secondaryInk)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title), \(status.title)")
@@ -451,7 +455,8 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                 Spacer(minLength: 4)
                                 plannedDayButton(weekID: week.id, dayID: day.id)
                             }
-                            .padding(.vertical, 5)
+                            .padding(.vertical, 7)
+                            .accessibilityElement(children: .contain)
                         }
                     }
                 }
