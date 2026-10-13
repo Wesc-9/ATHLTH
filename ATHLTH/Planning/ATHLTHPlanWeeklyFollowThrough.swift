@@ -226,6 +226,56 @@ enum ATHLTHPlanWeeklyFollowThrough {
         }
     }
 
+    /// Explicitly assigned intensity, never inferred from activity type.
+    enum PlannedEffort: Int {
+        case easy = 1
+        case moderate = 2
+        case hard = 3
+    }
+
+    struct EffortDistribution {
+        let easyMinutes: Int
+        let moderateMinutes: Int
+        let hardMinutes: Int
+        let unknownMinutes: Int
+        let adjacentHardDayPairs: Int
+    }
+
+    /// Summarizes entered intensity without interpreting it as recovery data.
+    static func effortDistribution(
+        plan: TrainingPlan, effortBySessionID: [UUID: PlannedEffort]
+    ) -> EffortDistribution {
+        var easy = 0
+        var moderate = 0
+        var hard = 0
+        var unknown = 0
+        var pairs = 0
+        var previousHard = false
+        for week in plan.weeks {
+            for day in week.days.sorted(by: { $0.dayIndex < $1.dayIndex }) {
+                var dayIsHard = false
+                for session in day.sessions {
+                    let minutes = max(0, session.durationMinutes ?? 0)
+                    switch effortBySessionID[session.id] {
+                    case .easy?: easy += minutes
+                    case .moderate?: moderate += minutes
+                    case .hard?:
+                        hard += minutes
+                        dayIsHard = true
+                    case nil: unknown += minutes
+                    }
+                }
+                if previousHard && dayIsHard { pairs += 1 }
+                previousHard = dayIsHard
+            }
+        }
+        return EffortDistribution(
+            easyMinutes: easy, moderateMinutes: moderate,
+            hardMinutes: hard, unknownMinutes: unknown,
+            adjacentHardDayPairs: pairs
+        )
+    }
+
     /// Conservative, non-mutating candidate for a future workout.
     /// The destination must be empty and later in the same week; explicitly
     /// timed, completed or skipped sessions are never offered for relocation.
