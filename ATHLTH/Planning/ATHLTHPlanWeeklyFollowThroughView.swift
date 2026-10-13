@@ -231,9 +231,41 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                 .frame(width: 50, alignment: .leading)
                                 VStack(alignment: .leading, spacing: 3) {
                                     ForEach(day.sessions) { workout in
-                                        Text(workout.title)
-                                            .font(.subheadline)
-                                            .lineLimit(2)
+                                        let completed = session.isPlanSessionCompleted(
+                                            planID: currentPlan.id, sessionID: workout.id,
+                                            healthWorkouts: health.workouts,
+                                            strengthHistory: strength.workoutHistory
+                                        )
+                                        let skipped = session.isPlanSessionSkipped(
+                                            planID: currentPlan.id, sessionID: workout.id
+                                        )
+                                        HStack(spacing: 5) {
+                                            Image(systemName: completed
+                                                  ? "checkmark.circle.fill"
+                                                  : skipped ? "minus.circle"
+                                                  : "circle")
+                                                .foregroundStyle(completed
+                                                    ? ATHLTHPlanDesign.accent
+                                                    : ATHLTHPlanDesign.secondaryInk)
+                                                .accessibilityHidden(true)
+                                            Text(workout.title)
+                                                .font(.subheadline)
+                                                .lineLimit(2)
+                                            Spacer(minLength: 4)
+                                            Text(completed
+                                                 ? ATHLTHLocalization.choose(
+                                                     english: "Done", norwegian: "Fullført"
+                                                   )
+                                                 : skipped
+                                                 ? ATHLTHLocalization.choose(
+                                                     english: "Skipped", norwegian: "Hoppet over"
+                                                   )
+                                                 : ATHLTHLocalization.choose(
+                                                     english: "Planned", norwegian: "Planlagt"
+                                                   ))
+                                                .font(.caption2)
+                                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                        }
                                     }
                                 }
                                 Spacer(minLength: 4)
