@@ -244,6 +244,33 @@ struct PlannedWorkoutDetailView: View {
         .presentationDragIndicator(.visible)
     }
 
+    // Keep the switch outside SwiftUI's ViewBuilder: assignments in a
+    // result-builder switch evaluate to Void and break Swift 6 compilation.
+    private var simpleActivityDescription: String {
+        switch currentWorkout.kind {
+        case .walking:
+            return ATHLTHLocalization.choose(
+                english: "Go for a comfortable walk.",
+                norwegian: "Gå en tur i et tempo som passer deg."
+            )
+        case .running:
+            return ATHLTHLocalization.choose(
+                english: "Run at a pace that feels comfortable.",
+                norwegian: "Løp i et tempo som føles behagelig."
+            )
+        case .strength:
+            return ATHLTHLocalization.choose(
+                english: "Complete your strength session at your own pace.",
+                norwegian: "Gjennomfør styrkeøkten i ditt eget tempo."
+            )
+        default:
+            return ATHLTHLocalization.choose(
+                english: "Complete the planned workout at your own pace.",
+                norwegian: "Gjennomfør den planlagte økten i ditt eget tempo."
+            )
+        }
+    }
+
     private var simpleInstructions: some View {
         ATHLTHCard {
             VStack(alignment: .leading, spacing: 10) {
@@ -253,30 +280,7 @@ struct PlannedWorkoutDetailView: View {
                 ))
                 .font(.headline)
                 let minutes = currentWorkout.durationMinutes
-                let activity: String
-                switch currentWorkout.kind {
-                case .walking:
-                    activity = ATHLTHLocalization.choose(
-                        english: "Go for a comfortable walk.",
-                        norwegian: "Gå en tur i et tempo som passer deg."
-                    )
-                case .running:
-                    activity = ATHLTHLocalization.choose(
-                        english: "Run at a pace that feels comfortable.",
-                        norwegian: "Løp i et tempo som føles behagelig."
-                    )
-                case .strength:
-                    activity = ATHLTHLocalization.choose(
-                        english: "Complete your strength session at your own pace.",
-                        norwegian: "Gjennomfør styrkeøkten i ditt eget tempo."
-                    )
-                default:
-                    activity = ATHLTHLocalization.choose(
-                        english: "Complete the planned workout at your own pace.",
-                        norwegian: "Gjennomfør den planlagte økten i ditt eget tempo."
-                    )
-                }
-                Text(activity)
+                Text(simpleActivityDescription)
                     .font(.subheadline)
                 if let minutes, minutes > 0 {
                     Label(
