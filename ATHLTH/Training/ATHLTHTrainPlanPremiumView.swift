@@ -503,21 +503,25 @@ struct ATHLTHTrainPlanPremiumView: View {
             if let selectedWeek {
                 weekPager(plan, week: selectedWeek)
 
-                VStack(spacing: 0) {
-                    ForEach(selectedWeek.days.sorted(by: {
-                        $0.dayIndex < $1.dayIndex
-                    })) { day in
-                        dayRow(day, plan: plan)
-                        if day.dayIndex != 7 {
-                            Rectangle()
-                                .fill(line.opacity(0.65))
-                                .frame(height: 0.7)
-                                .padding(.leading, 42)
+                if advanced {
+                    VStack(spacing: 0) {
+                        ForEach(selectedWeek.days.sorted(by: {
+                            $0.dayIndex < $1.dayIndex
+                        })) { day in
+                            dayRow(day, plan: plan)
+                            if day.dayIndex != 7 {
+                                Rectangle()
+                                    .fill(line.opacity(0.65))
+                                    .frame(height: 0.7)
+                                    .padding(.leading, 42)
+                            }
                         }
                     }
+                    .padding(.horizontal, 13)
+                    .surface(line: line)
+                } else {
+                    simpleWeekRows(selectedWeek, plan: plan)
                 }
-                .padding(.horizontal, 13)
-                .surface(line: line)
 
                 if advanced {
                 HStack(spacing: 7) {
@@ -591,6 +595,81 @@ struct ATHLTHTrainPlanPremiumView: View {
         .foregroundStyle(graphite)
         .background(soft, in: RoundedRectangle(cornerRadius: 11))
         .buttonStyle(.plain)
+    }
+
+    private func simpleWeekRows(
+        _ week: TrainingPlanWeek, plan: TrainingPlan
+    ) -> some View {
+        let days = week.days.filter { !$0.sessions.isEmpty }
+            .sorted { $0.dayIndex < $1.dayIndex }
+        return VStack(alignment: .leading, spacing: 10) {
+            if days.isEmpty {
+                Text(tr("No workouts this week", "Ingen økter denne uken"))
+                    .font(.subheadline)
+                    .foregroundStyle(secondaryInk)
+                Button {
+                    showingEditor = true
+                } label: {
+                    Label(tr("Add workout", "Legg til økt"), systemImage: "plus")
+                }
+            } else {
+                ForEach(days) { day in
+                    ForEach(day.sessions) { workout in
+                        Button {
+                            openingWorkout = workout
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: workout.kind.systemImage)
+                                    .font(.title3)
+                                    .foregroundStyle(kindTint(workout.kind))
+                                    .frame(width: 44, height: 44)
+                                    .background(
+                                        kindTint(workout.kind).opacity(0.10),
+                                        in: RoundedRectangle(cornerRadius: 13)
+                                    )
+                                    .accessibilityHidden(true)
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text(planDayDate(day.dayIndex, plan: plan)
+                                        .formatted(.dateTime.weekday(.wide).day().month(.abbreviated)))
+                                        .font(.caption)
+                                        .foregroundStyle(secondaryInk)
+                                    Text(simpleWorkoutDescription(workout))
+                                        .font(.headline)
+                                        .foregroundStyle(graphite)
+                                        .multilineTextAlignment(.leading)
+                                }
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right")
+                                    .foregroundStyle(secondaryInk)
+                                    .accessibilityHidden(true)
+                            }
+                            .padding(16)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.white.opacity(0.9),
+                                in: RoundedRectangle(cornerRadius: 18))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    private func simpleWorkoutDescription(_ workout: PlannedSession) -> String {
+        let activity: String
+        switch workout.kind {
+        case .walking: activity = tr("Go for a walk", "Gå en tur")
+        case .running: activity = tr("Go running", "Ta en løpetur")
+        case .strength: activity = tr("Do strength training", "Tren styrke")
+        case .mobility: activity = tr("Do mobility exercises", "Tren bevegelighet")
+        case .recovery: activity = tr("Move gently", "Beveg deg rolig")
+        case .custom: activity = workout.title
+        }
+        guard let minutes = workout.durationMinutes, minutes > 0 else {
+            return activity
+        }
+        return tr("\(activity) for \(minutes) minutes",
+                  "\(activity) i \(minutes) minutter")
     }
 
     private func dayRow(_ day: TrainingPlanDay, plan: TrainingPlan) -> some View {
