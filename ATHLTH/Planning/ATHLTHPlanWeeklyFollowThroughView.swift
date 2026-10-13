@@ -107,7 +107,23 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                     .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     ForEach(currentPlan.weeks) { week in
-                        ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
+                        HStack(spacing: 12) {
+                        Label("\(completedCount)", systemImage: "checkmark.circle.fill")
+                        Label("\(sessions.count - completedCount - skippedCount - unresolvedCount)", systemImage: "calendar")
+                        if unresolvedCount > 0 {
+                            Label("\(unresolvedCount)", systemImage: "questionmark.circle")
+                        }
+                        if skippedCount > 0 {
+                            Label("\(skippedCount)", systemImage: "minus.circle")
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "\(completedCount) completed, \(unresolvedCount) need review, \(skippedCount) skipped",
+                        norwegian: "\(completedCount) fullført, \(unresolvedCount) trenger gjennomgang, \(skippedCount) hoppet over"
+                    ))
+                    ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
                             ForEach(day.sessions) { workout in
                                 HStack(spacing: 8) {
                                     Text(workout.title)
@@ -194,6 +210,34 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
             if let currentWeekIndex {
                 let week = currentPlan.weeks[currentWeekIndex]
                 let summary = weeklyLoads[currentWeekIndex]
+                let sessions = week.days.flatMap { day in
+                    day.sessions.map { workout in (day.dayIndex, workout.id) }
+                }
+                let completedCount = sessions.filter { _, id in
+                    session.isPlanSessionCompleted(
+                        planID: currentPlan.id, sessionID: id,
+                        healthWorkouts: health.workouts,
+                        strengthHistory: strength.workoutHistory
+                    )
+                }.count
+                let skippedCount = sessions.filter { _, id in
+                    session.isPlanSessionSkipped(planID: currentPlan.id, sessionID: id)
+                }.count
+                let unresolvedCount = sessions.filter { dayIndex, id in
+                    guard !session.isPlanSessionCompleted(
+                        planID: currentPlan.id, sessionID: id,
+                        healthWorkouts: health.workouts,
+                        strengthHistory: strength.workoutHistory
+                    ), !session.isPlanSessionSkipped(
+                        planID: currentPlan.id, sessionID: id
+                    ), let start = currentPlan.startDate,
+                    let date = calendar.date(
+                        byAdding: .day,
+                        value: currentWeekIndex * 7 + dayIndex - 1,
+                        to: calendar.startOfDay(for: start)
+                    ) else { return false }
+                    return date < today
+                }.count
                 VStack(alignment: .leading, spacing: 9) {
                     HStack {
                         Label(ATHLTHLocalization.choose(
