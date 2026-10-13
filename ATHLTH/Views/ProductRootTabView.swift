@@ -808,16 +808,6 @@ struct ATHLTHHomeView: View {
                         hasCompletedProfileSetup
                 )
             }
-            .sheet(isPresented: $showingGlobalSearch) {
-                ATHLTHGlobalSearchView()
-                    .presentationDetents([.large])
-                    // Allow the native downward sheet gesture to dismiss search
-                    // directly back to Home. Keep the list scrollable and
-                    // prefer dragging the sheet when at the top of the list.
-                    .presentationDragIndicator(.visible)
-                    .presentationContentInteraction(.resizes)
-                    .presentationCornerRadius(30)
-            }
             .sheet(item: $selectedHomeStrengthSession) { workout in
                 WorkoutStartOptionsView(
                     session: workout,
@@ -1105,6 +1095,17 @@ struct ATHLTHHomeView: View {
                     groupRefresh,
                     activityRefresh
                 )
+            }
+            // Present search outside Home's refreshable environment so its
+            // scroll view never inherits Home's pull-to-refresh action.
+            .sheet(isPresented: $showingGlobalSearch) {
+                ATHLTHGlobalSearchView()
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                    // Scroll results normally; the native sheet handle
+                    // remains available for a downward swipe back to Home.
+                    .presentationContentInteraction(.scrolls)
+                    .presentationCornerRadius(30)
             }
             .onAppear {
                 syncHomeTodayWorkoutToWatch()
