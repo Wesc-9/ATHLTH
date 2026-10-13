@@ -862,6 +862,42 @@ struct ATHLTHTrainPlanPremiumView: View {
                             planDayDate(day.dayIndex, plan: plan),
                             inSameDayAs: Date()
                         )
+                        if !completed && !skipped &&
+                           (workout.isStructuredWorkout ||
+                            workout.kind == .running ||
+                            workout.kind == .walking ||
+                            workout.kind == .strength),
+                           let onStartWorkout {
+                            Button {
+                                // Re-resolve before launch; this card may be
+                                // showing a snapshot from an earlier plan edit.
+                                guard let current = session.trainingPlan(withID: plan.id)?
+                                    .weeks.flatMap(\.days).flatMap(\.sessions)
+                                    .first(where: { $0.id == workout.id }),
+                                      !session.isPlanSessionSkipped(
+                                        planID: plan.id, sessionID: current.id
+                                      ),
+                                      !session.isPlanSessionCompleted(
+                                        planID: plan.id,
+                                        sessionID: current.id,
+                                        healthWorkouts: health.workouts,
+                                        strengthHistory: strength.workoutHistory
+                                      )
+                                else { return }
+                                onStartWorkout(plan.id, current)
+                            } label: {
+                                Label(tr("Start workout", "Start økt"),
+                                      systemImage: "play.fill")
+                                    .font(.subheadline.weight(.semibold))
+                                    .frame(maxWidth: .infinity, minHeight: 42)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(kindTint(workout.kind))
+                            .accessibilityHint(tr(
+                                "Open the existing workout launcher",
+                                "Åpner den vanlige oppstarten av treningsøkter"
+                            ))
+                        }
                         Button {
                             openingWorkoutPlanID = plan.id
                             openingWorkout = workout
@@ -915,42 +951,6 @@ struct ATHLTHTrainPlanPremiumView: View {
                                 in: RoundedRectangle(cornerRadius: 18))
                         }
                         .buttonStyle(.plain)
-                        if !completed && !skipped &&
-                           (workout.isStructuredWorkout ||
-                            workout.kind == .running ||
-                            workout.kind == .walking ||
-                            workout.kind == .strength),
-                           let onStartWorkout {
-                            Button {
-                                // Re-resolve before launch; this card may be
-                                // showing a snapshot from an earlier plan edit.
-                                guard let current = session.trainingPlan(withID: plan.id)?
-                                    .weeks.flatMap(\.days).flatMap(\.sessions)
-                                    .first(where: { $0.id == workout.id }),
-                                      !session.isPlanSessionSkipped(
-                                        planID: plan.id, sessionID: current.id
-                                      ),
-                                      !session.isPlanSessionCompleted(
-                                        planID: plan.id,
-                                        sessionID: current.id,
-                                        healthWorkouts: health.workouts,
-                                        strengthHistory: strength.workoutHistory
-                                      )
-                                else { return }
-                                onStartWorkout(plan.id, current)
-                            } label: {
-                                Label(tr("Start workout", "Start økt"),
-                                      systemImage: "play.fill")
-                                    .font(.subheadline.weight(.semibold))
-                                    .frame(maxWidth: .infinity, minHeight: 42)
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(kindTint(workout.kind))
-                            .accessibilityHint(tr(
-                                "Open the existing workout launcher",
-                                "Åpner den vanlige oppstarten av treningsøkter"
-                            ))
-                        }
                         .contextMenu {
                             if !completed &&
                                 !workout.isStructuredWorkout &&
