@@ -192,6 +192,62 @@ struct ExerciseLibraryView: View {
 
             filters
 
+            if selectedSection == .mine {
+                ATHLTHPlanSurface {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(alignment: .top, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text("ATHLTH EXERCISE STUDIO")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .tracking(1.6)
+                                    .foregroundStyle(ATHLTHPlanDesign.accent)
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Your exercises",
+                                    norwegian: "Dine øvelser"
+                                ))
+                                .font(.system(size: 27, weight: .regular, design: .serif))
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                            }
+                            Spacer()
+                            Image(systemName: "figure.strengthtraining.traditional")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundStyle(ATHLTHPlanDesign.accent)
+                                .frame(width: 42, height: 42)
+                                .background(
+                                    ATHLTHPlanDesign.selectedSurface,
+                                    in: Circle()
+                                )
+                        }
+                        Text(ATHLTHLocalization.choose(
+                            english: "Create with AI or manually. Add a picture and your own technique video. Edit the exercise any time.",
+                            norwegian: "Lag med AI eller manuelt. Legg til bilde og egen teknikkvideo. Rediger øvelsen når som helst."
+                        ))
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+                        Button {
+                            showingCreateExercise = true
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Create exercise",
+                                    norwegian: "Opprett øvelse"
+                                ),
+                                systemImage: "plus"
+                            )
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 46)
+                            .background(ATHLTHPlanDesign.ink, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 6)
+            }
+
             if selectedSection == .library &&
                 library.isLoading &&
                 library.athlthCatalogExercises.isEmpty {
