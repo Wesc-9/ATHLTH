@@ -1405,7 +1405,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             ) {
                 HStack(spacing: 10) {
                     ForEach([1, 2, 3], id: \.self) { count in
-                        simpleChoice("\(count)", symbol: "calendar", selected: selectedDays.count == count) {
+                        simpleCompactChoice("\(count)", selected: selectedDays.count == count) {
                             selectedDays = balancedDays(count: count)
                             sessionsPerWeek = count
                             setSimpleKinds()
@@ -1419,13 +1419,36 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             ) {
                 HStack(spacing: 10) {
                     ForEach([15, 30, 45], id: \.self) { minutes in
-                        simpleChoice("\(minutes) min", symbol: "clock", selected: simpleMinutes == minutes) {
+                        simpleCompactChoice("\(minutes) min", selected: simpleMinutes == minutes) {
                             simpleMinutes = minutes
                             weeklyTimeBudgetMinutes = minutes * selectedDays.count
                         }
                     }
                 }
             }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Label(
+                    ATHLTHLocalization.choose(english: "Your plan", norwegian: "Planen din"),
+                    systemImage: "checkmark.circle.fill"
+                )
+                .font(.headline)
+                Text(ATHLTHLocalization.choose(
+                    english: "\(selectedDays.count) times a week · \(simpleMinutes) minutes each time · 8 weeks",
+                    norwegian: "\(selectedDays.count) ganger i uken · \(simpleMinutes) minutter hver gang · 8 uker"
+                ))
+                .font(.subheadline)
+                Text(ATHLTHLocalization.choose(
+                    english: "We'll spread the workouts across the week. You can change them later.",
+                    norwegian: "Vi fordeler øktene utover uken. Du kan endre dem senere."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(Color.white.opacity(0.8),
+                        in: RoundedRectangle(cornerRadius: 18, style: .continuous))
 
             if let conflict = conflictingPlan { conflictCard(conflict) }
         }
@@ -1472,6 +1495,24 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 selected ? ATHLTHTheme.accentDeep : Color.white.opacity(0.85),
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous)
             )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func simpleCompactChoice(
+        _ label: String, selected: Bool, action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.headline)
+                .foregroundStyle(selected ? Color.white : ATHLTHPlanDesign.ink)
+                .frame(maxWidth: .infinity, minHeight: 60)
+                .background(
+                    selected ? ATHLTHTheme.accentDeep : Color.white.opacity(0.85),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                )
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
