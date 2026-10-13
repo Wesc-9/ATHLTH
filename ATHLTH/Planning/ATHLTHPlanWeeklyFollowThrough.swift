@@ -123,7 +123,11 @@ enum ATHLTHPlanWeeklyFollowThrough {
     /// Refuse to reschedule an inconsistent week instead of guessing which
     /// duplicate or missing calendar day a move should target.
     private static func hasValidCalendarDays(_ plan: TrainingPlan) -> Bool {
-        plan.weeks.allSatisfy { week in
+        let weekIDs = plan.weeks.map(\.id)
+        let dayIDs = plan.weeks.flatMap { $0.days.map(\.id) }
+        guard Set(weekIDs).count == weekIDs.count,
+              Set(dayIDs).count == dayIDs.count else { return false }
+        return plan.weeks.allSatisfy { week in
             week.days.count == 7
                 && Set(week.days.map(\.dayIndex)) == Set(1...7)
         }
