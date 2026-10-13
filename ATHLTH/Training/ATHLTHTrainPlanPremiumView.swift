@@ -668,6 +668,12 @@ struct ATHLTHTrainPlanPremiumView: View {
             } else {
                 ForEach(days) { day in
                     ForEach(day.sessions) { workout in
+                        let completed = session.isPlanSessionCompleted(
+                            planID: plan.id,
+                            sessionID: workout.id,
+                            healthWorkouts: health.workouts,
+                            strengthHistory: strength.workoutHistory
+                        )
                         Button {
                             openingWorkout = workout
                         } label: {
@@ -690,6 +696,12 @@ struct ATHLTHTrainPlanPremiumView: View {
                                         .font(.headline)
                                         .foregroundStyle(graphite)
                                         .multilineTextAlignment(.leading)
+                                    if completed {
+                                        Label(tr("Completed", "Gjennomført"),
+                                              systemImage: "checkmark.circle.fill")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(kindTint(workout.kind))
+                                    }
                                 }
                                 Spacer(minLength: 0)
                                 Image(systemName: "chevron.right")
@@ -702,6 +714,16 @@ struct ATHLTHTrainPlanPremiumView: View {
                                 in: RoundedRectangle(cornerRadius: 18))
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            "\(simpleWorkoutDescription(workout)), " +
+                            (completed
+                                ? tr("completed", "gjennomført")
+                                : tr("planned", "planlagt"))
+                        )
+                        .accessibilityHint(tr(
+                            "Opens workout details",
+                            "Åpner detaljer om treningsøkten"
+                        ))
                     }
                 }
             }
