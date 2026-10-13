@@ -11,6 +11,7 @@ struct ATHLTHArenaNextStepsSection: View {
     @State private var remoteSteps: [RemoteStep] = []
     @State private var loadedFor: UUID?
     @State private var isLoading = false
+    @State private var refreshQueued = false
     @State private var loadError: String?
     @State private var loadGeneration = 0
 
@@ -269,7 +270,10 @@ struct ATHLTHArenaNextStepsSection: View {
 
     @MainActor
     private func reload() async {
-        guard !isLoading else { return }
+        if isLoading {
+            refreshQueued = true
+            return
+        }
         isLoading = true
         loadGeneration += 1
         let generation = loadGeneration
@@ -277,7 +281,13 @@ struct ATHLTHArenaNextStepsSection: View {
         loadedFor = nil
         remoteSteps = []
         loadError = nil
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            if refreshQueued {
+                refreshQueued = false
+                Task { await reload() }
+            }
+        }
 
         do {
             let series = try await cloud.loadSeries()
