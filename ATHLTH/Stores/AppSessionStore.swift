@@ -745,6 +745,19 @@ final class AppSessionStore: ObservableObject {
         if isPlanSessionManuallyCompleted(planID: planID, sessionID: sessionID) {
             return true
         }
+        // Structured workouts launched from a plan are recorded by their
+        // original session ID. Credit that recorded completion automatically
+        // rather than requiring a second manual completion or Health link.
+        if let plan = trainingPlan(withID: planID),
+           plan.weeks.flatMap(\.days).flatMap(\.sessions)
+                .contains(where: { $0.id == sessionID && $0.isStructuredWorkout }),
+           StructuredWorkoutCompletionStore.load(userID: profile.userID)
+                .contains(where: {
+                    $0.sourceWorkoutID == sessionID &&
+                    $0.completedBlockCount > 0
+                }) {
+            return true
+        }
         if strengthHistory.contains(where: {
             $0.isFinished && $0.plannedSessionID == sessionID
         }) {
