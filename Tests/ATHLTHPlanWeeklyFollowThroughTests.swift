@@ -367,6 +367,79 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
     }
 
     @MainActor
+    func testApprovedMovePersistsWorkoutAtTargetAndIncrementsVersion() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let workout = workout()
+        store.addSession(workout, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let preview = try XCTUnwrap(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: plan.startDate!
+        ))
+        XCTAssertTrue(ATHLTHPlanWeeklyFollowThrough.applyApprovedMove(
+            preview, expectedVersion: saved.version, store: store, planID: plan.id,
+            healthWorkouts: [], strengthHistory: [], referenceDate: plan.startDate!
+        ))
+        let updated = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertEqual(updated.version, saved.version + 1)
+        let source = try XCTUnwrap(updated.weeks[0].days.first(where: {
+            $0.id == preview.sourceDayID
+        }))
+        let destination = try XCTUnwrap(updated.weeks[0].days.first(where: {
+            $0.id == preview.destinationDayID
+        }))
+        XCTAssertFalse(source.sessions.contains(where: { $0.id == workout.id }))
+        XCTAssertEqual(destination.sessions.filter { $0.id == workout.id }.count, 1)
+        XCTAssertEqual(destination.sessions.first?.title, workout.title)
+        XCTAssertNotNil(destination.sessions.first?.scheduledStart)
+    }
+
+    @MainActor
+    func testApprovedMoveRejectsStaleVersionWithoutChangingPlan() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let workout = workout()
+        store.addSession(workout, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let preview = try XCTUnwrap(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: plan.startDate!
+        ))
+        store.addSession(workout(), toDay: plan.weeks[0].days[6].id, inPlan: plan.id)
+        let changed = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertFalse(ATHLTHPlanWeeklyFollowThrough.applyApprovedMove(
+            preview, expectedVersion: saved.version, store: store, planID: plan.id,
+            healthWorkouts: [], strengthHistory: [], referenceDate: plan.startDate!
+        ))
+        let after = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertEqual(after.version, changed.version)
+        XCTAssertTrue(after.weeks[0].days[0].sessions.contains(where: { $0.id == workout.id }))
+    }
+
+    @MainActor
+    func testApprovedMoveRejectsOccupiedTargetWithoutChangingPlan() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let workout = workout()
+        store.addSession(workout, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let preview = try XCTUnwrap(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: plan.startDate!
+        ))
+        store.addSession(workout(), toDay: preview.destinationDayID, inPlan: plan.id)
+        let changed = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertFalse(ATHLTHPlanWeeklyFollowThrough.applyApprovedMove(
+            preview, expectedVersion: changed.version, store: store, planID: plan.id,
+            healthWorkouts: [], strengthHistory: [], referenceDate: plan.startDate!
+        ))
+        let after = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertEqual(after.version, changed.version)
+        XCTAssertTrue(after.weeks[0].days[0].sessions.contains(where: { $0.id == workout.id }))
+    }
+
+    @MainActor
     func testDuplicateIdentitiesAreCountedOnlyOnce() throws {
         let (store, defaults, suite, plan) = try prepared(weekCount: 1)
         defer { defaults.removePersistentDomain(forName: suite) }
