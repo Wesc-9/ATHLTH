@@ -749,6 +749,45 @@ struct ATHLTHTrainPlanPremiumView: View {
                                 in: RoundedRectangle(cornerRadius: 18))
                         }
                         .buttonStyle(.plain)
+                        .contextMenu {
+                            Button {
+                                openingWorkout = workout
+                            } label: {
+                                Label(tr("Workout details", "Øktdetaljer"),
+                                      systemImage: "info.circle")
+                            }
+                            Button {
+                                editingDayID = day.id
+                            } label: {
+                                Label(tr("Change workout", "Endre økten"),
+                                      systemImage: "slider.horizontal.3")
+                            }
+                            if !completed {
+                                Button {
+                                    session.setPlanSessionManuallyCompleted(
+                                        planID: plan.id,
+                                        sessionID: workout.id,
+                                        completed: true
+                                    )
+                                } label: {
+                                    Label(tr("Mark as completed", "Marker som gjennomført"),
+                                          systemImage: "checkmark.circle")
+                                }
+                            } else if session.isPlanSessionManuallyCompleted(
+                                planID: plan.id, sessionID: workout.id
+                            ) {
+                                Button {
+                                    session.setPlanSessionManuallyCompleted(
+                                        planID: plan.id,
+                                        sessionID: workout.id,
+                                        completed: false
+                                    )
+                                } label: {
+                                    Label(tr("Undo completion", "Angre fullføring"),
+                                          systemImage: "arrow.uturn.backward")
+                                }
+                            }
+                        }
                         .accessibilityLabel(
                             "\(simpleWorkoutDescription(workout)), " +
                             (completed
