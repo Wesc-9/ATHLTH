@@ -1172,4 +1172,28 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
         ).adjacentHardDayPairs, 1)
     }
 
+    @MainActor
+    func testEffectiveDateRejectsNegativeWeekIndex() {
+        let start = Calendar.current.startOfDay(for: Date())
+        XCTAssertNil(ATHLTHPlanWeeklyFollowThrough.effectiveDate(
+            scheduledStart: nil, planStart: start, weekIndex: -1, dayIndex: 1
+        ))
+    }
+
+    @MainActor
+    func testExplicitDateRemainsAuthoritativeForInvalidWeekIndex() {
+        let explicit = Date()
+        XCTAssertEqual(ATHLTHPlanWeeklyFollowThrough.effectiveDate(
+            scheduledStart: explicit, planStart: nil, weekIndex: -1, dayIndex: 0
+        ), explicit)
+    }
+
+    @MainActor
+    func testEffectiveDateRejectsOverflowingWeekIndex() {
+        XCTAssertNil(ATHLTHPlanWeeklyFollowThrough.effectiveDate(
+            scheduledStart: nil, planStart: Date(),
+            weekIndex: Int.max, dayIndex: 7
+        ))
+    }
+
 }

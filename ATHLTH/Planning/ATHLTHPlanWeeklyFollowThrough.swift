@@ -667,7 +667,8 @@ enum ATHLTHPlanWeeklyFollowThrough {
         calendar: Calendar = .current
     ) -> Date? {
         if let scheduledStart { return scheduledStart }
-        guard let planStart, (1...7).contains(dayIndex) else { return nil }
+        guard let planStart, weekIndex >= 0, (1...7).contains(dayIndex),
+              weekIndex <= (Int.max - 6) / 7 else { return nil }
         return calendar.date(
             byAdding: .day,
             value: weekIndex * 7 + dayIndex - 1,
