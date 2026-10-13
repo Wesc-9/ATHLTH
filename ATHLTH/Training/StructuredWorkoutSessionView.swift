@@ -38,6 +38,17 @@ enum StructuredWorkoutCompletionStore {
         userID: UUID
     ) {
         var history = load(userID: userID)
+        // A planned session is a single completion target. Reopening its
+        // recording screen must not generate a second history entry.
+        // Unlinked library workouts remain repeatable.
+        if let planID = completion.sourcePlanID,
+           history.contains(where: {
+               $0.sourcePlanID == planID &&
+               $0.sourceWorkoutID == completion.sourceWorkoutID &&
+               $0.completedBlockCount > 0
+           }) {
+            return
+        }
         history.removeAll {
             $0.id == completion.id
         }
