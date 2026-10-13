@@ -120,6 +120,15 @@ enum ATHLTHPlanWeeklyFollowThrough {
         let destinationDayIndex: Int
     }
 
+    /// Refuse to reschedule an inconsistent week instead of guessing which
+    /// duplicate or missing calendar day a move should target.
+    private static func hasValidCalendarDays(_ plan: TrainingPlan) -> Bool {
+        plan.weeks.allSatisfy { week in
+            week.days.count == 7
+                && Set(week.days.map(\.dayIndex)) == Set(1...7)
+        }
+    }
+
     static func previewNextSafeMove(
         plan: TrainingPlan,
         store: AppSessionStore,
@@ -133,7 +142,8 @@ enum ATHLTHPlanWeeklyFollowThrough {
         }
         let today = calendar.startOfDay(for: referenceDate)
         let allIDs = plan.weeks.flatMap { $0.days.flatMap { $0.sessions.map(\.id) } }
-        guard Set(allIDs).count == allIDs.count else { return nil }
+        guard Set(allIDs).count == allIDs.count,
+              hasValidCalendarDays(plan) else { return nil }
         for (offset, week) in plan.weeks.enumerated() {
             let days = week.days.sorted { $0.dayIndex < $1.dayIndex }
             for (index, day) in days.enumerated() {
@@ -255,6 +265,7 @@ enum ATHLTHPlanWeeklyFollowThrough {
     ) -> Bool {
         let allIDs = plan.weeks.flatMap { $0.days.flatMap { $0.sessions.map(\.id) } }
         guard Set(allIDs).count == allIDs.count,
+              hasValidCalendarDays(plan),
               let start = plan.startDate.map({ calendar.startOfDay(for: $0) }),
               let weekOffset = plan.weeks.firstIndex(where: { $0.id == preview.weekID }),
               let source = plan.weeks[weekOffset].days.first(where: {

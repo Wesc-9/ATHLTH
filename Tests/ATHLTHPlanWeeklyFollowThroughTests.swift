@@ -788,6 +788,20 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
     }
 
     @MainActor
+    func testMovePreviewRejectsDuplicateCalendarDayIndexes() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var malformed = plan
+        malformed.weeks[0].days[2].dayIndex = 2
+        malformed.weeks[0].days[0].sessions = [workout()]
+        malformed.weeks[0].days[1].sessions = [workout()]
+        XCTAssertNil(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
+            plan: malformed, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: plan.startDate!
+        ))
+    }
+
+    @MainActor
     func testDuplicateIdentitiesAreCountedOnlyOnce() throws {
         let (store, defaults, suite, plan) = try prepared(weekCount: 1)
         defer { defaults.removePersistentDomain(forName: suite) }
