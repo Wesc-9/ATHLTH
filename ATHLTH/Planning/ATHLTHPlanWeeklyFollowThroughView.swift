@@ -20,6 +20,12 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
             strengthHistory: strength.workoutHistory
         )
         let relevant = report.relevantWeeks
+        let movePreview = ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
+            plan: plan,
+            store: session,
+            healthWorkouts: health.workouts,
+            strengthHistory: strength.workoutHistory
+        )
 
         ATHLTHPlanSurface {
             VStack(alignment: .leading, spacing: 5) {
@@ -220,6 +226,43 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                         .font(.caption)
                         .foregroundStyle(ATHLTHPlanDesign.ink)
                         .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    if let movePreview {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Possible schedule adjustment",
+                                    norwegian: "Mulig justering av timeplanen"
+                                ),
+                                systemImage: "calendar.badge.clock"
+                            )
+                            .font(.caption.weight(.semibold))
+                            Text(ATHLTHLocalization.choose(
+                                english: "Preview: day \(movePreview.sourceDayIndex) → day \(movePreview.destinationDayIndex), within the same week. The destination is empty.",
+                                norwegian: "Forhåndsvisning: dag \(movePreview.sourceDayIndex) → dag \(movePreview.destinationDayIndex), i samme uke. Måldagen er ledig."
+                            ))
+                            .font(.caption)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Nothing has moved. Check the session and confirm any changes in the plan editor.",
+                                norwegian: "Ingen økt er flyttet. Kontroller økten og godkjenn eventuelle endringer i planredigeringen."
+                            ))
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            Button {
+                                onSelect(movePreview.weekID, movePreview.sourceDayID)
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Inspect this workout",
+                                        norwegian: "Se gjennom denne økten"
+                                    ),
+                                    systemImage: "arrow.up.right"
+                                )
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
                     }
 
                     if let trend = report.completedWeekTrend {

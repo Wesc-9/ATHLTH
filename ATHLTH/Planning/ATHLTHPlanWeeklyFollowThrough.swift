@@ -108,6 +108,73 @@ enum ATHLTHPlanWeeklyFollowThrough {
         }
     }
 
+    /// Conservative, non-mutating candidate for a future workout.
+    /// The destination must be empty and later in the same week; explicitly
+    /// timed, completed or skipped sessions are never offered for relocation.
+    struct MovePreview {
+        let weekID: UUID
+        let sessionID: UUID
+        let sourceDayID: UUID
+        let destinationDayID: UUID
+        let sourceDayIndex: Int
+        let destinationDayIndex: Int
+    }
+
+    static func previewNextSafeMove(
+        plan: TrainingPlan,
+        store: AppSessionStore,
+        healthWorkouts: [WorkoutSummary],
+        strengthHistory: [StrengthWorkoutLog],
+        referenceDate: Date = Date(),
+        calendar: Calendar = .current
+    ) -> MovePreview? {
+        guard let start = plan.startDate.map({ calendar.startOfDay(for: $0) }) else {
+            return nil
+        }
+        let today = calendar.startOfDay(for: referenceDate)
+        for (offset, week) in plan.weeks.enumerated() {
+            let days = week.days.sorted { $0.dayIndex < $1.dayIndex }
+            for (index, day) in days.enumerated() {
+                guard (1...7).contains(day.dayIndex),
+                      let sourceDate = calendar.date(
+                          byAdding: .day,
+                          value: offset * 7 + day.dayIndex - 1,
+                          to: start
+                      ),
+                      sourceDate >= today,
+                      day.sessions.count == 1,
+                      let workout = day.sessions.first,
+                      workout.scheduledStart == nil,
+                      !store.isPlanSessionSkipped(planID: plan.id, sessionID: workout.id),
+                      !store.isPlanSessionCompleted(
+                          planID: plan.id,
+                          sessionID: workout.id,
+                          healthWorkouts: healthWorkouts,
+                          strengthHistory: strengthHistory
+                      ) else { continue }
+                for target in days.dropFirst(index + 1) {
+                    guard (1...7).contains(target.dayIndex),
+                          target.sessions.isEmpty,
+                          let targetDate = calendar.date(
+                              byAdding: .day,
+                              value: offset * 7 + target.dayIndex - 1,
+                              to: start
+                          ),
+                          targetDate > sourceDate else { continue }
+                    return MovePreview(
+                        weekID: week.id,
+                        sessionID: workout.id,
+                        sourceDayID: day.id,
+                        destinationDayID: target.id,
+                        sourceDayIndex: day.dayIndex,
+                        destinationDayIndex: target.dayIndex
+                    )
+                }
+            }
+        }
+        return nil
+    }
+
     static func inspect(
         plan: TrainingPlan,
         store: AppSessionStore,
