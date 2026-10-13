@@ -40,12 +40,18 @@ struct CommunityGroupEventDetailView: View {
 
     var body: some View {
         ZStack {
-            ATHLTHPremiumCanvas(
-                accent: Color.purple.opacity(0.22)
-            )
+            ATHLTHPlanDesign.canvas.ignoresSafeArea()
 
             ScrollView {
                 LazyVStack(spacing: 16) {
+                    ATHLTHCommunityContextRibbon(
+                        kind: .event,
+                        groupName: group.name
+                    )
+                    ATHLTHCommunityContextRibbon(
+                        kind: .challenge,
+                        groupName: group.name
+                    )
                     cover
                     titleBlock
                     organizerCard
@@ -240,7 +246,7 @@ struct CommunityGroupEventDetailView: View {
     }
 
     private var titleBlock: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             HStack(alignment: .top) {
                 VStack(
                     alignment: .leading,
@@ -248,7 +254,7 @@ struct CommunityGroupEventDetailView: View {
                 ) {
                     Text(current.title)
                         .font(
-                            .title2.weight(.bold)
+                            .system(size: 27, weight: .regular, design: .serif)
                         )
 
                     if !current.summary.isEmpty {
@@ -270,7 +276,7 @@ struct CommunityGroupEventDetailView: View {
     }
 
     private var organizerCard: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             Text("Hosted by")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
@@ -410,7 +416,7 @@ struct CommunityGroupEventDetailView: View {
     }
 
     private var scheduleCard: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             Text("When & where")
                 .font(.headline)
 
@@ -509,7 +515,7 @@ struct CommunityGroupEventDetailView: View {
     }
 
     private var activityCard: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             Text("Activity")
                 .font(.headline)
 
@@ -542,7 +548,7 @@ struct CommunityGroupEventDetailView: View {
     }
 
     private var participationCard: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             HStack {
                 VStack(
                     alignment: .leading,
@@ -677,7 +683,7 @@ struct CommunityGroupEventDetailView: View {
     }
 
     private var systemActionsCard: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             Text("Plan")
                 .font(.headline)
 
@@ -893,9 +899,7 @@ struct CommunityGroupChallengeDetailView: View {
 
     var body: some View {
         ZStack {
-            ATHLTHPremiumCanvas(
-                accent: Color.green.opacity(0.20)
-            )
+            ATHLTHPlanDesign.canvas.ignoresSafeArea()
 
             ScrollView {
                 LazyVStack(spacing: 16) {
@@ -1116,7 +1120,7 @@ struct CommunityGroupChallengeDetailView: View {
     }
 
     private var titleBlock: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             HStack(alignment: .top) {
                 VStack(
                     alignment: .leading,
@@ -1124,7 +1128,7 @@ struct CommunityGroupChallengeDetailView: View {
                 ) {
                     Text(current.title)
                         .font(
-                            .title2.weight(.bold)
+                            .system(size: 27, weight: .regular, design: .serif)
                         )
 
                     if !current.summary.isEmpty {
@@ -1146,7 +1150,7 @@ struct CommunityGroupChallengeDetailView: View {
     }
 
     private var organizerCard: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             Text("Hosted by")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
@@ -1227,7 +1231,7 @@ struct CommunityGroupChallengeDetailView: View {
     }
 
     private var rulesCard: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             Text("Challenge Rules")
                 .font(.headline)
 
@@ -1349,7 +1353,7 @@ struct CommunityGroupChallengeDetailView: View {
     }
 
     private var participationCard: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             HStack {
                 VStack(
                     alignment: .leading,
@@ -1418,7 +1422,7 @@ struct CommunityGroupChallengeDetailView: View {
     }
 
     private var progressCard: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             Text("My Progress")
                 .font(.headline)
 
@@ -1486,7 +1490,7 @@ struct CommunityGroupChallengeDetailView: View {
     }
 
     private var leaderboardCard: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             HStack {
                 Text(
                     current.resolvedStatus ==
@@ -1839,7 +1843,7 @@ struct CommunityGroupDiscussionSection: View {
     @State private var draft = ""
 
     var body: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             Text("Discussion")
                 .font(.headline)
 
