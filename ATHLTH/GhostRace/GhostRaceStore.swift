@@ -174,6 +174,9 @@ final class GhostRaceStore: ObservableObject {
     @Published var errorMessage: String?
 
     private var lastMatchedIndex: Int?
+    // Independent from the time the user stops the workout.
+    private var finishCrossingElapsed: TimeInterval?
+    private var lastReliableCourseSample: (meters: Double, elapsed: TimeInterval)?
     private var maximumLeadMeters: Double = 0
     private var maximumDeficitMeters: Double = 0
     private var leadChangeCount = 0
@@ -516,6 +519,12 @@ final class GhostRaceStore: ObservableObject {
             longitude: longitude
         )
 
+        // Paused workouts must not display a stale advantage.
+        if snapshot.state == .paused {
+            comparison = nil
+            return
+        }
+
         // Watch snapshots normally include live distance. Phone Ghost updates
         // only carry GPS + elapsed time, so a literal 0 m distance would pin
         // route matching to the start of the course and reject valid points
@@ -581,6 +590,13 @@ final class GhostRaceStore: ObservableObject {
                 from: matched.location
             )
 
+        recordFinishCrossing(
+            courseMeters: matched.cumulativeMeters,
+            deviationMeters: deviation,
+            elapsed: snapshot.elapsedTime,
+            routeMeters: reference.routeDistanceMeters
+        )
+
         let nextComparison =
             GhostRaceComparison(
                 userLatitude: latitude,
@@ -622,8 +638,17 @@ final class GhostRaceStore: ObservableObject {
     func updatePhoneWorkout(
         location: CLLocation?,
         elapsedTime: TimeInterval,
-        state: WatchWorkoutMirrorState
+        state: WatchWorkoutMirrorState,
+        routeProgressPercent: Double? = nil
     ) {
+        let routeDistance = reference?.routeDistanceMeters ?? 0
+        // Use measured distance along the shared course when available.
+        let measuredCourseMeters: Double = {
+            guard let percent = routeProgressPercent,
+                  percent.isFinite, (0...100).contains(percent),
+                  routeDistance > 0 else { return 0 }
+            return routeDistance * percent / 100
+        }()
         let snapshot =
             WatchWorkoutLiveSnapshot(
                 kind: .running,
@@ -634,7 +659,7 @@ final class GhostRaceStore: ObservableObject {
                     max(elapsedTime, 0),
                 heartRate: 0,
                 activeCalories: 0,
-                distanceMeters: 0,
+                distanceMeters: measuredCourseMeters,
                 averageHeartRate: nil,
                 maxHeartRate: nil,
                 routePointCount:
@@ -704,50 +729,66 @@ final class GhostRaceStore: ObservableObject {
         )
     }
 
+    private func recordFinishCrossing(
+        courseMeters: Double,
+        deviationMeters: Double,
+        elapsed: TimeInterval,
+        routeMeters: Double
+    ) {
+        guard finishCrossingElapsed == nil,
+              courseMeters.isFinite, elapsed.isFinite,
+              elapsed >= 0, routeMeters > 0,
+              deviationMeters.isFinite,
+              deviationMeters <= 40 else { return }
+
+        let finishBoundary = routeMeters * 0.995
+        if courseMeters >= finishBoundary {
+            // Interpolate the first verified crossing, not a later Stop tap.
+            if let previous = lastReliableCourseSample,
+               previous.meters < finishBoundary,
+               courseMeters > previous.meters,
+               elapsed >= previous.elapsed {
+                let fraction = min(max(
+                    (finishBoundary - previous.meters) /
+                    (courseMeters - previous.meters), 0
+                ), 1)
+                finishCrossingElapsed = previous.elapsed +
+                    (elapsed - previous.elapsed) * fraction
+            } else {
+                finishCrossingElapsed = elapsed
+            }
+        } else if lastReliableCourseSample == nil ||
+                    courseMeters >= (lastReliableCourseSample?.meters ?? 0) {
+            lastReliableCourseSample = (courseMeters, elapsed)
+        }
+    }
+
     private func complete(
         snapshot: WatchWorkoutLiveSnapshot,
         reference: GhostRaceReference
     ) {
-        guard result == nil else {
-            return
-        }
-
-        let progress =
-            comparison?.userProgress ?? 0
-        let completedRoute =
-            progress >= 0.94
-
-        let signedTime =
-            completedRoute
-                ? reference.durationSeconds -
-                    snapshot.elapsedTime
-                : nil
-
+        guard result == nil else { return }
+        let verifiedFinish = finishCrossingElapsed
+        let duration = verifiedFinish ?? snapshot.elapsedTime
         result = GhostRaceResult(
-            sourceWorkoutID:
-                reference.sourceWorkoutID,
-            completedRoute:
-                completedRoute,
-            elapsedTime:
-                snapshot.elapsedTime,
-            referenceDuration:
-                reference.durationSeconds,
-            signedTimeSeconds:
-                signedTime,
-            finalDistanceDeltaMeters:
-                comparison?
-                    .signedDistanceMeters,
+            sourceWorkoutID: reference.sourceWorkoutID,
+            completedRoute: verifiedFinish != nil,
+            elapsedTime: duration,
+            referenceDuration: reference.durationSeconds,
+            signedTimeSeconds: verifiedFinish.map {
+                reference.durationSeconds - $0
+            },
+            finalDistanceDeltaMeters: comparison?.signedDistanceMeters,
             finishedAt: Date(),
-            maximumLeadMeters:
-                maximumLeadMeters,
-            maximumDeficitMeters:
-                maximumDeficitMeters,
-            leadChangeCount:
-                leadChangeCount
+            maximumLeadMeters: maximumLeadMeters,
+            maximumDeficitMeters: maximumDeficitMeters,
+            leadChangeCount: leadChangeCount
         )
     }
 
     private func resetRaceDynamics() {
+        finishCrossingElapsed = nil
+        lastReliableCourseSample = nil
         maximumLeadMeters = 0
         maximumDeficitMeters = 0
         leadChangeCount = 0
@@ -862,16 +903,14 @@ final class GhostRaceStore: ObservableObject {
         let expectedProgress =
             expectedDistance /
             routeDistance
-        let expectedIndex =
-            Int(
-                (
-                    expectedProgress *
-                    Double(
-                        reference.points.count - 1
-                    )
-                )
-                .rounded()
-            )
+        // Recorded GPS timestamps are not uniformly spaced by route metre.
+        let expectedIndex = ATHLTHGhostTimeline.bracket(
+            at: expectedDistance,
+            count: reference.points.count,
+            position: { reference.points[$0].cumulativeMeters }
+        )?.lower ?? Int(
+            (expectedProgress * Double(reference.points.count - 1)).rounded()
+        )
         let indexRadius =
             max(
                 30,
@@ -960,31 +999,34 @@ final class GhostRaceStore: ObservableObject {
         at elapsedTime: TimeInterval,
         in reference: GhostRaceReference
     ) -> GhostRacePoint {
-        let target =
-            min(
-                max(elapsedTime, 0),
-                max(
-                    reference.durationSeconds,
-                    0
-                )
-            )
+        let points = reference.points
+        let target = min(max(elapsedTime, 0), max(reference.durationSeconds, 0))
+        guard let bounds = ATHLTHGhostTimeline.bracket(
+            at: target,
+            count: points.count,
+            position: { points[$0].elapsedTime }
+        ) else { return points[0] }
+        let first = points[bounds.lower]
+        let last = points[bounds.upper]
+        let fraction = bounds.fraction
 
-        var low = 0
-        var high =
-            reference.points.count - 1
-
-        while low < high {
-            let mid = (low + high + 1) / 2
-
-            if reference.points[mid]
-                .elapsedTime <= target {
-                low = mid
-            } else {
-                high = mid - 1
-            }
+        func blend(_ a: Double, _ b: Double) -> Double {
+            a + (b - a) * fraction
         }
-
-        return reference.points[low]
+        let altitude: Double?
+        if let a = first.altitude, let b = last.altitude {
+            altitude = blend(a, b)
+        } else {
+            altitude = first.altitude ?? last.altitude
+        }
+        return GhostRacePoint(
+            id: first.id,
+            latitude: blend(first.latitude, last.latitude),
+            longitude: blend(first.longitude, last.longitude),
+            altitude: altitude,
+            elapsedTime: blend(first.elapsedTime, last.elapsedTime),
+            cumulativeMeters: blend(first.cumulativeMeters, last.cumulativeMeters)
+        )
     }
 
     private func cumulativeDistances(
