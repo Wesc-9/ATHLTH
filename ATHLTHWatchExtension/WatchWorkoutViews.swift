@@ -4504,6 +4504,35 @@ struct WatchAudioCoachLiveSettingsView: View {
                 }
 
                 Section {
+                    ForEach([
+                        ATHLTHCoachSpeechStyle.balanced,
+                        .motivating
+                    ]) { style in
+                        Button {
+                            update { $0.speechStyle = style }
+                        } label: {
+                            HStack {
+                                Text(style.title)
+                                Spacer()
+                                if (configuration.speechStyle ?? .balanced) == style {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(WatchTheme.accent)
+                                }
+                            }
+                        }
+                        .accessibilityAddTraits(
+                            (configuration.speechStyle ?? .balanced) == style
+                                ? .isSelected : []
+                        )
+                    }
+                } header: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Coach personality",
+                        norwegian: "Coachen sin talemåte"
+                    ))
+                }
+
+                Section {
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             showAdvancedSettings.toggle()

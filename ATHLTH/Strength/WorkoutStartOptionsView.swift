@@ -1577,6 +1577,34 @@ private struct StrengthAudioCoachSettingsView: View {
                 }
 
                 Section {
+                    HStack(spacing: 9) {
+                        ForEach([
+                            ATHLTHCoachSpeechStyle.balanced,
+                            .motivating
+                        ]) { style in
+                            Button {
+                                configuration.speechStyle = style
+                            } label: {
+                                Label(style.title, systemImage: style == .motivating
+                                    ? "flame.fill" : "waveform")
+                                    .font(.caption.weight(.semibold))
+                                    .frame(maxWidth: .infinity, minHeight: 42)
+                                    .foregroundStyle((configuration.speechStyle ?? .balanced) == style
+                                        ? Color.white : ATHLTHTheme.primaryText)
+                                    .background((configuration.speechStyle ?? .balanced) == style
+                                        ? ATHLTHTheme.accentDeep : ATHLTHTheme.accentSoft,
+                                        in: RoundedRectangle(cornerRadius: 13))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                } header: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Coach personality", norwegian: "Coachen sin talemåte"
+                    ))
+                }
+
+                Section {
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             showDetailedOptions.toggle()

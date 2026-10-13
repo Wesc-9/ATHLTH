@@ -3804,6 +3804,28 @@ struct AudioCoachSetupCard: View {
                         .foregroundStyle(.secondary)
                     }
 
+                    HStack(spacing: 8) {
+                        ForEach([
+                            ATHLTHCoachSpeechStyle.balanced,
+                            .motivating
+                        ]) { style in
+                            Button {
+                                draft.speechStyle = style
+                            } label: {
+                                Label(style.title, systemImage: style == .motivating
+                                    ? "flame.fill" : "waveform")
+                                    .font(.caption.weight(.semibold))
+                                    .frame(maxWidth: .infinity, minHeight: 42)
+                                    .foregroundStyle(draft.speechStyle == style
+                                        ? Color.white : ATHLTHTheme.primaryText)
+                                    .background(draft.speechStyle == style
+                                        ? ATHLTHTheme.accentDeep : ATHLTHTheme.accentSoft,
+                                        in: RoundedRectangle(cornerRadius: 13))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             showAdvancedSettings.toggle()

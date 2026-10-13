@@ -3330,6 +3330,28 @@ private struct IPhoneAudioCoachLiveSheet: View {
                                         .font(.caption)
                                         .foregroundStyle(ATHLTHTheme.mutedText)
                                     }
+                                    HStack(spacing: 8) {
+                                        ForEach([
+                                            ATHLTHCoachSpeechStyle.balanced,
+                                            .motivating
+                                        ]) { style in
+                                            Button {
+                                                update { $0.speechStyle = style }
+                                            } label: {
+                                                Label(style.title, systemImage: style == .motivating
+                                                    ? "flame.fill" : "waveform")
+                                                    .font(.caption.weight(.semibold))
+                                                    .frame(maxWidth: .infinity, minHeight: 42)
+                                                    .foregroundStyle((configuration.speechStyle ?? .balanced) == style
+                                                        ? Color.white : ATHLTHTheme.primaryText)
+                                                    .background((configuration.speechStyle ?? .balanced) == style
+                                                        ? ATHLTHTheme.accentDeep : ATHLTHTheme.canvasBottom,
+                                                        in: RoundedRectangle(cornerRadius: 13))
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                    }
+
                                     Button {
                                         withAnimation(.easeInOut(duration: 0.2)) {
                                             showDetailedOptions.toggle()
