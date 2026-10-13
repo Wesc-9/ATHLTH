@@ -3960,10 +3960,10 @@ struct ATHLTHArenaOnlineDetailView: View {
                 HStack(alignment: .top, spacing: 11) {
                     Image(systemName: info.symbol)
                         .font(.title3.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
                         .frame(width: 41, height: 41)
                         .background(
-                            ATHLTHTheme.vitalitySoft.opacity(0.75),
+                            ATHLTHArenaLightStyle.soft,
                             in: RoundedRectangle(cornerRadius: 13)
                         )
                     VStack(alignment: .leading, spacing: 4) {
@@ -3973,13 +3973,13 @@ struct ATHLTHArenaOnlineDetailView: View {
                         ))
                         .font(.caption2.weight(.bold))
                         .tracking(1)
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
                         Text(info.title)
                             .font(.headline.weight(.bold))
-                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .foregroundStyle(ATHLTHArenaLightStyle.ink)
                         Text(info.detail)
                             .font(.caption)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 0)
@@ -4014,11 +4014,11 @@ struct ATHLTHArenaOnlineDetailView: View {
                         Image(systemName: "arrow.right")
                     }
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
                     .padding(.horizontal, 13)
                     .frame(minHeight: 44)
                     .background(
-                        ATHLTHTheme.vitalitySoft.opacity(0.55),
+                        ATHLTHArenaLightStyle.soft,
                         in: RoundedRectangle(cornerRadius: 12)
                     )
                 }
@@ -4426,13 +4426,16 @@ struct ATHLTHArenaOnlineDetailView: View {
                     norwegian: "Rundereglene godkjennes separat fra konkurranseresultatene. Godkjente regler gir ikke poeng."
                 ))
             }
-            Text(currentSeries.status == "completed"
-                ? ATHLTHLocalization.choose(english: "Completed", norwegian: "Fullført")
-                : currentSeries.status == "active"
-                    ? ATHLTHLocalization.choose(english: "Active", norwegian: "Aktiv")
-                    : ATHLTHLocalization.choose(english: "Pending agreement", norwegian: "Avventer enighet"))
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ATHLTHArenaLightStyle.secondary)
+            ATHLTHArenaStatusPill(
+                kind: ATHLTHArenaStatusPresentation.series(
+                    status: currentSeries.status,
+                    deadlinePassed: currentSeries.status == "active" &&
+                        (currentSeries.endsAt.map { $0 <= Date() } ?? false),
+                    unresolved: ATHLTHArenaArchivePresentation.isUnresolved(
+                        currentSeries
+                    )
+                )
+            )
             if currentSeries.status == "active",
                let endsAt = currentSeries.endsAt {
                 if Date() >= endsAt {
@@ -4527,8 +4530,7 @@ struct ATHLTHArenaOnlineDetailView: View {
             }
         }
         .padding(15)
-        .background(ATHLTHTheme.accentDeep.opacity(0.06),
-                    in: RoundedRectangle(cornerRadius: 18))
+        .background(ATHLTHArenaLightStyle.card(18))
     }
 
     private func roundCard(_ round: ATHLTHArenaRemoteProposal) -> some View {
