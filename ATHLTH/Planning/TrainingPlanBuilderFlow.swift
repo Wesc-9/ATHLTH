@@ -533,7 +533,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             sourceChoice
         case .basics:
             wizardScroll {
-                basicsStep
+                if mode == .basic {
+                    simpleBasicsStep
+                } else {
+                    basicsStep
+                }
             }
         case .profile:
             wizardScroll {
@@ -1359,6 +1363,144 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     "Mer kontroll for utøvere og trenere: sekundærfokus, måltall, tidsbudsjett og konkurransedato."
             )
         }
+    }
+
+    // The simple route deliberately has no technical settings, date picker,
+    // AI prompt or extra confirmation step. Advanced keeps the full wizard.
+    @State private var simpleMinutes = 30
+    @State private var simpleActivity: WorkoutKind = .walking
+
+    private var simpleBasicsStep: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            Text(ATHLTHLocalization.choose(
+                english: "Let's make a plan for you",
+                norwegian: "La oss lage en plan for deg"
+            ))
+            .font(.system(size: 30, weight: .semibold, design: .serif))
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+
+            Text(ATHLTHLocalization.choose(
+                english: "Just three choices. You can change your plan later.",
+                norwegian: "Bare tre enkle valg. Du kan endre planen senere."
+            ))
+            .font(.subheadline)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+            simpleQuestion(
+                ATHLTHLocalization.choose(english: "What would you like to do?", norwegian: "Hva vil du gjøre?")
+            ) {
+                simpleChoice(ATHLTHLocalization.choose(english: "Go for walks", norwegian: "Gå tur"), symbol: "figure.walk", selected: simpleActivity == .walking) {
+                    chooseSimpleActivity(.walking)
+                }
+                simpleChoice(ATHLTHLocalization.choose(english: "Go running", norwegian: "Løpe"), symbol: "figure.run", selected: simpleActivity == .running) {
+                    chooseSimpleActivity(.running)
+                }
+                simpleChoice(ATHLTHLocalization.choose(english: "Build strength", norwegian: "Trene styrke"), symbol: "dumbbell", selected: simpleActivity == .strength) {
+                    chooseSimpleActivity(.strength)
+                }
+            }
+
+            simpleQuestion(
+                ATHLTHLocalization.choose(english: "How many days each week?", norwegian: "Hvor mange dager i uken?")
+            ) {
+                HStack(spacing: 10) {
+                    ForEach([1, 2, 3], id: \.self) { count in
+                        simpleChoice("\(count)", symbol: "calendar", selected: selectedDays.count == count) {
+                            selectedDays = balancedDays(count: count)
+                            sessionsPerWeek = count
+                            setSimpleKinds()
+                        }
+                    }
+                }
+            }
+
+            simpleQuestion(
+                ATHLTHLocalization.choose(english: "How long each time?", norwegian: "Hvor lenge hver gang?")
+            ) {
+                HStack(spacing: 10) {
+                    ForEach([15, 30, 45], id: \.self) { minutes in
+                        simpleChoice("\(minutes) min", symbol: "clock", selected: simpleMinutes == minutes) {
+                            simpleMinutes = minutes
+                            weeklyTimeBudgetMinutes = minutes * selectedDays.count
+                        }
+                    }
+                }
+            }
+
+            if let conflict = conflictingPlan { conflictCard(conflict) }
+        }
+        .onAppear {
+            if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                chooseSimpleActivity(simpleActivity)
+            }
+        }
+    }
+
+    private func simpleQuestion<Content: View>(
+        _ question: String, @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(question)
+                .font(.headline)
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func simpleChoice(
+        _ label: String, symbol: String, selected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: symbol)
+                    .accessibilityHidden(true)
+                Text(label)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                if selected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .accessibilityHidden(true)
+                }
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(selected ? Color.white : ATHLTHPlanDesign.ink)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, minHeight: 58)
+            .background(
+                selected ? ATHLTHTheme.accentDeep : Color.white.opacity(0.85),
+                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func chooseSimpleActivity(_ kind: WorkoutKind) {
+        simpleActivity = kind
+        switch kind {
+        case .walking:
+            focus = .generalFitness
+            title = ATHLTHLocalization.choose(english: "My walking plan", norwegian: "Min gåplan")
+        case .running:
+            focus = .running
+            title = ATHLTHLocalization.choose(english: "My running plan", norwegian: "Min løpeplan")
+        case .strength:
+            focus = .strength
+            title = ATHLTHLocalization.choose(english: "My strength plan", norwegian: "Min styrkeplan")
+        default: break
+        }
+        weekCount = 8
+        setSimpleKinds()
+    }
+
+    private func setSimpleKinds() {
+        workoutKindOverridesByDay = Dictionary(
+            uniqueKeysWithValues: selectedDays.map { ($0, simpleActivity) }
+        )
+        weeklyTimeBudgetMinutes = simpleMinutes * selectedDays.count
     }
 
     private var basicsStep: some View {
@@ -3697,7 +3839,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 .opacity(0.35)
 
             HStack(spacing: 10) {
-                if step != .basics {
+                if step != .mode {
                     Button {
                         goBack()
                     } label: {
@@ -3723,14 +3865,17 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
                 if step != .review {
                     Button {
-                        goForward()
+                        if step == .basics && mode == .basic {
+                            createPlan(seedSuggestedWeek: true)
+                        } else {
+                            goForward()
+                        }
                     } label: {
                         HStack {
                             Text(
-                                ATHLTHLocalization.choose(
-                                    english: "Next",
-                                    norwegian: "Neste"
-                                )
+                                step == .basics && mode == .basic
+                                ? ATHLTHLocalization.choose(english: "Create my plan", norwegian: "Lag planen min")
+                                : ATHLTHLocalization.choose(english: "Next", norwegian: "Neste")
                             )
                             .font(.subheadline.weight(.bold))
 
