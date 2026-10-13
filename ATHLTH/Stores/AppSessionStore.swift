@@ -790,6 +790,13 @@ final class AppSessionStore: ObservableObject {
         healthWorkouts: [WorkoutSummary],
         strengthHistory: [StrengthWorkoutLog]
     ) -> Bool {
+        // A completion belongs to an existing workout in this exact plan.
+        // Stale history or a reused session ID must not credit another plan.
+        guard let plan = trainingPlan(withID: planID),
+              let planned = plan.weeks
+                .flatMap(\.days).flatMap(\.sessions)
+                .first(where: { $0.id == sessionID })
+        else { return false }
         if isPlanSessionSkipped(planID: planID, sessionID: sessionID) {
             return false
         }
@@ -799,9 +806,7 @@ final class AppSessionStore: ObservableObject {
         // Structured workouts launched from a plan are recorded by their
         // original session ID. Credit that recorded completion automatically
         // rather than requiring a second manual completion or Health link.
-        if let plan = trainingPlan(withID: planID),
-           plan.weeks.flatMap(\.days).flatMap(\.sessions)
-                .contains(where: { $0.id == sessionID && $0.isStructuredWorkout }),
+        if planned.isStructuredWorkout,
            StructuredWorkoutCompletionStore.load(userID: profile.userID)
                 .contains(where: {
                     $0.sourceWorkoutID == sessionID &&
@@ -817,11 +822,7 @@ final class AppSessionStore: ObservableObject {
         guard let linkedID = linkedHealthWorkoutID(
             planID: planID, sessionID: sessionID
         ),
-              let matchingWorkout = healthWorkouts.first(where: { $0.id == linkedID }),
-              let plan = trainingPlan(withID: planID),
-              let planned = plan.weeks
-                .flatMap(\.days).flatMap(\.sessions)
-                .first(where: { $0.id == sessionID })
+              let matchingWorkout = healthWorkouts.first(where: { $0.id == linkedID })
         else {
             return false
         }
