@@ -28,6 +28,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var showingRecoveryAdvice = false
     @State private var showingAIHelp = false
     @State private var editingDayID: UUID?
+    @State private var editingExistingWorkout: PlannedSession?
     @State private var openingWorkout: PlannedSession?
     @State private var openingWorkoutPlanID: UUID?
     @State private var queuedLaunchPlanID: UUID?
@@ -373,14 +374,18 @@ struct ATHLTHTrainPlanPremiumView: View {
         .sheet(isPresented: Binding(
             get: { editingDayID != nil },
             set: { visible in
-                if !visible { editingDayID = nil }
+                if !visible {
+                    editingDayID = nil
+                    editingExistingWorkout = nil
+                }
             }
         )) {
             if let plan, let dayID = editingDayID {
                 ATHLTHTrainWorkoutBuilderView(
                     planID: plan.id,
                     dayID: dayID,
-                    expectedPlanVersion: plan.version
+                    expectedPlanVersion: plan.version,
+                    existingWorkout: editingExistingWorkout
                 )
             }
         }
@@ -1092,6 +1097,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                                       systemImage: "info.circle")
                             }
                             Button {
+                                editingExistingWorkout = workout
                                 editingDayID = day.id
                             } label: {
                                 Label(tr("Change workout", "Endre økten"),
