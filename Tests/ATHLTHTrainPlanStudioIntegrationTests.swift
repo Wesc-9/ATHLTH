@@ -603,4 +603,58 @@ final class ATHLTHTrainPlanStudioIntegrationTests: XCTestCase {
         XCTAssertEqual(decodedLegacy.sourceWorkoutID, sessionID)
     }
 
+    @MainActor
+    func testCompletionIsScopedToExactPlanEvenWhenWorkoutIDsMatch() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let today = Calendar.current.startOfDay(for: Date())
+        let first = try XCTUnwrap(store.createTrainingPlan(
+            title: "First program", summary: "", weekCount: 1, startDate: today
+        ))
+        let second = try XCTUnwrap(store.createTrainingPlan(
+            title: "Second program", summary: "", weekCount: 1, startDate: today
+        ))
+        let shared = workout(name: "Same workout identifier")
+        store.addSession(shared, toDay: first.weeks[0].days[0].id, inPlan: first.id)
+        store.addSession(shared, toDay: second.weeks[0].days[0].id, inPlan: second.id)
+
+        store.setPlanSessionManuallyCompleted(
+            planID: first.id, sessionID: shared.id, completed: true
+        )
+        XCTAssertTrue(store.isPlanSessionCompleted(
+            planID: first.id, sessionID: shared.id,
+            healthWorkouts: [], strengthHistory: []
+        ))
+        XCTAssertFalse(store.isPlanSessionCompleted(
+            planID: second.id, sessionID: shared.id,
+            healthWorkouts: [], strengthHistory: []
+        ))
+
+        store.setPlanSessionSkipped(
+            planID: first.id, sessionID: shared.id, skipped: true
+        )
+        XCTAssertFalse(store.isPlanSessionCompleted(
+            planID: first.id, sessionID: shared.id,
+            healthWorkouts: [], strengthHistory: []
+        ))
+    }
+
+    @MainActor
+    func testRemovedWorkoutCannotBeCreditedByStaleManualCompletion() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Removed session", summary: "", weekCount: 1,
+            startDate: Calendar.current.startOfDay(for: Date())
+        ))
+        let missingID = UUID()
+        store.setPlanSessionManuallyCompleted(
+            planID: plan.id, sessionID: missingID, completed: true
+        )
+        XCTAssertFalse(store.isPlanSessionCompleted(
+            planID: plan.id, sessionID: missingID,
+            healthWorkouts: [], strengthHistory: []
+        ))
+    }
+
 }
