@@ -4974,8 +4974,14 @@ struct CommunityGroupsView: View {
 
     private var matchingGroups:
         [CommunityGroupRecord] {
+        // Include server-side search hits beyond the first paged Club screen.
+        let source = query.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2
+            ? groups.groups + groups.searchResults
+            : groups.groups
+        var seen = Set<UUID>()
         let publicGroups =
-            groups.groups.filter {
+            source.filter {
+                seen.insert($0.id).inserted &&
                 $0.visibility == "public" &&
                 !groups.joinedGroupIDs
                     .contains($0.id) &&
@@ -5162,6 +5168,20 @@ struct CommunityGroupsView: View {
         }
         .task {
             await groups.refresh()
+        }
+        .task(id: query) {
+            let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard clean.count >= 2 else {
+                groups.clearSearch()
+                return
+            }
+            do {
+                try await Task.sleep(for: .milliseconds(280))
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            await groups.search(clean)
         }
         .refreshable {
             await groups.refresh()
