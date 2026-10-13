@@ -10923,43 +10923,19 @@ private extension View {
         self
             .background(
                 LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.98),
-                        Color(
-                            red: 0.91,
-                            green: 0.94,
-                            blue: 0.98
-                        )
-                        .opacity(0.42)
-                    ],
+                    colors: [Color.white, ChallengePlanTheme.soft.opacity(0.55)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 ),
-                in: RoundedRectangle(
-                    cornerRadius: 20,
-                    style: .continuous
-                )
+                in: RoundedRectangle(cornerRadius: ChallengePlanTheme.radius,
+                                     style: .continuous)
             )
             .overlay {
-                RoundedRectangle(
-                    cornerRadius: 20,
-                    style: .continuous
-                )
-                .stroke(
-                    Color(
-                        red: 0.79,
-                        green: 0.83,
-                        blue: 0.90
-                    )
-                    .opacity(0.50),
-                    lineWidth: 0.8
-                )
+                RoundedRectangle(cornerRadius: ChallengePlanTheme.radius,
+                                 style: .continuous)
+                    .stroke(ChallengePlanTheme.line, lineWidth: 0.8)
             }
-            .shadow(
-                color: Color.black.opacity(0.025),
-                radius: 8,
-                y: 3
-            )
+            .shadow(color: .black.opacity(0.035), radius: 9, y: 4)
     }
 
     func challengeHint() -> some View {
