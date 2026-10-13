@@ -250,6 +250,7 @@ final class IPhoneWorkoutStore:
 
     private var lastLocation: CLLocation?
     private var coachPaceSampleAt: Date?
+    private var lastGoalEncouragementAt: Date?
     private var autoPauseDetector =
         OutdoorAutoPauseDetector()
     private var plannedRouteLocations: [CLLocation] = []
@@ -2185,6 +2186,7 @@ final class IPhoneWorkoutStore:
         configuration:
             WatchAudioCoachConfiguration?
     ) {
+        lastGoalEncouragementAt = nil
         guard let configuration,
               configuration.enabled
         else {
@@ -3476,6 +3478,20 @@ final class IPhoneWorkoutStore:
 
         guard !parts.isEmpty else {
             return
+        }
+
+        if let feedback = ATHLTHCoachGoalEncouragement.phrase(
+            style: configuration.speechStyle ?? .balanced,
+            step: activeStep,
+            paceSecondsPerKilometer: workout.currentPaceSecondsPerKilometer,
+            paceSampleAt: coachPaceSampleAt,
+            elapsedInStep: elapsed -
+                (workout.structuredStepStartElapsedTime ?? 0),
+            lastSpokenAt: lastGoalEncouragementAt,
+            norwegian: norwegian
+        ) {
+            parts.append(feedback)
+            lastGoalEncouragementAt = Date()
         }
 
         speak(

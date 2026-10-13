@@ -258,6 +258,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var healthKitDistanceLastUpdatedAt: Date?
     private var coachHeartRateSampleAt: Date?
     private var coachPaceSampleAt: Date?
+    private var lastGoalEncouragementAt: Date?
 
     /// The same sensor freshness gate used by live target alerts and coach.
     /// A disconnected/stale pulse must not be rendered as a live zone.
@@ -3691,6 +3692,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     private func resetAudioCoachThresholds() {
+        lastGoalEncouragementAt = nil
         let configuration = audioCoachConfiguration
 
         if configuration.enabled,
@@ -3800,8 +3802,21 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 distanceInStepMeters: currentStructuredStepDistanceMeters
             ) else { return }
 
-            let message = metricsAnnouncement
+            var message = metricsAnnouncement
             guard !message.isEmpty else { return }
+
+            if let feedback = ATHLTHCoachGoalEncouragement.phrase(
+                style: audioCoachConfiguration.speechStyle ?? .balanced,
+                step: currentStructuredRunningStep,
+                paceSecondsPerKilometer: currentPaceSecondsPerKilometer,
+                paceSampleAt: coachPaceSampleAt,
+                elapsedInStep: currentStructuredStepElapsedTime,
+                lastSpokenAt: lastGoalEncouragementAt,
+                norwegian: coachPhrase(english: "en", norwegian: "no") == "no"
+            ) {
+                message += ". " + feedback
+                lastGoalEncouragementAt = Date()
+            }
 
             WKInterfaceDevice.current().play(.click)
             speak(

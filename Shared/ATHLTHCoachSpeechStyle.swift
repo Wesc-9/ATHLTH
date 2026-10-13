@@ -91,6 +91,10 @@ enum ATHLTHCoachSpeechStyle: String, Codable, CaseIterable, Identifiable, Hashab
             return phrase
         case .motivating:
             guard isNeutralProgress else { return phrase }
+            if phrase.contains("Du holder målfarten") ||
+               phrase.contains("You're on your target pace") {
+                return phrase
+            }
             let encouragement = norwegian ? " Bra jobbet!" : " Nice work!"
             return phrase.hasSuffix(encouragement)
                 ? phrase
@@ -168,5 +172,42 @@ enum ATHLTHCoachPreferredSystemVoice {
             language: norwegian ? "nb-NO" :
                 (code == "en" ? "en-US" : code)
         )
+    }
+}
+
+
+/// Only reports a good pace against an actual planned interval and a fresh
+/// pace sensor. Rate limited to avoid repeated praise on every milestone.
+enum ATHLTHCoachGoalEncouragement {
+    static func phrase(
+        style: ATHLTHCoachSpeechStyle,
+        step: WatchRunningWorkoutStep?,
+        paceSecondsPerKilometer: TimeInterval?,
+        paceSampleAt: Date?,
+        elapsedInStep: TimeInterval,
+        lastSpokenAt: Date?,
+        norwegian: Bool,
+        now: Date = Date()
+    ) -> String? {
+        guard style == .motivating,
+              elapsedInStep.isFinite, elapsedInStep >= 45,
+              lastSpokenAt.map({ now.timeIntervalSince($0) >= 240 }) ?? true,
+              let step,
+              let low = step.targetPaceMinSecondsPerKilometer,
+              let high = step.targetPaceMaxSecondsPerKilometer,
+              low.isFinite, high.isFinite,
+              low >= 120, high <= 1_800,
+              ATHLTHCoachSensorFreshness.validPace(
+                  paceSecondsPerKilometer,
+                  sampledAt: paceSampleAt,
+                  now: now
+              ),
+              let pace = paceSecondsPerKilometer,
+              (min(low, high)...max(low, high)).contains(pace)
+        else { return nil }
+
+        return norwegian
+            ? "Du holder målfarten i dette draget. Fortsett slik!"
+            : "You're on your target pace in this interval. Keep it up!"
     }
 }

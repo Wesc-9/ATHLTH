@@ -274,6 +274,36 @@ final class AudioCoachContentLevelTests: XCTestCase {
         )
     }
 
+
+    func testMotivationNeedsFreshPaceAndPlannedTarget() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        var step = WatchRunningWorkoutStep(
+            id: UUID(), title: "Drag", measure: .time,
+            distanceMeters: nil, durationSeconds: 240, intensityText: nil
+        )
+        step.targetPaceMinSecondsPerKilometer = 300
+        step.targetPaceMaxSecondsPerKilometer = 330
+        func feedback(
+            _ pace: Double, sampledAt: Date, previous: Date? = nil,
+            style: ATHLTHCoachSpeechStyle = .motivating,
+            secondsInStep: TimeInterval = 70
+        ) -> String? {
+            ATHLTHCoachGoalEncouragement.phrase(
+                style: style, step: step, paceSecondsPerKilometer: pace,
+                paceSampleAt: sampledAt, elapsedInStep: secondsInStep,
+                lastSpokenAt: previous, norwegian: true, now: now
+            )
+        }
+        XCTAssertEqual(feedback(315, sampledAt: now),
+            "Du holder målfarten i dette draget. Fortsett slik!")
+        XCTAssertNil(feedback(350, sampledAt: now))
+        XCTAssertNil(feedback(315, sampledAt: now.addingTimeInterval(-20)))
+        XCTAssertNil(feedback(315, sampledAt: now,
+            previous: now.addingTimeInterval(-60)))
+        XCTAssertNil(feedback(315, sampledAt: now, style: .balanced))
+        XCTAssertNil(feedback(315, sampledAt: now, secondsInStep: 10))
+    }
+
     func testApplyingContentPresetNeverEnablesDisabledSession() {
         let original = WatchAudioCoachConfiguration.disabled
         for level in ATHLTHCoachContentLevel.allCases {
