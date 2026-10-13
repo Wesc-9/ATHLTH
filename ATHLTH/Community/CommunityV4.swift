@@ -1212,8 +1212,15 @@ struct ATHLTHCommunityV4View: View {
 // MARK: - Reference Community Front Page
 
 private struct CommunityReferenceHeader: View {
+    @EnvironmentObject private var messaging: MessagingStore
+    @EnvironmentObject private var groups: CommunityGroupStore
+
     let canManageWeekly: Bool
     @State private var showingCommunityCreate = false
+
+    private var inboxBadgeCount: Int {
+        messaging.unreadCount + messaging.messageRequestCount
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -1250,12 +1257,26 @@ private struct CommunityReferenceHeader: View {
                 NavigationLink {
                     MessageInboxDestinationView()
                 } label: {
-                    button(icon: "bubble.left.and.bubble.right", badge: 0)
+                    button(
+                        icon: "bubble.left.and.bubble.right",
+                        badge: inboxBadgeCount
+                    )
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(ATHLTHLocalization.choose(
                     english: "Inbox", norwegian: "Innboks"
                 ))
+                .accessibilityValue(
+                    inboxBadgeCount == 0
+                        ? ATHLTHLocalization.choose(
+                            english: "No unread messages or requests",
+                            norwegian: "Ingen uleste meldinger eller forespørsler"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "\(inboxBadgeCount) unread items",
+                            norwegian: "\(inboxBadgeCount) uleste elementer"
+                        )
+                )
 
                 Button {
                     showingCommunityCreate = true
