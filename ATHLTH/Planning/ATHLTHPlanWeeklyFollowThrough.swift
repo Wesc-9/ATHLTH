@@ -261,7 +261,18 @@ enum ATHLTHPlanWeeklyFollowThrough {
               destinationDate > sourceDate else {
             return false
         }
-        return true
+        // A preview is valid only while it remains an actual improvement.
+        // Recalculate from current data rather than accepting a once-valid
+        // proposal whose surrounding schedule has since changed.
+        let currentSuggestion = previewNextSafeMove(
+            plan: plan, store: store, healthWorkouts: healthWorkouts,
+            strengthHistory: strengthHistory, referenceDate: referenceDate,
+            calendar: calendar
+        )
+        return currentSuggestion?.weekID == preview.weekID
+            && currentSuggestion?.sessionID == preview.sessionID
+            && currentSuggestion?.sourceDayID == preview.sourceDayID
+            && currentSuggestion?.destinationDayID == preview.destinationDayID
     }
 
     /// Apply only after explicit user approval, revalidating saved state.

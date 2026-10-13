@@ -586,6 +586,29 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
     }
 
     @MainActor
+    func testPreviewRejectsMoveAfterSpacingBenefitDisappears() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        store.addSession(workout(), toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(workout(), toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let preview = try XCTUnwrap(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: plan.startDate!
+        ))
+        // A newly planned workout next to the destination makes this
+        // proposal no longer the best available improvement.
+        let neighborIndex = preview.destinationDayIndex
+        guard neighborIndex < 7 else { return XCTFail("Expected earlier target") }
+        store.addSession(workout(), toDay: plan.weeks[0].days[neighborIndex].id, inPlan: plan.id)
+        let changed = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertFalse(ATHLTHPlanWeeklyFollowThrough.validateMovePreview(
+            preview, plan: changed, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: plan.startDate!
+        ))
+    }
+
+    @MainActor
     func testDuplicateIdentitiesAreCountedOnlyOnce() throws {
         let (store, defaults, suite, plan) = try prepared(weekCount: 1)
         defer { defaults.removePersistentDomain(forName: suite) }
