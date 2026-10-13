@@ -74,6 +74,7 @@ private enum MessageInboxFilter:
 
 struct MessageInboxView: View {
     @EnvironmentObject private var messaging: MessagingStore
+    @EnvironmentObject private var groups: CommunityGroupStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var session: AppSessionStore
@@ -116,6 +117,10 @@ struct MessageInboxView: View {
                     filterKey: selectedFilter.rawValue,
                     onVisibleCountChanged: { arenaInboxVisibleCount = $0 }
                 )
+
+                if selectedFilter == .priority || selectedFilter == .groups {
+                    ATHLTHCommunityClubInboxSection()
+                }
 
                 if let error = displayableError {
                     inboxErrorCard(error)
@@ -283,10 +288,12 @@ struct MessageInboxView: View {
             )
         )
         .refreshable {
-            await social.refresh(
+            async let socialRefresh: Void = social.refresh(
                 challengeStore: challenges
             )
-            await messaging.refresh()
+            async let messageRefresh: Void = messaging.refresh(force: true)
+            async let clubRefresh: Void = groups.refresh(force: true)
+            _ = await (socialRefresh, messageRefresh, clubRefresh)
         }
         .task {
             refreshCoachInboxState()
@@ -294,6 +301,7 @@ struct MessageInboxView: View {
                 challengeStore: challenges
             )
             await messaging.refresh()
+            await groups.refresh()
             messaging.loadPinnedConversations()
             await realtime.refreshOnlineUsers()
         }
