@@ -9003,23 +9003,11 @@ struct ChallengeDetailView: View {
                                     .weight(.bold)
                             )
                             .tracking(2)
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .vitality
-                            )
+                            .foregroundStyle(ChallengePlanTheme.gold)
 
                         Text(challenge.title)
-                            .font(
-                                .system(
-                                    size: 30,
-                                    weight: .bold,
-                                    design: .rounded
-                                )
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .primaryText
-                            )
+                            .font(.system(size: 30, weight: .regular, design: .serif))
+                            .foregroundStyle(ChallengePlanTheme.ink)
                             .lineLimit(2)
                             .minimumScaleFactor(0.82)
                     }
@@ -9042,11 +9030,7 @@ struct ChallengeDetailView: View {
                         width: 66,
                         height: 66
                     )
-                    .background(
-                        ATHLTHTheme
-                            .vitality,
-                        in: Circle()
-                    )
+                    .background(ChallengePlanTheme.ink, in: Circle())
                 }
 
                 Text(
@@ -9055,10 +9039,7 @@ struct ChallengeDetailView: View {
                     )
                 )
                 .font(.subheadline)
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .mutedText
-                )
+                .foregroundStyle(ChallengePlanTheme.secondary)
                 .fixedSize(
                     horizontal: false,
                     vertical: true
