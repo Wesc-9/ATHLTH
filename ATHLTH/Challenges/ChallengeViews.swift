@@ -1306,7 +1306,7 @@ struct ChallengeCreationView: View {
     }
 
     private var creationHero: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(
                 alignment: .leading,
                 spacing: 15
@@ -1332,10 +1332,7 @@ struct ChallengeCreationView: View {
                                 .weight(.bold)
                         )
                         .tracking(2)
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .vitality
-                        )
+                        .foregroundStyle(ChallengePlanTheme.gold)
 
                         Text(
                             ATHLTHLocalization.choose(
@@ -1345,13 +1342,7 @@ struct ChallengeCreationView: View {
                                     "Bygg utfordringen."
                             )
                         )
-                        .font(
-                            .system(
-                                size: 29,
-                                weight: .bold,
-                                design: .rounded
-                            )
-                        )
+                        .font(.system(size: 30, weight: .regular, design: .serif))
                         .foregroundStyle(
                             ATHLTHTheme
                                 .primaryText
@@ -1375,11 +1366,7 @@ struct ChallengeCreationView: View {
                         width: 62,
                         height: 62
                     )
-                    .background(
-                        ATHLTHTheme
-                            .vitality,
-                        in: Circle()
-                    )
+                    .background(clubForest, in: Circle())
                 }
 
                 Text(
