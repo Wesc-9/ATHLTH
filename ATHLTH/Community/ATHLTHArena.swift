@@ -700,6 +700,7 @@ struct ATHLTHArenaHomeView: View {
     @State private var creationMode: ATHLTHArenaCreationMode?
     @State private var pendingDelete: UUID?
     @State private var remoteRevision = UUID()
+    @State private var showingCreateOptions = false
     @AppStorage("athlth.arena.workspace.advancedMode")
     private var advanced = false
 
@@ -708,7 +709,13 @@ struct ATHLTHArenaHomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 introduction
-                if advanced {
+                ATHLTHArenaNextStepsSection()
+                    .id("arena-next-steps")
+
+                if showingCreateOptions {
+                    createOptions
+                        .id("arena-create")
+                } else if advanced {
                     arenaQuickNavigation(scrollProxy)
                     quickStart
                         .id("arena-create")
@@ -1038,9 +1045,11 @@ struct ATHLTHArenaHomeView: View {
                 }
                 Spacer(minLength: 6)
                 Button {
-                    creationMode = .challenge
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        showingCreateOptions.toggle()
+                    }
                 } label: {
-                    Image(systemName: "plus")
+                    Image(systemName: showingCreateOptions ? "xmark" : "plus")
                         .font(.system(size: 18, weight: .medium))
                         .foregroundStyle(.white)
                         .frame(width: 43, height: 43)
@@ -1048,8 +1057,8 @@ struct ATHLTHArenaHomeView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "Create a challenge",
-                    norwegian: "Opprett utfordring"
+                    english: "Choose competition type",
+                    norwegian: "Velg konkurranseform"
                 ))
             }
 
@@ -1135,7 +1144,9 @@ struct ATHLTHArenaHomeView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
                 Button {
-                    creationMode = .challenge
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        showingCreateOptions = true
+                    }
                 } label: {
                     HStack {
                         Text(ATHLTHLocalization.choose(
@@ -1203,6 +1214,174 @@ struct ATHLTHArenaHomeView: View {
             .frame(maxWidth: .infinity, minHeight: 44)
             .background(ATHLTHArenaLightStyle.soft,
                         in: RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+    }
+
+    // One entry, six existing engines. Choosing a tile only opens its
+    // established editor; publication and invitations require explicit steps.
+    private var createOptions: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("ATHLTH · ARENA")
+                        .font(ATHLTHArenaLightStyle.eyebrow)
+                        .tracking(2)
+                        .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
+                    Text(ATHLTHLocalization.choose(
+                        english: "What will you create?",
+                        norwegian: "Hva vil du opprette?"
+                    ))
+                    .font(ATHLTHArenaLightStyle.editorialTitle(27))
+                    .foregroundStyle(ATHLTHArenaLightStyle.ink)
+                }
+                Spacer(minLength: 4)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showingCreateOptions = false
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .frame(width: 37, height: 37)
+                        .foregroundStyle(ATHLTHArenaLightStyle.ink)
+                        .background(ATHLTHArenaLightStyle.soft, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Close creation choices",
+                    norwegian: "Lukk opprettelsesvalgene"
+                ))
+            }
+            Text(ATHLTHLocalization.choose(
+                english: "Select a starting point. The underlying workout, route and scoring rules stay unchanged.",
+                norwegian: "Velg et utgangspunkt. Treningsmotor, ruter og poengregler forblir som før."
+            ))
+            .font(.subheadline)
+            .foregroundStyle(ATHLTHArenaLightStyle.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+            creationChoice(
+                mode: .challenge,
+                symbol: "flag.checkered",
+                title: ATHLTHLocalization.choose(
+                    english: "Challenge someone", norwegian: "Utfordre noen"
+                ),
+                subtitle: ATHLTHLocalization.choose(
+                    english: "One challenge, easy to set up",
+                    norwegian: "Én utfordring – raskt å komme i gang"
+                )
+            )
+            creationChoice(
+                mode: .route,
+                symbol: "map",
+                title: ATHLTHLocalization.choose(
+                    english: "Compete on a route", norwegian: "Konkurrer på en rute"
+                ),
+                subtitle: ATHLTHLocalization.choose(
+                    english: "Choose a saved route and invite",
+                    norwegian: "Velg en lagret rute og inviter"
+                )
+            )
+            creationChoice(
+                mode: .distance,
+                symbol: "figure.run",
+                title: ATHLTHLocalization.choose(
+                    english: "Set a distance", norwegian: "Bestem en distanse"
+                ),
+                subtitle: ATHLTHLocalization.choose(
+                    english: "Choose length and challenge",
+                    norwegian: "Velg lengde og utfordre"
+                )
+            )
+            if advanced {
+                creationChoice(
+                    mode: .strength,
+                    symbol: "dumbbell.fill",
+                    title: ATHLTHLocalization.choose(
+                        english: "Strength competition", norwegian: "Styrkekonkurranse"
+                    ),
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Repetitions, load and workout goals",
+                        norwegian: "Repetisjoner, belastning og øktmål"
+                    )
+                )
+                creationChoice(
+                    mode: .series,
+                    symbol: "trophy",
+                    title: ATHLTHLocalization.choose(
+                        english: "Competition series", norwegian: "Konkurranseserie"
+                    ),
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Multiple rounds, participants and points",
+                        norwegian: "Flere runder, deltakere og poeng"
+                    )
+                )
+                creationChoice(
+                    mode: .teamRelay,
+                    symbol: "person.3.sequence.fill",
+                    title: ATHLTHLocalization.choose(
+                        english: "Teams & relay", norwegian: "Lag og stafett"
+                    ),
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Team selection and relay legs",
+                        norwegian: "Lagoppsett og stafettetapper"
+                    )
+                )
+            } else {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        advanced = true
+                    }
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "See more competition types",
+                        norwegian: "Se flere konkurranseformer"
+                    ), systemImage: "slider.horizontal.3")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(ATHLTHArenaLightStyle.ink)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(17)
+        .background(ATHLTHArenaLightStyle.card(21))
+    }
+
+    private func creationChoice(
+        mode: ATHLTHArenaCreationMode,
+        symbol: String,
+        title: String,
+        subtitle: String
+    ) -> some View {
+        Button {
+            showingCreateOptions = false
+            creationMode = mode
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: symbol)
+                    .font(.system(size: 19, weight: .medium))
+                    .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
+                    .frame(width: 44, height: 44)
+                    .background(ATHLTHArenaLightStyle.soft,
+                                in: RoundedRectangle(cornerRadius: 13))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHArenaLightStyle.ink)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHArenaLightStyle.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 1)
+                Image(systemName: "arrow.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHArenaLightStyle.secondary)
+            }
+            .padding(11)
+            .background(ATHLTHArenaLightStyle.soft.opacity(0.42),
+                        in: RoundedRectangle(cornerRadius: 15))
         }
         .buttonStyle(.plain)
     }
