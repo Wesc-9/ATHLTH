@@ -1402,6 +1402,66 @@ struct CustomExerciseEditorView: View {
                         )
                     }
 
+                    if selectedImageData == nil,
+                       let originalImageURL = editing?.exercise.imageURL,
+                       originalImageURL.isFileURL,
+                       let image = UIImage(contentsOfFile: originalImageURL.path) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 160)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                    }
+
+                    Button {
+                        showingVideoImporter = true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Import demonstration video",
+                                norwegian: "Importer demonstrasjonsvideo"
+                            ),
+                            systemImage: "video.badge.plus"
+                        )
+                    }
+                    .disabled(isImportingVideo)
+
+                    if isImportingVideo {
+                        ProgressView(ATHLTHLocalization.choose(
+                            english: "Copying video to ATHLTH…",
+                            norwegian: "Kopierer video til ATHLTH…"
+                        ))
+                    }
+
+                    if let previewVideoURL {
+                        VideoPlayer(player: AVPlayer(url: previewVideoURL))
+                            .frame(height: 210)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .id(previewVideoURL)
+
+                        Button(role: .destructive) {
+                            ExerciseStudioVideoStorage.discardOwnedVideo(importedVideoURL)
+                            importedVideoURL = nil
+                            videoURLText = ""
+                            removingExistingVideo = true
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Remove video",
+                                    norwegian: "Fjern video"
+                                ),
+                                systemImage: "trash"
+                            )
+                        }
+                    }
+
+                    if let studioError {
+                        Text(studioError)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+
                     if !aiVideoBrief.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             Label(
@@ -1436,9 +1496,10 @@ struct CustomExerciseEditorView: View {
                     .autocorrectionDisabled()
                     .keyboardType(.URL)
 
-                    Text(
-                        "Your image is stored locally in ATHLTH. A direct video URL can be attached to the exercise and shown on its detail page."
-                    )
+                    Text(ATHLTHLocalization.choose(
+                        english: "Import an MP4, MOV or M4V (max 120 MB), or enter a direct HTTPS video URL. Imported media stays on this device and is not included when you share a plan. Only publish technique demonstrations you have reviewed.",
+                        norwegian: "Importer MP4, MOV eller M4V (maks 120 MB), eller legg inn en direkte HTTPS-lenke. Importert media lagres kun på denne enheten og følger ikke med delte planer. Kontroller teknikken før du deler en demonstrasjon."
+                    ))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
@@ -1661,11 +1722,12 @@ struct CustomExerciseEditorView: View {
     }
 
     private var cleanVideoURL: URL? {
-        let clean = videoURLText
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !clean.isEmpty else { return nil }
-        return URL(string: clean)
+        let clean = videoURLText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty,
+              let url = URL(string: clean),
+              url.scheme?.lowercased() == "https",
+              url.host != nil else { return nil }
+        return url
     }
 
     private func splitCSV(_ value: String) -> [String] {
