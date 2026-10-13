@@ -198,8 +198,28 @@ enum ATHLTHPlanWeeklyFollowThrough {
                 // A move must improve the schedule, not merely occupy a
                 // different free day. Never suggest equal or worse spacing.
                 let sourcePressure = adjacentWorkouts(day.dayIndex)
+                // Do not move a session next to a completed or skipped
+                // workout simply because that workout no longer contributes
+                // to future scheduling pressure. Occupied neighboring days
+                // still matter for the user's calendar and recovery context.
+                func hasOccupiedNeighbor(_ dayIndex: Int) -> Bool {
+                    let absoluteDay = offset * 7 + dayIndex - 1
+                    return [absoluteDay - 1, absoluteDay + 1].contains { neighbor in
+                        guard neighbor >= 0 else { return false }
+                        let weekIndex = neighbor / 7
+                        let neighborDayIndex = neighbor % 7 + 1
+                        guard plan.weeks.indices.contains(weekIndex) else {
+                            return false
+                        }
+                        return plan.weeks[weekIndex].days.contains {
+                            $0.dayIndex == neighborDayIndex
+                                && !$0.sessions.isEmpty
+                        }
+                    }
+                }
                 let ranked = eligible.filter {
                     adjacentWorkouts($0.dayIndex) < sourcePressure
+                        && !hasOccupiedNeighbor($0.dayIndex)
                 }.sorted { lhs, rhs in
                     let left = adjacentWorkouts(lhs.dayIndex)
                     let right = adjacentWorkouts(rhs.dayIndex)
