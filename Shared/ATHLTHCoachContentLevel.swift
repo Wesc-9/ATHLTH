@@ -304,7 +304,9 @@ enum ATHLTHCoachStructuredStepSpeech {
                 if rounded >= 60 {
                     let minutes = rounded / 60
                     let remainder = rounded % 60
-                    let unit = norwegian ? "minutter" : "minutes"
+                    let unit = norwegian
+                        ? (minutes == 1 ? "minutt" : "minutter")
+                        : (minutes == 1 ? "minute" : "minutes")
                     let secondsUnit = norwegian ? "sekunder" : "seconds"
                     parts.append(remainder == 0
                         ? "\(minutes) \(unit)"
@@ -352,5 +354,61 @@ enum ATHLTHCoachStructuredStepSpeech {
         }
 
         return parts.joined(separator: ". ")
+    }
+}
+
+
+extension ATHLTHCoachStructuredStepSpeech {
+    /// Returns only remaining targets that were explicitly configured.
+    /// No guessed tempo, route duration or sensor-dependent value is spoken.
+    static func remainingSummary(
+        for step: WatchRunningWorkoutStep,
+        elapsedInStep: TimeInterval,
+        distanceInStepMeters: Double,
+        announceTime: Bool,
+        announceDistance: Bool,
+        norwegian: Bool
+    ) -> String? {
+        switch step.measure {
+        case .time:
+            guard announceTime,
+                  let target = step.durationSeconds,
+                  target.isFinite, target > 0,
+                  elapsedInStep.isFinite
+            else { return nil }
+            let remaining = max(target - max(elapsedInStep, 0), 0)
+            guard remaining > 0 else { return nil }
+            let seconds = Int(remaining.rounded(.up))
+            let duration: String
+            if seconds < 60 {
+                duration = "\(seconds) " + (norwegian ? "sekunder" : "seconds")
+            } else {
+                let minutes = seconds / 60
+                let rest = seconds % 60
+                let minuteUnit = norwegian
+                    ? (minutes == 1 ? "minutt" : "minutter")
+                    : (minutes == 1 ? "minute" : "minutes")
+                duration = "\(minutes) \(minuteUnit)" +
+                    (rest > 0 ? " \(rest) " + (norwegian ? "sekunder" : "seconds") : "")
+            }
+            return (norwegian ? "Tid igjen i intervallet: " : "Time left in interval: ") +
+                duration
+
+        case .distance:
+            guard announceDistance,
+                  let target = step.distanceMeters,
+                  target.isFinite, target > 0,
+                  distanceInStepMeters.isFinite
+            else { return nil }
+            let remaining = max(target - max(distanceInStepMeters, 0), 0)
+            guard remaining > 0 else { return nil }
+            return (norwegian ? "Distanse igjen i intervallet: " :
+                "Distance left in interval: ") +
+                "\(Int(remaining.rounded())) " +
+                (norwegian ? "meter" : "meters")
+
+        case .open:
+            return nil
+        }
     }
 }

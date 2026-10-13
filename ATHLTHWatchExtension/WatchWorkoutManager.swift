@@ -4070,53 +4070,16 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             }
         }
 
-        if let step = currentStructuredRunningStep {
-            let elapsedInStep =
-                max(
-                    elapsedTime -
-                    structuredStepStartElapsedTime,
-                    0
-                )
-            let distanceInStep =
-                max(
-                    distanceMeters -
-                    structuredStepStartDistanceMeters,
-                    0
-                )
-
-            if configuration
-                .announceRemainingStepTime,
-               step.measure == .time,
-               let target = step.durationSeconds {
-                let remaining = max(
-                    target - elapsedInStep,
-                    0
-                )
-                parts.append(
-                    coachPhrase(
-                        english: "Time remaining in this step",
-                        norwegian: "Tid igjen i denne delen"
-                    ) + " " +
-                    spokenDuration(remaining)
-                )
-            }
-
-            if configuration
-                .announceRemainingStepDistance,
-               step.measure == .distance,
-               let target = step.distanceMeters {
-                let remaining = max(
-                    target - distanceInStep,
-                    0
-                )
-                parts.append(
-                    coachPhrase(
-                        english: "Distance remaining in this step",
-                        norwegian: "Distanse igjen i denne delen"
-                    ) + " " +
-                    spokenDistance(remaining)
-                )
-            }
+        if let step = currentStructuredRunningStep,
+           let remaining = ATHLTHCoachStructuredStepSpeech.remainingSummary(
+                for: step,
+                elapsedInStep: currentStructuredStepElapsedTime,
+                distanceInStepMeters: currentStructuredStepDistanceMeters,
+                announceTime: configuration.announceRemainingStepTime,
+                announceDistance: configuration.announceRemainingStepDistance,
+                norwegian: coachPhrase(english: "en", norwegian: "no") == "no"
+           ) {
+            parts.append(remaining)
         }
 
         return parts.joined(separator: ". ")

@@ -225,13 +225,53 @@ final class AudioCoachContentLevelTests: XCTestCase {
             for: step, position: .next, norwegian: true
         )
         XCTAssertTrue(norwegian.contains("Neste"))
-        XCTAssertTrue(norwegian.contains("1 minutter 30 sekunder"))
+        XCTAssertTrue(norwegian.contains("1 minutt 30 sekunder"))
         XCTAssertTrue(norwegian.contains("Målfart 5:00–5:30 min/km"))
         let english = ATHLTHCoachStructuredStepSpeech.phrase(
             for: step, position: .starting, norwegian: false
         )
         XCTAssertTrue(english.contains("Starting"))
         XCTAssertTrue(english.contains("Target pace 5:00–5:30"))
+    }
+
+
+    func testStructuredStepRemainingSummaryOnlyAnnouncesExplicitTargets() {
+        let step = WatchRunningWorkoutStep(
+            id: UUID(), title: "Drag",
+            measure: .time, distanceMeters: nil,
+            durationSeconds: 90, intensityText: nil
+        )
+        XCTAssertEqual(
+            ATHLTHCoachStructuredStepSpeech.remainingSummary(
+                for: step,
+                elapsedInStep: 45,
+                distanceInStepMeters: 0,
+                announceTime: true,
+                announceDistance: false,
+                norwegian: true
+            ),
+            "Tid igjen i intervallet: 45 sekunder"
+        )
+        XCTAssertNil(
+            ATHLTHCoachStructuredStepSpeech.remainingSummary(
+                for: step,
+                elapsedInStep: 45,
+                distanceInStepMeters: 0,
+                announceTime: false,
+                announceDistance: true,
+                norwegian: true
+            )
+        )
+        XCTAssertNil(
+            ATHLTHCoachStructuredStepSpeech.remainingSummary(
+                for: step,
+                elapsedInStep: 90,
+                distanceInStepMeters: 0,
+                announceTime: true,
+                announceDistance: true,
+                norwegian: true
+            )
+        )
     }
 
     func testApplyingContentPresetNeverEnablesDisabledSession() {

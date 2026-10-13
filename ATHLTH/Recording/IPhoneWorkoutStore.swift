@@ -3460,6 +3460,20 @@ final class IPhoneWorkoutStore:
             )
         }
 
+        if let activeStep,
+           let remaining = ATHLTHCoachStructuredStepSpeech.remainingSummary(
+                for: activeStep,
+                elapsedInStep: elapsed -
+                    (workout.structuredStepStartElapsedTime ?? 0),
+                distanceInStepMeters: workout.distanceMeters -
+                    (workout.structuredStepStartDistanceMeters ?? 0),
+                announceTime: configuration.announceRemainingStepTime,
+                announceDistance: configuration.announceRemainingStepDistance,
+                norwegian: norwegian
+           ) {
+            parts.append(remaining)
+        }
+
         guard !parts.isEmpty else {
             return
         }
