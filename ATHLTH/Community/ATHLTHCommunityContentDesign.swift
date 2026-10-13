@@ -67,3 +67,15 @@ struct ATHLTHCommunityContextRibbon: View {
         .accessibilityElement(children: .combine)
     }
 }
+
+enum ATHLTHCommunityChallengeEditingPolicy {
+    /// Once the start time has passed, rules and targets must remain stable
+    /// for competitors. Server-side permissions still remain authoritative.
+    static func canEdit(
+        status: CommunityGroupContentStatus,
+        startsAt: Date,
+        now: Date = Date()
+    ) -> Bool {
+        (status == .draft || status == .upcoming) && startsAt > now
+    }
+}
