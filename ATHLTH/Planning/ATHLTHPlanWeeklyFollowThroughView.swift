@@ -257,13 +257,15 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                 .frame(width: 65, alignment: .leading)
                                 VStack(alignment: .leading, spacing: 3) {
                                     ForEach(day.sessions) { workout in
-                                        let completed = session.isPlanSessionCompleted(
+                                        // Match the report's precedence: an explicitly
+                                        // skipped session must not also appear completed.
+                                        let skipped = session.isPlanSessionSkipped(
+                                            planID: currentPlan.id, sessionID: workout.id
+                                        )
+                                        let completed = !skipped && session.isPlanSessionCompleted(
                                             planID: currentPlan.id, sessionID: workout.id,
                                             healthWorkouts: health.workouts,
                                             strengthHistory: strength.workoutHistory
-                                        )
-                                        let skipped = session.isPlanSessionSkipped(
-                                            planID: currentPlan.id, sessionID: workout.id
                                         )
                                         let dayDate = currentPlan.startDate.flatMap { start in
                                             calendar.date(
