@@ -251,8 +251,8 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                             ))
                             .font(.caption)
                             Text(ATHLTHLocalization.choose(
-                                english: "Suggested because the new day has fewer adjacent planned workouts. This is a spacing suggestion, not a recovery assessment. Nothing changes without approval.",
-                                norwegian: "Foreslått fordi den nye dagen har færre planlagte økter på nabodagene. Dette er et fordelingsforslag, ikke en restitusjonsvurdering. Ingenting endres uten godkjenning."
+                                english: "The new day has fewer adjacent active workouts and no occupied neighboring days. This is a calendar-spacing suggestion, not a recovery assessment. Nothing changes without approval.",
+                                norwegian: "Den nye dagen har færre aktive økter på nabodagene og ingen opptatte nabodager. Dette er et forslag om kalenderfordeling, ikke en restitusjonsvurdering. Ingenting endres uten godkjenning."
                             ))
                             .font(.caption2)
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -270,8 +270,8 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                             .buttonStyle(.bordered)
                             .confirmationDialog(
                                 ATHLTHLocalization.choose(
-                                    english: "Proposed move — not saved",
-                                    norwegian: "Foreslått flytting – ikke lagret"
+                                    english: "Move \(moveDayLabel(movePreview.sourceDayIndex, weekID: movePreview.weekID, plan: currentPlan)) → \(moveDayLabel(movePreview.destinationDayIndex, weekID: movePreview.weekID, plan: currentPlan))?",
+                                    norwegian: "Flytt \(moveDayLabel(movePreview.sourceDayIndex, weekID: movePreview.weekID, plan: currentPlan)) → \(moveDayLabel(movePreview.destinationDayIndex, weekID: movePreview.weekID, plan: currentPlan))?"
                                 ),
                                 isPresented: $showsMovePreview,
                                 titleVisibility: .visible
