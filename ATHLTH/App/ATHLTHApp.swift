@@ -368,11 +368,6 @@ private struct ATHLTHLaunchGateView: View {
                         ATHLTHTheme.accent
                     )
 
-                Text("Opening ATHLTH…")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
             }
             .padding(28)
         }
