@@ -85,10 +85,15 @@ struct GhostRaceReference: Identifiable, Hashable {
     let points: [GhostRacePoint]
 
     var routeDistanceMeters: Double {
-        max(
-            points.last?.cumulativeMeters ?? 0,
-            distanceMeters
-        )
+        // Route progress must be measured against its actual geometry.
+        // HealthKit's independently estimated workout distance may be
+        // longer than the GPS polyline; using max() would make the route
+        // impossible to complete even after crossing its last waypoint.
+        let geometryMeters = points.last?.cumulativeMeters ?? 0
+        if geometryMeters.isFinite, geometryMeters > 0 {
+            return geometryMeters
+        }
+        return max(distanceMeters, 0)
     }
 }
 
