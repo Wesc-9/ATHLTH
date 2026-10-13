@@ -38,6 +38,13 @@ struct PlannedWorkoutDetailView: View {
         return workout
     }
 
+    private var isSkipped: Bool {
+        session.isPlanSessionSkipped(
+            planID: planID,
+            sessionID: currentWorkout.id
+        )
+    }
+
     private var isManuallyCompleted: Bool {
         session.isPlanSessionManuallyCompleted(
             planID: planID,
@@ -1100,7 +1107,24 @@ struct PlannedWorkoutDetailView: View {
                     )
                 )
 
-                if (isCompleted && !isManuallyCompleted) ||
+                if isSkipped {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "This workout was skipped",
+                            norwegian: "Denne økten ble hoppet over"
+                        ),
+                        systemImage: "forward.end.circle"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Restore the workout in your plan before recording it as completed.",
+                        norwegian: "Gjenopprett økten i planen før du registrerer den som gjennomført."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                } else if (isCompleted && !isManuallyCompleted) ||
                     storedLinkedHealthID != nil {
                     Label(
                         isCompleted
@@ -1192,7 +1216,8 @@ struct PlannedWorkoutDetailView: View {
                     .foregroundStyle(ATHLTHTheme.mutedText)
                 }
 
-                if linkedHealthWorkout == nil && !isHealthCompleted && !isCompleted {
+                if !isSkipped && linkedHealthWorkout == nil &&
+                    !isHealthCompleted && !isCompleted {
                     Button {
                         showingHealthLinkPicker = true
                     } label: {
