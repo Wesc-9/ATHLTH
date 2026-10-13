@@ -164,7 +164,24 @@ struct ATHLTHTrainPlanPremiumView: View {
                let launchWorkout = queuedLaunchWorkout {
                 queuedLaunchPlanID = nil
                 queuedLaunchWorkout = nil
-                onStartWorkout?(launchPlanID, launchWorkout)
+                openingWorkoutPlanID = nil
+                // Resolve the current record again after the detail sheet
+                // closes. A plan may have changed while the sheet was open.
+                if let sourcePlan = session.trainingPlan(withID: launchPlanID),
+                   let current = sourcePlan.weeks
+                        .flatMap(\.days).flatMap(\.sessions)
+                        .first(where: { $0.id == launchWorkout.id }),
+                   !session.isPlanSessionSkipped(
+                        planID: launchPlanID, sessionID: current.id
+                   ),
+                   !session.isPlanSessionCompleted(
+                        planID: launchPlanID,
+                        sessionID: current.id,
+                        healthWorkouts: health.workouts,
+                        strengthHistory: strength.workoutHistory
+                   ) {
+                    onStartWorkout?(launchPlanID, current)
+                }
             }
         }) { workout in
             if let openingWorkoutPlanID,
@@ -1018,6 +1035,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                     } else {
                         ForEach(day.sessions) { workout in
                             Button {
+                                openingWorkoutPlanID = plan.id
                                 openingWorkout = workout
                             } label: {
                                 VStack(alignment: .leading, spacing: 4) {
