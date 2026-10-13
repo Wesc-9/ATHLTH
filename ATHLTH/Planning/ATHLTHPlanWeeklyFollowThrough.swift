@@ -108,6 +108,59 @@ enum ATHLTHPlanWeeklyFollowThrough {
         }
     }
 
+    /// A deliberately transparent first step toward load-aware planning.
+    /// These are planning estimates, never measured exertion or recovery.
+    struct PlannedLoadSummary {
+        let estimatedMinutes: Int
+        let runningMinutes: Int
+        let strengthMinutes: Int
+        let walkingMinutes: Int
+        let unspecifiedMinutes: Int
+        let longerDays: Int
+        let consecutiveLongDayPairs: Int
+    }
+
+    static func plannedLoadSummary(
+        plan: TrainingPlan, longSessionThresholdMinutes: Int = 60
+    ) -> PlannedLoadSummary {
+        var total = 0
+        var running = 0
+        var strength = 0
+        var walking = 0
+        var unspecified = 0
+        var longerDays = 0
+        var consecutivePairs = 0
+        var previousLong = false
+        let threshold = max(1, longSessionThresholdMinutes)
+        for week in plan.weeks {
+            for day in week.days.sorted(by: { $0.dayIndex < $1.dayIndex }) {
+                let minutes = day.sessions.reduce(0) { sum, workout in
+                    sum + max(0, workout.durationMinutes ?? 0)
+                }
+                total += minutes
+                for workout in day.sessions {
+                    let duration = max(0, workout.durationMinutes ?? 0)
+                    switch String(describing: workout.kind).lowercased() {
+                    case "running": running += duration
+                    case "strength": strength += duration
+                    case "walking": walking += duration
+                    default: unspecified += duration
+                    }
+                }
+                let isLong = minutes >= threshold
+                if isLong { longerDays += 1 }
+                if previousLong && isLong { consecutivePairs += 1 }
+                previousLong = isLong
+            }
+        }
+        return PlannedLoadSummary(
+            estimatedMinutes: total, runningMinutes: running,
+            strengthMinutes: strength, walkingMinutes: walking,
+            unspecifiedMinutes: unspecified, longerDays: longerDays,
+            consecutiveLongDayPairs: consecutivePairs
+        )
+    }
+
     /// Conservative, non-mutating candidate for a future workout.
     /// The destination must be empty and later in the same week; explicitly
     /// timed, completed or skipped sessions are never offered for relocation.
