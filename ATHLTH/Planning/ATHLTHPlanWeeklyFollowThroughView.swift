@@ -141,6 +141,24 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                     norwegian: "\(count) tidligere økter er markert som hoppet over. Vurder om treningsplanen bør tilpasses."
                                 ))
                             }
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Before → after review",
+                                    norwegian: "Før → etter gjennomgang"
+                                ))
+                                .font(.caption.weight(.semibold))
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Before: \(report.pastCompleted) completed · \(report.pastSkipped) skipped · \(report.pastUnreviewed) unresolved.",
+                                    norwegian: "Før: \(report.pastCompleted) fullført · \(report.pastSkipped) hoppet over · \(report.pastUnreviewed) uavklart."
+                                ))
+                                Text(ATHLTHLocalization.choose(
+                                    english: "After opening: unchanged until you explicitly edit a session.",
+                                    norwegian: "Etter åpning: uendret til du selv redigerer en økt."
+                                ))
+                            }
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+
                             Text(ATHLTHLocalization.choose(
                                 english: "Only you can decide to change the plan. No changes are made automatically.",
                                 norwegian: "Du bestemmer selv om planen skal endres. Ingenting endres automatisk."
