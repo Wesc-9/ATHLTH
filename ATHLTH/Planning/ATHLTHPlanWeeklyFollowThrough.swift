@@ -161,6 +161,39 @@ enum ATHLTHPlanWeeklyFollowThrough {
         )
     }
 
+    struct WeekLoadSummary: Identifiable {
+        let id: UUID
+        let weekNumber: Int
+        let plannedMinutes: Int
+        let activeDays: Int
+        let longDays: Int
+        let adjacentLongDayPairs: Int
+    }
+
+    /// Per-week planning volume. Explicitly not a physiological load estimate.
+    static func weeklyLoadSummaries(
+        plan: TrainingPlan, longDayThresholdMinutes: Int = 60
+    ) -> [WeekLoadSummary] {
+        let threshold = max(1, longDayThresholdMinutes)
+        return plan.weeks.enumerated().map { index, week in
+            let days = week.days.sorted { $0.dayIndex < $1.dayIndex }
+            let durations = days.map { day in
+                day.sessions.reduce(0) { total, workout in
+                    total + max(0, workout.durationMinutes ?? 0)
+                }
+            }
+            let longDays = durations.map { $0 >= threshold }
+            let adjacent = zip(longDays, longDays.dropFirst()).filter { $0 && $1 }.count
+            return WeekLoadSummary(
+                id: week.id, weekNumber: index + 1,
+                plannedMinutes: durations.reduce(0, +),
+                activeDays: days.filter { !$0.sessions.isEmpty }.count,
+                longDays: longDays.filter { $0 }.count,
+                adjacentLongDayPairs: adjacent
+            )
+        }
+    }
+
     /// Conservative, non-mutating candidate for a future workout.
     /// The destination must be empty and later in the same week; explicitly
     /// timed, completed or skipped sessions are never offered for relocation.

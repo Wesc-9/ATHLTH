@@ -27,6 +27,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
             strengthHistory: strength.workoutHistory
         )
         let load = ATHLTHPlanWeeklyFollowThrough.plannedLoadSummary(plan: currentPlan)
+        let weeklyLoads = ATHLTHPlanWeeklyFollowThrough.weeklyLoadSummaries(plan: currentPlan)
         let relevant = report.relevantWeeks
         let movePreview = ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
             plan: currentPlan,
@@ -94,6 +95,29 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                             systemImage: "info.circle"
                         )
                         .font(.caption)
+                    }
+                    ForEach(weeklyLoads) { week in
+                        HStack(spacing: 8) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Week \(week.weekNumber)",
+                                norwegian: "Uke \(week.weekNumber)"
+                            ))
+                            .font(.caption.weight(.semibold))
+                            Spacer(minLength: 8)
+                            Text(ATHLTHLocalization.choose(
+                                english: "\(week.plannedMinutes) min · \(week.activeDays) workout days",
+                                norwegian: "\(week.plannedMinutes) min · \(week.activeDays) treningsdager"
+                            ))
+                            .font(.caption)
+                        }
+                        if week.adjacentLongDayPairs > 0 {
+                            Text(ATHLTHLocalization.choose(
+                                english: "\(week.adjacentLongDayPairs) adjacent long-day pairs in this week",
+                                norwegian: "\(week.adjacentLongDayPairs) par med lange treningsdager etter hverandre denne uken"
+                            ))
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
                     }
                     Text(ATHLTHLocalization.choose(
                         english: "Based on entered durations only. Not a recovery score or measured training load.",

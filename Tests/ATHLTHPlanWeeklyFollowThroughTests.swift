@@ -819,6 +819,30 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
     }
 
     @MainActor
+    func testWeeklyLoadSummarySeparatesWeeksAndFlagsConsecutiveLongDays() throws {
+        let (_, defaults, suite, plan) = try prepared(weekCount: 2)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var modified = plan
+        var first = workout()
+        first.durationMinutes = 65
+        var second = workout()
+        second.durationMinutes = 70
+        var third = workout()
+        third.durationMinutes = 25
+        modified.weeks[0].days[0].sessions = [first]
+        modified.weeks[0].days[1].sessions = [second]
+        modified.weeks[1].days[0].sessions = [third]
+        let weeks = ATHLTHPlanWeeklyFollowThrough.weeklyLoadSummaries(plan: modified)
+        XCTAssertEqual(weeks.count, 2)
+        XCTAssertEqual(weeks[0].plannedMinutes, 135)
+        XCTAssertEqual(weeks[0].activeDays, 2)
+        XCTAssertEqual(weeks[0].longDays, 2)
+        XCTAssertEqual(weeks[0].adjacentLongDayPairs, 1)
+        XCTAssertEqual(weeks[1].plannedMinutes, 25)
+        XCTAssertEqual(weeks[1].adjacentLongDayPairs, 0)
+    }
+
+    @MainActor
     func testDuplicateIdentitiesAreCountedOnlyOnce() throws {
         let (store, defaults, suite, plan) = try prepared(weekCount: 1)
         defer { defaults.removePersistentDomain(forName: suite) }
