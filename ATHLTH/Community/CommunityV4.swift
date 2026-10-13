@@ -16,6 +16,7 @@ struct ATHLTHCommunityV4View: View {
     @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
 
+    @StateObject private var trainTogetherAgenda = TrainTogetherMarketplaceStore()
     @State private var refreshError: String?
     @State private var showingPeopleSearch = false
     @State private var peopleSearchText = ""
@@ -317,6 +318,7 @@ struct ATHLTHCommunityV4View: View {
                 await refreshCommunity()
             }
         }
+        .environmentObject(trainTogetherAgenda)
     }
 
     private var communityPeopleSearch: some View {
@@ -777,6 +779,8 @@ struct ATHLTHCommunityV4View: View {
             clubRSVPs: groups.calendarEventRSVPs,
             clubs: groups.groups,
             challenges: joinedUpcomingChallenges,
+            trainTogetherPosts: trainTogetherAgenda.posts,
+            trainTogetherRequests: trainTogetherAgenda.requests,
             userID: session.profile.userID
         )
     }
@@ -1106,7 +1110,8 @@ struct ATHLTHCommunityV4View: View {
         !social.following.isEmpty ||
         !social.followers.isEmpty ||
         !groups.joinedGroups.isEmpty ||
-        !community.upcomingEvents.isEmpty
+        !community.upcomingEvents.isEmpty ||
+        !trainTogetherAgenda.posts.isEmpty
     }
 
     private func friendlyCommunityRefreshMessage(
@@ -1183,6 +1188,8 @@ struct ATHLTHCommunityV4View: View {
             )
         async let messageRefresh: Void =
             messaging.refresh(force: force)
+        async let trainTogetherRefresh: Void =
+            trainTogetherAgenda.refresh()
         async let onlineRefresh: Void =
             realtime.refreshOnlineUsers(
                 force: force
@@ -1199,6 +1206,7 @@ struct ATHLTHCommunityV4View: View {
             groupRefresh,
             weeklyRefresh,
             messageRefresh,
+            trainTogetherRefresh,
             onlineRefresh,
             liveRefresh
         )
@@ -1218,6 +1226,7 @@ struct ATHLTHCommunityV4View: View {
             weekly: officialChallenges.errorMessage != nil,
             friends: social.errorMessage != nil,
             messages: messaging.errorMessage != nil,
+            trainTogether: trainTogetherAgenda.errorMessage != nil,
             live: realtime.errorMessage != nil
         )
 
