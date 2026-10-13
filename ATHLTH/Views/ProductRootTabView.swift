@@ -7368,13 +7368,16 @@ struct ATHLTHTrainView: View {
             return
         }
 
-        if workout.kind == .strength {
-            selectedStrengthSession = workout
+        // Structured sessions must use their block-aware recorder,
+        // including structured strength sessions. Routing strength first
+        // silently discards the programmed blocks and their completion link.
+        if workout.isStructuredWorkout {
+            selectedStructuredWorkout = workout
             return
         }
 
-        if workout.isStructuredWorkout {
-            selectedStructuredWorkout = workout
+        if workout.kind == .strength {
+            selectedStrengthSession = workout
             return
         }
 

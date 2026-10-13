@@ -975,14 +975,20 @@ struct PlannedWorkoutDetailView: View {
     private var structuredWorkoutStartButton:
         some View {
         Button {
-            WorkoutLaunchCoordinator
-                .startLinkedSpotifyIfNeeded(
-                    workout: currentWorkout,
-                    session: session,
-                    settings: settings,
-                    spotify: spotify
-                )
-            showingStructuredWorkout = true
+            if let onStartWorkout {
+                // The owning Train tab enforces the same active-session
+                // protection and workout launch routing for every activity.
+                onStartWorkout(planID, currentWorkout)
+            } else {
+                WorkoutLaunchCoordinator
+                    .startLinkedSpotifyIfNeeded(
+                        workout: currentWorkout,
+                        session: session,
+                        settings: settings,
+                        spotify: spotify
+                    )
+                showingStructuredWorkout = true
+            }
         } label: {
             Label(
                 ATHLTHLocalization.choose(english: "Start workout", norwegian: "Start økt"),
@@ -994,7 +1000,9 @@ struct PlannedWorkoutDetailView: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(ATHLTHTheme.accentDeep)
-        .disabled(isCompleted)
+        .disabled(isCompleted || session.isPlanSessionSkipped(
+            planID: planID, sessionID: currentWorkout.id
+        ))
     }
 
     private func notesCard(_ notes: String) -> some View {
