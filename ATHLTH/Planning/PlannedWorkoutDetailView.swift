@@ -1062,7 +1062,7 @@ struct PlannedWorkoutDetailView: View {
                     )
                 )
 
-                if isCompleted && !isManuallyCompleted ||
+                if (isCompleted && !isManuallyCompleted) ||
                     storedLinkedHealthID != nil {
                     Label(
                         isCompleted
@@ -1154,7 +1154,7 @@ struct PlannedWorkoutDetailView: View {
                     .foregroundStyle(ATHLTHTheme.mutedText)
                 }
 
-                if linkedHealthWorkout == nil && !isHealthCompleted {
+                if linkedHealthWorkout == nil && !isHealthCompleted && !isCompleted {
                     Button {
                         showingHealthLinkPicker = true
                     } label: {
@@ -1170,14 +1170,16 @@ struct PlannedWorkoutDetailView: View {
                     .disabled(matchingHealthWorkouts.isEmpty)
                 }
 
-                Text(
-                    ATHLTHLocalization.choose(
-                        english: "Only workouts you explicitly link are credited to this plan. Other Health workouts are never matched by date alone.",
-                        norwegian: "Bare økter du selv kobler til, telles i denne planen. Andre Health-økter matches aldri kun på dato."
+                if !simplePresentation {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Only workouts you explicitly link are credited to this plan. Other Health workouts are never matched by date alone.",
+                            norwegian: "Bare økter du selv kobler til, telles i denne planen. Andre Health-økter matches aldri kun på dato."
+                        )
                     )
-                )
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
             }
         }
     }
