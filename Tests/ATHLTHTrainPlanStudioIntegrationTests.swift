@@ -511,4 +511,59 @@ final class ATHLTHTrainPlanStudioIntegrationTests: XCTestCase {
         XCTAssertEqual(calendar.component(.minute, from: scheduled), 15)
     }
 
+    @MainActor
+    func testMovingPlannedWorkoutPreservesIdentityAndRejectsStaleVersion() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Move safety", summary: "", weekCount: 2, startDate: today
+        ))
+        let original = workout(name: "Planned strength")
+        store.addSession(original, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        let before = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let destination = try XCTUnwrap(calendar.date(byAdding: .day, value: 8, to: today))
+
+        XCTAssertTrue(store.movePlanStudioWorkout(
+            planID: plan.id, workoutID: original.id, targetDate: destination,
+            expectedVersion: before.version,
+            healthWorkouts: [], strengthHistory: []
+        ))
+        let moved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertEqual(moved.version, before.version + 1)
+        XCTAssertFalse(moved.weeks[0].days[0].sessions.contains { $0.id == original.id })
+        XCTAssertEqual(moved.weeks[1].days[1].sessions.first?.id, original.id)
+        XCTAssertFalse(store.movePlanStudioWorkout(
+            planID: plan.id, workoutID: original.id, targetDate: today,
+            expectedVersion: before.version,
+            healthWorkouts: [], strengthHistory: []
+        ))
+    }
+
+    @MainActor
+    func testCompletedWorkoutCannotBeMovedFromPlanStudio() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Completed move guard", summary: "", weekCount: 1, startDate: today
+        ))
+        let original = workout()
+        store.addSession(original, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        let before = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        store.setPlanSessionManuallyCompleted(
+            planID: plan.id, sessionID: original.id, completed: true
+        )
+        let destination = try XCTUnwrap(calendar.date(byAdding: .day, value: 1, to: today))
+        XCTAssertFalse(store.movePlanStudioWorkout(
+            planID: plan.id, workoutID: original.id, targetDate: destination,
+            expectedVersion: before.version,
+            healthWorkouts: [], strengthHistory: []
+        ))
+        let after = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertEqual(after.weeks[0].days[0].sessions.first?.id, original.id)
+    }
+
 }
