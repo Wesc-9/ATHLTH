@@ -3665,6 +3665,9 @@ final class AppSessionStore: ObservableObject {
               source.date >= Calendar.current.startOfDay(for: Date()),
               Calendar.current.startOfDay(for: targetDate) >=
                   Calendar.current.startOfDay(for: Date()),
+              // Moving to the existing day must not rewrite the plan or
+              // increment its version (which invalidates open editors).
+              !Calendar.current.isDate(source.date, inSameDayAs: targetDate),
               !isPlanSessionSkipped(planID: planID, sessionID: workoutID),
               !isPlanSessionCompleted(
                   planID: planID, sessionID: workoutID,

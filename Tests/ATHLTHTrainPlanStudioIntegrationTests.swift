@@ -405,4 +405,33 @@ final class ATHLTHTrainPlanStudioIntegrationTests: XCTestCase {
         XCTAssertEqual(saved.weeks[0].days[0].sessions.count, 1)
     }
 
+    @MainActor
+    func testMovingToSameDayDoesNotChangePlanOrVersion() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let start = Calendar.current.startOfDay(for: Date())
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "No-op move", summary: "",
+            weekCount: 1, startDate: start
+        ))
+        let original = workout(name: "Keep on same day")
+        store.addSession(original, toDay: plan.weeks[0].days[0].id,
+                         inPlan: plan.id)
+        let before = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let sameDayLater = try XCTUnwrap(Calendar.current.date(
+            byAdding: .hour, value: 12, to: start
+        ))
+
+        XCTAssertFalse(store.movePlanStudioWorkout(
+            planID: plan.id, workoutID: original.id,
+            targetDate: sameDayLater,
+            expectedVersion: before.version,
+            healthWorkouts: [], strengthHistory: []
+        ))
+        let after = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertEqual(after.version, before.version)
+        XCTAssertEqual(after.weeks[0].days[0].sessions.map(\.id),
+                       [original.id])
+    }
+
 }
