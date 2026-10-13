@@ -260,12 +260,30 @@ struct WatchRunGhostFocusPage: View {
                     workout.automaticPauseActive,
                 now: timeline.date
             )
+            // Replay/Target Ghost are computed locally on Watch, while a
+            // Live Ghost uses a fresh synchronized opponent sample.
+            let isRecordedGhost = ghost == nil && workout.ghostRaceTitle != nil
+            let paused = workout.state == .paused || workout.automaticPauseActive
+            let recordedFresh: Bool = {
+                guard isRecordedGhost, !paused,
+                      let updated = workout.ghostComparisonUpdatedAt else {
+                    return false
+                }
+                return (-5...25).contains(timeline.date.timeIntervalSince(updated))
+            }()
+            let visibleMeters = isRecordedGhost
+                ? (recordedFresh ? workout.ghostDistanceDeltaMeters : nil)
+                : (state == .live ? ghost?.distanceDeltaMeters : nil)
+            let visibleTime = isRecordedGhost
+                ? (recordedFresh ? workout.ghostTimeDeltaSeconds : nil)
+                : (state == .live ? ghost?.estimatedTimeDeltaSeconds : nil)
+
             ScrollView {
                 VStack(alignment: .leading, spacing: 9) {
                     Label(
-                        ATHLTHLocalization.choose(
-                            english: "LIVE GHOST", norwegian: "LIVE GHOST"
-                        ),
+                        isRecordedGhost
+                            ? "GHOST RACE"
+                            : "LIVE GHOST",
                         systemImage: "figure.run.circle"
                     )
                     .font(.system(size: 10, weight: .heavy))
@@ -280,8 +298,7 @@ struct WatchRunGhostFocusPage: View {
                             .font(.system(size: 12, weight: .semibold))
                             .lineLimit(2)
 
-                        if state == .live,
-                           let meters = ghost?.distanceDeltaMeters,
+                        if let meters = visibleMeters,
                            meters.isFinite {
                             Text(abs(meters) < 8
                                 ? ATHLTHLocalization.choose(
@@ -291,10 +308,15 @@ struct WatchRunGhostFocusPage: View {
                                     ? ATHLTHLocalization.choose(
                                         english: "YOU LEAD", norwegian: "DU LEDER"
                                       )
-                                    : ATHLTHLocalization.choose(
-                                        english: "OPPONENT LEADS",
-                                        norwegian: "MOTSTANDER LEDER"
-                                      ))
+                                    : isRecordedGhost
+                                        ? ATHLTHLocalization.choose(
+                                            english: "GHOST LEADS",
+                                            norwegian: "GHOST LEDER"
+                                          )
+                                        : ATHLTHLocalization.choose(
+                                            english: "OPPONENT LEADS",
+                                            norwegian: "MOTSTANDER LEDER"
+                                          ))
                                 .font(.system(size: 10, weight: .heavy))
                                 .foregroundStyle(WatchTheme.liveAction)
 
@@ -321,7 +343,7 @@ struct WatchRunGhostFocusPage: View {
                                 )
                             )
 
-                            if let time = ghost?.estimatedTimeDeltaSeconds,
+                            if let time = visibleTime,
                                time.isFinite {
                                 Text(ATHLTHLocalization.choose(
                                     english: "Estimated gap: \(Int(abs(time).rounded())) s",
@@ -331,9 +353,17 @@ struct WatchRunGhostFocusPage: View {
                                 .foregroundStyle(WatchTheme.textSecondary)
                             }
                         } else {
-                            Label(message(state), systemImage:
-                                state == .paused ? "pause.fill" :
-                                "wifi.exclamationmark"
+                            Label(
+                                isRecordedGhost
+                                    ? (paused
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Workout paused", norwegian: "Økten er pauset"
+                                          )
+                                        : ATHLTHLocalization.choose(
+                                            english: "Waiting for fresh GPS", norwegian: "Venter på fersk GPS"
+                                          ))
+                                    : message(state),
+                                systemImage: paused ? "pause.fill" : "wifi.exclamationmark"
                             )
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(WatchTheme.warning)
