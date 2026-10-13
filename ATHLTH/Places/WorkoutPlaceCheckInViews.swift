@@ -2,6 +2,11 @@
 import MapKit
 import SwiftUI
 
+// Shared by the workout detail and its place picker.
+private func placeTR(_ en: String, _ no: String) -> String {
+    ATHLTHLocalization.choose(english: en, norwegian: no)
+}
+
 struct WorkoutPlaceCompactBadge: View {
     @EnvironmentObject private var places:
         WorkoutPlaceCheckInStore
@@ -35,7 +40,7 @@ struct WorkoutPlaceCompactBadge: View {
 
                     Spacer()
 
-                    Text("Private")
+                    Text(placeTR("Private", "Privat"))
                         .font(
                             .caption2.weight(
                                 .semibold
@@ -76,10 +81,10 @@ struct WorkoutPlaceCompactBadge: View {
             places.resolvedPlace(
                 for: workoutID
             ) {
-            return "Trained at \(place.name)"
+            return placeTR("Trained at \(place.name)", "Trent hos \(place.name)")
         }
 
-        return "Training place"
+        return placeTR("Training place", "Treningssted")
     }
 }
 
@@ -140,7 +145,7 @@ struct WorkoutPlaceCheckInSection: View {
                     alignment: .leading,
                     spacing: 2
                 ) {
-                    Text("Training place")
+                    Text(placeTR("Training place", "Treningssted"))
                         .font(
                             .headline.weight(
                                 .semibold
@@ -152,8 +157,8 @@ struct WorkoutPlaceCheckInSection: View {
 
                     Text(
                         record == nil
-                            ? "Add the fitness center for this workout."
-                            : "Saved privately to this workout."
+                            ? placeTR("Add the fitness center for this workout.", "Legg til treningssted for denne økten.")
+                            : placeTR("Saved privately to this workout.", "Lagret privat på denne økten.")
                     )
                     .font(.caption)
                     .foregroundStyle(
@@ -205,8 +210,8 @@ struct WorkoutPlaceCheckInSection: View {
 
                                 Text(
                                     resolving
-                                        ? "Loading place…"
-                                        : "Training place"
+                                        ? placeTR("Loading place…", "Laster treningssted…")
+                                        : placeTR("Training place", "Treningssted")
                                 )
                                 .font(
                                     .subheadline
@@ -238,7 +243,7 @@ struct WorkoutPlaceCheckInSection: View {
                     Button {
                         showingPicker = true
                     } label: {
-                        Text("Change")
+                        Text(placeTR("Change", "Endre"))
                             .font(
                                 .caption.weight(
                                     .semibold
@@ -249,7 +254,7 @@ struct WorkoutPlaceCheckInSection: View {
 
                     Menu {
                         Button(
-                            "Remove place",
+                            placeTR("Remove place", "Fjern treningssted"),
                             role: .destructive
                         ) {
                             Task {
@@ -277,7 +282,7 @@ struct WorkoutPlaceCheckInSection: View {
                     showingPicker = true
                 } label: {
                     Label(
-                        "Add training place",
+                        placeTR("Add training place", "Legg til treningssted"),
                         systemImage:
                             "plus.circle.fill"
                     )
@@ -300,7 +305,7 @@ struct WorkoutPlaceCheckInSection: View {
             }
 
             Text(
-                "ATHLTH stores the Apple Place ID, not a separate copy of the venue address. Place check-ins are private unless you explicitly choose to share them later."
+                placeTR("ATHLTH stores the Apple Place ID, not a separate copy of the venue address. Place check-ins are private unless you explicitly choose to share them later.", "ATHLTH lagrer stedets Apple-ID, ikke en egen kopi av adressen. Innsjekkinger er private med mindre du velger å dele dem senere.")
             )
             .font(.caption2)
             .foregroundStyle(
@@ -311,24 +316,29 @@ struct WorkoutPlaceCheckInSection: View {
                 vertical: true
             )
         }
-        .padding(16)
+        .padding(ATHLTHPlanDesign.Density.comfortable.cardPadding)
         .background(
-            ATHLTHTheme.card,
+            LinearGradient(
+                colors: [
+                    ATHLTHPlanDesign.surface,
+                    ATHLTHTheme.cardWarm.opacity(0.38)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
             in: RoundedRectangle(
-                cornerRadius: 22,
+                cornerRadius: ATHLTHPlanDesign.cardRadius,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 22,
+                cornerRadius: ATHLTHPlanDesign.cardRadius,
                 style: .continuous
             )
-            .stroke(
-                ATHLTHTheme.border,
-                lineWidth: 1
-            )
+            .stroke(ATHLTHPlanDesign.outline, lineWidth: 0.8)
         }
+        .shadow(color: ATHLTHTheme.accentDeep.opacity(0.055), radius: 13, y: 5)
         .sheet(
             isPresented:
                 $showingPicker
@@ -363,7 +373,7 @@ struct WorkoutPlaceCheckInSection: View {
             )
 
         if count == 1 {
-            return "First workout here"
+            return placeTR("First workout here", "Første økt her")
         }
 
         return ATHLTHLocalization.choose(
@@ -418,7 +428,7 @@ private struct WorkoutPlacePickerView:
                                 )
 
                             Text(
-                                "Finding fitness centers within 150 m…"
+                                placeTR("Finding fitness centers within 150 m…", "Søker etter treningssteder innen 150 m…")
                             )
                             .font(.caption)
                             .foregroundStyle(
@@ -437,7 +447,7 @@ private struct WorkoutPlacePickerView:
                     if !frequent.isEmpty {
                         placeSection(
                             title:
-                                "Places you train often",
+                                placeTR("Places you train often", "Steder du trener ofte"),
                             icon:
                                 "star.fill",
                             places:
@@ -446,7 +456,7 @@ private struct WorkoutPlacePickerView:
                     }
 
                     placeSection(
-                        title: "Nearby",
+                        title: placeTR("Nearby", "I nærheten"),
                         icon:
                             "location.fill",
                         places:
@@ -457,12 +467,12 @@ private struct WorkoutPlacePickerView:
                        !location.isUpdating,
                        nearby.isEmpty {
                         ContentUnavailableView(
-                            "No fitness center within 150 m",
+                            placeTR("No fitness center within 150 m", "Ingen treningssteder innen 150 m"),
                             systemImage:
                                 "figure.strengthtraining.traditional",
                             description:
                                 Text(
-                                    "Move closer to the venue and refresh. ATHLTH only allows a check-in when you're physically nearby."
+                                    placeTR("Move closer to the venue and refresh. ATHLTH only allows a check-in when you're physically nearby.", "Gå nærmere treningsstedet og oppdater. ATHLTH tillater bare innsjekking når du er i nærheten.")
                                 )
                         )
                         .frame(
@@ -489,7 +499,7 @@ private struct WorkoutPlacePickerView:
                 ATHLTHPremiumCanvas()
             )
             .navigationTitle(
-                "Training place"
+                placeTR("Training place", "Treningssted")
             )
             .navigationBarTitleDisplayMode(
                 .inline
@@ -499,7 +509,7 @@ private struct WorkoutPlacePickerView:
                     placement:
                         .cancellationAction
                 ) {
-                    Button("Close") {
+                    Button(placeTR("Close", "Lukk")) {
                         dismiss()
                     }
                 }
@@ -518,7 +528,7 @@ private struct WorkoutPlacePickerView:
                         )
                     }
                     .accessibilityLabel(
-                        "Refresh location"
+                        placeTR("Refresh location", "Oppdater posisjon")
                     )
                 }
             }
@@ -558,7 +568,7 @@ private struct WorkoutPlacePickerView:
                 spacing: 3
             ) {
                 Text(
-                    "Private check-in"
+                    placeTR("Private check-in", "Privat innsjekking")
                 )
                 .font(
                     .caption.weight(
@@ -570,7 +580,7 @@ private struct WorkoutPlacePickerView:
                 )
 
                 Text(
-                    "This place is saved to your workout only. It is not added to your public activity automatically."
+                    placeTR("This place is saved to your workout only. It is not added to your public activity automatically.", "Dette stedet lagres bare på økten din og deles ikke automatisk på aktiviteten din.")
                 )
                 .font(.caption2)
                 .foregroundStyle(
@@ -770,7 +780,7 @@ private struct WorkoutPlacePickerView:
                             .accent
                     )
                 } else {
-                    Text("Too far")
+                    Text(placeTR("Too far", "For langt unna"))
                         .font(
                             .caption2.weight(
                                 .semibold
