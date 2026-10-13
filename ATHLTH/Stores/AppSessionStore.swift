@@ -2318,24 +2318,32 @@ final class AppSessionStore: ObservableObject {
                 suggestedExercises = []
             }
 
+            // Simple plans use the duration chosen in the three-question
+            // flow. Advanced plans retain their per-activity defaults.
+            let simpleDuration = builderProfile.mode == .basic
+                ? builderProfile.weeklyTimeBudgetMinutes.map {
+                    max(5, min(180, $0 / max(targetDays.count, 1)))
+                }
+                : nil
+
             switch kind {
             case .running:
-                duration = 45
+                duration = simpleDuration ?? 45
                 distance = nil
             case .walking:
-                duration = 45
+                duration = simpleDuration ?? 45
                 distance = nil
             case .strength:
-                duration = 55
+                duration = simpleDuration ?? 55
                 distance = nil
             case .mobility:
-                duration = 25
+                duration = simpleDuration ?? 25
                 distance = nil
             case .recovery:
-                duration = 30
+                duration = simpleDuration ?? 30
                 distance = nil
             case .custom:
-                duration = 45
+                duration = simpleDuration ?? 45
                 distance = nil
             }
 
