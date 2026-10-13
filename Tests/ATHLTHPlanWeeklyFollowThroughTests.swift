@@ -457,6 +457,26 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
     }
 
     @MainActor
+    func testMovePreviewAccountsForWorkoutAcrossWeekBoundary() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 2)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        store.addSession(workout(), toDay: plan.weeks[1].days[0].id, inPlan: plan.id)
+        store.addSession(workout(), toDay: plan.weeks[1].days[2].id, inPlan: plan.id)
+        store.addSession(workout(), toDay: plan.weeks[0].days[6].id, inPlan: plan.id)
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let preview = try XCTUnwrap(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: plan.startDate!
+        ))
+        // First eligible source is the final day of week 1, so it has
+        // no later destination in that week. Week 2 day 1 is bordered
+        // by week 1 day 7 and week 2 day 2, and should move to day 5.
+        XCTAssertEqual(preview.weekID, plan.weeks[1].id)
+        XCTAssertEqual(preview.sourceDayIndex, 1)
+        XCTAssertEqual(preview.destinationDayIndex, 5)
+    }
+
+    @MainActor
     func testDuplicateIdentitiesAreCountedOnlyOnce() throws {
         let (store, defaults, suite, plan) = try prepared(weekCount: 1)
         defer { defaults.removePersistentDomain(forName: suite) }

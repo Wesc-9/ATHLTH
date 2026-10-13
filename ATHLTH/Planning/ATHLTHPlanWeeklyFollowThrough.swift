@@ -166,11 +166,26 @@ enum ATHLTHPlanWeeklyFollowThrough {
                           ) else { return false }
                     return targetDate > sourceDate
                 }
-                let ranked = eligible.sorted { lhs, rhs in
-                    func adjacentWorkouts(_ dayIndex: Int) -> Int {
-                        days.filter { abs($0.dayIndex - dayIndex) == 1 }
-                            .reduce(0) { $0 + $1.sessions.count }
+                // Count the actual adjacent calendar days, including the
+                // preceding and following week. Moving the source workout
+                // removes its contribution to neighboring-day counts.
+                func adjacentWorkouts(_ dayIndex: Int) -> Int {
+                    let absoluteDay = offset * 7 + dayIndex - 1
+                    return [absoluteDay - 1, absoluteDay + 1].reduce(0) {
+                        count, neighbor in
+                        guard neighbor >= 0 else { return count }
+                        let weekIndex = neighbor / 7
+                        let neighborDayIndex = neighbor % 7 + 1
+                        guard plan.weeks.indices.contains(weekIndex),
+                              let neighborDay = plan.weeks[weekIndex].days.first(where: {
+                                  $0.dayIndex == neighborDayIndex
+                              }) else { return count }
+                        return count + neighborDay.sessions.filter {
+                            $0.id != workout.id
+                        }.count
                     }
+                }
+                let ranked = eligible.sorted { lhs, rhs in
                     let left = adjacentWorkouts(lhs.dayIndex)
                     let right = adjacentWorkouts(rhs.dayIndex)
                     return left == right
