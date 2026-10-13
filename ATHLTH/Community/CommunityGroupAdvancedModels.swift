@@ -43,7 +43,18 @@ enum CommunityGroupContentStatus:
     var id: String { rawValue }
 
     var title: String {
-        rawValue.capitalized
+        switch self {
+        case .draft:
+            ATHLTHLocalization.choose(english: "Draft", norwegian: "Utkast")
+        case .upcoming:
+            ATHLTHLocalization.choose(english: "Upcoming", norwegian: "Kommende")
+        case .live:
+            ATHLTHLocalization.choose(english: "Live", norwegian: "Pågår")
+        case .completed:
+            ATHLTHLocalization.choose(english: "Completed", norwegian: "Fullført")
+        case .cancelled:
+            ATHLTHLocalization.choose(english: "Cancelled", norwegian: "Avlyst")
+        }
     }
 }
 
