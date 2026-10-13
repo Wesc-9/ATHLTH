@@ -48,10 +48,6 @@ struct CommunityGroupEventDetailView: View {
                         kind: .event,
                         groupName: group.name
                     )
-                    ATHLTHCommunityContextRibbon(
-                        kind: .challenge,
-                        groupName: group.name
-                    )
                     cover
                     titleBlock
                     organizerCard
@@ -903,6 +899,10 @@ struct CommunityGroupChallengeDetailView: View {
 
             ScrollView {
                 LazyVStack(spacing: 16) {
+                    ATHLTHCommunityContextRibbon(
+                        kind: .challenge,
+                        groupName: group.name
+                    )
                     cover
                     titleBlock
                     organizerCard
