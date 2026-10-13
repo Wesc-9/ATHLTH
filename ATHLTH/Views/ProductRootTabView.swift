@@ -1687,7 +1687,7 @@ struct ATHLTHHomeView: View {
     }
 
     private let homeGoalCalendarContentMinHeight: CGFloat = 82
-    private let homeGoalThumbnailHeight: CGFloat = 74
+    private let homeGoalThumbnailHeight: CGFloat = 58
 
     @ViewBuilder
     private var homeGoalAndCalendarRow:
@@ -1796,7 +1796,7 @@ struct ATHLTHHomeView: View {
                         showsDecorativeSymbol: false
                     )
                     .frame(
-                        width: 68,
+                        width: 76,
                         height:
                             homeGoalThumbnailHeight
                     )
