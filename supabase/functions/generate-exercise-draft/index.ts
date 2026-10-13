@@ -1,5 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
-import { enforceAIRequestBudget } from "../_shared/ai-request-budget.ts";
+import { enforceAIRequestBudget } from "./_shared/ai-request-budget.ts";
 
 const allowedMuscles = ["Chest","Back","Shoulders","Biceps","Triceps","Forearms","Core","Glutes","Quads","Hamstrings","Calves"];
 const cors = {
