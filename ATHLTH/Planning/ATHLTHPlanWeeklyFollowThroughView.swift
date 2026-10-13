@@ -245,7 +245,8 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                             HStack(alignment: .top, spacing: 10) {
                                 Text(
                                     currentPlan.startDate.flatMap { start in
-                                        calendar.date(
+                                        guard (1...7).contains(day.dayIndex) else { return nil }
+                                        return calendar.date(
                                             byAdding: .day,
                                             value: currentWeekIndex * 7 + day.dayIndex - 1,
                                             to: calendar.startOfDay(for: start)
@@ -271,7 +272,8 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                             strengthHistory: strength.workoutHistory
                                         )
                                         let dayDate = currentPlan.startDate.flatMap { start in
-                                            calendar.date(
+                                            guard (1...7).contains(day.dayIndex) else { return nil }
+                                            return calendar.date(
                                                 byAdding: .day,
                                                 value: currentWeekIndex * 7 + day.dayIndex - 1,
                                                 to: calendar.startOfDay(for: start)
