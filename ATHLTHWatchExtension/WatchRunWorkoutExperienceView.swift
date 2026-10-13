@@ -3661,8 +3661,8 @@ struct WatchRunWorkoutExperienceView: View {
                         HStack {
                             Label(
                                 ATHLTHLocalization.choose(
-                                    english: "Voice & style",
-                                    norwegian: "Stemme og talemåte"
+                                    english: "Audio Coach settings",
+                                    norwegian: "Audio Coach-innstillinger"
                                 ),
                                 systemImage: "slider.horizontal.3"
                             )

@@ -144,7 +144,7 @@ final class AudioCoachContentLevelTests: XCTestCase {
         original.useAcknowledgedVoiceLease = true
 
         for preset in ATHLTHCoachExperiencePreset.allCases {
-            for kind: WatchWorkoutKind in [.running, .walking, .strength, .hiit] {
+            for kind in [WatchWorkoutKind.running, .walking, .strength, .hiit] {
                 let updated = preset.applying(to: original, kind: kind)
                 XCTAssertTrue(updated.enabled)
                 XCTAssertTrue(preset.matches(updated, kind: kind))

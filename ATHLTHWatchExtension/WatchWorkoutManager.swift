@@ -369,8 +369,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     func updateAudioCoachDuringWorkout(
         _ configuration: WatchAudioCoachConfiguration
     ) {
-        let wasEnabled =
-            audioCoachConfiguration.enabled
+        let wasEnabled = audioCoachConfiguration.enabled
+        let priorStatusInterval = wasEnabled
+            ? audioCoachConfiguration.strengthStatusIntervalSeconds
+            : nil
 
         publish {
             self.audioCoachConfiguration = configuration
@@ -397,6 +399,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         } else {
             if !wasEnabled {
                 audioCoachReadyAnnouncedForWorkout = false
+            }
+            if kind == .strength {
+                let updatedInterval = configuration.strengthStatusIntervalSeconds
+                if !wasEnabled || priorStatusInterval != updatedInterval {
+                    strengthStatusCoachTask?.cancel()
+                    strengthStatusCoachTask = nil
+                    scheduleStrengthStatusCoach()
+                }
             }
             announceAudioCoachReadyIfNeeded()
         }
@@ -1615,6 +1625,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
                     guard !Task.isCancelled,
                           self.kind == .strength,
+                          self.audioCoachConfiguration.enabled,
+                          self.audioCoachConfiguration.strengthStatusIntervalSeconds == interval,
                           let snapshot =
                             self.strengthSession
                     else {
