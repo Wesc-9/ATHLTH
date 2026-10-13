@@ -1,6 +1,5 @@
 import CryptoKit
 import Foundation
-import Supabase
 
 enum ExerciseMuscleGroup: String, CaseIterable, Identifiable, Hashable {
     case chest = "Chest"
@@ -76,6 +75,7 @@ enum ExerciseMuscleGroup: String, CaseIterable, Identifiable, Hashable {
 final class ExerciseLibraryStore: ObservableObject {
     @Published private(set) var athlthCatalogExercises:
         [ExerciseLibraryEntry] =
+            ExerciseLibraryStore.nativeATHLTHExercises +
             ExerciseLibraryStore.fallbackATHLTHExercises
     @Published private(set) var repDBExercises: [ExerciseLibraryEntry] = []
     @Published private(set) var repDBExpectedCount: Int?
@@ -84,12 +84,9 @@ final class ExerciseLibraryStore: ObservableObject {
     @Published private(set) var lastUpdated: Date?
     @Published var errorMessage: String?
 
-    private let datasetURL = URL(string: "https://exercise-dataset.com/exercises.json")!
     private let imageBaseURL = URL(string: "https://exercise-dataset.com/")!
-    private let client: SupabaseClient = SupabaseEnvironment.client
 
     private var accountID: UUID?
-    private var lastATHLTHCatalogRefreshAt: Date?
     private var cachedAllExercises: [ExerciseLibraryEntry]?
     private var cachedBodyParts: [String]?
     private var cachedEquipmentOptions: [String]?
@@ -452,53 +449,10 @@ final class ExerciseLibraryStore: ObservableObject {
         cachedEquipmentOptions = nil
     }
 
+    /// Bundled exercises are available immediately and require no network connection.
+    /// The existing cached third-party catalog is read only to resolve old IDs.
     func refresh(force: Bool = false) async {
-        await refreshATHLTHCatalog(
-            force: force
-        )
-
-        if !force,
-           !repDBExercises.isEmpty,
-           let lastUpdated,
-           Date().timeIntervalSince(lastUpdated) < 7 * 24 * 3_600 {
-            return
-        }
-
-        guard !isLoading else { return }
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
-
-        do {
-            var request = URLRequest(url: datasetURL)
-            request.timeoutInterval = 30
-            request.cachePolicy = force ? .reloadIgnoringLocalCacheData : .returnCacheDataElseLoad
-
-            let (data, response) = try await URLSession.shared.data(for: request)
-
-            if let http = response as? HTTPURLResponse,
-               !(200..<300).contains(http.statusCode) {
-                throw ExerciseLibraryError.httpStatus(http.statusCode)
-            }
-
-            let dataset = try JSONDecoder().decode(
-                RepDBDataset.self,
-                from: data
-            )
-
-            let mapped = dataset.exercises.map(mapRepDB)
-            repDBExpectedCount = dataset.count ?? mapped.count
-            repDBExercises = mapped
-            invalidateDerivedCaches()
-            lastUpdated = Date()
-            persistRepDBCache(data)
-        } catch {
-            errorMessage = error.localizedDescription
-
-            if repDBExercises.isEmpty {
-                loadCachedRepDB()
-            }
-        }
+        _ = force
     }
 
     func search(
@@ -655,95 +609,6 @@ final class ExerciseLibraryStore: ObservableObject {
         persistCustomExercises()
     }
 
-
-    private func refreshATHLTHCatalog(
-        force: Bool = false
-    ) async {
-        if !force,
-           !athlthCatalogExercises.isEmpty,
-           let lastATHLTHCatalogRefreshAt,
-           Date().timeIntervalSince(
-                lastATHLTHCatalogRefreshAt
-           ) < 30 * 60 {
-            return
-        }
-
-        do {
-            let rows: [ATHLTHExerciseCatalogRecord] =
-                try await client
-                    .from("exercise_catalog")
-                    .select(
-                        "id,slug,name,summary,instructions,primary_muscles,secondary_muscles,equipment,category,difficulty,source_label,source_url,sort_order"
-                    )
-                    .eq("is_published", value: true)
-                    .order("sort_order", ascending: true)
-                    .execute()
-                    .value
-
-            lastATHLTHCatalogRefreshAt =
-                Date()
-
-            if !rows.isEmpty {
-                let refreshed = rows
-                    .filter { !Self.isRetiredOriginalCoreSlug($0.slug) }
-                    .map(mapATHLTHCatalog)
-
-                let currentSignature =
-                    athlthCatalogExercises.map {
-                        "\($0.id.uuidString)|\($0.name)|\($0.exercise.primaryMuscles.joined(separator: ","))|\($0.exercise.secondaryMuscles.joined(separator: ","))"
-                    }
-                let refreshedSignature =
-                    refreshed.map {
-                        "\($0.id.uuidString)|\($0.name)|\($0.exercise.primaryMuscles.joined(separator: ","))|\($0.exercise.secondaryMuscles.joined(separator: ","))"
-                    }
-
-                if currentSignature !=
-                    refreshedSignature {
-                    athlthCatalogExercises =
-                        refreshed
-                    invalidateDerivedCaches()
-                }
-            }
-        } catch {
-            if athlthCatalogExercises.isEmpty {
-                athlthCatalogExercises =
-                    Self.fallbackATHLTHExercises
-                invalidateDerivedCaches()
-            }
-        }
-    }
-
-    private func mapATHLTHCatalog(
-        _ source: ATHLTHExerciseCatalogRecord
-    ) -> ExerciseLibraryEntry {
-        let exercise = Exercise(
-            id: source.id,
-            origin: .publicCatalog,
-            ownerID: nil,
-            name: source.name,
-            instructions: source.instructions,
-            primaryMuscles: source.primaryMuscles,
-            secondaryMuscles: source.secondaryMuscles,
-            equipment: source.equipment,
-            imageURL: nil,
-            isVisibleOutsideOwnerLibrary: true,
-            videoURL: nil
-        )
-
-        return ExerciseLibraryEntry(
-            id: source.id,
-            exercise: exercise,
-            source: .athlthCatalog,
-            sourceIdentifier: source.slug,
-            summary: source.summary,
-            tips: [],
-            category: source.category,
-            difficulty: source.difficulty,
-            bodyPart: source.primaryMuscles.first,
-            imageStartURL: nil,
-            imagePeakURL: nil
-        )
-    }
 
     private func mapRepDB(_ source: RepDBExercise) -> ExerciseLibraryEntry {
         let startURL = source.images?.flat?.start
@@ -1379,38 +1244,6 @@ enum ExerciseLibraryError: LocalizedError {
     }
 }
 
-
-private struct ATHLTHExerciseCatalogRecord: Decodable {
-    let id: UUID
-    let slug: String
-    let name: String
-    let summary: String
-    let instructions: [String]
-    let primaryMuscles: [String]
-    let secondaryMuscles: [String]
-    let equipment: [String]
-    let category: String
-    let difficulty: String
-    let sourceLabel: String?
-    let sourceURL: String?
-    let sortOrder: Int
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case slug
-        case name
-        case summary
-        case instructions
-        case primaryMuscles = "primary_muscles"
-        case secondaryMuscles = "secondary_muscles"
-        case equipment
-        case category
-        case difficulty
-        case sourceLabel = "source_label"
-        case sourceURL = "source_url"
-        case sortOrder = "sort_order"
-    }
-}
 
 private struct RepDBDataset: Decodable {
     let count: Int?
