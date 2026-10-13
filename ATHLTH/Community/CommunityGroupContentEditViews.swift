@@ -349,7 +349,10 @@ struct CommunityGroupChallengeEditView: View {
     }
 
     private var rulesLocked: Bool {
-        Date() >= challenge.startsAt
+        !ATHLTHCommunityChallengeEditingPolicy.canEdit(
+            status: challenge.resolvedStatus,
+            startsAt: challenge.startsAt
+        )
     }
 
     private var targetValue: Double? {
@@ -548,6 +551,14 @@ struct CommunityGroupChallengeEditView: View {
     }
 
     private func save() {
+        guard !rulesLocked else {
+            saveError = ATHLTHLocalization.choose(
+                english: "The challenge has started. Its rules can no longer be edited.",
+                norwegian: "Utfordringen har startet. Reglene kan ikke endres lenger."
+            )
+            return
+        }
+
         guard let targetValue,
               targetValue > 0
         else {
