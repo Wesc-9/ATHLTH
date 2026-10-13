@@ -975,43 +975,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                             planDayDate(day.dayIndex, plan: plan),
                             inSameDayAs: Date()
                         )
-                        if !completed && !skipped &&
-                           (workout.isStructuredWorkout ||
-                            workout.kind == .running ||
-                            workout.kind == .walking ||
-                            workout.kind == .strength),
-                           let onStartWorkout {
-                            Button {
-                                // Re-resolve before launch; this card may be
-                                // showing a snapshot from an earlier plan edit.
-                                guard let current = session.trainingPlan(withID: plan.id)?
-                                    .weeks.flatMap(\.days).flatMap(\.sessions)
-                                    .first(where: { $0.id == workout.id }),
-                                      !session.isPlanSessionSkipped(
-                                        planID: plan.id, sessionID: current.id
-                                      ),
-                                      !session.isPlanSessionCompleted(
-                                        planID: plan.id,
-                                        sessionID: current.id,
-                                        healthWorkouts: health.workouts,
-                                        strengthHistory: strength.workoutHistory
-                                      )
-                                else { return }
-                                onStartWorkout(plan.id, current)
-                            } label: {
-                                Label(tr("Start workout", "Start økt"),
-                                      systemImage: "play.fill")
-                                    .font(.subheadline.weight(.semibold))
-                                    .frame(maxWidth: .infinity, minHeight: 48)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(graphite)
-                            .controlSize(.regular)
-                            .accessibilityHint(tr(
-                                "Open the existing workout launcher",
-                                "Åpner den vanlige oppstarten av treningsøkter"
-                            ))
-                        }
+                        VStack(spacing: 0) {
                         Button {
                             openingWorkoutPlanID = plan.id
                             openingWorkout = workout
@@ -1070,19 +1034,66 @@ struct ATHLTHTrainPlanPremiumView: View {
                             }
                             .padding(16)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(
-                                isToday ? soft : Color.white.opacity(0.94),
-                                in: RoundedRectangle(cornerRadius: 16)
-                            )
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 16)
-                                    .strokeBorder(
-                                        isToday ? warmGold.opacity(0.30) : line.opacity(0.70),
-                                        lineWidth: 1
-                                    )
-                            }
                         }
                         .buttonStyle(.plain)
+                            if !completed && !skipped &&
+                               (workout.isStructuredWorkout ||
+                                workout.kind == .running ||
+                                workout.kind == .walking ||
+                                workout.kind == .strength),
+                               let onStartWorkout {
+                                Divider()
+                                    .overlay(line.opacity(0.55))
+                                    .padding(.horizontal, 16)
+                                Button {
+                                    guard let current = session.trainingPlan(withID: plan.id)?
+                                        .weeks.flatMap(\.days).flatMap(\.sessions)
+                                        .first(where: { $0.id == workout.id }),
+                                          !session.isPlanSessionSkipped(
+                                            planID: plan.id, sessionID: current.id
+                                          ),
+                                          !session.isPlanSessionCompleted(
+                                            planID: plan.id,
+                                            sessionID: current.id,
+                                            healthWorkouts: health.workouts,
+                                            strengthHistory: strength.workoutHistory
+                                          )
+                                    else { return }
+                                    onStartWorkout(plan.id, current)
+                                } label: {
+                                    HStack(spacing: 9) {
+                                        Image(systemName: "play.fill")
+                                            .font(.caption)
+                                        Text(tr("Start workout", "Start økt"))
+                                            .font(.subheadline.weight(.semibold))
+                                        Spacer()
+                                        Image(systemName: "arrow.up.right")
+                                            .font(.caption)
+                                    }
+                                    .foregroundStyle(graphite)
+                                    .padding(.horizontal, 18)
+                                    .frame(minHeight: 49)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityHint(tr(
+                                    "Open the existing workout launcher",
+                                    "Åpner den vanlige oppstarten av treningsøkter"
+                                ))
+                            }
+                        }
+                        .background(
+                            isToday ? soft : Color.white.opacity(0.94),
+                            in: RoundedRectangle(cornerRadius: 18)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 18)
+                                .strokeBorder(
+                                    isToday ? warmGold.opacity(0.32) : line.opacity(0.70),
+                                    lineWidth: 1
+                                )
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
                         .contextMenu {
                             if !completed &&
                                 !workout.isStructuredWorkout &&
