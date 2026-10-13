@@ -1818,7 +1818,7 @@ struct OfficialWeeklyChallengeCard: View {
                     )
                     .font(.system(size: 10, weight: .bold))
                     .tracking(1.0)
-                    .foregroundStyle(Color.orange.opacity(0.92))
+                    .foregroundStyle(ATHLTHPlanDesign.accent)
                     .padding(.horizontal, 11)
                     .frame(height: 29)
                     .background(
@@ -1862,8 +1862,8 @@ struct OfficialWeeklyChallengeCard: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(challenge.title)
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .font(.system(size: 24, weight: .regular, design: .serif))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
                         .lineLimit(2)
                         .minimumScaleFactor(0.78)
 
@@ -1910,25 +1910,25 @@ struct OfficialWeeklyChallengeCard: View {
         .frame(maxWidth: .infinity)
         .clipShape(
             RoundedRectangle(
-                cornerRadius: 24,
+                cornerRadius: ATHLTHPlanDesign.cardRadius,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 24,
+                cornerRadius: ATHLTHPlanDesign.cardRadius,
                 style: .continuous
             )
-            .stroke(Color.white.opacity(0.55), lineWidth: 0.8)
+            .stroke(ATHLTHPlanDesign.outline, lineWidth: 0.8)
         }
         .shadow(
-            color: ATHLTHTheme.accentDeep.opacity(0.08),
-            radius: 14,
-            y: 7
+            color: ATHLTHTheme.accentDeep.opacity(0.045),
+            radius: 9,
+            y: 4
         )
         .contentShape(
             RoundedRectangle(
-                cornerRadius: 24,
+                cornerRadius: ATHLTHPlanDesign.cardRadius,
                 style: .continuous
             )
         )
@@ -2049,19 +2049,11 @@ struct OfficialWeeklyChallengeDetailView: View {
                         .padding(.top, 10)
                         .padding(.bottom, 32)
                     }
-                    .background(
-                    LinearGradient(
-                        colors: [
-                            ATHLTHTheme.canvasTop,
-                            ATHLTHTheme.surfaceStone.opacity(0.70),
-                            ATHLTHTheme.canvasBottom
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .ignoresSafeArea()
-                )
-                .navigationTitle("Weekly Challenge")
+                    .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+                .navigationTitle(ATHLTHLocalization.choose(
+                    english: "Weekly Challenge",
+                    norwegian: "Ukens utfordring"
+                ))
                 .navigationBarTitleDisplayMode(.inline)
                     .task(id: health.workouts.map(\.id)) {
                         await store.ensureParticipation(for: challenge)
@@ -2701,7 +2693,7 @@ struct OfficialWeeklyChallengeDetailView: View {
     private func progressSection(
         _ challenge: OfficialWeeklyChallenge
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Your progress")
@@ -2749,7 +2741,7 @@ struct OfficialWeeklyChallengeDetailView: View {
 
         return Group {
             if !rows.isEmpty {
-                ATHLTHCard {
+                ATHLTHPlanSurface {
                     HStack(alignment: .firstTextBaseline) {
                         VStack(alignment: .leading, spacing: 3) {
                             Text("Friends in this challenge")
@@ -2911,7 +2903,7 @@ struct OfficialWeeklyChallengeDetailView: View {
     private func leaderboardSection(
         _ challenge: OfficialWeeklyChallenge
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Leaderboard")
@@ -3035,7 +3027,7 @@ struct OfficialWeeklyChallengeDetailView: View {
     }
 
     private var countedWorkoutsSection: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Counted workouts")
@@ -3084,7 +3076,7 @@ struct OfficialWeeklyChallengeDetailView: View {
     private func rulesSection(
         _ challenge: OfficialWeeklyChallenge
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             Text("How it works")
                 .font(.title3.bold())
 
