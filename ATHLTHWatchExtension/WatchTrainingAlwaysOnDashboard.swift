@@ -373,7 +373,8 @@ struct WatchTrainingAlwaysOnDashboard: View {
 
             Spacer(minLength: 0)
             if workout.kind == .running,
-               workout.liveSurfaceContext.liveGhost != nil {
+               (workout.liveSurfaceContext.liveGhost != nil ||
+                workout.ghostRaceTitle != nil) {
                 alwaysOnGhostStatus
             }
             footer()
@@ -506,13 +507,26 @@ struct WatchTrainingAlwaysOnDashboard: View {
                     workout.automaticPauseActive,
                 now: timeline.date
             )
+            let isRecordedGhost = ghost == nil && workout.ghostRaceTitle != nil
+            let paused = workout.state == .paused || workout.automaticPauseActive
+            let recordedFresh: Bool = {
+                guard isRecordedGhost, !paused,
+                      let updated = workout.ghostComparisonUpdatedAt else {
+                    return false
+                }
+                return (-5...25).contains(timeline.date.timeIntervalSince(updated))
+            }()
+            let isLive = isRecordedGhost ? recordedFresh : signal == .live
+            let delta = isRecordedGhost
+                ? workout.ghostDistanceDeltaMeters
+                : ghost?.distanceDeltaMeters
             HStack(spacing: 5) {
-                Image(systemName: signal == .live
+                Image(systemName: isLive
                       ? "figure.run" : "wifi.exclamationmark")
                 .font(.system(size: 9, weight: .semibold))
 
-                if signal == .live,
-                   let delta = ghost?.distanceDeltaMeters,
+                if isLive,
+                   let delta,
                    delta.isFinite {
                     Text(abs(delta) < 8
                         ? ATHLTHLocalization.choose(
@@ -528,7 +542,7 @@ struct WatchTrainingAlwaysOnDashboard: View {
                     Text("\(Int(abs(delta).rounded())) m")
                         .monospacedDigit()
                 } else {
-                    Text(signal == .paused
+                    Text(paused
                         ? ATHLTHLocalization.choose(
                             english: "GHOST PAUSED", norwegian: "GHOST PAUSE"
                           )
@@ -539,7 +553,7 @@ struct WatchTrainingAlwaysOnDashboard: View {
                 Spacer(minLength: 0)
             }
             .font(.system(size: 9, weight: .bold))
-            .foregroundStyle(signal == .live ? accent : secondary)
+            .foregroundStyle(isLive ? accent : secondary)
             .lineLimit(1)
             .minimumScaleFactor(0.78)
         }
