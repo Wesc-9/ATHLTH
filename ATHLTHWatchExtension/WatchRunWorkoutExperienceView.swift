@@ -1876,7 +1876,9 @@ struct WatchRunWorkoutExperienceView: View {
                     )
 
                     liveHeroMetric(
-                        title: livePaceIsAverage ? "AVG PACE" : "PACE",
+                        title: livePaceIsAverage
+                            ? ATHLTHLocalization.choose(english: "AVG PACE", norwegian: "SNITTEMPO")
+                            : ATHLTHLocalization.choose(english: "PACE", norwegian: "TEMPO"),
                         value: paceText(liveDisplayedPace),
                         unit: "/km",
                         tint: WatchTheme.liveLime,
@@ -1885,7 +1887,9 @@ struct WatchRunWorkoutExperienceView: View {
                 } else {
                     // Running: pace first, then distance.
                     liveHeroMetric(
-                        title: livePaceIsAverage ? "AVG PACE" : "PACE",
+                        title: livePaceIsAverage
+                            ? ATHLTHLocalization.choose(english: "AVG PACE", norwegian: "SNITTEMPO")
+                            : ATHLTHLocalization.choose(english: "PACE", norwegian: "TEMPO"),
                         value: paceText(liveDisplayedPace),
                         unit: "/km",
                         tint: WatchTheme.liveLime,
@@ -2354,7 +2358,7 @@ struct WatchRunWorkoutExperienceView: View {
             )
 
             VStack(spacing: 4) {
-                Text("Average pace")
+                Text(ATHLTHLocalization.choose(english: "Average pace", norwegian: "Snittempo"))
                     .font(
                         .system(
                             size: 9,
