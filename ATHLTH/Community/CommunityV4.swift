@@ -2042,6 +2042,9 @@ private struct CommunityDiscoveryView: View {
     @EnvironmentObject private var session:
         AppSessionStore
 
+    @State private var searchText = ""
+    @State private var selectedCategory: ATHLTHCommunityDiscoveryCategory = .all
+
     private var publicGroups:
         [CommunityGroupRecord] {
         groups.groups
@@ -2051,7 +2054,11 @@ private struct CommunityDiscoveryView: View {
                     .contains($0.id) &&
                 groups.pendingInvite(
                     for: $0.id
-                ) == nil
+                ) == nil &&
+                ATHLTHCommunityDiscoveryPolicy.matches(
+                    searchText,
+                    in: [$0.name, $0.summary, $0.locationName]
+                )
             }
             .sorted {
                 $0.createdAt >
@@ -2075,7 +2082,11 @@ private struct CommunityDiscoveryView: View {
                 !item.participantRows.contains {
                     $0.userID ==
                         session.profile.userID
-                }
+                } &&
+                ATHLTHCommunityDiscoveryPolicy.matches(
+                    searchText,
+                    in: [item.event.title, item.event.summary, item.event.meetingName]
+                )
         }
     }
 
@@ -2096,7 +2107,11 @@ private struct CommunityDiscoveryView: View {
                 .contains {
                     $0.userID ==
                         session.profile.userID
-                }
+                } &&
+                ATHLTHCommunityDiscoveryPolicy.matches(
+                    searchText,
+                    in: [challenge.title]
+                )
         }
     }
 
@@ -2115,7 +2130,9 @@ private struct CommunityDiscoveryView: View {
                     spacing: 22
                 ) {
                     discoveryHeader
+                    discoveryFilters
 
+                    if selectedCategory == .all || selectedCategory == .clubs {
                     discoverySection(
                         title:
                             ATHLTHLocalization.choose(
@@ -2167,6 +2184,9 @@ private struct CommunityDiscoveryView: View {
                         }
                     }
 
+                    }
+
+                    if selectedCategory == .all || selectedCategory == .events {
                     discoverySection(
                         title:
                             ATHLTHLocalization.choose(
@@ -2219,6 +2239,9 @@ private struct CommunityDiscoveryView: View {
                         }
                     }
 
+                    }
+
+                    if selectedCategory == .all || selectedCategory == .challenges {
                     discoverySection(
                         title:
                             ATHLTHLocalization.choose(
@@ -2271,6 +2294,7 @@ private struct CommunityDiscoveryView: View {
                             }
                         }
                     }
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
@@ -2280,10 +2304,72 @@ private struct CommunityDiscoveryView: View {
             }
             .scrollIndicators(.hidden)
         }
-        .navigationTitle("Discovery")
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Explore", norwegian: "Utforsk"
+        ))
         .navigationBarTitleDisplayMode(.inline)
         .refreshable {
             await refreshDiscovery()
+        }
+    }
+
+    private var discoveryFilters: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 9) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                TextField(
+                    ATHLTHLocalization.choose(
+                        english: "Search clubs, events or challenges",
+                        norwegian: "Søk i klubber, arrangementer og utfordringer"
+                    ),
+                    text: $searchText
+                )
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Clear search", norwegian: "Tøm søk"
+                    ))
+                }
+            }
+            .padding(13)
+            .background(Color.white, in: RoundedRectangle(cornerRadius: 15))
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(ATHLTHCommunityDiscoveryCategory.allCases) { category in
+                        Button {
+                            selectedCategory = category
+                        } label: {
+                            Label(category.localizedTitle, systemImage: category.symbol)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(
+                                    selectedCategory == category
+                                        ? Color.white : ATHLTHPlanDesign.ink
+                                )
+                                .padding(.horizontal, 13)
+                                .frame(minHeight: 42)
+                                .background(
+                                    selectedCategory == category
+                                        ? ATHLTHPlanDesign.ink : Color.white,
+                                    in: Capsule()
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(
+                            selectedCategory == category ? .isSelected : []
+                        )
+                    }
+                }
+            }
         }
     }
 
