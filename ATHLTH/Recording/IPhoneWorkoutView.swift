@@ -3075,7 +3075,6 @@ private struct IPhoneAudioCoachLiveSheet: View {
     private var selectedExperience: ATHLTHCoachExperiencePreset? {
         ATHLTHCoachExperiencePreset.allCases.first { preset in
             ATHLTHCoachContentLevel.matching(configuration) == preset.contentLevel
-                && (configuration.speechStyle ?? .balanced) == preset.speechStyle
                 && configuration.timeIntervalSeconds == nil
                 && abs((configuration.distanceIntervalMeters ?? -1)
                     - preset.distanceIntervalKilometers * 1_000) < 0.01
@@ -3296,7 +3295,6 @@ private struct IPhoneAudioCoachLiveSheet: View {
                                             Button {
                                                 update { value in
                                                     value = preset.contentLevel.applying(to: value)
-                                                    value.speechStyle = preset.speechStyle
                                                     value.distanceIntervalMeters =
                                                         preset.distanceIntervalKilometers * 1_000
                                                     value.timeIntervalSeconds = nil

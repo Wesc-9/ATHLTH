@@ -112,6 +112,7 @@ final class AudioCoachContentLevelTests: XCTestCase {
             draft.speechVolume = 0.7
             draft.duckOtherAudio = false
             draft.timeTriggerEnabled = true
+            draft.speechStyle = .motivating
 
             draft.applyExperience(preset)
 
@@ -123,7 +124,7 @@ final class AudioCoachContentLevelTests: XCTestCase {
                 preset.distanceIntervalKilometers
             )
             XCTAssertEqual(draft.experiencePreset, preset)
-            XCTAssertEqual(draft.speechStyle, preset.speechStyle)
+            XCTAssertEqual(draft.speechStyle, .motivating)
             XCTAssertEqual(draft.voiceIdentifier, "my-favorite-voice")
             XCTAssertEqual(draft.language, .norwegian)
             XCTAssertEqual(draft.speechRate, 0.55)
@@ -142,12 +143,14 @@ final class AudioCoachContentLevelTests: XCTestCase {
         original.duckOtherAudio = false
         original.preferIPhoneAudioWhenReachable = true
         original.useAcknowledgedVoiceLease = true
+        original.speechStyle = .technical
 
         for preset in ATHLTHCoachExperiencePreset.allCases {
             for kind in [WatchWorkoutKind.running, .walking, .strength, .hiit] {
                 let updated = preset.applying(to: original, kind: kind)
                 XCTAssertTrue(updated.enabled)
                 XCTAssertTrue(preset.matches(updated, kind: kind))
+                XCTAssertEqual(updated.speechStyle, .technical)
                 XCTAssertEqual(updated.language, .norwegian)
                 XCTAssertEqual(updated.voiceIdentifier, "chosen-voice")
                 XCTAssertEqual(updated.speechRate, 0.55)

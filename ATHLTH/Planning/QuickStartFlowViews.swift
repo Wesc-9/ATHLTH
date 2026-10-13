@@ -120,7 +120,6 @@ struct AudioCoachDraft {
         guard enabled else { return nil }
         return ATHLTHCoachExperiencePreset.allCases.first { preset in
             ATHLTHCoachContentLevel.matching(configuration()) == preset.contentLevel
-                && speechStyle == preset.speechStyle
                 && distanceTriggerEnabled
                 && !timeTriggerEnabled
                 && abs(distanceIntervalKilometers - preset.distanceIntervalKilometers) < 0.001
@@ -146,7 +145,6 @@ struct AudioCoachDraft {
         distanceTriggerEnabled = true
         timeTriggerEnabled = false
         distanceIntervalKilometers = preset.distanceIntervalKilometers
-        speechStyle = preset.speechStyle
     }
 
     @MainActor

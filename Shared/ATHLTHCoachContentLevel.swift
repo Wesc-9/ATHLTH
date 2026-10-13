@@ -203,7 +203,7 @@ extension ATHLTHCoachExperiencePreset {
             }
         }
         value.enabled = true
-        value.speechStyle = speechStyle
+        // Speaking personality is independent of guidance frequency.
         return value
     }
 
@@ -211,9 +211,7 @@ extension ATHLTHCoachExperiencePreset {
         _ configuration: WatchAudioCoachConfiguration,
         kind: WatchWorkoutKind
     ) -> Bool {
-        guard configuration.enabled,
-              (configuration.speechStyle ?? .balanced) == speechStyle
-        else { return false }
+        guard configuration.enabled else { return false }
 
         let expected = applying(to: configuration, kind: kind)
         if kind == .strength {

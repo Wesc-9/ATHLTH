@@ -1826,7 +1826,6 @@ private struct StrengthAudioCoachSettingsView: View {
                 && configuration.shouldAnnounceNextSetDetails == expected.shouldAnnounceNextSetDetails
                 && configuration.shouldAnnounceExerciseProgress == expected.shouldAnnounceExerciseProgress
                 && configuration.announceWorkoutStatus == expected.announceWorkoutStatus
-                && (configuration.speechStyle ?? .balanced) == expected.speechStyle
         }
     }
 
@@ -1839,7 +1838,6 @@ private struct StrengthAudioCoachSettingsView: View {
     ) -> StrengthAudioCoachConfiguration {
         var value = configuration
         value.enabled = true
-        value.speechStyle = preset.speechStyle
         value.announceRestComplete = true
         value.announceNextExercise = true
         switch preset {
