@@ -18,6 +18,11 @@ enum ATHLTHPlanWeeklyFollowThrough {
         let pastCompleted: Int
         let firstReviewDayID: UUID?
 
+        var pastCompletionPercent: Int? {
+            guard pastDated > 0 else { return nil }
+            return Int((Double(pastCompleted) / Double(pastDated) * 100).rounded())
+        }
+
         var planned: Int {
             completed + skipped + upcoming + needsReview + unknownDate
         }
@@ -46,6 +51,23 @@ enum ATHLTHPlanWeeklyFollowThrough {
             return Int((Double(pastConfirmed) / Double(pastDated) * 100).rounded())
         }
         var total: Int { weeks.reduce(0) { $0 + $1.planned } }
+
+        /// Compare only complete historical weeks. Current/partial weeks and
+        /// undated sessions are excluded to avoid misleading trends.
+        var completedWeekTrend: (previous: Week, latest: Week, delta: Int)? {
+            let eligible = weeks.filter {
+                $0.pastDated > 0 && $0.upcoming == 0 && $0.unknownDate == 0
+                && $0.pastDated == $0.planned
+            }
+            guard eligible.count >= 2,
+                  let latest = eligible.last,
+                  let previous = eligible.dropLast().last,
+                  let latestPercent = latest.pastCompletionPercent,
+                  let previousPercent = previous.pastCompletionPercent else {
+                return nil
+            }
+            return (previous, latest, latestPercent - previousPercent)
+        }
 
         /// Lead with weeks needing review, then the nearest upcoming weeks.
         /// Older fully settled weeks remain accessible when expanded.

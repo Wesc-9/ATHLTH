@@ -191,6 +191,36 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
     }
 
     @MainActor
+    func testTrendRequiresTwoFullyPastWeeks() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 3)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let first = workout()
+        let second = workout()
+        let current = workout()
+        store.addSession(first, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(second, toDay: plan.weeks[1].days[0].id, inPlan: plan.id)
+        store.addSession(current, toDay: plan.weeks[2].days[0].id, inPlan: plan.id)
+        store.setPlanSessionManuallyCompleted(
+            planID: plan.id, sessionID: second.id, completed: true
+        )
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let partial = Calendar.current.date(byAdding: .day, value: 7, to: plan.startDate!)!
+        let before = ATHLTHPlanWeeklyFollowThrough.inspect(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: partial
+        )
+        XCTAssertNil(before.completedWeekTrend)
+        let later = Calendar.current.date(byAdding: .day, value: 14, to: plan.startDate!)!
+        let after = ATHLTHPlanWeeklyFollowThrough.inspect(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: later
+        )
+        XCTAssertEqual(after.completedWeekTrend?.previous.number, 1)
+        XCTAssertEqual(after.completedWeekTrend?.latest.number, 2)
+        XCTAssertEqual(after.completedWeekTrend?.delta, 100)
+    }
+
+    @MainActor
     func testDuplicateIdentitiesAreCountedOnlyOnce() throws {
         let (store, defaults, suite, plan) = try prepared(weekCount: 1)
         defer { defaults.removePersistentDomain(forName: suite) }

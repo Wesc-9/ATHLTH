@@ -106,6 +106,19 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                         .fixedSize(horizontal: false, vertical: true)
                     }
 
+                    if let trend = report.completedWeekTrend {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Completed weeks W\(trend.previous.number) → W\(trend.latest.number): \(trend.delta > 0 ? "+" : "")\(trend.delta) percentage points in completion. This describes recorded outcomes, not fitness progress.",
+                                norwegian: "Avsluttede uker U\(trend.previous.number) → U\(trend.latest.number): \(trend.delta > 0 ? "+" : "")\(trend.delta) prosentpoeng i gjennomføring. Dette viser registrerte resultater, ikke formutvikling."
+                            ),
+                            systemImage: "chart.line.uptrend.xyaxis"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+
                     if report.pastDated > 0 {
                         Label(
                             ATHLTHLocalization.choose(
