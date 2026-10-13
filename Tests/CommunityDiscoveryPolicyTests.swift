@@ -53,3 +53,19 @@ final class CommunityRefreshPolicyTests: XCTestCase {
         XCTAssertNil(ATHLTHCommunityRefreshPolicy.notice(for: []))
     }
 }
+
+final class CommunityChallengeEditPolicyTests: XCTestCase {
+    func testOnlyNotStartedClubChallengesCanBeEdited() {
+        let now = Date()
+        let future = now.addingTimeInterval(3600)
+        let past = now.addingTimeInterval(-3600)
+        let canEdit = ATHLTHCommunityChallengeEditingPolicy.canEdit
+
+        XCTAssertTrue(canEdit(.draft, future, now))
+        XCTAssertTrue(canEdit(.upcoming, future, now))
+        XCTAssertFalse(canEdit(.upcoming, past, now))
+        XCTAssertFalse(canEdit(.live, future, now))
+        XCTAssertFalse(canEdit(.completed, future, now))
+        XCTAssertFalse(canEdit(.cancelled, future, now))
+    }
+}
