@@ -34,14 +34,21 @@ struct ProfileChallengesSection: View {
     }
 
     var body: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Challenges")
-                        .font(.title3.weight(.bold))
-                    Text("Compete, train together and settle it with data.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text(ATHLTHLocalization.choose(
+                        english: "CHALLENGES", norwegian: "UTFORDRINGER"
+                    ))
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.8)
+                    .foregroundStyle(ChallengePlanTheme.gold)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Your friends, your goals, your progress.",
+                        norwegian: "Dine venner, dine mål, din fremgang."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(ChallengePlanTheme.secondary)
                 }
 
                 Spacer()
