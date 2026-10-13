@@ -862,6 +862,40 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
     }
 
     @MainActor
+    func testEffortDistributionKeepsUnknownIntensitySeparate() throws {
+        let (_, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var modified = plan
+        let easy = workout()
+        let unknown = workout()
+        modified.weeks[0].days[0].sessions = [easy]
+        modified.weeks[0].days[1].sessions = [unknown]
+        let result = ATHLTHPlanWeeklyFollowThrough.effortDistribution(
+            plan: modified, effortBySessionID: [easy.id: .easy]
+        )
+        XCTAssertEqual(result.easyMinutes, 30)
+        XCTAssertEqual(result.unknownMinutes, 30)
+        XCTAssertEqual(result.hardMinutes, 0)
+    }
+
+    @MainActor
+    func testHardDaysAreDetectedAcrossWeekBoundary() throws {
+        let (_, defaults, suite, plan) = try prepared(weekCount: 2)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var modified = plan
+        let first = workout()
+        let second = workout()
+        modified.weeks[0].days[6].sessions = [first]
+        modified.weeks[1].days[0].sessions = [second]
+        let result = ATHLTHPlanWeeklyFollowThrough.effortDistribution(
+            plan: modified,
+            effortBySessionID: [first.id: .hard, second.id: .hard]
+        )
+        XCTAssertEqual(result.hardMinutes, 60)
+        XCTAssertEqual(result.adjacentHardDayPairs, 1)
+    }
+
+    @MainActor
     func testDuplicateIdentitiesAreCountedOnlyOnce() throws {
         let (store, defaults, suite, plan) = try prepared(weekCount: 1)
         defer { defaults.removePersistentDomain(forName: suite) }
