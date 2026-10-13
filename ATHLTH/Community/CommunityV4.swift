@@ -3748,7 +3748,21 @@ private struct CommunityReferenceQuickActions: View {
             }
             .buttonStyle(.plain)
 
-
+            NavigationLink {
+                CommunityDiscoveryView()
+            } label: {
+                tile(
+                    title: ATHLTHLocalization.choose(
+                        english: "Explore", norwegian: "Utforsk"
+                    ),
+                    detail: ATHLTHLocalization.choose(
+                        english: "Find activities", norwegian: "Finn aktiviteter"
+                    ),
+                    icon: "safari",
+                    tint: ATHLTHTheme.accentDeep
+                )
+            }
+            .buttonStyle(.plain)
         }
     }
 
