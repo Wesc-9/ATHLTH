@@ -27,6 +27,8 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var editingDayID: UUID?
     @State private var openingWorkout: PlannedSession?
     @State private var movingWorkout: PlannedSession?
+    @State private var movingPlanID: UUID?
+    @State private var movingPlanVersion: Int?
     @State private var moveTargetDate = Date()
     @State private var moveError: String?
     @State private var editingPlan: TrainingPlan?
@@ -169,14 +171,15 @@ struct ATHLTHTrainPlanPremiumView: View {
             }
         }
         .sheet(item: $movingWorkout) { workout in
-            if let plan {
+            if let movingPlanID,
+               let plan = session.trainingPlan(withID: movingPlanID) {
                 NavigationStack {
                     Form {
                         Section {
                             DatePicker(
                                 tr("New workout date", "Ny treningsdato"),
                                 selection: $moveTargetDate,
-                                in: Date()...,
+                                in: Calendar.current.startOfDay(for: Date())...,
                                 displayedComponents: .date
                             )
                         } footer: {
@@ -196,6 +199,8 @@ struct ATHLTHTrainPlanPremiumView: View {
                         ToolbarItem(placement: .cancellationAction) {
                             Button(tr("Cancel", "Avbryt")) {
                                 movingWorkout = nil
+                                movingPlanID = nil
+                                movingPlanVersion = nil
                             }
                         }
                         ToolbarItem(placement: .confirmationAction) {
@@ -204,11 +209,13 @@ struct ATHLTHTrainPlanPremiumView: View {
                                     planID: plan.id,
                                     workoutID: workout.id,
                                     targetDate: moveTargetDate,
-                                    expectedVersion: plan.version,
+                                    expectedVersion: movingPlanVersion ?? -1,
                                     healthWorkouts: health.workouts,
                                     strengthHistory: strength.workoutHistory
                                 ) {
                                     movingWorkout = nil
+                                    movingPlanID = nil
+                                    movingPlanVersion = nil
                                     moveError = nil
                                 } else {
                                     moveError = tr(
@@ -821,10 +828,20 @@ struct ATHLTHTrainPlanPremiumView: View {
                                 Label(tr("Change workout", "Endre økten"),
                                       systemImage: "slider.horizontal.3")
                             }
-                            if !completed {
+                            if !completed &&
+                                !session.isPlanSessionSkipped(
+                                    planID: plan.id, sessionID: workout.id
+                                ) &&
+                                planDayDate(day.dayIndex, plan: plan) >=
+                                    Calendar.current.startOfDay(for: Date()) {
                                 Button {
                                     moveError = nil
-                                    moveTargetDate = planDayDate(day.dayIndex, plan: plan)
+                                    moveTargetDate = max(
+                                        Calendar.current.startOfDay(for: Date()),
+                                        planDayDate(day.dayIndex, plan: plan)
+                                    )
+                                    movingPlanID = plan.id
+                                    movingPlanVersion = plan.version
                                     movingWorkout = workout
                                 } label: {
                                     Label(tr("Move to another day", "Flytt til en annen dag"),
