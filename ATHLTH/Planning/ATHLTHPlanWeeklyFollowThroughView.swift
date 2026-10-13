@@ -98,6 +98,8 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                 .font(.caption2)
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title), \(status.title)")
     }
 
     @ViewBuilder
@@ -116,6 +118,9 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
             .font(.caption.weight(.semibold))
         }
         .buttonStyle(.borderless)
+        .accessibilityLabel(ATHLTHLocalization.choose(
+            english: "Review \(title)", norwegian: "Gjennomgå \(title)"
+        ))
         .accessibilityHint(ATHLTHLocalization.choose(
             english: "Open the planned day to review this workout",
             norwegian: "Åpner plandagen for å gjennomgå økten"
@@ -162,6 +167,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
         }
         .font(.caption)
         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(ATHLTHLocalization.choose(
             english: "\(weekStatus.completed) completed, \(weekStatus.upcoming) upcoming, \(weekStatus.needsReview) need review, \(weekStatus.skipped) skipped, \(weekStatus.unknownDate) unscheduled",
             norwegian: "\(weekStatus.completed) fullført, \(weekStatus.upcoming) kommende, \(weekStatus.needsReview) trenger gjennomgang, \(weekStatus.skipped) hoppet over, \(weekStatus.unknownDate) uten dato"
@@ -211,7 +217,10 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
 
         ATHLTHPlanSurface {
             VStack(alignment: .leading, spacing: 5) {
-                Text("ATHLTH / WEEKLY REVIEW")
+                Text(ATHLTHLocalization.choose(
+                    english: "ATHLTH / WEEKLY REVIEW",
+                    norwegian: "ATHLTH / UKEOVERSIKT"
+                ))
                     .font(.caption2.weight(.semibold))
                     .tracking(1.8)
                     .foregroundStyle(ATHLTHPlanDesign.accent)
