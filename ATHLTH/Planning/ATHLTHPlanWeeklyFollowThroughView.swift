@@ -329,6 +329,10 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                                  ? ATHLTHLocalization.choose(
                                                      english: "Needs review", norwegian: "Trenger gjennomgang"
                                                    )
+                                                 : effectiveDate == nil
+                                                 ? ATHLTHLocalization.choose(
+                                                     english: "No date", norwegian: "Uten dato"
+                                                   )
                                                  : ATHLTHLocalization.choose(
                                                      english: "Planned", norwegian: "Planlagt"
                                                    ))
