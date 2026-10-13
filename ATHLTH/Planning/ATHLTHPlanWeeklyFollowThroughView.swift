@@ -19,6 +19,44 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
     @State private var showsIntensityPreview = false
     @State private var showsTrainingDetails = false
 
+    /// One source for the status icon and label shown in weekly workout rows.
+    private enum WorkoutRowStatus {
+        case completed, skipped, needsReview, undated, planned
+
+        init(completed: Bool, skipped: Bool, needsReview: Bool, hasDate: Bool) {
+            if skipped { self = .skipped }
+            else if completed { self = .completed }
+            else if needsReview { self = .needsReview }
+            else if !hasDate { self = .undated }
+            else { self = .planned }
+        }
+
+        var symbol: String {
+            switch self {
+            case .completed: "checkmark.circle.fill"
+            case .skipped: "minus.circle"
+            case .needsReview: "questionmark.circle"
+            case .undated: "calendar.badge.questionmark"
+            case .planned: "circle"
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .completed:
+                ATHLTHLocalization.choose(english: "Done", norwegian: "Fullført")
+            case .skipped:
+                ATHLTHLocalization.choose(english: "Skipped", norwegian: "Hoppet over")
+            case .needsReview:
+                ATHLTHLocalization.choose(english: "Needs review", norwegian: "Trenger gjennomgang")
+            case .undated:
+                ATHLTHLocalization.choose(english: "No date", norwegian: "Uten dato")
+            case .planned:
+                ATHLTHLocalization.choose(english: "Planned", norwegian: "Planlagt")
+            }
+        }
+    }
+
     @ViewBuilder
     private func weekStatusSummary(
         _ weekStatus: ATHLTHPlanWeeklyFollowThrough.Week
@@ -309,12 +347,14 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                                 norwegian: "Åpner plandagen for å gjennomgå økten"
                                             ))
                                         }
+                                        let rowStatus = WorkoutRowStatus(
+                                            completed: completed,
+                                            skipped: skipped,
+                                            needsReview: needsReview,
+                                            hasDate: effectiveDate != nil
+                                        )
                                         HStack(spacing: 5) {
-                                            Image(systemName: completed
-                                                  ? "checkmark.circle.fill"
-                                                  : skipped ? "minus.circle"
-                                                  : effectiveDate == nil ? "calendar.badge.questionmark"
-                                                  : needsReview ? "questionmark.circle" : "circle")
+                                            Image(systemName: rowStatus.symbol)
                                                 .foregroundStyle(completed
                                                     ? ATHLTHPlanDesign.accent
                                                     : ATHLTHPlanDesign.secondaryInk)
@@ -342,25 +382,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                                 }
                                             }
                                             Spacer(minLength: 4)
-                                            Text(completed
-                                                 ? ATHLTHLocalization.choose(
-                                                     english: "Done", norwegian: "Fullført"
-                                                   )
-                                                 : skipped
-                                                 ? ATHLTHLocalization.choose(
-                                                     english: "Skipped", norwegian: "Hoppet over"
-                                                   )
-                                                 : needsReview
-                                                 ? ATHLTHLocalization.choose(
-                                                     english: "Needs review", norwegian: "Trenger gjennomgang"
-                                                   )
-                                                 : effectiveDate == nil
-                                                 ? ATHLTHLocalization.choose(
-                                                     english: "No date", norwegian: "Uten dato"
-                                                   )
-                                                 : ATHLTHLocalization.choose(
-                                                     english: "Planned", norwegian: "Planlagt"
-                                                   ))
+                                            Text(rowStatus.title)
                                                 .font(.caption2)
                                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                                         }
