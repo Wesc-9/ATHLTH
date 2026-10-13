@@ -26,6 +26,9 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var showingAIHelp = false
     @State private var editingDayID: UUID?
     @State private var openingWorkout: PlannedSession?
+    @State private var movingWorkout: PlannedSession?
+    @State private var moveTargetDate = Date()
+    @State private var moveError: String?
     @State private var editingPlan: TrainingPlan?
 
     private let graphite = Color(red: 0.18, green: 0.18, blue: 0.17)
@@ -163,6 +166,62 @@ struct ATHLTHTrainPlanPremiumView: View {
                         simplePresentation: true
                     )
                 }
+            }
+        }
+        .sheet(item: $movingWorkout) { workout in
+            if let plan {
+                NavigationStack {
+                    Form {
+                        Section {
+                            DatePicker(
+                                tr("New workout date", "Ny treningsdato"),
+                                selection: $moveTargetDate,
+                                in: Date()...,
+                                displayedComponents: .date
+                            )
+                        } footer: {
+                            Text(tr(
+                                "Only upcoming, unfinished workouts can be moved within the current plan.",
+                                "Bare kommende økter som ikke er gjennomført, kan flyttes innenfor planen."
+                            ))
+                        }
+                        if let moveError {
+                            Text(moveError)
+                                .foregroundStyle(.red)
+                        }
+                    }
+                    .navigationTitle(tr("Move workout", "Flytt økt"))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(tr("Cancel", "Avbryt")) {
+                                movingWorkout = nil
+                            }
+                        }
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(tr("Save", "Lagre")) {
+                                if session.movePlanStudioWorkout(
+                                    planID: plan.id,
+                                    workoutID: workout.id,
+                                    targetDate: moveTargetDate,
+                                    expectedVersion: plan.version,
+                                    healthWorkouts: health.workouts,
+                                    strengthHistory: strength.workoutHistory
+                                ) {
+                                    movingWorkout = nil
+                                    moveError = nil
+                                } else {
+                                    moveError = tr(
+                                        "Could not move this workout. Check the date or refresh the plan.",
+                                        "Kunne ikke flytte økten. Kontroller datoen eller oppdater planen."
+                                    )
+                                }
+                            }
+                            .fontWeight(.semibold)
+                        }
+                    }
+                }
+                .presentationDetents([.medium])
             }
         }
         .sheet(isPresented: $showingAIHelp) {
@@ -761,6 +820,16 @@ struct ATHLTHTrainPlanPremiumView: View {
                             } label: {
                                 Label(tr("Change workout", "Endre økten"),
                                       systemImage: "slider.horizontal.3")
+                            }
+                            if !completed {
+                                Button {
+                                    moveError = nil
+                                    moveTargetDate = planDayDate(day.dayIndex, plan: plan)
+                                    movingWorkout = workout
+                                } label: {
+                                    Label(tr("Move to another day", "Flytt til en annen dag"),
+                                          systemImage: "calendar.badge.clock")
+                                }
                             }
                             if !completed {
                                 Button {
