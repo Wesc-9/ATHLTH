@@ -84,6 +84,28 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                         )
                     )
 
+                    if let completedPercent = report.completionPercent,
+                       let accountedPercent = report.accountedPercent {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Completion: \(completedPercent)% · \(report.pastCompleted) of \(report.pastDated) past workouts",
+                                norwegian: "Gjennomført: \(completedPercent) % · \(report.pastCompleted) av \(report.pastDated) tidligere økter"
+                            ))
+                            Text(ATHLTHLocalization.choose(
+                                english: "Accounted for: \(accountedPercent)% · includes skipped workouts",
+                                norwegian: "Avklart: \(accountedPercent) % · inkluderer økter hoppet over"
+                            ))
+                            Text(ATHLTHLocalization.choose(
+                                english: "Unreviewed sessions are not assumed to be missed.",
+                                norwegian: "Uavklarte økter regnes ikke automatisk som uteblitte."
+                            ))
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+
                     if report.pastDated > 0 {
                         Label(
                             ATHLTHLocalization.choose(
