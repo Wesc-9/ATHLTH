@@ -10,7 +10,7 @@ final class CommunityDiscoveryPolicyTests: XCTestCase {
 
     func testCaseInsensitiveAndNorwegianDiacriticInsensitiveSearch() {
         XCTAssertTrue(ATHLTHCommunityDiscoveryPolicy.matches(
-            "lop", in: ["Løpeklubben", "Tur i fjellet"]
+            "trening", in: ["Tréningsklubben", "Tur i fjellet"]
         ))
         XCTAssertTrue(ATHLTHCommunityDiscoveryPolicy.matches(
             "KVELD", in: ["Løping på kvelden"]
