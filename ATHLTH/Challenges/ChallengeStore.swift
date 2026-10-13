@@ -239,7 +239,10 @@ final class ChallengeStore: ObservableObject {
             throw ChallengeStoreError.manualNotAllowed
         }
 
-        guard isWithinWindow(Date(), rules: challenge.rules) else {
+        guard challenge.canCountWorkout(
+            startedAt: Date(),
+            participantID: participantID
+        ) else {
             throw ChallengeStoreError.outsideChallengeWindow
         }
 
@@ -290,8 +293,7 @@ final class ChallengeStore: ObservableObject {
         let candidateIDs = challenges
             .filter {
                 $0.sport == .strength &&
-                $0.rules.verificationPolicy.allowsVerified &&
-                isWithinWindow(workout.startedAt, rules: $0.rules)
+                $0.rules.verificationPolicy.allowsVerified
             }
             .map(\.id)
 
@@ -306,6 +308,10 @@ final class ChallengeStore: ObservableObject {
             }
 
             let challenge = challenges[challengeIndex]
+            guard challenge.canCountWorkout(
+                startedAt: workout.startedAt,
+                participantID: participant.id
+            ) else { continue }
             guard let evaluation = strengthScore(
                 workout: workout,
                 rules: challenge.rules
@@ -361,10 +367,7 @@ final class ChallengeStore: ObservableObject {
         let candidateIDs = challenges
             .filter { challenge in
                 guard challenge.rules.verificationPolicy.allowsVerified,
-                      isWithinWindow(
-                          result.startedAt,
-                          rules: challenge.rules
-                      )
+                      challenge.scoringStartDate != nil
                 else {
                     return false
                 }
@@ -396,6 +399,10 @@ final class ChallengeStore: ObservableObject {
             }
 
             let challenge = challenges[challengeIndex]
+            guard challenge.canCountWorkout(
+                startedAt: result.startedAt,
+                participantID: participant.id
+            ) else { continue }
 
             guard canRecordVerifiedAttempt(
                 in: challenge,
@@ -424,6 +431,11 @@ final class ChallengeStore: ObservableObject {
                         for: result,
                         rules: challenge.rules
                     )
+
+                guard challenge.canCountWorkout(
+                    startedAt: evidence.startedAt,
+                    participantID: participant.id
+                ) else { continue }
 
                 let attempt = ChallengeAttempt(
                     id: UUID(),
@@ -471,6 +483,11 @@ final class ChallengeStore: ObservableObject {
                 else {
                     continue
                 }
+
+                guard challenge.canCountWorkout(
+                    startedAt: evidence.startedAt,
+                    participantID: participant.id
+                ) else { continue }
 
                 let attempt = ChallengeAttempt(
                     id: UUID(),
@@ -546,9 +563,9 @@ final class ChallengeStore: ObservableObject {
             let challenge = challenges[challengeIndex]
 
             for workout in health.workouts {
-                guard isWithinWindow(
-                    workout.startDate,
-                    rules: challenge.rules
+                guard challenge.canCountWorkout(
+                    startedAt: workout.startDate,
+                    participantID: participant.id
                 ) else {
                     continue
                 }
@@ -573,6 +590,11 @@ final class ChallengeStore: ObservableObject {
                 else {
                     continue
                 }
+
+                guard challenge.canCountWorkout(
+                    startedAt: evidence.startedAt,
+                    participantID: participant.id
+                ) else { continue }
 
                 let attempt = ChallengeAttempt(
                     id: UUID(),
@@ -630,7 +652,7 @@ final class ChallengeStore: ObservableObject {
 
         for participant in participants {
             let attempts = challenge.attempts.filter {
-                $0.participantID == participant.id && $0.isEligible
+                $0.participantID == participant.id && challenge.countsAttempt($0)
             }
 
             if challenge.rules.scoring == .mostDistance {
@@ -774,10 +796,11 @@ final class ChallengeStore: ObservableObject {
                 continue
             }
 
-            if now >= challenges[index].rules.startsAt {
+            if let scoringStart = challenges[index].scoringStartDate,
+               now >= scoringStart {
                 if challenges[index].rules.lockRulesAtStart &&
                     challenges[index].rulesLockedAt == nil {
-                    challenges[index].rulesLockedAt = challenges[index].rules.startsAt
+                    challenges[index].rulesLockedAt = scoringStart
                     changed = true
                 }
 
@@ -786,10 +809,8 @@ final class ChallengeStore: ObservableObject {
                     changed = true
                 }
             } else {
-                let hasAccepted = challenges[index].participants.contains {
-                    $0.state == .accepted || $0.state == .creator
-                }
-                let nextStatus: ATHLTHChallengeStatus = hasAccepted ? .upcoming : .invited
+                let nextStatus: ATHLTHChallengeStatus =
+                    challenges[index].scoringStartDate != nil ? .upcoming : .invited
 
                 if challenges[index].status != nextStatus {
                     challenges[index].status = nextStatus
@@ -810,7 +831,7 @@ final class ChallengeStore: ObservableObject {
         let eligibleAttempts =
             challenge.attempts.filter {
                 $0.participantID == participantID &&
-                $0.isEligible
+                challenge.countsAttempt($0)
             }
 
         if !challenge.rules.allowMultipleAttempts {
