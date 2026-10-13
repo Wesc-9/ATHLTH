@@ -650,6 +650,11 @@ struct ATHLTHAudioCoachSettingsView: View {
 
                 voiceMenu
 
+                if settings.audioCoachLanguage == .norwegian {
+                    premiumDivider
+                    norwegianVoiceChoicesSection
+                }
+
                 premiumDivider
 
                 VStack(
@@ -1335,6 +1340,101 @@ struct ATHLTHAudioCoachSettingsView: View {
                 }
             }
         }
+    }
+
+
+    /// Quick selection for two different *installed* Norwegian speakers.
+    /// More installed voices remain available in the full Voice menu.
+    private var norwegianVoiceChoicesSection: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            Text(ATHLTHLocalization.choose(
+                english: "Norwegian voices",
+                norwegian: "Norske stemmer"
+            ))
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(ATHLTHTheme.primaryText)
+
+            ForEach(norwegianVoiceChoices) { voice in
+                let index = norwegianVoiceChoices.firstIndex(of: voice) ?? 0
+                HStack(spacing: 10) {
+                    Button {
+                        settings.audioCoachVoiceIdentifier = voice.id
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName:
+                                settings.audioCoachVoiceIdentifier == voice.id
+                                    ? "checkmark.circle.fill" : "circle"
+                            )
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Norwegian voice \\(index + 1)",
+                                    norwegian: "Norsk stemme \\(index + 1)"
+                                ))
+                                .font(.subheadline.weight(.semibold))
+                                Text(voice.compactTitle)
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(
+                        settings.audioCoachVoiceIdentifier == voice.id
+                            ? .isSelected : []
+                    )
+
+                    Button {
+                        ATHLTHAudioCoachPreviewSpeaker.shared.speak(
+                            language: .norwegian,
+                            voiceIdentifier: voice.id,
+                            speechRate: settings.audioCoachSpeechRate,
+                            speechVolume: settings.audioCoachSpeechVolume,
+                            duckOtherAudio: settings.audioCoachDuckOtherAudio,
+                            speechStyle: settings.audioCoachSpeechStyle
+                        )
+                    } label: {
+                        Image(systemName: "play.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        ATHLTHLocalization.choose(
+                            english: "Preview \\(voice.name)",
+                            norwegian: "Forhåndslytt på \\(voice.name)"
+                        )
+                    )
+                }
+                .padding(12)
+                .background(
+                    ATHLTHTheme.accentSoft.opacity(0.7),
+                    in: RoundedRectangle(cornerRadius: 14)
+                )
+            }
+
+            if norwegianVoiceChoices.count < 2 {
+                Text(ATHLTHLocalization.choose(
+                    english: "Only \\(norwegianVoiceChoices.count) distinct Norwegian voice(s) are installed. Add other Norwegian system voices under iPhone Settings → Accessibility → Spoken Content → Voices, then reopen ATHLTH.",
+                    norwegian: "Bare \\(norwegianVoiceChoices.count) ulike norske stemmer er installert. Legg til flere under iPhone-innstillinger → Tilgjengelighet → Opplest innhold → Stemmer, og åpne ATHLTH igjen."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(16)
+    }
+
+    private var norwegianVoiceChoices: [ATHLTHAudioCoachVoiceOption] {
+        // The list is quality-sorted. Prefer a second voice with a different
+        // name rather than the same speaker at a different download quality.
+        var seenNames = Set<String>()
+        return Array(availableVoiceOptions.filter { option in
+            seenNames.insert(option.name.lowercased()).inserted
+        }.prefix(2))
     }
 
     private var availableVoiceOptions:
