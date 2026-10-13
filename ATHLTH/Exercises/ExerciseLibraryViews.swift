@@ -1304,6 +1304,7 @@ struct CustomExerciseEditorView: View {
     @State private var isImportingVideo = false
     @State private var didSaveExercise = false
     @State private var studioError: String?
+    @State private var showingEquipmentScanner = false
     @State private var aiPrompt = ""
     @State private var aiVideoBrief = ""
     @State private var isGeneratingAIDraft = false
@@ -1380,6 +1381,35 @@ struct CustomExerciseEditorView: View {
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 } header: {
                     Label("ATHLTH AI", systemImage: "sparkles")
+                }
+
+                Section {
+                    Button {
+                        showingEquipmentScanner = true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Scan a gym machine and suggest an exercise",
+                                norwegian: "Skann et apparat og få øvelsesforslag"
+                            ),
+                            systemImage: "camera.viewfinder"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(minHeight: 48)
+                    }
+                    .tint(ATHLTHPlanDesign.ink)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose an existing ATHLTH exercise as a starting point, then edit before saving your own version.",
+                        norwegian: "Bruk en eksisterende ATHLTH-øvelse som utgangspunkt, og tilpass den før du lagrer din egen versjon."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                } header: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Identify equipment with AI",
+                        norwegian: "Gjenkjenn apparat med AI"
+                    ))
                 }
 
                 Section("Exercise") {
@@ -1686,6 +1716,21 @@ struct CustomExerciseEditorView: View {
                         isImportingVideo
                     )
                 }
+            }
+            .sheet(isPresented: $showingEquipmentScanner) {
+                ATHLTHEquipmentScannerView(onSelect: { entry in
+                    name = library.localizedExerciseName(entry)
+                    primaryMuscles = Set(ExerciseMuscleGroup.allCases.filter {
+                        entry.exercise.primaryMuscles.contains($0.rawValue)
+                    })
+                    secondaryMuscles = Set(ExerciseMuscleGroup.allCases.filter {
+                        entry.exercise.secondaryMuscles.contains($0.rawValue) &&
+                        !primaryMuscles.contains($0)
+                    })
+                    equipment = entry.exercise.equipment.joined(separator: ", ")
+                    instructions = library.localizedExerciseInstructions(entry).joined(separator: "\n")
+                })
+                .environmentObject(library)
             }
             .fileImporter(
                 isPresented: $showingVideoImporter,
