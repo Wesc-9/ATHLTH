@@ -185,7 +185,7 @@ final class GhostRaceStore: ObservableObject {
     private var maximumLeadMeters: Double = 0
     private var maximumDeficitMeters: Double = 0
     private var leadChangeCount = 0
-    private var lastMeaningfulLeadSign = 0
+    private var leadTracker = ATHLTHGhostLeadTracker()
 
     var isPrepared: Bool {
         reference != nil
@@ -527,6 +527,7 @@ final class GhostRaceStore: ObservableObject {
         // Paused workouts must not display a stale advantage.
         if snapshot.state == .paused {
             comparison = nil
+            leadTracker.invalidatePending()
             return
         }
 
@@ -601,6 +602,17 @@ final class GhostRaceStore: ObservableObject {
                 from: matched.location
             )
 
+        // A nearby route point may still be on a parallel path or a
+        // shortcut. An unreliable map match never counts as a new lead.
+        guard deviation.isFinite, deviation <= 80 else {
+            comparison = nil
+            leadTracker.invalidatePending()
+            if snapshot.state == .completed {
+                complete(snapshot: snapshot, reference: reference)
+            }
+            return
+        }
+
         recordFinishCrossing(
             courseMeters: matched.cumulativeMeters,
             deviationMeters: deviation,
@@ -633,9 +645,8 @@ final class GhostRaceStore: ObservableObject {
 
         comparison = nextComparison
         recordRaceDynamics(
-            signedDistanceMeters:
-                nextComparison
-                    .signedDistanceMeters
+            signedDistanceMeters: nextComparison.signedDistanceMeters,
+            elapsedSeconds: snapshot.elapsedTime
         )
 
         if snapshot.state == .completed {
@@ -803,48 +814,30 @@ final class GhostRaceStore: ObservableObject {
         maximumLeadMeters = 0
         maximumDeficitMeters = 0
         leadChangeCount = 0
-        lastMeaningfulLeadSign = 0
+        leadTracker.reset()
     }
 
     private func recordRaceDynamics(
-        signedDistanceMeters: Double
+        signedDistanceMeters: Double,
+        elapsedSeconds: TimeInterval
     ) {
-        guard signedDistanceMeters.isFinite else {
+        guard signedDistanceMeters.isFinite,
+              elapsedSeconds.isFinite else {
+            leadTracker.invalidatePending()
             return
         }
 
-        maximumLeadMeters =
-            max(
-                maximumLeadMeters,
-                signedDistanceMeters
-            )
-        maximumDeficitMeters =
-            max(
-                maximumDeficitMeters,
-                -signedDistanceMeters
-            )
-
-        let threshold = 8.0
-        let sign: Int
-
-        if signedDistanceMeters >= threshold {
-            sign = 1
-        } else if signedDistanceMeters <= -threshold {
-            sign = -1
-        } else {
-            sign = 0
-        }
-
-        guard sign != 0 else {
-            return
-        }
-
-        if lastMeaningfulLeadSign != 0,
-           sign != lastMeaningfulLeadSign {
+        // Two distinct GPS samples with at least two seconds of stable
+        // opposite leadership are needed before recording a real overtake.
+        if leadTracker.observe(
+            signedGapMeters: signedDistanceMeters,
+            elapsedSeconds: elapsedSeconds
+        ) {
             leadChangeCount += 1
         }
 
-        lastMeaningfulLeadSign = sign
+        maximumLeadMeters = max(maximumLeadMeters, signedDistanceMeters)
+        maximumDeficitMeters = max(maximumDeficitMeters, -signedDistanceMeters)
     }
 
     private func nearestReferenceIndex(
