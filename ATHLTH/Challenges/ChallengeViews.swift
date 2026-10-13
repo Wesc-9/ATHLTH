@@ -10583,24 +10583,15 @@ struct ChallengeDetailView: View {
                 cornerRadius: 2,
                 style: .continuous
             )
-            .fill(
-                ATHLTHTheme
-                    .vitality
-            )
+            .fill(ChallengePlanTheme.gold)
             .frame(
                 width: 4,
                 height: 30
             )
 
             Text(title)
-                .font(
-                    .title3
-                        .weight(.bold)
-                )
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .primaryText
-                )
+                .font(.system(size: 23, weight: .regular, design: .serif))
+                .foregroundStyle(ChallengePlanTheme.ink)
 
             Spacer()
 
