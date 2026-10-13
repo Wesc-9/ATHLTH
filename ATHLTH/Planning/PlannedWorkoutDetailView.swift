@@ -271,7 +271,9 @@ struct PlannedWorkoutDetailView: View {
                             .frame(width: 3, height: 3)
 
                         Label(
-                            isCompleted ? "Completed" : "Planned",
+                            isCompleted
+                                ? ATHLTHLocalization.choose(english: "Completed", norwegian: "Fullført")
+                                : ATHLTHLocalization.choose(english: "Planned", norwegian: "Planlagt"),
                             systemImage: isCompleted
                                 ? "checkmark.circle.fill"
                                 : "calendar"
@@ -709,7 +711,7 @@ struct PlannedWorkoutDetailView: View {
     private var strengthCard: some View {
         ATHLTHCard {
             VStack(alignment: .leading, spacing: 13) {
-                sectionTitle("Exercises")
+                sectionTitle(ATHLTHLocalization.choose(english: "Exercises", norwegian: "Øvelser"))
 
                 ForEach(Array(currentWorkout.exercises.enumerated()), id: \.element.id) { index, exercise in
                     HStack(alignment: .top, spacing: 11) {
@@ -869,7 +871,7 @@ struct PlannedWorkoutDetailView: View {
     private var structuredWorkoutCard: some View {
         ATHLTHCard {
             VStack(alignment: .leading, spacing: 12) {
-                sectionTitle("Workout blocks")
+                sectionTitle(ATHLTHLocalization.choose(english: "Workout blocks", norwegian: "Øktblokker"))
 
                 ForEach(
                     currentWorkout.resolvedWorkoutBlocks
@@ -968,7 +970,7 @@ struct PlannedWorkoutDetailView: View {
     private func notesCard(_ notes: String) -> some View {
         ATHLTHCard {
             VStack(alignment: .leading, spacing: 9) {
-                sectionTitle("Notes")
+                sectionTitle(ATHLTHLocalization.choose(english: "Notes", norwegian: "Notater"))
 
                 Text(notes)
                     .font(.subheadline)
