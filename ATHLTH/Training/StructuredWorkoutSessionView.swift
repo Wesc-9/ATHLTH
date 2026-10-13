@@ -67,6 +67,8 @@ struct StructuredWorkoutSessionView: View {
     @State private var currentIndex = 0
     @State private var completedBlockIDs = Set<String>()
     @State private var showingFinishConfirmation = false
+    @State private var showingDiscardConfirmation = false
+    @State private var hasStarted = false
     @State private var savedCompletion = false
 
     private var blocks: [WorkoutTemplateBlock] {
@@ -115,9 +117,33 @@ struct StructuredWorkoutSessionView: View {
                     Button(ATHLTHLocalization.choose(
                         english: "Close", norwegian: "Lukk"
                     )) {
-                        dismiss()
+                        if savedCompletion {
+                            dismiss()
+                        } else {
+                            showingDiscardConfirmation = true
+                        }
                     }
                 }
+            }
+            .confirmationDialog(
+                ATHLTHLocalization.choose(
+                    english: "Leave without saving?",
+                    norwegian: "Forlate økten uten å lagre?"
+                ),
+                isPresented: $showingDiscardConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button(ATHLTHLocalization.choose(
+                    english: "Discard workout", norwegian: "Forkast økten"
+                ), role: .destructive) { dismiss() }
+                Button(ATHLTHLocalization.choose(
+                    english: "Continue workout", norwegian: "Fortsett økten"
+                ), role: .cancel) {}
+            } message: {
+                Text(ATHLTHLocalization.choose(
+                    english: "Workout progress will not be saved.",
+                    norwegian: "Fremdriften i økten blir ikke lagret."
+                ))
             }
             .safeAreaInset(edge: .bottom) {
                 bottomControls
@@ -158,7 +184,10 @@ struct StructuredWorkoutSessionView: View {
                 )
             }
             .onAppear {
-                startedAt = Date()
+                if !hasStarted {
+                    startedAt = Date()
+                    hasStarted = true
+                }
                 updateScreenAwakeState()
             }
             .onDisappear {
@@ -465,14 +494,19 @@ struct StructuredWorkoutSessionView: View {
     private var completionConfirmation: some View {
         ATHLTHCard {
             Label(
-                "Workout completed",
+                ATHLTHLocalization.choose(
+                    english: "Workout completed", norwegian: "Økt gjennomført"
+                ),
                 systemImage: "checkmark.circle.fill"
             )
             .font(.headline)
             .foregroundStyle(ATHLTHTheme.accentDeep)
 
             Text(
-                "This structured workout has been saved to your ATHLTH training history."
+                ATHLTHLocalization.choose(
+                    english: "This structured workout has been saved to your ATHLTH training history.",
+                    norwegian: "Denne økten er lagret i treningshistorikken din i ATHLTH."
+                )
             )
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -489,7 +523,9 @@ struct StructuredWorkoutSessionView: View {
                     Button {
                         dismiss()
                     } label: {
-                        Text("Done")
+                        Text(ATHLTHLocalization.choose(
+                            english: "Done", norwegian: "Ferdig"
+                        ))
                             .font(.headline)
                             .frame(maxWidth: .infinity)
                             .frame(height: 52)
