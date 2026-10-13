@@ -83,8 +83,8 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
 
                 if showsIntensityPreview {
                     Text(ATHLTHLocalization.choose(
-                        english: "Try assigning easy, moderate or hard intensity to sessions. This preview is not saved to your plan.",
-                        norwegian: "Prøv å angi rolig, moderat eller hard intensitet for øktene. Denne forhåndsvisningen lagres ikke i treningsplanen."
+                        english: "Try assigning easy, moderate or hard intensity to sessions. Intensity choices are saved locally for this plan.",
+                        norwegian: "Prøv å angi rolig, moderat eller hard intensitet for øktene. Intensitetsvalgene lagres lokalt for denne planen."
                     ))
                     .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -99,16 +99,16 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                     Menu {
                                         Button(ATHLTHLocalization.choose(
                                             english: "Not specified", norwegian: "Ikke angitt"
-                                        )) { previewEfforts.removeValue(forKey: workout.id) }
+                                        )) { updateEffort(nil, for: workout.id, plan: currentPlan) }
                                         Button(ATHLTHLocalization.choose(
                                             english: "Easy", norwegian: "Rolig"
-                                        )) { previewEfforts[workout.id] = .easy }
+                                        )) { updateEffort(.easy, for: workout.id, plan: currentPlan) }
                                         Button(ATHLTHLocalization.choose(
                                             english: "Moderate", norwegian: "Moderat"
-                                        )) { previewEfforts[workout.id] = .moderate }
+                                        )) { updateEffort(.moderate, for: workout.id, plan: currentPlan) }
                                         Button(ATHLTHLocalization.choose(
                                             english: "Hard", norwegian: "Hard"
-                                        )) { previewEfforts[workout.id] = .hard }
+                                        )) { updateEffort(.hard, for: workout.id, plan: currentPlan) }
                                     } label: {
                                         Text(previewEfforts[workout.id] == .easy
                                              ? ATHLTHLocalization.choose(english: "Easy", norwegian: "Rolig")
@@ -137,7 +137,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                     }
                     Button(ATHLTHLocalization.choose(
                         english: "Reset preview", norwegian: "Nullstill forhåndsvisning"
-                    )) { previewEfforts.removeAll() }
+                    )) { clearEfforts(plan: currentPlan) }
                     .font(.caption)
                 }
             }
@@ -710,5 +710,25 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
         }
         .accessibilityElement(children: .combine)
+        .onAppear {
+            previewEfforts = ATHLTHPlanWeeklyFollowThrough.savedEfforts(plan: currentPlan)
+        }
     }
+    private func updateEffort(
+        _ effort: ATHLTHPlanWeeklyFollowThrough.PlannedEffort?,
+        for sessionID: UUID, plan: TrainingPlan
+    ) {
+        if let effort {
+            previewEfforts[sessionID] = effort
+        } else {
+            previewEfforts.removeValue(forKey: sessionID)
+        }
+        ATHLTHPlanWeeklyFollowThrough.saveEfforts(previewEfforts, plan: plan)
+    }
+
+    private func clearEfforts(plan: TrainingPlan) {
+        previewEfforts.removeAll()
+        ATHLTHPlanWeeklyFollowThrough.saveEfforts(previewEfforts, plan: plan)
+    }
+
 }

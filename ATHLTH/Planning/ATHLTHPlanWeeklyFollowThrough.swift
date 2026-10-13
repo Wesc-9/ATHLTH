@@ -276,6 +276,37 @@ enum ATHLTHPlanWeeklyFollowThrough {
         )
     }
 
+    /// Local, plan-scoped intensity preferences. This does not change the
+    /// training plan model or imply that an effort level was measured.
+    private static func effortStorageKey(planID: UUID) -> String {
+        "athlth.plan-studio.effort.v1.\(planID.uuidString)"
+    }
+
+    static func savedEfforts(
+        plan: TrainingPlan, defaults: UserDefaults = .standard
+    ) -> [UUID: PlannedEffort] {
+        let stored = defaults.dictionary(forKey: effortStorageKey(planID: plan.id)) as? [String: Int] ?? [:]
+        let validIDs = Set(plan.weeks.flatMap { $0.days.flatMap { $0.sessions.map(\.id) } })
+        var result: [UUID: PlannedEffort] = [:]
+        for (key, value) in stored {
+            guard let id = UUID(uuidString: key), validIDs.contains(id),
+                  let effort = PlannedEffort(rawValue: value) else { continue }
+            result[id] = effort
+        }
+        return result
+    }
+
+    static func saveEfforts(
+        _ efforts: [UUID: PlannedEffort], plan: TrainingPlan,
+        defaults: UserDefaults = .standard
+    ) {
+        let validIDs = Set(plan.weeks.flatMap { $0.days.flatMap { $0.sessions.map(\.id) } })
+        let values = Dictionary(uniqueKeysWithValues: efforts.compactMap { id, effort in
+            validIDs.contains(id) ? (id.uuidString, effort.rawValue) : nil
+        })
+        defaults.set(values, forKey: effortStorageKey(planID: plan.id))
+    }
+
     /// Conservative, non-mutating candidate for a future workout.
     /// The destination must be empty and later in the same week; explicitly
     /// timed, completed or skipped sessions are never offered for relocation.
