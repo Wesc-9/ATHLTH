@@ -19,6 +19,17 @@ final class TrainTogetherMarketplaceStore:
 
     private let client =
         SupabaseEnvironment.client
+    private var lastSuccessfulRefresh: Date?
+
+    /// A lightweight caller can share the existing Marketplace refresh logic
+    /// without repeatedly fetching public posts on every Community appearance.
+    func refreshIfStale(maxAge: TimeInterval = 120) async {
+        if let lastSuccessfulRefresh,
+           Date().timeIntervalSince(lastSuccessfulRefresh) < maxAge {
+            return
+        }
+        await refresh()
+    }
 
     func refresh() async {
         guard !isLoading else {
@@ -101,6 +112,7 @@ final class TrainTogetherMarketplaceStore:
                 $0.scheduledStart < $1.scheduledStart
             }
             requests = loadedRequests
+            lastSuccessfulRefresh = Date()
             errorMessage = nil
         } catch {
             errorMessage =
