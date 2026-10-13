@@ -62,7 +62,7 @@ struct ATHLTHTrainPlanPremiumView: View {
             if let plan {
                 overview(plan)
                 weekWorkspace(plan)
-                libraryShortcuts
+                if advanced { libraryShortcuts }
             } else {
                 firstPlanInvitation
                 libraryShortcuts
@@ -87,6 +87,9 @@ struct ATHLTHTrainPlanPremiumView: View {
             ATHLTHTrainProgramComposerView { planID in
                 focusedPlanID = planID
                 selectedWeekIndex = 0
+                if let created = session.trainingPlan(withID: planID) {
+                    advanced = created.builderProfile?.mode == .advanced
+                }
             }
         }
         .sheet(isPresented: $showingMyPlans) {
@@ -181,6 +184,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                 Button {
                     focusedPlanID = item.id
                     selectedWeekIndex = nil
+                    advanced = item.builderProfile?.mode == .advanced
                 } label: {
                     Label(
                         item.title,
@@ -250,7 +254,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                 .foregroundStyle(secondaryInk)
                 Spacer()
                 Picker("", selection: $advanced) {
-                    Text("Basic").tag(false)
+                    Text(tr("Simple", "Enkel")).tag(false)
                     Text(tr("Advanced", "Avansert")).tag(true)
                 }
                 .pickerStyle(.segmented)
@@ -483,6 +487,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                         .font(.system(size: 24, weight: .regular, design: .serif))
                 }
                 Spacer()
+                if advanced {
                 Button { showingEditor = true } label: {
                     Text(tr("Full editor", "Full editor"))
                         .font(.caption.weight(.semibold))
@@ -491,6 +496,8 @@ struct ATHLTHTrainPlanPremiumView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(graphite)
+                }
+
             }
 
             if let selectedWeek {
@@ -512,6 +519,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                 .padding(.horizontal, 13)
                 .surface(line: line)
 
+                if advanced {
                 HStack(spacing: 7) {
                     Button { showingEditor = true } label: {
                         Label(tr("Copy or move week", "Kopier eller flytt uke"),
@@ -529,6 +537,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                 .foregroundStyle(graphite)
                 .padding(.horizontal, 3)
                 .padding(.top, 2)
+                }
             } else {
                 Text(tr("No weeks have been added yet.", "Det er ikke lagt til noen uker ennå."))
                     .font(.subheadline)
