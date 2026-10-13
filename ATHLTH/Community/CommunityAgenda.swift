@@ -7,6 +7,7 @@ struct ATHLTHCommunityAgendaEntry: Identifiable {
         case event(UUID)
         case clubEvent(group: CommunityGroupRecord, event: CommunityGroupEventRecord)
         case challenge(UUID)
+        case trainTogether(UUID)
     }
 
     let id: String
@@ -26,6 +27,8 @@ struct ATHLTHCommunityAgendaEntry: Identifiable {
             CommunityGroupEventDetailView(group: group, event: event)
         case .challenge(let challengeID):
             ChallengeDetailView(challengeID: challengeID)
+        case .trainTogether(let postID):
+            TrainTogetherPostDetailView(postID: postID)
         }
     }
 }
@@ -46,17 +49,39 @@ enum ATHLTHCommunityAgendaPolicy {
             rsvp == "going" || rsvp == "maybe" || rsvp == "waitlist"
     }
 
+    static func includesTrainTogetherPost(
+        _ post: TrainTogetherPost,
+        requests: [TrainTogetherRequest],
+        userID: UUID,
+        now: Date
+    ) -> Bool {
+        guard post.scheduledStart >= now,
+              post.status != .cancelled,
+              post.status != .completed else { return false }
+        if post.creatorID == userID { return true }
+        return requests.contains {
+            $0.postID == post.id &&
+            $0.requesterID == userID &&
+            $0.state == .accepted
+        }
+    }
+
     static func entries(
         events: [CommunityEventItem],
         clubEvents: [CommunityGroupEventRecord],
         clubRSVPs: [CommunityGroupEventRSVPRecord],
         clubs: [CommunityGroupRecord],
         challenges: [ATHLTHChallenge],
+        trainTogetherPosts: [TrainTogetherPost] = [],
+        trainTogetherRequests: [TrainTogetherRequest] = [],
         userID: UUID,
         now: Date = Date()
     ) -> [ATHLTHCommunityAgendaEntry] {
         var result: [ATHLTHCommunityAgendaEntry] = []
-        result.reserveCapacity(events.count + clubEvents.count + challenges.count)
+        result.reserveCapacity(
+            events.count + clubEvents.count + challenges.count +
+            trainTogetherPosts.count
+        )
 
         for item in events {
             let event = item.event
@@ -126,6 +151,30 @@ enum ATHLTHCommunityAgendaPolicy {
             ))
         }
 
+        // Only hosted or accepted sessions appear here. Public listings and
+        // pending invitations stay in discovery/inbox instead of the agenda.
+        for post in trainTogetherPosts {
+            guard includesTrainTogetherPost(
+                post,
+                requests: trainTogetherRequests,
+                userID: userID,
+                now: now
+            ) else { continue }
+
+            result.append(ATHLTHCommunityAgendaEntry(
+                id: "train-together:" + post.id.uuidString,
+                title: post.title,
+                context: ATHLTHLocalization.choose(
+                    english: "Train together", norwegian: "Tren sammen"
+                ),
+                scheduledAt: post.scheduledStart,
+                icon: post.resolvedParticipationMode == .physical
+                    ? "figure.run" : "person.2.wave.2",
+                isOngoing: false,
+                destination: .trainTogether(post.id)
+            ))
+        }
+
         // Different domains may share an underlying ID: preserve source identity.
         return result.sorted {
             if $0.scheduledAt != $1.scheduledAt {
@@ -158,8 +207,8 @@ struct ATHLTHCommunityAgendaView: View {
                         ),
                         systemImage: "calendar",
                         description: Text(ATHLTHLocalization.choose(
-                            english: "Events and challenges you've joined will appear here.",
-                            norwegian: "Arrangementer og utfordringer du deltar i vises her."
+                            english: "Your events, challenges and Train Together sessions will appear here.",
+                            norwegian: "Arrangementer, utfordringer og Tren sammen-økter du deltar i vises her."
                         ))
                     )
                 } else {
