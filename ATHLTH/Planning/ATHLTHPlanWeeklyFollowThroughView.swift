@@ -15,6 +15,8 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
     @State private var movePreviewUnavailable = false
     @State private var moveSaved = false
     @State private var lastApprovedSessionID: UUID?
+    @State private var previewEfforts: [UUID: ATHLTHPlanWeeklyFollowThrough.PlannedEffort] = [:]
+    @State private var showsIntensityPreview = false
 
     var body: some View {
         // Always use the persisted plan rather than a possibly stale
@@ -29,6 +31,9 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
         let load = ATHLTHPlanWeeklyFollowThrough.plannedLoadSummary(plan: currentPlan)
         let weeklyLoads = ATHLTHPlanWeeklyFollowThrough.weeklyLoadSummaries(plan: currentPlan)
         let volumeChanges = ATHLTHPlanWeeklyFollowThrough.weeklyVolumeChanges(plan: currentPlan)
+        let intensity = ATHLTHPlanWeeklyFollowThrough.effortDistribution(
+            plan: currentPlan, effortBySessionID: previewEfforts
+        )
         let relevant = report.relevantWeeks
         let movePreview = ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
             plan: currentPlan,
@@ -59,6 +64,85 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 .fixedSize(horizontal: false, vertical: true)
             }
+
+            VStack(alignment: .leading, spacing: 9) {
+                Button {
+                    showsIntensityPreview.toggle()
+                } label: {
+                    HStack {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Explore workout intensity",
+                            norwegian: "Utforsk treningsintensitet"
+                        ), systemImage: "waveform.path.ecg")
+                        Spacer()
+                        Image(systemName: showsIntensityPreview ? "chevron.up" : "chevron.down")
+                    }
+                    .font(.subheadline.weight(.semibold))
+                }
+                .buttonStyle(.plain)
+
+                if showsIntensityPreview {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Try assigning easy, moderate or hard intensity to sessions. This preview is not saved to your plan.",
+                        norwegian: "Prøv å angi rolig, moderat eller hard intensitet for øktene. Denne forhåndsvisningen lagres ikke i treningsplanen."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    ForEach(currentPlan.weeks) { week in
+                        ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
+                            ForEach(day.sessions) { workout in
+                                HStack(spacing: 8) {
+                                    Text(workout.title)
+                                        .font(.caption)
+                                        .lineLimit(1)
+                                    Spacer(minLength: 4)
+                                    Menu {
+                                        Button(ATHLTHLocalization.choose(
+                                            english: "Not specified", norwegian: "Ikke angitt"
+                                        )) { previewEfforts.removeValue(forKey: workout.id) }
+                                        Button(ATHLTHLocalization.choose(
+                                            english: "Easy", norwegian: "Rolig"
+                                        )) { previewEfforts[workout.id] = .easy }
+                                        Button(ATHLTHLocalization.choose(
+                                            english: "Moderate", norwegian: "Moderat"
+                                        )) { previewEfforts[workout.id] = .moderate }
+                                        Button(ATHLTHLocalization.choose(
+                                            english: "Hard", norwegian: "Hard"
+                                        )) { previewEfforts[workout.id] = .hard }
+                                    } label: {
+                                        Text(previewEfforts[workout.id] == .easy
+                                             ? ATHLTHLocalization.choose(english: "Easy", norwegian: "Rolig")
+                                             : previewEfforts[workout.id] == .moderate
+                                             ? ATHLTHLocalization.choose(english: "Moderate", norwegian: "Moderat")
+                                             : previewEfforts[workout.id] == .hard
+                                             ? ATHLTHLocalization.choose(english: "Hard", norwegian: "Hard")
+                                             : ATHLTHLocalization.choose(english: "Set intensity", norwegian: "Velg intensitet"))
+                                        .font(.caption.weight(.medium))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Text(ATHLTHLocalization.choose(
+                        english: "Easy \(intensity.easyMinutes) min · Moderate \(intensity.moderateMinutes) min · Hard \(intensity.hardMinutes) min · Unknown \(intensity.unknownMinutes) min",
+                        norwegian: "Rolig \(intensity.easyMinutes) min · Moderat \(intensity.moderateMinutes) min · Hard \(intensity.hardMinutes) min · Ukjent \(intensity.unknownMinutes) min"
+                    ))
+                    .font(.caption)
+                    if intensity.adjacentHardDayPairs > 0 {
+                        Label(ATHLTHLocalization.choose(
+                            english: "\(intensity.adjacentHardDayPairs) adjacent pairs of hard training days. Review your plan.",
+                            norwegian: "\(intensity.adjacentHardDayPairs) par med harde treningsdager etter hverandre. Vurder fordelingen."
+                        ), systemImage: "exclamationmark.circle")
+                        .font(.caption)
+                    }
+                    Button(ATHLTHLocalization.choose(
+                        english: "Reset preview", norwegian: "Nullstill forhåndsvisning"
+                    )) { previewEfforts.removeAll() }
+                    .font(.caption)
+                }
+            }
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             if load.estimatedMinutes > 0 {
                 VStack(alignment: .leading, spacing: 7) {
