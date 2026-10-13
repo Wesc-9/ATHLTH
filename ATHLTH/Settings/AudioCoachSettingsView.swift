@@ -129,25 +129,10 @@ private final class ATHLTHAudioCoachPreviewSpeaker:
         )
         let utterance = AVSpeechUtterance(string: preview)
 
-        if let voiceIdentifier,
-           let selectedVoice =
-                AVSpeechSynthesisVoice(
-                    identifier: voiceIdentifier
-                ) {
-            utterance.voice = selectedVoice
-        } else if language == .norwegian ||
-            (language == .system &&
-             useNorwegian) {
-            utterance.voice =
-                AVSpeechSynthesisVoice(
-                    language: "nb-NO"
-                )
-        } else if language == .english {
-            utterance.voice =
-                AVSpeechSynthesisVoice(
-                    language: "en-US"
-                )
-        }
+        utterance.voice = ATHLTHCoachPreferredSystemVoice.resolve(
+            selectedIdentifier: voiceIdentifier,
+            language: language
+        )
 
         utterance.rate =
             Float(
@@ -811,9 +796,8 @@ struct ATHLTHAudioCoachSettingsView: View {
                 id: \.rawValue
             ) { language in
                 Button {
-                    settings
-                        .audioCoachLanguage =
-                        language
+                    settings.audioCoachLanguage = language
+                    settings.audioCoachVoiceIdentifier = nil
                 } label: {
                     if settings
                         .audioCoachLanguage ==
@@ -1483,9 +1467,9 @@ struct ATHLTHAudioCoachSettingsView: View {
     private var voiceAvailabilityText: String {
         ATHLTHLocalization.choose(
             english:
-                "The voice menu is built from every compatible voice iOS exposes for the selected language, including enhanced variants when available. Apple Watch can have a different voice selection and will fall back automatically.",
+                "Automatic selects the best installed compatible voice. Enhanced and premium voices can be downloaded in iOS Settings; Apple Watch has its own voices.",
             norwegian:
-                "Stemmemenyen henter alle kompatible stemmer iOS tilbyr for valgt språk, inkludert forbedrede varianter når de finnes. Apple Watch kan ha et annet utvalg og bruker automatisk en passende reserve."
+                "Automatisk velger den beste kompatible stemmen som er installert. Forbedrede og premium-stemmer kan lastes ned i iOS-innstillinger. Apple Watch har egne stemmer."
         )
     }
 

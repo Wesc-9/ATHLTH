@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 
 /// The words used by Audio Coach, deliberately independent of voice speed,
 /// how frequently cues occur and which sensor values are announced.
@@ -122,5 +123,50 @@ enum ATHLTHCoachSpeechStyle: String, Codable, CaseIterable, Identifiable, Hashab
             }
             return text
         }
+    }
+}
+
+
+/// Uses the best compatible system voice installed on the actual speaker.
+/// User-selected voices are never overridden. No cloud request is required.
+enum ATHLTHCoachPreferredSystemVoice {
+    static func resolve(
+        selectedIdentifier: String?,
+        language: WatchAudioCoachLanguage
+    ) -> AVSpeechSynthesisVoice? {
+        if let selectedIdentifier,
+           let preferred = AVSpeechSynthesisVoice(identifier: selectedIdentifier) {
+            return preferred
+        }
+        let code: String
+        switch language {
+        case .norwegian: code = "nb"
+        case .english: code = "en"
+        case .system:
+            code = Locale.autoupdatingCurrent.language.languageCode?
+                .identifier.lowercased() ?? "en"
+        }
+        let norwegian = ["nb", "nn", "no"].contains(code)
+        let prefixes = norwegian ? ["nb", "nn", "no"] : [code]
+        let preferredLocale = norwegian ? "nb-no" :
+            (code == "en" ? "en-us" : code)
+        let available = AVSpeechSynthesisVoice.speechVoices().filter { voice in
+            let locale = voice.language.lowercased()
+            return prefixes.contains { locale.hasPrefix($0) }
+        }
+        let best = available.sorted { lhs, rhs in
+            if lhs.quality.rawValue != rhs.quality.rawValue {
+                return lhs.quality.rawValue > rhs.quality.rawValue
+            }
+            let leftExact = lhs.language.lowercased() == preferredLocale
+            let rightExact = rhs.language.lowercased() == preferredLocale
+            if leftExact != rightExact { return leftExact }
+            return lhs.identifier < rhs.identifier
+        }.first
+
+        return best ?? AVSpeechSynthesisVoice(
+            language: norwegian ? "nb-NO" :
+                (code == "en" ? "en-US" : code)
+        )
     }
 }

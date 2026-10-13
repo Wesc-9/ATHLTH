@@ -3583,31 +3583,10 @@ final class IPhoneWorkoutStore:
                 string: spokenPhrase
             )
 
-        if let voiceIdentifier =
-                configuration
-                    .voiceIdentifier,
-           let selectedVoice =
-                AVSpeechSynthesisVoice(
-                    identifier:
-                        voiceIdentifier
-                ) {
-            utterance.voice = selectedVoice
-        } else {
-            switch configuration.language {
-            case .english:
-                utterance.voice =
-                    AVSpeechSynthesisVoice(
-                        language: "en-US"
-                    )
-            case .norwegian:
-                utterance.voice =
-                    AVSpeechSynthesisVoice(
-                        language: "nb-NO"
-                    )
-            case .system:
-                break
-            }
-        }
+        utterance.voice = ATHLTHCoachPreferredSystemVoice.resolve(
+            selectedIdentifier: configuration.voiceIdentifier,
+            language: configuration.language
+        )
 
         utterance.rate =
             configuration

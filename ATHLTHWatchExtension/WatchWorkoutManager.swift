@@ -5741,24 +5741,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             string: spokenText
         )
 
-        if let voiceIdentifier =
-                audioCoachConfiguration
-                    .voiceIdentifier,
-           let selectedVoice =
-                AVSpeechSynthesisVoice(
-                    identifier:
-                        voiceIdentifier
-                ) {
-            utterance.voice =
-                selectedVoice
-        } else if let audioCoachVoiceLanguage,
-                  let voice =
-                    AVSpeechSynthesisVoice(
-                        language:
-                            audioCoachVoiceLanguage
-                    ) {
-            utterance.voice = voice
-        }
+        utterance.voice = ATHLTHCoachPreferredSystemVoice.resolve(
+            selectedIdentifier: audioCoachConfiguration.voiceIdentifier,
+            language: audioCoachConfiguration.language
+        )
 
         utterance.rate =
             audioCoachConfiguration
