@@ -39,15 +39,22 @@ enum ATHLTHCommunityDiscoveryPolicy {
     static func matches(_ query: String, in fields: [String]) -> Bool {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return true }
-        let words = trimmed.split(whereSeparator: \.isWhitespace)
-        return words.allSatisfy { word in
-            fields.contains { field in
-                field.range(
-                    of: String(word),
-                    options: [.caseInsensitive, .diacriticInsensitive],
-                    locale: Locale(identifier: "nb_NO")
-                ) != nil
-            }
+        let terms = normalized(trimmed).split(whereSeparator: \.isWhitespace)
+        let normalizedFields = fields.map(normalized)
+        return terms.allSatisfy { term in
+            normalizedFields.contains { $0.contains(term) }
         }
+    }
+
+    /// Foundation's diacritic folding alone does not fold Norwegian ø to o
+    /// or æ to ae. Map them explicitly so "loping" finds "Løping" too.
+    private static func normalized(_ value: String) -> String {
+        value.folding(
+            options: [.caseInsensitive, .diacriticInsensitive],
+            locale: Locale(identifier: "nb_NO")
+        )
+        .replacingOccurrences(of: "ø", with: "o")
+        .replacingOccurrences(of: "æ", with: "ae")
+        .replacingOccurrences(of: "å", with: "a")
     }
 }
