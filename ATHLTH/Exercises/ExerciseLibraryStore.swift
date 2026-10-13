@@ -820,6 +820,14 @@ final class ExerciseLibraryStore: ObservableObject {
         }
     }
 
+    /// Preserve a custom exercise's UUID when replacing its artwork.
+    func updateCustomImageData(_ data: Data, for exerciseID: UUID) throws -> URL {
+        guard customExercises.contains(where: { $0.id == exerciseID }) else {
+            throw ExerciseLibraryError.storageUnavailable
+        }
+        return try saveCustomImageData(data, exerciseID: exerciseID)
+    }
+
     private func saveCustomImageData(
         _ data: Data,
         exerciseID: UUID
