@@ -983,6 +983,15 @@ struct ATHLTHTrainPlanPremiumView: View {
                                         .font(.headline)
                                         .foregroundStyle(graphite)
                                         .multilineTextAlignment(.leading)
+                                    if let duration = workout.durationMinutes,
+                                       duration > 0 {
+                                        Label(
+                                            tr("About \(duration) min", "Ca. \(duration) min"),
+                                            systemImage: "clock"
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(secondaryInk)
+                                    }
                                     if isToday && !completed && !skipped {
                                         Label(tr("Today", "I dag"),
                                               systemImage: "calendar")
