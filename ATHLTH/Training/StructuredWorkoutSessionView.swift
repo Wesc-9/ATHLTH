@@ -112,7 +112,9 @@ struct StructuredWorkoutSessionView: View {
                 ToolbarItem(
                     placement: .cancellationAction
                 ) {
-                    Button("Close") {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Close", norwegian: "Lukk"
+                    )) {
                         dismiss()
                     }
                 }
@@ -121,20 +123,38 @@ struct StructuredWorkoutSessionView: View {
                 bottomControls
             }
             .confirmationDialog(
-                "Finish workout?",
+                ATHLTHLocalization.choose(
+                    english: "Finish workout?", norwegian: "Avslutte økten?"
+                ),
                 isPresented: $showingFinishConfirmation,
                 titleVisibility: .visible
             ) {
-                Button("Finish Workout") {
+                Button(ATHLTHLocalization.choose(
+                    english: "Finish workout", norwegian: "Fullfør økt"
+                )) {
                     finishWorkout()
                 }
+                .disabled(savedCompletion || completedBlockIDs.isEmpty)
 
-                Button("Cancel", role: .cancel) {}
+                Button(ATHLTHLocalization.choose(
+                    english: "Cancel", norwegian: "Avbryt"
+                ), role: .cancel) {}
             } message: {
                 Text(
-                    completedBlockIDs.count == blocks.count
-                        ? "All blocks are completed."
-                        : "\(completedBlockIDs.count) of \(blocks.count) blocks are marked complete."
+                    completedBlockIDs.isEmpty
+                        ? ATHLTHLocalization.choose(
+                            english: "Complete at least one block before saving the workout.",
+                            norwegian: "Fullfør minst én blokk før økten kan lagres."
+                        )
+                        : completedBlockIDs.count == blocks.count
+                            ? ATHLTHLocalization.choose(
+                                english: "All blocks are completed.",
+                                norwegian: "Alle blokkene er gjennomført."
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "\(completedBlockIDs.count) of \(blocks.count) blocks are completed.",
+                                norwegian: "\(completedBlockIDs.count) av \(blocks.count) blokker er gjennomført."
+                            )
                 )
             }
             .onAppear {
@@ -480,7 +500,9 @@ struct StructuredWorkoutSessionView: View {
                     Button {
                         showingFinishConfirmation = true
                     } label: {
-                        Text("Finish")
+                        Text(ATHLTHLocalization.choose(
+                            english: "Finish", norwegian: "Avslutt"
+                        ))
                             .font(.subheadline.weight(.semibold))
                             .frame(width: 88, height: 50)
                     }
@@ -539,6 +561,9 @@ struct StructuredWorkoutSessionView: View {
     }
 
     private func finishWorkout() {
+        // Ignore repeated confirmation taps and empty sessions. A saved
+        // structured completion is evidence for the linked training plan.
+        guard !savedCompletion, !completedBlockIDs.isEmpty else { return }
         let completion =
             StructuredWorkoutCompletion(
                 id: UUID(),
