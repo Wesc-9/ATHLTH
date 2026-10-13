@@ -14,6 +14,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
     @State private var showsMovePreview = false
     @State private var movePreviewUnavailable = false
     @State private var moveSaved = false
+    @State private var lastApprovedSessionID: UUID?
 
     var body: some View {
         let report = ATHLTHPlanWeeklyFollowThrough.inspect(
@@ -231,7 +232,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                         .fixedSize(horizontal: false, vertical: true)
                     }
 
-                    if let movePreview {
+                    if let movePreview, lastApprovedSessionID != movePreview.sessionID {
                         VStack(alignment: .leading, spacing: 6) {
                             Label(
                                 ATHLTHLocalization.choose(
@@ -247,8 +248,8 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                             ))
                             .font(.caption)
                             Text(ATHLTHLocalization.choose(
-                                english: "Nothing has moved. Check the session and confirm any changes in the plan editor.",
-                                norwegian: "Ingen økt er flyttet. Kontroller økten og godkjenn eventuelle endringer i planredigeringen."
+                                english: "Suggested because the new day has fewer adjacent planned workouts. This is a spacing suggestion, not a recovery assessment. Nothing changes without approval.",
+                                norwegian: "Foreslått fordi den nye dagen har færre planlagte økter på nabodagene. Dette er et fordelingsforslag, ikke en restitusjonsvurdering. Ingenting endres uten godkjenning."
                             ))
                             .font(.caption2)
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -301,6 +302,9 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                         healthWorkouts: health.workouts,
                                         strengthHistory: strength.workoutHistory
                                     )
+                                    if success {
+                                        lastApprovedSessionID = movePreview.sessionID
+                                    }
                                     moveSaved = success
                                     movePreviewUnavailable = !success
                                 }
@@ -310,7 +314,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                             } message: {
                                 Text(ATHLTHLocalization.choose(
                                     english: "Day \(movePreview.sourceDayIndex) → day \(movePreview.destinationDayIndex). Only approval saves this move.",
-                                    norwegian: "Dag \(movePreview.sourceDayIndex) → dag \(movePreview.destinationDayIndex). Ingenting flyttes automatisk."
+                                    norwegian: "Dag \(movePreview.sourceDayIndex) → dag \(movePreview.destinationDayIndex). Kun godkjenning lagrer flyttingen."
                                 ))
                             }
                             .alert(

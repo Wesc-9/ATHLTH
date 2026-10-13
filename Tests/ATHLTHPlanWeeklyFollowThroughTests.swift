@@ -510,6 +510,30 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
     }
 
     @MainActor
+    func testApprovedMoveCannotBeAppliedTwice() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        store.addSession(workout(), toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(workout(), toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let preview = try XCTUnwrap(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: plan.startDate!
+        ))
+        XCTAssertTrue(ATHLTHPlanWeeklyFollowThrough.applyApprovedMove(
+            preview, expectedVersion: saved.version, store: store, planID: plan.id,
+            healthWorkouts: [], strengthHistory: [], referenceDate: plan.startDate!
+        ))
+        let moved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertFalse(ATHLTHPlanWeeklyFollowThrough.applyApprovedMove(
+            preview, expectedVersion: saved.version, store: store, planID: plan.id,
+            healthWorkouts: [], strengthHistory: [], referenceDate: plan.startDate!
+        ))
+        let after = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertEqual(after.version, moved.version)
+    }
+
+    @MainActor
     func testDuplicateIdentitiesAreCountedOnlyOnce() throws {
         let (store, defaults, suite, plan) = try prepared(weekCount: 1)
         defer { defaults.removePersistentDomain(forName: suite) }
