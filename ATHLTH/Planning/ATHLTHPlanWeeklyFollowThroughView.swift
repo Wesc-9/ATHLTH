@@ -239,6 +239,15 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                         let skipped = session.isPlanSessionSkipped(
                                             planID: currentPlan.id, sessionID: workout.id
                                         )
+                                        let dayDate = currentPlan.startDate.flatMap { start in
+                                            calendar.date(
+                                                byAdding: .day,
+                                                value: currentWeekIndex * 7 + day.dayIndex - 1,
+                                                to: calendar.startOfDay(for: start)
+                                            )
+                                        }
+                                        let needsReview = !completed && !skipped
+                                            && (dayDate.map { $0 < today } ?? false)
                                         HStack(spacing: 5) {
                                             Image(systemName: completed
                                                   ? "checkmark.circle.fill"
@@ -259,6 +268,10 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                                  : skipped
                                                  ? ATHLTHLocalization.choose(
                                                      english: "Skipped", norwegian: "Hoppet over"
+                                                   )
+                                                 : needsReview
+                                                 ? ATHLTHLocalization.choose(
+                                                     english: "Needs review", norwegian: "Trenger gjennomgang"
                                                    )
                                                  : ATHLTHLocalization.choose(
                                                      english: "Planned", norwegian: "Planlagt"
