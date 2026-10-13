@@ -14,6 +14,7 @@ struct ATHLTHCommunityAgendaEntry: Identifiable {
     let context: String
     let scheduledAt: Date
     let icon: String
+    let isOngoing: Bool
     let destination: Destination
 
     @ViewBuilder
@@ -72,6 +73,7 @@ enum ATHLTHCommunityAgendaPolicy {
                 ),
                 scheduledAt: max(item.event.startsAt, now),
                 icon: "calendar",
+                isOngoing: item.event.status == "live",
                 destination: .event(item.id)
             ))
         }
@@ -99,6 +101,7 @@ enum ATHLTHCommunityAgendaPolicy {
                 context: club.name,
                 scheduledAt: max(event.startsAt, now),
                 icon: "person.3.fill",
+                isOngoing: event.status == "live",
                 destination: .clubEvent(group: club, event: event)
             ))
         }
@@ -118,6 +121,7 @@ enum ATHLTHCommunityAgendaPolicy {
                 ),
                 scheduledAt: max(challenge.rules.startsAt, now),
                 icon: "trophy",
+                isOngoing: challenge.status == .active,
                 destination: .challenge(challenge.id)
             ))
         }
@@ -202,9 +206,14 @@ struct ATHLTHCommunityAgendaRow: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHPlanDesign.ink)
                     .lineLimit(2)
-                Text(entry.scheduledAt.formatted(
-                    .dateTime.day().month(.abbreviated).hour().minute()
-                ))
+                Text(entry.isOngoing
+                    ? ATHLTHLocalization.choose(
+                        english: "Ongoing", norwegian: "Pågår"
+                    )
+                    : entry.scheduledAt.formatted(
+                        .dateTime.day().month(.abbreviated).hour().minute()
+                    )
+                )
                 .font(.caption)
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
