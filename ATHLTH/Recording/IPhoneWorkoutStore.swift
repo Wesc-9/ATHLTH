@@ -3198,7 +3198,11 @@ final class IPhoneWorkoutStore:
                 .audioCoachConfiguration?
                 .enabled == true {
                 speak(
-                    "Structured workout complete. Continue easy or finish when ready.",
+                    localizedCoachPhrase(
+                        english: "Structured workout complete. Continue easy or finish when ready.",
+                        norwegian: "Den planlagte økten er fullført. Fortsett rolig eller avslutt når du er klar.",
+                        configuration: workout.audioCoachConfiguration ?? .disabled
+                    ),
                     configuration:
                         workout.audioCoachConfiguration,
                     priority:
@@ -3221,10 +3225,18 @@ final class IPhoneWorkoutStore:
         if workout
             .audioCoachConfiguration?
             .announceCurrentWorkoutStep == true {
-            let next =
-                plan.steps[nextIndex]
+            let next = plan.steps[nextIndex]
+            let norwegian = localizedCoachPhrase(
+                english: "en",
+                norwegian: "no",
+                configuration: workout.audioCoachConfiguration ?? .disabled
+            ) == "no"
             speak(
-                "Next. \(next.title).",
+                ATHLTHCoachStructuredStepSpeech.phrase(
+                    for: next,
+                    position: .next,
+                    norwegian: norwegian
+                ),
                 configuration:
                     workout.audioCoachConfiguration,
                 priority: .structuredStep,
@@ -3257,8 +3269,23 @@ final class IPhoneWorkoutStore:
             return
         }
 
+        let position: ATHLTHCoachStructuredStepSpeech.Position
+        switch prefix {
+        case "Starting": position = .starting
+        case "Next": position = .next
+        default: position = .current
+        }
+        let norwegian = localizedCoachPhrase(
+            english: "en",
+            norwegian: "no",
+            configuration: workout.audioCoachConfiguration ?? .disabled
+        ) == "no"
         speak(
-            "\(prefix). \(plan.steps[workout.structuredStepIndex ?? 0].title).",
+            ATHLTHCoachStructuredStepSpeech.phrase(
+                for: plan.steps[workout.structuredStepIndex ?? 0],
+                position: position,
+                norwegian: norwegian
+            ),
             configuration:
                 workout.audioCoachConfiguration,
             priority: .structuredStep,
@@ -3332,6 +3359,21 @@ final class IPhoneWorkoutStore:
         guard shouldAnnounce else {
             return
         }
+
+        let activeStep: WatchRunningWorkoutStep? = {
+            guard workout.structuredWorkoutComplete != true,
+                  let plan = workout.structuredRunningWorkout,
+                  plan.steps.indices.contains(workout.structuredStepIndex ?? 0)
+            else { return nil }
+            return plan.steps[workout.structuredStepIndex ?? 0]
+        }()
+        guard ATHLTHCoachRoutineContextPolicy.shouldSpeakMilestone(
+            step: activeStep,
+            elapsedInStep: workout.elapsed(at: Date()) -
+                (workout.structuredStepStartElapsedTime ?? 0),
+            distanceInStepMeters: workout.distanceMeters -
+                (workout.structuredStepStartDistanceMeters ?? 0)
+        ) else { return }
 
         var parts: [String] = []
         let norwegian =

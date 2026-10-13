@@ -177,6 +177,63 @@ final class AudioCoachContentLevelTests: XCTestCase {
         }
     }
 
+
+    func testRoutineCoachDefersToStructuredStepTransitions() {
+        let timed = WatchRunningWorkoutStep(
+            id: UUID(),
+            title: "Interval",
+            measure: .time,
+            distanceMeters: nil,
+            durationSeconds: 60,
+            intensityText: nil
+        )
+        XCTAssertTrue(ATHLTHCoachRoutineContextPolicy.shouldSpeakMilestone(
+            step: nil, elapsedInStep: 1, distanceInStepMeters: 0))
+        XCTAssertFalse(ATHLTHCoachRoutineContextPolicy.shouldSpeakMilestone(
+            step: timed, elapsedInStep: 8, distanceInStepMeters: 0))
+        XCTAssertTrue(ATHLTHCoachRoutineContextPolicy.shouldSpeakMilestone(
+            step: timed, elapsedInStep: 30, distanceInStepMeters: 0))
+        XCTAssertFalse(ATHLTHCoachRoutineContextPolicy.shouldSpeakMilestone(
+            step: timed, elapsedInStep: 49, distanceInStepMeters: 0))
+
+        let distance = WatchRunningWorkoutStep(
+            id: UUID(),
+            title: "Run",
+            measure: .distance,
+            distanceMeters: 1_000,
+            durationSeconds: nil,
+            intensityText: nil
+        )
+        XCTAssertTrue(ATHLTHCoachRoutineContextPolicy.shouldSpeakMilestone(
+            step: distance, elapsedInStep: 180, distanceInStepMeters: 700))
+        XCTAssertFalse(ATHLTHCoachRoutineContextPolicy.shouldSpeakMilestone(
+            step: distance, elapsedInStep: 240, distanceInStepMeters: 960))
+    }
+
+    func testPlannedStepSpeechUsesRealTargetAndLocalization() {
+        var step = WatchRunningWorkoutStep(
+            id: UUID(),
+            title: "Drag",
+            measure: .time,
+            distanceMeters: nil,
+            durationSeconds: 90,
+            intensityText: nil
+        )
+        step.targetPaceMinSecondsPerKilometer = 300
+        step.targetPaceMaxSecondsPerKilometer = 330
+        let norwegian = ATHLTHCoachStructuredStepSpeech.phrase(
+            for: step, position: .next, norwegian: true
+        )
+        XCTAssertTrue(norwegian.contains("Neste"))
+        XCTAssertTrue(norwegian.contains("1 minutter 30 sekunder"))
+        XCTAssertTrue(norwegian.contains("Målfart 5:00–5:30 min/km"))
+        let english = ATHLTHCoachStructuredStepSpeech.phrase(
+            for: step, position: .starting, norwegian: false
+        )
+        XCTAssertTrue(english.contains("Starting"))
+        XCTAssertTrue(english.contains("Target pace 5:00–5:30"))
+    }
+
     func testApplyingContentPresetNeverEnablesDisabledSession() {
         let original = WatchAudioCoachConfiguration.disabled
         for level in ATHLTHCoachContentLevel.allCases {

@@ -241,3 +241,116 @@ extension ATHLTHCoachExperiencePreset {
                 expected.timeIntervalSeconds
     }
 }
+
+
+/// Keeps routine distance/time commentary out of short or nearly completed
+/// intervals. Planned-step announcements and independent safety alerts still
+/// take precedence. A suppressed routine milestone is intentionally skipped
+/// instead of replaying stale metrics after the next step begins.
+enum ATHLTHCoachRoutineContextPolicy {
+    static func shouldSpeakMilestone(
+        step: WatchRunningWorkoutStep?,
+        elapsedInStep: TimeInterval,
+        distanceInStepMeters: Double
+    ) -> Bool {
+        guard let step else { return true }
+
+        // Give the coach's new-step instruction time to finish.
+        guard elapsedInStep.isFinite, elapsedInStep >= 20 else {
+            return false
+        }
+
+        switch step.measure {
+        case .time:
+            guard let duration = step.durationSeconds,
+                  duration.isFinite, duration > 0 else { return true }
+            return duration - elapsedInStep > 20
+        case .distance:
+            guard let distance = step.distanceMeters,
+                  distance.isFinite, distance > 0 else { return true }
+            return distance - max(distanceInStepMeters, 0) > 75
+        case .open:
+            return true
+        }
+    }
+}
+
+/// Concise instructions based on the user's planned interval, shared by
+/// iPhone and Apple Watch. Use only explicit plan targets; no invented pace.
+enum ATHLTHCoachStructuredStepSpeech {
+    enum Position {
+        case starting, current, next
+    }
+
+    static func phrase(
+        for step: WatchRunningWorkoutStep,
+        position: Position,
+        norwegian: Bool
+    ) -> String {
+        let introduction: String
+        switch position {
+        case .starting: introduction = norwegian ? "Starter" : "Starting"
+        case .current: introduction = norwegian ? "Nå" : "Current"
+        case .next: introduction = norwegian ? "Neste" : "Next"
+        }
+
+        var parts = [introduction, step.title]
+
+        switch step.measure {
+        case .time:
+            if let seconds = step.durationSeconds,
+               seconds.isFinite, seconds > 0 {
+                let rounded = Int(seconds.rounded())
+                if rounded >= 60 {
+                    let minutes = rounded / 60
+                    let remainder = rounded % 60
+                    let unit = norwegian ? "minutter" : "minutes"
+                    let secondsUnit = norwegian ? "sekunder" : "seconds"
+                    parts.append(remainder == 0
+                        ? "\(minutes) \(unit)"
+                        : "\(minutes) \(unit) \(remainder) \(secondsUnit)")
+                } else {
+                    parts.append("\(rounded) " +
+                        (norwegian ? "sekunder" : "seconds"))
+                }
+            }
+        case .distance:
+            if let meters = step.distanceMeters,
+               meters.isFinite, meters > 0 {
+                if meters >= 1_000, meters.truncatingRemainder(dividingBy: 1_000) == 0 {
+                    parts.append("\(Int(meters / 1_000)) " +
+                        (norwegian ? "kilometer" : "kilometers"))
+                } else {
+                    parts.append("\(Int(meters.rounded())) " +
+                        (norwegian ? "meter" : "meters"))
+                }
+            }
+        case .open:
+            break
+        }
+
+        let paceValues = [
+            step.targetPaceMinSecondsPerKilometer,
+            step.targetPaceMaxSecondsPerKilometer
+        ].compactMap { $0 }.filter { $0.isFinite && (120...1_800).contains($0) }
+        if !paceValues.isEmpty {
+            let fast = paceValues.min()!
+            let slow = paceValues.max()!
+            func format(_ value: Double) -> String {
+                let seconds = Int(value.rounded())
+                return String(format: "%d:%02d", seconds / 60, seconds % 60)
+            }
+            let target = fast == slow
+                ? format(fast)
+                : "\(format(fast))–\(format(slow))"
+            parts.append((norwegian ? "Målfart " : "Target pace ") +
+                target + " min/km")
+        } else if let intensity = step.intensityText,
+                  !intensity.isEmpty {
+            // For non-pace training targets retain the user's plan label.
+            parts.append(intensity)
+        }
+
+        return parts.joined(separator: ". ")
+    }
+}

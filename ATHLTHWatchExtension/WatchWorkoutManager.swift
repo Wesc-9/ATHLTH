@@ -3794,9 +3794,18 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         if shouldAnnounce {
+            guard ATHLTHCoachRoutineContextPolicy.shouldSpeakMilestone(
+                step: currentStructuredRunningStep,
+                elapsedInStep: currentStructuredStepElapsedTime,
+                distanceInStepMeters: currentStructuredStepDistanceMeters
+            ) else { return }
+
+            let message = metricsAnnouncement
+            guard !message.isEmpty else { return }
+
             WKInterfaceDevice.current().play(.click)
             speak(
-                metricsAnnouncement,
+                message,
                 priority: .routineCoach,
                 event: ATHLTHCoachEvent(
                     kind: .routineMilestone,
@@ -3887,44 +3896,22 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
-        let localizedPrefix: String = {
-            switch prefix {
-            case "Starting":
-                return coachPhrase(
-                    english: "Starting",
-                    norwegian: "Starter"
-                )
-            case "Next":
-                return coachPhrase(
-                    english: "Next",
-                    norwegian: "Neste"
-                )
-            case "Current":
-                return coachPhrase(
-                    english: "Current",
-                    norwegian: "Nå"
-                )
-            default:
-                return prefix
-            }
-        }()
-
-        var parts = [
-            localizedPrefix,
-            step.title
-        ]
-
-        if let target = spokenTarget(for: step) {
-            parts.append(target)
+        let position: ATHLTHCoachStructuredStepSpeech.Position
+        switch prefix {
+        case "Starting": position = .starting
+        case "Next": position = .next
+        default: position = .current
         }
 
-        if let intensity = step.intensityText,
-           !intensity.isEmpty {
-            parts.append(intensity)
-        }
-
+        let norwegian = coachPhrase(
+            english: "en", norwegian: "no"
+        ) == "no"
         speak(
-            parts.joined(separator: ". "),
+            ATHLTHCoachStructuredStepSpeech.phrase(
+                for: step,
+                position: position,
+                norwegian: norwegian
+            ),
             priority: .structuredStep,
             event: ATHLTHCoachEvent(
                 kind: .runningStep,
