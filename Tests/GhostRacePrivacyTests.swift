@@ -261,6 +261,114 @@ final class GhostRacePrivacyTests: XCTestCase {
     }
 
     @MainActor
+    func testEarlyWorkoutStopCannotWinGhostRace() throws {
+        let reference = makeReference(
+            distanceMeters: 2_000, durationSeconds: 600, pointCount: 21
+        )
+        let store = GhostRaceStore()
+        try store.prepare(reference: reference)
+
+        store.updatePhoneWorkout(
+            location: reference.points[19].location,
+            elapsedTime: 570,
+            state: .completed,
+            routeProgressPercent: 95
+        )
+
+        let result = try XCTUnwrap(store.result)
+        XCTAssertFalse(result.completedRoute)
+        XCTAssertNil(result.signedTimeSeconds)
+        XCTAssertNil(result.beatGhost)
+    }
+
+    @MainActor
+    func testVerifiedFinishTimeIsNotDelayedByWorkoutStop() throws {
+        let reference = makeReference(
+            distanceMeters: 2_000, durationSeconds: 600, pointCount: 21
+        )
+        let store = GhostRaceStore()
+        try store.prepare(reference: reference)
+
+        store.updatePhoneWorkout(
+            location: reference.points.last!.location,
+            elapsedTime: 550,
+            state: .running,
+            routeProgressPercent: 100
+        )
+        store.updatePhoneWorkout(
+            location: reference.points.last!.location,
+            elapsedTime: 640,
+            state: .completed,
+            routeProgressPercent: 100
+        )
+
+        let result = try XCTUnwrap(store.result)
+        XCTAssertTrue(result.completedRoute)
+        XCTAssertEqual(result.elapsedTime, 550, accuracy: 0.01)
+        XCTAssertEqual(result.signedTimeSeconds ?? -1, 50, accuracy: 0.01)
+    }
+
+    @MainActor
+    func testIPhoneUsesMeasuredCourseProgressEvenWhenAheadOfGhost() throws {
+        let reference = makeReference(
+            distanceMeters: 2_000, durationSeconds: 600, pointCount: 21
+        )
+        let store = GhostRaceStore()
+        try store.prepare(reference: reference)
+
+        // At 60s the Ghost is only 200m in, but the user is already at
+        // the halfway GPS point. Matching must use actual course progress.
+        store.updatePhoneWorkout(
+            location: reference.points[10].location,
+            elapsedTime: 60,
+            state: .running,
+            routeProgressPercent: 50
+        )
+
+        let comparison = try XCTUnwrap(store.comparison)
+        XCTAssertEqual(comparison.userProgress, 0.5, accuracy: 0.02)
+        XCTAssertGreaterThan(comparison.signedDistanceMeters, 500)
+    }
+
+    @MainActor
+    func testMissingGPSAtStopReturnsIncompleteRaceInsteadOfHanging() throws {
+        let reference = makeReference(
+            distanceMeters: 2_000, durationSeconds: 600, pointCount: 21
+        )
+        let store = GhostRaceStore()
+        try store.prepare(reference: reference)
+
+        store.updatePhoneWorkout(
+            location: nil, elapsedTime: 600, state: .completed
+        )
+
+        let result = try XCTUnwrap(store.result)
+        XCTAssertFalse(result.completedRoute)
+        XCTAssertNil(result.beatGhost)
+    }
+
+    @MainActor
+    func testPausingHidesUnverifiedGhostAdvantage() throws {
+        let reference = makeReference(
+            distanceMeters: 2_000, durationSeconds: 600, pointCount: 21
+        )
+        let store = GhostRaceStore()
+        try store.prepare(reference: reference)
+        store.updatePhoneWorkout(
+            location: reference.points[10].location,
+            elapsedTime: 270, state: .running,
+            routeProgressPercent: 50
+        )
+        XCTAssertNotNil(store.comparison)
+        store.updatePhoneWorkout(
+            location: reference.points[10].location,
+            elapsedTime: 280, state: .paused,
+            routeProgressPercent: 50
+        )
+        XCTAssertNil(store.comparison)
+    }
+
+    @MainActor
     func testGhostResultTracksLeadChangesAndExtremes() throws {
         let reference = makeReference(
             distanceMeters: 2_000,
