@@ -311,9 +311,14 @@ final class ExerciseLibraryStore: ObservableObject {
     ]
 
     func localizedExerciseInstructions(_ entry: ExerciseLibraryEntry) -> [String] {
-        if ATHLTHLocalization.isNorwegian,
-           let key = entry.sourceIdentifier,
-           (entry.source == .repDB ||
+        guard ATHLTHLocalization.isNorwegian,
+              let key = entry.sourceIdentifier else {
+            return entry.exercise.instructions
+        }
+        if let nativeSteps = Self.nativeNorwegianInstructions[key] {
+            return nativeSteps
+        }
+        if (entry.source == .repDB ||
             (entry.source == .athlthCatalog && key.hasPrefix("athlth-core-"))),
            let steps = Self.norwegianCoreInstructions[key] {
             return steps
@@ -323,11 +328,24 @@ final class ExerciseLibraryStore: ObservableObject {
 
     func localizedExerciseName(_ entry: ExerciseLibraryEntry) -> String {
         guard ATHLTHLocalization.isNorwegian,
+              let id = entry.sourceIdentifier else { return entry.name }
+        if let nativeName = Self.nativeNorwegianNames[id] {
+            return nativeName
+        }
+        if entry.source == .repDB ||
+           (entry.source == .athlthCatalog && id.hasPrefix("athlth-core-")) {
+            return Self.norwegianExerciseNames[id] ?? entry.name
+        }
+        return entry.name
+    }
+
+    func localizedExerciseSummary(_ entry: ExerciseLibraryEntry) -> String? {
+        guard ATHLTHLocalization.isNorwegian,
               let id = entry.sourceIdentifier,
-              (entry.source == .repDB ||
-               (entry.source == .athlthCatalog && id.hasPrefix("athlth-core-")))
-        else { return entry.name }
-        return Self.norwegianExerciseNames[id] ?? entry.name
+              let steps = Self.nativeNorwegianInstructions[id] else {
+            return entry.summary
+        }
+        return steps.first
     }
 
     private static let norwegianMuscleSearchTerms: [String: [String]] = [
@@ -349,9 +367,13 @@ final class ExerciseLibraryStore: ObservableObject {
         primaryMuscles: [String]
     ) -> String {
         var words: [String] = []
-        if let sourceIdentifier,
-           let localized = norwegianExerciseNames[sourceIdentifier] {
-            words.append(localized)
+        if let sourceIdentifier {
+            if let localized = norwegianExerciseNames[sourceIdentifier] {
+                words.append(localized)
+            }
+            if let localized = nativeNorwegianNames[sourceIdentifier] {
+                words.append(localized)
+            }
         }
         let groups = ([bodyPart].compactMap { $0 } + primaryMuscles)
             .map {
@@ -377,8 +399,8 @@ final class ExerciseLibraryStore: ObservableObject {
                 repDBExercises
             )
             .filter { entry in
-                // Retire only the 20 ATHLTH-original core items; keep
-                // existing RepDB and user-created exercises available.
+                // Retire the old original-core batch. Keep legacy cached
+                // entries for references from previously recorded workouts.
                 entry.source != .athlthCatalog ||
                     !Self.isRetiredOriginalCoreSlug(entry.sourceIdentifier)
             }
@@ -467,6 +489,9 @@ final class ExerciseLibraryStore: ObservableObject {
             .lowercased()
 
         return allExercises.filter { entry in
+            // Third-party cached items are retained for old workout IDs,
+            // never shown as new choices or fetched from the network.
+            guard entry.source != .repDB else { return false }
             let matchesText: Bool
             if cleanQuery.isEmpty {
                 matchesText = true
