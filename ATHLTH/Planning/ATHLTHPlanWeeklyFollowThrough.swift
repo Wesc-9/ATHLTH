@@ -131,8 +131,9 @@ enum ATHLTHPlanWeeklyFollowThrough {
         var longerDays = 0
         var consecutivePairs = 0
         var previousLong = false
+        var previousDayOrdinal: Int?
         let threshold = max(1, longSessionThresholdMinutes)
-        for week in plan.weeks {
+        for (weekIndex, week) in plan.weeks.enumerated() {
             for day in week.days.sorted(by: { $0.dayIndex < $1.dayIndex }) {
                 let minutes = day.sessions.reduce(0) { sum, workout in
                     sum + max(0, workout.durationMinutes ?? 0)
@@ -149,8 +150,12 @@ enum ATHLTHPlanWeeklyFollowThrough {
                 }
                 let isLong = minutes >= threshold
                 if isLong { longerDays += 1 }
-                if previousLong && isLong { consecutivePairs += 1 }
+                let ordinal = weekIndex * 7 + day.dayIndex
+                if previousLong && isLong && previousDayOrdinal == ordinal - 1 {
+                    consecutivePairs += 1
+                }
                 previousLong = isLong
+                previousDayOrdinal = ordinal
             }
         }
         return PlannedLoadSummary(
@@ -183,8 +188,10 @@ enum ATHLTHPlanWeeklyFollowThrough {
                 }
             }
             let longDays = durations.map { $0 >= threshold }
-            let adjacent = zip(longDays, longDays.dropFirst()).filter { pair in
-                pair.0 && pair.1
+            let adjacent = zip(days, days.dropFirst()).filter { pair in
+                pair.1.dayIndex == pair.0.dayIndex + 1
+                    && pair.0.sessions.reduce(0) { $0 + max(0, $1.durationMinutes ?? 0) } >= threshold
+                    && pair.1.sessions.reduce(0) { $0 + max(0, $1.durationMinutes ?? 0) } >= threshold
             }.count
             return WeekLoadSummary(
                 id: week.id, weekNumber: index + 1,
@@ -251,7 +258,8 @@ enum ATHLTHPlanWeeklyFollowThrough {
         var unknown = 0
         var pairs = 0
         var previousHard = false
-        for week in plan.weeks {
+        var previousDayOrdinal: Int?
+        for (weekIndex, week) in plan.weeks.enumerated() {
             for day in week.days.sorted(by: { $0.dayIndex < $1.dayIndex }) {
                 var dayIsHard = false
                 for session in day.sessions {
@@ -265,8 +273,12 @@ enum ATHLTHPlanWeeklyFollowThrough {
                     case nil: unknown += minutes
                     }
                 }
-                if previousHard && dayIsHard { pairs += 1 }
+                let ordinal = weekIndex * 7 + day.dayIndex
+                if previousHard && dayIsHard && previousDayOrdinal == ordinal - 1 {
+                    pairs += 1
+                }
                 previousHard = dayIsHard
+                previousDayOrdinal = ordinal
             }
         }
         return EffortDistribution(
