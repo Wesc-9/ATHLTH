@@ -77,8 +77,8 @@ struct ATHLTHTrainPlanPremiumView: View {
     // chain so SwiftUI can type-check it independently on Swift 6.
     @ViewBuilder
     private func movingWorkoutEditor(_ workout: PlannedSession) -> some View {
-            if let movingPlanID,
-               let plan = session.trainingPlan(withID: movingPlanID) {
+            if let selectedMovePlanID = movingPlanID,
+               let plan = session.trainingPlan(withID: selectedMovePlanID) {
                 NavigationStack {
                     Form {
                         Section {
