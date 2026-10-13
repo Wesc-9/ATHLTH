@@ -115,6 +115,40 @@ struct AudioCoachDraft {
 
     var language: WatchAudioCoachLanguage = .system
 
+    /// Preserve voice, language, music routing and per-workout session data.
+    var experiencePreset: ATHLTHCoachExperiencePreset? {
+        guard enabled else { return nil }
+        return ATHLTHCoachExperiencePreset.allCases.first { preset in
+            ATHLTHCoachContentLevel.matching(configuration()) == preset.contentLevel
+                && speechStyle == preset.speechStyle
+                && distanceTriggerEnabled
+                && !timeTriggerEnabled
+                && abs(distanceIntervalKilometers - preset.distanceIntervalKilometers) < 0.001
+        }
+    }
+
+    mutating func applyExperience(_ preset: ATHLTHCoachExperiencePreset) {
+        enabled = true
+        let values = preset.contentLevel.applying(to: configuration())
+        announceDistance = values.announceDistance
+        announceElapsedTime = values.announceElapsedTime
+        announceAveragePace = values.announceAveragePace
+        announceClockTime = values.announceClockTime
+        announceHeartRate = values.announceHeartRate
+        announceRemainingRouteDistance = values.announceRemainingRouteDistance
+        announceEstimatedRemainingRouteTime = values.announceEstimatedRemainingRouteTime
+        announceCurrentWorkoutStep = values.announceCurrentWorkoutStep
+        announceRemainingStepTime = values.announceRemainingStepTime
+        announceRemainingStepDistance = values.announceRemainingStepDistance
+        announceWorkoutStart = values.shouldAnnounceWorkoutStart
+        announcePauseResume = values.shouldAnnouncePauseResume
+        announceWorkoutComplete = values.shouldAnnounceWorkoutComplete
+        distanceTriggerEnabled = true
+        timeTriggerEnabled = false
+        distanceIntervalKilometers = preset.distanceIntervalKilometers
+        speechStyle = preset.speechStyle
+    }
+
     @MainActor
     mutating func load(from settings: AppSettingsStore) {
         enabled = settings.audioCoachEnabledByDefault
@@ -3685,6 +3719,7 @@ struct AudioCoachSetupCard: View {
     @Binding var draft: AudioCoachDraft
     let showRouteOptions: Bool
     let showStructuredOptions: Bool
+    @State private var showAdvancedSettings = false
 
     var body: some View {
         ATHLTHCard {
@@ -3708,7 +3743,10 @@ struct AudioCoachSetupCard: View {
                     }
 
                     Text(
-                        "Choose when iPhone or Apple Watch speaks and exactly what it tells you."
+                        ATHLTHLocalization.choose(
+                            english: "Choose how much guidance you want during your workout.",
+                            norwegian: "Velg hvor mye veiledning du ønsker under økten."
+                        )
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -3722,6 +3760,73 @@ struct AudioCoachSetupCard: View {
 
             if draft.enabled {
                 VStack(alignment: .leading, spacing: 14) {
+                    Divider()
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "How much guidance?",
+                        norwegian: "Hvor mye veiledning?"
+                    ))
+                    .font(.subheadline.weight(.semibold))
+
+                    HStack(spacing: 7) {
+                        ForEach(ATHLTHCoachExperiencePreset.allCases) { preset in
+                            Button {
+                                draft.applyExperience(preset)
+                            } label: {
+                                VStack(spacing: 5) {
+                                    Text(preset.title)
+                                        .font(.subheadline.weight(.semibold))
+                                    Text(preset.subtitle)
+                                        .font(.caption2)
+                                        .multilineTextAlignment(.center)
+                                        .lineLimit(2)
+                                        .minimumScaleFactor(0.85)
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 69)
+                                .padding(.horizontal, 5)
+                                .foregroundStyle(draft.experiencePreset == preset
+                                    ? Color.white : ATHLTHTheme.primaryText)
+                                .background(draft.experiencePreset == preset
+                                    ? ATHLTHTheme.accentDeep : ATHLTHTheme.accentSoft,
+                                    in: RoundedRectangle(cornerRadius: 14))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(
+                                draft.experiencePreset == preset ? .isSelected : []
+                            )
+                        }
+                    }
+
+                    if draft.experiencePreset == nil {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Your custom setup is preserved until you select a level.",
+                            norwegian: "Ditt tilpassede oppsett beholdes til du velger et nivå."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showAdvancedSettings.toggle()
+                        }
+                    } label: {
+                        HStack {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "More settings", norwegian: "Flere innstillinger"
+                                ),
+                                systemImage: "slider.horizontal.3"
+                            )
+                            Spacer()
+                            Image(systemName: showAdvancedSettings
+                                ? "chevron.up" : "chevron.down")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                    }
+                    .buttonStyle(.plain)
+
+                    if showAdvancedSettings {
                     Divider()
 
                     Text("WHEN TO SPEAK")
@@ -3899,10 +4004,14 @@ struct AudioCoachSetupCard: View {
                     }
 
                     Text(
-                        "Your Settings defaults are loaded here automatically. Changes on this screen apply only to this workout."
+                        ATHLTHLocalization.choose(
+                            english: "Settings defaults are loaded automatically. Changes here affect only this workout.",
+                            norwegian: "Standardinnstillingene lastes automatisk. Endringer her gjelder bare denne økten."
+                        )
                     )
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    }
                 }
                 .padding(.top, 10)
             }
