@@ -203,7 +203,7 @@ final class CommunityEventChatStore:
                         .value
             }
 
-            messages = loadedMessages.reversed()
+            messages = Array(loadedMessages.reversed())
             canLoadOlderMessages = hasOlderMessages
             profiles =
                 Dictionary(
