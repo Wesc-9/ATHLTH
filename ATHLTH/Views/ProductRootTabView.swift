@@ -7321,9 +7321,9 @@ struct ATHLTHTrainView: View {
     ) {
         // Guard against a deleted/moved plan session between selecting
         // a week card and confirming the launch.
-        guard session.trainingPlan(withID: planID)?
+        guard let workout = session.trainingPlan(withID: planID)?
             .weeks.flatMap(\.days).flatMap(\.sessions)
-            .contains(where: { $0.id == workout.id }) == true
+            .first(where: { $0.id == workout.id })
         else {
             watchTransferError = ATHLTHLocalization.choose(
                 english: "This planned workout is no longer available. Refresh the plan.",
