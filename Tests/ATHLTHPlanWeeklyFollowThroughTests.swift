@@ -1093,4 +1093,47 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
         XCTAssertEqual(report.weeks[1].needsReview, 1)
         XCTAssertEqual(report.weeks[1].firstReviewDayID, plan.weeks[1].days[0].id)
     }
+
+    @MainActor
+    func testWorkoutScheduledEarlierTodayIsStillUpcoming() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var item = workout()
+        item.scheduledStart = try XCTUnwrap(Calendar.current.date(
+            byAdding: .hour, value: 6, to: plan.startDate!
+        ))
+        store.addSession(item, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let reference = try XCTUnwrap(Calendar.current.date(
+            byAdding: .hour, value: 20, to: plan.startDate!
+        ))
+        let report = ATHLTHPlanWeeklyFollowThrough.inspect(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: reference
+        )
+        XCTAssertEqual(report.upcoming, 1)
+        XCTAssertEqual(report.needsReview, 0)
+        XCTAssertEqual(report.pastDated, 0)
+    }
+
+    @MainActor
+    func testExplicitDateWorksWithoutPlanStart() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var modified = plan
+        modified.startDate = nil
+        var item = workout()
+        item.scheduledStart = plan.startDate
+        modified.weeks[0].days[0].sessions = [item]
+        let reference = try XCTUnwrap(Calendar.current.date(
+            byAdding: .day, value: 2, to: plan.startDate!
+        ))
+        let report = ATHLTHPlanWeeklyFollowThrough.inspect(
+            plan: modified, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: reference
+        )
+        XCTAssertEqual(report.needsReview, 1)
+        XCTAssertEqual(report.unknownDate, 0)
+        XCTAssertEqual(report.pastDated, 1)
+    }
 }
