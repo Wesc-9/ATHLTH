@@ -360,30 +360,30 @@ struct ATHLTHArenaEntryCard: View {
         HStack(spacing: 14) {
             ZStack {
                 RoundedRectangle(cornerRadius: 17, style: .continuous)
-                    .fill(ATHLTHTheme.accentDeep.opacity(0.09))
+                    .fill(ATHLTHArenaLightStyle.soft)
                     .frame(width: 58, height: 58)
                 Image(systemName: "trophy.fill")
                     .font(.system(size: 24, weight: .medium))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
             }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("ATHLTH Arena")
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .font(ATHLTHArenaLightStyle.editorialTitle(21))
+                    .foregroundStyle(ATHLTHArenaLightStyle.ink)
                 Text(ATHLTHLocalization.choose(
                     english: "Multiple rounds. One overall champion.",
                     norwegian: "Flere runder. Én sammenlagtvinner."
                 ))
                 .font(.subheadline)
-                .foregroundStyle(ATHLTHTheme.mutedText)
+                .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer(minLength: 3)
             Image(systemName: "chevron.right")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.mutedText)
+                .foregroundStyle(ATHLTHArenaLightStyle.secondary)
         }
         .padding(16)
         .background(ATHLTHArenaLightStyle.card(23))
@@ -1955,38 +1955,32 @@ struct ATHLTHArenaDraftDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Competition draft",
-                            norwegian: "Konkurranseutkast"
-                        ),
-                        systemImage: "trophy.fill"
-                    )
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    Text("ATHLTH · ARENA")
+                        .font(ATHLTHArenaLightStyle.eyebrow)
+                        .tracking(2)
+                        .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
 
                     Text(draft.title)
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .font(ATHLTHArenaLightStyle.editorialTitle(29))
+                        .foregroundStyle(ATHLTHArenaLightStyle.ink)
                     Text("\(draft.scope.title) · \(draft.durationDays) " +
                          ATHLTHLocalization.choose(english: "days", norwegian: "dager"))
                         .font(.subheadline)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                     Text(draft.scoring.title)
                         .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(18)
-                .background(.regularMaterial, in:
-                    RoundedRectangle(cornerRadius: 22))
+                .background(ATHLTHArenaLightStyle.card(21))
 
                 HStack {
                     Text(ATHLTHLocalization.choose(english: "Rounds", norwegian: "Runder"))
                         .font(.headline)
                     Spacer()
                     Text("\(draft.rounds.count)")
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                 }
 
                 if draft.rounds.isEmpty {
@@ -1995,7 +1989,7 @@ struct ATHLTHArenaDraftDetailView: View {
                         norwegian: "Legg til den første runden. Reglene kan endres før invitasjoner aktiveres."
                     ))
                     .font(.subheadline)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                     .padding(16)
                 }
 
@@ -2008,10 +2002,10 @@ struct ATHLTHArenaDraftDetailView: View {
                         VStack(alignment: .leading, spacing: 5) {
                             Text(round.title)
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ATHLTHTheme.primaryText)
+                                .foregroundStyle(ATHLTHArenaLightStyle.ink)
                             Text(round.rules)
                                 .font(.caption)
-                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                         }
                         Spacer(minLength: 3)
                         Button {
@@ -2028,15 +2022,14 @@ struct ATHLTHArenaDraftDetailView: View {
                             onSave(draft)
                         } label: {
                             Image(systemName: "minus.circle")
-                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                         }
                         .accessibilityLabel(ATHLTHLocalization.choose(
                             english: "Remove round", norwegian: "Fjern runde"
                         ))
                     }
                     .padding(14)
-                    .background(.regularMaterial, in:
-                        RoundedRectangle(cornerRadius: 17))
+                    .background(ATHLTHArenaLightStyle.card(17))
                 }
 
                 Button {
@@ -2053,7 +2046,7 @@ struct ATHLTHArenaDraftDetailView: View {
                 if draft.rounds.count >= 16 {
                     Text(ATHLTHArenaDraftIssue.tooManyRounds.message)
                         .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                 }
 
                 VStack(alignment: .leading, spacing: 9) {
@@ -2063,7 +2056,7 @@ struct ATHLTHArenaDraftDetailView: View {
                             norwegian: "Velg en klubb når du oppretter et nytt utkast."
                         ))
                         .font(.footnote)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                     } else {
                         Button {
                             Task { await publishDraft() }
@@ -2087,7 +2080,7 @@ struct ATHLTHArenaDraftDetailView: View {
                     if let issue = validationIssue {
                         Label(issue.message, systemImage: "info.circle")
                             .font(.footnote)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                     }
                     if let publishError {
                         Text(publishError)
@@ -2100,7 +2093,7 @@ struct ATHLTHArenaDraftDetailView: View {
                         norwegian: "En publisert serie blir et delt lobby-utkast. Konkurransen starter ikke automatisk."
                     ))
                     .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                 }
 
                 VStack(alignment: .leading, spacing: 7) {
@@ -2115,7 +2108,7 @@ struct ATHLTHArenaDraftDetailView: View {
                     ))
                     .font(.footnote)
                 }
-                .foregroundStyle(ATHLTHTheme.mutedText)
+                .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                 .padding(15)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(ATHLTHTheme.accentDeep.opacity(0.05),
