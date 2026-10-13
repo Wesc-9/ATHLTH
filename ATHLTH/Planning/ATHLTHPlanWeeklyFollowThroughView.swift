@@ -13,6 +13,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
     @State private var showsSuggestionPreview = false
     @State private var showsMovePreview = false
     @State private var movePreviewUnavailable = false
+    @State private var moveSaved = false
 
     var body: some View {
         let report = ATHLTHPlanWeeklyFollowThrough.inspect(
@@ -289,12 +290,41 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                     onSelect(movePreview.weekID, movePreview.sourceDayID)
                                 }
                                 Button(ATHLTHLocalization.choose(
+                                    english: "Approve and move workout",
+                                    norwegian: "Godkjenn og flytt økten"
+                                )) {
+                                    let success = ATHLTHPlanWeeklyFollowThrough.applyApprovedMove(
+                                        movePreview,
+                                        expectedVersion: plan.version,
+                                        store: session,
+                                        planID: plan.id,
+                                        healthWorkouts: health.workouts,
+                                        strengthHistory: strength.workoutHistory
+                                    )
+                                    moveSaved = success
+                                    movePreviewUnavailable = !success
+                                }
+                                Button(ATHLTHLocalization.choose(
                                     english: "Cancel", norwegian: "Avbryt"
                                 ), role: .cancel) { }
                             } message: {
                                 Text(ATHLTHLocalization.choose(
-                                    english: "Day \(movePreview.sourceDayIndex) → day \(movePreview.destinationDayIndex). Nothing is moved automatically.",
+                                    english: "Day \(movePreview.sourceDayIndex) → day \(movePreview.destinationDayIndex). Only approval saves this move.",
                                     norwegian: "Dag \(movePreview.sourceDayIndex) → dag \(movePreview.destinationDayIndex). Ingenting flyttes automatisk."
+                                ))
+                            }
+                            .alert(
+                                ATHLTHLocalization.choose(
+                                    english: "Workout moved",
+                                    norwegian: "Økten er flyttet"
+                                ),
+                                isPresented: $moveSaved
+                            ) {
+                                Button("OK", role: .cancel) { }
+                            } message: {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Your approved change was saved.",
+                                    norwegian: "Den godkjente endringen er lagret."
                                 ))
                             }
                             .alert(

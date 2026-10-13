@@ -229,6 +229,42 @@ enum ATHLTHPlanWeeklyFollowThrough {
         return true
     }
 
+    /// Apply only after explicit user approval, revalidating saved state.
+    static func applyApprovedMove(
+        _ preview: MovePreview,
+        expectedVersion: Int,
+        store: AppSessionStore,
+        planID: UUID,
+        healthWorkouts: [WorkoutSummary],
+        strengthHistory: [StrengthWorkoutLog],
+        referenceDate: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Bool {
+        guard let latest = store.trainingPlan(withID: planID),
+              latest.version == expectedVersion,
+              validateMovePreview(
+                  preview, plan: latest, store: store,
+                  healthWorkouts: healthWorkouts,
+                  strengthHistory: strengthHistory,
+                  referenceDate: referenceDate, calendar: calendar
+              ),
+              let start = latest.startDate.map({ calendar.startOfDay(for: $0) }),
+              let weekOffset = latest.weeks.firstIndex(where: { $0.id == preview.weekID }),
+              let targetDate = calendar.date(
+                  byAdding: .day,
+                  value: weekOffset * 7 + preview.destinationDayIndex - 1,
+                  to: start
+              ) else { return false }
+        return store.movePlanStudioWorkout(
+            planID: planID,
+            workoutID: preview.sessionID,
+            targetDate: targetDate,
+            expectedVersion: expectedVersion,
+            healthWorkouts: healthWorkouts,
+            strengthHistory: strengthHistory
+        )
+    }
+
     static func inspect(
         plan: TrainingPlan,
         store: AppSessionStore,
