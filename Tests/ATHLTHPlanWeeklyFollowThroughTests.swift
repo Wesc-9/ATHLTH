@@ -98,6 +98,8 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
         XCTAssertEqual(result.pastDated, 3)
         XCTAssertEqual(result.pastConfirmed, 2)
         XCTAssertEqual(result.pastCompleted, 1)
+        XCTAssertEqual(result.pastSkipped, 1)
+        XCTAssertEqual(result.pastUnreviewed, 1)
         XCTAssertEqual(result.completionPercent, 33)
         XCTAssertEqual(result.accountedPercent, 67)
     }
@@ -218,6 +220,9 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
         XCTAssertEqual(after.completedWeekTrend?.previous.number, 1)
         XCTAssertEqual(after.completedWeekTrend?.latest.number, 2)
         XCTAssertEqual(after.completedWeekTrend?.delta, 100)
+        XCTAssertEqual(after.completedWeekTrend?.previous.pastUnreviewed, 1)
+        XCTAssertEqual(after.completedWeekTrend?.latest.pastCompleted, 1)
+        XCTAssertEqual(after.completedWeekTrend?.latest.pastSkipped, 0)
     }
 
     @MainActor

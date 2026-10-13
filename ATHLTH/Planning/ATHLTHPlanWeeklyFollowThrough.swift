@@ -18,6 +18,9 @@ enum ATHLTHPlanWeeklyFollowThrough {
         let pastCompleted: Int
         let firstReviewDayID: UUID?
 
+        var pastSkipped: Int { pastConfirmed - pastCompleted }
+        var pastUnreviewed: Int { pastDated - pastConfirmed }
+
         var pastCompletionPercent: Int? {
             guard pastDated > 0 else { return nil }
             return Int((Double(pastCompleted) / Double(pastDated) * 100).rounded())
@@ -39,6 +42,8 @@ enum ATHLTHPlanWeeklyFollowThrough {
         var pastDated: Int { weeks.reduce(0) { $0 + $1.pastDated } }
         var pastConfirmed: Int { weeks.reduce(0) { $0 + $1.pastConfirmed } }
         var pastCompleted: Int { weeks.reduce(0) { $0 + $1.pastCompleted } }
+        var pastSkipped: Int { weeks.reduce(0) { $0 + $1.pastSkipped } }
+        var pastUnreviewed: Int { weeks.reduce(0) { $0 + $1.pastUnreviewed } }
 
         /// Nil means there are no past scheduled workouts to evaluate.
         var completionPercent: Int? {
