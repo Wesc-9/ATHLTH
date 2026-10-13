@@ -38,8 +38,9 @@ enum ATHLTHCommunityAgendaPolicy {
         rsvp: String?,
         now: Date
     ) -> Bool {
-        guard startsAt >= now, status != "cancelled",
-              status != "draft", status != "completed" else { return false }
+        guard (startsAt >= now || status == "live"),
+              status != "cancelled", status != "draft",
+              status != "completed" else { return false }
         return creatorID == userID ||
             rsvp == "going" || rsvp == "maybe" || rsvp == "waitlist"
     }
@@ -96,7 +97,7 @@ enum ATHLTHCommunityAgendaPolicy {
                 id: "club-event:" + event.id.uuidString,
                 title: event.title,
                 context: club.name,
-                scheduledAt: event.startsAt,
+                scheduledAt: max(event.startsAt, now),
                 icon: "person.3.fill",
                 destination: .clubEvent(group: club, event: event)
             ))
