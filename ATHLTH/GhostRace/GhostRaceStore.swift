@@ -500,16 +500,16 @@ final class GhostRaceStore: ObservableObject {
             return
         }
 
-        guard let latitude =
-                snapshot.currentLatitude,
-              let longitude =
-                snapshot.currentLongitude
+        guard let latitude = snapshot.currentLatitude,
+              let longitude = snapshot.currentLongitude,
+              latitude.isFinite, longitude.isFinite,
+              (-90...90).contains(latitude),
+              (-180...180).contains(longitude)
         else {
+            // An absent/bad GPS sample is not evidence of a lead.
+            comparison = nil
             if snapshot.state == .completed {
-                complete(
-                    snapshot: snapshot,
-                    reference: reference
-                )
+                complete(snapshot: snapshot, reference: reference)
             }
             return
         }
@@ -546,6 +546,12 @@ final class GhostRaceStore: ObservableObject {
                     in: reference
                 )
         else {
+            // The workout may end off-course. Report an incomplete race
+            // rather than leaving the user waiting forever for a result.
+            comparison = nil
+            if snapshot.state == .completed {
+                complete(snapshot: snapshot, reference: reference)
+            }
             return
         }
 
