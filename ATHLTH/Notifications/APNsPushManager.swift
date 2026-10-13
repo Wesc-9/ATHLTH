@@ -3,6 +3,17 @@ import Supabase
 import UIKit
 import UserNotifications
 
+// UIKit's escaping notification completion handlers are transferred to
+// MainActor exactly once, without sending notification objects across actors.
+private struct ATHLTHPresentationCompletion: @unchecked Sendable {
+    let finish: (UNNotificationPresentationOptions) -> Void
+}
+
+private struct ATHLTHTapCompletion: @unchecked Sendable {
+    let finish: () -> Void
+}
+
+
 struct ATHLTHPushNavigationTarget:
     Identifiable,
     Equatable
@@ -576,21 +587,6 @@ final class ATHLTHAppDelegate: NSObject,
         APNsPushManager.shared.didFailToRegister(error)
     }
 
-    // UIKit's completion-handler delegate variants avoid the Swift 6
-    // non-Sendable async protocol-witness mismatch. Completion is delivered
-    // from MainActor even when UserNotifications invokes the delegate on a
-    // cooperative background executor.
-    //
-    // UIKit owns these escaping callbacks. They are transferred exactly once
-    // to MainActor rather than exposing UNNotification objects across actors.
-    private struct PresentationCompletion: @unchecked Sendable {
-        let finish: (UNNotificationPresentationOptions) -> Void
-    }
-
-    private struct TapCompletion: @unchecked Sendable {
-        let finish: () -> Void
-    }
-
     nonisolated private func notificationPayload(
         _ userInfo: [AnyHashable: Any]
     ) -> Data? {
@@ -604,7 +600,7 @@ final class ATHLTHAppDelegate: NSObject,
             @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         let payload = notificationPayload(notification.request.content.userInfo)
-        let completion = PresentationCompletion(finish: completionHandler)
+        let completion = ATHLTHPresentationCompletion(finish: completionHandler)
         Task { @MainActor in
             if let payload,
                let userInfo = try? JSONSerialization.jsonObject(with: payload)
@@ -627,7 +623,7 @@ final class ATHLTHAppDelegate: NSObject,
         let payload = notificationPayload(
             response.notification.request.content.userInfo
         )
-        let completion = TapCompletion(finish: completionHandler)
+        let completion = ATHLTHTapCompletion(finish: completionHandler)
         Task { @MainActor in
             if let payload,
                let userInfo = try? JSONSerialization.jsonObject(with: payload)
