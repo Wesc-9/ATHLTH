@@ -96,6 +96,9 @@ struct PhoneWorkout: Codable, Identifiable {
     var distanceMeters: Double = 0
     var points: [PhoneRoutePoint] = []
     var healthID: UUID?
+    // Explicit plan origin, optional to preserve previous history.
+    var plannedPlanID: UUID? = nil
+    var plannedSessionID: UUID? = nil
     // Optional route metadata keeps older TestFlight recordings decodable
     // while allowing iPhone route runs to use the same selected route as Watch.
     var plannedRouteID: UUID? = nil
@@ -229,6 +232,8 @@ final class IPhoneWorkoutStore:
     }
     private var accountID: UUID?
     private var pendingWalking: Bool?
+    private var pendingPlannedPlanID: UUID?
+    private var pendingPlannedSessionID: UUID?
     private var pendingRunEnvironment: RunEnvironment = .outdoor
     private var pendingTreadmillInclinePercent: Double?
     private var pendingRoute: TrainingRoute?
@@ -293,6 +298,8 @@ final class IPhoneWorkoutStore:
         manager.stopUpdatingLocation()
         accountID = userID
         pendingWalking = nil
+        pendingPlannedPlanID = nil
+        pendingPlannedSessionID = nil
         pendingRunEnvironment = .outdoor
         pendingTreadmillInclinePercent = nil
         pendingRoute = nil
@@ -447,7 +454,9 @@ final class IPhoneWorkoutStore:
             WatchRouteAlertConfiguration? = nil,
         ghostUpdates:
             WatchGhostRaceAudioConfiguration? = nil,
-        autoPauseEnabled: Bool = false
+        autoPauseEnabled: Bool = false,
+        plannedPlanID: UUID? = nil,
+        plannedSessionID: UUID? = nil
     ) {
         guard accountID != nil, !saving else { return }
 
@@ -463,6 +472,8 @@ final class IPhoneWorkoutStore:
         }
 
         pendingWalking = walking
+        pendingPlannedPlanID = plannedPlanID
+        pendingPlannedSessionID = plannedSessionID
         pendingRunEnvironment = environment
         pendingTreadmillInclinePercent =
             environment == .treadmill
@@ -510,6 +521,8 @@ final class IPhoneWorkoutStore:
                 ? pendingRoute
                 : nil
         let workoutTitle = pendingWorkoutTitle
+        let plannedPlanID = pendingPlannedPlanID
+        let plannedSessionID = pendingPlannedSessionID
         let audioCoach = pendingAudioCoach
         let structuredWorkout =
             pendingStructuredWorkout
@@ -522,6 +535,8 @@ final class IPhoneWorkoutStore:
             pendingAutoPauseEnabled
 
         pendingWalking = nil
+        pendingPlannedPlanID = nil
+        pendingPlannedSessionID = nil
         pendingRunEnvironment = .outdoor
         pendingTreadmillInclinePercent = nil
         pendingRoute = nil
@@ -562,6 +577,8 @@ final class IPhoneWorkoutStore:
                 environment,
             treadmillInclinePercent:
                 treadmillInclinePercent,
+            plannedPlanID: plannedPlanID,
+            plannedSessionID: plannedSessionID,
             plannedRouteID: route?.id,
             plannedComparisonRouteID:
                 route?.sharedSourceRouteID ??

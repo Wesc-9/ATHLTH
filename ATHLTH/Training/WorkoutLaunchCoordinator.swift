@@ -385,7 +385,9 @@ enum WorkoutLaunchCoordinator {
         spotify: SpotifyPlaybackStore,
         ghostRace: GhostRaceStore? = nil,
         workoutMirroring:
-            WorkoutMirroringStore? = nil
+            WorkoutMirroringStore? = nil,
+        plannedPlanID: UUID? = nil,
+        plannedSessionID: UUID? = nil
     ) async throws {
         if ATHLTHDeviceRole.isIPad {
             let envelope =
@@ -535,7 +537,9 @@ enum WorkoutLaunchCoordinator {
                     resolvedGhostUpdates,
                 autoPauseEnabled:
                     configuration
-                        .autoPauseEnabled
+                        .autoPauseEnabled,
+                plannedPlanID: plannedPlanID,
+                plannedSessionID: plannedSessionID
             )
             watchConnection
                 .updateLocalWorkoutActivity(
@@ -729,7 +733,9 @@ enum WorkoutLaunchCoordinator {
         watchConnection: AppleWatchConnectionStore,
         spotify: SpotifyPlaybackStore,
         workoutMirroring:
-            WorkoutMirroringStore? = nil
+            WorkoutMirroringStore? = nil,
+        plannedPlanID: UUID? = nil,
+        plannedSessionID: UUID? = nil
     ) async throws {
         if ATHLTHDeviceRole.isIPad {
             let envelope =
@@ -792,7 +798,9 @@ enum WorkoutLaunchCoordinator {
                 routeAlerts:
                     settings.routeAlertConfiguration,
                 autoPauseEnabled:
-                    configuration.autoPauseEnabled
+                    configuration.autoPauseEnabled,
+                plannedPlanID: plannedPlanID,
+                plannedSessionID: plannedSessionID
             )
             watchConnection
                 .updateLocalWorkoutActivity(
