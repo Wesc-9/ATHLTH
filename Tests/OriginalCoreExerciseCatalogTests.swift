@@ -38,6 +38,32 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
         XCTAssertTrue(instructions.allSatisfy { $0.count >= 2 })
     }
 
+    @MainActor
+    func testNativeATHLTHCatalogIsAvailableOfflineWithStableIdentifiers() async {
+        let library = ExerciseLibraryStore()
+        let exercises = library.athlthCatalogExercises
+        XCTAssertGreaterThanOrEqual(exercises.count, 62)
+        XCTAssertEqual(Set(exercises.map(\.id)).count, exercises.count)
+        XCTAssertTrue(exercises.allSatisfy { $0.source == .athlthCatalog })
+        XCTAssertTrue(exercises.allSatisfy { !$0.exercise.primaryMuscles.isEmpty })
+
+        let benchPress = library.search(query: "benkpress")
+        XCTAssertTrue(benchPress.contains { $0.name == "Bench Press" })
+        XCTAssertTrue(library.search(query: "knebøy").contains {
+            $0.name == "Barbell Back Squat"
+        })
+
+        let beforeRefresh = exercises.map(\.id)
+        await library.refresh(force: true)
+        XCTAssertEqual(library.athlthCatalogExercises.map(\.id), beforeRefresh)
+
+        let anotherLibrary = ExerciseLibraryStore()
+        XCTAssertEqual(
+            anotherLibrary.athlthCatalogExercises.map(\.id),
+            beforeRefresh
+        )
+    }
+
     func testRecoveryEngineClassifiesPreviouslyUnrecognizedRepDBAnatomy() {
         let cases: [(String, String)] = [
             ("erector_spinae", "Lower Back"),
