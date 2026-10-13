@@ -515,13 +515,19 @@ struct ATHLTHChallenge: Identifiable, Codable, Hashable {
         return rules.endsAt.map { startedAt <= $0 } ?? true
     }
 
-    func countsAttempt(_ attempt: ChallengeAttempt) -> Bool {
-        guard attempt.challengeID == id, attempt.isEligible else { return false }
+    // Invalid route/verification results still remain visible after acceptance
+    // with their explanation, but must never contribute to the leaderboard.
+    func showsAttempt(_ attempt: ChallengeAttempt) -> Bool {
+        guard attempt.challengeID == id else { return false }
         let performedAt = attempt.verification == .manual
             ? attempt.submittedAt
             : attempt.startedAt
         guard let performedAt else { return false }
         return canCountWorkout(startedAt: performedAt, participantID: attempt.participantID)
+    }
+
+    func countsAttempt(_ attempt: ChallengeAttempt) -> Bool {
+        attempt.isEligible && showsAttempt(attempt)
     }
 
     var rulesAreLocked: Bool {
