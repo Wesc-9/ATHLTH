@@ -350,6 +350,53 @@ enum ATHLTHPlanWeeklyFollowThrough {
         }
     }
 
+    struct NextWorkout {
+        let weekID: UUID
+        let dayID: UUID
+        let sessionID: UUID
+        let title: String
+        let date: Date
+        let durationMinutes: Int?
+    }
+
+    /// Find the next unresolved scheduled workout without guessing completion.
+    static func nextWorkout(
+        plan: TrainingPlan, store: AppSessionStore,
+        healthWorkouts: [WorkoutSummary],
+        strengthHistory: [StrengthWorkoutLog],
+        referenceDate: Date = Date(), calendar: Calendar = .current
+    ) -> NextWorkout? {
+        guard let start = plan.startDate else { return nil }
+        let today = calendar.startOfDay(for: referenceDate)
+        var candidates: [NextWorkout] = []
+        for (weekOffset, week) in plan.weeks.enumerated() {
+            for day in week.days {
+                guard (1...7).contains(day.dayIndex),
+                      let date = calendar.date(
+                          byAdding: .day, value: weekOffset * 7 + day.dayIndex - 1,
+                          to: calendar.startOfDay(for: start)
+                      ), date >= today else { continue }
+                for workout in day.sessions {
+                    guard !store.isPlanSessionSkipped(planID: plan.id, sessionID: workout.id),
+                          !store.isPlanSessionCompleted(
+                              planID: plan.id, sessionID: workout.id,
+                              healthWorkouts: healthWorkouts,
+                              strengthHistory: strengthHistory
+                          ) else { continue }
+                    candidates.append(NextWorkout(
+                        weekID: week.id, dayID: day.id, sessionID: workout.id,
+                        title: workout.title, date: date,
+                        durationMinutes: workout.durationMinutes
+                    ))
+                }
+            }
+        }
+        return candidates.sorted {
+            if $0.date != $1.date { return $0.date < $1.date }
+            return $0.sessionID.uuidString < $1.sessionID.uuidString
+        }.first
+    }
+
     /// Conservative, non-mutating candidate for a future workout.
     /// The destination must be empty and later in the same week; explicitly
     /// timed, completed or skipped sessions are never offered for relocation.

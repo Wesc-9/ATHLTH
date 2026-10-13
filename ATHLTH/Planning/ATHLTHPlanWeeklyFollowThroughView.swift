@@ -38,6 +38,11 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
         let weeklyEfforts = ATHLTHPlanWeeklyFollowThrough.weeklyEffortSummaries(
             plan: currentPlan, effortBySessionID: previewEfforts
         )
+        let nextWorkout = ATHLTHPlanWeeklyFollowThrough.nextWorkout(
+            plan: currentPlan, store: session,
+            healthWorkouts: health.workouts,
+            strengthHistory: strength.workoutHistory
+        )
         let relevant = report.relevantWeeks
         let movePreview = ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
             plan: currentPlan,
@@ -176,6 +181,42 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
             }
             .foregroundStyle(ATHLTHPlanDesign.ink)
             .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let nextWorkout {
+                VStack(alignment: .leading, spacing: 7) {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Your next planned workout",
+                        norwegian: "Din neste planlagte økt"
+                    ), systemImage: "calendar.badge.clock")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    Text(nextWorkout.title)
+                        .font(.title3.weight(.semibold))
+                    Text(nextWorkout.date.formatted(
+                        .dateTime.weekday(.wide).day().month(.abbreviated)
+                    ))
+                    .font(.caption)
+                    if let minutes = nextWorkout.durationMinutes, minutes > 0 {
+                        Text(ATHLTHLocalization.choose(
+                            english: "\(minutes) planned minutes",
+                            norwegian: "\(minutes) planlagte minutter"
+                        ))
+                        .font(.caption)
+                    }
+                    Button {
+                        onSelect(nextWorkout.weekID, nextWorkout.dayID)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "View workout in plan",
+                            norwegian: "Se økten i planen"
+                        ), systemImage: "arrow.right")
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 8)
+            }
 
             if load.estimatedMinutes > 0 {
                 VStack(alignment: .leading, spacing: 7) {
