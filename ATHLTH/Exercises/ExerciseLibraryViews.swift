@@ -872,7 +872,7 @@ struct ExerciseDetailView: View {
                 artwork
 
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(library.localizedExerciseName(entry))
+                    Text(library.localizedExerciseName(currentEntry))
                         .font(.largeTitle.bold())
 
                     Text(
@@ -888,19 +888,19 @@ struct ExerciseDetailView: View {
                     .foregroundStyle(.secondary)
                 }
 
-                if let summary = library.localizedExerciseSummary(entry),
+                if let summary = library.localizedExerciseSummary(currentEntry),
                    !summary.isEmpty {
                     Text(summary)
                         .font(.subheadline)
                 }
 
-                if !library.localizedExerciseInstructions(entry).isEmpty {
+                if !library.localizedExerciseInstructions(currentEntry).isEmpty {
                     detailCard(ATHLTHLocalization.choose(
                         english: "How to perform",
                         norwegian: "Slik utfører du øvelsen"
                     )) {
                         ForEach(
-                            Array(library.localizedExerciseInstructions(entry).enumerated()),
+                            Array(library.localizedExerciseInstructions(currentEntry).enumerated()),
                             id: \.offset
                         ) { index, instruction in
                             HStack(alignment: .top, spacing: 10) {
