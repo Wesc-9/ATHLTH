@@ -124,6 +124,40 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                         .fixedSize(horizontal: false, vertical: true)
                     }
 
+                    if let suggestion = report.reviewSuggestion {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Suggested next step",
+                                    norwegian: "Forslag til neste steg"
+                                ),
+                                systemImage: "lightbulb"
+                            )
+                            .font(.caption.weight(.semibold))
+                            switch suggestion {
+                            case .reviewUnresolved(let count):
+                                Text(ATHLTHLocalization.choose(
+                                    english: "\(count) past workouts have no recorded outcome. Review these sessions before adjusting your plan.",
+                                    norwegian: "\(count) tidligere økter mangler registrert resultat. Gå gjennom øktene før du endrer planen."
+                                ))
+                            case .reviewSkipped(let count):
+                                Text(ATHLTHLocalization.choose(
+                                    english: "\(count) past workouts were marked skipped. Consider whether your schedule needs adjustment.",
+                                    norwegian: "\(count) tidligere økter er markert som hoppet over. Vurder om treningsplanen bør tilpasses."
+                                ))
+                            }
+                            Text(ATHLTHLocalization.choose(
+                                english: "Only you can decide to change the plan. No changes are made automatically.",
+                                norwegian: "Du bestemmer selv om planen skal endres. Ingenting endres automatisk."
+                            ))
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+
                     if let trend = report.completedWeekTrend {
                         Label(
                             ATHLTHLocalization.choose(

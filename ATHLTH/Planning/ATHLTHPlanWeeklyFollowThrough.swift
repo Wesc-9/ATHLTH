@@ -31,6 +31,11 @@ enum ATHLTHPlanWeeklyFollowThrough {
         }
     }
 
+    enum ReviewSuggestion: Equatable {
+        case reviewUnresolved(Int)
+        case reviewSkipped(Int)
+    }
+
     struct Report {
         let weeks: [Week]
 
@@ -56,6 +61,13 @@ enum ATHLTHPlanWeeklyFollowThrough {
             return Int((Double(pastConfirmed) / Double(pastDated) * 100).rounded())
         }
         var total: Int { weeks.reduce(0) { $0 + $1.planned } }
+
+        /// Read-only guidance; never edits, reschedules or assumes an outcome.
+        var reviewSuggestion: ReviewSuggestion? {
+            if pastUnreviewed >= 2 { return .reviewUnresolved(pastUnreviewed) }
+            if pastSkipped >= 2 { return .reviewSkipped(pastSkipped) }
+            return nil
+        }
 
         /// Compare only complete historical weeks. Current/partial weeks and
         /// undated sessions are excluded to avoid misleading trends.
