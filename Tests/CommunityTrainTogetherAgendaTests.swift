@@ -114,4 +114,49 @@ final class CommunityTrainTogetherAgendaTests: XCTestCase {
         )
         XCTAssertTrue(entries.isEmpty)
     }
+    func testClubChallengeMustBeJoinedWhenEnrollmentRequired() {
+        let now = Date()
+        let end = now.addingTimeInterval(3600)
+        let host = UUID()
+        let guest = UUID()
+        let check = ATHLTHCommunityAgendaPolicy.includesClubChallenge
+
+        XCTAssertTrue(check(
+            now, end, "active", host, host,
+            true, nil, now
+        ))
+        XCTAssertTrue(check(
+            now, end, "active", host, guest,
+            true, "joined", now
+        ))
+        XCTAssertFalse(check(
+            now, end, "active", host, guest,
+            true, nil, now
+        ))
+        XCTAssertFalse(check(
+            now, end, "active", host, guest,
+            true, "declined", now
+        ))
+        XCTAssertTrue(check(
+            now, end, "active", host, guest,
+            false, nil, now
+        ))
+    }
+
+    func testClubChallengeExcludesExpiredDraftCancelledAndCompleted() {
+        let now = Date()
+        let host = UUID()
+        let check = ATHLTHCommunityAgendaPolicy.includesClubChallenge
+        for status in ["draft", "cancelled", "completed"] {
+            XCTAssertFalse(check(
+                now, now.addingTimeInterval(3600), status,
+                host, host, false, nil, now
+            ))
+        }
+        XCTAssertFalse(check(
+            now.addingTimeInterval(-7200), now.addingTimeInterval(-3600),
+            "active", host, host, false, nil, now
+        ))
+    }
+
 }
