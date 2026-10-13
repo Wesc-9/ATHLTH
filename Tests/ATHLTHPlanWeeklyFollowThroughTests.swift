@@ -277,6 +277,27 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
     }
 
     @MainActor
+    func testSkippedSuggestionTargetsSkippedDayNotUnrelatedDay() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let first = workout()
+        let second = workout()
+        store.addSession(first, toDay: plan.weeks[0].days[2].id, inPlan: plan.id)
+        store.addSession(second, toDay: plan.weeks[0].days[3].id, inPlan: plan.id)
+        store.setPlanSessionSkipped(planID: plan.id, sessionID: first.id, skipped: true)
+        store.setPlanSessionSkipped(planID: plan.id, sessionID: second.id, skipped: true)
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let later = Calendar.current.date(byAdding: .day, value: 6, to: plan.startDate!)!
+        let report = ATHLTHPlanWeeklyFollowThrough.inspect(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: later
+        )
+        XCTAssertEqual(report.reviewSuggestion, .reviewSkipped(2))
+        XCTAssertEqual(report.weeks[0].firstSkippedDayID, plan.weeks[0].days[2].id)
+        XCTAssertNil(report.weeks[0].firstReviewDayID)
+    }
+
+    @MainActor
     func testDuplicateIdentitiesAreCountedOnlyOnce() throws {
         let (store, defaults, suite, plan) = try prepared(weekCount: 1)
         defer { defaults.removePersistentDomain(forName: suite) }

@@ -197,7 +197,14 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                         }
                                     }
                                     if let matching {
-                                        onSelect(matching.id, matching.firstReviewDayID)
+                                        let targetDay: UUID?
+                                        switch suggestion {
+                                        case .reviewUnresolved:
+                                            targetDay = matching.firstReviewDayID
+                                        case .reviewSkipped:
+                                            targetDay = matching.firstSkippedDayID
+                                        }
+                                        onSelect(matching.id, targetDay)
                                     }
                                 }
                                 Button(ATHLTHLocalization.choose(

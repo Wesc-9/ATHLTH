@@ -18,6 +18,7 @@ enum ATHLTHPlanWeeklyFollowThrough {
         let pastCompleted: Int
         let isFullyElapsed: Bool
         let firstReviewDayID: UUID?
+        let firstSkippedDayID: UUID?
 
         var pastSkipped: Int { pastConfirmed - pastCompleted }
         var pastUnreviewed: Int { pastDated - pastConfirmed }
@@ -127,6 +128,7 @@ enum ATHLTHPlanWeeklyFollowThrough {
             var pastConfirmed = 0
             var pastCompleted = 0
             var firstReviewDayID: UUID?
+            var firstSkippedDayID: UUID?
 
             for day in week.days.sorted(by: { $0.dayIndex < $1.dayIndex }) {
                 let fallback: Date?
@@ -150,7 +152,10 @@ enum ATHLTHPlanWeeklyFollowThrough {
                         planID: plan.id, sessionID: workout.id
                     ) {
                         skipped += 1
-                        if isPast { pastConfirmed += 1 }
+                        if isPast {
+                            pastConfirmed += 1
+                            if firstSkippedDayID == nil { firstSkippedDayID = day.id }
+                        }
                     } else if store.isPlanSessionCompleted(
                         planID: plan.id,
                         sessionID: workout.id,
@@ -193,7 +198,8 @@ enum ATHLTHPlanWeeklyFollowThrough {
                 isFullyElapsed: start.flatMap {
                     calendar.date(byAdding: .day, value: (weekOffset + 1) * 7, to: $0)
                 }.map { $0 <= today } ?? false,
-                firstReviewDayID: firstReviewDayID
+                firstReviewDayID: firstReviewDayID,
+                firstSkippedDayID: firstSkippedDayID
             ))
         }
         return Report(weeks: result)
