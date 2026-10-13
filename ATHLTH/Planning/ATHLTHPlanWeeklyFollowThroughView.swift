@@ -194,34 +194,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
             if let currentWeekIndex {
                 let week = currentPlan.weeks[currentWeekIndex]
                 let summary = weeklyLoads[currentWeekIndex]
-                let sessions = week.days.flatMap { day in
-                    day.sessions.map { workout in (day.dayIndex, workout.id) }
-                }
-                let completedCount = sessions.filter { _, id in
-                    session.isPlanSessionCompleted(
-                        planID: currentPlan.id, sessionID: id,
-                        healthWorkouts: health.workouts,
-                        strengthHistory: strength.workoutHistory
-                    )
-                }.count
-                let skippedCount = sessions.filter { _, id in
-                    session.isPlanSessionSkipped(planID: currentPlan.id, sessionID: id)
-                }.count
-                let unresolvedCount = sessions.filter { dayIndex, id in
-                    guard !session.isPlanSessionCompleted(
-                        planID: currentPlan.id, sessionID: id,
-                        healthWorkouts: health.workouts,
-                        strengthHistory: strength.workoutHistory
-                    ), !session.isPlanSessionSkipped(
-                        planID: currentPlan.id, sessionID: id
-                    ), let start = currentPlan.startDate,
-                    let date = calendar.date(
-                        byAdding: .day,
-                        value: currentWeekIndex * 7 + dayIndex - 1,
-                        to: calendar.startOfDay(for: start)
-                    ) else { return false }
-                    return date < today
-                }.count
+                let weekStatus = report.weeks[currentWeekIndex]
                 VStack(alignment: .leading, spacing: 9) {
                     HStack {
                         Label(ATHLTHLocalization.choose(
@@ -249,20 +222,20 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                     .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     HStack(spacing: 12) {
-                        Label("\(completedCount)", systemImage: "checkmark.circle.fill")
-                        Label("\(sessions.count - completedCount - skippedCount - unresolvedCount)", systemImage: "calendar")
-                        if unresolvedCount > 0 {
-                            Label("\(unresolvedCount)", systemImage: "questionmark.circle")
+                        Label("\(weekStatus.completed)", systemImage: "checkmark.circle.fill")
+                        Label("\(weekStatus.upcoming)", systemImage: "calendar")
+                        if weekStatus.needsReview > 0 {
+                            Label("\(weekStatus.needsReview)", systemImage: "questionmark.circle")
                         }
-                        if skippedCount > 0 {
-                            Label("\(skippedCount)", systemImage: "minus.circle")
+                        if weekStatus.skipped > 0 {
+                            Label("\(weekStatus.skipped)", systemImage: "minus.circle")
                         }
                     }
                     .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "\(completedCount) completed, \(unresolvedCount) need review, \(skippedCount) skipped",
-                        norwegian: "\(completedCount) fullført, \(unresolvedCount) trenger gjennomgang, \(skippedCount) hoppet over"
+                        english: "\(weekStatus.completed) completed, \(weekStatus.needsReview) need review, \(weekStatus.skipped) skipped",
+                        norwegian: "\(weekStatus.completed) fullført, \(weekStatus.needsReview) trenger gjennomgang, \(weekStatus.skipped) hoppet over"
                     ))
                     ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
                         if !day.sessions.isEmpty {
