@@ -34,6 +34,9 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
         let intensity = ATHLTHPlanWeeklyFollowThrough.effortDistribution(
             plan: currentPlan, effortBySessionID: previewEfforts
         )
+        let weeklyEfforts = ATHLTHPlanWeeklyFollowThrough.weeklyEffortSummaries(
+            plan: currentPlan, effortBySessionID: previewEfforts
+        )
         let relevant = report.relevantWeeks
         let movePreview = ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
             plan: currentPlan,
@@ -128,6 +131,35 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                         norwegian: "Rolig \(intensity.easyMinutes) min · Moderat \(intensity.moderateMinutes) min · Hard \(intensity.hardMinutes) min · Ukjent \(intensity.unknownMinutes) min"
                     ))
                     .font(.caption)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Intensity by week", norwegian: "Intensitet per uke"
+                        ))
+                        .font(.caption.weight(.semibold))
+                        ForEach(weeklyEfforts) { week in
+                            VStack(alignment: .leading, spacing: 3) {
+                                HStack {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Week \(week.weekNumber)",
+                                        norwegian: "Uke \(week.weekNumber)"
+                                    ))
+                                    .font(.caption.weight(.medium))
+                                    Spacer()
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "\(week.hardDays) hard days",
+                                        norwegian: "\(week.hardDays) harde dager"
+                                    ))
+                                    .font(.caption2)
+                                }
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Easy \(week.easyMinutes) · Moderate \(week.moderateMinutes) · Hard \(week.hardMinutes) · Unknown \(week.unknownMinutes) min",
+                                    norwegian: "Rolig \(week.easyMinutes) · Moderat \(week.moderateMinutes) · Hard \(week.hardMinutes) · Ukjent \(week.unknownMinutes) min"
+                                ))
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+                        }
+                    }
                     if intensity.adjacentHardDayPairs > 0 {
                         Label(ATHLTHLocalization.choose(
                             english: "\(intensity.adjacentHardDayPairs) adjacent pairs of hard training days. Review your plan.",
