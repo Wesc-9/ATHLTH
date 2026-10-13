@@ -1,6 +1,99 @@
 import CryptoKit
 import Foundation
 
+/// Local demonstration clips remain private on this device. Studio videos
+/// are never uploaded or described as AI-generated training instructions.
+enum ExerciseStudioVideoStorage {
+    static let maximumBytes: Int = 120 * 1024 * 1024
+    private static let formats: Set<String> = ["mp4", "mov", "m4v"]
+
+    private static var directory: URL? {
+        FileManager.default.urls(
+            for: .applicationSupportDirectory, in: .userDomainMask
+        ).first?
+            .appendingPathComponent("ATHLTH", isDirectory: true)
+            .appendingPathComponent("ExerciseLibrary", isDirectory: true)
+            .appendingPathComponent("CustomMedia", isDirectory: true)
+    }
+
+    static func importVideo(from source: URL) throws -> URL {
+        let ext = source.pathExtension.lowercased()
+        guard formats.contains(ext) else {
+            throw ExerciseStudioVideoError.unsupportedFormat
+        }
+        guard let directory else { throw ExerciseStudioVideoError.storageUnavailable }
+        let accessed = source.startAccessingSecurityScopedResource()
+        defer { if accessed { source.stopAccessingSecurityScopedResource() } }
+
+        let size = (try? source.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        if size > maximumBytes { throw ExerciseStudioVideoError.fileTooLarge }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let destination = directory.appendingPathComponent(
+            "exercise-video-" + UUID().uuidString
+        ).appendingPathExtension(ext)
+        do {
+            try FileManager.default.copyItem(at: source, to: destination)
+            let copiedSize = (try? destination.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            guard copiedSize > 0 && copiedSize <= maximumBytes else {
+                throw copiedSize > maximumBytes
+                    ? ExerciseStudioVideoError.fileTooLarge
+                    : ExerciseStudioVideoError.invalidVideo
+            }
+            return destination
+        } catch {
+            try? FileManager.default.removeItem(at: destination)
+            throw error
+        }
+    }
+
+    /// Never delete media outside ATHLTH's own video namespace.
+    static func discardOwnedVideo(_ url: URL?) {
+        guard let url, url.isFileURL, let directory,
+              url.deletingLastPathComponent().standardizedFileURL == directory.standardizedFileURL,
+              url.lastPathComponent.hasPrefix("exercise-video-"),
+              formats.contains(url.pathExtension.lowercased()) else { return }
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    static func isOwnedVideo(_ url: URL?) -> Bool {
+        guard let url, url.isFileURL, let directory else { return false }
+        return url.deletingLastPathComponent().standardizedFileURL == directory.standardizedFileURL &&
+            url.lastPathComponent.hasPrefix("exercise-video-")
+    }
+}
+
+enum ExerciseStudioVideoError: LocalizedError {
+    case unsupportedFormat
+    case fileTooLarge
+    case invalidVideo
+    case storageUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .unsupportedFormat:
+            return ATHLTHLocalization.choose(
+                english: "Choose an MP4, MOV or M4V video.",
+                norwegian: "Velg en MP4-, MOV- eller M4V-video."
+            )
+        case .fileTooLarge:
+            return ATHLTHLocalization.choose(
+                english: "Maximum video size is 120 MB.",
+                norwegian: "Videoen kan ikke være større enn 120 MB."
+            )
+        case .invalidVideo:
+            return ATHLTHLocalization.choose(
+                english: "The selected video is empty or invalid.",
+                norwegian: "Den valgte videoen er tom eller ugyldig."
+            )
+        case .storageUnavailable:
+            return ATHLTHLocalization.choose(
+                english: "Video storage is unavailable.",
+                norwegian: "Videolagring er ikke tilgjengelig."
+            )
+        }
+    }
+}
+
 enum ExerciseMuscleGroup: String, CaseIterable, Identifiable, Hashable {
     case chest = "Chest"
     case back = "Back"
@@ -629,7 +722,9 @@ final class ExerciseLibraryStore: ObservableObject {
             try? FileManager.default.removeItem(at: imageURL)
         }
 
+        let videoURL = customExercises.first(where: { $0.id == id })?.exercise.videoURL
         customExercises.removeAll { $0.id == id }
+        ExerciseStudioVideoStorage.discardOwnedVideo(videoURL)
         invalidateDerivedCaches()
         persistCustomExercises()
     }
