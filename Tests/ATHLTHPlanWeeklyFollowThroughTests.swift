@@ -1026,4 +1026,71 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
         XCTAssertEqual(report.needsReview, 0)
         XCTAssertEqual(report.pastDated, 0)
     }
+
+    @MainActor
+    func testMissingPlanAndWorkoutDatesRemainUnscheduled() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var modified = plan
+        modified.startDate = nil
+        modified.weeks[0].days[0].sessions = [workout()]
+        let report = ATHLTHPlanWeeklyFollowThrough.inspect(
+            plan: modified, store: store, healthWorkouts: [],
+            strengthHistory: []
+        )
+        XCTAssertEqual(report.total, 1)
+        XCTAssertEqual(report.unknownDate, 1)
+        XCTAssertEqual(report.needsReview, 0)
+        XCTAssertEqual(report.upcoming, 0)
+        XCTAssertNil(report.completionPercent)
+    }
+
+    @MainActor
+    func testSkippedStatusTakesPrecedenceOverManualCompletion() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let item = workout()
+        store.addSession(item, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.setPlanSessionManuallyCompleted(
+            planID: plan.id, sessionID: item.id, completed: true
+        )
+        store.setPlanSessionSkipped(
+            planID: plan.id, sessionID: item.id, skipped: true
+        )
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let reference = try XCTUnwrap(Calendar.current.date(
+            byAdding: .day, value: 1, to: plan.startDate!
+        ))
+        let report = ATHLTHPlanWeeklyFollowThrough.inspect(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: reference
+        )
+        XCTAssertEqual(report.total, 1)
+        XCTAssertEqual(report.skipped, 1)
+        XCTAssertEqual(report.completed, 0)
+        XCTAssertEqual(report.pastConfirmed, 1)
+        XCTAssertEqual(report.pastCompleted, 0)
+    }
+
+    @MainActor
+    func testMovedPastWorkoutNeedsReviewEvenIfOriginalDayIsFuture() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 2)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var item = workout()
+        item.scheduledStart = plan.startDate
+        store.addSession(item, toDay: plan.weeks[1].days[0].id, inPlan: plan.id)
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let reference = try XCTUnwrap(Calendar.current.date(
+            byAdding: .day, value: 2, to: plan.startDate!
+        ))
+        let report = ATHLTHPlanWeeklyFollowThrough.inspect(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: reference
+        )
+        XCTAssertEqual(report.total, 1)
+        XCTAssertEqual(report.needsReview, 1)
+        XCTAssertEqual(report.upcoming, 0)
+        XCTAssertEqual(report.weeks[1].needsReview, 1)
+        XCTAssertEqual(report.weeks[1].firstReviewDayID, plan.weeks[1].days[0].id)
+    }
 }
