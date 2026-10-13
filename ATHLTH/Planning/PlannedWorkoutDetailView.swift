@@ -112,9 +112,12 @@ struct PlannedWorkoutDetailView: View {
                            !session.isPlanSessionSkipped(
                                planID: planID, sessionID: currentWorkout.id
                            ),
-                           currentWorkout.kind == .running ||
-                           currentWorkout.kind == .walking ||
-                           currentWorkout.kind == .strength {
+                           (currentWorkout.kind == .running ||
+                            currentWorkout.kind == .walking ||
+                            currentWorkout.kind == .strength),
+                           session.trainingPlan(withID: planID)?
+                               .weeks.flatMap(\.days).flatMap(\.sessions)
+                               .contains(where: { $0.id == currentWorkout.id }) == true {
                             Button {
                                 onStartWorkout(planID, currentWorkout)
                             } label: {
