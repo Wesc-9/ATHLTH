@@ -2,6 +2,7 @@ import AVKit
 import PhotosUI
 import Supabase
 import SwiftUI
+import UniformTypeIdentifiers
 import UIKit
 
 enum ExerciseLibrarySection: String, CaseIterable, Identifiable {
@@ -1112,6 +1113,36 @@ private enum ATHLTHAIDraftValidationError: LocalizedError {
 }
 
 struct CustomExerciseEditorView: View {
+    let editing: ExerciseLibraryEntry?
+
+    init(editing: ExerciseLibraryEntry? = nil) {
+        self.editing = editing
+        _name = State(initialValue: editing?.exercise.name ?? "")
+        _primaryMuscles = State(initialValue: Set(
+            ExerciseMuscleGroup.allCases.filter {
+                editing?.exercise.primaryMuscles.contains($0.rawValue) ?? false
+            }
+        ))
+        _secondaryMuscles = State(initialValue: Set(
+            ExerciseMuscleGroup.allCases.filter {
+                editing?.exercise.secondaryMuscles.contains($0.rawValue) ?? false
+            }
+        ))
+        _equipment = State(initialValue: editing?.exercise.equipment.joined(separator: ", ") ?? "")
+        _instructions = State(initialValue: editing?.exercise.instructions.joined(separator: "\n") ?? "")
+        _shareable = State(initialValue: editing?.exercise.isVisibleOutsideOwnerLibrary ?? false)
+        _videoURLText = State(initialValue: editing?.exercise.videoURL.flatMap {
+            $0.isFileURL ? nil : $0.absoluteString
+        } ?? "")
+    }
+
+    private var previewVideoURL: URL? {
+        if removingExistingVideo {
+            return importedVideoURL ?? cleanVideoURL
+        }
+        return importedVideoURL ?? cleanVideoURL ?? editing?.exercise.videoURL
+    }
+
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var library: ExerciseLibraryStore
     @EnvironmentObject private var session: AppSessionStore
@@ -1127,6 +1158,12 @@ struct CustomExerciseEditorView: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedImageData: Data?
     @State private var videoURLText = ""
+    @State private var showingVideoImporter = false
+    @State private var importedVideoURL: URL?
+    @State private var removingExistingVideo = false
+    @State private var isImportingVideo = false
+    @State private var didSaveExercise = false
+    @State private var studioError: String?
     @State private var aiPrompt = ""
     @State private var aiVideoBrief = ""
     @State private var isGeneratingAIDraft = false
@@ -1421,7 +1458,10 @@ struct CustomExerciseEditorView: View {
                     .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("Create Exercise")
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: editing == nil ? "Exercise Studio" : "Edit exercise",
+                norwegian: editing == nil ? "Øvelsesstudio" : "Rediger øvelse"
+            ))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -1429,25 +1469,10 @@ struct CustomExerciseEditorView: View {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        _ = library.createCustomExercise(
-                            ownerID: session.profile.userID,
-                            name: name,
-                            instructions: splitLines(instructions),
-                            primaryMuscles:
-                                selectedMuscleValues(
-                                    primaryMuscles
-                                ),
-                            secondaryMuscles:
-                                selectedMuscleValues(
-                                    secondaryMuscles
-                                ),
-                            equipment: splitCSV(equipment),
-                            isVisibleOutsideOwnerLibrary: shareable,
-                            imageData: selectedImageData,
-                            videoURL: cleanVideoURL
-                        )
-                        dismiss()
+                    Button(ATHLTHLocalization.choose(
+                        english: "Save", norwegian: "Lagre"
+                    )) {
+                        saveExercise()
                     }
                     .disabled(
                         name
@@ -1460,6 +1485,39 @@ struct CustomExerciseEditorView: View {
                     )
                 }
             }
+            .fileImporter(
+                isPresented: $showingVideoImporter,
+                allowedContentTypes: [.movie, .mpeg4Movie],
+                allowsMultipleSelection: false
+            ) { result in
+                switch result {
+                case .success(let urls):
+                    guard let selected = urls.first else { return }
+                    Task {
+                        isImportingVideo = true
+                        defer { isImportingVideo = false }
+                        do {
+                            let imported = try await Task.detached(priority: .userInitiated) {
+                                try ExerciseStudioVideoStorage.importVideo(from: selected)
+                            }.value
+                            ExerciseStudioVideoStorage.discardOwnedVideo(importedVideoURL)
+                            importedVideoURL = imported
+                            removingExistingVideo = false
+                            videoURLText = ""
+                            studioError = nil
+                        } catch {
+                            studioError = error.localizedDescription
+                        }
+                    }
+                case .failure(let error):
+                    studioError = error.localizedDescription
+                }
+            }
+            .onDisappear {
+                if !didSaveExercise {
+                    ExerciseStudioVideoStorage.discardOwnedVideo(importedVideoURL)
+                }
+            }
             .onChange(of: selectedPhoto) { _, item in
                 guard let item else {
                     selectedImageData = nil
@@ -1470,6 +1528,45 @@ struct CustomExerciseEditorView: View {
                     selectedImageData = try? await item.loadTransferable(type: Data.self)
                 }
             }
+        }
+    }
+
+    private func saveExercise() {
+        do {
+            let video = previewVideoURL
+            if let editing {
+                var updated = editing.exercise
+                updated.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                updated.instructions = splitLines(instructions)
+                updated.primaryMuscles = selectedMuscleValues(primaryMuscles)
+                updated.secondaryMuscles = selectedMuscleValues(secondaryMuscles)
+                updated.equipment = splitCSV(equipment)
+                updated.isVisibleOutsideOwnerLibrary = shareable
+                updated.videoURL = video
+                if let selectedImageData {
+                    updated.imageURL = try library.updateCustomImageData(
+                        selectedImageData, for: editing.id
+                    )
+                }
+                library.updateCustomExercise(updated)
+            } else {
+                _ = library.createCustomExercise(
+                    ownerID: session.profile.userID,
+                    name: name,
+                    instructions: splitLines(instructions),
+                    primaryMuscles: selectedMuscleValues(primaryMuscles),
+                    secondaryMuscles: selectedMuscleValues(secondaryMuscles),
+                    equipment: splitCSV(equipment),
+                    isVisibleOutsideOwnerLibrary: shareable,
+                    imageData: selectedImageData,
+                    videoURL: video
+                )
+            }
+            didSaveExercise = true
+            importedVideoURL = nil
+            dismiss()
+        } catch {
+            studioError = error.localizedDescription
         }
     }
 
