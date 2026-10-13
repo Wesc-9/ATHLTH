@@ -183,13 +183,45 @@ enum ATHLTHPlanWeeklyFollowThrough {
                 }
             }
             let longDays = durations.map { $0 >= threshold }
-            let adjacent = zip(longDays, longDays.dropFirst()).filter { $0 && $1 }.count
+            let adjacent = zip(longDays, longDays.dropFirst()).filter { pair in
+                pair.0 && pair.1
+            }.count
             return WeekLoadSummary(
                 id: week.id, weekNumber: index + 1,
                 plannedMinutes: durations.reduce(0, +),
                 activeDays: days.filter { !$0.sessions.isEmpty }.count,
                 longDays: longDays.filter { $0 }.count,
                 adjacentLongDayPairs: adjacent
+            )
+        }
+    }
+
+    struct WeekVolumeChange {
+        let previousWeekNumber: Int
+        let currentWeekNumber: Int
+        let previousMinutes: Int
+        let currentMinutes: Int
+        let changePercent: Int?
+    }
+
+    /// A simple comparison of entered minutes, not a safe-load threshold.
+    /// Nil change is used when the previous week has no entered duration.
+    static func weeklyVolumeChanges(plan: TrainingPlan) -> [WeekVolumeChange] {
+        let weeks = weeklyLoadSummaries(plan: plan)
+        guard weeks.count > 1 else { return [] }
+        return zip(weeks, weeks.dropFirst()).map { pair in
+            let previous = pair.0
+            let current = pair.1
+            let percent: Int? = previous.plannedMinutes > 0
+                ? Int((Double(current.plannedMinutes - previous.plannedMinutes)
+                    / Double(previous.plannedMinutes) * 100).rounded())
+                : nil
+            return WeekVolumeChange(
+                previousWeekNumber: previous.weekNumber,
+                currentWeekNumber: current.weekNumber,
+                previousMinutes: previous.plannedMinutes,
+                currentMinutes: current.plannedMinutes,
+                changePercent: percent
             )
         }
     }

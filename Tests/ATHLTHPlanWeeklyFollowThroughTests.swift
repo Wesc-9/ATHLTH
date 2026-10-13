@@ -843,6 +843,25 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
     }
 
     @MainActor
+    func testWeeklyVolumeChangeUsesPreviousWeekAndHandlesZeroBaseline() throws {
+        let (_, defaults, suite, plan) = try prepared(weekCount: 3)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var modified = plan
+        var first = workout()
+        first.durationMinutes = 100
+        var second = workout()
+        second.durationMinutes = 150
+        modified.weeks[1].days[0].sessions = [first]
+        modified.weeks[2].days[0].sessions = [second]
+        let changes = ATHLTHPlanWeeklyFollowThrough.weeklyVolumeChanges(plan: modified)
+        XCTAssertEqual(changes.count, 2)
+        XCTAssertNil(changes[0].changePercent)
+        XCTAssertEqual(changes[1].changePercent, 50)
+        XCTAssertEqual(changes[1].previousMinutes, 100)
+        XCTAssertEqual(changes[1].currentMinutes, 150)
+    }
+
+    @MainActor
     func testDuplicateIdentitiesAreCountedOnlyOnce() throws {
         let (store, defaults, suite, plan) = try prepared(weekCount: 1)
         defer { defaults.removePersistentDomain(forName: suite) }

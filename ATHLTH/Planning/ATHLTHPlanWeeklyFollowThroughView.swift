@@ -28,6 +28,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
         )
         let load = ATHLTHPlanWeeklyFollowThrough.plannedLoadSummary(plan: currentPlan)
         let weeklyLoads = ATHLTHPlanWeeklyFollowThrough.weeklyLoadSummaries(plan: currentPlan)
+        let volumeChanges = ATHLTHPlanWeeklyFollowThrough.weeklyVolumeChanges(plan: currentPlan)
         let relevant = report.relevantWeeks
         let movePreview = ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
             plan: currentPlan,
@@ -114,6 +115,23 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                             Text(ATHLTHLocalization.choose(
                                 english: "\(week.adjacentLongDayPairs) adjacent long-day pairs in this week",
                                 norwegian: "\(week.adjacentLongDayPairs) par med lange treningsdager etter hverandre denne uken"
+                            ))
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                    }
+                    ForEach(volumeChanges, id: \.currentWeekNumber) { change in
+                        if let percent = change.changePercent {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Week \(change.currentWeekNumber) vs \(change.previousWeekNumber): \(percent >= 0 ? "+" : "")\(percent)% planned minutes",
+                                norwegian: "Uke \(change.currentWeekNumber) mot \(change.previousWeekNumber): \(percent >= 0 ? "+" : "")\(percent) % planlagte minutter"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        } else {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Week \(change.currentWeekNumber): no percentage comparison (previous week has no entered minutes)",
+                                norwegian: "Uke \(change.currentWeekNumber): ingen prosentvis sammenligning (forrige uke mangler registrerte minutter)"
                             ))
                             .font(.caption2)
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
