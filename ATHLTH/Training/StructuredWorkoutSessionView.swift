@@ -551,10 +551,15 @@ struct StructuredWorkoutSessionView: View {
                         completeCurrentAndAdvance()
                     } label: {
                         Label(
-                            currentIndex >=
-                                blocks.count - 1
-                                ? "Complete Block"
-                                : "Complete & Next",
+                            currentIndex >= blocks.count - 1
+                                ? ATHLTHLocalization.choose(
+                                    english: "Complete block",
+                                    norwegian: "Fullfør blokk"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Complete & next",
+                                    norwegian: "Fullfør og neste"
+                                ),
                             systemImage:
                                 "checkmark.circle.fill"
                         )
