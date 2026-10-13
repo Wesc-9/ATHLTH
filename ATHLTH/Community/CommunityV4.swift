@@ -245,14 +245,56 @@ struct ATHLTHCommunityV4View: View {
                     CommunityReferenceQuickActions()
 
                     if pendingCommunityActionCount > 0 {
-                        CommunityV4AttentionCard(
-                            unreadMessages: messaging.unreadCount,
-                            messageRequests: messaging.messageRequestCount,
-                            followRequests: social.incomingRequests.count,
-                            workoutInvites: pendingWorkoutInvitesCount,
-                            challengeInvites: challengeInvites.count,
-                            clubInvites: groups.ownInvites.count
-                        )
+                        NavigationLink {
+                            ATHLTHCommunityActionCenterView()
+                        } label: {
+                            HStack(spacing: 11) {
+                                Image(systemName: "tray.full")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundStyle(ATHLTHPlanDesign.accent)
+                                    .frame(width: 43, height: 43)
+                                    .background(
+                                        ATHLTHPlanDesign.selectedSurface,
+                                        in: RoundedRectangle(cornerRadius: 14)
+                                    )
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Your social inbox",
+                                        norwegian: "Din sosiale innboks"
+                                    ))
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Messages and invitations awaiting you",
+                                        norwegian: "Meldinger og invitasjoner som venter"
+                                    ))
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                }
+                                Spacer(minLength: 3)
+                                Text(pendingCommunityActionCount > 99
+                                    ? "99+" : "\(pendingCommunityActionCount)"
+                                )
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                                .padding(.horizontal, 9)
+                                .frame(minHeight: 26)
+                                .background(ATHLTHPlanDesign.selectedSurface, in: Capsule())
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+                            .padding(14)
+                            .background(
+                                Color.white,
+                                in: RoundedRectangle(cornerRadius: ATHLTHPlanDesign.cardRadius)
+                            )
+                            .overlay {
+                                RoundedRectangle(cornerRadius: ATHLTHPlanDesign.cardRadius)
+                                    .stroke(ATHLTHPlanDesign.outline, lineWidth: 0.8)
+                            }
+                        }
+                        .buttonStyle(.plain)
                     }
 
                     referenceUpcomingSection
