@@ -2257,21 +2257,16 @@ final class IPhoneWorkoutStore:
         workout: inout PhoneWorkout,
         location: CLLocation
     ) {
-        guard location.speed >= 0.35,
+        guard workout.runEnvironment == .outdoor,
+              let rawPace = ATHLTHRunningPace.outdoorGPS(
+                  speedMetersPerSecond: location.speed,
+                  isOutdoor: true
+              ),
               ATHLTHCoachSensorFreshness.isFresh(
                   sampledAt: location.timestamp,
                   maximumAge:
                     ATHLTHCoachSensorFreshness.maximumPaceAge
               )
-        else {
-            return
-        }
-
-        let rawPace =
-            1_000 / location.speed
-
-        guard rawPace >= 120,
-              rawPace <= 1_800
         else {
             return
         }
@@ -4322,7 +4317,11 @@ final class IPhoneWorkoutStore:
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         Task { @MainActor in
-            if self.manager.authorizationStatus == .denied || self.manager.authorizationStatus == .restricted { self.pause() }
+            if self.active?.runEnvironment == .outdoor,
+               (self.manager.authorizationStatus == .denied ||
+                self.manager.authorizationStatus == .restricted) {
+                self.pause()
+            }
             self.beginIfAuthorized()
         }
     }
@@ -4332,15 +4331,21 @@ final class IPhoneWorkoutStore:
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        Task { @MainActor in self.message = "GPS is unavailable. Time continues; distance will resume when the signal returns."; self.lastLocation = nil; self.coachPaceSampleAt = nil }
+        Task { @MainActor in
+            guard self.active?.runEnvironment == .outdoor else { return }
+            self.message = "GPS is unavailable. Time continues; distance will resume when the signal returns."
+            self.lastLocation = nil
+            self.coachPaceSampleAt = nil
+        }
     }
 
     private func accept(
         _ locations: [CLLocation]
     ) {
-        guard var workout = active else {
-            return
-        }
+        // Delayed CLLocation callbacks must not invent treadmill distance.
+        guard var workout = active,
+              workout.runEnvironment == .outdoor
+        else { return }
 
         var accepted = false
         var stateChanged = false
