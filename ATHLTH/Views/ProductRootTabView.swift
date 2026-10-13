@@ -1687,6 +1687,7 @@ struct ATHLTHHomeView: View {
     }
 
     private let homeGoalCalendarContentMinHeight: CGFloat = 82
+    private let homeGoalThumbnailHeight: CGFloat = 74
 
     @ViewBuilder
     private var homeGoalAndCalendarRow:
@@ -1797,7 +1798,7 @@ struct ATHLTHHomeView: View {
                     .frame(
                         width: 68,
                         height:
-                            homeGoalCalendarContentMinHeight
+                            homeGoalThumbnailHeight
                     )
                     .clipShape(
                         RoundedRectangle(
