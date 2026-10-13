@@ -867,26 +867,14 @@ struct ChallengeCreationView: View {
     @State private var createError: String?
     @State private var showingInvitePicker = false
 
-    private var clubForest: Color {
-        ATHLTHTheme.primaryText
-    }
-
-    private var clubEmerald: Color {
-        ATHLTHTheme.vitality
-    }
-
-    private var clubMint: Color {
-        ATHLTHTheme.vitalitySoft
-    }
+    private var clubForest: Color { ChallengePlanTheme.ink }
+    private var clubEmerald: Color { ATHLTHTheme.accentDeep }
+    private var clubMint: Color { ChallengePlanTheme.soft }
 
     var body: some View {
         NavigationStack {
             ZStack {
-                ATHLTHPremiumCanvas(
-                    accent:
-                        clubEmerald.opacity(0.14)
-                )
-                .ignoresSafeArea()
+                ChallengePlanTheme.canvas.ignoresSafeArea()
 
                 ScrollView {
                     VStack(spacing: 16) {
