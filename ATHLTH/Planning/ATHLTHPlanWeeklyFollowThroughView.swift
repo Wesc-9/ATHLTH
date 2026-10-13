@@ -614,7 +614,6 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                     ))
                     .font(.caption2)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                }
                     }
                 }
                 .foregroundStyle(ATHLTHPlanDesign.ink)
