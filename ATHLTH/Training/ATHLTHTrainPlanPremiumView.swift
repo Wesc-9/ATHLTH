@@ -917,6 +917,10 @@ struct ATHLTHTrainPlanPremiumView: View {
                         .buttonStyle(.plain)
                         .contextMenu {
                             if !completed &&
+                                !workout.isStructuredWorkout &&
+                                (workout.kind == .running ||
+                                 workout.kind == .walking ||
+                                 workout.kind == .strength) &&
                                 !session.isPlanSessionSkipped(
                                     planID: plan.id, sessionID: workout.id
                                 ), let onStartWorkout {
@@ -1003,9 +1007,10 @@ struct ATHLTHTrainPlanPremiumView: View {
                            !session.isPlanSessionSkipped(
                                planID: plan.id, sessionID: workout.id
                            ),
-                           workout.kind == .running ||
-                           workout.kind == .walking ||
-                           workout.kind == .strength {
+                           !workout.isStructuredWorkout,
+                           (workout.kind == .running ||
+                            workout.kind == .walking ||
+                            workout.kind == .strength) {
                             Button {
                                 onStartWorkout(plan.id, workout)
                             } label: {
