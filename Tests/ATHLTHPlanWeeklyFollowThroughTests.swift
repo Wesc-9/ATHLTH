@@ -792,7 +792,9 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
         let (store, defaults, suite, plan) = try prepared(weekCount: 1)
         defer { defaults.removePersistentDomain(forName: suite) }
         var malformed = plan
-        malformed.weeks[0].days[2].dayIndex = 2
+        // Duplicate the whole day instead of mutating a potentially immutable
+        // dayIndex property; this also reproduces a duplicated day identity.
+        malformed.weeks[0].days[2] = malformed.weeks[0].days[1]
         malformed.weeks[0].days[0].sessions = [workout()]
         malformed.weeks[0].days[1].sessions = [workout()]
         XCTAssertNil(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
