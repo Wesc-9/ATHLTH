@@ -13,6 +13,8 @@ enum ATHLTHPlanWeeklyFollowThrough {
         let upcoming: Int
         let needsReview: Int
         let unknownDate: Int
+        let pastDated: Int
+        let pastConfirmed: Int
         let firstReviewDayID: UUID?
 
         var planned: Int {
@@ -28,6 +30,8 @@ enum ATHLTHPlanWeeklyFollowThrough {
         var upcoming: Int { weeks.reduce(0) { $0 + $1.upcoming } }
         var needsReview: Int { weeks.reduce(0) { $0 + $1.needsReview } }
         var unknownDate: Int { weeks.reduce(0) { $0 + $1.unknownDate } }
+        var pastDated: Int { weeks.reduce(0) { $0 + $1.pastDated } }
+        var pastConfirmed: Int { weeks.reduce(0) { $0 + $1.pastConfirmed } }
         var total: Int { weeks.reduce(0) { $0 + $1.planned } }
 
         /// Lead with weeks needing review, then the nearest upcoming weeks.
@@ -66,6 +70,8 @@ enum ATHLTHPlanWeeklyFollowThrough {
             var upcoming = 0
             var needsReview = 0
             var unknownDate = 0
+            var pastDated = 0
+            var pastConfirmed = 0
             var firstReviewDayID: UUID?
 
             for day in week.days.sorted(by: { $0.dayIndex < $1.dayIndex }) {
@@ -83,10 +89,14 @@ enum ATHLTHPlanWeeklyFollowThrough {
                 for workout in day.sessions {
                     guard seen.insert(workout.id).inserted else { continue }
 
+                    let scheduled = workout.scheduledStart ?? fallback
+                    let isPast = scheduled.map { calendar.startOfDay(for: $0) < today } ?? false
+                    if isPast { pastDated += 1 }
                     if store.isPlanSessionSkipped(
                         planID: plan.id, sessionID: workout.id
                     ) {
                         skipped += 1
+                        if isPast { pastConfirmed += 1 }
                     } else if store.isPlanSessionCompleted(
                         planID: plan.id,
                         sessionID: workout.id,
@@ -94,7 +104,8 @@ enum ATHLTHPlanWeeklyFollowThrough {
                         strengthHistory: strengthHistory
                     ) {
                         completed += 1
-                    } else if let scheduled = workout.scheduledStart ?? fallback {
+                        if isPast { pastConfirmed += 1 }
+                    } else if let scheduled {
                         if calendar.startOfDay(for: scheduled) < today {
                             needsReview += 1
                             if firstReviewDayID == nil {
@@ -119,6 +130,8 @@ enum ATHLTHPlanWeeklyFollowThrough {
                 upcoming: upcoming,
                 needsReview: needsReview,
                 unknownDate: unknownDate,
+                pastDated: pastDated,
+                pastConfirmed: pastConfirmed,
                 firstReviewDayID: firstReviewDayID
             ))
         }

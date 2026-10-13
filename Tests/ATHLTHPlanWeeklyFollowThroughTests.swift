@@ -95,6 +95,37 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
         XCTAssertEqual(result.skipped, 1)
         XCTAssertEqual(result.needsReview, 1)
         XCTAssertEqual(result.upcoming, 0)
+        XCTAssertEqual(result.pastDated, 3)
+        XCTAssertEqual(result.pastConfirmed, 2)
+    }
+
+    @MainActor
+    func testFutureOutcomesAreExcludedFromPastCoverage() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let overdue = workout()
+        let todayCompleted = workout()
+        let futureSkipped = workout()
+        store.addSession(overdue, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(todayCompleted, toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
+        store.addSession(futureSkipped, toDay: plan.weeks[0].days[2].id, inPlan: plan.id)
+        store.setPlanSessionManuallyCompleted(
+            planID: plan.id, sessionID: todayCompleted.id, completed: true
+        )
+        store.setPlanSessionSkipped(
+            planID: plan.id, sessionID: futureSkipped.id, skipped: true
+        )
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let today = Calendar.current.date(byAdding: .day, value: 1, to: plan.startDate!)!
+        let report = ATHLTHPlanWeeklyFollowThrough.inspect(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: today
+        )
+        XCTAssertEqual(report.pastDated, 1)
+        XCTAssertEqual(report.pastConfirmed, 0)
+        XCTAssertEqual(report.needsReview, 1)
+        XCTAssertEqual(report.completed, 1)
+        XCTAssertEqual(report.skipped, 1)
     }
 
     @MainActor
@@ -145,6 +176,8 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
             referenceDate: Date().addingTimeInterval(3600 * 24 * 120)
         )
         XCTAssertEqual(result.unknownDate, 1)
+        XCTAssertEqual(result.pastDated, 0)
+        XCTAssertEqual(result.pastConfirmed, 0)
         XCTAssertEqual(result.needsReview, 0)
         XCTAssertEqual(result.upcoming, 0)
     }

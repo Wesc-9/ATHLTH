@@ -84,6 +84,19 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                         )
                     )
 
+                    if report.pastDated > 0 {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Past workouts accounted for: \(report.pastConfirmed) of \(report.pastDated) · includes completed and skipped.",
+                                norwegian: "Tidligere økter avklart: \(report.pastConfirmed) av \(report.pastDated) · inkluderer fullførte og hoppet over."
+                            ),
+                            systemImage: "checkmark.circle"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+
                     Text(ATHLTHLocalization.choose(
                         english: "\(report.skipped) skipped · \(report.unknownDate) without plan dates. Today's unfinished sessions are still upcoming.",
                         norwegian: "\(report.skipped) hoppet over · \(report.unknownDate) uten plandato. Dagens ufullførte økter regnes fortsatt som kommende."
