@@ -292,6 +292,18 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                         }
                                         let needsReview = !completed && !skipped
                                             && (dayDate.map { $0 < today } ?? false)
+                                        if needsReview {
+                                            Button {
+                                                onSelect(week.id, day.id)
+                                            } label: {
+                                                Label(ATHLTHLocalization.choose(
+                                                    english: "Review \(workout.title)",
+                                                    norwegian: "Gjennomgå \(workout.title)"
+                                                ), systemImage: "questionmark.circle")
+                                                .font(.caption.weight(.semibold))
+                                            }
+                                            .buttonStyle(.borderless)
+                                        }
                                         HStack(spacing: 5) {
                                             Image(systemName: completed
                                                   ? "checkmark.circle.fill"
