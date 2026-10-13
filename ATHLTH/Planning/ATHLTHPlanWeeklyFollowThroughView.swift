@@ -1064,6 +1064,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                     }
                 }
             }
+        }
         .onAppear {
             let latestPlan = session.trainingPlan(withID: plan.id) ?? plan
             previewEfforts = ATHLTHPlanWeeklyFollowThrough.savedEfforts(plan: latestPlan)
