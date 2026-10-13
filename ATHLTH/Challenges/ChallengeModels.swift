@@ -485,12 +485,13 @@ struct ATHLTHChallenge: Identifiable, Codable, Hashable {
     // The first opponent must explicitly accept before any workout can score.
     // Start time is based on the actual accepted response, never invite time.
     var scoringStartDate: Date? {
-        guard status != .draft, status != .cancelled,
-              let acceptedAt = participants
-                .filter { $0.state == .accepted && $0.userID != creatorID }
-                .compactMap(\.respondedAt)
-                .min()
-        else { return nil }
+        let acceptedAt = participants
+            .filter { $0.state == .accepted && $0.userID != creatorID }
+            .compactMap(\.respondedAt)
+            .min()
+        guard status != .draft,
+              status != .cancelled,
+              let acceptedAt else { return nil }
         return max(rules.startsAt, acceptedAt)
     }
 
