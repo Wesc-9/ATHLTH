@@ -261,6 +261,33 @@ final class GhostRacePrivacyTests: XCTestCase {
     }
 
     @MainActor
+    func testLongerHealthDistanceDoesNotMoveTheGhostFinishBeyondTheCourse() throws {
+        let original = makeReference(
+            distanceMeters: 2_000, durationSeconds: 600, pointCount: 21
+        )
+        let reference = GhostRaceReference(
+            id: original.id,
+            sourceWorkoutID: original.sourceWorkoutID,
+            title: original.title,
+            startedAt: original.startedAt,
+            durationSeconds: original.durationSeconds,
+            distanceMeters: 2_250, // HealthKit may exceed GPS geometry.
+            points: original.points
+        )
+        XCTAssertEqual(reference.routeDistanceMeters, 2_000, accuracy: 0.1)
+
+        let store = GhostRaceStore()
+        try store.prepare(reference: reference)
+        store.updatePhoneWorkout(
+            location: reference.points.last!.location,
+            elapsedTime: 575,
+            state: .completed,
+            routeProgressPercent: 100
+        )
+        XCTAssertEqual(store.result?.beatGhost, true)
+    }
+
+    @MainActor
     func testEarlyWorkoutStopCannotWinGhostRace() throws {
         let reference = makeReference(
             distanceMeters: 2_000, durationSeconds: 600, pointCount: 21
