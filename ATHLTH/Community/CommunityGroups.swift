@@ -2054,6 +2054,10 @@ final class CommunityGroupStore: ObservableObject {
     @Published private(set) var messagesByGroup: [UUID: [CommunityGroupMessageRecord]] = [:]
     @Published private(set) var eventsByGroup: [UUID: [CommunityGroupEventRecord]] = [:]
     @Published private(set) var challengesByGroup: [UUID: [CommunityGroupChallengeRecord]] = [:]
+    // Lightweight, cross-Club calendar snapshots do not overwrite any Club's
+    // complete challenge history loaded on its detail screen.
+    @Published private(set) var calendarClubChallenges: [CommunityGroupChallengeRecord] = []
+    @Published private(set) var calendarChallengeParticipations: [CommunityGroupChallengeParticipantRecord] = []
     @Published private(set) var challengeWorkouts: [CommunityGroupChallengeWorkoutRecord] = []
     @Published private(set) var joinRequestsByGroup: [UUID: [CommunityGroupJoinRequestRecord]] = [:]
     @Published private(set) var ownJoinRequests: [CommunityGroupJoinRequestRecord] = []
@@ -2665,12 +2669,16 @@ final class CommunityGroupStore: ObservableObject {
 
     func refreshCalendarContent() async {
         guard let userID = currentUserID else {
+            calendarClubChallenges = []
+            calendarChallengeParticipations = []
             return
         }
 
         let groupIDs = Array(joinedGroupIDs)
 
         guard !groupIDs.isEmpty else {
+            calendarClubChallenges = []
+            calendarChallengeParticipations = []
             return
         }
 
@@ -2716,10 +2724,33 @@ final class CommunityGroupStore: ObservableObject {
                         .execute()
                         .value
 
+            // Match the public agenda: upcoming Club challenges must be
+            // discoverable without opening every Club first.
+            async let challengesQuery: [CommunityGroupChallengeRecord] = client
+                .from("community_group_challenges")
+                .select()
+                .in("group_id", values: values)
+                .gte("ends_at", value: Date().ISO8601Format())
+                .order("starts_at", ascending: true)
+                .limit(500)
+                .execute()
+                .value
+
+            async let participationsQuery: [CommunityGroupChallengeParticipantRecord] = client
+                .from("community_group_challenge_participants")
+                .select()
+                .in("group_id", values: values)
+                .eq("user_id", value: userID)
+                .limit(500)
+                .execute()
+                .value
+
             let loadedEvents =
                 try await eventsQuery
             let loadedRSVPs =
                 try await rsvpQuery
+            let loadedChallenges = try await challengesQuery
+            let loadedParticipations = try await participationsQuery
 
             guard !Task.isCancelled else {
                 return
@@ -2743,6 +2774,8 @@ final class CommunityGroupStore: ObservableObject {
                     rsvpsByID[groupID] ?? []
             }
 
+            calendarClubChallenges = loadedChallenges
+            calendarChallengeParticipations = loadedParticipations
             errorMessage = nil
         } catch is CancellationError {
             return
