@@ -4832,11 +4832,17 @@ enum CommunityGroupsTab: String, CaseIterable, Identifiable {
                 norwegian: "Oversikt"
             )
         case .chat:
-            return "Chat"
+            return ATHLTHLocalization.choose(
+                english: "Chat", norwegian: "Chat"
+            )
         case .events:
-            return "Events"
+            return ATHLTHLocalization.choose(
+                english: "Events", norwegian: "Arrangementer"
+            )
         case .challenges:
-            return "Challenges"
+            return ATHLTHLocalization.choose(
+                english: "Challenges", norwegian: "Utfordringer"
+            )
         case .members:
             return ATHLTHLocalization.choose(
                 english: "Members",
