@@ -983,14 +983,25 @@ struct PlannedWorkoutDetailView: View {
     private var structuredWorkoutStartButton:
         some View {
         Button {
+            // Recheck persisted ownership and status at tap time. A detail
+            // sheet may outlive edits, deletions or a completion elsewhere.
+            guard let persisted = session.trainingPlan(withID: planID)?
+                .weeks.flatMap(\.days).flatMap(\.sessions)
+                .first(where: { $0.id == currentWorkout.id }),
+                persisted.isStructuredWorkout,
+                !session.isPlanSessionSkipped(planID: planID, sessionID: persisted.id),
+                !session.isPlanSessionCompleted(
+                    planID: planID, sessionID: persisted.id,
+                    healthWorkouts: health.workouts,
+                    strengthHistory: strength.workoutHistory
+                )
+            else { return }
             if let onStartWorkout {
-                // The owning Train tab enforces the same active-session
-                // protection and workout launch routing for every activity.
-                onStartWorkout(planID, currentWorkout)
+                onStartWorkout(planID, persisted)
             } else {
                 WorkoutLaunchCoordinator
                     .startLinkedSpotifyIfNeeded(
-                        workout: currentWorkout,
+                        workout: persisted,
                         session: session,
                         settings: settings,
                         spotify: spotify

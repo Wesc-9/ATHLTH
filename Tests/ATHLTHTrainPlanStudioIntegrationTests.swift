@@ -566,4 +566,41 @@ final class ATHLTHTrainPlanStudioIntegrationTests: XCTestCase {
         XCTAssertEqual(after.weeks[0].days[0].sessions.first?.id, original.id)
     }
 
+    func testStructuredCompletionKeepsPlanIdentityAndDecodesLegacyHistory() throws {
+        let planID = UUID()
+        let sessionID = UUID()
+        let completion = StructuredWorkoutCompletion(
+            id: UUID(),
+            workoutTemplateID: nil,
+            sourceWorkoutID: sessionID,
+            title: "Intervals",
+            category: "Running",
+            startedAt: Date(timeIntervalSince1970: 1_000),
+            endedAt: Date(timeIntervalSince1970: 1_600),
+            completedBlockCount: 3,
+            totalBlockCount: 4,
+            sourcePlanID: planID
+        )
+        let encoder = JSONEncoder()
+        let encoded = try encoder.encode(completion)
+        let restored = try JSONDecoder().decode(
+            StructuredWorkoutCompletion.self, from: encoded
+        )
+        XCTAssertEqual(restored.sourcePlanID, planID)
+        XCTAssertEqual(restored.sourceWorkoutID, sessionID)
+        XCTAssertEqual(restored.completedBlockCount, 3)
+
+        // Older stored records have no sourcePlanID. Keep them readable.
+        var legacy = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+        legacy.removeValue(forKey: "sourcePlanID")
+        let legacyData = try JSONSerialization.data(withJSONObject: legacy)
+        let decodedLegacy = try JSONDecoder().decode(
+            StructuredWorkoutCompletion.self, from: legacyData
+        )
+        XCTAssertNil(decodedLegacy.sourcePlanID)
+        XCTAssertEqual(decodedLegacy.sourceWorkoutID, sessionID)
+    }
+
 }
