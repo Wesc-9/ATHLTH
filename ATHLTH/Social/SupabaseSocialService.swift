@@ -1440,8 +1440,14 @@ final class SupabaseSocialService: Sendable {
             .value
 
         let remoteAttemptIDs = Set(remoteAttempts.map(\.id))
+        // Keep historical/early evidence out of the upload queue as well as
+        // the leaderboard. The backend independently enforces the same gate.
         let missingAttempts = challenge.attempts
-            .filter { $0.userID == currentUserID && !remoteAttemptIDs.contains($0.id) }
+            .filter {
+                $0.userID == currentUserID &&
+                !remoteAttemptIDs.contains($0.id) &&
+                challenge.countsAttempt($0)
+            }
             .map {
                 ChallengeAttemptWrite(
                     id: $0.id,
