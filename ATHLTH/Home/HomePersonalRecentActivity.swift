@@ -1,4 +1,5 @@
 import CoreLocation
+import Combine
 import SwiftUI
 import UIKit
 
@@ -672,6 +673,7 @@ struct HomePersonalRecentActivitySection:
                     HomeActivityVisibilityStore
                         .changed
             )
+            .receive(on: DispatchQueue.main)
         ) { _ in
             rebuildRecentWorkouts()
         }
@@ -2953,6 +2955,7 @@ struct HomePersonalActivityHistoryView:
                     HomeActivityVisibilityStore
                         .changed
             )
+            .receive(on: DispatchQueue.main)
         ) { _ in
             Task {
                 await load()
