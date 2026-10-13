@@ -5445,29 +5445,33 @@ struct SessionEditorView: View {
         hasSelectedWorkoutSource = true
     }
 
+    private var sourceChoiceCard: some View {
+        WorkoutPlanningSourceCard(
+            context: ATHLTHLocalization.choose(
+                english: "The same workout builder is used for personal plans and Train Together.",
+                norwegian: "Den samme øktmotoren brukes for egen planlegging og Train Together."
+            ),
+            onCreateNew: {
+                hasSelectedWorkoutSource = true
+                title = ""
+            },
+            onUsePlanned: {
+                showingSavedWorkoutPicker = true
+            },
+            onTrainTogether: onPreparedWorkout == nil
+                ? beginPartnerPlanningFromSource
+                : nil
+        )
+    }
+
     var body: some View {
         NavigationStack {
             Form {
                 if isStandalone && !hasSelectedWorkoutSource {
                     Section {
-                        WorkoutPlanningSourceCard(
-                            context: ATHLTHLocalization.choose(
-                                english: "The same workout builder is used for personal plans and Train Together.",
-                                norwegian: "Den samme øktmotoren brukes for egen planlegging og Train Together."
-                            ),
-                            onCreateNew: {
-                                hasSelectedWorkoutSource = true
-                                title = ""
-                            },
-                            onUsePlanned: {
-                                showingSavedWorkoutPicker = true
-                            },
-                            onTrainTogether: onPreparedWorkout == nil
-                                ? beginPartnerPlanningFromSource
-                                : nil
-                        )
+                        sourceChoiceCard
                     }
-                    .listRowBackground(Color.clear)
+                    .listRowBackground { SwiftUI.Color.clear }
                     .listRowInsets(EdgeInsets(top: 14, leading: 14,
                                               bottom: 14, trailing: 14))
                 } else {
