@@ -760,25 +760,34 @@ final class GhostRaceStore: ObservableObject {
         guard finishCrossingElapsed == nil,
               courseMeters.isFinite, elapsed.isFinite,
               elapsed >= 0, routeMeters > 0,
-              deviationMeters.isFinite,
-              deviationMeters <= 40 else { return }
+              deviationMeters.isFinite, deviationMeters <= 40 else {
+            return
+        }
 
         let finishBoundary = routeMeters * 0.995
         if courseMeters >= finishBoundary {
-            // Interpolate the first verified crossing, not a later Stop tap.
-            if let previous = lastReliableCourseSample,
-               previous.meters < finishBoundary,
-               courseMeters > previous.meters,
-               elapsed >= previous.elapsed {
-                let fraction = min(max(
-                    (finishBoundary - previous.meters) /
-                    (courseMeters - previous.meters), 0
-                ), 1)
-                finishCrossingElapsed = previous.elapsed +
-                    (elapsed - previous.elapsed) * fraction
-            } else {
-                finishCrossingElapsed = elapsed
+            // A single GPS hit near the end, or a loop passing its finish
+            // early, cannot certify a race. We need an earlier high-quality
+            // sample from the final fifth of the course and a physically
+            // plausible segment crossing toward the actual finish.
+            guard let previous = lastReliableCourseSample,
+                  previous.meters >= routeMeters * 0.80,
+                  previous.meters < finishBoundary,
+                  courseMeters > previous.meters else { return }
+
+            let sampleSeconds = elapsed - previous.elapsed
+            let traveledMeters = courseMeters - previous.meters
+            guard sampleSeconds.isFinite,
+                  (0.5...45).contains(sampleSeconds),
+                  traveledMeters <= max(25, sampleSeconds * 9) else {
+                return
             }
+
+            let fraction = min(max(
+                (finishBoundary - previous.meters) / traveledMeters, 0
+            ), 1)
+            finishCrossingElapsed = previous.elapsed +
+                sampleSeconds * fraction
         } else if lastReliableCourseSample == nil ||
                     courseMeters >= (lastReliableCourseSample?.meters ?? 0) {
             lastReliableCourseSample = (courseMeters, elapsed)
