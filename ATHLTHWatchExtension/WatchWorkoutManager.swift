@@ -236,6 +236,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var lastGhostAnnouncedLeadMeters: Double?
     private var lastGhostLeadAlertAt: Date?
     private var lastGhostLeadSign = 0
+    private var ghostOvertakeTracker = ATHLTHGhostLeadTracker()
     private var ghostFinalPhaseAnnounced = false
     private var lastLiveGhostConnectionText: String?
     private var lastGhostMapPublishedAt: Date?
@@ -515,6 +516,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         lastGhostAnnouncedLeadMeters = nil
         lastGhostLeadAlertAt = nil
         lastGhostLeadSign = 0
+        ghostOvertakeTracker.reset()
         ghostFinalPhaseAnnounced = false
         lastLiveGhostConnectionText = nil
         lastGhostMapPublishedAt = nil
@@ -3269,6 +3271,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         lastGhostAnnouncedLeadMeters = nil
         lastGhostLeadAlertAt = nil
         lastGhostLeadSign = 0
+        ghostOvertakeTracker.reset()
         ghostFinalPhaseAnnounced = false
         lastLiveGhostConnectionText = nil
         offRouteStartedAt = nil
@@ -4317,6 +4320,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
               userLocation.horizontalAccuracy <= 50,
               deviationMeters.isFinite,
               (0...80).contains(deviationMeters) else {
+            ghostOvertakeTracker.invalidatePending()
             publish {
                 self.ghostDistanceDeltaMeters = nil
                 self.ghostTimeDeltaSeconds = nil
@@ -4539,6 +4543,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
+        let confirmedOvertake = ghostOvertakeTracker.observe(
+            signedGapMeters: distanceDelta,
+            elapsedSeconds: elapsedTime
+        )
+
         var periodicAnnouncement = false
 
         if let interval =
@@ -4658,6 +4667,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 distanceDelta
             )
         let signChanged =
+            confirmedOvertake &&
             currentSign != 0 &&
             lastGhostLeadSign != 0 &&
             currentSign !=
