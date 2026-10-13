@@ -59,6 +59,19 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
         }
     }
 
+    private func intensityChoiceLabel(for workoutID: UUID) -> String {
+        switch previewEfforts[workoutID] {
+        case .easy:
+            return ATHLTHLocalization.choose(english: "Easy", norwegian: "Rolig")
+        case .moderate:
+            return ATHLTHLocalization.choose(english: "Moderate", norwegian: "Moderat")
+        case .hard:
+            return ATHLTHLocalization.choose(english: "Hard", norwegian: "Hard")
+        case .none:
+            return ATHLTHLocalization.choose(english: "Set intensity", norwegian: "Velg intensitet")
+        }
+    }
+
     @ViewBuilder
     private func workoutStatusRow(
         title: String,
@@ -290,13 +303,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                             english: "Hard", norwegian: "Hard"
                                         )) { updateEffort(.hard, for: workout.id, plan: currentPlan) }
                                     } label: {
-                                        Text(previewEfforts[workout.id] == .easy
-                                             ? ATHLTHLocalization.choose(english: "Easy", norwegian: "Rolig")
-                                             : previewEfforts[workout.id] == .moderate
-                                             ? ATHLTHLocalization.choose(english: "Moderate", norwegian: "Moderat")
-                                             : previewEfforts[workout.id] == .hard
-                                             ? ATHLTHLocalization.choose(english: "Hard", norwegian: "Hard")
-                                             : ATHLTHLocalization.choose(english: "Set intensity", norwegian: "Velg intensitet"))
+                                        Text(intensityChoiceLabel(for: workout.id))
                                         .font(.caption.weight(.medium))
                                     }
                                 }
