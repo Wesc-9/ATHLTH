@@ -67,7 +67,9 @@ struct CommunityGroupEventDetailView: View {
                 .frame(maxWidth: .infinity)
             }
         }
-        .navigationTitle("Event")
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Event", norwegian: "Arrangement"
+        ))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(
@@ -568,18 +570,9 @@ struct CommunityGroupEventDetailView: View {
                 current.resolvedStatus !=
                 .completed {
                 HStack(spacing: 8) {
-                    rsvpButton(
-                        "Going",
-                        status: "going"
-                    )
-                    rsvpButton(
-                        "Maybe",
-                        status: "maybe"
-                    )
-                    rsvpButton(
-                        "Can't go",
-                        status: "not_going"
-                    )
+                    rsvpButton(.going)
+                    rsvpButton(.maybe)
+                    rsvpButton(.notGoing)
                 }
                 .padding(.top, 10)
             }
@@ -757,15 +750,11 @@ struct CommunityGroupEventDetailView: View {
     }
 
     private func rsvpButton(
-        _ title: String,
-        status: String
+        _ decision: ATHLTHCommunityRSVPDecision
     ) -> some View {
+        let status = decision.rawValue
         let selected =
-            myRSVP == status ||
-            (
-                status == "going" &&
-                myRSVP == "waitlist"
-            )
+            ATHLTHCommunityRSVPDecision.resolvedStatus(myRSVP) == decision
 
         return Button {
             Task {
@@ -786,10 +775,10 @@ struct CommunityGroupEventDetailView: View {
                 }
             }
         } label: {
-            Text(title)
-                .font(
-                    .caption.weight(.semibold)
-                )
+            Label(decision.localizedTitle, systemImage: decision.symbol)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(.bordered)
