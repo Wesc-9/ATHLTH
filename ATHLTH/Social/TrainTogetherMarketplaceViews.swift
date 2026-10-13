@@ -5,6 +5,14 @@ import SwiftUI
 struct TrainTogetherMarketplaceView:
     View
 {
+    // Allows Community's shared create hub to start the existing workout
+    // planner directly, rather than maintaining a second creation form.
+    let initialCreationMode: SocialWorkoutParticipationMode?
+
+    init(initialCreationMode: SocialWorkoutParticipationMode? = nil) {
+        self.initialCreationMode = initialCreationMode
+    }
+
     @EnvironmentObject private var session:
         AppSessionStore
     @EnvironmentObject private var social:
@@ -15,6 +23,7 @@ struct TrainTogetherMarketplaceView:
 
     @State private var showingCreate =
         false
+    @State private var didOpenInitialCreation = false
     @State private var searchText = ""
     @State private var selectedKind:
         WorkoutKind?
@@ -268,6 +277,14 @@ struct TrainTogetherMarketplaceView:
             }
         }
         .task {
+            if let initialCreationMode,
+               !didOpenInitialCreation {
+                didOpenInitialCreation = true
+                modeFilter = initialCreationMode == .remote
+                    ? .sameWorkout
+                    : .physical
+                showingCreate = true
+            }
             async let market:
                 Void = marketplace.refresh()
             async let socialRefresh:
