@@ -230,12 +230,15 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                         if weekStatus.skipped > 0 {
                             Label("\(weekStatus.skipped)", systemImage: "minus.circle")
                         }
+                        if weekStatus.unknownDate > 0 {
+                            Label("\(weekStatus.unknownDate)", systemImage: "calendar.badge.questionmark")
+                        }
                     }
                     .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "\(weekStatus.completed) completed, \(weekStatus.upcoming) upcoming, \(weekStatus.needsReview) need review, \(weekStatus.skipped) skipped",
-                        norwegian: "\(weekStatus.completed) fullført, \(weekStatus.upcoming) kommende, \(weekStatus.needsReview) trenger gjennomgang, \(weekStatus.skipped) hoppet over"
+                        english: "\(weekStatus.completed) completed, \(weekStatus.upcoming) upcoming, \(weekStatus.needsReview) need review, \(weekStatus.skipped) skipped, \(weekStatus.unknownDate) unscheduled",
+                        norwegian: "\(weekStatus.completed) fullført, \(weekStatus.upcoming) kommende, \(weekStatus.needsReview) trenger gjennomgang, \(weekStatus.skipped) hoppet over, \(weekStatus.unknownDate) uten dato"
                     ))
                     ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
                         if !day.sessions.isEmpty {
