@@ -49,7 +49,7 @@ final class ATHLTHArenaStatusPresentationTests: XCTestCase {
             ), .needsReview
         )
         XCTAssertEqual(
-            ATHLTHArenaStatusPresentation.liveRace(status: "accepted"), .active
+            ATHLTHArenaStatusPresentation.liveRace(status: "accepted"), .ready
         )
     }
 
