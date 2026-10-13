@@ -263,7 +263,8 @@ struct ATHLTHArenaOnlineSection: View {
                 Text(ATHLTHLocalization.choose(
                     english: "Shared series", norwegian: "Delte konkurranser"
                 ))
-                .font(.headline)
+                .font(ATHLTHArenaLightStyle.editorialTitle(23))
+                .foregroundStyle(ATHLTHArenaLightStyle.ink)
                 Spacer()
                 if loading {
                     ProgressView().controlSize(.small)
@@ -610,29 +611,12 @@ struct ATHLTHArenaOnlineSection: View {
         )
         let deadlinePassed = urgency == .review
         let unresolved = ATHLTHArenaArchivePresentation.isUnresolved(item)
-        let statusLabel: String = deadlinePassed
-            ? ATHLTHLocalization.choose(
-                english: "REVIEW", norwegian: "KONTROLL"
-            )
-            : isActive
-            ? ATHLTHLocalization.choose(english: "ACTIVE", norwegian: "AKTIV")
-            : unresolved
-                ? ATHLTHLocalization.choose(
-                    english: "UNRESOLVED", norwegian: "UAVKLART"
-                  )
-                : isCompleted
-                    ? ATHLTHLocalization.choose(
-                        english: "FINISHED", norwegian: "FERDIG"
-                      )
-                    : item.status == "draft"
-                        ? ATHLTHLocalization.choose(
-                            english: "AGREEMENT", norwegian: "ENIGHET"
-                          )
-                        : item.status.uppercased()
-        let accent: Color = (deadlinePassed || unresolved)
-            ? .orange
-            : isActive ? ATHLTHTheme.accentDeep
-            : isCompleted ? .secondary : .orange
+        let statusKind = ATHLTHArenaStatusPresentation.series(
+            status: item.status,
+            deadlinePassed: deadlinePassed,
+            unresolved: unresolved
+        )
+        let accent = statusKind.foreground
 
         return NavigationLink {
             ATHLTHArenaOnlineDetailView(series: item)
@@ -648,7 +632,7 @@ struct ATHLTHArenaOnlineSection: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(item.title)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .foregroundStyle(ATHLTHArenaLightStyle.ink)
                         .lineLimit(2)
 
                     HStack(spacing: 6) {
@@ -661,7 +645,7 @@ struct ATHLTHArenaOnlineSection: View {
                         }
                     }
                     .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                     .lineLimit(1)
 
                     if let urgency {
@@ -678,16 +662,10 @@ struct ATHLTHArenaOnlineSection: View {
                 Spacer(minLength: 4)
 
                 VStack(alignment: .trailing, spacing: 8) {
-                    Text(statusLabel)
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
-                        .tracking(0.5)
-                        .foregroundStyle(accent)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(accent.opacity(0.09), in: Capsule())
+                    ATHLTHArenaStatusPill(kind: statusKind)
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                 }
             }
             .padding(14)
@@ -695,7 +673,7 @@ struct ATHLTHArenaOnlineSection: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 18)
                     .stroke(
-                        isActive ? ATHLTHTheme.accentDeep.opacity(0.18)
+                        isActive ? ATHLTHArenaLightStyle.line
                                  : Color.clear,
                         lineWidth: 1
                     )
