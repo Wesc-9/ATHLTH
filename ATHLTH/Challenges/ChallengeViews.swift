@@ -4,6 +4,18 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
+/// Challenge reuses the Training Plan visual language rather than carrying
+/// its own green/blue palette or heavier card treatments.
+private enum ChallengePlanTheme {
+    static let canvas = ATHLTHPlanDesign.canvas
+    static let ink = ATHLTHPlanDesign.ink
+    static let secondary = ATHLTHPlanDesign.secondaryInk
+    static let gold = ATHLTHPlanDesign.accent
+    static let line = ATHLTHPlanDesign.outline
+    static let soft = ATHLTHTheme.cardWarm.opacity(0.54)
+    static let radius = ATHLTHPlanDesign.cardRadius
+}
+
 struct ProfileChallengesSection: View {
     @EnvironmentObject private var challenges: ChallengeStore
 
@@ -140,11 +152,16 @@ struct ChallengeCompactRow: View {
                 .font(.caption2.bold())
                 .foregroundStyle(.secondary)
         }
-        .padding(11)
+        .padding(12)
         .background(
-            ATHLTHTheme.accent.opacity(0.035),
-            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+            Color.white,
+            in: RoundedRectangle(cornerRadius: 17, style: .continuous)
         )
+        .overlay {
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .stroke(ChallengePlanTheme.line, lineWidth: 0.8)
+        }
+        .shadow(color: .black.opacity(0.035), radius: 9, y: 4)
     }
 
     private func statusText(_ status: ATHLTHChallengeStatus) -> String {
@@ -196,33 +213,46 @@ struct ChallengeHubView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("ATHLTH Challenges")
-                            .font(.largeTitle.bold())
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "YOUR CHALLENGES",
+                            norwegian: "DINE UTFORDRINGER"
+                        ))
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(2.2)
+                        .foregroundStyle(ChallengePlanTheme.gold)
 
-                        Text(
-                            "Weekly community goals, friend challenges and routes."
-                        )
+                        Text(ATHLTHLocalization.choose(
+                            english: "Challenges",
+                            norwegian: "Utfordringer"
+                        ))
+                        .font(.system(size: 34, weight: .regular, design: .serif))
+                        .foregroundStyle(ChallengePlanTheme.ink)
+
+                        Text(ATHLTHLocalization.choose(
+                            english: "Weekly goals, friend duels and routes.",
+                            norwegian: "Ukens mål, vennedueller og ruter."
+                        ))
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ChallengePlanTheme.secondary)
                     }
 
-                    Spacer()
+                    Spacer(minLength: 4)
 
                     Button {
                         showingCreate = true
                     } label: {
                         Image(systemName: "plus")
-                            .font(.headline)
-                            .frame(width: 44, height: 44)
-                            .background(
-                                ATHLTHTheme.accent.opacity(0.12),
-                                in: Circle()
-                            )
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(.white)
+                            .frame(width: 43, height: 43)
+                            .background(ChallengePlanTheme.ink, in: Circle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Create challenge")
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Create challenge", norwegian: "Opprett utfordring"
+                    ))
                 }
 
                 if let weekly = officialChallenges.activeChallenge {
@@ -355,11 +385,10 @@ struct ChallengeHubView: View {
             }
             .padding()
         }
-        .background(
-            Color(.systemGroupedBackground)
-                .ignoresSafeArea()
-        )
-        .navigationTitle("Challenges")
+        .background(ChallengePlanTheme.canvas.ignoresSafeArea())
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Challenges", norwegian: "Utfordringer"
+        ))
         .navigationBarTitleDisplayMode(.inline)
         .task {
             challenges.refreshStatuses()
@@ -380,9 +409,10 @@ struct ChallengeHubView: View {
 
     private func sectionTitle(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(.caption2.bold())
-            .tracking(1.3)
-            .foregroundStyle(.secondary)
+            .font(.system(size: 10, weight: .semibold))
+            .tracking(1.8)
+            .foregroundStyle(ChallengePlanTheme.gold)
+            .padding(.top, 4)
     }
 
     private func officialRow(
@@ -455,78 +485,103 @@ struct ChallengeHubView: View {
 struct ChallengeHeroCard: View {
     let challenge: ATHLTHChallenge
 
+    private var statusLabel: String {
+        if challenge.scoringStartDate == nil &&
+           challenge.status != .completed &&
+           challenge.status != .cancelled {
+            return ATHLTHLocalization.choose(
+                english: "AWAITING ACCEPTANCE",
+                norwegian: "VENTER PÅ AKSEPT"
+            )
+        }
+        switch challenge.status {
+        case .active:
+            return ATHLTHLocalization.choose(english: "ACTIVE", norwegian: "AKTIV")
+        case .upcoming:
+            return ATHLTHLocalization.choose(english: "UPCOMING", norwegian: "KOMMENDE")
+        case .completed:
+            return ATHLTHLocalization.choose(english: "FINISHED", norwegian: "AVSLUTTET")
+        case .cancelled:
+            return ATHLTHLocalization.choose(english: "CANCELLED", norwegian: "AVLYST")
+        case .draft, .invited:
+            return ATHLTHLocalization.choose(english: "INVITATION", norwegian: "INVITASJON")
+        }
+    }
+
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            ChallengeCoverArtworkView(
-                sport: challenge.sport,
-                artworkName: challenge.rules.coverArtworkName,
-                remoteURL: challenge.rules.coverImageURL
-            )
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack(alignment: .topLeading) {
+                ChallengeCoverArtworkView(
+                    sport: challenge.sport,
+                    artworkName: challenge.rules.coverArtworkName,
+                    remoteURL: challenge.rules.coverImageURL
+                )
+                .frame(height: 116)
+                .clipped()
 
-            LinearGradient(
-                colors: [.clear, .clear, .black.opacity(0.46)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+                LinearGradient(
+                    colors: [.black.opacity(0.35), .clear],
+                    startPoint: .top, endPoint: .bottom
+                )
 
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Label(
-                        challenge.status == .active
-                            ? "LIVE"
-                            : challenge.status.rawValue.uppercased(),
-                        systemImage:
-                            challenge.status == .active
-                                ? "dot.radiowaves.left.and.right"
-                                : "calendar"
-                    )
-                    .font(.caption2.bold())
-                    .tracking(1)
-
-                    Spacer()
-
+                HStack(spacing: 8) {
+                    Label(statusLabel, systemImage: challenge.status == .active
+                        ? "dot.radiowaves.left.and.right" : "clock")
+                    Spacer(minLength: 4)
                     if challenge.rulesAreLocked {
-                        Label("RULES LOCKED", systemImage: "lock.fill")
-                            .font(.caption2.bold())
+                        Image(systemName: "lock.fill")
+                            .accessibilityLabel(ATHLTHLocalization.choose(
+                                english: "Rules locked", norwegian: "Regler låst"
+                            ))
                     }
                 }
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(0.8)
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.55), radius: 4, y: 1)
+                .padding(15)
+            }
+            .frame(height: 116)
+            .clipped()
 
-                Spacer()
-
+            VStack(alignment: .leading, spacing: 9) {
                 Text(challenge.title)
-                    .font(.title2.bold())
+                    .font(.system(size: 24, weight: .regular, design: .serif))
+                    .foregroundStyle(ChallengePlanTheme.ink)
                     .lineLimit(2)
+                    .multilineTextAlignment(.leading)
 
-                if let summary = challenge.rules.summary,
-                   !summary.isEmpty {
+                if let summary = challenge.rules.summary, !summary.isEmpty {
                     Text(summary)
                         .font(.caption)
+                        .foregroundStyle(ChallengePlanTheme.secondary)
                         .lineLimit(2)
-                        .foregroundStyle(.white.opacity(0.86))
                 }
 
-                HStack {
-                    Label(
-                        challenge.rules.scoring.title,
-                        systemImage: challenge.sport.systemImage
-                    )
-                    Spacer()
-                    Label(
-                        "\(challenge.participants.count)",
-                        systemImage: "person.2.fill"
-                    )
+                HStack(spacing: 9) {
+                    Label(challenge.rules.scoring.title,
+                          systemImage: challenge.sport.systemImage)
+                    Spacer(minLength: 4)
+                    Label("\(challenge.participants.count)",
+                          systemImage: "person.2.fill")
                 }
-                .font(.caption)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(ChallengePlanTheme.secondary)
             }
-            .foregroundStyle(.white)
-            .shadow(color: .black.opacity(0.24), radius: 5, y: 2)
-            .padding(18)
+            .padding(17)
         }
-        .frame(height: 205)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: ChallengePlanTheme.radius,
+                                    style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: ChallengePlanTheme.radius,
+                             style: .continuous)
+                .stroke(ChallengePlanTheme.line, lineWidth: 0.8)
+        }
+        .shadow(color: .black.opacity(0.035), radius: 9, y: 4)
     }
 }
-
 struct ChallengeCoverArtworkView: View {
     let sport: ATHLTHChallengeSport
     let artworkName: String?
