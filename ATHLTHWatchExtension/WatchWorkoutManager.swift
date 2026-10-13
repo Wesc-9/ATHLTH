@@ -624,17 +624,17 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
     }
 
-    var averagePaceSecondsPerKilometer: TimeInterval? {
-        // GPS pace is unavailable indoors. Derive measured average pace
-        // from Watch distance after a short warm-up to avoid early spikes.
-        guard distanceMeters >= 20,
-              elapsedTime > 0
-        else {
-            return nil
-        }
+    // Location type is configured on the actual HealthKit session; .running
+    // alone is not proof of an outdoor workout (e.g. treadmill sessions).
+    private var usesOutdoorGPS: Bool {
+        workoutSession?.workoutConfiguration.locationType == .outdoor
+    }
 
-        return elapsedTime /
-            (distanceMeters / 1_000)
+    var averagePaceSecondsPerKilometer: TimeInterval? {
+        ATHLTHRunningPace.average(
+            elapsedSeconds: elapsedTime,
+            distanceMeters: distanceMeters
+        )
     }
 
     var currentStructuredStepElapsedTime: TimeInterval {
@@ -2903,6 +2903,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     .startUpdatingLocation()
             } else {
                 routeBuilder = nil
+                locationManager.stopUpdatingLocation()
+                locationManager.allowsBackgroundLocationUpdates = false
             }
 
             updateFinalStatistics(
@@ -3516,7 +3518,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 mirroringRetryPending = true
             }
 
-            locationManager.requestWhenInUseAuthorization()
+            if configuration.locationType != .outdoor {
+                locationManager.stopUpdatingLocation()
+                locationManager.allowsBackgroundLocationUpdates = false
+            } else {
+                locationManager.requestWhenInUseAuthorization()
+            }
 
             if configuration.locationType == .outdoor {
                 locationManager.allowsBackgroundLocationUpdates = true
@@ -4167,8 +4174,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private func updateOutdoorMetrics(
         using location: CLLocation
     ) {
-        guard kind == .running ||
-                kind == .walking,
+        guard (kind == .running || kind == .walking),
+              usesOutdoorGPS,
               ATHLTHCoachSensorFreshness.isFresh(
                   sampledAt: location.timestamp,
                   maximumAge: ATHLTHCoachSensorFreshness.maximumPaceAge
@@ -4177,12 +4184,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
-        if location.speed >= 0.35 {
-            let rawPace =
-                1_000 / location.speed
-
-            if rawPace >= 120,
-               rawPace <= 1_800 {
+        if let rawPace = ATHLTHRunningPace.outdoorGPS(
+            speedMetersPerSecond: location.speed,
+            isOutdoor: usesOutdoorGPS
+        ) {
                 let smoothed: TimeInterval
 
                 if let existing =
@@ -4199,7 +4204,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     self.currentPaceSecondsPerKilometer =
                         smoothed
                 }
-            }
         }
 
         updateRouteNavigation(
@@ -7159,7 +7163,7 @@ extension WatchWorkoutManager:
                 return
             }
 
-            if self.kind.usesOutdoorLocation {
+            if self.usesOutdoorGPS {
                 self.locationManager
                     .allowsBackgroundLocationUpdates =
                     true
@@ -7212,6 +7216,9 @@ private extension WatchWorkoutManager {
             }
             return
         }
+
+        // Treadmill sessions must not consume GPS points, pace or auto-pause.
+        guard usesOutdoorGPS else { return }
 
         let orderedLocations =
             filtered.sorted {
@@ -7389,7 +7396,8 @@ private extension WatchWorkoutManager {
         using location: CLLocation
     ) {
         guard state == .running,
-              kind == .running || kind == .walking
+              usesOutdoorGPS,
+              (kind == .running || kind == .walking)
         else {
             return
         }
