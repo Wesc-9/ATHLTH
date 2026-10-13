@@ -5459,7 +5459,7 @@ struct SessionEditorView: View {
                 showingSavedWorkoutPicker = true
             },
             onTrainTogether: onPreparedWorkout == nil
-                ? beginPartnerPlanningFromSource
+                ? { beginPartnerPlanningFromSource() }
                 : nil
         )
     }
@@ -5471,7 +5471,7 @@ struct SessionEditorView: View {
                     Section {
                         sourceChoiceCard
                     }
-                    .listRowBackground { SwiftUI.Color.clear }
+                    .listRowBackground(SwiftUI.Color.clear)
                     .listRowInsets(EdgeInsets(top: 14, leading: 14,
                                               bottom: 14, trailing: 14))
                 } else {
