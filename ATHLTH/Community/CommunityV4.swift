@@ -1189,7 +1189,9 @@ struct ATHLTHCommunityV4View: View {
         async let messageRefresh: Void =
             messaging.refresh(force: force)
         async let trainTogetherRefresh: Void =
-            trainTogetherAgenda.refresh()
+            force
+                ? trainTogetherAgenda.refresh()
+                : trainTogetherAgenda.refreshIfStale()
         async let onlineRefresh: Void =
             realtime.refreshOnlineUsers(
                 force: force
