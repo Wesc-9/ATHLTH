@@ -804,6 +804,11 @@ struct ExerciseDetailView: View {
     let onSelect: ((ExerciseLibraryEntry) -> Void)?
 
     @State private var showingDelete = false
+    @State private var showingEdit = false
+
+    private var currentEntry: ExerciseLibraryEntry {
+        library.allExercises.first(where: { $0.id == currentEntry.id }) ?? entry
+    }
 
     var body: some View {
         ScrollView {
@@ -816,9 +821,9 @@ struct ExerciseDetailView: View {
 
                     Text(
                         [
-                            entry.bodyPart,
-                            entry.difficulty,
-                            entry.exercise.equipment.first
+                            currentEntry.bodyPart,
+                            currentEntry.difficulty,
+                            currentEntry.exercise.equipment.first
                         ]
                         .compactMap { $0 }
                         .joined(separator: " · ")
@@ -856,24 +861,37 @@ struct ExerciseDetailView: View {
                     }
                 }
 
-                if let videoURL = entry.exercise.videoURL {
-                    detailCard("Video") {
-                        VideoPlayer(
-                            player: AVPlayer(url: videoURL)
-                        )
-                        .frame(height: 220)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                if let videoURL = currentEntry.exercise.videoURL {
+                    detailCard(ATHLTHLocalization.choose(
+                        english: "Demonstration", norwegian: "Demonstrasjon"
+                    )) {
+                        VideoPlayer(player: AVPlayer(url: videoURL))
+                            .frame(height: 220)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .id(videoURL)
 
-                        Link(destination: videoURL) {
-                            Label("Open source video", systemImage: "arrow.up.right.square")
-                                .font(.caption.weight(.semibold))
+                        if !videoURL.isFileURL {
+                            Link(destination: videoURL) {
+                                Label(ATHLTHLocalization.choose(
+                                    english: "Open video source",
+                                    norwegian: "Åpne videokilden"
+                                ), systemImage: "arrow.up.right.square")
+                                    .font(.caption.weight(.semibold))
+                            }
+                        } else {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Private on-device video",
+                                norwegian: "Privat video lagret på enheten"
+                            ), systemImage: "iphone")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                     }
                 }
 
-                if !entry.tips.isEmpty {
+                if !currentEntry.tips.isEmpty {
                     detailCard("Tips") {
-                        ForEach(entry.tips, id: \.self) { tip in
+                        ForEach(currentEntry.tips, id: \.self) { tip in
                             Label(tip, systemImage: "lightbulb.fill")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
@@ -881,14 +899,14 @@ struct ExerciseDetailView: View {
                     }
                 }
 
-                if entry.source == .repDB {
+                if currentEntry.source == .repDB {
                     Link(destination: URL(string: "https://repdb.co")!) {
                         Label("Exercise data by RepDB", systemImage: "arrow.up.right.square")
                             .font(.caption.weight(.semibold))
                     }
                 }
 
-                if entry.source == .custom {
+                if currentEntry.source == .custom {
                     Button("Delete Custom Exercise", role: .destructive) {
                         showingDelete = true
                     }
@@ -903,8 +921,27 @@ struct ExerciseDetailView: View {
                     ATHLTHTheme.accent
             )
         )
-        .navigationTitle("Exercise")
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Exercise", norwegian: "Øvelse"
+        ))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if currentEntry.source == .custom {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingEdit = true
+                    } label: {
+                        Image(systemName: "square.and.pencil")
+                    }
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Edit exercise", norwegian: "Rediger øvelse"
+                    ))
+                }
+            }
+        }
+        .sheet(isPresented: $showingEdit) {
+            CustomExerciseEditorView(editing: currentEntry)
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if let onSelect {
                 VStack(spacing: 0) {
@@ -912,7 +949,7 @@ struct ExerciseDetailView: View {
                         .opacity(0.35)
 
                     Button {
-                        onSelect(entry)
+                        onSelect(currentEntry)
                         dismiss()
                     } label: {
                         Label(
@@ -949,7 +986,7 @@ struct ExerciseDetailView: View {
             titleVisibility: .visible
         ) {
             Button("Delete", role: .destructive) {
-                library.deleteCustomExercise(entry.id)
+                library.deleteCustomExercise(currentEntry.id)
                 dismiss()
             }
             Button("Cancel", role: .cancel) {}
@@ -958,11 +995,11 @@ struct ExerciseDetailView: View {
 
     private var artwork: some View {
         HStack(spacing: 10) {
-            ExerciseArtwork(entry: entry, size: 160)
+            ExerciseArtwork(entry: currentEntry, size: 160)
 
-            if entry.imagePeakURL != nil &&
-               entry.imagePeakURL != entry.imageStartURL {
-                ATHLTHStorageImage(url: entry.imagePeakURL) { phase in
+            if currentEntry.imagePeakURL != nil &&
+               currentEntry.imagePeakURL != currentEntry.imageStartURL {
+                ATHLTHStorageImage(url: currentEntry.imagePeakURL) { phase in
                     switch phase {
                     case .success(let image):
                         image
