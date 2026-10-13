@@ -797,6 +797,9 @@ struct ATHLTHTrainPlanPremiumView: View {
                             healthWorkouts: health.workouts,
                             strengthHistory: strength.workoutHistory
                         )
+                        let skipped = session.isPlanSessionSkipped(
+                            planID: plan.id, sessionID: workout.id
+                        )
                         let isToday = Calendar.current.isDate(
                             planDayDate(day.dayIndex, plan: plan),
                             inSameDayAs: Date()
@@ -824,11 +827,17 @@ struct ATHLTHTrainPlanPremiumView: View {
                                         .font(.headline)
                                         .foregroundStyle(graphite)
                                         .multilineTextAlignment(.leading)
-                                    if isToday && !completed {
+                                    if isToday && !completed && !skipped {
                                         Label(tr("Today", "I dag"),
                                               systemImage: "calendar")
                                             .font(.caption.weight(.semibold))
                                             .foregroundStyle(warmGold)
+                                    }
+                                    if skipped {
+                                        Label(tr("Skipped", "Hoppet over"),
+                                              systemImage: "forward.end")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(secondaryInk)
                                     }
                                     if completed {
                                         Label(tr("Completed", "Gjennomført"),
@@ -893,7 +902,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                                           systemImage: "calendar.badge.clock")
                                 }
                             }
-                            if !completed {
+                            if !completed && !skipped {
                                 Button {
                                     session.setPlanSessionManuallyCompleted(
                                         planID: plan.id,
@@ -923,6 +932,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                             "\(simpleWorkoutDescription(workout)), " +
                             (completed
                                 ? tr("completed", "gjennomført")
+                                : skipped ? tr("skipped", "hoppet over")
                                 : isToday ? tr("today", "i dag")
                                           : tr("planned", "planlagt"))
                         )
