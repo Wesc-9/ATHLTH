@@ -107,22 +107,6 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                     .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     ForEach(currentPlan.weeks) { week in
-                        HStack(spacing: 12) {
-                        Label("\(completedCount)", systemImage: "checkmark.circle.fill")
-                        Label("\(sessions.count - completedCount - skippedCount - unresolvedCount)", systemImage: "calendar")
-                        if unresolvedCount > 0 {
-                            Label("\(unresolvedCount)", systemImage: "questionmark.circle")
-                        }
-                        if skippedCount > 0 {
-                            Label("\(skippedCount)", systemImage: "minus.circle")
-                        }
-                    }
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "\(completedCount) completed, \(unresolvedCount) need review, \(skippedCount) skipped",
-                        norwegian: "\(completedCount) fullført, \(unresolvedCount) trenger gjennomgang, \(skippedCount) hoppet over"
-                    ))
                     ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
                             ForEach(day.sessions) { workout in
                                 HStack(spacing: 8) {
@@ -264,6 +248,22 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                     }
                     .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        HStack(spacing: 12) {
+                        Label("\(completedCount)", systemImage: "checkmark.circle.fill")
+                        Label("\(sessions.count - completedCount - skippedCount - unresolvedCount)", systemImage: "calendar")
+                        if unresolvedCount > 0 {
+                            Label("\(unresolvedCount)", systemImage: "questionmark.circle")
+                        }
+                        if skippedCount > 0 {
+                            Label("\(skippedCount)", systemImage: "minus.circle")
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "\(completedCount) completed, \(unresolvedCount) need review, \(skippedCount) skipped",
+                        norwegian: "\(completedCount) fullført, \(unresolvedCount) trenger gjennomgang, \(skippedCount) hoppet over"
+                    ))
                     ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
                         if !day.sessions.isEmpty {
                             HStack(alignment: .top, spacing: 10) {
