@@ -10,6 +10,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
     let plan: TrainingPlan
     let onSelect: (UUID, UUID?) -> Void
     @State private var showsAll = false
+    @State private var showsSuggestionPreview = false
 
     var body: some View {
         let report = ATHLTHPlanWeeklyFollowThrough.inspect(
@@ -146,6 +147,50 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                             ))
                             .font(.caption2)
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+                            Button {
+                                showsSuggestionPreview = true
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Review suggestion",
+                                        norwegian: "Se gjennom forslaget"
+                                    ),
+                                    systemImage: "arrow.up.right"
+                                )
+                            }
+                            .buttonStyle(.bordered)
+                            .confirmationDialog(
+                                ATHLTHLocalization.choose(
+                                    english: "Preview only — your plan will not change",
+                                    norwegian: "Kun forhåndsvisning – planen endres ikke"
+                                ),
+                                isPresented: $showsSuggestionPreview,
+                                titleVisibility: .visible
+                            ) {
+                                Button(ATHLTHLocalization.choose(
+                                    english: "Open relevant week",
+                                    norwegian: "Åpne aktuell uke"
+                                )) {
+                                    let matching = report.relevantWeeks.first {
+                                        switch suggestion {
+                                        case .reviewUnresolved: return $0.needsReview > 0
+                                        case .reviewSkipped: return $0.pastSkipped > 0
+                                        }
+                                    }
+                                    if let matching {
+                                        onSelect(matching.id, matching.firstReviewDayID)
+                                    }
+                                }
+                                Button(ATHLTHLocalization.choose(
+                                    english: "Cancel", norwegian: "Avbryt"
+                                ), role: .cancel) { }
+                            } message: {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "You can inspect the recorded sessions in the existing plan editor. No workout will be moved, skipped or overwritten.",
+                                    norwegian: "Du kan kontrollere de registrerte øktene i den eksisterende planredigeringen. Ingen økter flyttes, hoppes over eller overskrives."
+                                ))
+                            }
                         }
                         .font(.caption)
                         .foregroundStyle(ATHLTHPlanDesign.ink)
