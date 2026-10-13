@@ -1,5 +1,32 @@
 import SwiftUI
 
+/// A bounded, deterministic action scan that checks invitation-stage and
+/// active competitions fairly without querying all historical series.
+enum ATHLTHArenaActionSelection {
+    static let maxChecked = 12
+    private static let guaranteedPerStatus = 6
+
+    static func candidates(
+        from all: [ATHLTHArenaRemoteSeries]
+    ) -> [ATHLTHArenaRemoteSeries] {
+        let eligible = all.filter { $0.status == "draft" || $0.status == "active" }
+        func earlier(_ lhs: ATHLTHArenaRemoteSeries, _ rhs: ATHLTHArenaRemoteSeries) -> Bool {
+            let l = lhs.endsAt ?? .distantFuture
+            let r = rhs.endsAt ?? .distantFuture
+            if l != r { return l < r }
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
+        let drafts = eligible.filter { $0.status == "draft" }.sorted(by: earlier)
+        let active = eligible.filter { $0.status == "active" }.sorted(by: earlier)
+        let guaranteed = Array(drafts.prefix(guaranteedPerStatus)) +
+            Array(active.prefix(guaranteedPerStatus))
+        let chosenIDs = Set(guaranteed.map(\.id))
+        let overflow = eligible.filter { !chosenIDs.contains($0.id) }
+            .sorted(by: earlier)
+        return Array((guaranteed + overflow).prefix(maxChecked))
+    }
+}
+
 /// A read-only inbox for Arena. The existing destination views remain the
 /// authority for acceptance, rules, scores and every server-side mutation.
 struct ATHLTHArenaNextStepsSection: View {
@@ -14,6 +41,8 @@ struct ATHLTHArenaNextStepsSection: View {
     @State private var refreshQueued = false
     @State private var loadError: String?
     @State private var loadGeneration = 0
+    @State private var hasUncheckedSeries = false
+    @State private var lastRefreshCompletedAt: Date?
 
     private let cloud = ATHLTHArenaCloudService()
 
@@ -195,6 +224,26 @@ struct ATHLTHArenaNextStepsSection: View {
                     .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                 }
             }
+            if hasUncheckedSeries && loadedFor == session.profile.userID {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Showing priority actions from a selection of competitions. Check the full list below for the rest.",
+                        norwegian: "Viser prioriterte handlinger fra et utvalg konkurranser. Se hele listen nedenfor for resten."
+                    ),
+                    systemImage: "info.circle"
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHArenaLightStyle.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .onAppear {
+            // Refresh after returning from a detail screen where the user may
+            // have accepted an invite or voted, without polling in background.
+            if let last = lastRefreshCompletedAt,
+               Date().timeIntervalSince(last) >= 25 {
+                Task { await reload() }
+            }
         }
         .task(id: session.profile.userID) {
             await reload()
@@ -280,6 +329,7 @@ struct ATHLTHArenaNextStepsSection: View {
         let userID = session.profile.userID
         loadedFor = nil
         remoteSteps = []
+        hasUncheckedSeries = false
         loadError = nil
         defer {
             isLoading = false
@@ -291,20 +341,19 @@ struct ATHLTHArenaNextStepsSection: View {
 
         do {
             let series = try await cloud.loadSeries()
-            // Bound foreground network work: details can always be viewed
-            // from the full series list. Never label this as an exhaustive inbox.
-            let candidates = series
-                .filter { $0.status == "draft" || $0.status == "active" }
-                .sorted {
-                    let lhs = $0.endsAt ?? .distantFuture
-                    let rhs = $1.endsAt ?? .distantFuture
-                    return lhs == rhs ? $0.id.uuidString < $1.id.uuidString : lhs < rhs
-                }
-                .prefix(8)
+            // Balance invitations (draft) and live rounds (active). This
+            // remains a priority digest, not a complete replacement for the
+            // authorized competition list below.
+            let candidates = ATHLTHArenaActionSelection.candidates(from: series)
+            let eligibleCount = series.filter {
+                $0.status == "draft" || $0.status == "active"
+            }.count
+            var detailFailures = 0
 
             var found: [RemoteStep] = []
             for series in candidates {
                 guard !Task.isCancelled, session.profile.userID == userID else { return }
+                do {
                 let members = try await cloud.loadMembers(seriesID: series.id)
                 guard let own = members.first(where: { $0.userID == userID }),
                       own.response == "accepted" || own.response == "invited" else {
@@ -390,17 +439,33 @@ struct ATHLTHArenaNextStepsSection: View {
                     default: break
                     }
                 }
+                } catch {
+                    // One inaccessible/temporarily failed series cannot hide
+                    // other fully verified actions from the user.
+                    detailFailures += 1
+                    continue
+                }
             }
             guard !Task.isCancelled,
                   session.profile.userID == userID,
                   generation == loadGeneration else { return }
             remoteSteps = found
             loadedFor = userID
+            hasUncheckedSeries = eligibleCount > candidates.count
+            lastRefreshCompletedAt = Date()
+            if detailFailures > 0 {
+                loadError = ATHLTHLocalization.choose(
+                    english: "Some competitions could not be checked. View all competitions below for their current status.",
+                    norwegian: "Noen konkurranser kunne ikke kontrolleres. Åpne alle konkurransene nedenfor for oppdatert status."
+                )
+            }
         } catch {
             guard session.profile.userID == userID,
                   generation == loadGeneration else { return }
             remoteSteps = []
             loadedFor = nil
+            hasUncheckedSeries = false
+            lastRefreshCompletedAt = Date()
             loadError = ATHLTHLocalization.choose(
                 english: "Some Arena actions could not be checked. Open your competitions below for the latest status.",
                 norwegian: "Enkelte Arena-handlinger kunne ikke kontrolleres. Åpne konkurransene nedenfor for oppdatert status."
