@@ -26,6 +26,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var showingAIHelp = false
     @State private var editingDayID: UUID?
     @State private var openingWorkout: PlannedSession?
+    @State private var openingWorkoutPlanID: UUID?
     @State private var movingWorkout: PlannedSession?
     @State private var movingPlanID: UUID?
     @State private var movingPlanVersion: Int?
@@ -152,8 +153,10 @@ struct ATHLTHTrainPlanPremiumView: View {
             PlanMetadataEditorView(plan: item)
         }
         .sheet(item: $openingWorkout) { workout in
-            if let plan, let dayID = workoutDayID(workout, plan: plan) {
-                if advanced {
+            if let openingWorkoutPlanID,
+               let plan = session.trainingPlan(withID: openingWorkoutPlanID),
+               let dayID = workoutDayID(workout, plan: plan) {
+                if plan.builderProfile?.mode == .advanced {
                     ATHLTHTrainWorkoutBuilderView(
                         planID: plan.id,
                         dayID: dayID,
@@ -164,7 +167,12 @@ struct ATHLTHTrainPlanPremiumView: View {
                     PlannedWorkoutDetailView(
                         planID: plan.id,
                         workout: workout,
-                        isHealthCompleted: false,
+                        isHealthCompleted: session.isPlanSessionCompleted(
+                            planID: plan.id,
+                            sessionID: workout.id,
+                            healthWorkouts: health.workouts,
+                            strengthHistory: strength.workoutHistory
+                        ),
                         simplePresentation: true
                     )
                 }
@@ -770,6 +778,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                             inSameDayAs: Date()
                         )
                         Button {
+                            openingWorkoutPlanID = plan.id
                             openingWorkout = workout
                         } label: {
                             HStack(spacing: 12) {
@@ -817,6 +826,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                         .buttonStyle(.plain)
                         .contextMenu {
                             Button {
+                                openingWorkoutPlanID = plan.id
                                 openingWorkout = workout
                             } label: {
                                 Label(tr("Workout details", "Øktdetaljer"),
