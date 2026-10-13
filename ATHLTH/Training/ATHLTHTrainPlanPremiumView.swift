@@ -831,25 +831,6 @@ struct ATHLTHTrainPlanPremiumView: View {
                                             .font(.caption.weight(.semibold))
                                             .foregroundStyle(warmGold)
                                     }
-                                    if !completed &&
-                                        !session.isPlanSessionSkipped(
-                                            planID: plan.id, sessionID: workout.id
-                                        ),
-                                        let onStartWorkout {
-                                        Button {
-                                            onStartWorkout(plan.id, workout)
-                                        } label: {
-                                            Label(tr("Start workout", "Start økt"),
-                                                  systemImage: "play.fill")
-                                                .font(.caption.weight(.semibold))
-                                        }
-                                        .buttonStyle(.bordered)
-                                        .tint(kindTint(workout.kind))
-                                        .accessibilityHint(tr(
-                                            "Start this planned workout using the existing training flow",
-                                            "Start denne planlagte økten i den vanlige treningsflyten"
-                                        ))
-                                    }
                                     if completed {
                                         Label(tr("Completed", "Gjennomført"),
                                               systemImage: "checkmark.circle.fill")
@@ -869,6 +850,17 @@ struct ATHLTHTrainPlanPremiumView: View {
                         }
                         .buttonStyle(.plain)
                         .contextMenu {
+                            if !completed &&
+                                !session.isPlanSessionSkipped(
+                                    planID: plan.id, sessionID: workout.id
+                                ), let onStartWorkout {
+                                Button {
+                                    onStartWorkout(plan.id, workout)
+                                } label: {
+                                    Label(tr("Start workout", "Start økt"),
+                                          systemImage: "play.fill")
+                                }
+                            }
                             Button {
                                 openingWorkoutPlanID = plan.id
                                 openingWorkout = workout
