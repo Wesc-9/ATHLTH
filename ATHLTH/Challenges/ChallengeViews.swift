@@ -997,14 +997,7 @@ struct ChallengeCreationView: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 54)
                         .background(
-                            LinearGradient(
-                                colors: [
-                                    clubForest,
-                                    clubEmerald
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ),
+                            clubForest,
                             in: Capsule(
                                 style: .continuous
                             )
@@ -2027,12 +2020,7 @@ struct ChallengeCreationView: View {
             .vertical,
             9
         )
-        .background(
-            ATHLTHTheme
-                .surfaceSage
-                .opacity(0.72),
-            in: Capsule()
-        )
+        .background(ChallengePlanTheme.soft, in: Capsule())
     }
 
     private var creationHeroLabel: String {
