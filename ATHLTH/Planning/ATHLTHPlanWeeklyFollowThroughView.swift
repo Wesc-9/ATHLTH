@@ -677,6 +677,10 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                 }
             }
         }
+        .onAppear {
+            let latestPlan = session.trainingPlan(withID: plan.id) ?? plan
+            previewEfforts = ATHLTHPlanWeeklyFollowThrough.savedEfforts(plan: latestPlan)
+        }
     }
 
     /// Show a calendar date instead of ambiguous "day 1–7" labels.
@@ -710,9 +714,6 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
         }
         .accessibilityElement(children: .combine)
-        .onAppear {
-            previewEfforts = ATHLTHPlanWeeklyFollowThrough.savedEfforts(plan: currentPlan)
-        }
     }
     private func updateEffort(
         _ effort: ATHLTHPlanWeeklyFollowThrough.PlannedEffort?,
