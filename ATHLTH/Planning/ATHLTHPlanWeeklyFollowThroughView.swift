@@ -17,15 +17,18 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
     @State private var lastApprovedSessionID: UUID?
 
     var body: some View {
+        // Always use the persisted plan rather than a possibly stale
+        // value captured when the parent first presented this screen.
+        let currentPlan = session.trainingPlan(withID: plan.id) ?? plan
         let report = ATHLTHPlanWeeklyFollowThrough.inspect(
-            plan: plan,
+            plan: currentPlan,
             store: session,
             healthWorkouts: health.workouts,
             strengthHistory: strength.workoutHistory
         )
         let relevant = report.relevantWeeks
         let movePreview = ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
-            plan: plan,
+            plan: currentPlan,
             store: session,
             healthWorkouts: health.workouts,
             strengthHistory: strength.workoutHistory
@@ -296,7 +299,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                 )) {
                                     let success = ATHLTHPlanWeeklyFollowThrough.applyApprovedMove(
                                         movePreview,
-                                        expectedVersion: plan.version,
+                                        expectedVersion: currentPlan.version,
                                         store: session,
                                         planID: plan.id,
                                         healthWorkouts: health.workouts,
