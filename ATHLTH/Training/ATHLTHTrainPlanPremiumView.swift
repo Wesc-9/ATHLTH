@@ -925,7 +925,24 @@ struct ATHLTHTrainPlanPremiumView: View {
                                     planID: plan.id, sessionID: workout.id
                                 ), let onStartWorkout {
                                 Button {
-                                    onStartWorkout(plan.id, workout)
+                                    // A context menu can remain open while the plan
+                                    // changes. Launch only the latest persisted session.
+                                    if let latestPlan = session.trainingPlan(withID: plan.id),
+                                       let current = latestPlan.weeks
+                                           .flatMap(\.days).flatMap(\.sessions)
+                                           .first(where: { $0.id == workout.id }),
+                                       !current.isStructuredWorkout,
+                                       !session.isPlanSessionSkipped(
+                                           planID: plan.id, sessionID: current.id
+                                       ),
+                                       !session.isPlanSessionCompleted(
+                                           planID: plan.id,
+                                           sessionID: current.id,
+                                           healthWorkouts: health.workouts,
+                                           strengthHistory: strength.workoutHistory
+                                       ) {
+                                        onStartWorkout(plan.id, current)
+                                    }
                                 } label: {
                                     Label(tr("Start workout", "Start økt"),
                                           systemImage: "play.fill")
