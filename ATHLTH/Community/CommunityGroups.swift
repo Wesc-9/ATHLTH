@@ -2910,24 +2910,31 @@ final class CommunityGroupStore: ObservableObject {
                 profileCardsByID[profile.userID] = profile
             }
 
-            let allContributions: [CommunityGroupChallengeWorkoutRecord] =
-                try await client
+            // Fetch only contributions for challenges belonging to this
+            // club. A global 1,000-row cutoff hides older results when other
+            // clubs are active and sends unnecessary rows to the phone.
+            let challengeIDs = Set(loadedChallenges.map(\.id))
+            let clubContributions: [CommunityGroupChallengeWorkoutRecord]
+            if challengeIDs.isEmpty {
+                clubContributions = []
+            } else {
+                clubContributions = try await client
                     .from("community_group_challenge_workouts")
                     .select()
+                    .in(
+                        "challenge_id",
+                        values: challengeIDs.map(\.uuidString)
+                    )
                     .order("created_at", ascending: false)
                     .limit(1_000)
                     .execute()
                     .value
+            }
 
-            let challengeIDs = Set(loadedChallenges.map(\.id))
             challengeWorkouts.removeAll {
                 challengeIDs.contains($0.challengeID)
             }
-            challengeWorkouts.append(
-                contentsOf: allContributions.filter {
-                    challengeIDs.contains($0.challengeID)
-                }
-            )
+            challengeWorkouts.append(contentsOf: clubContributions)
 
             await refreshAnnouncementReactions(
                 groupID,
