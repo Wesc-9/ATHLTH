@@ -17,6 +17,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
     @State private var lastApprovedSessionID: UUID?
     @State private var previewEfforts: [UUID: ATHLTHPlanWeeklyFollowThrough.PlannedEffort] = [:]
     @State private var showsIntensityPreview = false
+    @State private var showsTrainingDetails = false
 
     var body: some View {
         // Always use the persisted plan rather than a possibly stale
@@ -74,8 +75,8 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                 } label: {
                     HStack {
                         Label(ATHLTHLocalization.choose(
-                            english: "Explore workout intensity",
-                            norwegian: "Utforsk treningsintensitet"
+                            english: "Workout intensity",
+                            norwegian: "Intensitet i treningsplanen"
                         ), systemImage: "waveform.path.ecg")
                         Spacer()
                         Image(systemName: showsIntensityPreview ? "chevron.up" : "chevron.down")
@@ -168,7 +169,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                         .font(.caption)
                     }
                     Button(ATHLTHLocalization.choose(
-                        english: "Reset preview", norwegian: "Nullstill forhåndsvisning"
+                        english: "Clear intensity choices", norwegian: "Fjern intensitetsvalg"
                     )) { clearEfforts(plan: currentPlan) }
                     .font(.caption)
                 }
@@ -178,6 +179,21 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
 
             if load.estimatedMinutes > 0 {
                 VStack(alignment: .leading, spacing: 7) {
+                    Button {
+                        showsTrainingDetails.toggle()
+                    } label: {
+                        HStack {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Training volume and weekly trends",
+                                norwegian: "Treningsmengde og utvikling"
+                            ), systemImage: "chart.bar.xaxis")
+                            Spacer()
+                            Image(systemName: showsTrainingDetails ? "chevron.up" : "chevron.down")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                    }
+                    .buttonStyle(.plain)
+                    if showsTrainingDetails {
                     Label(
                         ATHLTHLocalization.choose(
                             english: "Planned training volume",
@@ -259,6 +275,8 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                     ))
                     .font(.caption2)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                    }
                 }
                 .foregroundStyle(ATHLTHPlanDesign.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
