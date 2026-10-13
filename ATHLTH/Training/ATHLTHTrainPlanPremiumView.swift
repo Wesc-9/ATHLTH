@@ -73,6 +73,112 @@ struct ATHLTHTrainPlanPremiumView: View {
 
     // Small view fragments prevent SwiftUI's result-builder type checker
     // from having to solve the entire planner and all of its sheets at once.
+    // Isolate the move-workout form from the long Plan workspace modifier
+    // chain so SwiftUI can type-check it independently on Swift 6.
+    @ViewBuilder
+    private func movingWorkoutEditor(_ workout: PlannedSession) -> some View {
+            if let movingPlanID,
+               let plan = session.trainingPlan(withID: movingPlanID) {
+                NavigationStack {
+                    Form {
+                        Section {
+                            if let startDate = plan.startDate,
+                               !plan.weeks.isEmpty {
+                                let calendar = Calendar.current
+                                let first = calendar.startOfDay(for: startDate)
+                                let last = calendar.date(
+                                    byAdding: .day,
+                                    value: plan.weeks.count * 7 - 1,
+                                    to: first
+                                ) ?? first
+                                let earliest = max(
+                                    calendar.startOfDay(for: Date()), first
+                                )
+                                if earliest <= last {
+                                    DatePicker(
+                                        tr("New workout date", "Ny treningsdato"),
+                                        selection: $moveTargetDate,
+                                        in: earliest...last,
+                                        displayedComponents: .date
+                                    )
+                                } else {
+                                    Text(tr(
+                                        "This plan has no upcoming dates.",
+                                        "Denne planen har ingen kommende datoer."
+                                    ))
+                                    .foregroundStyle(.secondary)
+                                }
+                            } else {
+                                Text(tr(
+                                    "The plan has no valid date range.",
+                                    "Planen mangler en gyldig datoperiode."
+                                ))
+                                .foregroundStyle(.secondary)
+                            }
+                        } footer: {
+                            Text(tr(
+                                "Choose a date within the plan. Completed and skipped workouts cannot be moved.",
+                                "Velg en dato innenfor planen. Gjennomførte og hoppede økter kan ikke flyttes."
+                            ))
+                        }
+                        if let moveError {
+                            Text(moveError)
+                                .foregroundStyle(.red)
+                        }
+                    }
+                    .navigationTitle(tr("Move workout", "Flytt økt"))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(tr("Cancel", "Avbryt")) {
+                                movingWorkout = nil
+                                movingPlanID = nil
+                                movingPlanVersion = nil
+                            }
+                        }
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(tr("Save", "Lagre")) {
+                                if session.movePlanStudioWorkout(
+                                    planID: plan.id,
+                                    workoutID: workout.id,
+                                    targetDate: moveTargetDate,
+                                    expectedVersion: movingPlanVersion ?? -1,
+                                    healthWorkouts: health.workouts,
+                                    strengthHistory: strength.workoutHistory
+                                ) {
+                                    movingWorkout = nil
+                                    movingPlanID = nil
+                                    movingPlanVersion = nil
+                                    moveError = nil
+                                } else {
+                                    moveError = tr(
+                                        "Could not move this workout. Check the date or refresh the plan.",
+                                        "Kunne ikke flytte økten. Kontroller datoen eller oppdater planen."
+                                    )
+                                }
+                            }
+                            .fontWeight(.semibold)
+                            .disabled({
+                                guard let start = plan.startDate,
+                                      !plan.weeks.isEmpty else { return true }
+                                let calendar = Calendar.current
+                                let first = calendar.startOfDay(for: start)
+                                let last = calendar.date(
+                                    byAdding: .day,
+                                    value: plan.weeks.count * 7 - 1,
+                                    to: first
+                                ) ?? first
+                                let target = calendar.startOfDay(for: moveTargetDate)
+                                return target < max(first, calendar.startOfDay(for: Date()))
+                                    || target > last
+                            }())
+                        }
+                    }
+                }
+                .presentationDetents([.medium])
+            }
+    }
+
     private var planContent: some View {
         VStack(alignment: .leading, spacing: 18) {
             header
@@ -267,106 +373,7 @@ struct ATHLTHTrainPlanPremiumView: View {
             Text(deleteError ?? "")
         }
         .sheet(item: $movingWorkout) { workout in
-            if let movingPlanID,
-               let plan = session.trainingPlan(withID: movingPlanID) {
-                NavigationStack {
-                    Form {
-                        Section {
-                            if let startDate = plan.startDate,
-                               !plan.weeks.isEmpty {
-                                let calendar = Calendar.current
-                                let first = calendar.startOfDay(for: startDate)
-                                let last = calendar.date(
-                                    byAdding: .day,
-                                    value: plan.weeks.count * 7 - 1,
-                                    to: first
-                                ) ?? first
-                                let earliest = max(
-                                    calendar.startOfDay(for: Date()), first
-                                )
-                                if earliest <= last {
-                                    DatePicker(
-                                        tr("New workout date", "Ny treningsdato"),
-                                        selection: $moveTargetDate,
-                                        in: earliest...last,
-                                        displayedComponents: .date
-                                    )
-                                } else {
-                                    Text(tr(
-                                        "This plan has no upcoming dates.",
-                                        "Denne planen har ingen kommende datoer."
-                                    ))
-                                    .foregroundStyle(.secondary)
-                                }
-                            } else {
-                                Text(tr(
-                                    "The plan has no valid date range.",
-                                    "Planen mangler en gyldig datoperiode."
-                                ))
-                                .foregroundStyle(.secondary)
-                            }
-                        } footer: {
-                            Text(tr(
-                                "Choose a date within the plan. Completed and skipped workouts cannot be moved.",
-                                "Velg en dato innenfor planen. Gjennomførte og hoppede økter kan ikke flyttes."
-                            ))
-                        }
-                        if let moveError {
-                            Text(moveError)
-                                .foregroundStyle(.red)
-                        }
-                    }
-                    .navigationTitle(tr("Move workout", "Flytt økt"))
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button(tr("Cancel", "Avbryt")) {
-                                movingWorkout = nil
-                                movingPlanID = nil
-                                movingPlanVersion = nil
-                            }
-                        }
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button(tr("Save", "Lagre")) {
-                                if session.movePlanStudioWorkout(
-                                    planID: plan.id,
-                                    workoutID: workout.id,
-                                    targetDate: moveTargetDate,
-                                    expectedVersion: movingPlanVersion ?? -1,
-                                    healthWorkouts: health.workouts,
-                                    strengthHistory: strength.workoutHistory
-                                ) {
-                                    movingWorkout = nil
-                                    movingPlanID = nil
-                                    movingPlanVersion = nil
-                                    moveError = nil
-                                } else {
-                                    moveError = tr(
-                                        "Could not move this workout. Check the date or refresh the plan.",
-                                        "Kunne ikke flytte økten. Kontroller datoen eller oppdater planen."
-                                    )
-                                }
-                            }
-                            .fontWeight(.semibold)
-                            .disabled({
-                                guard let start = plan.startDate,
-                                      !plan.weeks.isEmpty else { return true }
-                                let calendar = Calendar.current
-                                let first = calendar.startOfDay(for: start)
-                                let last = calendar.date(
-                                    byAdding: .day,
-                                    value: plan.weeks.count * 7 - 1,
-                                    to: first
-                                ) ?? first
-                                let target = calendar.startOfDay(for: moveTargetDate)
-                                return target < max(first, calendar.startOfDay(for: Date()))
-                                    || target > last
-                            }())
-                        }
-                    }
-                }
-                .presentationDetents([.medium])
-            }
+            movingWorkoutEditor(workout)
         }
         .sheet(isPresented: $showingAIHelp) {
             CoachPlanAdaptationView()
