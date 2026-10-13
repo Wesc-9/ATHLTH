@@ -21,7 +21,7 @@ final class EquipmentScannerTests: XCTestCase {
             from: Data(payload.utf8)
         )
         XCTAssertEqual(scan.matchedExercises(in: [candidate]).map(\.id), [candidate.id])
-        XCTAssertEqual(scan.matchedExercises(in: []), [])
+        XCTAssertTrue(scan.matchedExercises(in: []).isEmpty)
     }
 
     @MainActor
