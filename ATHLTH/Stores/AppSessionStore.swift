@@ -690,10 +690,20 @@ final class AppSessionStore: ObservableObject {
         _ phoneHistory: [PhoneWorkout],
         healthWorkouts: [WorkoutSummary]
     ) {
+        let declined = AccountLocalStorage.read(
+            Set<String>.self,
+            name: "planAutomaticHealthRelinkDeclines",
+            userID: profile.userID
+        ) ?? []
         for recorded in phoneHistory where recorded.end != nil {
             guard let planID = recorded.plannedPlanID,
                   let sessionID = recorded.plannedSessionID,
                   let healthID = recorded.healthID,
+                  !declined.contains(
+                      Self.manualCompletionKey(
+                          planID: planID, sessionID: sessionID
+                      ) + "|" + healthID.uuidString
+                  ),
                   linkedHealthWorkoutID(
                       planID: planID, sessionID: sessionID
                   ) == nil,
@@ -748,8 +758,23 @@ final class AppSessionStore: ObservableObject {
         let key = Self.manualCompletionKey(
             planID: planID, sessionID: sessionID
         )
-        guard linkedHealthWorkoutsByPlanSession.removeValue(forKey: key) != nil
+        guard let linkedID =
+            linkedHealthWorkoutsByPlanSession.removeValue(forKey: key)
         else { return }
+
+        // Respect an explicit unlink even when an old iPhone recording
+        // still contains the original plan ID and HealthKit UUID.
+        var declined = AccountLocalStorage.read(
+            Set<String>.self,
+            name: "planAutomaticHealthRelinkDeclines",
+            userID: profile.userID
+        ) ?? []
+        declined.insert(key + "|" + linkedID.uuidString)
+        AccountLocalStorage.write(
+            declined,
+            name: "planAutomaticHealthRelinkDeclines",
+            userID: profile.userID
+        )
         persistAccountContent()
     }
 

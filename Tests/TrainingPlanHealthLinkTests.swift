@@ -337,5 +337,18 @@ final class TrainingPlanHealthLinkTests: XCTestCase {
             planID: plan.id, sessionID: second.id,
             healthWorkouts: [healthRun], strengthHistory: []
         ))
+
+        // Explicit unlink must not be undone by the next Health refresh.
+        store.unlinkHealthWorkout(planID: plan.id, sessionID: first.id)
+        store.reconcilePlanLinkedPhoneWorkouts(
+            [phone], healthWorkouts: [healthRun]
+        )
+        XCTAssertNil(store.linkedHealthWorkoutID(
+            planID: plan.id, sessionID: first.id
+        ))
+        // Manual re-link remains possible after choosing the Health workout.
+        XCTAssertTrue(store.linkHealthWorkout(
+            healthRun, toPlan: plan.id, sessionID: first.id
+        ))
     }
 }
