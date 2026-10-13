@@ -281,7 +281,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                         showsAll ? relevant.count : 4
                     ))) { week in
                         Button {
-                            onSelect(week.id, week.firstReviewDayID)
+                            onSelect(week.id, week.preferredReviewDayID)
                         } label: {
                             HStack(spacing: 12) {
                                 Text(ATHLTHLocalization.choose(
@@ -305,6 +305,13 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                         Text(ATHLTHLocalization.choose(
                                             english: "\(week.needsReview) to review · open related day",
                                             norwegian: "\(week.needsReview) til gjennomgang · åpne dagen"
+                                        ))
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    } else if week.pastSkipped > 0 {
+                                        Text(ATHLTHLocalization.choose(
+                                            english: "\(week.pastSkipped) past skipped · open related day",
+                                            norwegian: "\(week.pastSkipped) tidligere hoppet over · åpne dagen"
                                         ))
                                         .font(.caption)
                                         .foregroundStyle(ATHLTHTheme.accentDeep)

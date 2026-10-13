@@ -28,6 +28,8 @@ enum ATHLTHPlanWeeklyFollowThrough {
             return Int((Double(pastCompleted) / Double(pastDated) * 100).rounded())
         }
 
+        var preferredReviewDayID: UUID? { firstReviewDayID ?? firstSkippedDayID }
+
         var planned: Int {
             completed + skipped + upcoming + needsReview + unknownDate
         }
@@ -93,13 +95,16 @@ enum ATHLTHPlanWeeklyFollowThrough {
         var relevantWeeks: [Week] {
             let nonempty = weeks.filter { $0.planned > 0 }
             let review = nonempty.filter { $0.needsReview > 0 }
+            let skipped = nonempty.filter {
+                $0.needsReview == 0 && $0.pastSkipped > 0
+            }
             let upcoming = nonempty.filter {
-                $0.needsReview == 0 && $0.upcoming > 0
+                $0.needsReview == 0 && $0.pastSkipped == 0 && $0.upcoming > 0
             }
             let others = nonempty.filter {
-                $0.needsReview == 0 && $0.upcoming == 0
+                $0.needsReview == 0 && $0.pastSkipped == 0 && $0.upcoming == 0
             }
-            return review + upcoming + others
+            return review + skipped + upcoming + others
         }
     }
 
