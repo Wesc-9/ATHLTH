@@ -317,33 +317,40 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                     norwegian: "Dag \(movePreview.sourceDayIndex) → dag \(movePreview.destinationDayIndex). Kun godkjenning lagrer flyttingen."
                                 ))
                             }
+                            // A single alert presenter avoids conflicting
+                            // modifiers on the same view hierarchy.
                             .alert(
-                                ATHLTHLocalization.choose(
-                                    english: "Workout moved",
-                                    norwegian: "Økten er flyttet"
-                                ),
-                                isPresented: $moveSaved
+                                moveSaved
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Workout moved",
+                                        norwegian: "Økten er flyttet"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Proposal no longer available",
+                                        norwegian: "Forslaget er ikke lenger tilgjengelig"
+                                    ),
+                                isPresented: Binding(
+                                    get: { moveSaved || movePreviewUnavailable },
+                                    set: { presented in
+                                        if !presented {
+                                            moveSaved = false
+                                            movePreviewUnavailable = false
+                                        }
+                                    }
+                                )
                             ) {
                                 Button("OK", role: .cancel) { }
                             } message: {
-                                Text(ATHLTHLocalization.choose(
-                                    english: "Your approved change was saved.",
-                                    norwegian: "Den godkjente endringen er lagret."
-                                ))
-                            }
-                            .alert(
-                                ATHLTHLocalization.choose(
-                                    english: "Proposal no longer available",
-                                    norwegian: "Forslaget er ikke lenger tilgjengelig"
-                                ),
-                                isPresented: $movePreviewUnavailable
-                            ) {
-                                Button("OK", role: .cancel) { }
-                            } message: {
-                                Text(ATHLTHLocalization.choose(
-                                    english: "The plan changed or the workout is no longer eligible.",
-                                    norwegian: "Planen er endret, eller økten kan ikke lenger flyttes."
-                                ))
+                                Text(moveSaved
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Your approved change was saved.",
+                                        norwegian: "Den godkjente endringen er lagret."
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "The plan changed or the workout is no longer eligible.",
+                                        norwegian: "Planen er endret, eller økten kan ikke lenger flyttes."
+                                    )
+                                )
                             }
                         }
                         .foregroundStyle(ATHLTHPlanDesign.ink)
