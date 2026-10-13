@@ -693,6 +693,7 @@ struct ChallengeCreationView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var messaging: MessagingStore
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
 
     let preselectedFriends: [SocialProfileCard]
     let preselectedRouteID: UUID?
@@ -873,6 +874,8 @@ struct ChallengeCreationView: View {
     @State private var creatingChallenge = false
     @State private var createError: String?
     @State private var showingInvitePicker = false
+    @State private var showingExercisePicker = false
+    @State private var exerciseSearchQuery = ""
 
     private var clubForest: Color { ChallengePlanTheme.ink }
     private var clubEmerald: Color { ATHLTHTheme.accentDeep }
@@ -1260,6 +1263,9 @@ struct ChallengeCreationView: View {
             ) {
                 creationInvitePicker
             }
+            .sheet(isPresented: $showingExercisePicker) {
+                strengthExercisePicker
+            }
             .sheet(
                 item:
                     $activeSelectionSheet
@@ -1301,6 +1307,63 @@ struct ChallengeCreationView: View {
                 }
             } message: {
                 Text(createError ?? "")
+            }
+        }
+    }
+
+    private var strengthExercisePicker: some View {
+        NavigationStack {
+            List {
+                ForEach(exerciseLibrary.search(query: exerciseSearchQuery)) { entry in
+                    Button {
+                        // Persist canonical names so historical verified results match.
+                        exerciseName = entry.name
+                        showingExercisePicker = false
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "dumbbell")
+                                .foregroundStyle(ATHLTHPlanDesign.accent)
+                                .frame(width: 28)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(exerciseLibrary.localizedExerciseName(entry))
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                Text(entry.exercise.equipment.joined(separator: " · "))
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                    .lineLimit(1)
+                            }
+                            Spacer(minLength: 0)
+                            if exerciseName == entry.name {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(ATHLTHPlanDesign.accent)
+                            }
+                        }
+                        .frame(minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+            .searchable(
+                text: $exerciseSearchQuery,
+                prompt: ATHLTHLocalization.choose(
+                    english: "Search exercises", norwegian: "Søk etter øvelse"
+                )
+            )
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Choose exercise", norwegian: "Velg øvelse"
+            ))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Close", norwegian: "Lukk"
+                    )) {
+                        showingExercisePicker = false
+                    }
+                }
             }
         }
     }
@@ -3107,6 +3170,24 @@ struct ChallengeCreationView: View {
                 text: $exerciseName,
                 icon: "dumbbell.fill"
             )
+
+            Button {
+                exerciseSearchQuery = ""
+                showingExercisePicker = true
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Choose from ATHLTH exercises",
+                        norwegian: "Velg fra ATHLTH-øvelser"
+                    ),
+                    systemImage: "list.bullet"
+                )
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(minHeight: 44)
+            }
+            .buttonStyle(.plain)
 
             creationDivider
         }
@@ -5976,6 +6057,15 @@ struct ChallengeCreationView: View {
             if scoring != .workoutVolume {
                 TextField("Exercise", text: $exerciseName)
                     .textFieldStyle(.roundedBorder)
+                Button {
+                    exerciseSearchQuery = ""
+                    showingExercisePicker = true
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Choose from ATHLTH exercises",
+                        norwegian: "Velg fra ATHLTH-øvelser"
+                    ), systemImage: "list.bullet")
+                }
             }
 
             if scoring == .mostReps {
