@@ -5268,7 +5268,15 @@ struct ATHLTHTrainView: View {
 
                     switch selectedSection {
                     case 1:
-                        ATHLTHTrainPlanPremiumView()
+                        ATHLTHTrainPlanPremiumView(
+                            onStartWorkout: { planID, workout in
+                                openTodayPrimaryWorkout(
+                                    workout,
+                                    planID: planID,
+                                    isHealthCompleted: false
+                                )
+                            }
+                        )
                     case 2:
                         ATHLTHTrainProgressPremiumView {
                             selectedSection = 1
@@ -7241,6 +7249,19 @@ struct ATHLTHTrainView: View {
         planID: UUID,
         isHealthCompleted: Bool
     ) {
+        // Guard against a deleted/moved plan session between selecting
+        // a week card and confirming the launch.
+        guard session.trainingPlan(withID: planID)?
+            .weeks.flatMap(\.days).flatMap(\.sessions)
+            .contains(where: { $0.id == workout.id }) == true
+        else {
+            watchTransferError = ATHLTHLocalization.choose(
+                english: "This planned workout is no longer available. Refresh the plan.",
+                norwegian: "Denne planlagte økten finnes ikke lenger. Oppdater planen."
+            )
+            return
+        }
+
         if session.isPlanSessionCompleted(
             planID: planID,
             sessionID: workout.id,
@@ -7257,6 +7278,26 @@ struct ATHLTHTrainView: View {
             return
         }
 
+        if session.isPlanSessionSkipped(
+            planID: planID, sessionID: workout.id
+        ) {
+            selectedPlanWorkout = PlannedWorkoutSelection(
+                planID: planID, workout: workout,
+                isHealthCompleted: isHealthCompleted
+            )
+            return
+        }
+
+        // Never replace a live workout with a second one from the plan.
+        if phoneWorkout.active != nil ||
+            strengthWorkout.activeWorkout != nil {
+            watchTransferError = ATHLTHLocalization.choose(
+                english: "A workout is already in progress. Finish it before starting a planned session.",
+                norwegian: "En økt pågår allerede. Avslutt den før du starter en planlagt økt."
+            )
+            return
+        }
+
         if workout.kind == .strength {
             selectedStrengthSession = workout
             return
@@ -7267,10 +7308,17 @@ struct ATHLTHTrainView: View {
             return
         }
 
-        if workout.kind == .running,
-           let running =
-                workout.resolvedRunningWorkouts.first {
-            pendingRunningTemplate = running
+        if workout.kind == .running {
+            if let running = workout.resolvedRunningWorkouts.first {
+                pendingRunningTemplate = running
+            } else {
+                showingRunQuickStart = true
+            }
+            return
+        }
+
+        if workout.kind == .walking {
+            showingWalkQuickStart = true
             return
         }
 

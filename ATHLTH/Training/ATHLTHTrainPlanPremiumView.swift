@@ -9,6 +9,9 @@ struct ATHLTHTrainPlanPremiumView: View {
 
     // Optional deep link from "I dag" or the rebuilt library.
     var highlightedPlanID: UUID? = nil
+    // The owning Train tab supplies its existing iPhone/Watch launch flow.
+    // Embedded plan previews without that owner remain read-only for launch.
+    var onStartWorkout: ((UUID, PlannedSession) -> Void)? = nil
     @State private var focusedPlanID: UUID?
 
     @AppStorage("athlth.planWorkspace.advancedMode")
@@ -27,6 +30,8 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var editingDayID: UUID?
     @State private var openingWorkout: PlannedSession?
     @State private var openingWorkoutPlanID: UUID?
+    @State private var queuedLaunchPlanID: UUID?
+    @State private var queuedLaunchWorkout: PlannedSession?
     @State private var movingWorkout: PlannedSession?
     @State private var movingPlanID: UUID?
     @State private var movingPlanVersion: Int?
@@ -152,7 +157,16 @@ struct ATHLTHTrainPlanPremiumView: View {
         .sheet(item: $editingPlan) { item in
             PlanMetadataEditorView(plan: item)
         }
-        .sheet(item: $openingWorkout) { workout in
+        .sheet(item: $openingWorkout, onDismiss: {
+            // Start only after dismissing details so iOS does not try to
+            // present two workout sheets at the same time.
+            if let launchPlanID = queuedLaunchPlanID,
+               let launchWorkout = queuedLaunchWorkout {
+                queuedLaunchPlanID = nil
+                queuedLaunchWorkout = nil
+                onStartWorkout?(launchPlanID, launchWorkout)
+            }
+        }) { workout in
             if let openingWorkoutPlanID,
                let plan = session.trainingPlan(withID: openingWorkoutPlanID),
                let dayID = workoutDayID(workout, plan: plan) {
@@ -173,7 +187,8 @@ struct ATHLTHTrainPlanPremiumView: View {
                             healthWorkouts: health.workouts,
                             strengthHistory: strength.workoutHistory
                         ),
-                        simplePresentation: true
+                        simplePresentation: true,
+                        onStartWorkout: launchFromWorkoutDetails
                     )
                 }
             }
@@ -255,6 +270,15 @@ struct ATHLTHTrainPlanPremiumView: View {
                     expectedPlanVersion: plan.version
                 )
             }
+        }
+    }
+
+    private var launchFromWorkoutDetails: ((UUID, PlannedSession) -> Void)? {
+        guard onStartWorkout != nil else { return nil }
+        return { planID, workout in
+            queuedLaunchPlanID = planID
+            queuedLaunchWorkout = workout
+            openingWorkout = nil
         }
     }
 
@@ -895,6 +919,32 @@ struct ATHLTHTrainPlanPremiumView: View {
                             "Opens workout details",
                             "Åpner detaljer om treningsøkten"
                         ))
+                        if let onStartWorkout,
+                           !completed,
+                           !session.isPlanSessionSkipped(
+                               planID: plan.id, sessionID: workout.id
+                           ),
+                           workout.kind == .running ||
+                           workout.kind == .walking ||
+                           workout.kind == .strength {
+                            Button {
+                                onStartWorkout(plan.id, workout)
+                            } label: {
+                                Label(tr("Start workout", "Start økt"),
+                                      systemImage: "play.fill")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(graphite)
+                                    .padding(.horizontal, 15)
+                                    .frame(height: 38)
+                                    .background(soft, in: Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                            .accessibilityHint(tr(
+                                "Choose iPhone or Apple Watch to record this workout.",
+                                "Velg iPhone eller Apple Watch for å registrere denne økten."
+                            ))
+                        }
                     }
                 }
             }

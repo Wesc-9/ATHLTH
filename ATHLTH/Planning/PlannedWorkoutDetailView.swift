@@ -13,6 +13,8 @@ struct PlannedWorkoutDetailView: View {
     let workout: PlannedSession
     let isHealthCompleted: Bool
     var simplePresentation = false
+    // Reuses the owning Train tab launch flow for unstructured sessions.
+    var onStartWorkout: ((UUID, PlannedSession) -> Void)? = nil
 
     @State private var showingEditor = false
     @State private var showingStructuredWorkout = false
@@ -104,6 +106,31 @@ struct PlannedWorkoutDetailView: View {
                     header
                     if simplePresentation {
                         simpleInstructions
+                        if !currentWorkout.isStructuredWorkout,
+                           let onStartWorkout,
+                           !isCompleted,
+                           !session.isPlanSessionSkipped(
+                               planID: planID, sessionID: currentWorkout.id
+                           ),
+                           currentWorkout.kind == .running ||
+                           currentWorkout.kind == .walking ||
+                           currentWorkout.kind == .strength {
+                            Button {
+                                onStartWorkout(planID, currentWorkout)
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Start workout",
+                                        norwegian: "Start økt"
+                                    ),
+                                    systemImage: "play.fill"
+                                )
+                                .font(.headline)
+                                .frame(maxWidth: .infinity, minHeight: 52)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(ATHLTHTheme.accentDeep)
+                        }
                     }
                     overviewCard
 
@@ -231,7 +258,7 @@ struct PlannedWorkoutDetailView: View {
                     )
                     .font(.subheadline.weight(.semibold))
                 }
-                if !currentWorkout.isStructuredWorkout && !isCompleted {
+                if !currentWorkout.isStructuredWorkout && !isCompleted && onStartWorkout == nil {
                     Text(ATHLTHLocalization.choose(
                         english: "Start the workout from the Train tab. Return here to record completion.",
                         norwegian: "Start treningen fra Tren-fanen. Kom tilbake hit for å registrere at økten er gjennomført."
