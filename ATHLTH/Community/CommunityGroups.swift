@@ -2776,11 +2776,13 @@ final class CommunityGroupStore: ObservableObject {
                 .execute()
                 .value
 
+            // Read the newest page. An ascending query with a limit
+            // freezes Club chat at its oldest 150 messages after growth.
             async let messagesQuery: [CommunityGroupMessageRecord] = client
                 .from("community_group_messages")
                 .select()
                 .eq("group_id", value: groupID)
-                .order("created_at", ascending: true)
+                .order("created_at", ascending: false)
                 .limit(150)
                 .execute()
                 .value
@@ -2897,7 +2899,9 @@ final class CommunityGroupStore: ObservableObject {
             }
 
             membersByGroup[groupID] = loadedMembers
-            messagesByGroup[groupID] = loadedMessages
+            messagesByGroup[groupID] = loadedMessages.sorted {
+                $0.createdAt < $1.createdAt
+            }
             eventsByGroup[groupID] = loadedEvents
             challengesByGroup[groupID] = loadedChallenges
             announcementsByGroup[groupID] = loadedAnnouncements
@@ -4198,12 +4202,14 @@ final class CommunityGroupStore: ObservableObject {
                 .from("community_group_messages")
                 .select()
                 .eq("group_id", value: groupID)
-                .order("created_at", ascending: true)
+                .order("created_at", ascending: false)
                 .limit(150)
                 .execute()
                 .value
 
-            messagesByGroup[groupID] = rows
+            messagesByGroup[groupID] = rows.sorted {
+                $0.createdAt < $1.createdAt
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
