@@ -2466,26 +2466,38 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
 
                 ForEach(Array(shownDuels.prefix(showAllDuels ? 150 : 5))) { challenge in
                     let room = rooms.first { $0.challengeID == challenge.id }
-                    let senderTime = participants.first {
+                    let senderParticipant = participants.first {
                         $0.challengeID == challenge.id &&
                         $0.userID == challenge.senderID
-                    }?.elapsedSeconds
-                    let recipientTime = participants.first {
+                    }
+                    let recipientParticipant = participants.first {
                         $0.challengeID == challenge.id &&
                         $0.userID == challenge.recipientID
-                    }?.elapsedSeconds
+                    }
+                    let senderTime = senderParticipant?.elapsedSeconds
+                    let recipientTime = recipientParticipant?.elapsedSeconds
+                    let raceClockConsistent = ATHLTHLiveGhostResultEvidence
+                        .bothFinishesPlausible(
+                            synchronizedStart: room?.startsAt,
+                            firstFinish: senderParticipant?.finishedAt,
+                            firstElapsed: senderTime,
+                            secondFinish: recipientParticipant?.finishedAt,
+                            secondElapsed: recipientTime
+                        )
                     let existingResult = roundResults.first {
                         $0.roundID == challenge.arenaRoundID &&
                         $0.status != "rejected"
                     }
-                    let review = ATHLTHArenaLiveDuelReview.candidate(
-                        senderID: challenge.senderID,
-                        recipientID: challenge.recipientID,
-                        senderSeconds: senderTime,
-                        recipientSeconds: recipientTime,
-                        reportedWinnerID: room?.winnerID,
-                        isFinished: room?.status == .finished
-                    )
+                    let review: ATHLTHArenaLiveDuelCandidate? =
+                        raceClockConsistent
+                        ? ATHLTHArenaLiveDuelReview.candidate(
+                            senderID: challenge.senderID,
+                            recipientID: challenge.recipientID,
+                            senderSeconds: senderTime,
+                            recipientSeconds: recipientTime,
+                            reportedWinnerID: room?.winnerID,
+                            isFinished: room?.status == .finished
+                        ) : nil
                     VStack(alignment: .leading, spacing: 9) {
                         HStack {
                             Text(rounds.first { $0.id == challenge.arenaRoundID }?.title ??
@@ -2734,7 +2746,21 @@ private struct ATHLTHArenaLinkedLiveDuelsSection: View {
         for challenge: GhostFriendRaceChallengeRecord,
         result: ATHLTHArenaLiveDuelCandidate
     ) -> ATHLTHArenaLiveOutcomeDraft? {
-        guard series.status == "active",
+        let matchingRoom = rooms.first { $0.challengeID == challenge.id }
+        let first = participants.first {
+            $0.challengeID == challenge.id && $0.userID == challenge.senderID
+        }
+        let second = participants.first {
+            $0.challengeID == challenge.id && $0.userID == challenge.recipientID
+        }
+        guard ATHLTHLiveGhostResultEvidence.bothFinishesPlausible(
+                  synchronizedStart: matchingRoom?.startsAt,
+                  firstFinish: first?.finishedAt,
+                  firstElapsed: first?.elapsedSeconds,
+                  secondFinish: second?.finishedAt,
+                  secondElapsed: second?.elapsedSeconds
+              ),
+              series.status == "active",
               let roundID = challenge.arenaRoundID,
               let round = rounds.first(where: { $0.id == roundID }),
               ATHLTHArenaLiveRoundCompatibility.permitsPrefilledResult(
