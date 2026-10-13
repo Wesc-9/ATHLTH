@@ -1185,34 +1185,22 @@ struct ATHLTHCommunityV4View: View {
 
         challenges.refreshStatuses()
 
-        let rawRefreshError =
-            social.errorMessage ??
-            messaging.errorMessage ??
-            community.errorMessage ??
-            groups.errorMessage ??
-            officialChallenges.errorMessage ??
-            realtime.errorMessage
+        let failedAreas = ATHLTHCommunityRefreshPolicy.failedAreas(
+            events: community.errorMessage != nil,
+            clubs: groups.errorMessage != nil,
+            weekly: officialChallenges.errorMessage != nil,
+            friends: social.errorMessage != nil,
+            messages: messaging.errorMessage != nil,
+            live: realtime.errorMessage != nil
+        )
 
-        if let rawRefreshError {
-            // Background refreshes must never interrupt a Community page that
-            // already has useful cached content. Pull-to-refresh can surface a
-            // compact inline notice, but raw networking/system errors never
-            // reach the user.
-            if force ||
-                !hasUsableCommunityContent {
-                withAnimation(
-                    .easeInOut(
-                        duration: 0.18
-                    )
-                ) {
-                    refreshError =
-                        friendlyCommunityRefreshMessage(
-                            for:
-                                rawRefreshError
-                        )
-                }
-            } else {
-                refreshError = nil
+        // A single partial backend failure should never blank Community.
+        // Manual refresh can explain the affected area without exposing
+        // networking internals; background refresh stays quiet with cached data.
+        if force || !hasUsableCommunityContent {
+            let notice = ATHLTHCommunityRefreshPolicy.notice(for: failedAreas)
+            withAnimation(.easeInOut(duration: 0.18)) {
+                refreshError = notice
             }
         } else {
             refreshError = nil
