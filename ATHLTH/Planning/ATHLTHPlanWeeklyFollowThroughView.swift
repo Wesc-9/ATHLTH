@@ -301,9 +301,21 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                                     ? ATHLTHPlanDesign.accent
                                                     : ATHLTHPlanDesign.secondaryInk)
                                                 .accessibilityHidden(true)
-                                            Text(workout.title)
-                                                .font(.subheadline)
-                                                .lineLimit(2)
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(workout.title)
+                                                    .font(.subheadline)
+                                                    .lineLimit(2)
+                                                if let scheduled = workout.scheduledStart,
+                                                   dayDate.map({
+                                                       !calendar.isDate($0, inSameDayAs: scheduled)
+                                                   }) ?? true {
+                                                    Text(scheduled.formatted(
+                                                        .dateTime.weekday(.abbreviated).day().month(.abbreviated)
+                                                    ))
+                                                    .font(.caption2)
+                                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                                }
+                                            }
                                             Spacer(minLength: 4)
                                             Text(completed
                                                  ? ATHLTHLocalization.choose(
