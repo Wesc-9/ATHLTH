@@ -2384,7 +2384,7 @@ struct CommunityEventDetailView: View {
                     pinnedViews: [.sectionHeaders]
                 ) {
                     ATHLTHCommunityContextRibbon(
-                        kind: .event,
+                        kind: .publicEvent,
                         groupName: "ATHLTH"
                     )
                     eventHero(item)
