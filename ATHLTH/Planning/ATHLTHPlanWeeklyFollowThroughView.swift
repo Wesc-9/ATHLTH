@@ -105,13 +105,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                         .foregroundStyle(ATHLTHPlanDesign.ink)
                         .fixedSize(horizontal: false, vertical: true)
 
-                        Text(ATHLTHLocalization.choose(
-                            english: "Recorded change: completed \(trend.latest.pastCompleted - trend.previous.pastCompleted >= 0 ? "+" : "")\(trend.latest.pastCompleted - trend.previous.pastCompleted), skipped \(trend.latest.pastSkipped - trend.previous.pastSkipped >= 0 ? "+" : "")\(trend.latest.pastSkipped - trend.previous.pastSkipped), unreviewed \(trend.latest.pastUnreviewed - trend.previous.pastUnreviewed >= 0 ? "+" : "")\(trend.latest.pastUnreviewed - trend.previous.pastUnreviewed). Counts are not normalized for weekly plan size.",
-                            norwegian: "Registrert endring: fullført \(trend.latest.pastCompleted - trend.previous.pastCompleted >= 0 ? "+" : "")\(trend.latest.pastCompleted - trend.previous.pastCompleted), hoppet over \(trend.latest.pastSkipped - trend.previous.pastSkipped >= 0 ? "+" : "")\(trend.latest.pastSkipped - trend.previous.pastSkipped), uavklart \(trend.latest.pastUnreviewed - trend.previous.pastUnreviewed >= 0 ? "+" : "")\(trend.latest.pastUnreviewed - trend.previous.pastUnreviewed). Antall er ikke justert for ulikt antall planlagte økter."
-                        ))
-                        .font(.caption2)
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        .fixedSize(horizontal: false, vertical: true)
+
                     }
 
                     if report.pastDated > 0 {
@@ -168,6 +162,14 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                         )
                         .font(.caption)
                         .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                        Text(ATHLTHLocalization.choose(
+                            english: "Recorded change: completed \(trend.latest.pastCompleted - trend.previous.pastCompleted >= 0 ? "+" : "")\(trend.latest.pastCompleted - trend.previous.pastCompleted), skipped \(trend.latest.pastSkipped - trend.previous.pastSkipped >= 0 ? "+" : "")\(trend.latest.pastSkipped - trend.previous.pastSkipped), unreviewed \(trend.latest.pastUnreviewed - trend.previous.pastUnreviewed >= 0 ? "+" : "")\(trend.latest.pastUnreviewed - trend.previous.pastUnreviewed). Counts are not normalized for weekly plan size.",
+                            norwegian: "Registrert endring: fullført \(trend.latest.pastCompleted - trend.previous.pastCompleted >= 0 ? "+" : "")\(trend.latest.pastCompleted - trend.previous.pastCompleted), hoppet over \(trend.latest.pastSkipped - trend.previous.pastSkipped >= 0 ? "+" : "")\(trend.latest.pastSkipped - trend.previous.pastSkipped), uavklart \(trend.latest.pastUnreviewed - trend.previous.pastUnreviewed >= 0 ? "+" : "")\(trend.latest.pastUnreviewed - trend.previous.pastUnreviewed). Antall er ikke justert for ulikt antall planlagte økter."
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         .fixedSize(horizontal: false, vertical: true)
                     }
 
