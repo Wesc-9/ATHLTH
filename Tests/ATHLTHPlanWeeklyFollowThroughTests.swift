@@ -949,4 +949,81 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
         XCTAssertEqual(result.total, 1)
         XCTAssertEqual(result.upcoming, 1)
     }
+
+    @MainActor
+    func testEffectiveDateUsesExplicitScheduleAcrossWeeks() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 5
+        )))
+        let moved = try XCTUnwrap(calendar.date(
+            byAdding: .day, value: 18, to: start
+        ))
+        let actual = ATHLTHPlanWeeklyFollowThrough.effectiveDate(
+            scheduledStart: moved, planStart: start,
+            weekIndex: 0, dayIndex: 1, calendar: calendar
+        )
+        XCTAssertEqual(actual, moved)
+        let original = ATHLTHPlanWeeklyFollowThrough.effectiveDate(
+            scheduledStart: nil, planStart: start,
+            weekIndex: 0, dayIndex: 1, calendar: calendar
+        )
+        XCTAssertEqual(original, start)
+    }
+
+    @MainActor
+    func testEffectiveDateUsesWeekAndDayOffset() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 5
+        )))
+        let expected = try XCTUnwrap(calendar.date(
+            byAdding: .day, value: 9, to: start
+        ))
+        XCTAssertEqual(ATHLTHPlanWeeklyFollowThrough.effectiveDate(
+            scheduledStart: nil, planStart: start,
+            weekIndex: 1, dayIndex: 3, calendar: calendar
+        ), expected)
+    }
+
+    @MainActor
+    func testEffectiveDateDoesNotInventDatesForInvalidDays() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 5
+        )))
+        for day in [0, -1, 8, 99] {
+            XCTAssertNil(ATHLTHPlanWeeklyFollowThrough.effectiveDate(
+                scheduledStart: nil, planStart: start,
+                weekIndex: 0, dayIndex: day, calendar: calendar
+            ))
+        }
+        XCTAssertNil(ATHLTHPlanWeeklyFollowThrough.effectiveDate(
+            scheduledStart: nil, planStart: nil,
+            weekIndex: 0, dayIndex: 1, calendar: calendar
+        ))
+    }
+
+    @MainActor
+    func testInspectUsesMovedWorkoutDateRatherThanOriginalDay() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 2)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var moved = workout()
+        let shifted = try XCTUnwrap(Calendar.current.date(
+            byAdding: .day, value: 10, to: plan.startDate!
+        ))
+        moved.scheduledStart = shifted
+        store.addSession(moved, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let reference = try XCTUnwrap(Calendar.current.date(
+            byAdding: .day, value: 3, to: plan.startDate!
+        ))
+        let report = ATHLTHPlanWeeklyFollowThrough.inspect(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: reference
+        )
+        XCTAssertEqual(report.upcoming, 1)
+        XCTAssertEqual(report.needsReview, 0)
+        XCTAssertEqual(report.pastDated, 0)
+    }
 }
