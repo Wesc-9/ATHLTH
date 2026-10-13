@@ -111,9 +111,16 @@ private final class ATHLTHAudioCoachPreviewSpeaker:
 
         // Sample data only: preview exactly how the chosen wording
         // sounds without reading personal HealthKit workout measurements.
-        let sample = useNorwegian
-            ? "Distanse 2 kilometer. Tid 12 minutter."
-            : "Distance 2 kilometers. Time 12 minutes."
+        let sample: String
+        if speechStyle == .motivating {
+            sample = useNorwegian
+                ? "Du er godt i gang. Hold fokus på neste drag, du har dette!"
+                : "You're making progress. Focus on the next interval, you've got this!"
+        } else {
+            sample = useNorwegian
+                ? "Distanse 2 kilometer. Tid 12 minutter."
+                : "Distance 2 kilometers. Time 12 minutes."
+        }
         let preview = speechStyle.render(
             sample,
             language: language,
@@ -225,6 +232,7 @@ struct ATHLTHAudioCoachSettingsView: View {
                     VStack(spacing: 0) {
                         defaultsSection
                         experienceSection
+                        speakingToneQuickSection
                         voiceSection
                         advancedOptionsToggle
                         if showAdvancedSettings {
@@ -320,7 +328,6 @@ struct ATHLTHAudioCoachSettingsView: View {
     private var selectedExperience: ATHLTHCoachExperiencePreset? {
         ATHLTHCoachExperiencePreset.allCases.first { preset in
             currentContentLevel == preset.contentLevel
-                && settings.audioCoachSpeechStyle == preset.speechStyle
                 && settings.audioCoachDistanceTriggerEnabled
                 && !settings.audioCoachTimeTriggerEnabled
                 && abs(settings.audioCoachDistanceIntervalKilometers
@@ -331,7 +338,6 @@ struct ATHLTHAudioCoachSettingsView: View {
     private func applyExperience(_ preset: ATHLTHCoachExperiencePreset) {
         // Intentional selection; never resets language, voice, volume or output.
         selectContentLevel(preset.contentLevel)
-        settings.audioCoachSpeechStyle = preset.speechStyle
         settings.audioCoachDistanceTriggerEnabled = true
         settings.audioCoachTimeTriggerEnabled = false
         settings.audioCoachDistanceIntervalKilometers =
@@ -386,6 +392,49 @@ struct ATHLTHAudioCoachSettingsView: View {
                         ))
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                }
+                .padding(16)
+            }
+        }
+    }
+
+    private var speakingToneQuickSection: some View {
+        premiumSection(ATHLTHLocalization.choose(
+            english: "How should the coach sound?",
+            norwegian: "Hvordan skal coachen snakke?"
+        )) {
+            premiumCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose a motivating or calm tone, independently of how many updates you hear.",
+                        norwegian: "Velg rolig eller motiverende talemåte, uavhengig av hvor ofte du får meldinger."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    HStack(spacing: 8) {
+                        ForEach([
+                            ATHLTHCoachSpeechStyle.balanced,
+                            .motivating
+                        ]) { style in
+                            Button {
+                                settings.audioCoachSpeechStyle = style
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: style == .motivating
+                                        ? "flame.fill" : "waveform")
+                                    Text(style.title)
+                                }
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity, minHeight: 50)
+                                .foregroundStyle(settings.audioCoachSpeechStyle == style
+                                    ? Color.white : ATHLTHTheme.primaryText)
+                                .background(settings.audioCoachSpeechStyle == style
+                                    ? ATHLTHTheme.accentDeep : ATHLTHTheme.accentSoft,
+                                    in: RoundedRectangle(cornerRadius: 14))
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                 }
                 .padding(16)
