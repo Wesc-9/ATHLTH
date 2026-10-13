@@ -338,9 +338,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             ) {
                 if let createdPlanID {
                     ScrollView {
-                        AdvancedPlannerView(planID: createdPlanID)
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 14)
+                        if mode == .basic {
+                            ATHLTHTrainPlanPremiumView(highlightedPlanID: createdPlanID)
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 14)
+                        } else {
+                            AdvancedPlannerView(planID: createdPlanID)
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 14)
+                        }
                     }
                     .background(
                         ATHLTHPremiumCanvas(
@@ -349,8 +355,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     )
                     .navigationTitle(
                         ATHLTHLocalization.choose(
-                            english: "Build your workouts",
-                            norwegian: "Bygg treningsøktene"
+                            english: mode == .basic ? "Your plan" : "Build your workouts",
+                            norwegian: mode == .basic ? "Planen din" : "Bygg treningsøktene"
                         )
                     )
                     .navigationBarTitleDisplayMode(.inline)
@@ -1451,7 +1457,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             .background(Color.white.opacity(0.8),
                         in: RoundedRectangle(cornerRadius: 18, style: .continuous))
 
-            if let conflict = conflictingPlan { conflictCard(conflict) }
+            if let conflict = conflictingPlan {
+                conflictCard(conflict)
+                Text(ATHLTHLocalization.choose(
+                    english: "You already have a plan for these dates. Go back and choose Advanced to change the dates.",
+                    norwegian: "Du har allerede en plan i denne perioden. Gå tilbake og velg Avansert hvis du vil endre datoene."
+                ))
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
         }
         .onAppear {
             if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

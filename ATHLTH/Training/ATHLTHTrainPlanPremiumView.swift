@@ -148,12 +148,20 @@ struct ATHLTHTrainPlanPremiumView: View {
         }
         .sheet(item: $openingWorkout) { workout in
             if let plan, let dayID = workoutDayID(workout, plan: plan) {
-                ATHLTHTrainWorkoutBuilderView(
-                    planID: plan.id,
-                    dayID: dayID,
-                    expectedPlanVersion: plan.version,
-                    existingWorkout: workout
-                )
+                if advanced {
+                    ATHLTHTrainWorkoutBuilderView(
+                        planID: plan.id,
+                        dayID: dayID,
+                        expectedPlanVersion: plan.version,
+                        existingWorkout: workout
+                    )
+                } else {
+                    PlannedWorkoutDetailView(
+                        planID: plan.id,
+                        workout: workout,
+                        isHealthCompleted: false
+                    )
+                }
             }
         }
         .sheet(isPresented: $showingAIHelp) {
@@ -525,7 +533,9 @@ struct ATHLTHTrainPlanPremiumView: View {
                         .font(.system(size: 9, weight: .bold))
                         .tracking(1.6)
                         .foregroundStyle(warmGold)
-                    Text(tr("Weekly schedule", "Treningsuken"))
+                    Text(advanced
+                         ? tr("Weekly schedule", "Treningsuken")
+                         : tr("Your workouts", "Øktene dine"))
                         .font(.system(size: 24, weight: .regular, design: .serif))
                 }
                 Spacer()
