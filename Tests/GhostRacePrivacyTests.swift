@@ -227,11 +227,12 @@ final class GhostRacePrivacyTests: XCTestCase {
         )
 
         store.updatePhoneWorkout(
-            location:
-                reference
-                    .points
-                    .last!
-                    .location,
+            location: reference.points[19].location,
+            elapsedTime: 540,
+            state: .running
+        )
+        store.updatePhoneWorkout(
+            location: reference.points.last!.location,
             elapsedTime: 570,
             state: .completed
         )
@@ -249,11 +250,8 @@ final class GhostRacePrivacyTests: XCTestCase {
                 result.signedTimeSeconds
             )
 
-        XCTAssertEqual(
-            signedTime,
-            30,
-            accuracy: 0.01
-        )
+        XCTAssertGreaterThan(signedTime, 30)
+        XCTAssertLessThan(signedTime, 32)
         XCTAssertEqual(
             result.beatGhost,
             true
@@ -279,12 +277,59 @@ final class GhostRacePrivacyTests: XCTestCase {
         let store = GhostRaceStore()
         try store.prepare(reference: reference)
         store.updatePhoneWorkout(
+            location: reference.points[19].location,
+            elapsedTime: 540,
+            state: .running,
+            routeProgressPercent: 95
+        )
+        store.updatePhoneWorkout(
             location: reference.points.last!.location,
             elapsedTime: 575,
             state: .completed,
             routeProgressPercent: 100
         )
         XCTAssertEqual(store.result?.beatGhost, true)
+    }
+
+    @MainActor
+    func testImpossibleLastSecondGPSJumpDoesNotCountAsFinish() throws {
+        let reference = makeReference(
+            distanceMeters: 2_000, durationSeconds: 600, pointCount: 21
+        )
+        let store = GhostRaceStore()
+        try store.prepare(reference: reference)
+        store.updatePhoneWorkout(
+            location: reference.points[19].location,
+            elapsedTime: 540,
+            state: .running,
+            routeProgressPercent: 95
+        )
+        store.updatePhoneWorkout(
+            location: reference.points.last!.location,
+            elapsedTime: 541, // 100 metres in one second is invalid.
+            state: .completed,
+            routeProgressPercent: 100
+        )
+        let result = try XCTUnwrap(store.result)
+        XCTAssertFalse(result.completedRoute)
+        XCTAssertNil(result.beatGhost)
+    }
+
+    @MainActor
+    func testFinishRequiresEarlierReliableCourseSample() throws {
+        let reference = makeReference(
+            distanceMeters: 2_000, durationSeconds: 600, pointCount: 21
+        )
+        let store = GhostRaceStore()
+        try store.prepare(reference: reference)
+        store.updatePhoneWorkout(
+            location: reference.points.last!.location,
+            elapsedTime: 570,
+            state: .completed,
+            routeProgressPercent: 100
+        )
+        XCTAssertEqual(store.result?.completedRoute, false)
+        XCTAssertNil(store.result?.beatGhost)
     }
 
     @MainActor
@@ -317,6 +362,12 @@ final class GhostRacePrivacyTests: XCTestCase {
         try store.prepare(reference: reference)
 
         store.updatePhoneWorkout(
+            location: reference.points[19].location,
+            elapsedTime: 525,
+            state: .running,
+            routeProgressPercent: 95
+        )
+        store.updatePhoneWorkout(
             location: reference.points.last!.location,
             elapsedTime: 550,
             state: .running,
@@ -331,8 +382,9 @@ final class GhostRacePrivacyTests: XCTestCase {
 
         let result = try XCTUnwrap(store.result)
         XCTAssertTrue(result.completedRoute)
-        XCTAssertEqual(result.elapsedTime, 550, accuracy: 0.01)
-        XCTAssertEqual(result.signedTimeSeconds ?? -1, 50, accuracy: 0.01)
+        XCTAssertGreaterThan(result.elapsedTime, 525)
+        XCTAssertLessThan(result.elapsedTime, 550)
+        XCTAssertGreaterThan(result.signedTimeSeconds ?? -1, 50)
     }
 
     @MainActor
@@ -423,8 +475,12 @@ final class GhostRacePrivacyTests: XCTestCase {
         )
 
         store.updatePhoneWorkout(
-            location:
-                reference.points.last!.location,
+            location: reference.points[19].location,
+            elapsedTime: 540,
+            state: .running
+        )
+        store.updatePhoneWorkout(
+            location: reference.points.last!.location,
             elapsedTime: 570,
             state: .completed
         )
