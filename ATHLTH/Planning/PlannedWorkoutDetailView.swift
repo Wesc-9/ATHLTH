@@ -1097,6 +1097,20 @@ struct PlannedWorkoutDetailView: View {
         }
     }
 
+    /// Use the same persisted evidence that credits the training plan.
+    /// An unfinished structured session must never appear as a completion.
+    private var recordedStructuredCompletion: StructuredWorkoutCompletion? {
+        guard currentWorkout.isStructuredWorkout else { return nil }
+        return StructuredWorkoutCompletionStore.load(
+            userID: session.profile.userID
+        )
+        .filter {
+            $0.sourceWorkoutID == currentWorkout.id &&
+            $0.completedBlockCount > 0
+        }
+        .max(by: { $0.endedAt < $1.endedAt })
+    }
+
     private var completionCard: some View {
         ATHLTHCard {
             VStack(alignment: .leading, spacing: 14) {
@@ -1142,6 +1156,28 @@ struct PlannedWorkoutDetailView: View {
                     )
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                    if isCompleted, let completion = recordedStructuredCompletion {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "\(completion.completedBlockCount) of \(completion.totalBlockCount) blocks completed",
+                                    norwegian: "\(completion.completedBlockCount) av \(completion.totalBlockCount) blokker gjennomført"
+                                ),
+                                systemImage: "list.bullet.clipboard"
+                            )
+                            Label(
+                                completion.endedAt.formatted(
+                                    date: .abbreviated,
+                                    time: .shortened
+                                ),
+                                systemImage: "calendar.badge.checkmark"
+                            )
+                        }
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .accessibilityElement(children: .combine)
+                    }
 
                     if storedLinkedHealthID != nil {
                         Button {
