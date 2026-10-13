@@ -4630,9 +4630,16 @@ private struct HomeWeeklyProgressDaySheet:
                     )
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(HomeCompletedWorkoutPresentation.title(
-                        for: workout.activity
-                    ))
+                    Text(
+                        workout.activity == .running && workout.isIndoor == true
+                            ? ATHLTHLocalization.choose(
+                                english: "Treadmill",
+                                norwegian: "Tredemølle"
+                            )
+                            : HomeCompletedWorkoutPresentation.title(
+                                for: workout.activity
+                            )
+                    )
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(ATHLTHTheme.primaryText)
                     .lineLimit(1)
