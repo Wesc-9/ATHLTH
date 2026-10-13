@@ -4,6 +4,7 @@ import SwiftUI
 /// results and seasons. Business status and authorization stay on the server.
 enum ATHLTHArenaStatusKind: Equatable {
     case active
+    case ready
     case waiting
     case needsReview
     case completed
@@ -14,6 +15,8 @@ enum ATHLTHArenaStatusKind: Equatable {
         switch self {
         case .active:
             return ATHLTHLocalization.choose(english: "IN PROGRESS", norwegian: "PÅGÅR")
+        case .ready:
+            return ATHLTHLocalization.choose(english: "READY", norwegian: "KLAR")
         case .waiting:
             return ATHLTHLocalization.choose(english: "AWAITING", norwegian: "AVVENTER")
         case .needsReview:
@@ -30,6 +33,7 @@ enum ATHLTHArenaStatusKind: Equatable {
     var symbol: String {
         switch self {
         case .active: return "figure.run"
+        case .ready: return "flag.checkered"
         case .waiting: return "clock"
         case .needsReview: return "exclamationmark.circle"
         case .completed: return "checkmark.seal"
@@ -41,6 +45,7 @@ enum ATHLTHArenaStatusKind: Equatable {
     var foreground: Color {
         switch self {
         case .active: return ATHLTHArenaLightStyle.ink
+        case .ready: return ATHLTHArenaLightStyle.warmGold
         case .waiting: return ATHLTHArenaLightStyle.warmGold
         case .needsReview: return .orange
         case .completed: return ATHLTHArenaLightStyle.secondary
@@ -52,6 +57,7 @@ enum ATHLTHArenaStatusKind: Equatable {
     var background: Color {
         switch self {
         case .active: return ATHLTHArenaLightStyle.soft
+        case .ready: return ATHLTHArenaLightStyle.warmGold.opacity(0.11)
         case .waiting, .upcoming:
             return ATHLTHArenaLightStyle.warmGold.opacity(0.11)
         case .needsReview: return Color.orange.opacity(0.10)
@@ -92,7 +98,8 @@ enum ATHLTHArenaStatusPresentation {
     ) -> ATHLTHArenaStatusKind {
         if requiresResponse { return .needsReview }
         switch status {
-        case "accepted", "active", "running": return .active
+        case "accepted": return .ready
+        case "active", "running": return .active
         case "pending": return .waiting
         case "completed", "finished": return .completed
         default: return .unavailable
