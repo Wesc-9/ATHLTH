@@ -778,6 +778,8 @@ struct ATHLTHCommunityV4View: View {
             clubEvents: groups.calendarEvents,
             clubRSVPs: groups.calendarEventRSVPs,
             clubs: groups.groups,
+            clubChallenges: groups.calendarClubChallenges,
+            clubChallengeParticipations: groups.calendarChallengeParticipations,
             challenges: joinedUpcomingChallenges,
             trainTogetherPosts: trainTogetherAgenda.posts,
             trainTogetherRequests: trainTogetherAgenda.requests,
@@ -1213,7 +1215,9 @@ struct ATHLTHCommunityV4View: View {
             liveRefresh
         )
 
-        await groups.refreshCalendarContent()
+        async let eventCalendarRefresh: Void = groups.refreshCalendarContent()
+        async let clubChallengeCalendarRefresh: Void = groups.refreshCalendarChallenges()
+        _ = await (eventCalendarRefresh, clubChallengeCalendarRefresh)
 
         await officialChallenges
             .syncCompletionState(
