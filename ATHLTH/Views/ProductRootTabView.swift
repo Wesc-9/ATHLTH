@@ -5483,7 +5483,9 @@ struct ATHLTHTrainView: View {
                     watchConnected: watchConnection.isReady,
                     plannedSession: pendingPlannedEnduranceWorkout?.workout
                 ) { configuration in
-                    let planOrigin = pendingPlannedEnduranceWorkout
+                    let planOrigin = validPendingPlanOrigin(
+                        pendingPlannedEnduranceWorkout, kind: .walking
+                    )
                     Task { @MainActor in
                         guard await social.beginWorkoutWithFriends(
                             title: "Walk",
@@ -7288,11 +7290,38 @@ struct ATHLTHTrainView: View {
 
     // A change from the planned run to a different quick-start mode
     // must not silently credit an unrelated workout to the plan.
+    // The quick-start sheet may stay open while the plan changes elsewhere.
+    // Never attach recorded evidence to a removed, skipped or finished session.
+    private func validPendingPlanOrigin(
+        _ origin: PlannedWorkoutSelection?,
+        kind: WorkoutKind
+    ) -> PlannedWorkoutSelection? {
+        guard let origin,
+              let current = session.trainingPlan(withID: origin.planID)?
+                .weeks.flatMap(\.days).flatMap(\.sessions)
+                .first(where: { $0.id == origin.workout.id }),
+              current.kind == kind,
+              !session.isPlanSessionSkipped(
+                planID: origin.planID, sessionID: current.id
+              ),
+              !session.isPlanSessionCompleted(
+                planID: origin.planID,
+                sessionID: current.id,
+                healthWorkouts: health.workouts,
+                strengthHistory: strengthWorkout.workoutHistory
+              ) else { return nil }
+        return PlannedWorkoutSelection(
+            planID: origin.planID,
+            workout: current,
+            isHealthCompleted: false
+        )
+    }
+
     private func matchedPlanOriginForRun(
         _ origin: PlannedWorkoutSelection?,
         configuration: RunQuickStartConfiguration
     ) -> PlannedWorkoutSelection? {
-        guard let origin, origin.workout.kind == .running else {
+        guard let origin = validPendingPlanOrigin(origin, kind: .running) else {
             return nil
         }
         let planned = origin.workout
