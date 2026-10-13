@@ -5077,6 +5077,7 @@ struct SessionEditorView: View {
     let preserveSourceID: Bool
 
     @State private var hasSelectedWorkoutSource = false
+    @State private var prioritizePartnerPlanning = false
     @State private var title = ""
     @State private var kind: WorkoutKind = .strength
     @State private var durationMinutes = 0
@@ -5438,6 +5439,12 @@ struct SessionEditorView: View {
         )
     }
 
+    private func beginPartnerPlanningFromSource() {
+        title = ""
+        prioritizePartnerPlanning = true
+        hasSelectedWorkoutSource = true
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -5454,13 +5461,21 @@ struct SessionEditorView: View {
                             },
                             onUsePlanned: {
                                 showingSavedWorkoutPicker = true
-                            }
+                            },
+                            onTrainTogether: onPreparedWorkout == nil
+                                ? beginPartnerPlanningFromSource
+                                : nil
                         )
                     }
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 14, leading: 14,
                                               bottom: 14, trailing: 14))
                 } else {
+                // Entry from the "Train together" card puts partner selection
+                // first while retaining the exact same workout editor.
+                if prioritizePartnerPlanning && onPreparedWorkout == nil {
+                    partnerPlanningSection
+                }
                 Section {
                     workoutBuilderOverview
                 }
@@ -5683,7 +5698,7 @@ struct SessionEditorView: View {
                 )
 
 
-                if onPreparedWorkout == nil {
+                if onPreparedWorkout == nil && !prioritizePartnerPlanning {
                     partnerPlanningSection
                 }
                 plannedWorkoutLogisticsSection
