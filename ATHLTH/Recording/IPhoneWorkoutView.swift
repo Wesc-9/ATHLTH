@@ -217,23 +217,18 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
             let distance =
                 workout.distanceMeters /
                 splitMeters
-            let currentPace =
-                workout
-                    .currentPaceSecondsPerKilometer
-                    .map {
-                        isMetric
-                            ? $0
-                            : $0 * 1.609344
-                    }
-            let isTreadmill =
-                workout.runEnvironment ==
-                .treadmill
-            let treadmillAveragePace: TimeInterval? =
-                isTreadmill &&
-                workout.distanceMeters >= 20 &&
-                elapsed > 0
-                ? elapsed / (workout.distanceMeters / 1_000) *
-                    (isMetric ? 1.0 : 1.609344)
+            let isTreadmill = workout.runEnvironment == .treadmill
+            // Phone treadmill workouts must never reuse GPS pace (including
+            // a delayed GPS callback from a previous outdoor session).
+            let currentPace = isTreadmill ? nil :
+                workout.currentPaceSecondsPerKilometer.map {
+                    isMetric ? $0 : $0 * 1.609344
+                }
+            let treadmillAveragePace = isTreadmill
+                ? ATHLTHRunningPace.average(
+                    elapsedSeconds: elapsed,
+                    distanceMeters: workout.distanceMeters
+                ).map { isMetric ? $0 : $0 * 1.609344 }
                 : nil
             let displayedPace = currentPace ?? treadmillAveragePace
 
