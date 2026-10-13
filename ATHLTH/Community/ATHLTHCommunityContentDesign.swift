@@ -3,11 +3,17 @@ import SwiftUI
 /// A shared content identity for Club events and Club challenges.
 /// Presentation is shared; RSVP and competition rules deliberately remain separate.
 enum ATHLTHCommunityContentKind {
+    case publicEvent
     case event
     case challenge
 
     var localizedTitle: String {
         switch self {
+        case .publicEvent:
+            ATHLTHLocalization.choose(
+                english: "Community event",
+                norwegian: "Arrangement"
+            )
         case .event:
             ATHLTHLocalization.choose(
                 english: "Club event",
@@ -23,6 +29,7 @@ enum ATHLTHCommunityContentKind {
 
     var symbol: String {
         switch self {
+        case .publicEvent: "calendar"
         case .event: "calendar.badge.clock"
         case .challenge: "trophy"
         }
