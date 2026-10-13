@@ -58,6 +58,49 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
     }
 
     @ViewBuilder
+    private func workoutStatusRow(
+        title: String,
+        status: WorkoutRowStatus,
+        scheduledStart: Date?,
+        originalDate: Date?,
+        calendar: Calendar
+    ) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: status.symbol)
+                .foregroundStyle(status == .completed
+                    ? ATHLTHPlanDesign.accent
+                    : ATHLTHPlanDesign.secondaryInk)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline)
+                    .lineLimit(2)
+                if let scheduled = scheduledStart,
+                   originalDate.map({
+                       !calendar.isDate($0, inSameDayAs: scheduled)
+                   }) ?? true {
+                    Label(
+                        scheduled.formatted(
+                            .dateTime.weekday(.abbreviated).day().month(.abbreviated)
+                        ),
+                        systemImage: "calendar.badge.clock"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Scheduled for \(scheduled.formatted(date: .abbreviated, time: .omitted))",
+                        norwegian: "Planlagt til \(scheduled.formatted(date: .abbreviated, time: .omitted))"
+                    ))
+                }
+            }
+            Spacer(minLength: 4)
+            Text(status.title)
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+        }
+    }
+
+    @ViewBuilder
     private func weekStatusSummary(
         _ weekStatus: ATHLTHPlanWeeklyFollowThrough.Week
     ) -> some View {
@@ -353,39 +396,13 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                             needsReview: needsReview,
                                             hasDate: effectiveDate != nil
                                         )
-                                        HStack(spacing: 5) {
-                                            Image(systemName: rowStatus.symbol)
-                                                .foregroundStyle(completed
-                                                    ? ATHLTHPlanDesign.accent
-                                                    : ATHLTHPlanDesign.secondaryInk)
-                                                .accessibilityHidden(true)
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text(workout.title)
-                                                    .font(.subheadline)
-                                                    .lineLimit(2)
-                                                if let scheduled = workout.scheduledStart,
-                                                   dayDate.map({
-                                                       !calendar.isDate($0, inSameDayAs: scheduled)
-                                                   }) ?? true {
-                                                    Label(
-                                                        scheduled.formatted(
-                                                            .dateTime.weekday(.abbreviated).day().month(.abbreviated)
-                                                        ),
-                                                        systemImage: "calendar.badge.clock"
-                                                    )
-                                                    .font(.caption2)
-                                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                                    .accessibilityLabel(ATHLTHLocalization.choose(
-                                                        english: "Scheduled for \(scheduled.formatted(date: .abbreviated, time: .omitted))",
-                                                        norwegian: "Planlagt til \(scheduled.formatted(date: .abbreviated, time: .omitted))"
-                                                    ))
-                                                }
-                                            }
-                                            Spacer(minLength: 4)
-                                            Text(rowStatus.title)
-                                                .font(.caption2)
-                                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                        }
+                                        workoutStatusRow(
+                                            title: workout.title,
+                                            status: rowStatus,
+                                            scheduledStart: workout.scheduledStart,
+                                            originalDate: dayDate,
+                                            calendar: calendar
+                                        )
                                     }
                                 }
                                 Spacer(minLength: 4)
