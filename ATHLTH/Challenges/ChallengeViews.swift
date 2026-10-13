@@ -8184,7 +8184,7 @@ struct ChallengeDetailView: View {
                         if let myCompletedAttempt = challenge.attempts
                             .filter({
                                 $0.userID == session.profile.userID &&
-                                $0.isEligible
+                                challenge.countsAttempt($0)
                             })
                             .sorted(by: { $0.submittedAt > $1.submittedAt })
                             .first {
@@ -10474,17 +10474,17 @@ struct ChallengeDetailView: View {
                             norwegian: "Forsøk"
                         ),
                     trailing:
-                        challenge.attempts.isEmpty
+                        challenge.attempts.filter { challenge.countsAttempt($0) }.isEmpty
                             ? nil
-                            : "\(challenge.attempts.count)"
+                            : "\(challenge.attempts.filter { challenge.countsAttempt($0) }.count)"
                 )
 
-            if challenge.attempts.isEmpty {
+            if challenge.attempts.filter({ challenge.countsAttempt($0) }).isEmpty {
                 Text("No attempts yet.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(challenge.attempts.sorted { $0.submittedAt > $1.submittedAt }.prefix(10)) { attempt in
+                ForEach(challenge.attempts.filter { challenge.countsAttempt($0) }.sorted { $0.submittedAt > $1.submittedAt }.prefix(10)) { attempt in
                     HStack(alignment: .top, spacing: 10) {
                         Image(
                             systemName: attempt.isEligible
@@ -10682,6 +10682,14 @@ struct ChallengeDetailView: View {
     }
 
     private func timeText(_ challenge: ATHLTHChallenge) -> String {
+        if challenge.scoringStartDate == nil &&
+           challenge.status != .cancelled &&
+           challenge.status != .completed {
+            return ATHLTHLocalization.choose(
+                english: "Waiting for acceptance",
+                norwegian: "Venter på aksept"
+            )
+        }
         if challenge.status == .active, let end = challenge.rules.endsAt {
             return end.formatted(.relative(presentation: .named))
         }
