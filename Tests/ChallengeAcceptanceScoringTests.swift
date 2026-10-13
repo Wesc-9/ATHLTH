@@ -155,6 +155,31 @@ final class ChallengeAcceptanceScoringTests: XCTestCase {
         XCTAssertFalse(subject.countsAttempt(invalidVerified))
     }
 
+    func testInvalidAfterAcceptanceAttemptRemainsVisibleButUnscored() {
+        let subject = challenge(inviteState: .accepted, response: acceptedAt, status: .active)
+        var attempted = attempt(
+            subject,
+            participantID: subject.participants[0].id,
+            startedAt: acceptedAt.addingTimeInterval(300)
+        )
+        attempted.isEligible = false
+        attempted.ineligibilityReason = "Route mismatch"
+        XCTAssertTrue(subject.showsAttempt(attempted))
+        XCTAssertFalse(subject.countsAttempt(attempted))
+    }
+
+    func testPreAcceptanceAttemptDoesNotAppearEvenIfUploadedLater() {
+        let subject = challenge(inviteState: .accepted, response: acceptedAt, status: .active)
+        let early = attempt(
+            subject,
+            participantID: subject.participants[0].id,
+            startedAt: acceptedAt.addingTimeInterval(-300),
+            submittedAt: acceptedAt.addingTimeInterval(900)
+        )
+        XCTAssertFalse(subject.showsAttempt(early))
+        XCTAssertFalse(subject.countsAttempt(early))
+    }
+
     func testCancelledChallengeAndEndedWindowRejectAttempts() {
         let cancelled = challenge(inviteState: .accepted, response: acceptedAt, status: .cancelled)
         XCTAssertNil(cancelled.scoringStartDate)
