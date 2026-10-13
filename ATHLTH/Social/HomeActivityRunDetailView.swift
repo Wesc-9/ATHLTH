@@ -1685,21 +1685,13 @@ struct HomeActivityRunDetailView: View {
     }
 
     private var averagePaceSeconds: Double? {
-        guard let distance =
-                workout.distanceMeters,
-              distance > 0
-        else {
+        guard let distance = workout.distanceMeters else {
             return nil
         }
-
-        let value =
-            workout.duration /
-            (distance / 1_000)
-
-        return value.isFinite &&
-            value > 0
-            ? value
-            : nil
+        return ATHLTHRunningPace.average(
+            elapsedSeconds: workout.duration,
+            distanceMeters: distance
+        )
     }
 
     private var detailNavigationTitle: String {
