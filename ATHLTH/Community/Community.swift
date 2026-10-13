@@ -2383,6 +2383,10 @@ struct CommunityEventDetailView: View {
                     spacing: 16,
                     pinnedViews: [.sectionHeaders]
                 ) {
+                    ATHLTHCommunityContextRibbon(
+                        kind: .event,
+                        groupName: "ATHLTH"
+                    )
                     eventHero(item)
 
                     Section {
@@ -2404,15 +2408,7 @@ struct CommunityEventDetailView: View {
                 .padding(.top, 70)
             }
         }
-        .background(
-            ATHLTHPremiumCanvas(
-                accent:
-                    ATHLTHTheme
-                        .vitality
-                        .opacity(0.20)
-            )
-            .ignoresSafeArea()
-        )
+        .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
         .navigationTitle(
             ATHLTHLocalization.choose(
                 english: "Event",
@@ -2609,12 +2605,12 @@ struct CommunityEventDetailView: View {
     private func eventGhostCard<Content: View>(
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            content()
+        // Shared premium surface with Club events and the Training Plan.
+        ATHLTHPlanSurface {
+            VStack(alignment: .leading, spacing: 0) {
+                content()
+            }
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .modifier(CommunityEventGhostSurface(cornerRadius: 24))
     }
 
     private func eventTabBar(
