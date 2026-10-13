@@ -216,16 +216,43 @@ struct ATHLTHTrainPlanPremiumView: View {
                 NavigationStack {
                     Form {
                         Section {
-                            DatePicker(
-                                tr("New workout date", "Ny treningsdato"),
-                                selection: $moveTargetDate,
-                                in: Calendar.current.startOfDay(for: Date())...,
-                                displayedComponents: .date
-                            )
+                            if let startDate = plan.startDate,
+                               !plan.weeks.isEmpty {
+                                let calendar = Calendar.current
+                                let first = calendar.startOfDay(for: startDate)
+                                let last = calendar.date(
+                                    byAdding: .day,
+                                    value: plan.weeks.count * 7 - 1,
+                                    to: first
+                                ) ?? first
+                                let earliest = max(
+                                    calendar.startOfDay(for: Date()), first
+                                )
+                                if earliest <= last {
+                                    DatePicker(
+                                        tr("New workout date", "Ny treningsdato"),
+                                        selection: $moveTargetDate,
+                                        in: earliest...last,
+                                        displayedComponents: .date
+                                    )
+                                } else {
+                                    Text(tr(
+                                        "This plan has no upcoming dates.",
+                                        "Denne planen har ingen kommende datoer."
+                                    ))
+                                    .foregroundStyle(.secondary)
+                                }
+                            } else {
+                                Text(tr(
+                                    "The plan has no valid date range.",
+                                    "Planen mangler en gyldig datoperiode."
+                                ))
+                                .foregroundStyle(.secondary)
+                            }
                         } footer: {
                             Text(tr(
-                                "Only upcoming, unfinished workouts can be moved within the current plan.",
-                                "Bare kommende økter som ikke er gjennomført, kan flyttes innenfor planen."
+                                "Choose a date within the plan. Completed and skipped workouts cannot be moved.",
+                                "Velg en dato innenfor planen. Gjennomførte og hoppede økter kan ikke flyttes."
                             ))
                         }
                         if let moveError {
@@ -265,6 +292,20 @@ struct ATHLTHTrainPlanPremiumView: View {
                                 }
                             }
                             .fontWeight(.semibold)
+                            .disabled({
+                                guard let start = plan.startDate,
+                                      !plan.weeks.isEmpty else { return true }
+                                let calendar = Calendar.current
+                                let first = calendar.startOfDay(for: start)
+                                let last = calendar.date(
+                                    byAdding: .day,
+                                    value: plan.weeks.count * 7 - 1,
+                                    to: first
+                                ) ?? first
+                                let target = calendar.startOfDay(for: moveTargetDate)
+                                return target < max(first, calendar.startOfDay(for: Date()))
+                                    || target > last
+                            }())
                         }
                     }
                 }
