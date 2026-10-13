@@ -863,7 +863,7 @@ struct ExerciseDetailView: View {
     @State private var showingEdit = false
 
     private var currentEntry: ExerciseLibraryEntry {
-        library.allExercises.first(where: { $0.id == currentEntry.id }) ?? entry
+        library.allExercises.first(where: { $0.id == entry.id }) ?? entry
     }
 
     var body: some View {
@@ -1635,7 +1635,8 @@ struct CustomExerciseEditorView: View {
                                     .whitespacesAndNewlines
                             )
                             .isEmpty ||
-                        primaryMuscles.isEmpty
+                        primaryMuscles.isEmpty ||
+                        isImportingVideo
                     )
                 }
             }
