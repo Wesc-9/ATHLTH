@@ -23,11 +23,22 @@ private struct ATHLTHEquipmentScanRequest: Encodable {
     let candidates: [ATHLTHEquipmentScanCandidate]
 }
 
-private struct ATHLTHEquipmentScanResponse: Decodable {
+struct ATHLTHEquipmentScanResponse: Decodable {
     let equipmentName: String
     let confidence: String
     let explanation: String
     let exerciseIDs: [String]
+
+    /// Reject uncertain, unknown and duplicate IDs even if an AI response is malformed.
+    func matchedExercises(in candidates: [ExerciseLibraryEntry]) -> [ExerciseLibraryEntry] {
+        guard confidence == "high" || confidence == "medium" else { return [] }
+        let byID = Dictionary(uniqueKeysWithValues: candidates.map { ($0.id.uuidString, $0) })
+        var seen = Set<String>()
+        return exerciseIDs.compactMap { id in
+            guard seen.insert(id).inserted else { return nil }
+            return byID[id]
+        }
+    }
 }
 
 private enum ATHLTHEquipmentScannerError: LocalizedError {
@@ -178,9 +189,7 @@ struct ATHLTHEquipmentScannerView: View {
     }
 
     private var matches: [ExerciseLibraryEntry] {
-        guard let analysis else { return [] }
-        let byID = Dictionary(uniqueKeysWithValues: candidates.map { ($0.id.uuidString, $0) })
-        return analysis.exerciseIDs.compactMap { byID[$0] }
+        analysis?.matchedExercises(in: candidates) ?? []
     }
 
     var body: some View {
