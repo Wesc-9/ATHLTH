@@ -7360,7 +7360,8 @@ struct ATHLTHTrainView: View {
 
         // Never replace a live workout with a second one from the plan.
         if phoneWorkout.active != nil ||
-            strengthWorkout.activeWorkout != nil {
+            strengthWorkout.activeWorkout != nil ||
+            ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive {
             watchTransferError = ATHLTHLocalization.choose(
                 english: "A workout is already in progress. Finish it before starting a planned session.",
                 norwegian: "En økt pågår allerede. Avslutt den før du starter en planlagt økt."
