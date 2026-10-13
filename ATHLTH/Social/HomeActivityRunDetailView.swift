@@ -35,6 +35,15 @@ struct HomeActivityRunDetailView: View {
         )
     }
 
+    // Indoor running has no outdoor GPS track; preserve route features for outdoor workouts.
+    private var isTreadmillWorkout: Bool {
+        workout.activity == .running && workout.isIndoor == true
+    }
+
+    private func tr(_ english: String, _ norwegian: String) -> String {
+        ATHLTHLocalization.choose(english: english, norwegian: norwegian)
+    }
+
     private var route: [CLLocation] {
         let source = detail?.route ?? []
         let accurate =
@@ -234,7 +243,7 @@ struct HomeActivityRunDetailView: View {
             VStack(spacing: 16) {
                 summaryCard
 
-                if linkedRoute != nil {
+                if !isTreadmillWorkout && linkedRoute != nil {
                     routeResultCard
                 }
 
@@ -244,9 +253,12 @@ struct HomeActivityRunDetailView: View {
                     )
                 }
 
-                mapCard
-
-                routeFactsCard
+                if isTreadmillWorkout {
+                    treadmillFactsCard
+                } else {
+                    mapCard
+                    routeFactsCard
+                }
 
                 coachCard
             }
@@ -254,17 +266,7 @@ struct HomeActivityRunDetailView: View {
             .padding(.top, 10)
             .padding(.bottom, 28)
         }
-        .background(
-            LinearGradient(
-                colors: [
-                    ATHLTHTheme.canvasTop,
-                    ATHLTHTheme.canvasBottom
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-        )
+        .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
         .navigationTitle(
             detailNavigationTitle
         )
@@ -293,7 +295,7 @@ struct HomeActivityRunDetailView: View {
     }
 
     private var summaryCard: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(
                 alignment: .leading,
                 spacing: 14
@@ -367,7 +369,7 @@ struct HomeActivityRunDetailView: View {
                     )
 
                 if distanceText != "—" {
-                    Text("completed")
+                    Text(tr("completed", "fullført"))
                         .font(.caption)
                         .foregroundStyle(
                             ATHLTHTheme.mutedText
@@ -380,22 +382,22 @@ struct HomeActivityRunDetailView: View {
             ) {
                 HStack(spacing: 0) {
                     summaryMetric(
-                        "Time",
+                        tr("Time", "Tid"),
                         durationText
                     )
                     summaryDivider
                     summaryMetric(
-                        "Avg. pace",
+                        tr("Avg. pace", "Snittempo"),
                         paceText
                     )
                     summaryDivider
                     summaryMetric(
-                        "Avg. HR",
+                        tr("Avg. HR", "Snittpuls"),
                         averageHeartRateText
                     )
                     summaryDivider
                     summaryMetric(
-                        "Max HR",
+                        tr("Max HR", "Makspuls"),
                         maxHeartRateText
                     )
                 }
@@ -408,19 +410,19 @@ struct HomeActivityRunDetailView: View {
                     spacing: 12
                 ) {
                     summaryMetric(
-                        "Time",
+                        tr("Time", "Tid"),
                         durationText
                     )
                     summaryMetric(
-                        "Avg. pace",
+                        tr("Avg. pace", "Snittempo"),
                         paceText
                     )
                     summaryMetric(
-                        "Avg. HR",
+                        tr("Avg. HR", "Snittpuls"),
                         averageHeartRateText
                     )
                     summaryMetric(
-                        "Max HR",
+                        tr("Max HR", "Makspuls"),
                         maxHeartRateText
                     )
                 }
@@ -485,14 +487,14 @@ struct HomeActivityRunDetailView: View {
             }
         }
         }
-        .athlthLightweightCardChrome()
+
     }
 
     @ViewBuilder
     private var routeResultCard:
         some View {
         if let route = linkedRoute {
-            ATHLTHCard {
+            ATHLTHPlanSurface {
                 VStack(
                     alignment: .leading,
                     spacing: 14
@@ -756,9 +758,9 @@ struct HomeActivityRunDetailView: View {
                     }
                 }
             }
-            .athlthLightweightCardChrome()
+    
         } else if isLoadingRouteResult {
-            ATHLTHCard {
+            ATHLTHPlanSurface {
                 HStack(spacing: 12) {
                     ProgressView()
                         .controlSize(.small)
@@ -781,7 +783,7 @@ struct HomeActivityRunDetailView: View {
                     Spacer()
                 }
             }
-            .athlthLightweightCardChrome()
+    
         }
     }
 
@@ -915,7 +917,7 @@ struct HomeActivityRunDetailView: View {
 
     @ViewBuilder
     private var mapCard: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(
                 alignment: .leading,
                 spacing: 12
@@ -925,7 +927,7 @@ struct HomeActivityRunDetailView: View {
                     alignment: .leading,
                     spacing: 2
                 ) {
-                    Text("Route")
+                    Text(tr("Route", "Rute"))
                         .font(
                             .headline.weight(
                                 .semibold
@@ -936,7 +938,7 @@ struct HomeActivityRunDetailView: View {
                         )
 
                     Text(
-                        "Apple Maps · pace by segment"
+                        tr("Apple Maps · pace by segment", "Apple Kart · tempo per segment")
                     )
                     .font(.caption)
                     .foregroundStyle(
@@ -1039,10 +1041,10 @@ struct HomeActivityRunDetailView: View {
                 paceLegend
             } else {
                 ContentUnavailableView(
-                    "No GPS route",
+                    tr("No GPS route", "Ingen GPS-rute"),
                     systemImage: "map",
                     description: Text(
-                        "Route details appear when this workout contains GPS data."
+                        tr("Route details appear when this workout contains GPS data.", "Rutedetaljer vises når økten inneholder GPS-data.")
                     )
                 )
                 .frame(
@@ -1059,7 +1061,7 @@ struct HomeActivityRunDetailView: View {
             }
         }
         }
-        .athlthLightweightCardChrome()
+
     }
 
     private var paceLegend: some View {
@@ -1075,11 +1077,11 @@ struct HomeActivityRunDetailView: View {
             .clipShape(Capsule())
 
             HStack {
-                Text("Faster")
+                Text(tr("Faster", "Raskere"))
                 Spacer()
-                Text("Average")
+                Text(tr("Average", "Gjennomsnitt"))
                 Spacer()
-                Text("Slower")
+                Text(tr("Slower", "Roligere"))
             }
             .font(.caption2)
             .foregroundStyle(
@@ -1087,7 +1089,7 @@ struct HomeActivityRunDetailView: View {
             )
 
             Text(
-                "Colors are relative to this workout."
+                tr("Colors are relative to this workout.", "Fargene viser tempo relativt til denne økten.")
             )
             .font(.caption2)
             .foregroundStyle(
@@ -1102,13 +1104,39 @@ struct HomeActivityRunDetailView: View {
         .padding(.horizontal, 2)
     }
 
+    // Treadmill sessions show recorded workout metrics instead of GPS or elevation.
+    private var treadmillFactsCard: some View {
+        ATHLTHPlanSurface {
+            VStack(alignment: .leading, spacing: 12) {
+                Label(tr("Workout data", "Øktdata"), systemImage: "figure.run")
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                HStack(spacing: 10) {
+                    routeFact(
+                        icon: "flame.fill",
+                        label: tr("Active energy", "Aktiv energi"),
+                        value: activeEnergyText
+                    )
+                    routeFact(
+                        icon: runningPowerText == "—" ? "heart.fill" : "bolt.fill",
+                        label: runningPowerText == "—"
+                            ? tr("Max heart rate", "Makspuls")
+                            : tr("Avg. power", "Snitteffekt"),
+                        value: runningPowerText == "—" ? maxHeartRateText : runningPowerText
+                    )
+                }
+            }
+        }
+    }
+
     private var routeFactsCard: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(
                 alignment: .leading,
                 spacing: 12
             ) {
-            Text("Route details")
+            Text(tr("Route details", "Rutedetaljer"))
                 .font(
                     .headline.weight(
                         .semibold
@@ -1133,7 +1161,7 @@ struct HomeActivityRunDetailView: View {
             ) {
                 routeFact(
                     icon: "mountain.2.fill",
-                    label: "Elevation gain",
+                    label: tr("Elevation gain", "Høydemeter"),
                     value:
                         ascentText ??
                         "—"
@@ -1142,14 +1170,14 @@ struct HomeActivityRunDetailView: View {
                 routeFact(
                     icon:
                         "arrow.up.right.circle.fill",
-                    label: "Highest point",
+                    label: tr("Highest point", "Høyeste punkt"),
                     value:
                         highestPointText
                 )
 
                 routeFact(
                     icon: "flame.fill",
-                    label: "Active energy",
+                    label: tr("Active energy", "Aktiv energi"),
                     value:
                         activeEnergyText
                 )
@@ -1161,8 +1189,8 @@ struct HomeActivityRunDetailView: View {
                             : "bolt.fill",
                     label:
                         runningPowerText == "—"
-                            ? "Max heart rate"
-                            : "Avg. power",
+                            ? tr("Max heart rate", "Makspuls")
+                            : tr("Avg. power", "Snitteffekt"),
                     value:
                         runningPowerText == "—"
                             ? maxHeartRateText
@@ -1171,7 +1199,7 @@ struct HomeActivityRunDetailView: View {
             }
         }
         }
-        .athlthLightweightCardChrome()
+
     }
 
     private var coachCard: some View {
@@ -1242,7 +1270,9 @@ struct HomeActivityRunDetailView: View {
                     )
             } else if isLoadingAIInsight {
                 Text(
-                    "Coach is analyzing pace, route, elevation and effort…"
+                    isTreadmillWorkout
+                        ? tr("Coach is analyzing pace and effort…", "Coachen analyserer tempo og belastning…")
+                        : tr("Coach is analyzing pace, route, elevation and effort…", "Coachen analyserer tempo, rute, høydemeter og belastning…")
                 )
                 .font(.subheadline)
                 .foregroundStyle(
@@ -1296,7 +1326,9 @@ struct HomeActivityRunDetailView: View {
             isLoadingDetail = false
         }
 
-        await loadRouteResultIfNeeded()
+        if !isTreadmillWorkout {
+            await loadRouteResultIfNeeded()
+        }
         await loadCoachInsightIfNeeded()
     }
 
@@ -1696,32 +1728,28 @@ struct HomeActivityRunDetailView: View {
     }
 
     private var detailNavigationTitle: String {
+        if isTreadmillWorkout {
+            return tr("Treadmill details", "Tredemølle")
+        }
         switch workout.activity {
-        case .running:
-            return "Run details"
-        case .walking:
-            return "Walk details"
-        case .cycling:
-            return "Ride details"
-        case .hiking:
-            return "Hike details"
-        default:
-            return "Workout details"
+        case .running: return tr("Run details", "Løpedetaljer")
+        case .walking: return tr("Walk details", "Gådetaljer")
+        case .cycling: return tr("Ride details", "Sykkeldetaljer")
+        case .hiking: return tr("Hike details", "Turdetaljer")
+        default: return tr("Workout details", "Øktdetaljer")
         }
     }
 
     private var activityTitle: String {
+        if isTreadmillWorkout {
+            return tr("Treadmill", "Tredemølle")
+        }
         switch workout.activity {
-        case .running:
-            return "Run"
-        case .walking:
-            return "Walk"
-        case .cycling:
-            return "Ride"
-        case .hiking:
-            return "Hike"
-        default:
-            return workout.activity.rawValue
+        case .running: return tr("Run", "Løping")
+        case .walking: return tr("Walk", "Gåtur")
+        case .cycling: return tr("Ride", "Sykling")
+        case .hiking: return tr("Hike", "Fottur")
+        default: return workout.activity.rawValue
         }
     }
 
@@ -1862,18 +1890,21 @@ struct HomeActivityRunDetailView: View {
 
     private var coachUnavailableText: String {
         if !session.hasPaidAccess {
-            return
-                "Coach insight is available with ATHLTH+."
+            return tr(
+                "Coach insight is available with ATHLTH+.",
+                "Coach-innsikt er tilgjengelig med ATHLTH+."
+            )
         }
-
-        if !session
-            .aiHealthDataSharingEnabled {
-            return
-                "Enable Coach health-data sharing in Settings to analyze this workout."
+        if !session.aiHealthDataSharingEnabled {
+            return tr(
+                "Enable Coach health-data sharing in Settings to analyze this workout.",
+                "Aktiver deling av helsedata med Coach i Innstillinger for å analysere økten."
+            )
         }
-
-        return
-            "Coach insight is not available for this workout yet."
+        return tr(
+            "Coach insight is not available for this workout yet.",
+            "Coach-innsikt er ikke tilgjengelig for denne økten ennå."
+        )
     }
 
     private static func paceText(
