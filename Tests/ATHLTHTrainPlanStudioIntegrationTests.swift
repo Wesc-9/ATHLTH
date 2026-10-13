@@ -434,4 +434,40 @@ final class ATHLTHTrainPlanStudioIntegrationTests: XCTestCase {
                        [original.id])
     }
 
+    @MainActor
+    func testPlanStudioSaveNormalizesScheduledDayAndPreservesClock() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Scheduled time integrity", summary: "",
+            weekCount: 2, startDate: today
+        ))
+        let dayID = plan.weeks[0].days[2].id
+        var draft = workout(name: "Timed run")
+        let foreignDate = try XCTUnwrap(calendar.date(
+            byAdding: .day, value: 9, to: today
+        ))
+        draft.scheduledStart = try XCTUnwrap(calendar.date(
+            bySettingHour: 7, minute: 35, second: 0, of: foreignDate
+        ))
+        let before = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertTrue(store.savePlanStudioWorkout(
+            draft, inPlan: plan.id, dayID: dayID,
+            editingWorkoutID: nil, expectedPlanVersion: before.version,
+            healthWorkouts: [], strengthHistory: []
+        ))
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let scheduled = try XCTUnwrap(saved.weeks[0].days[2]
+            .sessions.first?.scheduledStart)
+        let expectedDay = try XCTUnwrap(calendar.date(
+            byAdding: .day, value: 2, to: today
+        ))
+        XCTAssertTrue(calendar.isDate(scheduled, inSameDayAs: expectedDay))
+        XCTAssertEqual(calendar.component(.hour, from: scheduled), 7)
+        XCTAssertEqual(calendar.component(.minute, from: scheduled), 35)
+        XCTAssertEqual(saved.weeks[0].days[2].sessions.first?.id, draft.id)
+    }
+
 }

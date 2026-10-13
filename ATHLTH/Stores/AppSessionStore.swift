@@ -3747,6 +3747,23 @@ final class AppSessionStore: ObservableObject {
         ), plannedDate >= Calendar.current.startOfDay(for: Date())
         else { return false }
 
+        // The day selected in Plan Studio is authoritative. A reused
+        // template or edited session may carry a scheduledStart from another
+        // day; keep its clock time but normalize the date to the target day.
+        var normalizedDraft = draft
+        if let scheduledStart = draft.scheduledStart {
+            let calendar = Calendar.current
+            let clock = calendar.dateComponents(
+                [.hour, .minute, .second], from: scheduledStart
+            )
+            normalizedDraft.scheduledStart = calendar.date(
+                bySettingHour: clock.hour ?? 18,
+                minute: clock.minute ?? 0,
+                second: clock.second ?? 0,
+                of: plannedDate
+            ) ?? plannedDate
+        }
+
         if let editingWorkoutID {
             guard draft.id == editingWorkoutID,
                   let workoutIndex = day.sessions.firstIndex(where: {
@@ -3763,12 +3780,12 @@ final class AppSessionStore: ObservableObject {
                   )
             else { return false }
             plan.weeks[weekIndex].days[dayIndex]
-                .sessions[workoutIndex] = draft
+                .sessions[workoutIndex] = normalizedDraft
         } else {
             // New IDs must not collide with any workout already in the plan.
             guard !plan.weeks.flatMap(\.days).flatMap(\.sessions)
                 .contains(where: { $0.id == draft.id }) else { return false }
-            plan.weeks[weekIndex].days[dayIndex].sessions.append(draft)
+            plan.weeks[weekIndex].days[dayIndex].sessions.append(normalizedDraft)
         }
         plan.version += 1
         plan.updatedAt = Date()

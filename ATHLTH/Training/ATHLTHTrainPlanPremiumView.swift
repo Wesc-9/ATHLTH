@@ -853,6 +853,23 @@ struct ATHLTHTrainPlanPremiumView: View {
                 strengthHistory: strength.workoutHistory
             )
         }.count
+        let skippedCount = workouts.filter {
+            session.isPlanSessionSkipped(planID: plan.id, sessionID: $0.id)
+        }.count
+        let overdueCount = week.days.reduce(0) { total, day in
+            let date = planDayDate(day.dayIndex, plan: plan)
+            guard date < Calendar.current.startOfDay(for: Date()) else {
+                return total
+            }
+            return total + day.sessions.filter {
+                !session.isPlanSessionSkipped(planID: plan.id, sessionID: $0.id) &&
+                !session.isPlanSessionCompleted(
+                    planID: plan.id, sessionID: $0.id,
+                    healthWorkouts: health.workouts,
+                    strengthHistory: strength.workoutHistory
+                )
+            }.count
+        }
         return HStack(spacing: 9) {
             Button {
                 withAnimation(.easeInOut(duration: 0.18)) {
@@ -875,6 +892,18 @@ struct ATHLTHTrainPlanPremiumView: View {
                           "\(completedCount) av \(workouts.count) gjennomført"))
                     .font(.caption2)
                     .foregroundStyle(secondaryInk)
+                if !advanced && (skippedCount > 0 || overdueCount > 0) {
+                    Text([
+                        skippedCount > 0
+                            ? tr("\(skippedCount) skipped", "\(skippedCount) hoppet over")
+                            : nil,
+                        overdueCount > 0
+                            ? tr("\(overdueCount) overdue", "\(overdueCount) ikke gjennomført")
+                            : nil
+                    ].compactMap { $0 }.joined(separator: " · "))
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(secondaryInk)
+                }
             }
             Spacer(minLength: 0)
             Button {
@@ -1168,6 +1197,20 @@ struct ATHLTHTrainPlanPremiumView: View {
                         }
                     }
                 }
+                Button {
+                    showingEditor = true
+                } label: {
+                    Label(tr("Add workout to week", "Legg til økt i uken"),
+                          systemImage: "plus.circle")
+                        .font(.subheadline.weight(.medium))
+                        .frame(maxWidth: .infinity, minHeight: 42)
+                }
+                .buttonStyle(.bordered)
+                .tint(warmGold)
+                .accessibilityHint(tr(
+                    "Open the week editor to plan another workout",
+                    "Åpner ukeplanleggeren for å legge til en ny økt"
+                ))
             }
         }
     }
