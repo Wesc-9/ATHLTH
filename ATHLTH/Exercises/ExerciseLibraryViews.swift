@@ -41,6 +41,7 @@ struct ExerciseLibraryView: View {
     @State private var selectedEquipment = "All"
     @State private var favoritesOnly = false
     @State private var showingCreateExercise = false
+    @State private var showingEquipmentScanner = false
     @State private var selectedSection: ExerciseLibrarySection = .library
 
     init(
@@ -191,6 +192,48 @@ struct ExerciseLibraryView: View {
             }
 
             filters
+
+            Button {
+                showingEquipmentScanner = true
+            } label: {
+                HStack(spacing: 11) {
+                    Image(systemName: "camera.viewfinder")
+                        .font(.system(size: 19, weight: .medium))
+                        .foregroundStyle(ATHLTHPlanDesign.accent)
+                        .frame(width: 38, height: 38)
+                        .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Scan gym equipment",
+                            norwegian: "Skann treningsapparat"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Find exercises using the camera",
+                            norwegian: "Finn øvelser med kameraet"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accent)
+                }
+                .padding(12)
+                .background(
+                    Color.white,
+                    in: RoundedRectangle(cornerRadius: ATHLTHPlanDesign.cardRadius)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: ATHLTHPlanDesign.cardRadius)
+                        .stroke(ATHLTHPlanDesign.outline, lineWidth: 1)
+                }
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 5)
 
             if selectedSection == .mine {
                 ATHLTHPlanSurface {
@@ -442,6 +485,10 @@ struct ExerciseLibraryView: View {
             CustomExerciseEditorView()
                 .environmentObject(library)
                 .environmentObject(session)
+        }
+        .sheet(isPresented: $showingEquipmentScanner) {
+            ATHLTHEquipmentScannerView(onSelect: onSelect)
+                .environmentObject(library)
         }
         .task {
             recents.refresh()
