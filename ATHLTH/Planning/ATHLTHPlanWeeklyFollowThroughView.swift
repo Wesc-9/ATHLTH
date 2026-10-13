@@ -248,7 +248,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                     }
                     .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        HStack(spacing: 12) {
+                    HStack(spacing: 12) {
                         Label("\(completedCount)", systemImage: "checkmark.circle.fill")
                         Label("\(sessions.count - completedCount - skippedCount - unresolvedCount)", systemImage: "calendar")
                         if unresolvedCount > 0 {
@@ -267,12 +267,21 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                     ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
                         if !day.sessions.isEmpty {
                             HStack(alignment: .top, spacing: 10) {
-                                Text(ATHLTHLocalization.choose(
-                                    english: "Day \(day.dayIndex)",
-                                    norwegian: "Dag \(day.dayIndex)"
-                                ))
+                                Text(
+                                    currentPlan.startDate.flatMap { start in
+                                        calendar.date(
+                                            byAdding: .day,
+                                            value: currentWeekIndex * 7 + day.dayIndex - 1,
+                                            to: calendar.startOfDay(for: start)
+                                        )
+                                    }?.formatted(.dateTime.weekday(.abbreviated))
+                                    ?? ATHLTHLocalization.choose(
+                                        english: "Day \(day.dayIndex)",
+                                        norwegian: "Dag \(day.dayIndex)"
+                                    )
+                                )
                                 .font(.caption.weight(.semibold))
-                                .frame(width: 50, alignment: .leading)
+                                .frame(width: 65, alignment: .leading)
                                 VStack(alignment: .leading, spacing: 3) {
                                     ForEach(day.sessions) { workout in
                                         let completed = session.isPlanSessionCompleted(
