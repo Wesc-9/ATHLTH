@@ -175,6 +175,56 @@ enum ATHLTHPlanWeeklyFollowThrough {
         return nil
     }
 
+    /// Revalidate a previously shown preview against the current plan.
+    /// Never apply a stale proposal or silently change another session.
+    static func validateMovePreview(
+        _ preview: MovePreview,
+        plan: TrainingPlan,
+        store: AppSessionStore,
+        healthWorkouts: [WorkoutSummary],
+        strengthHistory: [StrengthWorkoutLog],
+        referenceDate: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Bool {
+        guard let start = plan.startDate.map({ calendar.startOfDay(for: $0) }),
+              let weekOffset = plan.weeks.firstIndex(where: { $0.id == preview.weekID }),
+              let source = plan.weeks[weekOffset].days.first(where: {
+                  $0.id == preview.sourceDayID && $0.dayIndex == preview.sourceDayIndex
+              }),
+              let destination = plan.weeks[weekOffset].days.first(where: {
+                  $0.id == preview.destinationDayID && $0.dayIndex == preview.destinationDayIndex
+              }),
+              (1...7).contains(source.dayIndex),
+              (1...7).contains(destination.dayIndex),
+              source.dayIndex < destination.dayIndex,
+              source.sessions.count == 1,
+              source.sessions[0].id == preview.sessionID,
+              source.sessions[0].scheduledStart == nil,
+              destination.sessions.isEmpty,
+              !store.isPlanSessionSkipped(planID: plan.id, sessionID: preview.sessionID),
+              !store.isPlanSessionCompleted(
+                  planID: plan.id,
+                  sessionID: preview.sessionID,
+                  healthWorkouts: healthWorkouts,
+                  strengthHistory: strengthHistory
+              ),
+              let sourceDate = calendar.date(
+                  byAdding: .day,
+                  value: weekOffset * 7 + source.dayIndex - 1,
+                  to: start
+              ),
+              sourceDate >= calendar.startOfDay(for: referenceDate),
+              let destinationDate = calendar.date(
+                  byAdding: .day,
+                  value: weekOffset * 7 + destination.dayIndex - 1,
+                  to: start
+              ),
+              destinationDate > sourceDate else {
+            return false
+        }
+        return true
+    }
+
     static func inspect(
         plan: TrainingPlan,
         store: AppSessionStore,
