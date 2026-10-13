@@ -101,6 +101,27 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
     }
 
     @ViewBuilder
+    private func plannedDayButton(weekID: UUID, dayID: UUID) -> some View {
+        Button {
+            onSelect(weekID, dayID)
+        } label: {
+            Image(systemName: "arrow.up.right")
+                .font(.caption.weight(.semibold))
+                .frame(minWidth: 36, minHeight: 36)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(ATHLTHLocalization.choose(
+            english: "Open planned day",
+            norwegian: "Åpne planlagt dag"
+        ))
+        .accessibilityHint(ATHLTHLocalization.choose(
+            english: "Show the workouts and details for this day",
+            norwegian: "Vis øktene og detaljene for denne dagen"
+        ))
+    }
+
+    @ViewBuilder
     private func weekStatusSummary(
         _ weekStatus: ATHLTHPlanWeeklyFollowThrough.Week
     ) -> some View {
@@ -406,16 +427,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                     }
                                 }
                                 Spacer(minLength: 4)
-                                Button {
-                                    onSelect(week.id, day.id)
-                                } label: {
-                                    Image(systemName: "arrow.up.right")
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel(ATHLTHLocalization.choose(
-                                    english: "Open planned day",
-                                    norwegian: "Åpne planlagt dag"
-                                ))
+                                plannedDayButton(weekID: week.id, dayID: day.id)
                             }
                             .padding(.vertical, 5)
                         }
