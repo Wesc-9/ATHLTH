@@ -579,13 +579,18 @@ final class ATHLTHAppDelegate: NSObject,
     // APNs payloads are JSON. Serialize before crossing to MainActor so
     // Swift 6 does not transfer a non-Sendable [AnyHashable: Any] dictionary.
     // The original payload is reconstructed before dispatching notifications.
+    // UNUserNotificationCenter's async delegate completion must run on the
+    // main executor. A nonisolated async delegate can complete on a cooperative
+    // background executor and trigger UIKit's state-restoration assertion
+    // (_performBlockAfterCATransactionCommitSynchronizes) on iOS.
+    // Keep both async delegate entry points explicitly MainActor-isolated.
     nonisolated private func notificationPayload(
         _ userInfo: [AnyHashable: Any]
     ) -> Data? {
         try? JSONSerialization.data(withJSONObject: userInfo)
     }
 
-    nonisolated func userNotificationCenter(
+    @MainActor func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
@@ -607,7 +612,7 @@ final class ATHLTHAppDelegate: NSObject,
         return [.banner, .sound, .badge, .list]
     }
 
-    nonisolated func userNotificationCenter(
+    @MainActor func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
