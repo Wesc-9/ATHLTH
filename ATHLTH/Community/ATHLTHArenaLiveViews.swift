@@ -961,15 +961,30 @@ struct ATHLTHArenaSeasonsSection: View {
         }
     }
 
+    private func seasonStatusKind(
+        _ season: ATHLTHArenaClubSeason
+    ) -> ATHLTHArenaStatusKind {
+        switch ATHLTHArenaSeasonPresentation.phase(
+            startsOn: season.startsOn,
+            endsOn: season.endsOn,
+            today: ATHLTHArenaSeasonDate.sql(Date())
+        ) {
+        case .active: return .active
+        case .upcoming: return .upcoming
+        case .completed: return .completed
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 11) {
             HStack(spacing: 8) {
                 Image(systemName: "medal.star.fill")
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
                 Text(ATHLTHLocalization.choose(
                     english: "Club seasons", norwegian: "Klubbsesonger"
                 ))
-                .font(.headline)
+                .font(ATHLTHArenaLightStyle.editorialTitle(23))
+                .foregroundStyle(ATHLTHArenaLightStyle.ink)
                 Spacer()
                 if isLoading {
                     ProgressView().controlSize(.small)
@@ -1011,7 +1026,7 @@ struct ATHLTHArenaSeasonsSection: View {
                     norwegian: "Klubbsesonger samler godkjente poeng fra flere Arena-konkurranser. Klubbadministratorer kan opprette en sesong her."
                 ))
                 .font(.subheadline)
-                .foregroundStyle(ATHLTHTheme.mutedText)
+                .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                 .padding(14)
                 .background(ATHLTHArenaLightStyle.card(18))
             }
@@ -1031,21 +1046,22 @@ struct ATHLTHArenaSeasonsSection: View {
                             .font(.title3)
                             .frame(width: 42, height: 42)
                             .background(
-                                ATHLTHTheme.vitalitySoft.opacity(0.72),
+                                ATHLTHArenaLightStyle.soft,
                                 in: RoundedRectangle(cornerRadius: 14)
                             )
                         VStack(alignment: .leading, spacing: 4) {
                             Text(season.title)
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ATHLTHTheme.primaryText)
+                                .foregroundStyle(ATHLTHArenaLightStyle.ink)
                             Text(ATHLTHArenaSeasonDate.label(season.startsOn) +
                                  " – " +
                                  ATHLTHArenaSeasonDate.label(season.endsOn))
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
-                            Label(seasonState(season), systemImage: "calendar.badge.clock")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                            ATHLTHArenaStatusPill(
+                                kind: seasonStatusKind(season),
+                                title: seasonState(season)
+                            )
                         }
                         Spacer(minLength: 3)
                         Image(systemName: "chevron.right")
