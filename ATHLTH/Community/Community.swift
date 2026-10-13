@@ -1007,6 +1007,12 @@ final class SupabaseCommunityService {
             details
         )
             .filter { seen.insert($0.id).inserted }
+            .filter {
+                !CommunityEventExpiryPolicy.shouldAutoCancel(
+                    status: $0.status,
+                    startsAt: $0.startsAt
+                )
+            }
             .sorted { lhs, rhs in
                 let lhsUpcoming =
                     lhs.status == "upcoming" &&
@@ -1594,8 +1600,10 @@ final class CommunityEventStore: ObservableObject {
     var upcomingEvents: [CommunityEventItem] {
         events
             .filter {
-                $0.event.status == "upcoming" ||
-                $0.event.status == "live"
+                CommunityEventExpiryPolicy.shouldShowAsUpcoming(
+                    status: $0.event.status,
+                    startsAt: $0.event.startsAt
+                )
             }
             .sorted { lhs, rhs in
                 if lhs.event.status !=
