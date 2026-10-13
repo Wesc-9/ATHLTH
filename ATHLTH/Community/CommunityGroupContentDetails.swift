@@ -930,12 +930,18 @@ struct CommunityGroupChallengeDetailView: View {
             ) {
                 if canManageContent {
                     Menu {
-                        if current.status != "cancelled" {
+                        if ATHLTHCommunityChallengeEditingPolicy.canEdit(
+                            status: current.resolvedStatus,
+                            startsAt: current.startsAt
+                        ) {
                             Button {
                                 showingEdit = true
                             } label: {
                                 Label(
-                                    "Edit Challenge",
+                                    ATHLTHLocalization.choose(
+                                        english: "Edit Challenge",
+                                        norwegian: "Rediger utfordring"
+                                    ),
                                     systemImage: "pencil"
                                 )
                             }
