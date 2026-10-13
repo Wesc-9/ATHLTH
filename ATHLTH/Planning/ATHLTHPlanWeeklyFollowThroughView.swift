@@ -11,6 +11,8 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
     let onSelect: (UUID, UUID?) -> Void
     @State private var showsAll = false
     @State private var showsSuggestionPreview = false
+    @State private var showsMovePreview = false
+    @State private var movePreviewUnavailable = false
 
     var body: some View {
         let report = ATHLTHPlanWeeklyFollowThrough.inspect(
@@ -250,17 +252,65 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                             .font(.caption2)
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                             Button {
-                                onSelect(movePreview.weekID, movePreview.sourceDayID)
+                                showsMovePreview = true
                             } label: {
                                 Label(
                                     ATHLTHLocalization.choose(
-                                        english: "Inspect this workout",
-                                        norwegian: "Se gjennom denne økten"
+                                        english: "Review proposed move",
+                                        norwegian: "Se gjennom foreslått flytting"
                                     ),
                                     systemImage: "arrow.up.right"
                                 )
                             }
                             .buttonStyle(.bordered)
+                            .confirmationDialog(
+                                ATHLTHLocalization.choose(
+                                    english: "Proposed move — not saved",
+                                    norwegian: "Foreslått flytting – ikke lagret"
+                                ),
+                                isPresented: $showsMovePreview,
+                                titleVisibility: .visible
+                            ) {
+                                Button(ATHLTHLocalization.choose(
+                                    english: "Open workout in plan",
+                                    norwegian: "Åpne økten i planen"
+                                )) {
+                                    guard let latest = session.trainingPlan(withID: plan.id),
+                                          ATHLTHPlanWeeklyFollowThrough.validateMovePreview(
+                                              movePreview,
+                                              plan: latest,
+                                              store: session,
+                                              healthWorkouts: health.workouts,
+                                              strengthHistory: strength.workoutHistory
+                                          ) else {
+                                        movePreviewUnavailable = true
+                                        return
+                                    }
+                                    onSelect(movePreview.weekID, movePreview.sourceDayID)
+                                }
+                                Button(ATHLTHLocalization.choose(
+                                    english: "Cancel", norwegian: "Avbryt"
+                                ), role: .cancel) { }
+                            } message: {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Day \(movePreview.sourceDayIndex) → day \(movePreview.destinationDayIndex). Nothing is moved automatically.",
+                                    norwegian: "Dag \(movePreview.sourceDayIndex) → dag \(movePreview.destinationDayIndex). Ingenting flyttes automatisk."
+                                ))
+                            }
+                            .alert(
+                                ATHLTHLocalization.choose(
+                                    english: "Proposal no longer available",
+                                    norwegian: "Forslaget er ikke lenger tilgjengelig"
+                                ),
+                                isPresented: $movePreviewUnavailable
+                            ) {
+                                Button("OK", role: .cancel) { }
+                            } message: {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "The plan changed or the workout is no longer eligible.",
+                                    norwegian: "Planen er endret, eller økten kan ikke lenger flyttes."
+                                ))
+                            }
                         }
                         .foregroundStyle(ATHLTHPlanDesign.ink)
                     }

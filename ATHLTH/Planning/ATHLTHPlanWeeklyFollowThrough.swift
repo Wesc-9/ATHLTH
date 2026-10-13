@@ -132,6 +132,8 @@ enum ATHLTHPlanWeeklyFollowThrough {
             return nil
         }
         let today = calendar.startOfDay(for: referenceDate)
+        let allIDs = plan.weeks.flatMap { $0.days.flatMap { $0.sessions.map(\.id) } }
+        guard Set(allIDs).count == allIDs.count else { return nil }
         for (offset, week) in plan.weeks.enumerated() {
             let days = week.days.sorted { $0.dayIndex < $1.dayIndex }
             for (index, day) in days.enumerated() {
@@ -186,7 +188,9 @@ enum ATHLTHPlanWeeklyFollowThrough {
         referenceDate: Date = Date(),
         calendar: Calendar = .current
     ) -> Bool {
-        guard let start = plan.startDate.map({ calendar.startOfDay(for: $0) }),
+        let allIDs = plan.weeks.flatMap { $0.days.flatMap { $0.sessions.map(\.id) } }
+        guard Set(allIDs).count == allIDs.count,
+              let start = plan.startDate.map({ calendar.startOfDay(for: $0) }),
               let weekOffset = plan.weeks.firstIndex(where: { $0.id == preview.weekID }),
               let source = plan.weeks[weekOffset].days.first(where: {
                   $0.id == preview.sourceDayID && $0.dayIndex == preview.sourceDayIndex

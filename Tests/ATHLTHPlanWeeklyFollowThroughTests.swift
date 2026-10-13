@@ -341,6 +341,32 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
     }
 
     @MainActor
+    func testMovePreviewRejectsDuplicatedSessionIdentity() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let source = workout()
+        var duplicate = plan
+        duplicate.weeks[0].days[0].sessions = [source]
+        duplicate.weeks[0].days[2].sessions = [source]
+        XCTAssertNil(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
+            plan: duplicate, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: plan.startDate!
+        ))
+        let preview = ATHLTHPlanWeeklyFollowThrough.MovePreview(
+            weekID: duplicate.weeks[0].id,
+            sessionID: source.id,
+            sourceDayID: duplicate.weeks[0].days[0].id,
+            destinationDayID: duplicate.weeks[0].days[1].id,
+            sourceDayIndex: 1,
+            destinationDayIndex: 2
+        )
+        XCTAssertFalse(ATHLTHPlanWeeklyFollowThrough.validateMovePreview(
+            preview, plan: duplicate, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: plan.startDate!
+        ))
+    }
+
+    @MainActor
     func testDuplicateIdentitiesAreCountedOnlyOnce() throws {
         let (store, defaults, suite, plan) = try prepared(weekCount: 1)
         defer { defaults.removePersistentDomain(forName: suite) }
