@@ -4817,10 +4817,16 @@ final class CommunityGroupStore: ObservableObject {
 
 enum CommunityGroupsTab: String, CaseIterable, Identifiable {
     case overview = "Overview"
+    case activities = "Activities"
     case chat = "Chat"
+    // Historical entry points still resolve to the consolidated Activities tab.
     case events = "Events"
     case challenges = "Challenges"
     case members = "Members"
+
+    static let visibleTabs: [CommunityGroupsTab] = [
+        .overview, .activities, .chat, .members
+    ]
 
     var id: String { rawValue }
 
@@ -4834,6 +4840,10 @@ enum CommunityGroupsTab: String, CaseIterable, Identifiable {
         case .chat:
             return ATHLTHLocalization.choose(
                 english: "Chat", norwegian: "Chat"
+            )
+        case .activities:
+            return ATHLTHLocalization.choose(
+                english: "Activities", norwegian: "Aktiviteter"
             )
         case .events:
             return ATHLTHLocalization.choose(
@@ -6558,16 +6568,20 @@ struct CommunityGroupDetailView: View {
 
     @State private var selectedTab: CommunityGroupsTab
     @State private var tabIndicator: CommunityGroupsTab
+    @State private var activityCategory: CommunityGroupActivityCategory = .events
 
     init(
         group: CommunityGroupRecord,
         initialTab: CommunityGroupsTab = .overview
     ) {
         self.group = group
-        _selectedTab =
-            State(initialValue: initialTab)
-        _tabIndicator =
-            State(initialValue: initialTab)
+        let resolved: CommunityGroupsTab =
+            initialTab == .events || initialTab == .challenges ? .activities : initialTab
+        _selectedTab = State(initialValue: resolved)
+        _tabIndicator = State(initialValue: resolved)
+        _activityCategory = State(
+            initialValue: initialTab == .challenges ? .challenges : .events
+        )
     }
     @State private var messageDraft = ""
     @State private var selectedChatPhoto: PhotosPickerItem?
@@ -6694,12 +6708,14 @@ struct CommunityGroupDetailView: View {
                                     switch selectedTab {
                                     case .overview:
                                         overview
+                                    case .activities:
+                                        clubActivities
                                     case .chat:
                                         EmptyView()
                                     case .events:
-                                        events
+                                        clubActivities
                                     case .challenges:
-                                        challenges
+                                        clubActivities
                                     case .members:
                                         EmptyView() // Shown in its own scrolling list.
                                     }
@@ -6845,16 +6861,24 @@ struct CommunityGroupDetailView: View {
     private func selectTab(
         _ tab: CommunityGroupsTab
     ) {
-        if selectedTab != tab {
+        if tab == .events {
+            activityCategory = .events
+        } else if tab == .challenges {
+            activityCategory = .challenges
+        }
+        let resolved: CommunityGroupsTab =
+            tab == .events || tab == .challenges ? .activities : tab
+
+        if selectedTab != resolved {
             var transaction = Transaction()
             transaction.disablesAnimations = true
 
             withTransaction(transaction) {
-                selectedTab = tab
+                selectedTab = resolved
             }
         }
 
-        guard tabIndicator != tab else {
+        guard tabIndicator != resolved else {
             return
         }
 
@@ -6863,14 +6887,40 @@ struct CommunityGroupDetailView: View {
                 duration: 0.14
             )
         ) {
-            tabIndicator = tab
+            tabIndicator = resolved
+        }
+    }
+
+    private var clubActivities: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Picker(
+                ATHLTHLocalization.choose(
+                    english: "Club activity type", norwegian: "Type klubbaktivitet"
+                ),
+                selection: $activityCategory
+            ) {
+                ForEach(CommunityGroupActivityCategory.allCases) { category in
+                    Text(category.localizedTitle).tag(category)
+                }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Select events or challenges",
+                norwegian: "Velg arrangementer eller utfordringer"
+            ))
+
+            if activityCategory == .events {
+                events
+            } else {
+                challenges
+            }
         }
     }
 
     private var groupAreaPicker: some View {
         HStack(spacing: 3) {
             ForEach(
-                CommunityGroupsTab.allCases
+                CommunityGroupsTab.visibleTabs
             ) { tab in
                 Button {
                     // Swap heavy tab content outside an animation transaction.
