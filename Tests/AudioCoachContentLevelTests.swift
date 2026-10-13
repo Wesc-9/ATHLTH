@@ -86,6 +86,23 @@ final class AudioCoachContentLevelTests: XCTestCase {
         XCTAssertNil(ATHLTHCoachContentLevel.matching(custom))
     }
 
+    func testExperiencePresetsHavePredictableContentAndCadence() {
+        let calm = ATHLTHCoachExperiencePreset.calm
+        let balanced = ATHLTHCoachExperiencePreset.balanced
+        let active = ATHLTHCoachExperiencePreset.active
+
+        XCTAssertEqual(ATHLTHCoachExperiencePreset.allCases.count, 3)
+        XCTAssertEqual(calm.contentLevel, .simple)
+        XCTAssertEqual(balanced.contentLevel, .standard)
+        XCTAssertEqual(active.contentLevel, .advanced)
+        XCTAssertEqual(calm.speechStyle, .minimal)
+        XCTAssertEqual(balanced.speechStyle, .balanced)
+        XCTAssertEqual(active.speechStyle, .motivating)
+        XCTAssertEqual(calm.distanceIntervalKilometers, 2.0)
+        XCTAssertEqual(balanced.distanceIntervalKilometers, 1.0)
+        XCTAssertEqual(active.distanceIntervalKilometers, 0.5)
+    }
+
     func testApplyingContentPresetNeverEnablesDisabledSession() {
         let original = WatchAudioCoachConfiguration.disabled
         for level in ATHLTHCoachContentLevel.allCases {
