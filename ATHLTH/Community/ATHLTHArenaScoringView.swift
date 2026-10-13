@@ -412,7 +412,8 @@ struct ATHLTHArenaScoringSection: View {
                 Text(ATHLTHLocalization.choose(
                     english: "Overall standings", norwegian: "Sammenlagtstilling"
                 ))
-                .font(.headline)
+                .font(ATHLTHArenaLightStyle.editorialTitle(23))
+                .foregroundStyle(ATHLTHArenaLightStyle.ink)
                 Spacer()
                 if loading {
                     ProgressView().controlSize(.small)
@@ -445,7 +446,7 @@ struct ATHLTHArenaScoringSection: View {
                 HStack(spacing: 12) {
                     Text(rank.map { "\($0)." } ?? "–")
                         .font(.headline.monospacedDigit())
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                         .frame(width: 27)
                     Image(systemName: member.isDeleted
                           ? "person.crop.circle.badge.xmark"
@@ -453,14 +454,14 @@ struct ATHLTHArenaScoringSection: View {
                         .foregroundStyle(member.isDeleted ? Color.gray : ATHLTHTheme.accentDeep)
                     Text(memberName(member))
                         .font(.subheadline.weight(rank == 1 ? .semibold : .regular))
-                        .foregroundStyle(member.isDeleted ? Color.gray : ATHLTHTheme.primaryText)
+                        .foregroundStyle(member.isDeleted ? Color.gray : ATHLTHArenaLightStyle.ink)
                     Spacer()
                     Text("\(ATHLTHArenaSeriesScorePresentation.visiblePoints(member.points).formatted()) p")
                         .font(.subheadline.weight(.bold).monospacedDigit())
-                        .foregroundStyle(member.isDeleted ? Color.gray : ATHLTHTheme.primaryText)
+                        .foregroundStyle(member.isDeleted ? Color.gray : ATHLTHArenaLightStyle.ink)
                 }
                 .padding(12)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .background(ATHLTHArenaLightStyle.card(16))
             }
 
             if series.status == "draft" {
@@ -830,7 +831,7 @@ struct ATHLTHArenaScoringSection: View {
                     norwegian: "Nylige runderesultater"
                 ))
                 .font(.subheadline.weight(.bold))
-                .foregroundStyle(ATHLTHTheme.primaryText)
+                .foregroundStyle(ATHLTHArenaLightStyle.ink)
                 Spacer(minLength: 0)
                 if hasMoreResultHistory {
                     Button {
@@ -932,12 +933,15 @@ struct ATHLTHArenaScoringSection: View {
                             )
                         )
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .foregroundStyle(ATHLTHArenaLightStyle.ink)
                         .lineLimit(2)
 
-                        Text(historyTitle(state))
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(historyColor(state))
+                        ATHLTHArenaStatusPill(
+                            kind: ATHLTHArenaStatusPresentation.result(
+                                status: result.status
+                            ),
+                            title: historyTitle(state)
+                        )
 
                         if state == .approved,
                            let personalSlotID = personalStanding?.slotID,
@@ -1140,19 +1144,14 @@ struct ATHLTHArenaScoringSection: View {
             HStack {
                 Text(round.title)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .foregroundStyle(ATHLTHArenaLightStyle.ink)
                 Spacer()
                 if let result {
-                    Text(result.status == "approved"
-                         ? ATHLTHLocalization.choose(english: "Approved", norwegian: "Godkjent")
-                         : result.status == "expired"
-                            ? ATHLTHLocalization.choose(english: "Expired", norwegian: "Utløpt")
-                            : result.status == "rejected"
-                              ? ATHLTHLocalization.choose(english: "Rejected", norwegian: "Avvist")
-                              : ATHLTHLocalization.choose(english: "Pending", norwegian: "Venter"))
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(result.status == "approved"
-                                         ? Color.green : ATHLTHTheme.accentDeep)
+                    ATHLTHArenaStatusPill(
+                        kind: ATHLTHArenaStatusPresentation.result(
+                            status: result.status
+                        )
+                    )
                 }
             }
             let roundEvidence = linkedWorkouts.filter { $0.roundID == round.id }
@@ -1246,7 +1245,7 @@ struct ATHLTHArenaScoringSection: View {
             }
         }
         .padding(14)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 17))
+        .background(ATHLTHArenaLightStyle.card(17))
     }
 
     /// This only checks for a discrepancy in complete, unambiguous shared
