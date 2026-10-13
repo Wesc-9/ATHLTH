@@ -741,6 +741,41 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
     }
 
     @MainActor
+    func testExplicitlyTimedWorkoutIsNeverSuggestedForMoving() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var timed = workout()
+        timed.scheduledStart = Calendar.current.date(
+            byAdding: .hour, value: 18, to: plan.startDate!
+        )
+        store.addSession(timed, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(workout(), toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertNil(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: plan.startDate!
+        ))
+    }
+
+    @MainActor
+    func testMovePreviewIsNotOfferedForPastWorkout() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        store.addSession(workout(), toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(workout(), toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let nextDay = try XCTUnwrap(Calendar.current.date(
+            byAdding: .day, value: 1, to: plan.startDate!
+        ))
+        // Day 1 is now in the past, and day 2 has no occupied
+        // neighboring day after excluding day 1 from consideration.
+        XCTAssertNil(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: nextDay
+        ))
+    }
+
+    @MainActor
     func testDuplicateIdentitiesAreCountedOnlyOnce() throws {
         let (store, defaults, suite, plan) = try prepared(weekCount: 1)
         defer { defaults.removePersistentDomain(forName: suite) }
