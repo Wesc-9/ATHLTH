@@ -11,8 +11,14 @@ enum ExerciseLibrarySection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .library: return "Library"
-        case .mine: return "My Exercises"
+        case .library:
+            return ATHLTHLocalization.choose(
+                english: "ATHLTH Library", norwegian: "ATHLTH-bibliotek"
+            )
+        case .mine:
+            return ATHLTHLocalization.choose(
+                english: "My Exercises", norwegian: "Mine øvelser"
+            )
         }
     }
 }
@@ -186,8 +192,10 @@ struct ExerciseLibraryView: View {
 
             if selectedSection == .library &&
                 library.isLoading &&
-                library.repDBExercises.isEmpty {
-                ProgressView("Loading exercise library…")
+                library.athlthCatalogExercises.isEmpty {
+                ProgressView(ATHLTHLocalization.choose(
+                    english: "Loading exercises…", norwegian: "Laster øvelser…"
+                ))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if results.isEmpty {
                 if selectedSection == .mine && query.isEmpty {
@@ -817,7 +825,8 @@ struct ExerciseDetailView: View {
                     .foregroundStyle(.secondary)
                 }
 
-                if let summary = entry.summary, !summary.isEmpty {
+                if let summary = library.localizedExerciseSummary(entry),
+                   !summary.isEmpty {
                     Text(summary)
                         .font(.subheadline)
                 }
