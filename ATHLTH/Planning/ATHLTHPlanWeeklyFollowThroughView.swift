@@ -234,8 +234,8 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                     .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "\(weekStatus.completed) completed, \(weekStatus.needsReview) need review, \(weekStatus.skipped) skipped",
-                        norwegian: "\(weekStatus.completed) fullført, \(weekStatus.needsReview) trenger gjennomgang, \(weekStatus.skipped) hoppet over"
+                        english: "\(weekStatus.completed) completed, \(weekStatus.upcoming) upcoming, \(weekStatus.needsReview) need review, \(weekStatus.skipped) skipped",
+                        norwegian: "\(weekStatus.completed) fullført, \(weekStatus.upcoming) kommende, \(weekStatus.needsReview) trenger gjennomgang, \(weekStatus.skipped) hoppet over"
                     ))
                     ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
                         if !day.sessions.isEmpty {
@@ -272,8 +272,9 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                                                 to: calendar.startOfDay(for: start)
                                             )
                                         }
+                                        let effectiveDate = workout.scheduledStart ?? dayDate
                                         let needsReview = !completed && !skipped
-                                            && (dayDate.map { $0 < today } ?? false)
+                                            && (effectiveDate.map { calendar.startOfDay(for: $0) < today } ?? false)
                                         if needsReview {
                                             Button {
                                                 onSelect(week.id, day.id)
