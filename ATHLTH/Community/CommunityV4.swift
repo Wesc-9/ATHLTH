@@ -141,26 +141,9 @@ struct ATHLTHCommunityV4View: View {
         }
     }
 
-    private var discoveryGroups:
-        [CommunityGroupRecord] {
-        let joined = groups.groups.filter {
-            groups.joinedGroupIDs.contains($0.id)
-        }
-        let publicUnjoined = publicDiscoveryGroups
-
-        return Array(
-            (joined + publicUnjoined)
-                .reduce(
-                    into: [CommunityGroupRecord]()
-                ) { result, group in
-                    if !result.contains(
-                        where: { $0.id == group.id }
-                    ) {
-                        result.append(group)
-                    }
-                }
-                .prefix(5)
-        )
+    // Discovery should show new clubs, not repeat clubs already joined.
+    private var discoveryGroups: [CommunityGroupRecord] {
+        Array(publicDiscoveryGroups.prefix(5))
     }
 
     private var publicDiscoveryGroups:
@@ -242,11 +225,14 @@ struct ATHLTHCommunityV4View: View {
                         )
                     }
 
+                    // Four distinct destinations, no second Challenge/Arena shortcut.
+                    CommunityReferenceQuickActions()
+
+                    referenceUpcomingSection
                     referenceWeeklyChallengeSection
                     referenceFriendsVsFriendsSection
 
-                    // Arena is distinct from both Weekly Challenge and
-                    // the existing one-off friends/challenge workflows.
+                    // Arena remains the dedicated competitive experience.
                     NavigationLink {
                         ATHLTHArenaHomeView()
                     } label: {
@@ -254,10 +240,7 @@ struct ATHLTHCommunityV4View: View {
                     }
                     .buttonStyle(.plain)
 
-                    CommunityReferenceQuickActions()
-
                     referenceRecentActivitySection
-                    referenceUpcomingSection
                     referenceDiscoverySection
                 }
                 .padding(.horizontal, 14)
@@ -760,74 +743,42 @@ struct ATHLTHCommunityV4View: View {
         }
     }
 
+    private var agendaEntries: [ATHLTHCommunityAgendaEntry] {
+        ATHLTHCommunityAgendaPolicy.entries(
+            events: joinedUpcomingEvents,
+            clubEvents: groups.calendarEvents,
+            clubRSVPs: groups.calendarEventRSVPs,
+            clubs: groups.groups,
+            challenges: joinedUpcomingChallenges,
+            userID: session.profile.userID
+        )
+    }
+
     @ViewBuilder
     private var referenceUpcomingSection: some View {
-        if !joinedUpcomingEvents.isEmpty ||
-            !joinedUpcomingChallenges.isEmpty {
+        let items = agendaEntries
+        if !items.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 CommunityReferenceSectionTitle(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english: "Upcoming",
-                            norwegian: "Kommende"
-                        ),
-                    destinationTitle:
-                        ATHLTHLocalization.choose(
-                            english: "See all",
-                            norwegian: "Se alle"
-                        ),
+                    title: ATHLTHLocalization.choose(
+                        english: "Upcoming", norwegian: "Kommende"
+                    ),
+                    destinationTitle: ATHLTHLocalization.choose(
+                        english: "See all", norwegian: "Se alle"
+                    ),
                     destination: {
-                        AnyView(
-                            CommunityEventsView()
-                        )
+                        AnyView(ATHLTHCommunityAgendaView(entries: items))
                     }
                 )
 
-                ScrollView(
-                    .horizontal,
-                    showsIndicators: false
-                ) {
+                ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: 9) {
-                        ForEach(
-                            joinedUpcomingEvents
-                                .prefix(3)
-                        ) { event in
+                        ForEach(Array(items.prefix(4))) { entry in
                             NavigationLink {
-                                CommunityEventDetailView(
-                                    eventID: event.id
-                                )
+                                entry.destinationView
                             } label: {
-                                CommunityReferenceUpcomingEventCard(
-                                    item: event
-                                )
-                                .frame(width: 252)
-                            }
-                            .buttonStyle(.plain)
-                        }
-
-                        ForEach(
-                            joinedUpcomingChallenges
-                                .prefix(3)
-                        ) { challenge in
-                            NavigationLink {
-                                ChallengeDetailView(
-                                    challengeID:
-                                        challenge.id
-                                )
-                            } label: {
-                                CommunityDiscoveryNowRow(
-                                    eyebrow:
-                                        ATHLTHLocalization.choose(
-                                            english: "JOINED CHALLENGE",
-                                            norwegian: "PÅMELDT CHALLENGE"
-                                        ),
-                                    title: challenge.title,
-                                    detail: challenge.sport.title,
-                                    icon:
-                                        challenge.sport.systemImage,
-                                    tint: .orange
-                                )
-                                .frame(width: 260)
+                                ATHLTHCommunityAgendaRow(entry: entry)
+                                    .frame(width: 264)
                             }
                             .buttonStyle(.plain)
                         }
@@ -1273,6 +1224,7 @@ struct ATHLTHCommunityV4View: View {
 
 private struct CommunityReferenceHeader: View {
     let canManageWeekly: Bool
+    @State private var showingCreateEvent = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -1306,20 +1258,44 @@ private struct CommunityReferenceHeader: View {
             Spacer(minLength: 4)
 
             HStack(spacing: 8) {
+                NavigationLink {
+                    MessageInboxDestinationView()
+                } label: {
+                    button(icon: "bubble.left.and.bubble.right", badge: 0)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Inbox", norwegian: "Innboks"
+                ))
+
+                Button {
+                    showingCreateEvent = true
+                } label: {
+                    button(icon: "plus", badge: 0)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Create event", norwegian: "Opprett arrangement"
+                ))
+
                 if canManageWeekly {
                     NavigationLink {
                         OfficialWeeklyChallengeAdminListView()
                     } label: {
-                        button(
-                            icon: "slider.horizontal.3",
-                            badge: 0
-                        )
+                        button(icon: "slider.horizontal.3", badge: 0)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Manage weekly challenges",
+                        norwegian: "Administrer ukesutfordringer"
+                    ))
                 }
             }
         }
         .padding(.bottom, 1)
+        .sheet(isPresented: $showingCreateEvent) {
+            CommunityEventCreateView()
+        }
     }
 
     private func button(
@@ -3571,93 +3547,55 @@ private struct CommunityDiscoveryDivider:
 }
 
 private struct CommunityReferenceQuickActions: View {
-    @State private var showingCreateEvent = false
-
     var body: some View {
-        HStack(spacing: 8) {
-            NavigationLink {
-                CommunityGroupsView()
-            } label: {
-                tile(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english: "Clubs",
-                            norwegian: "Klubber"
-                        ),
-                    detail:
-                        ATHLTHLocalization.choose(
-                            english: "Explore",
-                            norwegian: "Utforsk"
-                        ),
-                    icon:
-                        "person.3.fill",
-                    tint: .green
-                )
-            }
-            .buttonStyle(.plain)
-
-            NavigationLink {
-                ATHLTHArenaHomeView()
-            } label: {
-                tile(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english: "Challenge",
-                            norwegian: "Challenge"
-                        ),
-                    detail:
-                        ATHLTHLocalization.choose(
-                            english: "Create",
-                            norwegian: "Opprett"
-                        ),
-                    icon: "trophy.fill",
-                    tint: .orange
-                )
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                showingCreateEvent = true
-            } label: {
-                tile(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english: "Event",
-                            norwegian: "Event"
-                        ),
-                    detail:
-                        ATHLTHLocalization.choose(
-                            english: "Create",
-                            norwegian: "Opprett"
-                        ),
-                    icon: "calendar.badge.plus",
-                    tint: .blue
-                )
-            }
-            .buttonStyle(.plain)
-
+        HStack(spacing: 9) {
             NavigationLink {
                 TrainTogetherMarketplaceView()
             } label: {
                 tile(
-                    title: "Train Together",
-                    detail:
-                        ATHLTHLocalization.choose(
-                            english: "Join a workout",
-                            norwegian: "Tren sammen"
-                        ),
-                    icon:
-                        "person.2.wave.2.fill",
-                    tint:
-                        ATHLTHTheme.accentDeep
+                    title: ATHLTHLocalization.choose(
+                        english: "Train together", norwegian: "Tren sammen"
+                    ),
+                    detail: ATHLTHLocalization.choose(
+                        english: "Find a session", norwegian: "Finn en økt"
+                    ),
+                    icon: "figure.run.circle",
+                    tint: ATHLTHTheme.accentDeep
                 )
             }
             .buttonStyle(.plain)
-        }
-        .sheet(
-            isPresented: $showingCreateEvent
-        ) {
-            CommunityEventCreateView()
+
+            NavigationLink {
+                CommunityGroupsView()
+            } label: {
+                tile(
+                    title: ATHLTHLocalization.choose(
+                        english: "Clubs", norwegian: "Klubber"
+                    ),
+                    detail: ATHLTHLocalization.choose(
+                        english: "Your community", norwegian: "Ditt fellesskap"
+                    ),
+                    icon: "person.3",
+                    tint: ATHLTHTheme.accentDeep
+                )
+            }
+            .buttonStyle(.plain)
+
+            NavigationLink {
+                CommunityDiscoveryView()
+            } label: {
+                tile(
+                    title: ATHLTHLocalization.choose(
+                        english: "Explore", norwegian: "Utforsk"
+                    ),
+                    detail: ATHLTHLocalization.choose(
+                        english: "Find something new", norwegian: "Oppdag mer"
+                    ),
+                    icon: "safari",
+                    tint: ATHLTHTheme.accentDeep
+                )
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -3667,72 +3605,42 @@ private struct CommunityReferenceQuickActions: View {
         icon: String,
         tint: Color
     ) -> some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 7) {
             Image(systemName: icon)
-                .font(
-                    .system(
-                        size: 18,
-                        weight: .semibold
-                    )
-                )
+                .font(.system(size: 19, weight: .medium))
                 .foregroundStyle(tint)
-                .frame(
-                    width: 35,
-                    height: 35
-                )
+                .frame(width: 42, height: 42)
                 .background(
-                    tint.opacity(0.10),
-                    in:
-                        RoundedRectangle(
-                            cornerRadius: 11,
-                            style:
-                                .continuous
-                        )
+                    tint.opacity(0.085),
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
                 )
+                .accessibilityHidden(true)
 
             Text(title)
-                .font(
-                    .caption.weight(
-                        .bold
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .primaryText
-                )
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
 
             Text(detail)
-                .font(.system(size: 9))
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
+                .font(.system(size: 10))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 .lineLimit(1)
-                .minimumScaleFactor(0.70)
+                .minimumScaleFactor(0.75)
         }
-        .frame(
-            maxWidth: .infinity,
-            minHeight: 78
-        )
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 101)
+        .padding(.vertical, 10)
         .background(
-            Color.white.opacity(0.90),
-            in:
-                RoundedRectangle(
-                    cornerRadius: 17,
-                    style: .continuous
-                )
+            ATHLTHPlanDesign.surface,
+            in: RoundedRectangle(cornerRadius: ATHLTHPlanDesign.cardRadius)
         )
         .overlay {
-            RoundedRectangle(
-                cornerRadius: 17,
-                style: .continuous
-            )
-            .stroke(
-                tint.opacity(0.08),
-                lineWidth: 0.7
-            )
+            RoundedRectangle(cornerRadius: ATHLTHPlanDesign.cardRadius)
+                .stroke(ATHLTHPlanDesign.outline, lineWidth: 0.8)
         }
+        .contentShape(RoundedRectangle(cornerRadius: ATHLTHPlanDesign.cardRadius))
+        .accessibilityElement(children: .combine)
     }
 }
 
