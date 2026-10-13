@@ -4251,6 +4251,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         updateGhostRace(
             traveledAlongRoute:
                 guidance.traveledAlongRouteMeters,
+            deviationMeters:
+                guidance.deviationMeters,
             userLocation:
                 location
         )
@@ -4303,12 +4305,23 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     private func updateGhostRace(
         traveledAlongRoute: Double,
+        deviationMeters: Double,
         userLocation: CLLocation
     ) {
-        guard let ghost =
-                ghostRaceConfiguration,
-              !ghost.points.isEmpty
-        else {
+        guard let ghost = ghostRaceConfiguration,
+              !ghost.points.isEmpty else { return }
+
+        // Never display or announce a fresh pass on unreliable Watch GPS.
+        // The user keeps recording while the Ghost comparison waits.
+        guard userLocation.horizontalAccuracy >= 0,
+              userLocation.horizontalAccuracy <= 50,
+              deviationMeters.isFinite,
+              (0...80).contains(deviationMeters) else {
+            publish {
+                self.ghostDistanceDeltaMeters = nil
+                self.ghostTimeDeltaSeconds = nil
+                self.ghostComparisonUpdatedAt = nil
+            }
             return
         }
 
