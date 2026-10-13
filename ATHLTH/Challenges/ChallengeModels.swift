@@ -482,6 +482,48 @@ struct ATHLTHChallenge: Identifiable, Codable, Hashable {
         self.rulesLockedAt = rulesLockedAt
     }
 
+    // The first opponent must explicitly accept before any workout can score.
+    // Start time is based on the actual accepted response, never invite time.
+    var scoringStartDate: Date? {
+        guard status != .draft, status != .cancelled,
+              let acceptedAt = participants
+                .filter { $0.state == .accepted && $0.userID != creatorID }
+                .compactMap(\.respondedAt)
+                .min()
+        else { return nil }
+        return max(rules.startsAt, acceptedAt)
+    }
+
+    func scoringStartDate(for participantID: UUID) -> Date? {
+        guard let start = scoringStartDate,
+              let person = participants.first(where: { $0.id == participantID })
+        else { return nil }
+        switch person.state {
+        case .creator:
+            return start
+        case .accepted:
+            guard let acceptedAt = person.respondedAt else { return nil }
+            return max(start, acceptedAt)
+        case .invited, .declined, .withdrawn:
+            return nil
+        }
+    }
+
+    func canCountWorkout(startedAt: Date, participantID: UUID) -> Bool {
+        guard let start = scoringStartDate(for: participantID),
+              startedAt >= start else { return false }
+        return rules.endsAt.map { startedAt <= $0 } ?? true
+    }
+
+    func countsAttempt(_ attempt: ChallengeAttempt) -> Bool {
+        guard attempt.challengeID == id, attempt.isEligible else { return false }
+        let performedAt = attempt.verification == .manual
+            ? attempt.submittedAt
+            : attempt.startedAt
+        guard let performedAt else { return false }
+        return canCountWorkout(startedAt: performedAt, participantID: attempt.participantID)
+    }
+
     var rulesAreLocked: Bool {
         rulesLockedAt != nil ||
         (rules.lockRulesAtStart && Date() >= rules.startsAt)
