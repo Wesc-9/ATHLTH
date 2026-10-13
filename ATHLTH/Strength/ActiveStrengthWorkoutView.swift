@@ -1,3 +1,4 @@
+import AVKit
 import SwiftUI
 import UIKit
 
@@ -4110,6 +4111,12 @@ struct ActiveStrengthWorkoutView: View {
         return nil
     }
 
+    private func focusedExerciseVideoURL(_ exercise: StrengthExerciseLog) -> URL? {
+        // Snapshots preserve demonstrations even when a custom exercise changes.
+        exercise.exercise.videoURL ??
+            focusedExerciseLibraryEntry(exercise)?.exercise.videoURL
+    }
+
     private func focusedExerciseInstructionDisclosure(
         _ exercise: StrengthExerciseLog
     ) -> some View {
@@ -4125,6 +4132,7 @@ struct ActiveStrengthWorkoutView: View {
             focusedExerciseSummary(
                 exercise
             )
+        let demoURL = focusedExerciseVideoURL(exercise)
 
         return VStack(spacing: 0) {
             Button {
@@ -4258,6 +4266,27 @@ struct ActiveStrengthWorkoutView: View {
                     alignment: .leading,
                     spacing: 12
                 ) {
+                    if let demoURL {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Demonstration",
+                                    norwegian: "Demonstrasjon"
+                                ),
+                                systemImage: "play.rectangle"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+
+                            // Play only when instructions are expanded, never automatically
+                            // while the athlete is recording or resting.
+                            VideoPlayer(player: AVPlayer(url: demoURL))
+                                .frame(height: 190)
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                .id(demoURL)
+                        }
+                    }
+
                     if let summary {
                         Text(summary)
                             .font(.caption)
@@ -4388,7 +4417,8 @@ struct ActiveStrengthWorkoutView: View {
                         }
                     }
 
-                    if summary == nil &&
+                    if demoURL == nil &&
+                        summary == nil &&
                         steps.isEmpty &&
                         tips.isEmpty {
                         Text(
