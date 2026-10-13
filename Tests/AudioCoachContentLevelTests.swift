@@ -103,6 +103,35 @@ final class AudioCoachContentLevelTests: XCTestCase {
         XCTAssertEqual(active.distanceIntervalKilometers, 0.5)
     }
 
+    func testRunningExperiencePreservesVoiceAndAppliesFrequency() {
+        for preset in ATHLTHCoachExperiencePreset.allCases {
+            var draft = AudioCoachDraft()
+            draft.language = .norwegian
+            draft.voiceIdentifier = "my-favorite-voice"
+            draft.speechRate = 0.55
+            draft.speechVolume = 0.7
+            draft.duckOtherAudio = false
+            draft.timeTriggerEnabled = true
+
+            draft.applyExperience(preset)
+
+            XCTAssertTrue(draft.enabled)
+            XCTAssertTrue(draft.distanceTriggerEnabled)
+            XCTAssertFalse(draft.timeTriggerEnabled)
+            XCTAssertEqual(
+                draft.distanceIntervalKilometers,
+                preset.distanceIntervalKilometers
+            )
+            XCTAssertEqual(draft.experiencePreset, preset)
+            XCTAssertEqual(draft.speechStyle, preset.speechStyle)
+            XCTAssertEqual(draft.voiceIdentifier, "my-favorite-voice")
+            XCTAssertEqual(draft.language, .norwegian)
+            XCTAssertEqual(draft.speechRate, 0.55)
+            XCTAssertEqual(draft.speechVolume, 0.7)
+            XCTAssertFalse(draft.duckOtherAudio)
+        }
+    }
+
     func testApplyingContentPresetNeverEnablesDisabledSession() {
         let original = WatchAudioCoachConfiguration.disabled
         for level in ATHLTHCoachContentLevel.allCases {
