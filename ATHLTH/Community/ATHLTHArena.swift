@@ -1099,14 +1099,16 @@ struct ATHLTHArenaHomeView: View {
 
     private var simpleQuickStart: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Image("GoalRunning")
-                .resizable()
-                .scaledToFill()
-                .saturation(0.55)
-                .frame(height: 124)
-                .frame(maxWidth: .infinity)
-                .clipped()
-                .accessibilityHidden(true)
+            GeometryReader { geometry in
+                Image("GoalRunning")
+                    .resizable()
+                    .scaledToFill()
+                    .saturation(0.55)
+                    .frame(width: geometry.size.width, height: 124)
+                    .clipped()
+                    .accessibilityHidden(true)
+            }
+            .frame(height: 124)
 
             VStack(alignment: .leading, spacing: 13) {
                 Text(ATHLTHLocalization.choose(
@@ -1411,21 +1413,25 @@ private struct ATHLTHArenaDistanceStarter: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 18) {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "Choose any distance",
-                        norwegian: "Bestem distansen selv"
-                    ),
-                    systemImage: "figure.run"
-                )
-                .font(.title2.weight(.bold))
+                VStack(alignment: .leading, spacing: 7) {
+                    Text("ATHLTH · ARENA")
+                        .font(ATHLTHArenaLightStyle.eyebrow)
+                        .tracking(2)
+                        .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose your distance",
+                        norwegian: "Velg din distanse"
+                    ))
+                    .font(ATHLTHArenaLightStyle.editorialTitle(30))
+                    .foregroundStyle(ATHLTHArenaLightStyle.ink)
+                }
 
                 Text(ATHLTHLocalization.choose(
                     english: "Compete on any route over the chosen distance.",
                     norwegian: "Konkurrer hvor som helst på distansen du bestemmer."
                 ))
                 .font(.subheadline)
-                .foregroundStyle(ATHLTHTheme.mutedText)
+                .foregroundStyle(ATHLTHArenaLightStyle.secondary)
 
                 HStack(spacing: 8) {
                     ForEach([1.0, 3.0, 5.0, 10.0], id: \.self) { km in
@@ -1445,9 +1451,10 @@ private struct ATHLTHArenaDistanceStarter: View {
                     .keyboardType(.decimalPad)
                     .font(.title2.weight(.semibold))
                     .padding(13)
-                    .background(.white, in: RoundedRectangle(cornerRadius: 14))
+                    .background(ATHLTHArenaLightStyle.surface,
+                                in: RoundedRectangle(cornerRadius: 14))
                     Text("km")
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                 }
                 if distanceKilometers == nil {
                     Text(ATHLTHLocalization.choose(
