@@ -19,6 +19,31 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
     @State private var showsIntensityPreview = false
     @State private var showsTrainingDetails = false
 
+    @ViewBuilder
+    private func weekStatusSummary(
+        _ weekStatus: ATHLTHPlanWeeklyFollowThrough.Week
+    ) -> some View {
+        HStack(spacing: 12) {
+            Label("\(weekStatus.completed)", systemImage: "checkmark.circle.fill")
+            Label("\(weekStatus.upcoming)", systemImage: "calendar")
+            if weekStatus.needsReview > 0 {
+                Label("\(weekStatus.needsReview)", systemImage: "questionmark.circle")
+            }
+            if weekStatus.skipped > 0 {
+                Label("\(weekStatus.skipped)", systemImage: "minus.circle")
+            }
+            if weekStatus.unknownDate > 0 {
+                Label("\(weekStatus.unknownDate)", systemImage: "calendar.badge.questionmark")
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+        .accessibilityLabel(ATHLTHLocalization.choose(
+            english: "\(weekStatus.completed) completed, \(weekStatus.upcoming) upcoming, \(weekStatus.needsReview) need review, \(weekStatus.skipped) skipped, \(weekStatus.unknownDate) unscheduled",
+            norwegian: "\(weekStatus.completed) fullført, \(weekStatus.upcoming) kommende, \(weekStatus.needsReview) trenger gjennomgang, \(weekStatus.skipped) hoppet over, \(weekStatus.unknownDate) uten dato"
+        ))
+    }
+
     var body: some View {
         // Always use the persisted plan rather than a possibly stale
         // value captured when the parent first presented this screen.
@@ -221,25 +246,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                     }
                     .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    HStack(spacing: 12) {
-                        Label("\(weekStatus.completed)", systemImage: "checkmark.circle.fill")
-                        Label("\(weekStatus.upcoming)", systemImage: "calendar")
-                        if weekStatus.needsReview > 0 {
-                            Label("\(weekStatus.needsReview)", systemImage: "questionmark.circle")
-                        }
-                        if weekStatus.skipped > 0 {
-                            Label("\(weekStatus.skipped)", systemImage: "minus.circle")
-                        }
-                        if weekStatus.unknownDate > 0 {
-                            Label("\(weekStatus.unknownDate)", systemImage: "calendar.badge.questionmark")
-                        }
-                    }
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "\(weekStatus.completed) completed, \(weekStatus.upcoming) upcoming, \(weekStatus.needsReview) need review, \(weekStatus.skipped) skipped, \(weekStatus.unknownDate) unscheduled",
-                        norwegian: "\(weekStatus.completed) fullført, \(weekStatus.upcoming) kommende, \(weekStatus.needsReview) trenger gjennomgang, \(weekStatus.skipped) hoppet over, \(weekStatus.unknownDate) uten dato"
-                    ))
+                    weekStatusSummary(weekStatus)
                     ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
                         if !day.sessions.isEmpty {
                             HStack(alignment: .top, spacing: 10) {
