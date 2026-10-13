@@ -1446,7 +1446,7 @@ final class SupabaseSocialService: Sendable {
             .filter {
                 $0.userID == currentUserID &&
                 !remoteAttemptIDs.contains($0.id) &&
-                challenge.countsAttempt($0)
+                challenge.showsAttempt($0)
             }
             .map {
                 ChallengeAttemptWrite(
