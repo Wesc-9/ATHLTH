@@ -8,6 +8,7 @@ enum ATHLTHCommunityRefreshArea: String, CaseIterable, Identifiable {
     case weekly
     case friends
     case messages
+    case trainTogether
     case live
 
     var id: String { rawValue }
@@ -19,6 +20,7 @@ enum ATHLTHCommunityRefreshArea: String, CaseIterable, Identifiable {
         case .weekly: ATHLTHLocalization.choose(english: "Weekly challenge", norwegian: "Ukesutfordring")
         case .friends: ATHLTHLocalization.choose(english: "Friends", norwegian: "Venner")
         case .messages: ATHLTHLocalization.choose(english: "Messages", norwegian: "Meldinger")
+        case .trainTogether: ATHLTHLocalization.choose(english: "Train Together", norwegian: "Tren sammen")
         case .live: ATHLTHLocalization.choose(english: "Live training", norwegian: "Direktetrening")
         }
     }
@@ -31,6 +33,7 @@ enum ATHLTHCommunityRefreshPolicy {
         weekly: Bool,
         friends: Bool,
         messages: Bool,
+        trainTogether: Bool = false,
         live: Bool
     ) -> [ATHLTHCommunityRefreshArea] {
         ATHLTHCommunityRefreshArea.allCases.filter {
@@ -40,6 +43,7 @@ enum ATHLTHCommunityRefreshPolicy {
             case .weekly: weekly
             case .friends: friends
             case .messages: messages
+            case .trainTogether: trainTogether
             case .live: live
             }
         }
