@@ -246,8 +246,8 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                             )
                             .font(.caption.weight(.semibold))
                             Text(ATHLTHLocalization.choose(
-                                english: "Preview: day \(movePreview.sourceDayIndex) → day \(movePreview.destinationDayIndex), within the same week. The destination is empty.",
-                                norwegian: "Forhåndsvisning: dag \(movePreview.sourceDayIndex) → dag \(movePreview.destinationDayIndex), i samme uke. Måldagen er ledig."
+                                english: "Preview: \(moveDayLabel(movePreview.sourceDayIndex, weekID: movePreview.weekID, plan: currentPlan)) → \(moveDayLabel(movePreview.destinationDayIndex, weekID: movePreview.weekID, plan: currentPlan)). The destination is empty.",
+                                norwegian: "Forhåndsvisning: \(moveDayLabel(movePreview.sourceDayIndex, weekID: movePreview.weekID, plan: currentPlan)) → \(moveDayLabel(movePreview.destinationDayIndex, weekID: movePreview.weekID, plan: currentPlan)). Måldagen er ledig."
                             ))
                             .font(.caption)
                             Text(ATHLTHLocalization.choose(
@@ -501,6 +501,26 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                 }
             }
         }
+    }
+
+    /// Show a calendar date instead of ambiguous "day 1–7" labels.
+    /// The fallback remains stable for plans without a valid start date.
+    private func moveDayLabel(
+        _ dayIndex: Int, weekID: UUID, plan: TrainingPlan
+    ) -> String {
+        guard (1...7).contains(dayIndex),
+              let start = plan.startDate,
+              let weekOffset = plan.weeks.firstIndex(where: { $0.id == weekID }),
+              let date = Calendar.current.date(
+                  byAdding: .day,
+                  value: weekOffset * 7 + dayIndex - 1,
+                  to: Calendar.current.startOfDay(for: start)
+              ) else {
+            return ATHLTHLocalization.choose(
+                english: "Day \(dayIndex)", norwegian: "Dag \(dayIndex)"
+            )
+        }
+        return date.formatted(.dateTime.weekday(.wide).day().month(.abbreviated))
     }
 
     private func metric(_ number: Int, label: String) -> some View {
