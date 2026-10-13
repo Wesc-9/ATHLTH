@@ -6,6 +6,7 @@ struct ATHLTHCommunityAgendaEntry: Identifiable {
     enum Destination {
         case event(UUID)
         case clubEvent(group: CommunityGroupRecord, event: CommunityGroupEventRecord)
+        case clubChallenge(group: CommunityGroupRecord, challenge: CommunityGroupChallengeRecord)
         case challenge(UUID)
         case trainTogether(UUID)
     }
@@ -25,6 +26,8 @@ struct ATHLTHCommunityAgendaEntry: Identifiable {
             CommunityEventDetailView(eventID: eventID)
         case .clubEvent(let group, let event):
             CommunityGroupEventDetailView(group: group, event: event)
+        case .clubChallenge(let group, let challenge):
+            CommunityGroupChallengeDetailView(group: group, challenge: challenge)
         case .challenge(let challengeID):
             ChallengeDetailView(challengeID: challengeID)
         case .trainTogether(let postID):
@@ -49,6 +52,27 @@ enum ATHLTHCommunityAgendaPolicy {
             rsvp == "going" || rsvp == "maybe" || rsvp == "waitlist"
     }
 
+    /// Membership context and participant state determine visibility;
+    /// a Club challenge is never implicitly joined to an athlete who has
+    /// not opted in when joinRequired is enabled.
+    static func includesClubChallenge(
+        startsAt: Date,
+        endsAt: Date,
+        status: String,
+        creatorID: UUID,
+        userID: UUID,
+        joinRequired: Bool,
+        participationStatus: String?,
+        now: Date
+    ) -> Bool {
+        guard endsAt >= now,
+              status != "cancelled",
+              status != "completed",
+              status != "draft" else { return false }
+        guard joinRequired else { return true }
+        return creatorID == userID || participationStatus == "joined"
+    }
+
     static func includesTrainTogetherPost(
         _ post: TrainTogetherPost,
         requests: [TrainTogetherRequest],
@@ -71,6 +95,8 @@ enum ATHLTHCommunityAgendaPolicy {
         clubEvents: [CommunityGroupEventRecord],
         clubRSVPs: [CommunityGroupEventRSVPRecord],
         clubs: [CommunityGroupRecord],
+        clubChallenges: [CommunityGroupChallengeRecord] = [],
+        clubChallengeParticipations: [CommunityGroupChallengeParticipantRecord] = [],
         challenges: [ATHLTHChallenge],
         trainTogetherPosts: [TrainTogetherPost] = [],
         trainTogetherRequests: [TrainTogetherRequest] = [],
@@ -80,7 +106,7 @@ enum ATHLTHCommunityAgendaPolicy {
         var result: [ATHLTHCommunityAgendaEntry] = []
         result.reserveCapacity(
             events.count + clubEvents.count + challenges.count +
-            trainTogetherPosts.count
+            trainTogetherPosts.count + clubChallenges.count
         )
 
         for item in events {
@@ -128,6 +154,35 @@ enum ATHLTHCommunityAgendaPolicy {
                 icon: "person.3.fill",
                 isOngoing: event.status == "live",
                 destination: .clubEvent(group: club, event: event)
+            ))
+        }
+
+        // Club challenges reuse the same agenda presentation and preserve
+        // their own participant and scoring engine.
+        var participationByChallenge: [UUID: String] = [:]
+        for participant in clubChallengeParticipations where participant.userID == userID {
+            participationByChallenge[participant.challengeID] = participant.status
+        }
+        for challenge in clubChallenges {
+            guard let club = clubsByID[challenge.groupID],
+                  includesClubChallenge(
+                    startsAt: challenge.startsAt,
+                    endsAt: challenge.endsAt,
+                    status: challenge.status,
+                    creatorID: challenge.creatorID,
+                    userID: userID,
+                    joinRequired: challenge.joinRequired,
+                    participationStatus: participationByChallenge[challenge.id],
+                    now: now
+                  ) else { continue }
+            result.append(ATHLTHCommunityAgendaEntry(
+                id: "club-challenge:" + challenge.id.uuidString,
+                title: challenge.title,
+                context: club.name,
+                scheduledAt: max(challenge.startsAt, now),
+                icon: "trophy",
+                isOngoing: challenge.startsAt <= now,
+                destination: .clubChallenge(group: club, challenge: challenge)
             ))
         }
 
