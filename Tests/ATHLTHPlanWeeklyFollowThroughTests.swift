@@ -679,6 +679,48 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
     }
 
     @MainActor
+    func testMoveAvoidsDestinationAdjacentToSkippedWorkout() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let skipped = workout()
+        store.addSession(workout(), toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(workout(), toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
+        store.addSession(skipped, toDay: plan.weeks[0].days[4].id, inPlan: plan.id)
+        store.setPlanSessionSkipped(
+            planID: plan.id, sessionID: skipped.id, skipped: true
+        )
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let preview = try XCTUnwrap(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: plan.startDate!
+        ))
+        // Day 4 borders skipped day 5, and day 6 borders it too.
+        // Day 7 is the earliest destination with no occupied neighbors.
+        XCTAssertEqual(preview.sourceDayIndex, 1)
+        XCTAssertEqual(preview.destinationDayIndex, 7)
+    }
+
+    @MainActor
+    func testMoveAvoidsDestinationAdjacentToCompletedWorkout() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let completed = workout()
+        store.addSession(workout(), toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(workout(), toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
+        store.addSession(completed, toDay: plan.weeks[0].days[4].id, inPlan: plan.id)
+        store.setPlanSessionManuallyCompleted(
+            planID: plan.id, sessionID: completed.id, completed: true
+        )
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let preview = try XCTUnwrap(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: plan.startDate!
+        ))
+        XCTAssertEqual(preview.sourceDayIndex, 1)
+        XCTAssertEqual(preview.destinationDayIndex, 7)
+    }
+
+    @MainActor
     func testDuplicateIdentitiesAreCountedOnlyOnce() throws {
         let (store, defaults, suite, plan) = try prepared(weekCount: 1)
         defer { defaults.removePersistentDomain(forName: suite) }
