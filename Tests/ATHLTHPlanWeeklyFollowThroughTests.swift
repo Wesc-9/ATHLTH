@@ -721,6 +721,26 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
     }
 
     @MainActor
+    func testMoveAvoidsDestinationAdjacentToNextWeekWorkout() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 2)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        store.addSession(workout(), toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(workout(), toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
+        store.addSession(workout(), toDay: plan.weeks[0].days[3].id, inPlan: plan.id)
+        store.addSession(workout(), toDay: plan.weeks[1].days[0].id, inPlan: plan.id)
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let preview = try XCTUnwrap(ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: plan.startDate!
+        ))
+        // Day 7 of week 1 borders the occupied first day of week 2.
+        // Day 6 has no occupied neighbors and is the safer destination.
+        XCTAssertEqual(preview.weekID, plan.weeks[0].id)
+        XCTAssertEqual(preview.sourceDayIndex, 1)
+        XCTAssertEqual(preview.destinationDayIndex, 6)
+    }
+
+    @MainActor
     func testDuplicateIdentitiesAreCountedOnlyOnce() throws {
         let (store, defaults, suite, plan) = try prepared(weekCount: 1)
         defer { defaults.removePersistentDomain(forName: suite) }
