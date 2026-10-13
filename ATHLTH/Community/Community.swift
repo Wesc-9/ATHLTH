@@ -4501,10 +4501,7 @@ struct CommunityEventDetailView: View {
                             }
                         } label: {
                             Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Going",
-                                    norwegian: "Delta"
-                                ),
+                                ATHLTHCommunityRSVPDecision.going.localizedTitle,
                                 systemImage: "person.badge.plus"
                             )
                             .frame(maxWidth: .infinity)
@@ -4524,10 +4521,7 @@ struct CommunityEventDetailView: View {
                             }
                         } label: {
                             Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Maybe",
-                                    norwegian: "Kanskje"
-                                ),
+                                ATHLTHCommunityRSVPDecision.maybe.localizedTitle,
                                 systemImage: community.isMaybe(item)
                                     ? "questionmark.circle.fill"
                                     : "questionmark.circle"
