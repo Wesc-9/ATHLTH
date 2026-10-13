@@ -43,6 +43,15 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
             healthWorkouts: health.workouts,
             strengthHistory: strength.workoutHistory
         )
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let currentWeekIndex: Int? = currentPlan.startDate.flatMap { start in
+            let days = calendar.dateComponents(
+                [.day], from: calendar.startOfDay(for: start), to: today
+            ).day ?? -1
+            let index = days / 7
+            return days >= 0 && index < currentPlan.weeks.count ? index : nil
+        }
         let relevant = report.relevantWeeks
         let movePreview = ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
             plan: currentPlan,
@@ -181,6 +190,72 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
             }
             .foregroundStyle(ATHLTHPlanDesign.ink)
             .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let currentWeekIndex {
+                let week = currentPlan.weeks[currentWeekIndex]
+                let summary = weeklyLoads[currentWeekIndex]
+                VStack(alignment: .leading, spacing: 9) {
+                    HStack {
+                        Label(ATHLTHLocalization.choose(
+                            english: "This week", norwegian: "Denne uken"
+                        ), systemImage: "calendar")
+                        .font(.headline)
+                        Spacer()
+                        Text(ATHLTHLocalization.choose(
+                            english: "Week \(currentWeekIndex + 1)",
+                            norwegian: "Uke \(currentWeekIndex + 1)"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    HStack(spacing: 12) {
+                        Label(ATHLTHLocalization.choose(
+                            english: "\(summary.activeDays) training days",
+                            norwegian: "\(summary.activeDays) treningsdager"
+                        ), systemImage: "figure.run")
+                        Label(ATHLTHLocalization.choose(
+                            english: "\(summary.plannedMinutes) min planned",
+                            norwegian: "\(summary.plannedMinutes) min planlagt"
+                        ), systemImage: "clock")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
+                        if !day.sessions.isEmpty {
+                            HStack(alignment: .top, spacing: 10) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Day \(day.dayIndex)",
+                                    norwegian: "Dag \(day.dayIndex)"
+                                ))
+                                .font(.caption.weight(.semibold))
+                                .frame(width: 50, alignment: .leading)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    ForEach(day.sessions) { workout in
+                                        Text(workout.title)
+                                            .font(.subheadline)
+                                            .lineLimit(2)
+                                    }
+                                }
+                                Spacer(minLength: 4)
+                                Button {
+                                    onSelect(week.id, day.id)
+                                } label: {
+                                    Image(systemName: "arrow.up.right")
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(ATHLTHLocalization.choose(
+                                    english: "Open planned day",
+                                    norwegian: "Åpne planlagt dag"
+                                ))
+                            }
+                            .padding(.vertical, 5)
+                        }
+                    }
+                }
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 8)
+            }
 
             if let nextWorkout {
                 VStack(alignment: .leading, spacing: 7) {
