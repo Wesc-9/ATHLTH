@@ -26,6 +26,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
             healthWorkouts: health.workouts,
             strengthHistory: strength.workoutHistory
         )
+        let load = ATHLTHPlanWeeklyFollowThrough.plannedLoadSummary(plan: currentPlan)
         let relevant = report.relevantWeeks
         let movePreview = ATHLTHPlanWeeklyFollowThrough.previewNextSafeMove(
             plan: currentPlan,
@@ -55,6 +56,55 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                 .font(.caption)
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if load.estimatedMinutes > 0 {
+                VStack(alignment: .leading, spacing: 7) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Planned training volume",
+                            norwegian: "Planlagt treningsmengde"
+                        ),
+                        systemImage: "chart.bar.xaxis"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    Text(ATHLTHLocalization.choose(
+                        english: "\(load.estimatedMinutes) minutes across the plan",
+                        norwegian: "\(load.estimatedMinutes) minutter i hele planen"
+                    ))
+                    .font(.title3.weight(.semibold))
+                    Text(ATHLTHLocalization.choose(
+                        english: "Running \(load.runningMinutes) min · Strength \(load.strengthMinutes) min · Walking \(load.walkingMinutes) min",
+                        norwegian: "Løping \(load.runningMinutes) min · Styrke \(load.strengthMinutes) min · Gange \(load.walkingMinutes) min"
+                    ))
+                    .font(.caption)
+                    if load.unspecifiedMinutes > 0 {
+                        Text(ATHLTHLocalization.choose(
+                            english: "\(load.unspecifiedMinutes) minutes in other workout types",
+                            norwegian: "\(load.unspecifiedMinutes) minutter i andre økttyper"
+                        ))
+                        .font(.caption2)
+                    }
+                    if load.consecutiveLongDayPairs > 0 {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "\(load.consecutiveLongDayPairs) adjacent pairs of days with at least 60 planned minutes. Review their intensity before training.",
+                                norwegian: "\(load.consecutiveLongDayPairs) par med påfølgende dager som har minst 60 planlagte minutter. Vurder intensiteten før trening."
+                            ),
+                            systemImage: "info.circle"
+                        )
+                        .font(.caption)
+                    }
+                    Text(ATHLTHLocalization.choose(
+                        english: "Based on entered durations only. Not a recovery score or measured training load.",
+                        norwegian: "Basert kun på registrert varighet. Dette er ikke en restitusjonsscore eller målt treningsbelastning."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 8)
             }
 
             if report.total == 0 {
