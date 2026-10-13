@@ -147,6 +147,7 @@ struct ATHLTHCommunityActionCenterView: View {
             english: "Inbox", norwegian: "Innboks"
         ))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
     }
 
     private func actionRow(
