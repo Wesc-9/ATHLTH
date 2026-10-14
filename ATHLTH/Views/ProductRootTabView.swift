@@ -5290,7 +5290,9 @@ struct ATHLTHTrainView: View {
                 // A vertical ScrollView may let scaled images or long
                 // labels propose a width wider than the device. Always
                 // measure against the scroll container, never its content.
-                .containerRelativeFrame(.horizontal) { availableWidth, _ in
+                // SwiftUI may evaluate this pure sizing closure on its
+                // AsyncRenderer. Do not inherit this view's MainActor.
+                .containerRelativeFrame(.horizontal) { @Sendable availableWidth, _ in
                     min(availableWidth, 760)
                 }
                 .frame(maxWidth: .infinity)

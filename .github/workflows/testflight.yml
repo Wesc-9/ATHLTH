@@ -328,6 +328,16 @@ jobs:
             fi
           fi
 
+      # Keep UUID-matched symbols accessible after runner cleanup so a
+      # TestFlight crash can be resolved to the exact shipped source line.
+      - name: Preserve release debug symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: athlth-release-symbols-${{ github.run_id }}
+          path: ${{ runner.temp }}/ATHLTH.xcarchive/dSYMs
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Seed archive entitlements with ad-hoc signatures
         shell: bash
         run: |
