@@ -250,8 +250,10 @@ final class GhostRacePrivacyTests: XCTestCase {
                 result.signedTimeSeconds
             )
 
-        XCTAssertGreaterThan(signedTime, 30)
-        XCTAssertLessThan(signedTime, 32)
+        // Verified finish occurs at 99.5% of the 2 km reference.
+        // Between 1900 m at 540 s and 2000 m at 570 s, the interpolated
+        // crossing is at 567 s, hence 600 - 567 = 33 seconds ahead.
+        XCTAssertEqual(signedTime, 33, accuracy: 0.001)
         XCTAssertEqual(
             result.beatGhost,
             true

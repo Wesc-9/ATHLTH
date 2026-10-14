@@ -611,8 +611,19 @@ final class ATHLTHTrainPlanStudioIntegrationTests: XCTestCase {
         let first = try XCTUnwrap(store.createTrainingPlan(
             title: "First program", summary: "", weekCount: 1, startDate: today
         ))
+        // Overlapping plans are intentionally rejected. The same workout
+        // identifier must still be isolated by plan even across sequential
+        // plans with non-overlapping date windows.
+        XCTAssertNil(store.createTrainingPlan(
+            title: "Overlapping program", summary: "", weekCount: 1,
+            startDate: today
+        ))
+        let nextWeek = try XCTUnwrap(Calendar.current.date(
+            byAdding: .day, value: 7, to: today
+        ))
         let second = try XCTUnwrap(store.createTrainingPlan(
-            title: "Second program", summary: "", weekCount: 1, startDate: today
+            title: "Second program", summary: "", weekCount: 1,
+            startDate: nextWeek
         ))
         let shared = workout(name: "Same workout identifier")
         store.addSession(shared, toDay: first.weeks[0].days[0].id, inPlan: first.id)
