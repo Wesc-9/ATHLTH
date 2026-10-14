@@ -1616,8 +1616,12 @@ struct IPhoneWorkoutView: View {
             }
             .sheet(isPresented: $showingTreadmillSpeedEditor) {
                 TreadmillSpeedEditorView(
-                    initialValue: recorder.active?.treadmillSpeedKilometersPerHour ?? 0
-                ) { recorder.setTreadmillSpeedKilometersPerHour($0) }
+                    initialValue:
+                        recorder.active?.treadmillSpeedHistory?.last?.kilometersPerHour ??
+                        recorder.active?.treadmillSpeedKilometersPerHour ?? 0,
+                    onSave: { recorder.setTreadmillSpeedKilometersPerHour($0) },
+                    onHistorySave: { recorder.recordTreadmillHistoricalSpeedKilometersPerHour($0) }
+                )
                 .presentationDetents([.medium])
             }
             .sheet(isPresented: $showingAIConversation) {
@@ -3982,11 +3986,16 @@ struct TreadmillInclineEditorView: View {
 struct TreadmillSpeedEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var speed: Double
+    @State private var historyOnly = true
     let onSave: (Double) -> Void
+    let onHistorySave: (Double) -> Void
 
-    init(initialValue: Double, onSave: @escaping (Double) -> Void) {
+    init(initialValue: Double,
+         onSave: @escaping (Double) -> Void,
+         onHistorySave: @escaping (Double) -> Void) {
         _speed = State(initialValue: initialValue.isFinite ? min(max(initialValue, 0), 30) : 0)
         self.onSave = onSave
+        self.onHistorySave = onHistorySave
     }
 
     var body: some View {
@@ -4000,10 +4009,21 @@ struct TreadmillSpeedEditorView: View {
                         )).monospacedDigit()
                     }
                     Slider(value: $speed, in: 0...30, step: 0.1)
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "For history and future coaching only",
+                            norwegian: "Kun for historikk og fremtidig coaching"
+                        ),
+                        isOn: $historyOnly
+                    )
                 } footer: {
                     Text(ATHLTHLocalization.choose(
-                        english: "Enter the speed shown on the treadmill. Changes apply from now. Pauses add no distance; iPhone does not measure belt speed.",
-                        norwegian: "Oppgi hastigheten som vises på mølla. Endringer gjelder fra nå. Pauser gir ingen distanse; iPhone måler ikke møllehastigheten."
+                        english: historyOnly
+                            ? "Stored with your workout and available to the next Audio Coach session. Does not modify live pace or distance."
+                            : "Also used to estimate treadmill distance while running. The iPhone does not read treadmill speed automatically.",
+                        norwegian: historyOnly
+                            ? "Lagres med økten og brukes som historikk for neste Audio Coach. Endrer ikke dagens tempo- eller distanseberegning."
+                            : "Brukes også til å anslå distansen mens du løper. iPhone leser ikke møllehastigheten automatisk."
                     ))
                 }
             }
@@ -4015,7 +4035,11 @@ struct TreadmillSpeedEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(ATHLTHLocalization.choose(english: "Save", norwegian: "Lagre")) {
-                        onSave(speed)
+                        if historyOnly {
+                            onHistorySave(speed)
+                        } else {
+                            onSave(speed)
+                        }
                         dismiss()
                     }
                 }
