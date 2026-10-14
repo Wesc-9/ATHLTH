@@ -39,3 +39,10 @@ deno test supabase/functions/create-audio-coach-session/policy.test.ts
 - Server VAD explicitly creates responses and interrupts a previous response when the athlete starts speaking again.
 - The iPhone stops sharing voice audio on an incoming audio interruption or removal of an existing headset (e.g., unplugged AirPods).
 - Live AI remains disabled at the backend until hardware validation and provider spending limits have been approved.
+
+## Server-side session admission budget
+- A new migration adds the `audio-coach-realtime` feature to the existing atomic `consume_ai_request_budget` RPC, at 10 units per call (at most one reservation per minute).
+- Voice reservations have a separate conservative cap derived from that user's shared daily AI units: **at most 3 starts in a UTC day**, fewer if other AI features consumed the same unit budget.
+- The migration does **not** modify existing feature prices, exposed grants, RLS, or the authenticated client's rights.
+- Automated local-database regression verifies three admitted starts, denial of the fourth, other AI features working, and no anonymous budget RPC access.
+- A session admission cap does not meter live provider audio minutes or terminate remote sessions; maintain the disabled server feature flag until provider account spend limits and end-to-end shutdown are validated.
