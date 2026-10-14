@@ -88,6 +88,9 @@ final class RunningWorkoutLibraryStore: ObservableObject {
         copy.intervalGhostPaceSecondsPerKilometer =
             source.intervalGhostPaceSecondsPerKilometer
         copy.coachBrief = source.coachBrief
+        copy.intervalGhostFollowRecovery = source.intervalGhostFollowRecovery
+        copy.intervalGhostRecoverySlowdownPercent =
+            source.intervalGhostRecoverySlowdownPercent
         copy.sharedSourceOwnerID =
             source.sharedSourceOwnerID ?? sourceOwnerID
         copy.sharedSourceWorkoutID =
@@ -111,7 +114,8 @@ final class RunningWorkoutLibraryStore: ObservableObject {
                     repetitions: $0.repetitions,
                     work: $0.work,
                     recovery: $0.recovery,
-                    notes: $0.notes
+                    notes: $0.notes,
+                    repetitionOverrides: $0.repetitionOverrides
                 )
             },
             routeID: source.routeID,
@@ -124,6 +128,9 @@ final class RunningWorkoutLibraryStore: ObservableObject {
         editable.intervalGhostPaceSecondsPerKilometer =
             source.intervalGhostPaceSecondsPerKilometer
         editable.coachBrief = source.coachBrief
+        editable.intervalGhostFollowRecovery = source.intervalGhostFollowRecovery
+        editable.intervalGhostRecoverySlowdownPercent =
+            source.intervalGhostRecoverySlowdownPercent
         customTemplates.append(editable)
         persist()
         return editable
