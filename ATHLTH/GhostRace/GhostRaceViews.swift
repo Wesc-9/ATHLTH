@@ -522,101 +522,90 @@ struct GhostRaceHubView: View {
 
     private var liveModeIntro: some View {
         ATHLTHCard {
-            VStack(alignment: .leading, spacing: 13) {
-                HStack {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Race with others",
-                        norwegian: "Konkurrer mot andre"
-                    ))
-                    .font(.headline)
-
-                    Spacer()
-
-                    Image(systemName: "person.2.fill")
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 10) {
+                    Image(systemName: "person.2.wave.2.fill")
+                        .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 44, height: 44)
+                        .background(ATHLTHTheme.accentSoft,
+                                    in: RoundedRectangle(cornerRadius: 14))
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Race with others",
+                            norwegian: "Konkurrer mot andre"
+                        ))
+                        .font(.headline)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Follow a public runner or invite a friend to a real duel.",
+                            norwegian: "Følg en synlig løper, eller inviter en venn til en ekte duell."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
 
                 HStack(spacing: 10) {
-                    Button {
-                        Task {
-                            await realtime.refreshVisibleLiveSessions()
-                        }
-                    } label: {
-                        liveOption(
-                            title: ATHLTHLocalization.choose(
-                                english: "Live now", norwegian: "Live nå"
-                            ),
-                            detail: ATHLTHLocalization.choose(
-                                english: "Refresh runners", norwegian: "Oppdater løpere"
-                            ),
-                            icon: "dot.radiowaves.left.and.right",
-                            selected: true
-                        )
+                    VStack(alignment: .leading, spacing: 5) {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Live now", norwegian: "Live nå"
+                        ), systemImage: "dot.radiowaves.left.and.right")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        Text(ATHLTHLocalization.choose(
+                            english: "See shared runs", norwegian: "Se delte økter"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityHint(ATHLTHLocalization.choose(
-                        english: "Refresh the visible live runners below",
-                        norwegian: "Oppdater listen over synlige løpere nedenfor"
-                    ))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .frame(minHeight: 80)
+                    .background(ATHLTHTheme.accentSoft.opacity(0.75),
+                                in: RoundedRectangle(cornerRadius: 16))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(ATHLTHTheme.accentDeep.opacity(0.55),
+                                    lineWidth: 1)
+                    }
 
                     NavigationLink {
                         GhostFriendRaceHubView()
                     } label: {
-                        liveOption(
-                            title: ATHLTHLocalization.choose(
+                        VStack(alignment: .leading, spacing: 5) {
+                            Label(ATHLTHLocalization.choose(
                                 english: "Friends", norwegian: "Venner"
-                            ),
-                            detail: ATHLTHLocalization.choose(
-                                english: "Invite a friend", norwegian: "Inviter en venn"
-                            ),
-                            icon: "person.2",
-                            selected: false
-                        )
+                            ), systemImage: "person.2.fill")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+
+                            HStack(spacing: 5) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Send invitation",
+                                    norwegian: "Send invitasjon"
+                                ))
+                                Image(systemName: "arrow.up.right")
+                            }
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .frame(minHeight: 80)
+                        .background(ATHLTHTheme.surfaceStone,
+                                    in: RoundedRectangle(cornerRadius: 16))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(ATHLTHTheme.border, lineWidth: 0.7)
+                        }
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
-
-                Text(ATHLTHLocalization.choose(
-                    english: "Only runners who share their activity appear in the list.",
-                    norwegian: "Bare løpere som deler aktiviteten sin, vises i listen."
-                ))
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
             }
-        }
-    }
-
-    private func liveOption(
-        title: String,
-        detail: String,
-        icon: String,
-        selected: Bool
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(ATHLTHTheme.accentDeep)
-            Text(title)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(ATHLTHTheme.primaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            Text(detail)
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .frame(maxWidth: .infinity, minHeight: 80, alignment: .topLeading)
-        .padding(10)
-        .background(
-            selected ? ATHLTHTheme.accentSoft : ATHLTHTheme.surfaceStone,
-            in: RoundedRectangle(cornerRadius: 14)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(selected ? ATHLTHTheme.accentDeep : ATHLTHTheme.border,
-                        lineWidth: selected ? 1.1 : 0.7)
         }
     }
 
@@ -916,237 +905,177 @@ struct GhostRaceHubView: View {
         )
     }
 
-    @ViewBuilder
+    // A visible shared run is a live reference, not proof that its owner
+    // agreed to a synchronized duel. Friend invites handle mutual consent.
+    private var sharedLiveRunningSessions: [ATHLTHLiveWorkoutSession] {
+        realtime.visibleLiveSessions.filter {
+            $0.activity == "running" &&
+            $0.ownerID != realtime.currentUserID
+        }
+    }
+
     private var liveNowSection: some View {
-        let sessions =
-            realtime.visibleLiveSessions
-                .filter {
-                    $0.activity == "running" &&
-                    $0.ownerID !=
-                        realtime.currentUserID
-                }
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 13) {
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Live now", norwegian: "Live nå"
+                        ))
+                        .font(.headline)
 
-        if !sessions.isEmpty {
-            ATHLTHCard {
-                HStack {
-                    VStack(
-                        alignment: .leading,
-                        spacing: 3
-                    ) {
-                        Text("Live now")
-                            .font(
-                                .title3.weight(
-                                    .bold
-                                )
-                            )
-
-                        Text(
-                            "Watch a visible runner, or use their live distance as a lightweight Ghost while you run."
-                        )
+                        Text(ATHLTHLocalization.choose(
+                            english: "Shared runs · not synchronized duels",
+                            norwegian: "Delte løp · ikke synkroniserte dueller"
+                        ))
                         .font(.caption)
-                        .foregroundStyle(
-                            .secondary
-                        )
+                        .foregroundStyle(ATHLTHTheme.mutedText)
                     }
 
                     Spacer()
 
-                    Image(
-                        systemName:
-                            "dot.radiowaves.left.and.right"
-                    )
-                    .foregroundStyle(
-                        Color.green
-                    )
+                    Button {
+                        Task { await realtime.refreshVisibleLiveSessions() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 44, height: 44)
+                            .background(ATHLTHTheme.surfaceStone, in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Refresh live runners",
+                        norwegian: "Oppdater synlige løpere"
+                    ))
                 }
 
-                VStack(spacing: 0) {
-                    ForEach(
-                        Array(
-                            sessions.prefix(6)
-                        )
-                    ) { liveSession in
+                if sharedLiveRunningSessions.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "figure.run.circle")
+                            .font(.system(size: 38, weight: .ultraLight))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                        Text(ATHLTHLocalization.choose(
+                            english: "No shared runners right now",
+                            norwegian: "Ingen synlige løpere akkurat nå"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        .multilineTextAlignment(.center)
+
+                        Text(ATHLTHLocalization.choose(
+                            english: "Only runners who enable live sharing are visible. You can still invite a friend.",
+                            norwegian: "Bare løpere som har aktivert deling vises. Du kan fortsatt invitere en venn."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .multilineTextAlignment(.center)
+
                         NavigationLink {
-                            ATHLTHLiveWorkoutMapView(
-                                session:
-                                    liveSession
-                            )
+                            GhostFriendRaceHubView()
                         } label: {
-                            HStack(
-                                spacing: 12
-                            ) {
-                                Image(
-                                    systemName:
-                                        liveSession
-                                            .ghostChallengeID ==
-                                            nil
-                                            ? "figure.run.circle.fill"
-                                            : "flag.checkered.circle.fill"
-                                )
-                                .font(
-                                    .system(
-                                        size: 20,
-                                        weight:
-                                            .semibold
-                                    )
-                                )
-                                .foregroundStyle(
-                                    liveSession
-                                        .ghostChallengeID ==
-                                        nil
-                                        ? ATHLTHTheme
-                                            .vitality
-                                        : ATHLTHTheme
-                                            .premiumGold
-                                )
-                                .frame(
-                                    width: 40,
-                                    height: 40
-                                )
-                                .background(
-                                    Color.primary
-                                        .opacity(
-                                            0.035
-                                        ),
-                                    in:
-                                        RoundedRectangle(
-                                            cornerRadius:
-                                                12
-                                        )
-                                )
-
-                                VStack(
-                                    alignment:
-                                        .leading,
-                                    spacing: 2
-                                ) {
-                                    Text(
-                                        liveSession
-                                            .title
-                                    )
-                                    .font(
-                                        .subheadline
-                                            .weight(
-                                                .semibold
-                                            )
-                                    )
-                                    .foregroundStyle(
-                                        ATHLTHTheme
-                                            .primaryText
-                                    )
-                                    .lineLimit(1)
-
-                                    Text(
-                                        liveRunnerSubtitle(
-                                            liveSession
-                                        )
-                                    )
-                                    .font(.caption)
-                                    .foregroundStyle(
-                                        .secondary
-                                    )
-                                    .lineLimit(1)
-                                }
-
-                                Spacer()
-
-                                Image(
-                                    systemName:
-                                        "chevron.right"
-                                )
-                                .font(
-                                    .caption.bold()
-                                )
-                                .foregroundStyle(
-                                    .tertiary
-                                )
-                            }
-                            .padding(
-                                .vertical,
-                                8
-                            )
+                            Label(ATHLTHLocalization.choose(
+                                english: "Invite a friend",
+                                norwegian: "Inviter en venn"
+                            ), systemImage: "person.badge.plus")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 46)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHTheme.accentDeep)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(16)
+                    .background(ATHLTHTheme.surfaceStone.opacity(0.65),
+                                in: RoundedRectangle(cornerRadius: 18))
+                } else {
+                    ForEach(Array(sharedLiveRunningSessions.prefix(8))) { liveSession in
+                        let isSelected =
+                            realtime.selectedLiveGhostSessionID == liveSession.id
 
-                        Button {
-                            if realtime
-                                .selectedLiveGhostSessionID ==
-                                liveSession.id {
-                                realtime
-                                    .selectLiveGhost(
-                                        nil
-                                    )
-                            } else {
-                                realtime
-                                    .selectLiveGhost(
-                                        liveSession
-                                    )
+                        VStack(alignment: .leading, spacing: 10) {
+                            NavigationLink {
+                                ATHLTHLiveWorkoutMapView(session: liveSession)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "figure.run")
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                        .frame(width: 44, height: 44)
+                                        .background(ATHLTHTheme.accentSoft,
+                                                    in: Circle())
+
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(liveRunnerName(liveSession))
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(ATHLTHTheme.primaryText)
+                                        Text(liveSession.routeTitle ??
+                                             liveSession.title)
+                                            .font(.caption)
+                                            .foregroundStyle(ATHLTHTheme.mutedText)
+                                            .lineLimit(2)
+                                    }
+
+                                    Spacer(minLength: 4)
+
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+                                .contentShape(Rectangle())
                             }
-                        } label: {
-                            HStack {
+                            .buttonStyle(.plain)
+
+                            Button {
+                                realtime.selectLiveGhost(
+                                    isSelected ? nil : liveSession
+                                )
+                            } label: {
                                 Label(
-                                    realtime
-                                        .selectedLiveGhostSessionID ==
-                                        liveSession.id
-                                        ? "Live Ghost selected"
-                                        : "Use as Live Ghost",
-                                    systemImage:
-                                        realtime
-                                            .selectedLiveGhostSessionID ==
-                                            liveSession.id
-                                            ? "checkmark.circle.fill"
-                                            : "figure.run.circle"
+                                    ATHLTHLocalization.choose(
+                                        english: isSelected
+                                            ? "Live Ghost selected"
+                                            : "Use as Live Ghost",
+                                        norwegian: isSelected
+                                            ? "Valgt som Live Ghost"
+                                            : "Bruk som Live Ghost"
+                                    ),
+                                    systemImage: isSelected
+                                        ? "checkmark.circle.fill" : "figure.run.circle"
                                 )
-
-                                Spacer()
-
-                                if realtime
-                                    .selectedLiveGhostSessionID ==
-                                    liveSession.id {
-                                    Text("iPhone")
-                                        .font(.caption2)
-                                        .foregroundStyle(
-                                            .secondary
-                                        )
-                                }
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .background(
+                                    isSelected
+                                        ? ATHLTHTheme.accentSoft
+                                        : Color.white.opacity(0.8),
+                                    in: RoundedRectangle(cornerRadius: 12)
+                                )
                             }
-                            .font(
-                                .caption.weight(
-                                    .semibold
-                                )
-                            )
-                            .foregroundStyle(
-                                realtime
-                                    .selectedLiveGhostSessionID ==
-                                    liveSession.id
-                                    ? ATHLTHTheme
-                                        .vitality
-                                    : ATHLTHTheme
-                                        .accentDeep
-                            )
-                            .padding(
-                                .vertical,
-                                7
-                            )
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
-
-                        if liveSession.id !=
-                            sessions
-                                .prefix(6)
-                                .last?
-                                .id {
-                            Divider()
-                                .padding(
-                                    .leading,
-                                    52
-                                )
-                        }
+                        .padding(13)
+                        .background(ATHLTHTheme.surfaceStone.opacity(0.8),
+                                    in: RoundedRectangle(cornerRadius: 17))
                     }
                 }
-                .padding(.top, 4)
             }
         }
+    }
+
+    private func liveRunnerName(
+        _ liveSession: ATHLTHLiveWorkoutSession
+    ) -> String {
+        social.visibleProfiles.first {
+            $0.userID == liveSession.ownerID
+        }?.resolvedName ??
+        social.following.first {
+            $0.userID == liveSession.ownerID
+        }?.resolvedName ??
+        ATHLTHLocalization.choose(
+            english: "ATHLTH runner", norwegian: "ATHLTH-løper"
+        )
     }
 
     private func liveRunnerSubtitle(
