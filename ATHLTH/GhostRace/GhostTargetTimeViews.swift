@@ -728,6 +728,302 @@ struct TargetGhostSetupView: View {
         }
     }
 
+    private var experienceSelector: some View {
+        HStack(spacing: 8) {
+            Text(ATHLTHLocalization.choose(
+                english: "Display", norwegian: "Visning"
+            ))
+            .font(.caption.weight(.medium))
+            .foregroundStyle(ATHLTHTheme.mutedText)
+
+            Spacer(minLength: 8)
+
+            HStack(spacing: 3) {
+                experienceChoice(
+                    title: ATHLTHLocalization.choose(
+                        english: "Basic", norwegian: "Enkel"
+                    ),
+                    isAdvanced: false
+                )
+                experienceChoice(
+                    title: ATHLTHLocalization.choose(
+                        english: "Advanced", norwegian: "Avansert"
+                    ),
+                    isAdvanced: true
+                )
+            }
+            .padding(3)
+            .background(ATHLTHTheme.surfaceStone, in: Capsule())
+        }
+        .padding(.horizontal, 3)
+    }
+
+    private func experienceChoice(
+        title: String,
+        isAdvanced: Bool
+    ) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                advancedMode = isAdvanced
+            }
+        } label: {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(
+                    advancedMode == isAdvanced
+                        ? ATHLTHTheme.primaryText
+                        : ATHLTHTheme.mutedText
+                )
+                .padding(.horizontal, 12)
+                .frame(minHeight: 42)
+                .background(
+                    advancedMode == isAdvanced ? Color.white : Color.clear,
+                    in: Capsule()
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(advancedMode == isAdvanced ? .isSelected : [])
+    }
+
+    private var basicTargetCard: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Your finish-time goal",
+                        norwegian: "Tiden du vil slå"
+                    ))
+                    .font(.headline)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "A starting suggestion based on the route, not an assessment of your fitness.",
+                        norwegian: "Et utgangspunkt basert på løypa, ikke en vurdering av formen din."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                if !routeReady {
+                    Label(ATHLTHLocalization.choose(
+                        english: "This route has too little valid GPS geometry for Ghost Race. Choose another saved route.",
+                        norwegian: "Løypa mangler nok gyldige GPS-punkter til Ghost Race. Velg en annen lagret rute."
+                    ), systemImage: "exclamationmark.triangle")
+                    .font(.subheadline)
+                    .foregroundStyle(.orange)
+                }
+
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text(targetDuration.map(GhostTargetTimeFormatter.string) ?? "—")
+                        .font(.system(size: 36, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .minimumScaleFactor(0.7)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 4)
+
+                    Label(
+                        String(format: "%.1f km", route.distanceKilometers),
+                        systemImage: "figure.run"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+                .padding(15)
+                .background(ATHLTHTheme.accentSoft.opacity(0.65),
+                            in: RoundedRectangle(cornerRadius: 16))
+
+                HStack(alignment: .top, spacing: 7) {
+                    ForEach(basicTargetOptions) { option in
+                        let isSelected = targetDuration.map {
+                            abs($0 - option.duration) < 0.5
+                        } ?? false
+
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                setTarget(option.duration)
+                                basicShowCustomTime = false
+                            }
+                        } label: {
+                            VStack(spacing: 7) {
+                                Image(systemName: isSelected
+                                    ? "checkmark.circle.fill"
+                                    : option.icon)
+                                    .font(.system(size: 16, weight: .semibold))
+
+                                Text(option.title)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.center)
+                                    .minimumScaleFactor(0.8)
+
+                                Text(GhostTargetTimeFormatter.string(option.duration))
+                                    .font(.caption2.weight(.bold))
+                                    .monospacedDigit()
+                            }
+                            .foregroundStyle(
+                                isSelected ? Color.white : ATHLTHTheme.primaryText
+                            )
+                            .frame(maxWidth: .infinity, minHeight: 89)
+                            .padding(.horizontal, 5)
+                            .background(
+                                isSelected
+                                    ? ATHLTHTheme.accentDeep
+                                    : ATHLTHTheme.surfaceStone,
+                                in: RoundedRectangle(cornerRadius: 14)
+                            )
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(isSelected ? .isSelected : [])
+                    }
+                }
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        basicShowCustomTime.toggle()
+                    }
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: basicShowCustomTime ? "Hide time editing" : "Choose another time",
+                        norwegian: basicShowCustomTime ? "Skjul tidsvalg" : "Velg en annen tid"
+                    ), systemImage: basicShowCustomTime
+                        ? "chevron.up" : "slider.horizontal.3")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.plain)
+
+                if basicShowCustomTime {
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english: "Finish time (MM:SS)",
+                            norwegian: "Sluttid (MM:SS)"
+                        ),
+                        text: $targetTimeText
+                    )
+                    .keyboardType(.numbersAndPunctuation)
+                    .font(.title2.weight(.bold))
+                    .monospacedDigit()
+                    .padding(14)
+                    .background(ATHLTHTheme.surfaceStone,
+                                in: RoundedRectangle(cornerRadius: 14))
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Use MM:SS or H:MM:SS (1 min–24 h).",
+                        norwegian: "Bruk MM:SS eller T:MM:SS (1 min–24 t)."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(targetDuration == nil
+                        ? Color.orange : ATHLTHTheme.mutedText)
+                }
+
+                if let targetDuration {
+                    HStack(spacing: 9) {
+                        Image(systemName: "speedometer")
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Average pace",
+                            norwegian: "Gjennomsnittstempo"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        Spacer()
+                        Text(GhostTargetTimeFormatter.paceText(
+                            distanceKilometers: route.distanceKilometers,
+                            duration: targetDuration
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        .monospacedDigit()
+                    }
+                }
+
+                Label(ATHLTHLocalization.choose(
+                    english: "Basic uses even pacing and iPhone GPS. Switch to Advanced for split strategy and Apple Watch.",
+                    norwegian: "Enkel bruker jevnt tempo og iPhone-GPS. Velg Avansert for splittstrategi og Apple Watch."
+                ), systemImage: "info.circle")
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+        }
+    }
+
+    private var splitPreviewCard: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 13) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Ghost pacing preview",
+                    norwegian: "Slik disponerer Ghosten løpet"
+                ))
+                .font(.headline)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Estimated split times derived from your target and selected strategy.",
+                    norwegian: "Beregnet splittid basert på målet og valgt strategi."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+
+                if let targetDuration {
+                    let halfway = targetDuration *
+                        pacingStrategy.elapsedFraction(at: 0.5)
+
+                    HStack(spacing: 10) {
+                        splitPreviewHalf(
+                            title: ATHLTHLocalization.choose(
+                                english: "First half", norwegian: "Første halvdel"
+                            ),
+                            seconds: halfway,
+                            icon: "1.circle"
+                        )
+                        splitPreviewHalf(
+                            title: ATHLTHLocalization.choose(
+                                english: "Second half", norwegian: "Andre halvdel"
+                            ),
+                            seconds: targetDuration - halfway,
+                            icon: "2.circle"
+                        )
+                    }
+
+                    Label(
+                        pacingStrategy.title,
+                        systemImage: pacingStrategy.icon
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                } else {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Enter a valid goal to preview your splits.",
+                        norwegian: "Legg inn et gyldig mål for å se splittene."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+            }
+        }
+    }
+
+    private func splitPreviewHalf(
+        title: String, seconds: TimeInterval, icon: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Label(title, systemImage: icon)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .lineLimit(2)
+            Text(GhostTargetTimeFormatter.string(seconds))
+                .font(.title3.weight(.bold))
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHTheme.primaryText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(13)
+        .background(ATHLTHTheme.surfaceStone,
+                    in: RoundedRectangle(cornerRadius: 15))
+    }
+
     private var summaryCard: some View {
         ATHLTHCard {
             VStack(alignment: .leading, spacing: 12) {
