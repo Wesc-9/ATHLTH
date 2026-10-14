@@ -790,6 +790,11 @@ struct WatchRunningWorkoutStep: Identifiable, Codable, Hashable {
     var intensityText: String?
     var targetPaceMinSecondsPerKilometer: Double? = nil
     var targetPaceMaxSecondsPerKilometer: Double? = nil
+    /// Work, recovery, warmup, or cooldown. Optional for older transfers.
+    var phase: String? = nil
+    var targetHeartRateZone: Int? = nil
+    var ghostPaceSecondsPerKilometer: Double? = nil
+    var coachBrief: String? = nil
 }
 
 enum ATHLTHRunningStepEngine {
