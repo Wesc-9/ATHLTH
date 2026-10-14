@@ -42,6 +42,8 @@ struct GhostFriendRaceHubView: View {
         GhostFriendRaceStore()
 
     @State private var runs: [WorkoutSummary] = []
+    @State private var unverifiedRuns: [WorkoutSummary] = []
+    @State private var checkedRunCount = 0
     @State private var selectedFriendID: UUID?
     @State private var selectedWorkoutID: UUID?
     @State private var selectedPlannedRoute: TrainingRoute?
@@ -98,7 +100,8 @@ struct GhostFriendRaceHubView: View {
 
     private var canSendSelectedCourse: Bool {
         switch courseMode {
-        case .previousWorkout: return selectedWorkoutID != nil
+        case .previousWorkout:
+            return runs.contains { $0.id == selectedWorkoutID }
         case .plannedRoute: return selectedPlannedRoute != nil && targetTime != nil
         }
     }
@@ -622,10 +625,24 @@ struct GhostFriendRaceHubView: View {
                             ), systemImage: "map")
                         }
                         .buttonStyle(.bordered)
+
+                        if hasMoreFriendRuns {
+                            Button {
+                                Task { await loadMoreFriendRuns() }
+                            } label: {
+                                Label(ATHLTHLocalization.choose(
+                                    english: "Check more previous runs",
+                                    norwegian: "Kontroller flere løp"
+                                ), systemImage: "arrow.clockwise")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(loadingRuns)
+                        }
                     } else {
                         Text(ATHLTHLocalization.choose(
-                            english: "Use a previous run as your Ghost.",
-                            norwegian: "Bruk et tidligere løp som Ghost."
+                            english: "Use a GPS-verified previous run as your Ghost.",
+                            norwegian: "Bruk et tidligere løp med gyldig GPS som Ghost."
                         ))
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
@@ -669,6 +686,25 @@ struct GhostFriendRaceHubView: View {
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            .accessibilityHint(ATHLTHLocalization.choose(
+                                english: "Choose this verified run as your invitation reference",
+                                norwegian: "Velg dette GPS-godkjente løpet til invitasjonen"
+                            ))
+                        }
+
+                        if hasMoreFriendRuns {
+                            Button {
+                                Task { await loadMoreFriendRuns() }
+                            } label: {
+                                Label(ATHLTHLocalization.choose(
+                                    english: "Find more GPS runs",
+                                    norwegian: "Finn flere GPS-løp"
+                                ), systemImage: "arrow.clockwise")
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(loadingRuns)
                         }
                     }
                 } else {
@@ -1358,28 +1394,55 @@ struct GhostFriendRaceHubView: View {
         }
     }
 
+    private var hasMoreFriendRuns: Bool {
+        checkedRunCount < unverifiedRuns.count
+    }
+
     @MainActor
     private func loadRuns() async {
+        guard !loadingRuns else { return }
         loadingRuns = true
-        defer {
-            loadingRuns = false
+        defer { loadingRuns = false }
+
+        let history = (try? await health.workoutHistory()) ?? health.workouts
+        unverifiedRuns = history.filter {
+            $0.activity == .running &&
+            ($0.distanceMeters ?? 0) >= 250 &&
+            $0.duration > 0
         }
+        .sorted { $0.startDate > $1.startDate }
 
-        let history =
-            (try? await health.workoutHistory()) ??
-            health.workouts
+        runs = []
+        checkedRunCount = 0
+        selectedWorkoutID = nil
+        await scanMoreFriendRuns()
+    }
 
-        runs =
-            history
-                .filter {
-                    $0.activity == .running &&
-                    ($0.distanceMeters ?? 0) >=
-                        250
-                }
-                .sorted {
-                    $0.startDate >
-                    $1.startDate
-                }
+    @MainActor
+    private func loadMoreFriendRuns() async {
+        guard !loadingRuns else { return }
+        loadingRuns = true
+        defer { loadingRuns = false }
+        await scanMoreFriendRuns()
+    }
+
+    @MainActor
+    private func scanMoreFriendRuns() async {
+        // In Basic, search for five ready choices without extra taps.
+        // Limit the number of HealthKit GPS queries in one interaction.
+        let needed = advancedMode ? 30 : 5
+        let limit = min(checkedRunCount + 30, unverifiedRuns.count)
+
+        while checkedRunCount < limit && runs.count < needed {
+            if Task.isCancelled { return }
+            let workout = unverifiedRuns[checkedRunCount]
+            let route = await health.workoutRoute(for: workout.id)
+            checkedRunCount += 1
+
+            if GhostRaceTrackEligibility.hasUsableGPS(route) {
+                runs.append(workout)
+            }
+        }
     }
 
     private func profileName(
