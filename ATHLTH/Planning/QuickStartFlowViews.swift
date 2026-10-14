@@ -1749,6 +1749,29 @@ struct RunQuickStartSheet: View {
             }
             .padding(.top, 10)
 
+            if environment == .treadmill,
+               let prior = phoneWorkout.lastTreadmillSpeedReference {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "clock.arrow.circlepath")
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.format(
+                            english: "Your previous logged belt speed: %.1f km/h",
+                            norwegian: "Din sist registrerte møllehastighet: %.1f km/t",
+                            prior.speed
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        Text(ATHLTHLocalization.choose(
+                            english: "Historical reference only. Set your actual belt speed during the workout.",
+                            norwegian: "Kun historikk. Registrer faktisk møllehastighet under økten."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .padding(.top, 10)
+            }
+
         }
     }
 
