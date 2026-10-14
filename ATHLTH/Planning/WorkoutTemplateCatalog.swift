@@ -1345,6 +1345,7 @@ struct WorkoutTemplateBuilderView: View {
     @State private var blocks: [WorkoutTemplateBlock] = []
     @State private var selectedRouteID: UUID?
     @State private var showingExercisePicker = false
+    @State private var selectedPhase: WorkoutPhaseKind = .main
 
     private var canSave: Bool {
         !title.trimmingCharacters(
@@ -1464,12 +1465,21 @@ struct WorkoutTemplateBuilderView: View {
                     }
 
                     ATHLTHCard {
-                        Text("ADD BLOCK")
+                        Text(ATHLTHLocalization.choose(
+                            english: "PIN A WORKOUT PHASE",
+                            norwegian: "FEST EN DEL AV ØKTEN"
+                        ))
                             .font(.caption2.weight(.bold))
                             .tracking(1.5)
-                            .foregroundStyle(
-                                ATHLTHTheme.mutedText
-                            )
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        Picker(ATHLTHLocalization.choose(english: "Phase", norwegian: "Fase"),
+                               selection: $selectedPhase) {
+                            ForEach(WorkoutPhaseKind.allCases) { phase in
+                                Text(phase.title).tag(phase)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.top, 9)
 
                         HStack(spacing: 9) {
                             blockAddButton(
@@ -1578,16 +1588,44 @@ struct WorkoutTemplateBuilderView: View {
                             : ATHLTHTheme.accentDeep
                     )
 
-                Text(block.title)
-                    .font(.subheadline.weight(.semibold))
+                VStack(alignment: .leading, spacing: 3) {
+                    Label(block.resolvedPhase.title, systemImage: block.resolvedPhase.symbol)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    Text(block.title)
+                        .font(.subheadline.weight(.semibold))
+                }
 
                 Spacer()
 
-                Button(role: .destructive) {
-                    blocks.remove(at: index)
-                    resequence()
+                Menu {
+                    ForEach(WorkoutPhaseKind.allCases) { phase in
+                        Button {
+                            blocks[index].phase = phase
+                        } label: {
+                            Label(phase.title, systemImage: phase.symbol)
+                        }
+                    }
+                    if index > 0 {
+                        Button(ATHLTHLocalization.choose(english: "Move up", norwegian: "Flytt opp")) {
+                            blocks.swapAt(index, index - 1)
+                            resequence()
+                        }
+                    }
+                    if index < blocks.count - 1 {
+                        Button(ATHLTHLocalization.choose(english: "Move down", norwegian: "Flytt ned")) {
+                            blocks.swapAt(index, index + 1)
+                            resequence()
+                        }
+                    }
+                    Button(role: .destructive) {
+                        blocks.remove(at: index)
+                        resequence()
+                    } label: {
+                        Label(ATHLTHLocalization.choose(english: "Remove", norwegian: "Fjern"), systemImage: "trash")
+                    }
                 } label: {
-                    Image(systemName: "trash")
+                    Image(systemName: "ellipsis")
                         .font(.caption)
                 }
                 .buttonStyle(.plain)
@@ -1595,15 +1633,56 @@ struct WorkoutTemplateBuilderView: View {
 
             switch block.kind {
             case .run:
-                Stepper(
-                    value: distanceBinding(index),
-                    in: 100...20_000,
-                    step: 100
-                ) {
-                    Text(
-                        "Distance · \(Int((blocks[index].distanceMeters ?? 1_000).rounded())) m"
-                    )
-                    .font(.caption)
+                TextField(ATHLTHLocalization.choose(english: "Activity (jogging, strides, drills)",
+                                                       norwegian: "Aktivitet (jogg, stigningsløp, drill)"),
+                          text: Binding(
+                            get: { blocks[index].title },
+                            set: { blocks[index].title = $0 }
+                          ))
+                    .font(.subheadline)
+                Picker(ATHLTHLocalization.choose(english: "Goal", norwegian: "Mål"),
+                       selection: Binding<Bool>(
+                          get: { blocks[index].durationSeconds != nil },
+                          set: { timed in
+                              blocks[index].durationSeconds = timed ? 600 : nil
+                              blocks[index].distanceMeters = timed ? nil : 1_000
+                          })) {
+                    Text(ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse")).tag(false)
+                    Text(ATHLTHLocalization.choose(english: "Time", norwegian: "Tid")).tag(true)
+                }
+                .pickerStyle(.segmented)
+                if blocks[index].durationSeconds != nil {
+                    Stepper(value: durationBinding(index), in: 15...7200, step: 15) {
+                        Text("\(Int(blocks[index].durationSeconds ?? 600)) s")
+                    }
+                } else {
+                    Stepper(value: distanceBinding(index), in: 100...20000, step: 100) {
+                        Text("\(Int(blocks[index].distanceMeters ?? 1000)) m")
+                    }
+                }
+                Toggle(ATHLTHLocalization.choose(english: "Target pace", norwegian: "Måltempo"),
+                       isOn: Binding(
+                          get: { blocks[index].targetPaceSecondsPerKilometer != nil },
+                          set: { blocks[index].targetPaceSecondsPerKilometer = $0 ? 330 : nil }
+                       ))
+                if blocks[index].targetPaceSecondsPerKilometer != nil {
+                    Stepper(value: Binding(
+                              get: { blocks[index].targetPaceSecondsPerKilometer ?? 330 },
+                              set: { blocks[index].targetPaceSecondsPerKilometer = $0 }),
+                            in: 150...1200, step: 5) {
+                        let pace = Int(blocks[index].targetPaceSecondsPerKilometer ?? 330)
+                        Text(String(format: "%d:%02d/km", pace / 60, pace % 60))
+                    }
+                }
+                Picker(ATHLTHLocalization.choose(english: "Target pulse zone", norwegian: "Pulssone"),
+                       selection: Binding<Int>(
+                         get: { blocks[index].targetHeartRateZone ?? 0 },
+                         set: { blocks[index].targetHeartRateZone = $0 == 0 ? nil : $0 }
+                       )) {
+                    Text(ATHLTHLocalization.choose(english: "No target", norwegian: "Ingen")).tag(0)
+                    ForEach(1...5, id: \.self) { zone in
+                        Text("\(zone)").tag(zone)
+                    }
                 }
 
             case .exercise:
@@ -1681,7 +1760,8 @@ struct WorkoutTemplateBuilderView: View {
                 durationSeconds: nil,
                 targetWeightKilograms: nil,
                 loadNote: nil,
-                notes: nil
+                notes: nil,
+                phase: selectedPhase
             )
         )
     }
@@ -1698,7 +1778,8 @@ struct WorkoutTemplateBuilderView: View {
                 durationSeconds: 60,
                 targetWeightKilograms: nil,
                 loadNote: nil,
-                notes: nil
+                notes: nil,
+                phase: .recovery
             )
         )
     }
@@ -1717,7 +1798,8 @@ struct WorkoutTemplateBuilderView: View {
                 durationSeconds: nil,
                 targetWeightKilograms: nil,
                 loadNote: nil,
-                notes: nil
+                notes: nil,
+                phase: selectedPhase
             )
         )
     }
@@ -1736,7 +1818,10 @@ struct WorkoutTemplateBuilderView: View {
                 targetWeightKilograms:
                     block.targetWeightKilograms,
                 loadNote: block.loadNote,
-                notes: block.notes
+                notes: block.notes,
+                phase: block.phase,
+                targetPaceSecondsPerKilometer: block.targetPaceSecondsPerKilometer,
+                targetHeartRateZone: block.targetHeartRateZone
             )
         }
     }
