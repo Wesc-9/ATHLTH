@@ -165,7 +165,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         }
 
         if let targetWeightKilograms,
-           targetWeightKilograms > 0 {
+           targetWeightKilograms >= 0 {
             parts.append(
                 String(
                     format: "%.1f kg",
@@ -209,8 +209,7 @@ extension Array where Element == WorkoutTemplateBlock {
 
         func append(_ source: WorkoutTemplateBlock, title: String? = nil) {
             guard output.count < 1000 else { return }
-            var item = source
-            item = WorkoutTemplateBlock(
+            let item = WorkoutTemplateBlock(
                 sequence: output.count + 1,
                 kind: source.kind,
                 title: title ?? source.title,
@@ -1793,6 +1792,18 @@ struct WorkoutTemplateBuilderView: View {
                 Spacer()
 
                 Menu {
+                    let starts = timelineStarts
+                    let position = starts.firstIndex(of: firstIndex)
+                    if let position, position > 0 {
+                        Button(tr("Move group up", "Flytt gruppe opp"), systemImage: "arrow.up") {
+                            moveTimelineSection(startingAt: firstIndex, direction: -1)
+                        }
+                    }
+                    if let position, position < starts.count - 1 {
+                        Button(tr("Move group down", "Flytt gruppe ned"), systemImage: "arrow.down") {
+                            moveTimelineSection(startingAt: firstIndex, direction: 1)
+                        }
+                    }
                     Button(tr("Ungroup", "Løs opp gruppe"), systemImage: "square.stack.3d.up") {
                         for i in members {
                             blocks[i].groupID = nil
@@ -1850,9 +1861,9 @@ struct WorkoutTemplateBuilderView: View {
                     Button(tr("Running", "Løping"), systemImage: "figure.run") {
                         addRunBlock(toGroup: id)
                     }
-                    Button(tr("Rest", "Pause"), systemImage: "pause.fill") {
-                        addRestBlock(toGroup: id)
-                    }
+                }
+                Button(tr("Rest", "Pause"), systemImage: "pause.fill") {
+                    addRestBlock(toGroup: id)
                 }
             } label: {
                 Label(tr("Add to group", "Legg til i gruppen"), systemImage: "plus.circle")
@@ -1938,18 +1949,28 @@ struct WorkoutTemplateBuilderView: View {
                                 Label(phase.title, systemImage: phase.symbol)
                             }
                         }
-                        if index > 0 && blocks[index - 1].groupID == block.groupID {
+                        if index > 0 && (block.groupID == nil ||
+                                blocks[index - 1].groupID == block.groupID) {
                             Button(tr("Move up", "Flytt opp"), systemImage: "arrow.up") {
-                                blocks.swapAt(index, index - 1)
-                                resequence()
-                                expandedBlockIndex = index - 1
+                                if block.groupID == nil {
+                                    moveTimelineSection(startingAt: index, direction: -1)
+                                } else {
+                                    blocks.swapAt(index, index - 1)
+                                    resequence()
+                                    expandedBlockIndex = index - 1
+                                }
                             }
                         }
-                        if index < blocks.count - 1 && blocks[index + 1].groupID == block.groupID {
+                        if index < blocks.count - 1 && (block.groupID == nil ||
+                                blocks[index + 1].groupID == block.groupID) {
                             Button(tr("Move down", "Flytt ned"), systemImage: "arrow.down") {
-                                blocks.swapAt(index, index + 1)
-                                resequence()
-                                expandedBlockIndex = index + 1
+                                if block.groupID == nil {
+                                    moveTimelineSection(startingAt: index, direction: 1)
+                                } else {
+                                    blocks.swapAt(index, index + 1)
+                                    resequence()
+                                    expandedBlockIndex = index + 1
+                                }
                             }
                         }
                         Button(role: .destructive) {
@@ -2340,6 +2361,19 @@ struct WorkoutTemplateBuilderView: View {
             block.restBetweenSetsSeconds = 90
         }
         insertBlock(block, toGroup: groupID)
+    }
+
+    private func moveTimelineSection(startingAt index: Int, direction: Int) {
+        let starts = timelineStarts
+        guard let position = starts.firstIndex(of: index),
+              starts.indices.contains(position + direction) else { return }
+        var sections = starts.map { first in
+            groupIndices(startingAt: first).map { blocks[$0] }
+        }
+        sections.swapAt(position, position + direction)
+        blocks = sections.flatMap { $0 }
+        resequence()
+        expandedBlockIndex = nil
     }
 
     private func resequence() {
