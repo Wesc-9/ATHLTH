@@ -1534,6 +1534,12 @@ struct WorkoutTemplateBuilderView: View {
     @State private var expandedBlockIndex: Int?
     @State private var exerciseTargetGroupID: UUID?
     @State private var pendingNewGroupKind: WorkoutBlockGroupKind?
+    @State private var collapsedGroupIDs: Set<UUID> = []
+    @State private var showingDiscardConfirmation = false
+
+    private let studioInk = Color(red: 0.08, green: 0.14, blue: 0.27)
+    private let studioBlue = Color(red: 0.04, green: 0.43, blue: 0.98)
+    private let studioBackground = Color(red: 0.958, green: 0.973, blue: 0.988)
 
     private func tr(_ english: String, _ norwegian: String) -> String {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
@@ -1623,19 +1629,19 @@ struct WorkoutTemplateBuilderView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     workoutOverview
-                    timeline
                     addBlockSection
+                    timeline
                     if hasRunning {
                         routeSection
                     }
                 }
-                .padding(.horizontal, 18)
-                .padding(.top, 14)
-                .padding(.bottom, 24)
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 28)
                 .frame(maxWidth: 720)
                 .frame(maxWidth: .infinity)
             }
-            .background(ATHLTHPremiumCanvas(accent: Color.teal.opacity(0.12)))
+            .background(studioBackground.ignoresSafeArea())
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 saveBar
             }
@@ -1644,14 +1650,29 @@ struct WorkoutTemplateBuilderView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(tr("Cancel", "Avbryt")) {
-                        dismiss()
+                        if !blocks.isEmpty || !title.isEmpty {
+                            showingDiscardConfirmation = true
+                        } else {
+                            dismiss()
+                        }
                     }
                 }
             }
+            .confirmationDialog(
+                tr("Discard workout?", "Forkaste treningsøkten?"),
+                isPresented: $showingDiscardConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button(tr("Discard", "Forkast"), role: .destructive) {
+                    dismiss()
+                }
+                Button(tr("Keep editing", "Fortsett å redigere"), role: .cancel) {}
+            } message: {
+                Text(tr("Changes that haven't been saved will be lost.",
+                        "Endringer som ikke er lagret, går tapt."))
+            }
             .sheet(isPresented: $showingExercisePicker) {
                 NavigationStack {
-                    // No fixed source: allow switching between the ATHLTH
-                    // library and exercises created by the user.
                     ExerciseLibraryView(
                         source: nil,
                         selectionTitle: tr("Add Exercise", "Legg til øvelse")
@@ -1676,97 +1697,165 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private var workoutOverview: some View {
-        ATHLTHCard {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text(tr("NEW WORKOUT", "NY TRENINGSØKT"))
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.6)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                    Spacer()
-                    Label(categoryTitle, systemImage: "circle.grid.2x2")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                }
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Image("TreadmillRecentCardHero")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: proxy.size.width, height: 184)
+                    .clipped()
 
-                TextField(tr("Name your workout", "Gi økten et navn"), text: $title)
-                    .font(.title2.weight(.bold))
+                LinearGradient(
+                    stops: [
+                        .init(color: Color(red: 0.92, green: 0.96, blue: 1).opacity(0.99), location: 0),
+                        .init(color: Color(red: 0.92, green: 0.96, blue: 1).opacity(0.96), location: 0.36),
+                        .init(color: Color(red: 0.92, green: 0.96, blue: 1).opacity(0.36), location: 0.68),
+                        .init(color: .clear, location: 1)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+
+                VStack(alignment: .leading, spacing: 11) {
+                    Text("A T H L T H")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(studioInk.opacity(0.73))
+
+                    TextField(
+                        tr("Workout name", "Navngi treningsøkten"),
+                        text: $title
+                    )
+                    .font(.system(size: 27, weight: .bold, design: .rounded))
+                    .foregroundStyle(studioInk)
+                    .tint(studioBlue)
+                    .lineLimit(1)
                     .textInputAutocapitalization(.sentences)
+                    .accessibilityLabel(tr("Workout name", "Navn på treningsøkt"))
 
-                HStack(spacing: 14) {
-                    Label("\(blocks.count) " + tr("blocks", "blokker"),
-                          systemImage: "rectangle.stack")
-                    if blocks.expandedForExecution().count != blocks.count {
-                        Text("· \(blocks.expandedForExecution().count) " + tr("steps", "steg"))
+                    HStack(spacing: 6) {
+                        metricPill(
+                            "\(blocks.expandedForExecution().count) " + tr("steps", "steg"),
+                            icon: "square.stack.3d.up"
+                        )
+                        if let knownDurationMinutes {
+                            metricPill("\(knownDurationMinutes) min", icon: "clock")
+                        }
+                        metricPill(categoryTitle, icon: "chart.bar.fill")
                     }
-                    if let knownDurationMinutes {
-                        Label("\(knownDurationMinutes) " + tr("min", "min"),
-                              systemImage: "clock")
-                    }
+
+                    Text(tr("Build your workout, step by step.",
+                            "Bygg økten steg for steg."))
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(studioInk.opacity(0.7))
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .padding(.horizontal, 19)
+                .padding(.vertical, 18)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+        .frame(height: 184)
+        .clipShape(RoundedRectangle(cornerRadius: 23, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 23, style: .continuous)
+                .strokeBorder(.white.opacity(0.92), lineWidth: 1)
+        }
+        .shadow(color: studioInk.opacity(0.07), radius: 16, y: 8)
+    }
+
+    private func metricPill(_ value: String, icon: String) -> some View {
+        Label(value, systemImage: icon)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(studioInk)
+            .lineLimit(1)
+            .padding(.horizontal, 9)
+            .frame(height: 28)
+            .background(.white.opacity(0.79), in: Capsule())
     }
 
     private var timeline: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(tr("YOUR WORKOUT", "DIN TRENINGSØKT"))
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.6)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                Spacer()
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(alignment: .center, spacing: 8) {
+                Text(tr("WORKOUT", "TRENINGSØKT").uppercased() +
+                     " (\(blocks.expandedForExecution().count) " +
+                     tr("STEPS", "STEG") + ")")
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(1.25)
+                    .foregroundStyle(studioInk.opacity(0.8))
+
+                Spacer(minLength: 0)
+
                 if !blocks.isEmpty {
-                    Text(tr("Tap a block to edit", "Trykk på en blokk for å redigere"))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                    Label(tr("Drag to reorder", "Dra for å endre rekkefølge"),
+                          systemImage: "arrow.up.arrow.down")
+                        .font(.system(size: 10))
+                        .foregroundStyle(studioInk.opacity(0.6))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 }
             }
+            .padding(.horizontal, 3)
 
             if blocks.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "figure.run.square.stack")
-                        .font(.system(size: 29, weight: .light))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                    Text(tr("Build your session, one block at a time",
-                            "Bygg økten, én blokk om gangen"))
+                VStack(spacing: 9) {
+                    Image(systemName: "square.stack.3d.up")
+                        .font(.system(size: 27))
+                        .foregroundStyle(studioBlue)
+                    Text(tr("Your workout starts here",
+                            "Treningsøkten din starter her"))
                         .font(.headline)
-                        .multilineTextAlignment(.center)
-                    Text(tr("Start with an exercise, run or warm-up. The timeline will appear here.",
-                            "Start med en øvelse, løpetur eller oppvarming. Økten vises her etter hvert."))
+                    Text(tr("Choose an exercise, run, rest or group above.",
+                            "Velg øvelse, løping, pause eller gruppe over."))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
                     Button {
                         openExercisePicker()
                     } label: {
-                        Label(tr("Add exercise", "Legg til øvelse"),
+                        Label(tr("Add your first exercise", "Legg til første øvelse"),
                               systemImage: "plus.circle.fill")
-                            .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 46)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.accentDeep)
+                    .tint(studioBlue)
+                    .padding(.top, 7)
                 }
-                .padding(20)
                 .frame(maxWidth: .infinity)
-                .background(Color.white.opacity(0.82),
-                            in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .padding(22)
+                .background(.white, in: RoundedRectangle(cornerRadius: 22))
             } else {
-                VStack(spacing: 9) {
-                    ForEach(timelineStarts, id: \.self) { index in
-                        if blocks[index].groupID != nil {
-                            groupTimelineCard(startingAt: index)
-                        } else {
-                            builderBlockRow(index)
+                VStack(spacing: 11) {
+                    ForEach(Array(timelineStarts.enumerated()), id: \.element) { position, index in
+                        HStack(alignment: .top, spacing: 10) {
+                            timelineNumber(position + 1)
+                                .frame(width: 34)
+                            Group {
+                                if blocks[index].groupID != nil {
+                                    groupTimelineCard(startingAt: index)
+                                } else {
+                                    builderBlockRow(index, nested: false)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .dropDestination(for: String.self) { items, _ in
+                                guard let source = items.first.flatMap(Int.init),
+                                      source != index else { return false }
+                                moveTimelineSection(from: source, to: index)
+                                return true
+                            }
                         }
                     }
                 }
             }
         }
+    }
+
+    private func timelineNumber(_ number: Int) -> some View {
+        Text("\(number)")
+            .font(.system(size: 13, weight: .bold))
+            .foregroundStyle(studioBlue)
+            .frame(width: 33, height: 33)
+            .background(Color(red: 0.87, green: 0.93, blue: 1.0), in: Circle())
+            .overlay { Circle().strokeBorder(.white, lineWidth: 1.4) }
+            .padding(.top, 8)
+            .accessibilityLabel(tr("Section", "Del") + " \(number)")
     }
 
     private func groupTimelineCard(startingAt firstIndex: Int) -> some View {
@@ -2122,75 +2211,86 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private var addBlockSection: some View {
-        ATHLTHCard {
-            VStack(alignment: .leading, spacing: 13) {
-                HStack {
-                    Text(tr("ADD A BLOCK", "LEGG TIL BLOKK"))
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.5)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                    Spacer()
-                    Menu {
-                        ForEach(WorkoutPhaseKind.allCases) { phase in
-                            Button {
-                                selectedPhase = phase
-                            } label: {
-                                Label(phase.title, systemImage: phase.symbol)
-                            }
-                        }
-                    } label: {
-                        Label(selectedPhase.title, systemImage: selectedPhase.symbol)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                    }
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(tr("BLOCK LIBRARY", "BLOKKBIBLIOTEK"))
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(1.6)
+                    .foregroundStyle(studioInk.opacity(0.74))
+                Spacer()
+                Text(tr("Add blocks to your workout.",
+                        "Legg til blokker i økten din."))
+                    .font(.system(size: 10))
+                    .foregroundStyle(studioInk.opacity(0.55))
+            }
 
+            HStack(spacing: 9) {
                 Button {
                     openExercisePicker()
                 } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "dumbbell.fill")
-                            .font(.title3)
-                            .frame(width: 30)
-                        Text(tr("Add exercise from library",
-                                "Legg til øvelse fra biblioteket"))
-                            .font(.subheadline.weight(.semibold))
-                        Spacer()
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title3)
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .frame(height: 54)
-                    .background(ATHLTHTheme.accentDeep,
-                                in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    studioLibraryTile(tr("Exercise", "Øvelse"), icon: "dumbbell.fill",
+                                      color: Color(red: 0.12, green: 0.48, blue: 0.98))
                 }
                 .buttonStyle(.plain)
 
-                HStack(spacing: 10) {
-                    blockAddButton(tr("Running", "Løping"), icon: "figure.run") {
-                        addRunBlock()
-                    }
-                    blockAddButton(tr("Rest", "Pause"), icon: "pause.fill") {
-                        addRestBlock()
-                    }
+                Button {
+                    addRunBlock()
+                } label: {
+                    studioLibraryTile(tr("Running", "Løping"), icon: "figure.run",
+                                      color: Color(red: 0.04, green: 0.48, blue: 0.47))
                 }
-                Divider()
-                Text(tr("ADVANCED", "AVANSERT"))
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.3)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+                .buttonStyle(.plain)
 
-                HStack(spacing: 10) {
-                    blockAddButton(tr("Superset", "Supersett"), icon: "dumbbell.fill") {
+                Button {
+                    addRestBlock()
+                } label: {
+                    studioLibraryTile(tr("Rest", "Pause"), icon: "pause.fill",
+                                      color: Color(red: 0.73, green: 0.38, blue: 0.29))
+                }
+                .buttonStyle(.plain)
+
+                Menu {
+                    Button {
                         createSuperset()
+                    } label: {
+                        Label(tr("Superset", "Supersett"), systemImage: "dumbbell.fill")
                     }
-                    blockAddButton(tr("Intervals", "Intervaller"), icon: "repeat") {
+                    Button {
                         createIntervals()
+                    } label: {
+                        Label(tr("Intervals", "Intervaller"), systemImage: "repeat")
                     }
+                } label: {
+                    studioLibraryTile(tr("Groups", "Grupper"), icon: "square.on.square",
+                                      color: Color(red: 0.45, green: 0.27, blue: 0.91))
                 }
             }
         }
+        .padding(14)
+        .background(.white.opacity(0.96),
+                    in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(.white, lineWidth: 1)
+        }
+        .shadow(color: studioInk.opacity(0.045), radius: 14, y: 6)
+    }
+
+    private func studioLibraryTile(_ title: String, icon: String, color: Color) -> some View {
+        VStack(spacing: 11) {
+            Image(systemName: icon)
+                .font(.system(size: 21, weight: .semibold))
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .foregroundStyle(color)
+        .frame(maxWidth: .infinity)
+        .frame(height: 87)
+        .background(color.opacity(0.105),
+                    in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 17))
     }
 
     private var routeSection: some View {
@@ -2217,21 +2317,50 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private var saveBar: some View {
-        Button {
-            saveWorkout()
-        } label: {
-            Label(tr("Save Workout", "Lagre treningsøkt"),
-                  systemImage: "checkmark.circle.fill")
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .frame(height: 54)
+        HStack(spacing: 10) {
+            Menu {
+                Button(tr("Exercise", "Øvelse"), systemImage: "dumbbell.fill") {
+                    openExercisePicker()
+                }
+                Button(tr("Running", "Løping"), systemImage: "figure.run") {
+                    addRunBlock()
+                }
+                Button(tr("Rest", "Pause"), systemImage: "pause.fill") {
+                    addRestBlock()
+                }
+                Button(tr("Superset", "Supersett"), systemImage: "dumbbell.fill") {
+                    createSuperset()
+                }
+                Button(tr("Intervals", "Intervaller"), systemImage: "repeat") {
+                    createIntervals()
+                }
+            } label: {
+                Label(tr("Add block", "Legg til blokk"), systemImage: "plus.circle")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(studioInk)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(.white, in: Capsule())
+                    .overlay { Capsule().strokeBorder(studioInk.opacity(0.12)) }
+            }
+
+            Button {
+                saveWorkout()
+            } label: {
+                Label(tr("Save workout", "Lagre treningsøkt"),
+                      systemImage: "checkmark.circle.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(studioBlue, in: Capsule())
+                    .opacity(canSave ? 1 : 0.48)
+            }
+            .disabled(!canSave)
         }
-        .buttonStyle(.borderedProminent)
-        .tint(ATHLTHTheme.accentDeep)
-        .disabled(!canSave)
-        .padding(.horizontal, 18)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
         .background(.regularMaterial)
     }
 
