@@ -172,6 +172,7 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     @Published private(set) var pendingStrengthCommands:
         [WatchStrengthCommand] = []
     @Published private(set) var lastSpotifyCommand: WatchSpotifyCommand?
+    @Published private(set) var latestAIConversationRequestID: UUID?
     @Published private(set) var workoutLaunchInProgress = false
     @Published private(set) var workoutLaunchError: String?
     @Published private(set) var watchWorkoutActivityState:
@@ -1390,6 +1391,12 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     }
 
     private func receive(_ payload: IncomingWatchPayload) {
+        if payload.kind == WatchTransferKind.aiCoachConversationRequest.rawValue {
+            if ATHLTHAIWatchCoachRequestPolicy.accepts(sentAt: payload.sentAt) {
+                latestAIConversationRequestID = UUID()
+            }
+            return
+        }
         if payload.kind ==
             WatchTransferKind.todayWorkoutRequest.rawValue {
             sendWatchPayload(

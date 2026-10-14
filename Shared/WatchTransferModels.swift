@@ -1536,6 +1536,7 @@ enum WatchTransferKind: String {
     case workoutCommand
     case workoutRouteSelection
     case audioCoachConfiguration
+    case aiCoachConversationRequest
     case runningWorkout
     case ghostRace
     case liveSurfaceConfiguration
@@ -1573,4 +1574,15 @@ enum WatchTransferMetadataKey {
     static let sentAt = "sentAt"
     static let workoutAllowed = "workoutAllowed"
     static let workoutActive = "workoutActive"
+}
+
+
+/// Only a fresh interactive Watch request may reveal the iPhone AI consent UI.
+/// No Watch command is allowed to start the microphone directly.
+enum ATHLTHAIWatchCoachRequestPolicy {
+    static func accepts(sentAt: TimeInterval?, now: Date = Date()) -> Bool {
+        guard let sentAt, sentAt.isFinite else { return false }
+        let age = now.timeIntervalSince1970 - sentAt
+        return age >= 0 && age <= 20
+    }
 }

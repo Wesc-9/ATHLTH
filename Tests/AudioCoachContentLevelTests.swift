@@ -307,6 +307,18 @@ final class AudioCoachContentLevelTests: XCTestCase {
         XCTAssertNil(feedback(315, sampledAt: now, secondsInStep: 10))
     }
 
+    func testWatchCoachRequestRequiresRecentExplicitTap() {
+        let current = Date(timeIntervalSince1970: 500_000)
+        XCTAssertTrue(ATHLTHAIWatchCoachRequestPolicy.accepts(
+            sentAt: current.timeIntervalSince1970 - 3, now: current))
+        XCTAssertFalse(ATHLTHAIWatchCoachRequestPolicy.accepts(
+            sentAt: nil, now: current))
+        XCTAssertFalse(ATHLTHAIWatchCoachRequestPolicy.accepts(
+            sentAt: current.timeIntervalSince1970 - 60, now: current))
+        XCTAssertFalse(ATHLTHAIWatchCoachRequestPolicy.accepts(
+            sentAt: current.timeIntervalSince1970 + 5, now: current))
+    }
+
     func testApplyingContentPresetNeverEnablesDisabledSession() {
         let original = WatchAudioCoachConfiguration.disabled
         for level in ATHLTHCoachContentLevel.allCases {

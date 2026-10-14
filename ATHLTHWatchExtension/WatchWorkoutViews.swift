@@ -1587,6 +1587,23 @@ struct WatchActiveWorkoutView: View {
                 .watchSurface(radius: 16)
             }
 
+            if workoutManager.isActive {
+                Button {
+                    workoutManager.requestAIConversationOnIPhone()
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "AI Coach on iPhone",
+                            norwegian: "AI Coach på iPhone"
+                        ),
+                        systemImage: "mic.circle"
+                    )
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(maxWidth: .infinity, minHeight: 38)
+                }
+                .buttonStyle(.bordered)
+            }
+
             if workoutManager.audioCoachConfigured {
                 NavigationLink {
                     WatchAudioCoachLiveSettingsView(
@@ -3935,6 +3952,23 @@ private struct WatchRunWalkWorkoutPager: View {
                     .font(.system(size: 12, weight: .semibold))
                     .frame(maxWidth: .infinity)
                     .frame(height: 34)
+                }
+                .buttonStyle(.bordered)
+            }
+
+            if workoutManager.isActive {
+                Button {
+                    workoutManager.requestAIConversationOnIPhone()
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "AI Coach on iPhone",
+                            norwegian: "AI Coach på iPhone"
+                        ),
+                        systemImage: "mic.circle"
+                    )
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(maxWidth: .infinity, minHeight: 38)
                 }
                 .buttonStyle(.bordered)
             }

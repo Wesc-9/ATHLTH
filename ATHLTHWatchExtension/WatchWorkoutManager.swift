@@ -2652,6 +2652,27 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             activity
     }
 
+    func requestAIConversationOnIPhone() {
+        guard isActive else { return }
+        guard WCSession.isSupported(),
+              WCSession.default.activationState == .activated,
+              WCSession.default.isReachable
+        else {
+            errorMessage = ATHLTHLocalization.choose(
+                english: "Open ATHLTH on iPhone to request an AI Coach conversation.",
+                norwegian: "Åpne ATHLTH på iPhone for å be om en AI-samtale."
+            )
+            return
+        }
+        // No durable transferUserInfo. Stale requests never launch consent.
+        WCSession.default.sendMessage([
+            WatchTransferMetadataKey.kind:
+                WatchTransferKind.aiCoachConversationRequest.rawValue,
+            WatchTransferMetadataKey.sentAt:
+                Date().timeIntervalSince1970
+        ], replyHandler: nil, errorHandler: nil)
+    }
+
     private func localWorkoutStartAllowed()
         async -> Bool {
         if companionWorkoutActivity?
