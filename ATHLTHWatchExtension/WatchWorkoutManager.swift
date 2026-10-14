@@ -6458,6 +6458,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             runningStepRemainingMeters:
                 runningStepReadout?.unit == .meters
                     ? runningStepReadout?.remaining : nil,
+            runningStepCoachBrief: currentRunningStep?.coachBrief,
+            runningStepPhase: currentRunningStep?.phase,
+            runningStepTargetHeartRateZone: currentRunningStep?.targetHeartRateZone,
             heartRateTargetZone:
                 targetAlertConfiguration?.heartRateZone,
             heartRateTargetMinimumBPM:
