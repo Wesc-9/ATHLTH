@@ -4,6 +4,7 @@ import SwiftUI
 /// RunningWorkoutBlock model. No new execution engine is introduced.
 struct ATHLTHTrainIntervalComposerView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
 
     let initial: RunningWorkoutTemplate?
     let onSave: (RunningWorkoutTemplate) -> Void
@@ -13,6 +14,7 @@ struct ATHLTHTrainIntervalComposerView: View {
     @State private var kind: RunningBlockKind = .work
     @State private var activityName = ""
     @State private var targetEffort: RunningIntensityKind = .easy
+    @State private var saveAsReusableTemplate = false
     @State private var measure: RunningMeasureKind = .distance
     @State private var minutes = 5
     @State private var distanceMeters = 1000
@@ -433,6 +435,9 @@ struct ATHLTHTrainIntervalComposerView: View {
                 .foregroundStyle(muted)
             }
 
+            Toggle(tr("Also save as reusable template", "Lagre også som gjenbrukbar mal"),
+                   isOn: $saveAsReusableTemplate)
+                .tint(bronze)
             Text(tr("Tell Audio Coach what matters", "Fortell Audio Coach hva som er viktig"))
                 .font(.subheadline.weight(.semibold))
             TextField(tr("e.g. Motivate me and focus on pace", "F.eks. Motiver meg og følg med på tempo"),
@@ -580,7 +585,7 @@ struct ATHLTHTrainIntervalComposerView: View {
     private func save() {
         let now = Date()
         var result = RunningWorkoutTemplate(
-            id: initial?.isBuiltIn == false ? initial!.id : UUID(),
+            id: initial?.isBuiltIn == false ? (initial?.id ?? UUID()) : UUID(),
             title: name.trimmingCharacters(in: .whitespacesAndNewlines),
             type: initial?.type ?? .intervals,
             summary: tr("Advanced structured running session",
@@ -597,6 +602,9 @@ struct ATHLTHTrainIntervalComposerView: View {
         result.intervalGhostRecoverySlowdownPercent = ghostRecoverySlowdownPercent
         result.coachBrief = coachBrief.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? nil : String(coachBrief.prefix(300))
+        if saveAsReusableTemplate {
+            runningLibrary.save(result)
+        }
         onSave(result)
         dismiss()
     }
