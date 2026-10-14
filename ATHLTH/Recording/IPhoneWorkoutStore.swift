@@ -2013,6 +2013,26 @@ final class IPhoneWorkoutStore:
             .first
     }
 
+    /// Record user-reported treadmill pace for history/next coaching session
+    /// without advancing distance or modifying the current belt-speed estimate.
+    func recordTreadmillHistoricalSpeedKilometersPerHour(_ speed: Double) {
+        guard var workout = active,
+              workout.runEnvironment == .treadmill,
+              speed.isFinite, (0...30).contains(speed) else { return }
+        var points = workout.treadmillSpeedHistory ?? []
+        let elapsed = workout.elapsed(at: Date())
+        if points.last?.kilometersPerHour != speed ||
+           (points.last?.activeElapsedSeconds ?? -1) < elapsed - 60 {
+            points.append(PhoneTreadmillSpeedEntry(
+                activeElapsedSeconds: elapsed,
+                kilometersPerHour: speed
+            ))
+            workout.treadmillSpeedHistory = points
+            active = workout
+            checkpoint(force: true)
+        }
+    }
+
     func setTreadmillSpeedKilometersPerHour(_ speed: Double) {
         guard var workout = active, workout.runEnvironment == .treadmill,
               speed.isFinite, (0...30).contains(speed) else { return }
