@@ -30,6 +30,9 @@ struct ExerciseLibraryView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
     @EnvironmentObject private var recents: LibraryRecentsStore
+    @ObservedObject private var norwegianTranslations = NorwegianExerciseAutoTranslation.shared
+    @State private var nameTranslationConfig: TranslationSession.Configuration?
+    @State private var languageStatus: LanguageAvailability.Status = .unsupported
 
     let source: ExerciseLibrarySection?
     let selectionTitle: String?
@@ -195,6 +198,7 @@ struct ExerciseLibraryView: View {
             }
 
             filters
+            translationAvailabilityBanner
 
             Button {
                 showingEquipmentScanner = true
@@ -502,6 +506,49 @@ struct ExerciseLibraryView: View {
         }
         .refreshable {
             await library.refresh(force: true)
+        }
+        .task {
+            guard ATHLTHLocalization.isNorwegian else { return }
+            languageStatus = await NorwegianExerciseAutoTranslation.availabilityStatus()
+            if languageStatus == .installed {
+                nameTranslationConfig = NorwegianExerciseAutoTranslation.configuration()
+            }
+        }
+        .translationTask(nameTranslationConfig) { session in
+            let pendingNames = library.selectableExercises
+                .filter { $0.source == .repDB }
+                .filter {
+                    NorwegianExerciseText.name(for: $0.sourceIdentifier) == nil
+                      && ATHLTHExerciseNameLocalization.norwegianName(for: $0.name)
+                         == $0.name
+                }
+                .map(\.name)
+            await norwegianTranslations.translate(texts: pendingNames, using: session)
+        }
+    }
+
+    @ViewBuilder
+    private var translationAvailabilityBanner: some View {
+        if ATHLTHLocalization.isNorwegian &&
+           selectedSection == .library &&
+           languageStatus == .supported {
+            Button {
+                // The system explicitly asks before downloading any missing
+                // language model. Nothing is bundled inside ATHLTH itself.
+                nameTranslationConfig = NorwegianExerciseAutoTranslation.configuration()
+                languageStatus = .installed
+            } label: {
+                Label(
+                    "Oversett resten av øvelsesnavnene til norsk",
+                    systemImage: "character.book.closed"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 7)
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 17)
         }
     }
 
