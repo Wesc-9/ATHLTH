@@ -107,8 +107,12 @@ struct GhostRaceHubView: View {
     @EnvironmentObject private var publicTrailDiscovery:
         PublicTrailDiscoveryStore
 
+    // Replay lists only GPS runs that can actually prepare a Ghost.
     @State private var recentRuns: [WorkoutSummary] = []
+    @State private var replayCandidates: [WorkoutSummary] = []
+    @State private var replayCheckedCount = 0
     @State private var loading = false
+    @State private var verifyingReplay = false
     @State private var startingWorkoutID: UUID?
     @State private var liveStartingSessionID: UUID?
     // Each race category keeps its own experience level.
@@ -1879,31 +1883,68 @@ struct GhostRaceHubView: View {
         return nil
     }
 
+    private var hasMoreReplayCandidates: Bool {
+        replayCheckedCount < replayCandidates.count
+    }
+
+    // HealthKit run history alone does not guarantee a usable GPS track.
+    // Validate progressively, without pulling heart-rate and other detail
+    // data, and reuse HealthKitManager's route cache.
     private func loadRuns() async {
         loading = true
-        defer {
-            loading = false
-        }
+        defer { loading = false }
 
         guard health.hasRequestedAuthorization else {
             recentRuns = []
+            replayCandidates = []
+            replayCheckedCount = 0
             return
         }
 
-        let history =
-            (try? await health.workoutHistory()) ??
-            health.workouts
+        let history = (try? await health.workoutHistory()) ?? health.workouts
+        replayCandidates = history
+            .filter {
+                $0.activity == .running &&
+                ($0.distanceMeters ?? 0) >= 250 &&
+                $0.duration > 0
+            }
+            .sorted { $0.startDate > $1.startDate }
 
-        recentRuns =
-            history
+        recentRuns = []
+        replayCheckedCount = 0
+        await verifyNextReplayBatch()
+    }
+
+    private func verifyNextReplayBatch() async {
+        guard !verifyingReplay, hasMoreReplayCandidates else { return }
+        verifyingReplay = true
+        defer { verifyingReplay = false }
+
+        let batchEnd = min(replayCheckedCount + 12, replayCandidates.count)
+        while replayCheckedCount < batchEnd {
+            let workout = replayCandidates[replayCheckedCount]
+            let route = await health.workoutRoute(for: workout.id)
+            replayCheckedCount += 1
+
+            // Match the actual GhostRaceStore.prepare() requirements.
+            let valid = route
                 .filter {
-                    $0.activity == .running &&
-                    ($0.distanceMeters ?? 0) >= 250
+                    $0.coordinate.latitude.isFinite &&
+                    $0.coordinate.longitude.isFinite &&
+                    $0.horizontalAccuracy >= 0 &&
+                    $0.horizontalAccuracy <= 65
                 }
-                .sorted {
-                    $0.startDate >
-                    $1.startDate
-                }
+                .sorted { $0.timestamp < $1.timestamp }
+
+            guard valid.count >= 2 else { continue }
+            var distance = 0.0
+            for index in 1..<valid.count {
+                distance += valid[index].distance(from: valid[index - 1])
+            }
+            if distance >= 250 {
+                recentRuns.append(workout)
+            }
+        }
     }
 
     private var deviceRequirementText: String {
