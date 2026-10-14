@@ -1863,239 +1863,335 @@ struct WorkoutTemplateBuilderView: View {
         let members = groupIndices(startingAt: firstIndex)
         let kind = first.groupKind ?? .intervals
         let id = first.groupID!
+        let collapsed = collapsedGroupIDs.contains(id)
+        let number = timelineStarts.filter {
+            $0 <= firstIndex && blocks[$0].groupID != nil
+        }.count
+        let letters = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+        let letter = String(letters[(max(number, 1) - 1) % letters.count])
 
         return VStack(alignment: .leading, spacing: 11) {
-            HStack(spacing: 9) {
-                Image(systemName: kind.symbol)
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .frame(width: 28, height: 28)
-                    .background(ATHLTHTheme.accentSoft, in: Circle())
+            HStack(spacing: 8) {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 13))
+                    .foregroundStyle(studioInk.opacity(0.36))
+                    .frame(width: 20, height: 38)
+                    .contentShape(Rectangle())
+                    .draggable(String(firstIndex))
+                    .accessibilityLabel(tr("Drag to reorder group",
+                                           "Dra for å flytte gruppe"))
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(kind.title).font(.subheadline.weight(.bold))
-                    Text("\(members.count) " + tr("blocks", "blokker"))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                Image(systemName: kind == .superset ? "dumbbell.fill" : "figure.run")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(studioBlue)
+                    .frame(width: 40, height: 40)
+                    .background(studioBlue.opacity(0.085),
+                                in: RoundedRectangle(cornerRadius: 12))
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        if collapsed {
+                            collapsedGroupIDs.remove(id)
+                        } else {
+                            collapsedGroupIDs.insert(id)
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Text(tr("Group", "Gruppe") + " " + letter + " – " + kind.title)
+                            .font(.system(size: 13, weight: .bold))
+                            .lineLimit(2)
+                            .foregroundStyle(studioInk)
+                        Spacer(minLength: 0)
+                        Image(systemName: collapsed ? "chevron.right" : "chevron.down")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(studioInk.opacity(0.58))
+                    }
+                    .contentShape(Rectangle())
                 }
-                Spacer()
+                .buttonStyle(.plain)
 
                 Menu {
-                    let starts = timelineStarts
-                    let position = starts.firstIndex(of: firstIndex)
-                    if let position, position > 0 {
-                        Button(tr("Move group up", "Flytt gruppe opp"), systemImage: "arrow.up") {
+                    ForEach(1...20, id: \.self) { rounds in
+                        Button("\(rounds) " + tr("rounds", "runder")) {
+                            for index in blocks.indices where blocks[index].groupID == id {
+                                blocks[index].groupRounds = rounds
+                            }
+                        }
+                    }
+                } label: {
+                    Text("\(first.groupRounds ?? 3) " + tr("rounds", "runder"))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(studioInk.opacity(0.82))
+                        .lineLimit(1)
+                        .padding(.horizontal, 9)
+                        .frame(height: 25)
+                        .background(studioBlue.opacity(0.075), in: Capsule())
+                }
+
+                Menu {
+                    if let pos = timelineStarts.firstIndex(of: firstIndex), pos > 0 {
+                        Button(tr("Move group up", "Flytt gruppe opp"),
+                               systemImage: "arrow.up") {
                             moveTimelineSection(startingAt: firstIndex, direction: -1)
                         }
                     }
-                    if let position, position < starts.count - 1 {
-                        Button(tr("Move group down", "Flytt gruppe ned"), systemImage: "arrow.down") {
+                    if let pos = timelineStarts.firstIndex(of: firstIndex),
+                       pos < timelineStarts.count - 1 {
+                        Button(tr("Move group down", "Flytt gruppe ned"),
+                               systemImage: "arrow.down") {
                             moveTimelineSection(startingAt: firstIndex, direction: 1)
                         }
                     }
-                    Button(tr("Ungroup", "Løs opp gruppe"), systemImage: "square.stack.3d.up") {
-                        for i in members {
-                            blocks[i].groupID = nil
-                            blocks[i].groupKind = nil
-                            blocks[i].groupRounds = nil
+                    Button(tr("Ungroup", "Løs opp gruppe"),
+                           systemImage: "square.stack.3d.up") {
+                        for index in members {
+                            blocks[index].groupID = nil
+                            blocks[index].groupKind = nil
+                            blocks[index].groupRounds = nil
                         }
+                        collapsedGroupIDs.remove(id)
                     }
                     Button(role: .destructive) {
                         blocks.removeAll { $0.groupID == id }
                         resequence()
+                        collapsedGroupIDs.remove(id)
                         expandedBlockIndex = nil
                     } label: {
-                        Label(tr("Delete group", "Slett gruppe"), systemImage: "trash")
+                        Label(tr("Delete group", "Slett gruppe"),
+                              systemImage: "trash")
                     }
                 } label: {
                     Image(systemName: "ellipsis")
-                        .frame(width: 30, height: 34)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(studioInk.opacity(0.64))
+                        .frame(width: 24, height: 36)
                 }
             }
 
-            Stepper(
-                value: Binding(
-                    get: { blocks.first(where: { $0.groupID == id })?.groupRounds ?? 3 },
-                    set: { rounds in
-                        for index in blocks.indices where blocks[index].groupID == id {
-                            blocks[index].groupRounds = rounds
+            if !collapsed {
+                VStack(spacing: 0) {
+                    ForEach(members, id: \.self) { index in
+                        builderBlockRow(index, nested: true)
+                        if index != members.last {
+                            Divider()
+                                .padding(.leading, 57)
                         }
                     }
-                ),
-                in: 1...20
-            ) {
-                Label("\(first.groupRounds ?? 3) " + tr("rounds", "runder"),
-                      systemImage: "repeat")
-                    .font(.subheadline.weight(.medium))
-            }
-
-            ForEach(members, id: \.self) { index in
-                builderBlockRow(index)
-            }
-
-            if kind == .superset && members.count < 2 {
-                Label(tr("Add at least one more exercise",
-                         "Legg til minst én øvelse til"),
-                      systemImage: "info.circle")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Menu {
-                Button(tr("Exercise", "Øvelse"), systemImage: "dumbbell.fill") {
-                    openExercisePicker(for: id)
                 }
-                if kind == .intervals {
-                    Button(tr("Running", "Løping"), systemImage: "figure.run") {
-                        addRunBlock(toGroup: id)
+
+                if kind == .superset && members.filter({ blocks[$0].kind == .exercise }).count < 2 {
+                    Label(tr("Add at least two exercises before saving.",
+                             "Legg til minst to øvelser før lagring."),
+                          systemImage: "info.circle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+
+                Menu {
+                    Button(tr("Exercise", "Øvelse"), systemImage: "dumbbell.fill") {
+                        openExercisePicker(for: id)
                     }
+                    if kind == .intervals {
+                        Button(tr("Running", "Løping"), systemImage: "figure.run") {
+                            addRunBlock(toGroup: id)
+                        }
+                    }
+                    Button(tr("Rest", "Pause"), systemImage: "pause.fill") {
+                        addRestBlock(toGroup: id)
+                    }
+                } label: {
+                    Label(tr("Add to group", "Legg til i gruppen"),
+                          systemImage: "plus.circle")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(studioBlue)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 34)
+                        .background(studioBlue.opacity(0.065),
+                                    in: RoundedRectangle(cornerRadius: 11))
                 }
-                Button(tr("Rest", "Pause"), systemImage: "pause.fill") {
-                    addRestBlock(toGroup: id)
-                }
-            } label: {
-                Label(tr("Add to group", "Legg til i gruppen"), systemImage: "plus.circle")
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 40)
             }
-            .buttonStyle(.bordered)
-            .tint(ATHLTHTheme.accentDeep)
         }
-        .padding(13)
-        .background(ATHLTHTheme.accentSoft.opacity(0.33),
-                    in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .padding(11)
+        .background(.white,
+                    in: RoundedRectangle(cornerRadius: 21, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(ATHLTHTheme.accentDeep.opacity(0.12), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 21, style: .continuous)
+                .strokeBorder(studioInk.opacity(0.045), lineWidth: 0.8)
         }
+        .shadow(color: studioInk.opacity(0.055), radius: 13, y: 5)
     }
 
-    private func builderBlockRow(_ index: Int) -> some View {
+    private func builderBlockRow(_ index: Int, nested: Bool = false) -> some View {
         let block = blocks[index]
         let isExpanded = expandedBlockIndex == index
 
-        return HStack(alignment: .top, spacing: 11) {
-            VStack(spacing: 4) {
-                Image(systemName: block.resolvedPhase.symbol)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .frame(width: 30, height: 30)
-                    .background(ATHLTHTheme.accentSoft, in: Circle())
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(ATHLTHTheme.accentDeep.opacity(0.16))
-                    .frame(width: 2, height: isExpanded ? 170 : 64)
-            }
-            .frame(width: 30)
-
-            VStack(alignment: .leading, spacing: 11) {
-                HStack(spacing: 8) {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            expandedBlockIndex = isExpanded ? nil : index
-                        }
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: block.kind.systemImage)
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundStyle(
-                                    block.kind == .run
-                                        ? ATHLTHTheme.vitality
-                                        : ATHLTHTheme.accentDeep
-                                )
-                                .frame(width: 26)
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(block.resolvedPhase.title.uppercased())
-                                    .font(.caption2.weight(.bold))
-                                    .tracking(0.8)
-                                    .foregroundStyle(ATHLTHTheme.mutedText)
-                                Text(block.title)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(.primary)
-                                if let targetText = block.targetText {
-                                    Text(targetText)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(2)
-                                }
-                            }
-                            Spacer(minLength: 0)
-                            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                        }
+        return VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: nested ? 7 : 9) {
+                if !nested {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 13))
+                        .foregroundStyle(studioInk.opacity(0.34))
+                        .frame(width: 18, height: 46)
                         .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
+                        .draggable(String(index))
+                        .accessibilityLabel(tr("Drag to reorder", "Dra for å flytte blokk"))
+                }
 
-                    Menu {
-                        ForEach(WorkoutPhaseKind.allCases) { phase in
-                            Button {
-                                blocks[index].phase = phase
-                            } label: {
-                                Label(phase.title, systemImage: phase.symbol)
-                            }
+                blockArtwork(block, size: nested ? 49 : 52)
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        expandedBlockIndex = isExpanded ? nil : index
+                    }
+                } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(block.title)
+                            .font(.system(size: nested ? 13 : 14, weight: .semibold))
+                            .foregroundStyle(studioInk)
+                            .lineLimit(2)
+
+                        if let summary = block.targetText {
+                            Text(summary)
+                                .font(.system(size: 11))
+                                .foregroundStyle(studioInk.opacity(0.62))
+                                .lineLimit(2)
+                        } else if block.kind == .exercise {
+                            Text(tr("Adjust reps and load", "Juster reps og belastning"))
+                                .font(.system(size: 11))
+                                .foregroundStyle(studioInk.opacity(0.55))
+                        } else {
+                            Text(block.resolvedPhase.title)
+                                .font(.system(size: 11))
+                                .foregroundStyle(studioInk.opacity(0.55))
                         }
-                        if index > 0 && (block.groupID == nil ||
-                                blocks[index - 1].groupID == block.groupID) {
-                            Button(tr("Move up", "Flytt opp"), systemImage: "arrow.up") {
-                                if block.groupID == nil {
-                                    moveTimelineSection(startingAt: index, direction: -1)
-                                } else {
-                                    blocks.swapAt(index, index - 1)
-                                    resequence()
-                                    expandedBlockIndex = index - 1
-                                }
-                            }
-                        }
-                        if index < blocks.count - 1 && (block.groupID == nil ||
-                                blocks[index + 1].groupID == block.groupID) {
-                            Button(tr("Move down", "Flytt ned"), systemImage: "arrow.down") {
-                                if block.groupID == nil {
-                                    moveTimelineSection(startingAt: index, direction: 1)
-                                } else {
-                                    blocks.swapAt(index, index + 1)
-                                    resequence()
-                                    expandedBlockIndex = index + 1
-                                }
-                            }
-                        }
-                        Button(role: .destructive) {
-                            let removedGroup = blocks[index].groupID
-                            blocks.remove(at: index)
-                            if let removedGroup,
-                               blocks.filter({ $0.groupID == removedGroup }).count < 2 {
-                                for i in blocks.indices where blocks[i].groupID == removedGroup {
-                                    blocks[i].groupID = nil
-                                    blocks[i].groupKind = nil
-                                    blocks[i].groupRounds = nil
-                                }
-                            }
-                            resequence()
-                            expandedBlockIndex = nil
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                Menu {
+                    ForEach(WorkoutPhaseKind.allCases) { phase in
+                        Button {
+                            blocks[index].phase = phase
                         } label: {
-                            Label(tr("Remove", "Fjern"), systemImage: "trash")
+                            Label(phase.title, systemImage: phase.symbol)
                         }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 32, height: 36)
-                            .contentShape(Rectangle())
                     }
+
+                    if index > 0 &&
+                       (block.groupID == nil || blocks[index - 1].groupID == block.groupID) {
+                        Button(tr("Move up", "Flytt opp"), systemImage: "arrow.up") {
+                            if block.groupID == nil {
+                                moveTimelineSection(startingAt: index, direction: -1)
+                            } else {
+                                blocks.swapAt(index, index - 1)
+                                resequence()
+                                expandedBlockIndex = index - 1
+                            }
+                        }
+                    }
+
+                    if index < blocks.count - 1 &&
+                       (block.groupID == nil || blocks[index + 1].groupID == block.groupID) {
+                        Button(tr("Move down", "Flytt ned"), systemImage: "arrow.down") {
+                            if block.groupID == nil {
+                                moveTimelineSection(startingAt: index, direction: 1)
+                            } else {
+                                blocks.swapAt(index, index + 1)
+                                resequence()
+                                expandedBlockIndex = index + 1
+                            }
+                        }
+                    }
+
+                    Button(role: .destructive) {
+                        let removedGroup = blocks[index].groupID
+                        blocks.remove(at: index)
+                        if let removedGroup,
+                           blocks.filter({ $0.groupID == removedGroup }).count < 2 {
+                            for i in blocks.indices where blocks[i].groupID == removedGroup {
+                                blocks[i].groupID = nil
+                                blocks[i].groupKind = nil
+                                blocks[i].groupRounds = nil
+                            }
+                        }
+                        resequence()
+                        expandedBlockIndex = nil
+                    } label: {
+                        Label(tr("Remove", "Fjern"), systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(studioInk.opacity(0.65))
+                        .frame(width: 24, height: 38)
                 }
 
-                if isExpanded {
-                    Divider()
-                    blockDetails(index)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        expandedBlockIndex = isExpanded ? nil : index
+                    }
+                } label: {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(studioInk.opacity(0.58))
+                        .frame(width: 18, height: 38)
                 }
+                .buttonStyle(.plain)
             }
-            .padding(15)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.white.opacity(0.87),
-                        in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+
+            if isExpanded {
+                Divider()
+                blockDetails(index)
+                    .padding(.horizontal, 4)
+                    .padding(.bottom, 4)
+            }
+        }
+        .padding(nested ? 5 : 11)
+        .background {
+            if !nested {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(.white)
+            }
+        }
+        .overlay {
+            if !nested {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(studioInk.opacity(0.04), lineWidth: 0.8)
+            }
+        }
+        .shadow(color: studioInk.opacity(nested ? 0 : 0.05),
+                radius: 12, y: 5)
+    }
+
+    @ViewBuilder
+    private func blockArtwork(_ block: WorkoutTemplateBlock, size: CGFloat) -> some View {
+        if block.kind == .exercise,
+           let match = exerciseLibrary.allExercises.first(where: { entry in
+               (block.exerciseSlug != nil && entry.sourceIdentifier == block.exerciseSlug)
+                   || entry.name.localizedCaseInsensitiveCompare(block.title) == .orderedSame
+           }) {
+            ExerciseArtwork(entry: match, size: size)
+        } else if block.kind == .run,
+                  (block.title.localizedCaseInsensitiveContains("mølle") ||
+                   block.title.localizedCaseInsensitiveContains("treadmill")) {
+            Image("TreadmillRecentCardHero")
+                .resizable()
+                .scaledToFill()
+                .frame(width: size, height: size)
+                .clipShape(RoundedRectangle(cornerRadius: 11))
+        } else {
+            let icon = block.kind == .run
+                ? (block.resolvedPhase == .cooldown ? "figure.walk" : "figure.run")
+                : block.kind.systemImage
+            Image(systemName: icon)
+                .font(.system(size: 21, weight: .medium))
+                .foregroundStyle(studioInk.opacity(0.82))
+                .frame(width: size, height: size)
+                .background(studioBackground,
+                            in: RoundedRectangle(cornerRadius: 11))
         }
     }
 
