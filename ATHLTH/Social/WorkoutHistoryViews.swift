@@ -1681,7 +1681,160 @@ struct PostWorkoutReviewView: View {
         )
     }
 
+    @ViewBuilder
     private var resultStrip: some View {
+        if workout.activity == .running || workout.activity == .walking {
+            enduranceResultsGrid
+        } else {
+            compactResultStrip
+        }
+    }
+
+    /// All values here are backed by the completed workout or HealthKit.
+    /// Missing pulse, energy, cadence or treadmill incline is shown as a dash.
+    private var enduranceResultsGrid: some View {
+        VStack(spacing: 0) {
+            completionStatsRow(
+                (ATHLTHLocalization.choose(english: "Time", norwegian: "Tid"),
+                 durationText(workout.duration), "stopwatch", completionAccent),
+                (ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse"),
+                 completionDistanceText, "location.fill", completionAccent),
+                (ATHLTHLocalization.choose(english: "Pace", norwegian: "Tempo"),
+                 completionPaceText, "speedometer", completionAccent)
+            )
+
+            Rectangle().fill(ATHLTHTheme.divider.opacity(0.62)).frame(height: 0.7)
+
+            completionStatsRow(
+                (ATHLTHLocalization.choose(english: "Avg HR", norwegian: "Puls snitt"),
+                 bpmText(replayContext?.averageHeartRateBPM), "heart.fill", .red),
+                (ATHLTHLocalization.choose(english: "Max HR", norwegian: "Puls maks"),
+                 bpmText(replayContext?.maxHeartRateBPM), "heart.text.square.fill", .red),
+                (ATHLTHLocalization.choose(english: "Calories", norwegian: "Kalorier"),
+                 calorieText, "flame.fill", completionAccent)
+            )
+
+            Rectangle().fill(ATHLTHTheme.divider.opacity(0.62)).frame(height: 0.7)
+
+            completionStatsRow(
+                (ATHLTHLocalization.choose(english: "Avg speed", norwegian: "Hastighet snitt"),
+                 averageSpeedText, "speedometer", completionAccent),
+                (ATHLTHLocalization.choose(english: "Avg cadence", norwegian: "Kadens snitt"),
+                 completionCadenceSPM.map { "\($0) spm" } ?? "—",
+                 "figure.walk", completionAccent),
+                (workout.isIndoor == true
+                    ? ATHLTHLocalization.choose(english: "Incline", norwegian: "Stigning")
+                    : ATHLTHLocalization.choose(english: "Elevation", norwegian: "Høydemeter"),
+                 elevationOrInclineText, "mountain.2.fill", completionAccent)
+            )
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(
+            Color.white.opacity(0.97),
+            in: RoundedRectangle(cornerRadius: 25, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 25, style: .continuous)
+                .stroke(Color.white.opacity(0.96), lineWidth: 0.8)
+        }
+    }
+
+    private func completionStatsRow(
+        _ left: (String, String, String, Color),
+        _ middle: (String, String, String, Color),
+        _ right: (String, String, String, Color)
+    ) -> some View {
+        HStack(spacing: 0) {
+            completionStat(left.0, value: left.1, icon: left.2, tint: left.3)
+            Rectangle()
+                .fill(ATHLTHTheme.divider.opacity(0.60))
+                .frame(width: 1, height: 55)
+            completionStat(middle.0, value: middle.1, icon: middle.2, tint: middle.3)
+            Rectangle()
+                .fill(ATHLTHTheme.divider.opacity(0.60))
+                .frame(width: 1, height: 55)
+            completionStat(right.0, value: right.1, icon: right.2, tint: right.3)
+        }
+        .frame(minHeight: 87)
+    }
+
+    private func completionStat(
+        _ title: String,
+        value: String,
+        icon: String,
+        tint: Color
+    ) -> some View {
+        HStack(alignment: .center, spacing: 7) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 18)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.75)
+                Text(value)
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.60)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var completionDistanceText: String {
+        guard let meters = workout.distanceMeters, meters.isFinite, meters > 0
+        else { return "—" }
+        return String(format: "%.2f km", meters / 1_000)
+    }
+
+    private var completionPaceText: String {
+        guard let meters = workout.distanceMeters, meters > 0 else { return "—" }
+        return averagePaceText(duration: workout.duration, distanceMeters: meters)
+    }
+
+    private func bpmText(_ value: Double?) -> String {
+        guard let value, value.isFinite, value > 0 else { return "—" }
+        return "\(Int(value.rounded())) bpm"
+    }
+
+    private var calorieText: String {
+        guard let value = workout.activeEnergyKilocalories ??
+                replayContext?.activeEnergyKilocalories,
+              value.isFinite, value > 0 else { return "—" }
+        return "\(Int(value.rounded())) kcal"
+    }
+
+    private var averageSpeedText: String {
+        guard let distance = workout.distanceMeters,
+              distance.isFinite, distance > 0, workout.duration > 0
+        else { return "—" }
+        return String(format: "%.1f km/t", distance / workout.duration * 3.6)
+    }
+
+    private var elevationOrInclineText: String {
+        if workout.isIndoor == true {
+            guard let recorded = phoneWorkout.history.first(where: {
+                $0.id == workout.id || $0.healthID == workout.id
+            })?.treadmillInclinePercent,
+            recorded.isFinite else { return "—" }
+            return String(format: "%.0f %%", recorded)
+        }
+        guard let elevation = replayContext?.elevationGainMeters,
+              elevation.isFinite, elevation >= 0 else { return "—" }
+        return String(format: "+%.0f m", elevation)
+    }
+
+    private var compactResultStrip: some View {
         HStack(spacing: 0) {
             resultMetric(
                 title: ATHLTHLocalization.choose(english: "Time", norwegian: "Tid"),
