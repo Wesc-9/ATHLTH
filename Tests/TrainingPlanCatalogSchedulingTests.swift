@@ -3,6 +3,66 @@ import XCTest
 
 final class TrainingPlanCatalogSchedulingTests: XCTestCase {
     @MainActor
+    func testSimplePlansAlternateEverySelectedActivityEvenWithOneDayPerWeek() throws {
+        for days in [[3], [1, 2, 3, 4, 5, 6, 7]] {
+            for minutes in [5, 60, 180] {
+                let suite = "SimpleMixedPlanTests.\(UUID().uuidString)"
+                let defaults = UserDefaults(suiteName: suite)!
+                defer { defaults.removePersistentDomain(forName: suite) }
+                let store = AppSessionStore(defaults: defaults)
+                let kinds: [WorkoutKind] = [.walking, .running, .strength]
+                let profile = TrainingPlanBuilderProfile(
+                    mode: .basic, primaryFocus: .hybrid, goal: .improveFitness,
+                    sessionsPerWeek: days.count, preferredDayIndexes: days,
+                    weeklyTimeBudgetMinutes: minutes * days.count,
+                    simpleWorkoutKinds: kinds,
+                    preferredWorkoutKindsByDay: Dictionary(uniqueKeysWithValues: days.map { ($0, WorkoutKind.walking) })
+                )
+                let start = Calendar.current.date(from: DateComponents(year: 2030, month: 1, day: 8))!
+                let plan = try XCTUnwrap(store.createConfiguredTrainingPlan(
+                    title: "Simple mixed plan", summary: "", weekCount: 8,
+                    startDate: start, builderProfile: profile, seedSuggestedWeek: true
+                ))
+                let workouts = plan.weeks.flatMap(\.days).flatMap(\.sessions)
+                XCTAssertEqual(workouts.count, days.count * 8)
+                XCTAssertEqual(Set(workouts.map(\.kind)), Set(kinds))
+                for (index, workout) in workouts.enumerated() {
+                    XCTAssertEqual(workout.kind, kinds[index % kinds.count])
+                    XCTAssertEqual(workout.durationMinutes, minutes)
+                }
+                let restored = try JSONDecoder().decode(
+                    TrainingPlanBuilderProfile.self,
+                    from: JSONEncoder().encode(profile)
+                )
+                XCTAssertEqual(restored.simpleWorkoutKinds, kinds)
+            }
+        }
+    }
+
+    @MainActor
+    func testExistingSimplePlanKeepsItsPerDayActivityWithoutNewSelectionField() throws {
+        let suite = "SimpleLegacyPlanTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = AppSessionStore(defaults: defaults)
+        let profile = TrainingPlanBuilderProfile(
+            mode: .basic, primaryFocus: .generalFitness, goal: .improveFitness,
+            sessionsPerWeek: 1, preferredDayIndexes: [3], weeklyTimeBudgetMinutes: 60,
+            preferredWorkoutKindsByDay: [3: .walking]
+        )
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(profile)) as? [String: Any])
+        json.removeValue(forKey: "simpleWorkoutKinds")
+        let restored = try JSONDecoder().decode(TrainingPlanBuilderProfile.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertNil(restored.simpleWorkoutKinds)
+        let start = Calendar.current.date(from: DateComponents(year: 2030, month: 1, day: 8))!
+        let plan = try XCTUnwrap(store.createConfiguredTrainingPlan(
+            title: "Existing simple plan", summary: "", weekCount: 8,
+            startDate: start, builderProfile: restored, seedSuggestedWeek: true
+        ))
+        XCTAssertTrue(plan.weeks.flatMap(\.days).flatMap(\.sessions).allSatisfy { $0.kind == .walking && $0.durationMinutes == 60 })
+    }
+
+    @MainActor
     func testShortOneAndTwoWeekProgramsUseActualSelectedDuration() {
         for weeks in [1, 2] {
             let suite = "TrainingPlanShortDurationTests.\(UUID().uuidString)"

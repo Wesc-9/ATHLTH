@@ -1289,6 +1289,11 @@ struct TrainingPlanBuilderProfile: Codable, Hashable {
     var equipmentContext: String? = nil
     var weeklyTimeBudgetMinutes: Int? = nil
 
+    // Simple plans alternate these activities across all weeks, even if
+    // there are fewer training days than selected activities. Old plans
+    // omit this field and keep their existing per-day suggestions.
+    var simpleWorkoutKinds: [WorkoutKind]? = nil
+
     // Optional for backwards compatibility with plans created before the
     // per-day workout-type picker was introduced. Missing values keep using
     // the focus-based suggested pattern.

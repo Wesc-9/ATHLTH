@@ -2459,18 +2459,15 @@ final class AppSessionStore: ObservableObject {
                         continue
                     }
 
-                    let kind =
-                        builderProfile
-                            .preferredWorkoutKindsByDay?[
-                                dayIndex
-                            ] ??
-                        pattern[
-                            slot %
-                            max(
-                                pattern.count,
-                                1
-                            )
-                        ]
+                    let kind: WorkoutKind
+                    if builderProfile.mode == .basic,
+                       let kinds = builderProfile.simpleWorkoutKinds,
+                       !kinds.isEmpty {
+                        kind = kinds[(weekIndex * targetDays.count + slot) % kinds.count]
+                    } else {
+                        kind = builderProfile.preferredWorkoutKindsByDay?[dayIndex]
+                            ?? pattern[slot % max(pattern.count, 1)]
+                    }
 
                     weeks[weekIndex]
                         .days[actualDayIndex]

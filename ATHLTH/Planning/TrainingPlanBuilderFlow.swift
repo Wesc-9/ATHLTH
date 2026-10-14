@@ -1375,7 +1375,23 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     // The simple route deliberately has no technical settings, date picker,
     // AI prompt or extra confirmation step. Advanced keeps the full wizard.
     @State private var simpleMinutes = 30
-    @State private var simpleActivity: WorkoutKind = .walking
+    @State private var simpleActivities: Set<WorkoutKind> = [.walking]
+    @State private var showingSimpleDays = false
+    @State private var showingSimpleDuration = false
+
+    private var orderedSimpleActivities: [WorkoutKind] {
+        [.walking, .running, .strength].filter { simpleActivities.contains($0) }
+    }
+
+    private var simpleActivitySummary: String {
+        orderedSimpleActivities.map { kind in
+            switch kind {
+            case .walking: return ATHLTHLocalization.choose(english: "walking", norwegian: "gåturer")
+            case .running: return ATHLTHLocalization.choose(english: "running", norwegian: "løping")
+            default: return ATHLTHLocalization.choose(english: "strength", norwegian: "styrke")
+            }
+        }.joined(separator: ATHLTHLocalization.choose(english: " and ", norwegian: " og "))
+    }
 
     private var simpleBasicsStep: some View {
         VStack(alignment: .leading, spacing: 22) {
@@ -1396,13 +1412,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             simpleQuestion(
                 ATHLTHLocalization.choose(english: "What would you like to do?", norwegian: "Hva vil du gjøre?")
             ) {
-                simpleChoice(ATHLTHLocalization.choose(english: "Go for walks", norwegian: "Gå tur"), symbol: "figure.walk", selected: simpleActivity == .walking) {
+                Text(ATHLTHLocalization.choose(english: "You can choose more than one.", norwegian: "Du kan velge flere."))
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                simpleChoice(ATHLTHLocalization.choose(english: "Go for walks", norwegian: "Gå tur"), symbol: "figure.walk", selected: simpleActivities.contains(.walking)) {
                     chooseSimpleActivity(.walking)
                 }
-                simpleChoice(ATHLTHLocalization.choose(english: "Go running", norwegian: "Løpe"), symbol: "figure.run", selected: simpleActivity == .running) {
+                simpleChoice(ATHLTHLocalization.choose(english: "Go running", norwegian: "Løpe"), symbol: "figure.run", selected: simpleActivities.contains(.running)) {
                     chooseSimpleActivity(.running)
                 }
-                simpleChoice(ATHLTHLocalization.choose(english: "Build strength", norwegian: "Trene styrke"), symbol: "dumbbell", selected: simpleActivity == .strength) {
+                simpleChoice(ATHLTHLocalization.choose(english: "Build strength", norwegian: "Trene styrke"), symbol: "dumbbell", selected: simpleActivities.contains(.strength)) {
                     chooseSimpleActivity(.strength)
                 }
             }
@@ -1413,9 +1432,19 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 HStack(spacing: 10) {
                     ForEach([1, 2, 3], id: \.self) { count in
                         simpleCompactChoice("\(count)", selected: selectedDays.count == count) {
-                            selectedDays = balancedDays(count: count)
-                            sessionsPerWeek = count
-                            setSimpleKinds()
+                            setSimpleDays(count)
+                        }
+                    }
+                }
+                simpleChoice(ATHLTHLocalization.choose(english: "Choose yourself", norwegian: "Velg selv"), symbol: "calendar", selected: showingSimpleDays || selectedDays.count > 3) {
+                    showingSimpleDays.toggle()
+                }
+                if showingSimpleDays {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 65))], spacing: 10) {
+                        ForEach(1...7, id: \.self) { count in
+                            simpleCompactChoice("\(count)", selected: selectedDays.count == count) {
+                                setSimpleDays(count)
+                            }
                         }
                     }
                 }
@@ -1432,6 +1461,39 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         }
                     }
                 }
+                simpleChoice(ATHLTHLocalization.choose(english: "Choose yourself", norwegian: "Velg selv"), symbol: "clock", selected: showingSimpleDuration || ![15, 30, 45].contains(simpleMinutes)) {
+                    showingSimpleDuration.toggle()
+                }
+                if showingSimpleDuration {
+                    HStack(spacing: 16) {
+                        Button {
+                            simpleMinutes = max(5, simpleMinutes - 5)
+                        } label: {
+                            Image(systemName: "minus")
+                                .font(.title2.weight(.semibold))
+                                .frame(width: 60, height: 60)
+                                .background(Color.white, in: RoundedRectangle(cornerRadius: 16))
+                        }
+                        .disabled(simpleMinutes <= 5)
+                        .accessibilityLabel(ATHLTHLocalization.choose(english: "Five minutes less", norwegian: "Fem minutter mindre"))
+                        Text("\(simpleMinutes) min")
+                            .font(.title2.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .accessibilityLabel(ATHLTHLocalization.choose(english: "\(simpleMinutes) minutes each time", norwegian: "\(simpleMinutes) minutter hver gang"))
+                        Button {
+                            simpleMinutes = min(180, simpleMinutes + 5)
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.title2.weight(.semibold))
+                                .frame(width: 60, height: 60)
+                                .background(Color.white, in: RoundedRectangle(cornerRadius: 16))
+                        }
+                        .disabled(simpleMinutes >= 180)
+                        .accessibilityLabel(ATHLTHLocalization.choose(english: "Five minutes more", norwegian: "Fem minutter mer"))
+                    }
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .buttonStyle(.plain)
+                }
             }
 
             VStack(alignment: .leading, spacing: 8) {
@@ -1440,6 +1502,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     systemImage: "checkmark.circle.fill"
                 )
                 .font(.headline)
+                Text(simpleActivitySummary.capitalized)
+                    .font(.subheadline.weight(.semibold))
                 Text(ATHLTHLocalization.choose(
                     english: "\(selectedDays.count) times a week · \(simpleMinutes) minutes each time · 8 weeks",
                     norwegian: "\(selectedDays.count) ganger i uken · \(simpleMinutes) minutter hver gang · 8 uker"
@@ -1469,7 +1533,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
         .onAppear {
             if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                chooseSimpleActivity(simpleActivity)
+                updateSimplePlanChoices()
             }
         }
     }
@@ -1535,26 +1599,47 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private func chooseSimpleActivity(_ kind: WorkoutKind) {
-        simpleActivity = kind
-        switch kind {
-        case .walking:
-            focus = .generalFitness
-            title = ATHLTHLocalization.choose(english: "My walking plan", norwegian: "Min gåplan")
-        case .running:
+        if simpleActivities.contains(kind) {
+            // Keep at least one activity without an extra validation step.
+            guard simpleActivities.count > 1 else { return }
+            simpleActivities.remove(kind)
+        } else {
+            simpleActivities.insert(kind)
+        }
+        updateSimplePlanChoices()
+    }
+
+    private func updateSimplePlanChoices() {
+        if simpleActivities.count > 1 {
+            focus = .hybrid
+            title = ATHLTHLocalization.choose(english: "My training plan", norwegian: "Min treningsplan")
+        } else if simpleActivities.contains(.running) {
             focus = .running
             title = ATHLTHLocalization.choose(english: "My running plan", norwegian: "Min løpeplan")
-        case .strength:
+        } else if simpleActivities.contains(.strength) {
             focus = .strength
             title = ATHLTHLocalization.choose(english: "My strength plan", norwegian: "Min styrkeplan")
-        default: break
+        } else {
+            focus = .generalFitness
+            title = ATHLTHLocalization.choose(english: "My walking plan", norwegian: "Min gåplan")
         }
         weekCount = 8
         setSimpleKinds()
     }
 
+    private func setSimpleDays(_ count: Int) {
+        selectedDays = balancedDays(count: count)
+        sessionsPerWeek = count
+        setSimpleKinds()
+    }
+
     private func setSimpleKinds() {
+        let kinds = orderedSimpleActivities
+        guard !kinds.isEmpty else { return }
         workoutKindOverridesByDay = Dictionary(
-            uniqueKeysWithValues: selectedDays.map { ($0, simpleActivity) }
+            uniqueKeysWithValues: selectedDays.sorted().enumerated().map {
+                ($0.element, kinds[$0.offset % kinds.count])
+            }
         )
         weeklyTimeBudgetMinutes = simpleMinutes * selectedDays.count
     }
@@ -4611,10 +4696,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
         if mode == .basic {
             weekCount = 8
-            weeklyTimeBudgetMinutes = simpleMinutes * selectedDays.count
-            workoutKindOverridesByDay = Dictionary(
-                uniqueKeysWithValues: selectedDays.map { ($0, simpleActivity) }
-            )
+            updateSimplePlanChoices()
         }
 
         let cleanLimitations =
@@ -4656,6 +4738,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 equipmentContext: equipment.rawValue,
                 weeklyTimeBudgetMinutes:
                     weeklyTimeBudgetMinutes,
+                simpleWorkoutKinds: mode == .basic ? orderedSimpleActivities : nil,
                 preferredWorkoutKindsByDay:
                     Dictionary(
                         uniqueKeysWithValues:

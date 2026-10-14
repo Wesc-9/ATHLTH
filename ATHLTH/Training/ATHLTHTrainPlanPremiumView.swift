@@ -42,6 +42,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var movingPlanID: UUID?
     @State private var movingPlanVersion: Int?
     @State private var moveTargetDate = Date()
+    @State private var moveWeekDate = Date()
     @State private var moveError: String?
     @State private var editingPlan: TrainingPlan?
 
@@ -71,6 +72,68 @@ struct ATHLTHTrainPlanPremiumView: View {
         editingSheets
     }
 
+    private func beginMovingWorkout(_ workout: PlannedSession, day: TrainingPlanDay, plan: TrainingPlan) {
+        moveError = nil
+        moveTargetDate = planDayDate(day.dayIndex, plan: plan)
+        moveWeekDate = moveTargetDate
+        movingPlanID = plan.id
+        movingPlanVersion = plan.version
+        movingWorkout = workout
+    }
+
+    private func simpleMoveDays(earliest: Date, last: Date) -> some View {
+        let calendar = Calendar.current
+        let weekStart = calendar.dateInterval(of: .weekOfYear, for: moveWeekDate)?.start ?? moveWeekDate
+        let dates = (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: weekStart) }
+        return VStack(alignment: .leading, spacing: 10) {
+            Text(tr("Choose a new day", "Velg en ny dag"))
+                .font(.headline)
+            HStack {
+                Button {
+                    moveWeekDate = calendar.date(byAdding: .day, value: -7, to: weekStart) ?? weekStart
+                } label: {
+                    Image(systemName: "chevron.left").frame(width: 48, height: 48)
+                }
+                .disabled((dates.last ?? weekStart) <= earliest || weekStart <= earliest)
+                .accessibilityLabel(tr("Previous week", "Forrige uke"))
+                Spacer()
+                Text(weekStart.formatted(.dateTime.day().month(.abbreviated)))
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Button {
+                    moveWeekDate = calendar.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart
+                } label: {
+                    Image(systemName: "chevron.right").frame(width: 48, height: 48)
+                }
+                .disabled((dates.last ?? weekStart) >= last)
+                .accessibilityLabel(tr("Next week", "Neste uke"))
+            }
+            ForEach(dates, id: \.self) { date in
+                let selected = calendar.isDate(date, inSameDayAs: moveTargetDate)
+                Button {
+                    moveTargetDate = date
+                    moveError = nil
+                } label: {
+                    HStack {
+                        Text(date.formatted(.dateTime.weekday(.wide).day().month(.abbreviated)))
+                            .font(.body.weight(.semibold))
+                            .multilineTextAlignment(.leading)
+                        Spacer()
+                        if selected { Image(systemName: "checkmark.circle.fill") }
+                    }
+                    .foregroundStyle(selected ? Color.white : graphite)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 52)
+                    .background(selected ? graphite : soft, in: RoundedRectangle(cornerRadius: 14))
+                }
+                .disabled(date < earliest || date > last)
+                .opacity(date < earliest || date > last ? 0.35 : 1)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
     // Small view fragments prevent SwiftUI's result-builder type checker
     // from having to solve the entire planner and all of its sheets at once.
     // Isolate the move-workout form from the long Plan workspace modifier
@@ -95,12 +158,16 @@ struct ATHLTHTrainPlanPremiumView: View {
                                     calendar.startOfDay(for: Date()), first
                                 )
                                 if earliest <= last {
-                                    DatePicker(
-                                        tr("New workout date", "Ny treningsdato"),
-                                        selection: $moveTargetDate,
-                                        in: earliest...last,
-                                        displayedComponents: .date
-                                    )
+                                    if advanced {
+                                        DatePicker(
+                                            tr("New workout date", "Ny treningsdato"),
+                                            selection: $moveTargetDate,
+                                            in: earliest...last,
+                                            displayedComponents: .date
+                                        )
+                                    } else {
+                                        simpleMoveDays(earliest: earliest, last: last)
+                                    }
                                 } else {
                                     Text(tr(
                                         "This plan has no upcoming dates.",
@@ -146,6 +213,13 @@ struct ATHLTHTrainPlanPremiumView: View {
                                     healthWorkouts: health.workouts,
                                     strengthHistory: strength.workoutHistory
                                 ) {
+                                    if let start = plan.startDate {
+                                        let days = Calendar.current.dateComponents(
+                                            [.day], from: Calendar.current.startOfDay(for: start),
+                                            to: Calendar.current.startOfDay(for: moveTargetDate)
+                                        ).day ?? 0
+                                        selectedWeekIndex = max(0, days / 7)
+                                    }
                                     movingWorkout = nil
                                     movingPlanID = nil
                                     movingPlanVersion = nil
@@ -169,13 +243,19 @@ struct ATHLTHTrainPlanPremiumView: View {
                                     to: first
                                 ) ?? first
                                 let target = calendar.startOfDay(for: moveTargetDate)
-                                return target < max(first, calendar.startOfDay(for: Date()))
+                                let source = plan.weeks.flatMap(\.days).first {
+                                    $0.sessions.contains { $0.id == workout.id }
+                                }
+                                let unchanged = source.map {
+                                    calendar.isDate(planDayDate($0.dayIndex, plan: plan), inSameDayAs: target)
+                                } ?? true
+                                return unchanged || target < max(first, calendar.startOfDay(for: Date()))
                                     || target > last
                             }())
                         }
                     }
                 }
-                .presentationDetents([.medium])
+                .presentationDetents([.large])
             }
     }
 
@@ -1044,6 +1124,24 @@ struct ATHLTHTrainPlanPremiumView: View {
                         }
                         .buttonStyle(.plain)
                             if !completed && !skipped &&
+                               planDayDate(day.dayIndex, plan: plan) >= Calendar.current.startOfDay(for: Date()) {
+                                Divider()
+                                    .overlay(line.opacity(0.55))
+                                    .padding(.horizontal, 16)
+                                Button {
+                                    beginMovingWorkout(workout, day: day, plan: plan)
+                                } label: {
+                                    Label(tr("Move workout", "Flytt økt"), systemImage: "calendar.badge.clock")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(graphite)
+                                        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                                        .padding(.horizontal, 18)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityHint(tr("Choose another day", "Velg en annen dag"))
+                            }
+                            if !completed && !skipped &&
                                (workout.isStructuredWorkout ||
                                 workout.kind == .running ||
                                 workout.kind == .walking ||
@@ -1155,14 +1253,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                                 planDayDate(day.dayIndex, plan: plan) >=
                                     Calendar.current.startOfDay(for: Date()) {
                                 Button {
-                                    moveError = nil
-                                    moveTargetDate = max(
-                                        Calendar.current.startOfDay(for: Date()),
-                                        planDayDate(day.dayIndex, plan: plan)
-                                    )
-                                    movingPlanID = plan.id
-                                    movingPlanVersion = plan.version
-                                    movingWorkout = workout
+                                    beginMovingWorkout(workout, day: day, plan: plan)
                                 } label: {
                                     Label(tr("Move to another day", "Flytt til en annen dag"),
                                           systemImage: "calendar.badge.clock")
