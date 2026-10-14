@@ -1843,6 +1843,13 @@ struct WorkoutTemplateBuilderView: View {
                         }
                     }
                 }
+                .background(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(studioBlue.opacity(0.17))
+                        .frame(width: 2)
+                        .padding(.leading, 16)
+                        .padding(.vertical, 22)
+                }
             }
         }
     }
@@ -2586,6 +2593,22 @@ struct WorkoutTemplateBuilderView: View {
             block.restBetweenSetsSeconds = 90
         }
         insertBlock(block, toGroup: groupID)
+    }
+
+    private func moveTimelineSection(from source: Int, to destination: Int) {
+        let starts = timelineStarts
+        guard let sourcePosition = starts.firstIndex(of: source),
+              let targetPosition = starts.firstIndex(of: destination),
+              sourcePosition != targetPosition else { return }
+
+        var sections = starts.map { start in
+            groupIndices(startingAt: start).map { blocks[$0] }
+        }
+        let moving = sections.remove(at: sourcePosition)
+        sections.insert(moving, at: targetPosition)
+        blocks = sections.flatMap { $0 }
+        resequence()
+        expandedBlockIndex = nil
     }
 
     private func moveTimelineSection(startingAt index: Int, direction: Int) {
