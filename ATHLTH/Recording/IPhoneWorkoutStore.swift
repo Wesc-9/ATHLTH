@@ -768,6 +768,71 @@ final class IPhoneWorkoutStore:
         }
     }
 
+    /// Returns only fresh live metrics on a requested AI tool call.
+    /// Phone-only workouts do not currently provide a verified live HR feed.
+    func liveAICoachStatus(now: Date = Date()) -> ATHLTHLiveCoachWorkoutStatus {
+        guard let workout = active else { return .unavailable }
+        let elapsed = workout.elapsed(at: now)
+        let running = workout.resumedAt != nil
+        let stepIndex = workout.structuredStepIndex ?? 0
+        let steps = workout.structuredRunningWorkout?.steps ?? []
+        let activeStep: WatchRunningWorkoutStep? =
+            workout.structuredWorkoutComplete != true &&
+            steps.indices.contains(stepIndex) ? steps[stepIndex] : nil
+        let durationRemaining: Double?
+        let distanceRemaining: Double?
+        if let activeStep {
+            switch activeStep.measure {
+            case .time:
+                durationRemaining = activeStep.durationSeconds.map {
+                    max(0, $0 - (elapsed -
+                        (workout.structuredStepStartElapsedTime ?? 0)))
+                }
+                distanceRemaining = nil
+            case .distance:
+                durationRemaining = nil
+                distanceRemaining = activeStep.distanceMeters.map {
+                    max(0, $0 - (workout.distanceMeters -
+                        (workout.structuredStepStartDistanceMeters ?? 0)))
+                }
+            case .open:
+                durationRemaining = nil
+                distanceRemaining = nil
+            }
+        } else {
+            durationRemaining = nil
+            distanceRemaining = nil
+        }
+        return ATHLTHLiveCoachWorkoutStatus(
+            availability: "available",
+            activity: workout.walking ? "walking" : "running",
+            state: running ? "running" : "paused",
+            elapsedSeconds: ATHLTHLiveCoachWorkoutStatus.positiveInteger(elapsed),
+            distanceMeters: ATHLTHLiveCoachWorkoutStatus.positiveInteger(workout.distanceMeters),
+            paceSecondsPerKilometer: running &&
+                ATHLTHCoachSensorFreshness.validPace(
+                    workout.currentPaceSecondsPerKilometer,
+                    sampledAt: coachPaceSampleAt, now: now
+                ) ? ATHLTHLiveCoachWorkoutStatus.positiveInteger(
+                    workout.currentPaceSecondsPerKilometer
+                ) : nil,
+            heartRateBPM: nil,
+            currentStep: activeStep?.title,
+            nextStep: activeStep != nil && steps.indices.contains(stepIndex + 1)
+                ? steps[stepIndex + 1].title : nil,
+            stepNumber: activeStep == nil ? nil : stepIndex + 1,
+            totalSteps: activeStep == nil ? nil : steps.count,
+            stepRemainingSeconds: ATHLTHLiveCoachWorkoutStatus.positiveInteger(durationRemaining),
+            stepRemainingMeters: ATHLTHLiveCoachWorkoutStatus.positiveInteger(distanceRemaining),
+            targetPaceMinimumSecondsPerKilometer: ATHLTHLiveCoachWorkoutStatus.positiveInteger(
+                activeStep?.targetPaceMinSecondsPerKilometer
+            ),
+            targetPaceMaximumSecondsPerKilometer: ATHLTHLiveCoachWorkoutStatus.positiveInteger(
+                activeStep?.targetPaceMaxSecondsPerKilometer
+            )
+        )
+    }
+
     /// One-off status, read from the active recorder. No threshold reset.
     func announceCoachStatusNow() {
         guard !coachSpeechPaused,
