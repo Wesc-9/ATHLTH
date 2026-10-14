@@ -1,5 +1,49 @@
 import SwiftUI
 
+/// Free strength records HealthKit metrics without inventing a prescription.
+struct WatchFreeStrengthPage: View {
+    @EnvironmentObject private var workout: WatchWorkoutManager
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(ATHLTHLocalization.choose(english: "FREE STRENGTH", norwegian: "FRI STYRKEØKT"))
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(WatchTheme.textPrimary)
+                Text(ATHLTHLocalization.choose(english: "Train at your own pace", norwegian: "Tren i ditt eget tempo"))
+                    .font(.system(size: 10))
+                    .foregroundStyle(WatchTheme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(duration)
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(WatchTheme.textPrimary)
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                HStack(spacing: 7) {
+                    WatchStrengthReadout(
+                        title: ATHLTHLocalization.choose(english: "PULSE", norwegian: "PULS"),
+                        value: workout.heartRate > 0 ? "\(Int(workout.heartRate.rounded()))" : "—",
+                        symbol: "heart.fill"
+                    )
+                    WatchStrengthReadout(title: "KCAL", value: "\(Int(max(workout.activeCalories, 0).rounded()))", symbol: "flame.fill")
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    private var duration: String {
+        let seconds = max(0, Int(workout.elapsedTime.isFinite ? workout.elapsedTime : 0))
+        return seconds >= 3600
+            ? String(format: "%d:%02d:%02d", seconds / 3600, seconds / 60 % 60, seconds % 60)
+            : String(format: "%02d:%02d", seconds / 60, seconds % 60)
+    }
+}
+
+
 /// Lightweight, read-only pages around the existing strength set editor.
 /// WatchWorkoutManager remains the sole owner of the workout and commands.
 struct WatchStrengthSessionStatusPage: View {
@@ -347,7 +391,7 @@ struct WatchStrengthReadOnlySetPage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if let snapshot = workout.strengthSession {
+            if let snapshot = workout.strengthSession, snapshot.hasExercisePrescription {
                 WatchStrengthPageHeading(
                     title: snapshot.isWarmUp == true
                         ? ATHLTHLocalization.choose(
@@ -410,6 +454,8 @@ struct WatchStrengthReadOnlySetPage: View {
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .watchSurface()
+            } else {
+                WatchFreeStrengthPage()
             }
             Spacer(minLength: 0)
         }

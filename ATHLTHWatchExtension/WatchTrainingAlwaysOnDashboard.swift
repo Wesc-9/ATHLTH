@@ -37,7 +37,7 @@ struct WatchTrainingAlwaysOnDashboard: View {
         ATHLTHAlwaysOnFocusResolver.resolve(
             .init(
                 kind: workout.kind,
-                hasStrengthSession: workout.strengthSession != nil,
+                hasStrengthSession: workout.strengthSession?.hasExercisePrescription == true,
                 isStrengthResting: workout.strengthSession?.isResting == true,
                 isTimedStrengthSet:
                     workout.strengthSession?.targetKindRaw == "time",

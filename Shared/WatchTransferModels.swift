@@ -1131,6 +1131,9 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
 
     /// Optional: older Watch versions receive the planned duration only.
     var timedSetCountdown: WatchTimedStrengthCountdown? = nil
+    /// Empty/free sessions carry draft defaults, not an exercise to perform.
+    var hasExercisePrescription: Bool { exerciseCount > 0 }
+
 }
 
 enum WatchStrengthCommandKind: String, Codable, Hashable {

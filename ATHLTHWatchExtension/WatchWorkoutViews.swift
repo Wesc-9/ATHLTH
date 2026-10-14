@@ -176,7 +176,9 @@ struct WatchActiveWorkoutView: View {
                     if workoutManager.kind == .strength {
                         // Set/rest remains the first page. Additional pages
                         // are read-only and do not mutate the workout.
-                        if workoutManager.strengthSession?.targetKindRaw == "time",
+                        if workoutManager.strengthSession?.hasExercisePrescription != true {
+                            WatchFreeStrengthPage().tag(0)
+                        } else if workoutManager.strengthSession?.targetKindRaw == "time",
                            workoutManager.strengthSession?.isResting != true,
                            workoutManager.strengthSession?.currentExerciseComplete != true {
                             WatchStrengthTimedSetPage()
@@ -190,11 +192,10 @@ struct WatchActiveWorkoutView: View {
                                 .tag(0)
                         }
 
-                        WatchStrengthSessionStatusPage()
-                            .tag(2)
-
-                        WatchStrengthExerciseQueuePage()
-                            .tag(3)
+                        if workoutManager.strengthSession?.hasExercisePrescription == true {
+                            WatchStrengthSessionStatusPage().tag(2)
+                            WatchStrengthExerciseQueuePage().tag(3)
+                        }
 
                         WatchStrengthPulsePage()
                             .tag(4)
@@ -672,7 +673,9 @@ struct WatchActiveWorkoutView: View {
         if let snapshot =
                 workoutManager
                     .strengthSession {
-            if snapshot.isResting,
+            if !snapshot.hasExercisePrescription {
+                WatchFreeStrengthPage()
+            } else if snapshot.isResting,
                let restEndsAt =
                     snapshot.restEndsAt {
                 VStack(spacing: 6) {
@@ -2364,10 +2367,10 @@ struct WatchActiveWorkoutView: View {
     }
 
     private var completedContent: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             VStack(spacing: 5) {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 42))
+                    .font(.system(size: 28))
                     .foregroundStyle(WatchTheme.green)
 
                 Text(
@@ -2376,12 +2379,12 @@ struct WatchActiveWorkoutView: View {
                         norwegian: "Økt lagret"
                     )
                 )
-                .font(.system(size: 17, weight: .bold))
+                .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(
                     WatchTheme.textPrimary
                 )
             }
-            .padding(.top, 4)
+            .padding(.top, 0)
 
             if workoutManager.liveSurfaceContext.liveGhost != nil {
                 VStack(alignment: .leading, spacing: 5) {
@@ -2409,7 +2412,7 @@ struct WatchActiveWorkoutView: View {
 
             if let result = workoutManager.completedResult {
                 Text(durationText(result.duration))
-                    .font(.system(size: 28, weight: .semibold, design: .rounded))
+                    .font(.system(size: 24, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(
                         WatchTheme.textPrimary
@@ -2451,7 +2454,7 @@ struct WatchActiveWorkoutView: View {
                         )
                     }
                 }
-                .padding(.vertical, 9)
+                .padding(.vertical, 6)
                 .watchSurface()
 
                 if let laps =

@@ -2,6 +2,26 @@ import XCTest
 @testable import ATHLTH
 
 final class WorkoutLaunchHardeningTests: XCTestCase {
+    func testFreeStrengthDraftDefaultsAreNotAnExercisePrescription() {
+        var snapshot = WatchStrengthSessionSnapshot(
+            workoutID: UUID(), title: "Strength", exerciseIndex: 0,
+            exerciseCount: 0, exerciseName: nil, primaryMuscles: [],
+            setIndex: 0, setCount: 0, setNumber: nil, completedSets: 0,
+            totalSets: 0, draftReps: 8, draftWeightKilograms: 20,
+            draftRestSeconds: 60, isResting: false, restEndsAt: nil,
+            currentExerciseComplete: false, hasNextExercise: false,
+            allExercisesComplete: false, updatedAt: Date(), inputMode: .iPhone
+        )
+        XCTAssertFalse(snapshot.hasExercisePrescription)
+        snapshot.exerciseCount = 1
+        snapshot.exerciseName = "Squat"
+        snapshot.setCount = 3
+        snapshot.totalSets = 3
+        XCTAssertTrue(snapshot.hasExercisePrescription)
+        snapshot.allExercisesComplete = true
+        XCTAssertTrue(snapshot.hasExercisePrescription)
+    }
+
     func testCompletedResultReleasesOldWatchLockAndRejectsDelayedActiveMessage() {
         let end = Date(timeIntervalSince1970: 1_800_000_000)
         let old = WatchWorkoutActivityState(isActive: true, title: "Run", updatedAt: end.addingTimeInterval(-30))
