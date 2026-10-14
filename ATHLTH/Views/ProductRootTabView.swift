@@ -540,7 +540,7 @@ private struct ATHLTHMirroredWorkoutPresenter: View {
     @State private var showingLiveWorkout = false
 
     private var presentationTrigger: String {
-        "\(workoutMirroring.presentationGeneration)-\(workoutMirroring.isPresentationRequested)-\(scenePhase == .active)"
+        "\(workoutMirroring.presentationGeneration)-\(workoutMirroring.snapshot?.startedAt?.timeIntervalSince1970 ?? 0)-\(workoutMirroring.isPresentationRequested)-\(workoutMirroring.isUserMinimized)-\(scenePhase == .active)"
     }
 
     private var canPresentMirroredWorkout: Bool {
@@ -599,13 +599,8 @@ private struct ATHLTHMirroredWorkoutPresenter: View {
                 // dismissing. Own the cover with local state and retry the
                 // actual presentation, so SwiftUI cannot leave an active
                 // workout hidden behind a stale true binding.
-                for delay in [
-                    Duration.milliseconds(350),
-                    Duration.milliseconds(650),
-                    Duration.milliseconds(1_100),
-                    Duration.milliseconds(1_800)
-                ] {
-                    try? await Task.sleep(for: delay)
+                while canPresentMirroredWorkout && !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(650))
 
                     guard !Task.isCancelled,
                           canPresentMirroredWorkout

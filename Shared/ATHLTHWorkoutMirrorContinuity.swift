@@ -22,6 +22,17 @@ enum ATHLTHWorkoutMirrorContinuity {
         return true
     }
 
+    /// A late result from another short run must not terminate the new run.
+    static func canApplyCompletion(
+        snapshot: WatchWorkoutLiveSnapshot,
+        kind: WatchWorkoutKind,
+        startedAt: Date,
+        endedAt: Date
+    ) -> Bool {
+        guard snapshot.kind == kind, let currentStart = snapshot.startedAt else { return false }
+        return abs(currentStart.timeIntervalSince(startedAt)) < 2 && currentStart <= endedAt
+    }
+
     /// Old HealthKit delegate callbacks can be delivered after a different
     /// session has attached. Never apply them to that newer session.
     static func acceptsDelegateCallback(

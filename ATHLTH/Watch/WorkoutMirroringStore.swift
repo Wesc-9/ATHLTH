@@ -467,6 +467,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
 
         publish {
             self.snapshot = initialSnapshot
+            self.liveViewIsVisible = false
             self.isUserMinimized = false
             self.connectionText =
                 ATHLTHLocalization.choose(
@@ -605,19 +606,33 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         }
     }
 
+    /// An explicit inactive Watch response also ends a stale live mirror.
+    /// Ignore inactive messages from before this workout started.
+    func reconcileInactiveWatchActivity(_ activity: WatchWorkoutActivityState) {
+        guard !activity.isActive, var current = snapshot,
+              hasActiveMirroredWorkout,
+              current.startedAt.map({ $0 <= activity.updatedAt })
+                ?? (current.capturedAt <= activity.updatedAt)
+        else { return }
+        current.state = .completed
+        current.capturedAt = activity.updatedAt
+        snapshot = current
+        mirroredSession = nil
+        isPresentationRequested = false
+        liveViewIsVisible = false
+        ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive = false
+        ATHLTHWatchWorkoutRuntime.lastMirrorDetectedAt = Date()
+        clearIPhoneAudioCoach()
+    }
+
     func reconcileCompletedWatchWorkout(
         _ result: WatchWorkoutResult
     ) {
         guard var snapshot,
-              snapshot.kind == result.kind,
-              let mirroredStartedAt =
-                snapshot.startedAt,
-              abs(
-                mirroredStartedAt
-                    .timeIntervalSince(
-                        result.startedAt
-                    )
-              ) < 180
+              ATHLTHWorkoutMirrorContinuity.canApplyCompletion(
+                snapshot: snapshot, kind: result.kind,
+                startedAt: result.startedAt, endedAt: result.endedAt
+              )
         else {
             return
         }

@@ -24,6 +24,21 @@ final class ATHLTHWorkoutMirrorContinuityTests: XCTestCase {
         )
     }
 
+    func testCompletionBelongsToExactWorkoutRatherThanAnotherNearbyRun() {
+        XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.canApplyCompletion(
+            snapshot: snapshot(), kind: .running, startedAt: startedAt,
+            endedAt: startedAt.addingTimeInterval(60)
+        ))
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.canApplyCompletion(
+            snapshot: snapshot(), kind: .running, startedAt: startedAt.addingTimeInterval(-15),
+            endedAt: startedAt.addingTimeInterval(-5)
+        ))
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.canApplyCompletion(
+            snapshot: snapshot(), kind: .running, startedAt: startedAt.addingTimeInterval(-15),
+            endedAt: startedAt.addingTimeInterval(5)
+        ))
+    }
+
     func testReattachingSameWatchWorkoutCanRetainMetrics() {
         XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.mayCarryRecordedMetrics(
             previous: snapshot(),

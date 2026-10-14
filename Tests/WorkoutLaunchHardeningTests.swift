@@ -2,6 +2,22 @@ import XCTest
 @testable import ATHLTH
 
 final class WorkoutLaunchHardeningTests: XCTestCase {
+    func testCompletedResultReleasesOldWatchLockAndRejectsDelayedActiveMessage() {
+        let end = Date(timeIntervalSince1970: 1_800_000_000)
+        let old = WatchWorkoutActivityState(isActive: true, title: "Run", updatedAt: end.addingTimeInterval(-30))
+        let resolved = WatchWorkoutActivityState.afterCompletion(current: old, endedAt: end)
+        XCTAssertFalse(resolved.isActive)
+        XCTAssertNil(resolved.title)
+        XCTAssertGreaterThan(resolved.updatedAt, old.updatedAt)
+    }
+
+    func testDelayedCompletionDoesNotReleaseNewerWatchWorkout() {
+        let end = Date(timeIntervalSince1970: 1_800_000_000)
+        let newer = WatchWorkoutActivityState(isActive: true, title: "New run", updatedAt: end.addingTimeInterval(5))
+        XCTAssertEqual(WatchWorkoutActivityState.afterCompletion(current: newer, endedAt: end), newer)
+        XCTAssertFalse(WatchWorkoutActivityState.afterCompletion(current: nil, endedAt: end).isActive)
+    }
+
     @MainActor
     func testAIHealthConsentIsAccountScopedAndPersists() {
         let suite =

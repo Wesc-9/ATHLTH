@@ -1547,6 +1547,13 @@ struct WatchWorkoutActivityState: Codable, Hashable {
     let isActive: Bool
     let title: String?
     let updatedAt: Date
+
+    /// A saved result is authoritative completion evidence. Never clear a
+    /// newer recording when an older result arrives late.
+    static func afterCompletion(current: Self?, endedAt: Date) -> Self {
+        if let current, current.updatedAt > endedAt { return current }
+        return Self(isActive: false, title: nil, updatedAt: endedAt)
+    }
 }
 
 enum WatchTransferKind: String {

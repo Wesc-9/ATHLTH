@@ -987,6 +987,16 @@ struct AppRootView: View {
         ) { _, _ in
             syncLocalWorkoutActivityToWatch()
         }
+        .task(id: "\(phoneWorkout.active?.id.uuidString ?? "none")-\(scenePhase == .active)") {
+            if scenePhase == .active {
+                phoneWorkout.restoreLivePresentationIfNeeded()
+            }
+        }
+        .onChange(of: watchConnection.watchWorkoutActivityState) { _, activity in
+            if let activity {
+                workoutMirroring.reconcileInactiveWatchActivity(activity)
+            }
+        }
         .onChange(of: watchConnection.lastSpotifyCommand) { _, command in
             guard let command else { return }
             handleWatchSpotifyCommand(command)

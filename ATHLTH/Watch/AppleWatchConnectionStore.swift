@@ -1350,6 +1350,16 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
             return
         }
 
+        // Release the start guard as soon as the completed result arrives,
+        // independently of sign-in, Health import or summary dismissal.
+        let activity = WatchWorkoutActivityState.afterCompletion(
+            current: watchWorkoutActivityState, endedAt: result.endedAt
+        )
+        watchWorkoutActivityState = activity
+        lastWatchWorkoutActivitySentAt = max(
+            lastWatchWorkoutActivitySentAt, activity.updatedAt.timeIntervalSince1970
+        )
+
         guard !handledWorkoutResultIDs
                 .contains(result.id),
               !pendingWorkoutResults

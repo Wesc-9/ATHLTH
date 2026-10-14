@@ -699,13 +699,37 @@ final class IPhoneWorkoutStore:
         // modal presentation. It can therefore become visible immediately
         // even while the quick-start sheet is finishing its dismissal.
         showingWorkout = true
+        guard let workoutID = active?.id else { return }
+        livePresentationRetryTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(750))
+                guard !Task.isCancelled, let self,
+                      self.active?.id == workoutID,
+                      !self.isUserMinimized,
+                      !self.liveViewIsVisible
+                else { return }
+                guard UIApplication.shared.applicationState == .active else { return }
+                // Refresh the root overlay if launch coincided with another
+                // sheet or the previous Watch live screen being dismissed.
+                self.showingWorkout = false
+                await Task.yield()
+                try? await Task.sleep(for: .milliseconds(70))
+                guard !Task.isCancelled,
+                      self.active?.id == workoutID,
+                      !self.isUserMinimized else { return }
+                self.showingWorkout = true
+            }
+        }
+    }
+
+    func restoreLivePresentationIfNeeded() {
+        guard active != nil, !isUserMinimized, !liveViewIsVisible else { return }
+        requestLiveWorkoutPresentationAfterLaunch()
     }
 
     func presentWorkout() {
         guard active != nil else { return }
-        livePresentationRetryTask?.cancel()
-        isUserMinimized = false
-        showingWorkout = true
+        requestLiveWorkoutPresentationAfterLaunch()
     }
 
     func minimizeWorkout() {
