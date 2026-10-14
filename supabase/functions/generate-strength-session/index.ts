@@ -1,3 +1,4 @@
+import { compactStrengthCandidates } from "../_shared/strength-session-prompt.ts";
 import { enforceAIRequestBudget } from "../_shared/ai-request-budget.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
@@ -311,8 +312,11 @@ Deno.serve(async (req: Request) => {
     }, 400);
   }
 
-  const candidateIDs =
-    eligibleCandidates.map((candidate) => candidate.exerciseID);
+  const compact = compactStrengthCandidates(eligibleCandidates);
+  const candidateIDs = Array.from(compact.references.keys());
+  if (candidateIDs.length < exerciseCount) {
+    return json({ error: "Not enough compatible exercises are available." }, 400);
+  }
 
   const schema = {
     type: "object",
@@ -391,15 +395,15 @@ Deno.serve(async (req: Request) => {
   };
 
   const recentWorkouts = body.personalize === true
-    ? (body.recentWorkouts ?? []).slice(0, 4).map((workout) => ({
-        title: String(workout?.title ?? "").slice(0, 100),
+    ? (body.recentWorkouts ?? []).slice(0, 2).map((workout) => ({
+        title: String(workout?.title ?? "").slice(0, 60),
         daysAgo: clampInteger(workout?.daysAgo, 0, 60, 0),
         exercises: Array.isArray(workout?.exercises)
-          ? workout.exercises.slice(0, 10).map((exercise) => ({
-              name: String(exercise?.name ?? "").slice(0, 100),
+          ? workout.exercises.slice(0, 4).map((exercise) => ({
+              name: String(exercise?.name ?? "").slice(0, 60),
               primaryMuscles: Array.isArray(exercise?.primaryMuscles)
-                ? exercise.primaryMuscles.slice(0, 8).map((value) =>
-                    String(value).slice(0, 60)
+                ? exercise.primaryMuscles.slice(0, 2).map((value) =>
+                    String(value).slice(0, 24)
                   )
                 : [],
               completedSets: clampInteger(
@@ -425,10 +429,10 @@ Deno.serve(async (req: Request) => {
     personalize: body.personalize === true,
     language,
     existingExerciseNames: (body.existingExerciseNames ?? [])
-      .slice(0, 12)
-      .map((value) => String(value).slice(0, 100)),
+      .slice(0, 8)
+      .map((value) => String(value).slice(0, 60)),
     recentWorkouts,
-    candidates: eligibleCandidates,
+    candidates: compact.candidates,
   };
 
   const instructions = [
@@ -465,6 +469,7 @@ Deno.serve(async (req: Request) => {
         reasoning: {
           effort: "low",
         },
+        max_output_tokens: 1600,
         instructions,
         input: JSON.stringify(context),
         text: {
@@ -486,9 +491,10 @@ Deno.serve(async (req: Request) => {
       status: aiResponse.status,
       body: failure.slice(0, 1400),
     });
-    return json({
-      error: "ATHLTH AI could not build the strength session.",
-    }, 502);
+    if (aiResponse.status === 429 || aiResponse.status === 413) {
+      return json({ error: "AI request limit reached. Try again shortly.", code: "AI_RATE_LIMIT" }, 429);
+    }
+    return json({ error: "ATHLTH AI could not build the strength session." }, 502);
   }
 
   const payload = await aiResponse.json();
@@ -513,14 +519,14 @@ Deno.serve(async (req: Request) => {
   const exercises = Array.isArray(generated?.exercises)
     ? generated.exercises
         .filter((exercise: any) => {
-          const id = String(exercise?.exerciseID ?? "");
-          if (!candidateMap.has(id) || seen.has(id)) return false;
+          const id = compact.references.get(String(exercise?.exerciseID ?? ""));
+          if (!id || !candidateMap.has(id) || seen.has(id)) return false;
           seen.add(id);
           return true;
         })
         .slice(0, exerciseCount)
         .map((exercise: any) => ({
-          exerciseID: String(exercise.exerciseID),
+          exerciseID: compact.references.get(String(exercise.exerciseID))!,
           sets: clampInteger(exercise.sets, 1, 6, 3),
           reps: clampInteger(exercise.reps, 4, 30, 8),
           restSeconds: clampInteger(exercise.restSeconds, 30, 240, 90),
