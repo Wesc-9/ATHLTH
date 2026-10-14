@@ -106,8 +106,8 @@ struct ExerciseLibraryView: View {
         }
 
         return results.sorted {
-            $0.name.localizedStandardCompare(
-                $1.name
+            library.localizedExerciseName($0).localizedStandardCompare(
+                library.localizedExerciseName($1)
             ) == .orderedAscending
         }
     }
@@ -120,7 +120,7 @@ struct ExerciseLibraryView: View {
         for entry in entries {
             let letter =
                 exerciseIndexLetter(
-                    for: entry.name
+                    for: library.localizedExerciseName(entry)
                 )
 
             if firstIDs[letter] == nil {
@@ -393,10 +393,10 @@ struct ExerciseLibraryView: View {
                                         LibraryFavoriteButton(
                                             kind: .exercise,
                                             itemID: entry.id.uuidString,
-                                            title: entry.name,
+                                            title: library.localizedExerciseName(entry),
                                             subtitle: [
-                                                entry.bodyPart,
-                                                entry.exercise.equipment.first
+                                                entry.bodyPart.map(library.localizedBodyPartTitle),
+                                                entry.exercise.equipment.first.map(library.localizedEquipmentTitle)
                                             ]
                                             .compactMap { $0 }
                                             .joined(separator: " · "),
@@ -732,8 +732,18 @@ struct ExerciseLibraryView: View {
                                 norwegian: "Alle"
                             )
                         ) { selectedEquipment = "All" }
-                        ForEach(library.equipmentOptions, id: \.self) { equipment in
-                            Button(equipment) { selectedEquipment = equipment }
+                        ForEach(
+                            library.equipmentOptions.sorted {
+                                library.localizedEquipmentTitle($0)
+                                    .localizedStandardCompare(
+                                        library.localizedEquipmentTitle($1)
+                                    ) == .orderedAscending
+                            },
+                            id: \.self
+                        ) { equipment in
+                            Button(library.localizedEquipmentTitle(equipment)) {
+                                selectedEquipment = equipment
+                            }
                         }
                     } label: {
                         filterChip(
@@ -742,7 +752,7 @@ struct ExerciseLibraryView: View {
                                     english: "Equipment",
                                     norwegian: "Utstyr"
                                 )
-                                : selectedEquipment,
+                                : library.localizedEquipmentTitle(selectedEquipment),
                             active: selectedEquipment != "All"
                         )
                     }
@@ -790,8 +800,11 @@ struct ExerciseLibraryView: View {
         recents.markUsed(
             .exercise,
             itemID: entry.id.uuidString,
-            title: entry.name,
-            subtitle: [entry.bodyPart, entry.exercise.equipment.first]
+            title: library.localizedExerciseName(entry),
+            subtitle: [
+                entry.bodyPart.map(library.localizedBodyPartTitle),
+                entry.exercise.equipment.first.map(library.localizedEquipmentTitle)
+            ]
                 .compactMap { $0 }
                 .joined(separator: " · "),
             icon: "dumbbell.fill"
@@ -821,8 +834,8 @@ struct ExerciseLibraryView: View {
 
                 Text(
                     [
-                        entry.bodyPart,
-                        entry.exercise.equipment.first
+                        entry.bodyPart.map(library.localizedBodyPartTitle),
+                        entry.exercise.equipment.first.map(library.localizedEquipmentTitle)
                     ]
                     .compactMap { $0 }
                     .joined(separator: " · ")
@@ -832,7 +845,7 @@ struct ExerciseLibraryView: View {
                 .lineLimit(1)
 
                 if let difficulty = entry.difficulty {
-                    Text(difficulty)
+                    Text(library.localizedDifficultyTitle(difficulty))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -928,9 +941,9 @@ struct ExerciseDetailView: View {
 
                     Text(
                         [
-                            currentEntry.bodyPart,
-                            currentEntry.difficulty,
-                            currentEntry.exercise.equipment.first
+                            currentEntry.bodyPart.map(library.localizedBodyPartTitle),
+                            currentEntry.difficulty.map(library.localizedDifficultyTitle),
+                            currentEntry.exercise.equipment.first.map(library.localizedEquipmentTitle)
                         ]
                         .compactMap { $0 }
                         .joined(separator: " · ")
@@ -996,9 +1009,9 @@ struct ExerciseDetailView: View {
                     }
                 }
 
-                if !currentEntry.tips.isEmpty {
+                if !library.localizedExerciseTips(currentEntry).isEmpty {
                     detailCard("Tips") {
-                        ForEach(currentEntry.tips, id: \.self) { tip in
+                        ForEach(library.localizedExerciseTips(currentEntry), id: \.self) { tip in
                             Label(tip, systemImage: "lightbulb.fill")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
