@@ -375,7 +375,19 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
 /// completing a conversation immediately releases the microphone and resumes
 /// the user's previous ordinary Audio Coach mute state.
 struct ATHLTHLiveAICoachConversationView: View {
+    enum Source {
+        case phoneWorkout
+        case mirroredWatchWorkout
+    }
+
+    let source: Source
+
+    init(source: Source = .phoneWorkout) {
+        self.source = source
+    }
+
     @EnvironmentObject private var recorder: IPhoneWorkoutStore
+    @EnvironmentObject private var mirroring: WorkoutMirroringStore
     @EnvironmentObject private var settings: AppSettingsStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -535,9 +547,14 @@ struct ATHLTHLiveAICoachConversationView: View {
     }
 
     private func begin() {
-        if !recorder.coachSpeechPaused {
-            recorder.setCoachSpeechPaused(true)
-            restoreCoachVoice = true
+        switch source {
+        case .phoneWorkout:
+            if !recorder.coachSpeechPaused {
+                recorder.setCoachSpeechPaused(true)
+                restoreCoachVoice = true
+            }
+        case .mirroredWatchWorkout:
+            mirroring.setAIConversationActive(true)
         }
         Task {
             await conversation.start(
@@ -550,9 +567,14 @@ struct ATHLTHLiveAICoachConversationView: View {
     }
 
     private func restoreOrdinaryCoach() {
-        if restoreCoachVoice {
-            recorder.setCoachSpeechPaused(false)
-            restoreCoachVoice = false
+        switch source {
+        case .phoneWorkout:
+            if restoreCoachVoice {
+                recorder.setCoachSpeechPaused(false)
+                restoreCoachVoice = false
+            }
+        case .mirroredWatchWorkout:
+            mirroring.setAIConversationActive(false)
         }
     }
 

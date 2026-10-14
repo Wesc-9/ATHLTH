@@ -16,7 +16,7 @@
 - Add a real live-status tool only when it can return fresh, user-consented telemetry, explicitly identified as unverified when no fresh measurements are available.
 - iPhone conversation screen is only reachable from an active workout, requests both consent toggles and native microphone permission, stops on dismissal/background, and limits conversations to five minutes on the client.
 - A client time limit is **not** a server-enforced usage cap. Confirm backend provider spending controls and server-side session termination/accounting before enabling the feature for customers.
-- No watch microphone or remote controls are implemented in this phase.
+- Apple Watch can now send a fresh, interactive request to **open the iPhone consent UI** when the iPhone is reachable and the mirrored workout is displayed. The Watch does **not** activate the microphone or persist requests. The iPhone remains the only AI audio host. Never imply that voice capture on Watch or automatic remote mic activation is supported.
 
 ## Environment
 

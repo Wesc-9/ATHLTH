@@ -3,6 +3,8 @@ import AVFoundation
 
 struct MirroredWorkoutLiveView: View {
     @EnvironmentObject private var mirroring: WorkoutMirroringStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
@@ -10,6 +12,7 @@ struct MirroredWorkoutLiveView: View {
     @State private var showingTreadmillInclineEditor = false
     @State private var treadmillInclineDraft = 0.0
     @State private var coachOutputName: String?
+    @State private var showingAIConversation = false
 
     var body: some View {
         NavigationStack {
@@ -110,6 +113,36 @@ struct MirroredWorkoutLiveView: View {
 
                         if mirroring.mirroredIPhoneCoachAvailable {
                             mirroredAudioCoachCard
+                        }
+
+                        if mirroring.hasActiveMirroredWorkout {
+                            Button {
+                                showingAIConversation = true
+                            } label: {
+                                ATHLTHCard {
+                                    HStack(spacing: 10) {
+                                        Image(systemName: "mic.circle.fill")
+                                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                                            .font(.title2)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(ATHLTHLocalization.choose(
+                                                english: "Talk to AI Coach",
+                                                norwegian: "Snakk med AI Coach"
+                                            ))
+                                            .font(.subheadline.weight(.semibold))
+                                            Text(ATHLTHLocalization.choose(
+                                                english: "Optional · confirm microphone on iPhone",
+                                                norwegian: "Valgfritt · godkjenn mikrofon på iPhone"
+                                            ))
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
                         }
 
                         if let liveSession =
@@ -285,6 +318,13 @@ struct MirroredWorkoutLiveView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingAIConversation) {
+            ATHLTHLiveAICoachConversationView(source: .mirroredWatchWorkout)
+                .environmentObject(settings)
+                .environmentObject(mirroring)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
         .sheet(
             isPresented:
                 $showingTreadmillInclineEditor
@@ -329,11 +369,20 @@ struct MirroredWorkoutLiveView: View {
                 reason: "watch-mirrored-workout"
             )
         }
+        .onChange(of: watchConnection.latestAIConversationRequestID) { _, request in
+            if request != nil &&
+               mirroring.hasActiveMirroredWorkout &&
+               scenePhase == .active {
+                // A Watch request opens a choice, never microphone capture.
+                showingAIConversation = true
+            }
+        }
         .onChange(
             of:
                 mirroring
                     .hasActiveMirroredWorkout
-        ) { _, _ in
+        ) { _, isActive in
+            if !isActive { showingAIConversation = false }
             updateScreenAwakeState()
         }
         .onChange(

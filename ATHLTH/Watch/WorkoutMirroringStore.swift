@@ -23,6 +23,19 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     @Published private(set) var presentationGeneration = 0
     @Published private(set) var lastCoachMessage: String?
 
+    func setAIConversationActive(_ active: Bool) {
+        guard aiConversationActive != active else { return }
+        aiConversationActive = active
+        if active {
+            // Never change HealthKit recording or remote Watch cue ownership.
+            // Only suspend the local phone voice while the AI has its audio.
+            iPhoneAudioCoach.suspendForWatchFallback()
+        } else if iPhoneAudioCoachAttached, let snapshot {
+            // Align milestones to current progress; old cues must not replay.
+            iPhoneAudioCoach.synchronizeOnHandoff(snapshot)
+        }
+    }
+
     var mirroredIPhoneCoachAvailable: Bool {
         iPhoneAudioCoachAttached &&
         iPhoneAudioCoach.isEnabled &&
@@ -49,6 +62,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     private var mirroredSession: HKWorkoutSession?
     private let iPhoneAudioCoach =
         MirroredWorkoutAudioCoach()
+    private var aiConversationActive = false
     private var iPhoneAudioCoachPreparedAt:
         Date?
     private var iPhoneAudioCoachAttached =
@@ -242,6 +256,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     }
 
     func clearIPhoneAudioCoach() {
+        aiConversationActive = false
         resetVoiceLease()
         iPhoneAudioCoach.stop()
         iPhoneAudioCoachPreparedAt = nil
@@ -521,7 +536,9 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         guard let latestSnapshot else { return }
 
         if iPhoneAudioCoachAttached {
-            if latestSnapshot.supportsAudioCoachVoiceLease != true {
+            if aiConversationActive {
+                iPhoneAudioCoach.suspendForWatchFallback()
+            } else if latestSnapshot.supportsAudioCoachVoiceLease != true {
                 // Preserve the pre-lease phone speech path while the
                 // paired Watch app is still on an older build.
                 iPhoneAudioCoach.handle(latestSnapshot)
@@ -630,8 +647,9 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
             )
 
         if iPhoneAudioCoachAttached {
-            if snapshot.supportsAudioCoachVoiceLease != true ||
-                hasAcknowledgedVoiceLease {
+            if !aiConversationActive &&
+               (snapshot.supportsAudioCoachVoiceLease != true ||
+                hasAcknowledgedVoiceLease) {
                 iPhoneAudioCoach.handle(snapshot)
             }
             resetVoiceLease()
@@ -753,8 +771,9 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
             self.snapshot = snapshot
 
             if self.iPhoneAudioCoachAttached {
-                if snapshot.supportsAudioCoachVoiceLease != true ||
-                    self.hasAcknowledgedVoiceLease {
+                if !self.aiConversationActive &&
+                   (snapshot.supportsAudioCoachVoiceLease != true ||
+                    self.hasAcknowledgedVoiceLease) {
                     self.iPhoneAudioCoach.handle(snapshot)
                 }
                 self.offerVoiceLeaseIfNeeded(for: snapshot)
