@@ -319,7 +319,7 @@ struct MirroredWorkoutLiveView: View {
             }
         }
         .sheet(isPresented: $showingAIConversation) {
-            ATHLTHLiveAICoachConversationView(source: .mirroredWatchWorkout)
+            ATHLTHGroqVoiceCoachView(source: .mirroredWatchWorkout)
                 .environmentObject(settings)
                 .environmentObject(mirroring)
                 .presentationDetents([.large])

@@ -1548,7 +1548,7 @@ struct IPhoneWorkoutView: View {
                 .presentationDetents([.medium])
             }
             .sheet(isPresented: $showingAIConversation) {
-                ATHLTHLiveAICoachConversationView()
+                ATHLTHGroqVoiceCoachView()
                     .environmentObject(recorder)
                     .environmentObject(settings)
                     .presentationDetents([.large])

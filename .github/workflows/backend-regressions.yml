@@ -32,6 +32,10 @@ jobs:
           node supabase/functions/_shared/account-storage-cleanup.test.ts
           node supabase/functions/_shared/ai-request-budget.test.ts
           node supabase/functions/_shared/recovery-privacy.test.ts
+      - name: Test Groq Audio Coach request policy
+        run: |
+          deno test supabase/functions/audio-coach-groq-turn/policy.test.ts
+          deno check supabase/functions/audio-coach-groq-turn/index.ts
       - name: Test Audio Coach AI opt-in policy
         run: deno test supabase/functions/create-audio-coach-session/policy.test.ts
       - name: Typecheck changed Edge Functions
