@@ -423,21 +423,29 @@ final class ExerciseLibraryStore: ObservableObject {
     ]
 
     func localizedExerciseInstructions(_ entry: ExerciseLibraryEntry) -> [String] {
-        guard ATHLTHLocalization.isNorwegian else { return entry.exercise.instructions }
-        if let reviewed = NorwegianExerciseText.record(for: entry.sourceIdentifier)?.instructions,
-           !reviewed.isEmpty {
+        guard ATHLTHLocalization.isNorwegian else {
+            return entry.exercise.instructions
+        }
+        if let reviewed = NorwegianExerciseText.record(
+            for: entry.sourceIdentifier
+        )?.instructions, !reviewed.isEmpty {
             return reviewed
         }
-        guard let key = entry.sourceIdentifier else { return entry.exercise.instructions }
-        if let nativeSteps = Self.nativeNorwegianInstructions[key] { return nativeSteps }
-        if (entry.source == .repDB ||
-            (entry.source == .athlthCatalog && key.hasPrefix("athlth-core-"))),
-           let steps = Self.norwegianCoreInstructions[key] {
-            return steps
+        if let key = entry.sourceIdentifier {
+            if let native = Self.nativeNorwegianInstructions[key] {
+                return native
+            }
+            if (entry.source == .repDB ||
+                (entry.source == .athlthCatalog &&
+                 key.hasPrefix("athlth-core-"))),
+               let steps = Self.norwegianCoreInstructions[key] {
+                return steps
+            }
         }
-        // Never fabricate technical safety instructions: use original text
-        // when a reviewed Norwegian translation is not yet available.
-        return entry.exercise.instructions
+        guard entry.source == .repDB else { return entry.exercise.instructions }
+        return entry.exercise.instructions.map {
+            NorwegianExerciseAutoTranslation.shared.translated($0) ?? $0
+        }
     }
 
     func localizedExerciseName(_ entry: ExerciseLibraryEntry) -> String {
@@ -449,32 +457,46 @@ final class ExerciseLibraryStore: ObservableObject {
             return reviewed
         }
         if let id = entry.sourceIdentifier {
-            if let nativeName = Self.nativeNorwegianNames[id] { return nativeName }
+            if let native = Self.nativeNorwegianNames[id] { return native }
             if let alias = Self.norwegianExerciseNames[id] { return alias }
         }
-        return ATHLTHExerciseNameLocalization.norwegianName(for: entry.name)
+        let curated = ATHLTHExerciseNameLocalization.norwegianName(for: entry.name)
+        if curated != entry.name { return curated }
+        return NorwegianExerciseAutoTranslation.shared.translated(entry.name)
+            ?? entry.name
     }
 
     func localizedExerciseSummary(_ entry: ExerciseLibraryEntry) -> String? {
         guard ATHLTHLocalization.isNorwegian else { return entry.summary }
-        if let reviewed = NorwegianExerciseText.record(for: entry.sourceIdentifier)?.summary,
-           !reviewed.isEmpty {
+        if let reviewed = NorwegianExerciseText.record(
+            for: entry.sourceIdentifier
+        )?.summary, !reviewed.isEmpty {
             return reviewed
         }
         if let id = entry.sourceIdentifier,
-           let nativeSteps = Self.nativeNorwegianInstructions[id] {
-            return nativeSteps.first
+           let native = Self.nativeNorwegianInstructions[id] {
+            return native.first
         }
-        return entry.summary
+        guard let original = entry.summary else { return nil }
+        if entry.source == .repDB {
+            return NorwegianExerciseAutoTranslation.shared.translated(original)
+                ?? original
+        }
+        return original
     }
 
     func localizedExerciseTips(_ entry: ExerciseLibraryEntry) -> [String] {
-        guard ATHLTHLocalization.isNorwegian else { return entry.tips }
-        if let reviewed = NorwegianExerciseText.record(for: entry.sourceIdentifier)?.tips,
-           !reviewed.isEmpty {
+        guard ATHLTHLocalization.isNorwegian, entry.source == .repDB else {
+            return entry.tips
+        }
+        if let reviewed = NorwegianExerciseText.record(
+            for: entry.sourceIdentifier
+        )?.tips, !reviewed.isEmpty {
             return reviewed
         }
-        return entry.tips
+        return entry.tips.map {
+            NorwegianExerciseAutoTranslation.shared.translated($0) ?? $0
+        }
     }
 
     func localizedEquipmentTitle(_ value: String) -> String {
