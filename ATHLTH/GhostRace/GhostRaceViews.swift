@@ -1358,12 +1358,32 @@ struct GhostRaceHubView: View {
         guard let range = distance.distanceRange else { return nil }
         return recentRuns
             .filter {
-                $0.distanceKilometers.map(range.contains) ?? false
+                ($0.distanceKilometers.map(range.contains) ?? false) &&
+                ($0.paceMinutesPerKilometer.map {
+                    $0.isFinite && $0 > 0
+                } ?? false)
             }
             .min {
                 ($0.paceMinutesPerKilometer ?? .infinity) <
                 ($1.paceMinutesPerKilometer ?? .infinity)
             }
+    }
+
+    private var similarReplayRuns: [WorkoutSummary] {
+        guard let latest = recommendedReplay,
+              let latestDistance = latest.distanceKilometers,
+              latestDistance > 0 else {
+            return []
+        }
+        // Similar distance is not the same thing as a route match.
+        return Array(recentRuns.filter { workout in
+            guard workout.id != latest.id,
+                  let distance = workout.distanceKilometers else {
+                return false
+            }
+            return abs(distance - latestDistance) <=
+                max(latestDistance * 0.10, 0.25)
+        }.prefix(3))
     }
 
     private var replayFavoritesKey: String {
@@ -1476,6 +1496,28 @@ struct GhostRaceHubView: View {
     private var pastSelfSection: some View {
         VStack(spacing: 14) {
             replayRecommendationCard
+
+            if !similarReplayRuns.isEmpty {
+                ATHLTHCard {
+                    VStack(alignment: .leading, spacing: 11) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Similar distance",
+                            norwegian: "Lignende distanse"
+                        ))
+                        .font(.headline)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Comparable length, not necessarily the same route.",
+                            norwegian: "Omtrent like lange løp, men ikke nødvendigvis samme rute."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                        ForEach(similarReplayRuns) { workout in
+                            replayRunCard(workout)
+                        }
+                    }
+                }
+            }
 
             if bestReplay(in: .five) != nil ||
                 bestReplay(in: .ten) != nil {
@@ -1935,97 +1977,6 @@ struct GhostRaceHubView: View {
         }
     }
 
-    private func runRow(
-        _ workout: WorkoutSummary
-    ) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: "figure.run")
-                .font(.headline)
-                .foregroundStyle(ATHLTHTheme.vitality)
-                .frame(width: 42, height: 42)
-                .background(
-                    ATHLTHTheme.vitalitySoft,
-                    in: RoundedRectangle(
-                        cornerRadius: 12
-                    )
-                )
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(
-                    workout.startDate.formatted(
-                        date: .abbreviated,
-                        time: .shortened
-                    )
-                )
-                .font(.subheadline.weight(.semibold))
-
-                HStack(spacing: 8) {
-                    if let distance =
-                        workout.distanceKilometers {
-                        Text(
-                            String(
-                                format: "%.2f km",
-                                distance
-                            )
-                        )
-                    }
-
-                    Text(clock(workout.duration))
-
-                    if let pace =
-                        workout.paceMinutesPerKilometer {
-                        Text(paceText(pace))
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            Button {
-                toggleReplayFavorite(workout.id)
-            } label: {
-                Image(systemName: replayFavoriteIDs.contains(workout.id)
-                    ? "star.fill" : "star")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .frame(width: 32, height: 40)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(
-                replayFavoriteIDs.contains(workout.id)
-                    ? ATHLTHLocalization.choose(
-                        english: "Remove favorite", norwegian: "Fjern favoritt"
-                    )
-                    : ATHLTHLocalization.choose(
-                        english: "Add favorite", norwegian: "Legg til favoritt"
-                    )
-            )
-
-            Button {
-                pendingReplayRun = workout
-            } label: {
-                if startingWorkoutID == workout.id {
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(width: 54)
-                } else {
-                    Text("Race")
-                        .font(.caption.weight(.bold))
-                        .frame(width: 54)
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(ATHLTHTheme.vitality)
-            .disabled(
-                !canStartRace ||
-                startingWorkoutID != nil
-            )
-        }
-        .padding(.vertical, 8)
-    }
-
     private func start(
         _ workout: WorkoutSummary
     ) async {
@@ -2157,6 +2108,8 @@ struct GhostRaceHubView: View {
     // Validate progressively, without pulling heart-rate and other detail
     // data, and reuse HealthKitManager's route cache.
     private func loadRuns() async {
+        // A pull-to-refresh must not reset an in-flight route scan.
+        guard !verifyingReplay else { return }
         loading = true
         defer { loading = false }
 
