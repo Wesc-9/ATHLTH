@@ -1486,6 +1486,26 @@ struct IPhoneWorkoutView: View {
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                     }
+                                    if let loggedAverage =
+                                        workout.averageLoggedTreadmillSpeedKilometersPerHour {
+                                        Text(ATHLTHLocalization.format(
+                                            english: "Logged average belt speed: %.1f km/h",
+                                            norwegian: "Registrert snitthastighet: %.1f km/t",
+                                            loggedAverage
+                                        ))
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    }
+                                    if let entries = workout.treadmillSpeedHistory,
+                                       entries.count > 1 {
+                                        Text(ATHLTHLocalization.format(
+                                            english: "%d manual speed entries saved",
+                                            norwegian: "%d manuelle hastighetsmålinger lagret",
+                                            entries.count
+                                        ))
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                    }
                                     HStack(spacing: 8) {
                                         Label(
                                             ATHLTHLocalization.format(
