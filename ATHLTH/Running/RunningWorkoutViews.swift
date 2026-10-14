@@ -342,6 +342,7 @@ struct RunningWorkoutDetailView: View {
     let onStart: ((RunningWorkoutTemplate) -> Void)?
 
     @State private var showingDelete = false
+    @State private var showingIntervalEditor = false
 
     var body: some View {
         ScrollView {
@@ -407,6 +408,22 @@ struct RunningWorkoutDetailView: View {
                     .tint(ATHLTHTheme.accent)
                 }
 
+                if workout.type == .intervals || workout.type == .threshold {
+                    Button {
+                        showingIntervalEditor = true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Customize intervals", norwegian: "Tilpass intervaller"
+                            ),
+                            systemImage: "slider.horizontal.3"
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accent)
+                }
+
                 if workout.isBuiltIn {
                     Button {
                         _ = library.duplicate(workout)
@@ -453,6 +470,15 @@ struct RunningWorkoutDetailView: View {
                     .padding(.bottom, 8)
                 }
                 .background(.ultraThinMaterial)
+            }
+        }
+        .sheet(isPresented: $showingIntervalEditor) {
+            ATHLTHTrainIntervalComposerView(initial: workout) { edited in
+                library.save(edited)
+                if let onSelect {
+                    onSelect(edited)
+                    dismiss()
+                }
             }
         }
         .confirmationDialog(
