@@ -4,6 +4,7 @@ import SwiftUI
 struct ATHLTHWorkoutReplayCard: View {
     let workout: SocialPublishableWorkout
     let context: WorkoutAIInsightContext?
+    @State private var showingMoments = false
 
     private var isStrength: Bool {
         workout.activity == .strength
@@ -17,103 +18,217 @@ struct ATHLTHWorkoutReplayCard: View {
     }
 
     var body: some View {
-        ATHLTHCard {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "play.square.stack.fill")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.vitality)
-                    .frame(width: 43, height: 43)
-                    .background(
-                        ATHLTHTheme.vitalitySoft,
-                        in: RoundedRectangle(
-                            cornerRadius: 13,
-                            style: .continuous
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    showingMoments.toggle()
+                }
+            } label: {
+                HStack(alignment: .top, spacing: 12) {
+                    ZStack {
+                        Image(replayArtwork)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 96, height: 126)
+                            .clipped()
+
+                        LinearGradient(
+                            colors: [.clear, .black.opacity(0.65)],
+                            startPoint: .center,
+                            endPoint: .bottom
                         )
-                    )
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("ATHLTH Replay")
-                        .font(.headline)
+                        Image(systemName: showingMoments ? "pause.circle" : "play.circle")
+                            .font(.system(size: 41, weight: .ultraLight))
+                            .foregroundStyle(.white)
 
-                    Text(
-                        isStrength
-                            ? ATHLTHLocalization.choose(
-                                english: "Your session, condensed into the moments that mattered.",
-                                norwegian: "Høydepunktene fra styrkeøkten din."
-                            )
-                            : ATHLTHLocalization.choose(
-                                english: "A quick story of how the workout unfolded.",
-                                norwegian: "Et raskt tilbakeblikk på hvordan økten utviklet seg."
-                            )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                Text(ATHLTHLocalization.choose(english: "REPLAY", norwegian: "TILBAKEBLIKK"))
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(1.1)
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(
-                        ATHLTHTheme.accentSoft,
-                        in: Capsule()
-                    )
-            }
-
-            VStack(spacing: 0) {
-                ForEach(Array(replayMoments.enumerated()), id: \.offset) { index, moment in
-                    HStack(alignment: .top, spacing: 11) {
-                        ZStack {
-                            Circle()
-                                .fill(moment.tint.opacity(0.11))
-                                .frame(width: 34, height: 34)
-
-                            Image(systemName: moment.icon)
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(moment.tint)
+                        VStack {
+                            Spacer()
+                            Text("ATHLTH")
+                                .font(.system(size: 9, weight: .bold))
+                                .tracking(1.2)
+                                .foregroundStyle(.white)
+                                .padding(.bottom, 8)
                         }
+                    }
+                    .frame(width: 96, height: 126)
+                    .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(moment.title)
-                                .font(.subheadline.weight(.semibold))
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(alignment: .top, spacing: 4) {
+                            Text("ATHLTH Replay")
+                                .font(.system(size: 17, weight: .bold))
                                 .foregroundStyle(ATHLTHTheme.primaryText)
-
-                            Text(moment.detail)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.82)
+                            Spacer(minLength: 2)
+                            Text(ATHLTHLocalization.choose(
+                                english: "REPLAY", norwegian: "TILBAKEBLIKK"
+                            ))
+                            .font(.system(size: 8, weight: .bold))
+                            .tracking(0.6)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 6)
+                            .background(Color.black.opacity(0.05), in: Capsule())
+                            .foregroundStyle(ATHLTHTheme.mutedText)
                         }
+                        Text(isStrength
+                             ? ATHLTHLocalization.choose(
+                                 english: "Highlights from your strength session.",
+                                 norwegian: "Høydepunktene fra styrkeøkten."
+                             )
+                             : ATHLTHLocalization.choose(
+                                 english: "A quick look at how your session unfolded.",
+                                 norwegian: "Et raskt tilbakeblikk på hvordan økten utviklet seg."
+                             ))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
 
-                        Spacer(minLength: 0)
+                        Spacer(minLength: 5)
+
+                        Rectangle()
+                            .fill(ATHLTHTheme.divider.opacity(0.65))
+                            .frame(height: 0.7)
+
+                        HStack(spacing: 7) {
+                            replayMetric(
+                                title: isStrength
+                                    ? ATHLTHLocalization.choose(english: "Exercises", norwegian: "Øvelser")
+                                    : ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse"),
+                                value: replayFirstMetric,
+                                icon: isStrength ? "dumbbell.fill" : "point.topleft.down.curvedto.point.bottomright.up"
+                            )
+                            replayMetric(
+                                title: isStrength
+                                    ? ATHLTHLocalization.choose(english: "Volume", norwegian: "Volum")
+                                    : ATHLTHLocalization.choose(english: "Avg pace", norwegian: "Snitt-tempo"),
+                                value: replaySecondMetric,
+                                icon: isStrength ? "scalemass.fill" : "speedometer"
+                            )
+                            replayMetric(
+                                title: ATHLTHLocalization.choose(english: "Total", norwegian: "Totaltid"),
+                                value: durationText(workout.duration),
+                                icon: "chart.bar.fill"
+                            )
+                        }
                     }
-                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity, minHeight: 126)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: showingMoments ? "Close workout replay highlights"
+                    : "Open workout replay highlights",
+                norwegian: showingMoments ? "Lukk øktens tilbakeblikk"
+                    : "Vis øktens tilbakeblikk"
+            ))
 
-                    if index < replayMoments.count - 1 {
-                        Divider()
-                            .padding(.leading, 45)
+            if showingMoments {
+                Divider()
+                    .padding(.top, 12)
+                VStack(spacing: 0) {
+                    ForEach(Array(replayMoments.enumerated()), id: \.offset) { index, moment in
+                        HStack(alignment: .top, spacing: 11) {
+                            Image(systemName: moment.icon)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(moment.tint)
+                                .frame(width: 32, height: 32)
+                                .background(moment.tint.opacity(0.09), in: Circle())
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(moment.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                                Text(moment.detail)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.vertical, 10)
+
+                        if index < replayMoments.count - 1 {
+                            Divider().padding(.leading, 43)
+                        }
                     }
                 }
-            }
-            .padding(.top, 6)
 
-            if !isStrength &&
-                usableSegments.isEmpty {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "Detailed phases appear when the workout contains enough route or heart-rate data.",
-                        norwegian: "Detaljerte faser vises når økten har nok rute- eller pulsdata."
-                    ),
-                    systemImage: "waveform.path.ecg"
-                )
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .padding(.top, 8)
+                if !isStrength && usableSegments.isEmpty {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "More replay detail appears with route or heart-rate samples.",
+                            norwegian: "Flere Replay-detaljer vises når økten har rute- eller pulsdata."
+                        ),
+                        systemImage: "info.circle"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 8)
+                }
             }
         }
+        .padding(12)
+        .background(Color.white.opacity(0.92),
+                    in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color.white.opacity(0.95), lineWidth: 0.9)
+        }
+    }
+
+    private func replayMetric(title: String, value: String, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 3) {
+                Image(systemName: icon)
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                Text(value)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.60)
+            }
+            .font(.system(size: 12, weight: .bold))
+
+            Text(title)
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var replayArtwork: String {
+        if workout.isIndoor == true && workout.activity == .running {
+            return "TreadmillRecentCardHero"
+        }
+        if isStrength { return "StrengthPostWorkoutHero" }
+        return "GoalRunning"
+    }
+
+    private var replayFirstMetric: String {
+        if isStrength {
+            return workout.strengthExerciseCount.map(String.init) ?? "—"
+        }
+        guard let meters = workout.distanceMeters,
+              meters.isFinite && meters > 0 else { return "—" }
+        return String(format: "%.2f km", meters / 1_000)
+    }
+
+    private var replaySecondMetric: String {
+        if isStrength {
+            guard let volume = workout.strengthTotalVolumeKilograms,
+                  volume.isFinite, volume > 0 else { return "—" }
+            return volume >= 1_000
+                ? String(format: "%.1f t", volume / 1_000)
+                : String(format: "%.0f kg", volume)
+        }
+        guard let meters = workout.distanceMeters,
+              meters > 0 && workout.duration > 0 else { return "—" }
+        return paceText(workout.duration / (meters / 1_000))
     }
 
     private var replayMoments: [ReplayMoment] {
