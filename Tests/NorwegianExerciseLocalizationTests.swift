@@ -63,4 +63,66 @@ final class NorwegianExerciseLocalizationTests: XCTestCase {
         XCTAssertNotNil(reviewed?.tips?.first)
         XCTAssertNil(NorwegianExerciseText.record(for: "never-existed-example"))
     }
+    @MainActor
+    func testEveryRepDBEntryKeepsCanonicalIdentifierAndFallbackText() {
+        let old = UserDefaults.standard.string(forKey: "settings.language")
+        UserDefaults.standard.set("nb", forKey: "settings.language")
+        defer {
+            if let old {
+                UserDefaults.standard.set(old, forKey: "settings.language")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "settings.language")
+            }
+        }
+
+        let library = ExerciseLibraryStore()
+        XCTAssertGreaterThanOrEqual(library.repDBExercises.count, 600)
+        for entry in library.repDBExercises {
+            XCTAssertNotNil(entry.sourceIdentifier)
+            XCTAssertFalse(entry.name.isEmpty)
+            // Even before Apple's language model is installed, every
+            // exercise has a usable name and valid technique instructions.
+            XCTAssertFalse(library.localizedExerciseName(entry).isEmpty)
+            XCTAssertFalse(library.localizedExerciseInstructions(entry).isEmpty)
+            XCTAssertFalse(entry.exercise.instructions.isEmpty)
+        }
+        XCTAssertGreaterThanOrEqual(
+            NorwegianExerciseAutoTranslation.shared.cachedStringCount, 0
+        )
+    }
+
+    @MainActor
+    func testTranslationNeverChangesCanonicalEquipmentOrExerciseIdentity() {
+        let old = UserDefaults.standard.string(forKey: "settings.language")
+        UserDefaults.standard.set("nb", forKey: "settings.language")
+        defer {
+            if let old {
+                UserDefaults.standard.set(old, forKey: "settings.language")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "settings.language")
+            }
+        }
+
+        let library = ExerciseLibraryStore()
+        let original = library.repDBExercises.first {
+            $0.exercise.equipment.contains("Barbell")
+        }
+        guard let entry = original else {
+            XCTFail("Expected a barbell exercise in RepDB")
+            return
+        }
+
+        let stableID = entry.id
+        let canonicalName = entry.name
+        let canonicalEquipment = entry.exercise.equipment
+        _ = library.localizedExerciseName(entry)
+        _ = library.localizedExerciseInstructions(entry)
+        _ = library.localizedExerciseSummary(entry)
+        _ = library.localizedExerciseTips(entry)
+        XCTAssertEqual(entry.id, stableID)
+        XCTAssertEqual(entry.name, canonicalName)
+        XCTAssertEqual(entry.exercise.equipment, canonicalEquipment)
+        XCTAssertEqual(library.localizedEquipmentTitle("Barbell"), "Vektstang")
+    }
+
 }
