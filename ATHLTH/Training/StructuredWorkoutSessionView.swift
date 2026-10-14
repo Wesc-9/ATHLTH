@@ -291,7 +291,8 @@ struct StructuredWorkoutSessionView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("CURRENT BLOCK")
+                Label(block.resolvedPhase.title.uppercased(),
+                      systemImage: block.resolvedPhase.symbol)
                     .font(.caption2.weight(.bold))
                     .tracking(1.8)
                     .foregroundStyle(
@@ -432,6 +433,10 @@ struct StructuredWorkoutSessionView: View {
                             alignment: .leading,
                             spacing: 3
                         ) {
+                            Label(block.resolvedPhase.title,
+                                  systemImage: block.resolvedPhase.symbol)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
                             Text(block.title)
                                 .font(
                                     .subheadline.weight(.semibold)
