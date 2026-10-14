@@ -212,6 +212,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var coachCueQueue = ATHLTHCoachCueQueue()
     /// Temporary voice mute; HealthKit capture and safety haptics continue.
     @Published private(set) var coachSpeechPaused = false
+    private var aiConversationVoiceSuppressed = false
+    private var coachSpeechWasPausedBeforeAI = false
+    private var aiConversationVoiceTimeoutTask: Task<Void, Never>?
     @Published private(set) var lastCoachMessage: String?
     private var coachReplayMemory = ATHLTHCoachReplayMemory()
 
@@ -726,8 +729,36 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
     }
 
+    /// Keep Watch workout capture and haptics active while iPhone AI speaks.
+    /// A local timeout restores voice if the phone disconnects unexpectedly.
+    func setAIConversationVoiceSuppressed(_ suppress: Bool) {
+        if suppress {
+            guard isActive, !aiConversationVoiceSuppressed else { return }
+            aiConversationVoiceSuppressed = true
+            coachSpeechWasPausedBeforeAI = coachSpeechPaused
+            setCoachSpeechPaused(true)
+            aiConversationVoiceTimeoutTask?.cancel()
+            aiConversationVoiceTimeoutTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(310))
+                guard !Task.isCancelled else { return }
+                self?.setAIConversationVoiceSuppressed(false)
+            }
+            return
+        }
+
+        guard aiConversationVoiceSuppressed else { return }
+        aiConversationVoiceSuppressed = false
+        aiConversationVoiceTimeoutTask?.cancel()
+        aiConversationVoiceTimeoutTask = nil
+        if !coachSpeechWasPausedBeforeAI, isActive {
+            setCoachSpeechPaused(false)
+        }
+        coachSpeechWasPausedBeforeAI = false
+    }
+
     /// Silences only the voice, not recording or haptic alerts.
     func setCoachSpeechPaused(_ paused: Bool) {
+        if aiConversationVoiceSuppressed && !paused { return }
         guard audioCoachConfiguration.enabled, isActive else {
             coachSpeechPaused = false
             return

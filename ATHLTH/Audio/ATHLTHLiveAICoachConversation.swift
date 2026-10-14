@@ -444,6 +444,7 @@ struct ATHLTHLiveAICoachConversationView: View {
 
     @EnvironmentObject private var recorder: IPhoneWorkoutStore
     @EnvironmentObject private var mirroring: WorkoutMirroringStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var settings: AppSettingsStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -452,6 +453,7 @@ struct ATHLTHLiveAICoachConversationView: View {
     @State private var allowProviderProcessing = false
     @State private var allowLiveWorkoutMetrics = false
     @State private var restoreCoachVoice = false
+    @State private var watchVoiceConnectionUnavailable = false
 
     var body: some View {
         NavigationStack {
@@ -480,6 +482,15 @@ struct ATHLTHLiveAICoachConversationView: View {
                                 .font(.subheadline)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
                                 .multilineTextAlignment(.center)
+                            if watchVoiceConnectionUnavailable {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Open ATHLTH on both your connected Watch and iPhone before AI voice, to avoid overlapping coaches.",
+                                    norwegian: "Åpne ATHLTH på både tilkoblet Apple Watch og iPhone før AI-tale, slik at coachene ikke snakker samtidig."
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                                .multilineTextAlignment(.center)
+                            }
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 22)
@@ -620,6 +631,7 @@ struct ATHLTHLiveAICoachConversationView: View {
     }
 
     private func begin() {
+        watchVoiceConnectionUnavailable = false
         switch source {
         case .phoneWorkout where recorder.active == nil:
             return
@@ -635,6 +647,10 @@ struct ATHLTHLiveAICoachConversationView: View {
                 restoreCoachVoice = true
             }
         case .mirroredWatchWorkout:
+            guard watchConnection.sendAIConversationVoiceSuppression(true) else {
+                watchVoiceConnectionUnavailable = true
+                return
+            }
             mirroring.setAIConversationActive(true)
         }
         let statusProvider: (@MainActor () -> ATHLTHLiveCoachWorkoutStatus)?
@@ -672,6 +688,7 @@ struct ATHLTHLiveAICoachConversationView: View {
             }
         case .mirroredWatchWorkout:
             mirroring.setAIConversationActive(false)
+            watchConnection.sendAIConversationVoiceSuppression(false)
         }
     }
 

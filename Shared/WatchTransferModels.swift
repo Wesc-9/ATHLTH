@@ -1537,6 +1537,7 @@ enum WatchTransferKind: String {
     case workoutRouteSelection
     case audioCoachConfiguration
     case aiCoachConversationRequest
+    case aiCoachConversationState
     case runningWorkout
     case ghostRace
     case liveSurfaceConfiguration

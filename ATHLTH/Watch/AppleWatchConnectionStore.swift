@@ -679,6 +679,24 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         }
     }
 
+    /// Interactive only. Never persist or queue a voice-mute command.
+    @discardableResult
+    func sendAIConversationVoiceSuppression(_ active: Bool) -> Bool {
+        guard let session,
+              session.activationState == .activated,
+              session.isReachable,
+              let data = try? JSONEncoder().encode(active)
+        else { return false }
+
+        session.sendMessage([
+            WatchTransferMetadataKey.kind:
+                WatchTransferKind.aiCoachConversationState.rawValue,
+            WatchTransferMetadataKey.payload: data,
+            WatchTransferMetadataKey.sentAt: Date().timeIntervalSince1970
+        ], replyHandler: nil, errorHandler: nil)
+        return true
+    }
+
     func sendAudioCoachConfiguration(
         _ configuration: WatchAudioCoachConfiguration
     ) {

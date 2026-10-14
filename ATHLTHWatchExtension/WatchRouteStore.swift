@@ -426,6 +426,11 @@ final class WatchRouteStore: NSObject, ObservableObject {
         }
 
         switch kind {
+        case .aiCoachConversationState:
+            guard let active = try? JSONDecoder().decode(Bool.self, from: data)
+            else { return }
+            WatchWorkoutManager.shared.setAIConversationVoiceSuppressed(active)
+
         case .audioCoachConfiguration:
             guard let configuration = try? JSONDecoder().decode(
                 WatchAudioCoachConfiguration.self,
@@ -909,6 +914,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
            transferKind ==
                 .audioCoachConfiguration ||
            transferKind == .runningWorkout ||
+           transferKind == .aiCoachConversationState ||
            transferKind == .ghostRace ||
            transferKind == .liveSurfaceConfiguration ||
            transferKind == .liveSurfaceContext ||
@@ -929,6 +935,11 @@ final class WatchRouteStore: NSObject, ObservableObject {
                         sentAt: sentAt
                       )
                 else {
+                    return
+                }
+
+                if transferKind == .aiCoachConversationState,
+                   !ATHLTHAIWatchCoachRequestPolicy.accepts(sentAt: sentAt) {
                     return
                 }
 
