@@ -4,3 +4,7 @@ DerivedData/
 *.xcuserstate
 xcuserdata/
 ATHLTH.xcodeproj/
+
+# Licensed RepDB source snapshot is downloaded only while building the app.
+# Never publish its raw JSON or WebP images as a dataset in this public repo.
+/ATHLTH/Resources/RepDBOffline.bundle/
