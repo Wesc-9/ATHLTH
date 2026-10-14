@@ -3976,9 +3976,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             english: "en", norwegian: "no"
         ) == "no"
         speak(
-            ATHLTHCoachStructuredStepSpeech.phrase(
-                for: step,
-                position: position,
+            ATHLTHIntervalCoachCue.appendToStepAnnouncement(
+                ATHLTHCoachStructuredStepSpeech.phrase(
+                    for: step,
+                    position: position,
+                    norwegian: norwegian
+                ),
+                step: step,
                 norwegian: norwegian
             ),
             priority: .structuredStep,
