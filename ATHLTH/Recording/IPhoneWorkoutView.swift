@@ -875,6 +875,7 @@ struct IPhoneWorkoutView: View {
     @State private var followMe = true
     @State private var showingTreadmillInclineEditor = false
     @State private var showingLiveAudioCoach = false
+    @State private var showingAIConversation = false
     @State private var treadmillInclineDraft = 0.0
     @State private var treadmillInclineEditingWorkoutID:
         UUID?
@@ -1531,6 +1532,13 @@ struct IPhoneWorkoutView: View {
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
             }
+            .sheet(isPresented: $showingAIConversation) {
+                ATHLTHLiveAICoachConversationView()
+                    .environmentObject(recorder)
+                    .environmentObject(settings)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
             .sheet(
                 isPresented:
                     $showingTreadmillInclineEditor
@@ -1969,6 +1977,40 @@ struct IPhoneWorkoutView: View {
                     RoundedRectangle(cornerRadius: 17, style: .continuous)
                         .stroke(ATHLTHTheme.accentDeep.opacity(0.10))
                 }
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                showingAIConversation = true
+            } label: {
+                HStack(spacing: 11) {
+                    Image(systemName: "mic.circle.fill")
+                        .font(.system(size: 25))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Talk to the coach",
+                            norwegian: "Snakk med coachen"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Optional AI conversation · recording continues",
+                            norwegian: "Valgfri AI-samtale · treningen fortsetter"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .background(
+                    ATHLTHTheme.canvasBottom,
+                    in: RoundedRectangle(cornerRadius: 17)
+                )
             }
             .buttonStyle(.plain)
 
