@@ -322,9 +322,12 @@ struct TargetGhostSetupView: View {
 
     let route: TrainingRoute
     var challengeTitle: String? = nil
+    private let suggestedBaselineDuration: TimeInterval
+    private let routeReady: Bool
 
     @State private var targetTimeText: String
     @State private var targetPaceText: String
+    @State private var basicShowCustomTime = false
     @State private var goalType: GhostTargetGoalType = .finishTime
     @State private var pacingStrategy: GhostTargetPacingStrategy = .even
     @AppStorage("athlth.ghostRace.target.advancedMode")
@@ -349,21 +352,22 @@ struct TargetGhostSetupView: View {
         let sharedTime = suggestedDurationSeconds.flatMap { seconds -> Double? in
             seconds.isFinite && (60...86_400).contains(seconds) ? seconds : nil
         }
-        let suggested =
+        let rawSuggestion =
             sharedTime ??
             route.expectedTravelTimeSeconds ??
-            max(
-                route.distanceKilometers * 330,
-                5 * 60
-            )
+            max(route.distanceKilometers * 330, 5 * 60)
+        let suggested = rawSuggestion.isFinite
+            ? min(max(rawSuggestion.rounded(), 60), 86_400)
+            : max(min(route.distanceKilometers * 330, 86_400), 300)
 
+        self.suggestedBaselineDuration = suggested
+        self.routeReady = GhostTargetRouteEligibility.isUsable(route)
         _targetTimeText = State(
             initialValue: GhostTargetTimeFormatter.string(suggested)
         )
         _targetPaceText = State(
             initialValue: GhostTargetPaceFormatter.text(
-                secondsPerKilometer:
-                    suggested / max(route.distanceKilometers, 0.1)
+                secondsPerKilometer: suggested / max(route.distanceKilometers, 0.1)
             )
         )
     }
@@ -392,6 +396,35 @@ struct TargetGhostSetupView: View {
                 routeKilometers: route.distanceKilometers
             )
         }
+    }
+
+    private var basicTargetOptions: [GhostQuickTargetOption] {
+        [
+            GhostQuickTargetOption(
+                id: "relaxed",
+                title: ATHLTHLocalization.choose(
+                    english: "More time", norwegian: "Mer tid"
+                ),
+                icon: "tortoise",
+                duration: min(86_400, (suggestedBaselineDuration * 1.10).rounded())
+            ),
+            GhostQuickTargetOption(
+                id: "suggested",
+                title: ATHLTHLocalization.choose(
+                    english: "Suggested", norwegian: "Forslag"
+                ),
+                icon: "checkmark.circle",
+                duration: suggestedBaselineDuration
+            ),
+            GhostQuickTargetOption(
+                id: "ambitious",
+                title: ATHLTHLocalization.choose(
+                    english: "Less time", norwegian: "Mindre tid"
+                ),
+                icon: "bolt",
+                duration: max(60, (suggestedBaselineDuration * 0.90).rounded())
+            )
+        ]
     }
 
     private var historicalAttempts:
@@ -571,7 +604,9 @@ struct TargetGhostSetupView: View {
     }
 
     private var canStart: Bool {
-        guard targetDuration != nil,
+        guard let targetDuration,
+              (60...86_400).contains(targetDuration),
+              routeReady,
               !starting
         else {
             return false
@@ -589,12 +624,14 @@ struct TargetGhostSetupView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 18) {
+            VStack(spacing: 14) {
                 summaryCard
-                targetChoiceCard
+                experienceSelector
 
                 if advancedMode {
+                    targetChoiceCard
                     ghostStrategyCard
+                    splitPreviewCard
 
                     if personalBest != nil ||
                         latestAttempt != nil ||
@@ -603,6 +640,8 @@ struct TargetGhostSetupView: View {
                     }
 
                     workoutDeviceCard
+                } else {
+                    basicTargetCard
                 }
             }
             .padding()
@@ -630,16 +669,22 @@ struct TargetGhostSetupView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: advancedMode) { _, isAdvanced in
             if !isAdvanced {
-                // Do not retain invisible pace/device/strategy choices in Basic.
+                // Hidden advanced options must never change a Basic race.
                 if let duration = targetDuration {
                     setTarget(duration)
                 }
                 pacingStrategy = .even
                 captureDevice = .iPhone
+            } else {
+                Task { await loadAttemptHistory() }
             }
         }
         .task(id: route.id) {
-            await loadAttemptHistory()
+            // Personal route history is an advanced insight; Basic should
+            // not wait for HealthKit queries to display its starting goal.
+            if advancedMode {
+                await loadAttemptHistory()
+            }
         }
         .confirmationDialog(
             ATHLTHLocalization.choose(
@@ -1204,7 +1249,9 @@ struct TargetGhostSetupView: View {
                             "figure.run"
                     )
 
-                    Text("Start Target Ghost")
+                    Text(ATHLTHLocalization.choose(
+                        english: "Start Target Ghost", norwegian: "Start mål-Ghost"
+                    ))
 
                     Spacer()
 
@@ -1500,9 +1547,13 @@ struct TargetGhostSetupView: View {
 
     @MainActor
     private func start() async {
-        guard let targetDuration else {
-            errorMessage =
-                "Enter a valid target finish time."
+        guard routeReady,
+              let targetDuration,
+              (60...86_400).contains(targetDuration) else {
+            errorMessage = ATHLTHLocalization.choose(
+                english: "Choose a valid finish time and a GPS route.",
+                norwegian: "Velg en gyldig sluttid og en GPS-løype."
+            )
             return
         }
 
