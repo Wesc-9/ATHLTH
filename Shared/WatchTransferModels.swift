@@ -1263,6 +1263,9 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var runningNextStepTitle: String? = nil
     var runningStepRemainingSeconds: TimeInterval? = nil
     var runningStepRemainingMeters: Double? = nil
+    var runningStepCoachBrief: String? = nil
+    var runningStepPhase: String? = nil
+    var runningStepTargetHeartRateZone: Int? = nil
 
     var heartRateTargetZone: Int? = nil
     var heartRateTargetMinimumBPM: Double? = nil
