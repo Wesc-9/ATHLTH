@@ -177,6 +177,9 @@ final class ExerciseLibraryStore: ObservableObject {
     @Published private(set) var lastUpdated: Date?
     @Published var errorMessage: String?
 
+    // RepDB is a published, downloadable data snapshot rather than a live exercise API.
+    // Keep a persisted local copy so existing users can train during an outage.
+    private let datasetURL = URL(string: "https://exercise-dataset.com/exercises.json")!
     private let imageBaseURL = URL(string: "https://exercise-dataset.com/")!
 
     private var accountID: UUID?
@@ -576,10 +579,55 @@ final class ExerciseLibraryStore: ObservableObject {
         lastSearchResults = []
     }
 
-    /// Bundled exercises are available immediately and require no network connection.
-    /// The existing cached third-party catalog is read only to resolve old IDs.
+    /// Fetch only when needed. An existing on-device RepDB snapshot is never
+    /// replaced by an error, a failed download or an implausibly small catalog.
+    /// Manual refresh works even when the last successful sync is recent.
     func refresh(force: Bool = false) async {
-        _ = force
+        if !force, !repDBExercises.isEmpty, let lastUpdated,
+           Date().timeIntervalSince(lastUpdated) < 7 * 24 * 3_600 {
+            return
+        }
+        guard !isLoading else { return }
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            var request = URLRequest(url: datasetURL)
+            request.timeoutInterval = 30
+            request.cachePolicy = force
+                ? .reloadIgnoringLocalCacheData
+                : .returnCacheDataElseLoad
+            let (data, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse,
+               !(200..<300).contains(http.statusCode) {
+                throw ExerciseLibraryError.httpStatus(http.statusCode)
+            }
+
+            let dataset = try JSONDecoder().decode(RepDBDataset.self, from: data)
+            let mapped = dataset.exercises.map(mapRepDB)
+            guard mapped.count >= 400,
+                  Set(mapped.map(\.id)).count == mapped.count else {
+                throw ExerciseLibraryError.invalidDataset
+            }
+
+            // Only switch the visible library after a complete validated decode.
+            repDBExercises = mapped
+            repDBExpectedCount = dataset.count ?? mapped.count
+            lastUpdated = Date()
+            invalidateDerivedCaches()
+            persistRepDBCache(data)
+        } catch {
+            errorMessage = error.localizedDescription
+            if repDBExercises.isEmpty { loadCachedRepDB() }
+        }
+    }
+
+    /// Keep historical native exercise IDs available for old workout logs,
+    /// but offer RepDB (and personal exercises) as the primary choices.
+    var selectableExercises: [ExerciseLibraryEntry] {
+        guard !repDBExercises.isEmpty else { return allExercises }
+        return allExercises.filter { $0.source == .repDB || $0.source == .custom }
     }
 
     func search(
@@ -597,10 +645,7 @@ final class ExerciseLibraryStore: ObservableObject {
         if lastSearchRequest == request { return lastSearchResults }
         let queryTokens = cleanQuery.split(whereSeparator: { $0.isWhitespace }).map(String.init)
 
-        let matches = allExercises.filter { entry in
-            // Third-party cached items are retained for old workout IDs,
-            // never shown as new choices or fetched from the network.
-            guard entry.source != .repDB else { return false }
+        let matches = selectableExercises.filter { entry in
             let matchesText: Bool
             if cleanQuery.isEmpty {
                 matchesText = true
@@ -880,8 +925,12 @@ final class ExerciseLibraryStore: ObservableObject {
             return
         }
 
-        repDBExercises = dataset.exercises.map(mapRepDB)
-        repDBExpectedCount = dataset.count ?? repDBExercises.count
+        let restored = dataset.exercises.map(mapRepDB)
+        // Do not promote an old broken/partial cache to a usable catalog.
+        guard restored.count >= 400,
+              Set(restored.map(\.id)).count == restored.count else { return }
+        repDBExercises = restored
+        repDBExpectedCount = dataset.count ?? restored.count
         invalidateDerivedCaches()
 
         if let values = try? url.resourceValues(forKeys: [.contentModificationDateKey]) {
@@ -1379,11 +1428,14 @@ final class ExerciseLibraryStore: ObservableObject {
 }
 
 enum ExerciseLibraryError: LocalizedError {
+    case invalidDataset
     case httpStatus(Int)
     case storageUnavailable
 
     var errorDescription: String? {
         switch self {
+        case .invalidDataset:
+            return "RepDB sent an incomplete exercise catalog. Your saved catalog is unchanged."
         case .httpStatus(let status):
             return "RepDB exercise library returned HTTP \(status)."
         case .storageUnavailable:
