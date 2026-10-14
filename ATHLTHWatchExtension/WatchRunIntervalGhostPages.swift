@@ -157,6 +157,29 @@ struct WatchRunIntervalFocusPage: View {
                         .watchSurface(radius: 14)
                     }
 
+                    if step.phase == "recovery",
+                       step.ghostFollowsRecovery == true {
+                        let following = ATHLTHIntervalGhostPacer.followsRecovery(
+                            step: step,
+                            observedPaceSecondsPerKilometer:
+                                workout.currentPaceSecondsPerKilometer
+                        )
+                        HStack(spacing: 7) {
+                            Image(systemName: "figure.run.circle")
+                            Text(ATHLTHLocalization.choose(
+                                english: following ? "Ghost matches your recovery"
+                                                   : "Ghost is waiting for slower pace",
+                                norwegian: following ? "Ghost følger pausetempoet"
+                                                     : "Ghost venter på roligere tempo"
+                            ))
+                            .lineLimit(2)
+                        }
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(WatchTheme.textSecondary)
+                        .padding(9)
+                        .watchSurface(radius: 14)
+                    }
+
                     if let next = workout.nextStructuredRunningStep {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(ATHLTHLocalization.choose(
