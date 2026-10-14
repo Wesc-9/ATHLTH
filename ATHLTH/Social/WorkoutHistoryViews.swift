@@ -965,6 +965,7 @@ struct PostWorkoutReviewView: View {
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
     @EnvironmentObject private var workoutCompletion: WorkoutCompletionCoordinator
     @EnvironmentObject private var ghostRace:
         GhostRaceStore
@@ -991,6 +992,7 @@ struct PostWorkoutReviewView: View {
     @State private var saving = false
     @State private var alreadyPublished = false
     @State private var replayContext: WorkoutAIInsightContext?
+    @State private var completionCadenceSPM: Int?
     @State private var completionRoute: [CLLocation] = []
     @State private var isAdvancedReview = false
     @State private var showingTrainingPartners = false
@@ -1066,7 +1068,9 @@ struct PostWorkoutReviewView: View {
                         compactTrainTogetherButton
                     }
 
-                    visibilityCard
+                    if isAdvancedReview {
+                        visibilityCard
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 10)
@@ -1216,6 +1220,8 @@ struct PostWorkoutReviewView: View {
                     loadReplayContext()
                 async let routeLoad: Void =
                     loadCompletionRoute()
+                async let cadenceLoad: Void =
+                    loadCompletionCadence()
                 async let mediaLoad: Void =
                     social.refreshWorkoutMedia()
 
@@ -1223,6 +1229,7 @@ struct PostWorkoutReviewView: View {
                     reviewLoad,
                     replayLoad,
                     routeLoad,
+                    cadenceLoad,
                     mediaLoad
                 )
             }
@@ -3903,6 +3910,25 @@ struct PostWorkoutReviewView: View {
             maximumHeartRateBPM:
                 session.onboardingProfile?.maximumHeartRateBPM
         )
+    }
+
+    @MainActor
+    private func loadCompletionCadence() async {
+        guard workout.activity == .running ||
+                workout.activity == .walking,
+              workout.duration > 0 else {
+            completionCadenceSPM = nil
+            return
+        }
+        let detail = await health.workoutDetail(for: workout.id)
+        guard let steps = detail.stepCount,
+              steps.isFinite, steps > 0 else {
+            completionCadenceSPM = nil
+            return
+        }
+        let cadence = steps / (workout.duration / 60)
+        completionCadenceSPM = cadence.isFinite && (30...260).contains(cadence)
+            ? Int(cadence.rounded()) : nil
     }
 
     @MainActor
