@@ -3414,9 +3414,13 @@ final class IPhoneWorkoutStore:
                 configuration: workout.audioCoachConfiguration ?? .disabled
             ) == "no"
             speak(
-                ATHLTHCoachStructuredStepSpeech.phrase(
-                    for: next,
-                    position: .next,
+                ATHLTHIntervalCoachCue.appendToStepAnnouncement(
+                    ATHLTHCoachStructuredStepSpeech.phrase(
+                        for: next,
+                        position: .next,
+                        norwegian: norwegian
+                    ),
+                    step: next,
                     norwegian: norwegian
                 ),
                 configuration:
@@ -3463,9 +3467,13 @@ final class IPhoneWorkoutStore:
             configuration: workout.audioCoachConfiguration ?? .disabled
         ) == "no"
         speak(
-            ATHLTHCoachStructuredStepSpeech.phrase(
-                for: plan.steps[workout.structuredStepIndex ?? 0],
-                position: position,
+            ATHLTHIntervalCoachCue.appendToStepAnnouncement(
+                ATHLTHCoachStructuredStepSpeech.phrase(
+                    for: plan.steps[workout.structuredStepIndex ?? 0],
+                    position: position,
+                    norwegian: norwegian
+                ),
+                step: plan.steps[workout.structuredStepIndex ?? 0],
                 norwegian: norwegian
             ),
             configuration:
