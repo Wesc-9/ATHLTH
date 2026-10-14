@@ -15,6 +15,7 @@ struct ATHLTHTrainIntervalComposerView: View {
     @State private var activityName = ""
     @State private var targetEffort: RunningIntensityKind = .easy
     @State private var saveAsReusableTemplate = false
+    @State private var showingReplaceStructureConfirmation = false
     @State private var measure: RunningMeasureKind = .distance
     @State private var minutes = 5
     @State private var distanceMeters = 1000
@@ -101,6 +102,20 @@ struct ATHLTHTrainIntervalComposerView: View {
             .background(paper.ignoresSafeArea())
             .navigationTitle(tr("Advanced session builder", "Avansert øktbygger"))
             .navigationBarTitleDisplayMode(.inline)
+            .confirmationDialog(
+                tr("Replace current workout structure?", "Erstatte gjeldende øktoppsett?"),
+                isPresented: $showingReplaceStructureConfirmation
+            ) {
+                Button(tr("Use 4 × 4 template", "Bruk 4 × 4-malen")) {
+                    loadFourByFour()
+                }
+                Button(tr("Cancel", "Avbryt"), role: .cancel) {}
+            } message: {
+                Text(tr(
+                    "The current unsaved structure will be replaced.",
+                    "Det nåværende ulagrede oppsettet erstattes."
+                ))
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(tr("Cancel", "Avbryt")) { dismiss() }
@@ -142,7 +157,11 @@ struct ATHLTHTrainIntervalComposerView: View {
             .font(.subheadline)
             .foregroundStyle(muted)
             Button {
-                loadFourByFour()
+                if blocks.isEmpty {
+                    loadFourByFour()
+                } else {
+                    showingReplaceStructureConfirmation = true
+                }
             } label: {
                 Label(tr("Use 4 × 4 preset", "Bruk 4 × 4-mal"),
                       systemImage: "square.stack.3d.up")
@@ -160,6 +179,21 @@ struct ATHLTHTrainIntervalComposerView: View {
         .foregroundStyle(ink)
     }
 
+    private var estimatedDuration: TimeInterval? {
+        let pieces = blocks.flatMap { block -> [RunningStepTarget] in
+            (1...max(block.repetitions, 1)).flatMap { repetition in
+                [block.resolvedWork(at: repetition)] +
+                (block.resolvedRecovery(after: repetition).map { [$0] } ?? [])
+            }
+        }
+        guard !pieces.isEmpty, pieces.allSatisfy({ $0.measure == .time }) else {
+            return nil
+        }
+        return pieces.reduce(0) { total, target in
+            total + max(target.durationSeconds ?? 0, 0)
+        }
+    }
+
     private var blockList: some View {
         VStack(alignment: .leading, spacing: 11) {
             HStack {
@@ -168,9 +202,16 @@ struct ATHLTHTrainIntervalComposerView: View {
                     .tracking(1.4)
                     .foregroundStyle(bronze)
                 Spacer()
-                Text("\(blocks.count) " + tr("blocks", "blokker"))
-                    .font(.caption)
-                    .foregroundStyle(muted)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("\(blocks.count) " + tr("blocks", "blokker"))
+                        .font(.caption)
+                        .foregroundStyle(muted)
+                    if let duration = estimatedDuration {
+                        Text("\(Int(duration / 60)) min")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ink)
+                    }
+                }
             }
             if blocks.isEmpty {
                 Text(tr("Add your first block below.", "Legg til første blokk nedenfor."))
