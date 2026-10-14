@@ -728,6 +728,22 @@ final class IPhoneWorkoutStore:
             )
         }
 
+        if environment == .treadmill, audioCoach?.enabled == true,
+           let prior = lastTreadmillSpeedReference {
+            let speed = prior.speed
+            speak(
+                localizedCoachPhrase(
+                    english: String(format:
+                        "Your previous manually logged treadmill average was %.1f kilometers per hour. Use it only as a reference and adjust to today's effort.", speed),
+                    norwegian: String(format:
+                        "Forrige registrerte møllegjennomsnitt var %.1f kilometer i timen. Bruk det som referanse og tilpass etter dagsformen.", speed),
+                    configuration: audioCoach
+                ),
+                configuration: audioCoach,
+                priority: .routineCoach
+            )
+        }
+
         announceStructuredStepIfNeeded(
             prefix: "Starting"
         )
