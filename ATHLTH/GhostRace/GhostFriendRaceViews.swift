@@ -20,6 +20,14 @@ private enum GhostFriendCourseMode: String, CaseIterable, Identifiable {
     }
 }
 
+private enum GhostInvitationStep: Int {
+    case friend
+    case reference
+    case confirm
+
+    var number: Int { rawValue + 1 }
+}
+
 struct GhostFriendRaceHubView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var health: HealthKitManager
@@ -39,6 +47,10 @@ struct GhostFriendRaceHubView: View {
     @State private var selectedPlannedRoute: TrainingRoute?
     @State private var courseMode: GhostFriendCourseMode = .previousWorkout
     @State private var targetTimeText = "40:00"
+    @State private var showingInviteComposer = false
+    @State private var inviteStep: GhostInvitationStep = .friend
+    @State private var friendSearch = ""
+    @State private var showSentConfirmation = false
     @AppStorage("athlth.ghostRace.live.advancedMode")
     private var advancedMode = false
     @State private var showingRoutePicker = false
@@ -99,289 +111,81 @@ struct GhostFriendRaceHubView: View {
         )
     }
 
+    // A premium landing page keeps received and sent races visible,
+    // while creation happens in a short, focused invitation flow.
     var body: some View {
-        List {
-            if advancedMode {
-                Section {
-                    privacyCard
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                friendIntroCard
+
+                if showSentConfirmation {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Invitation sent. Waiting for your friend to accept.",
+                        norwegian: "Invitasjonen er sendt. Venter på svar fra vennen din."
+                    ), systemImage: "checkmark.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(ATHLTHTheme.accentSoft,
+                                in: RoundedRectangle(cornerRadius: 15))
                 }
-            }
 
-            Section(ATHLTHLocalization.choose(
-                english: "Incoming", norwegian: "Mottatte invitasjoner"
-            )) {
-                if friendRaces.incoming.isEmpty {
-                    Text("No active Ghost Race invites.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(friendRaces.incoming) { challenge in
-                        incomingRow(challenge)
-                    }
-                }
-            }
-
-            Section(ATHLTHLocalization.choose(
-                english: "Invite a friend", norwegian: "Inviter en venn"
-            )) {
-                if social.mutualFollows.isEmpty {
-                    ContentUnavailableView(
-                        "No friends yet",
-                        systemImage: "person.2",
-                        description: Text(
-                            "Add a friend in Community before sending a Ghost Race."
-                        )
-                    )
-                } else {
-                    Picker(
-                        "Friend",
-                        selection: $selectedFriendID
-                    ) {
-                        Text("Choose friend")
-                            .tag(UUID?.none)
-
-                        ForEach(social.mutualFollows) { friend in
-                            Text(friend.resolvedName)
-                                .tag(Optional(friend.userID))
-                        }
-                    }
-
-                    if advancedMode && agreedArenaRouteID == nil {
-                        Picker(
-                            ATHLTHLocalization.choose(
-                                english: "Course source", norwegian: "Velg grunnlag"
-                            ),
-                            selection: $courseMode
-                        ) {
-                            ForEach(GhostFriendCourseMode.allCases) { option in
-                                Text(option.title).tag(option)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                    }
-
-                    if courseMode == .previousWorkout {
-                        Picker(
-                            ATHLTHLocalization.choose(
-                                english: "GPS reference run", norwegian: "GPS-økt"
-                            ),
-                            selection: $selectedWorkoutID
-                        ) {
+                Button {
+                    inviteStep = selectedFriendID == nil ? .friend : .reference
+                    friendSearch = ""
+                    showSentConfirmation = false
+                    showingInviteComposer = true
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "person.badge.plus")
+                            .font(.title3.weight(.semibold))
+                        VStack(alignment: .leading, spacing: 3) {
                             Text(ATHLTHLocalization.choose(
-                                english: "Choose run", norwegian: "Velg økt"
+                                english: "Invite a friend",
+                                norwegian: "Inviter en venn"
                             ))
-                            .tag(UUID?.none)
-
-                            ForEach(runs.prefix(40)) { workout in
-                                Text(runTitle(workout))
-                                    .tag(Optional(workout.id))
-                            }
-                        }
-
-                        if loadingRuns {
-                            ProgressView(
-                                ATHLTHLocalization.choose(
-                                    english: "Loading past runs…",
-                                    norwegian: "Henter tidligere økter…"
-                                )
-                            )
-                        }
-
-                        if advancedMode {
+                            .font(.headline)
                             Text(ATHLTHLocalization.choose(
-                                english: "The selected GPS run is used as the reference. You choose whether to send it.",
-                                norwegian: "Den valgte GPS-økten brukes som grunnlag. Du bestemmer om den skal sendes."
+                                english: "Choose a friend and a Ghost reference",
+                                norwegian: "Velg en venn og et løpegrunnlag"
                             ))
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .opacity(0.84)
                         }
-
-                        if arenaRoundID != nil {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "A previous run starts a separate Live Ghost duel. It is not automatically treated as the agreed Arena route.",
-                                    norwegian: "En tidligere økt starter en egen Live Ghost-duell. Den blir ikke automatisk regnet som den avtalte Arena-ruten."
-                                ),
-                                systemImage: "info.circle"
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
-                    } else {
-                        Button {
-                            showingRoutePicker = true
-                        } label: {
-                            HStack {
-                                Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
-                                Text(selectedPlannedRoute?.title ??
-                                    ATHLTHLocalization.choose(
-                                        english: "Choose or create route",
-                                        norwegian: "Velg eller lag rute"
-                                    ))
-                                Spacer(minLength: 4)
-                                Image(systemName: "chevron.right")
-                            }
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(ATHLTHTheme.accentDeep)
-                        .disabled(agreedArenaRouteID != nil)
-
-                        if agreedArenaRouteID != nil {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "The agreed Arena course is locked for this round.",
-                                    norwegian: "Den avtalte Arena-ruten er låst for denne runden."
-                                ),
-                                systemImage: "lock.shield"
-                            )
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                        }
-
-                        if let route = selectedPlannedRoute {
-                            Label(
-                                String(format: "%.2f km", route.distanceKilometers),
-                                systemImage: "map"
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
-
-                        HStack {
-                            TextField(
-                                ATHLTHLocalization.choose(
-                                    english: "Target finish time (mm:ss)",
-                                    norwegian: "Måltid (mm:ss)"
-                                ),
-                                text: $targetTimeText
-                            )
-                            .keyboardType(.numbersAndPunctuation)
-                            Text("mm:ss")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        if targetTime == nil {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Enter a target time between 1 minute and 24 hours.",
-                                norwegian: "Velg en måltid mellom 1 minutt og 24 timer."
-                            ))
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                        }
-
-                        Text(ATHLTHLocalization.choose(
-                            english: "Your selected route and a synthetic pacing reference are shared with the friend; no previous workout is claimed. Both start together in the Live Ghost lobby.",
-                            norwegian: "Den valgte ruten og en beregnet mål-Ghost deles med vennen, ikke en tidligere økt. Begge starter samtidig fra Live Ghost-lobbyen."
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        Spacer(minLength: 4)
+                        Image(systemName: "arrow.right")
+                            .font(.headline)
                     }
+                    .foregroundStyle(.white)
+                    .padding(18)
+                    .frame(maxWidth: .infinity, minHeight: 76)
+                    .background(ATHLTHTheme.accentDeep,
+                                in: RoundedRectangle(cornerRadius: 20))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
 
-                    if !advancedMode {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Only a reduced GPS reference is shared.",
-                                norwegian: "Bare en forenklet GPS-referanse deles."
-                            ),
-                            systemImage: "lock.shield"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                    }
+                invitationsOverview
 
-                    Button {
-                        Task {
-                            await sendChallenge()
-                        }
-                    } label: {
-                        if sending || friendRaces.isSending {
-                            HStack {
-                                ProgressView()
-                                Text("Sending…")
-                            }
-                            .frame(maxWidth: .infinity)
-                        } else {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Invite to synchronized duel",
-                                    norwegian: "Inviter til synkronisert duell"
-                                ),
-                                systemImage: "paperplane.fill"
-                            )
-                            .frame(maxWidth: .infinity)
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.vitality)
-                    .disabled(
-                        selectedFriendID == nil ||
-                        !canSendSelectedCourse ||
-                        sending ||
-                        friendRaces.isSending
-                    )
+                if advancedMode {
+                    ATHLTHCard { privacyCard }
                 }
             }
-
-            Section("Sent") {
-                if friendRaces.outgoing.isEmpty {
-                    Text("No active sent Ghost Races.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(friendRaces.outgoing) { challenge in
-                        outgoingRow(challenge)
-                    }
-                }
-            }
-
-            if advancedMode {
-                Section {
-                    NavigationLink {
-                        ChallengeCreationView()
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Create a standard challenge",
-                                norwegian: "Opprett en vanlig utfordring"
-                            ),
-                            systemImage: "trophy.fill"
-                        )
-                    }
-
-                    Text(ATHLTHLocalization.choose(
-                        english: "Standard challenges have separate distance, route and verification rules.",
-                        norwegian: "Vanlige utfordringer har egne regler for distanse, rute og verifisering."
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-            }
+            .padding(16)
+            .padding(.bottom, 32)
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
         }
+        .background(ATHLTHPremiumCanvas(
+            accent: ATHLTHTheme.vitality.opacity(0.13)
+        ))
         .navigationTitle(ATHLTHLocalization.choose(
             english: "Live Ghost duel", norwegian: "Live Ghost-duell"
         ))
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showingRoutePicker) {
-            NavigationStack {
-                SavedRoutesView(
-                    selectionTitle: ATHLTHLocalization.choose(
-                        english: "Duel route", norwegian: "Rute for duellen"
-                    ),
-                    onSelect: { route in
-                        selectedPlannedRoute = route
-                        let suggested = route.expectedTravelTimeSeconds ??
-                            max(route.distanceKilometers * 330, 300)
-                        targetTimeText = GhostTargetTimeFormatter.string(suggested)
-                        showingRoutePicker = false
-                    }
-                )
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button(ATHLTHLocalization.choose(
-                            english: "Close", norwegian: "Lukk"
-                        )) { showingRoutePicker = false }
-                    }
-                }
-            }
+        .sheet(isPresented: $showingInviteComposer) {
+            invitationComposer
         }
         .task {
             await social.refresh()
@@ -418,6 +222,686 @@ struct GhostFriendRaceHubView: View {
                 localError ??
                 friendRaces.errorMessage ??
                 ""
+            )
+        }
+    }
+
+    private var friendIntroCard: some View {
+        ATHLTHCard {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "figure.run.circle.fill")
+                    .font(.system(size: 34, weight: .light))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 50, height: 50)
+                    .background(ATHLTHTheme.accentSoft, in: Circle())
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Race a friend",
+                        norwegian: "Løp mot en venn"
+                    ))
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Send a private Ghost invite. The duel only starts after your friend accepts and both are ready.",
+                        norwegian: "Inviter til en privat Ghost-duell. Dere starter først når invitasjonen er godtatt og begge er klare."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private var invitationsOverview: some View {
+        VStack(spacing: 14) {
+            ATHLTHCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Incoming", norwegian: "Mottatte invitasjoner"
+                        ))
+                        .font(.headline)
+                        Spacer()
+                        if friendRaces.isLoading {
+                            ProgressView().controlSize(.small)
+                        }
+                    }
+
+                    if friendRaces.incoming.isEmpty {
+                        Label(ATHLTHLocalization.choose(
+                            english: "No invitations to respond to",
+                            norwegian: "Ingen invitasjoner å svare på"
+                        ), systemImage: "tray")
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .padding(.vertical, 9)
+                    } else {
+                        ForEach(friendRaces.incoming) { challenge in
+                            incomingRow(challenge)
+                            if challenge.id != friendRaces.incoming.last?.id {
+                                Divider()
+                            }
+                        }
+                    }
+                }
+            }
+
+            ATHLTHCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Sent", norwegian: "Sendte invitasjoner"
+                    ))
+                    .font(.headline)
+
+                    if friendRaces.outgoing.isEmpty {
+                        Text(ATHLTHLocalization.choose(
+                            english: "No active invitations sent",
+                            norwegian: "Ingen aktive sendte invitasjoner"
+                        ))
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .padding(.vertical, 9)
+                    } else {
+                        ForEach(friendRaces.outgoing) { challenge in
+                            outgoingRow(challenge)
+                            if challenge.id != friendRaces.outgoing.last?.id {
+                                Divider()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var filteredFriends: [SocialProfileCard] {
+        let query = friendSearch.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !query.isEmpty else { return social.mutualFollows }
+        return social.mutualFollows.filter {
+            $0.resolvedName.localizedStandardContains(query)
+        }
+    }
+
+    private var selectedFriend: SocialProfileCard? {
+        guard let selectedFriendID else { return nil }
+        return social.mutualFollows.first {
+            $0.userID == selectedFriendID
+        }
+    }
+
+    private var invitationComposer: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    inviteProgress
+
+                    switch inviteStep {
+                    case .friend: invitationFriendStep
+                    case .reference: invitationReferenceStep
+                    case .confirm: invitationConfirmationStep
+                    }
+                }
+                .padding(16)
+                .frame(maxWidth: 700)
+                .frame(maxWidth: .infinity)
+            }
+            .background(ATHLTHPremiumCanvas(
+                accent: ATHLTHTheme.vitality.opacity(0.13)
+            ))
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Invite a friend", norwegian: "Inviter venn"
+            ))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Close", norwegian: "Lukk"
+                    )) {
+                        showingInviteComposer = false
+                    }
+                }
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                inviteActions
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(.regularMaterial)
+            }
+            .sheet(isPresented: $showingRoutePicker) {
+                NavigationStack {
+                    SavedRoutesView(
+                        selectionTitle: ATHLTHLocalization.choose(
+                            english: "Duel route",
+                            norwegian: "Rute for duellen"
+                        ),
+                        onSelect: { route in
+                            selectedPlannedRoute = route
+                            let suggested = route.expectedTravelTimeSeconds ??
+                                max(route.distanceKilometers * 330, 300)
+                            targetTimeText = GhostTargetTimeFormatter.string(suggested)
+                            showingRoutePicker = false
+                            if !advancedMode {
+                                inviteStep = .confirm
+                            }
+                        }
+                    )
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(ATHLTHLocalization.choose(
+                                english: "Close", norwegian: "Lukk"
+                            )) {
+                                showingRoutePicker = false
+                            }
+                        }
+                    }
+                }
+            }
+            .alert(
+                ATHLTHLocalization.choose(
+                    english: "Could not send invitation",
+                    norwegian: "Kunne ikke sende invitasjonen"
+                ),
+                isPresented: Binding(
+                    get: {
+                        localError != nil ||
+                        friendRaces.errorMessage != nil
+                    },
+                    set: { visible in
+                        if !visible {
+                            localError = nil
+                            friendRaces.errorMessage = nil
+                        }
+                    }
+                )
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(localError ?? friendRaces.errorMessage ?? "")
+            }
+        }
+        .interactiveDismissDisabled(sending || friendRaces.isSending)
+    }
+
+    private var inviteProgress: some View {
+        HStack(spacing: 8) {
+            ForEach(1...3, id: \.self) { number in
+                HStack(spacing: 7) {
+                    Image(systemName: number < inviteStep.number
+                        ? "checkmark.circle.fill"
+                        : (number == inviteStep.number
+                            ? "circle.inset.filled" : "circle"))
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(
+                        number <= inviteStep.number
+                            ? ATHLTHTheme.accentDeep
+                            : ATHLTHTheme.mutedText
+                    )
+
+                    Text(number == 1
+                         ? ATHLTHLocalization.choose(
+                             english: "Friend", norwegian: "Venn"
+                         )
+                         : number == 2
+                             ? ATHLTHLocalization.choose(
+                                 english: "Run", norwegian: "Løp"
+                             )
+                             : ATHLTHLocalization.choose(
+                                 english: "Confirm", norwegian: "Bekreft"
+                             ))
+                    .font(.caption.weight(number == inviteStep.number
+                        ? .bold : .medium))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(13)
+        .background(ATHLTHTheme.surfaceStone,
+                    in: RoundedRectangle(cornerRadius: 15))
+        .accessibilityElement(children: .combine)
+    }
+
+    private var invitationFriendStep: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 13) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Who would you like to race?",
+                    norwegian: "Hvem vil du løpe mot?"
+                ))
+                .font(.title3.weight(.bold))
+
+                if social.mutualFollows.isEmpty {
+                    ContentUnavailableView(
+                        ATHLTHLocalization.choose(
+                            english: "No mutual friends yet",
+                            norwegian: "Ingen gjensidige venner ennå"
+                        ),
+                        systemImage: "person.2",
+                        description: Text(ATHLTHLocalization.choose(
+                            english: "Find a friend in Community. You can invite each other once you both follow.",
+                            norwegian: "Finn en venn i Fellesskap. Dere kan invitere hverandre når begge følger hverandre."
+                        ))
+                    )
+                } else {
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        TextField(ATHLTHLocalization.choose(
+                            english: "Search friends",
+                            norwegian: "Søk etter venner"
+                        ), text: $friendSearch)
+                        .textInputAutocapitalization(.never)
+                    }
+                    .padding(12)
+                    .background(ATHLTHTheme.surfaceStone,
+                                in: RoundedRectangle(cornerRadius: 13))
+
+                    if filteredFriends.isEmpty {
+                        Text(ATHLTHLocalization.choose(
+                            english: "No friends match the search.",
+                            norwegian: "Ingen venner samsvarer med søket."
+                        ))
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+
+                    ForEach(filteredFriends) { friend in
+                        Button {
+                            selectedFriendID = friend.userID
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                inviteStep = .reference
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Text(String(friend.resolvedName.prefix(1)).uppercased())
+                                    .font(.headline)
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    .frame(width: 44, height: 44)
+                                    .background(ATHLTHTheme.accentSoft, in: Circle())
+
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(friend.resolvedName)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(ATHLTHTheme.primaryText)
+
+                                    if realtime.isOnline(friend.userID) {
+                                        Label(ATHLTHLocalization.choose(
+                                            english: "Online", norwegian: "Pålogget"
+                                        ), systemImage: "circle.fill")
+                                        .font(.caption2)
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    }
+                                }
+
+                                Spacer(minLength: 6)
+
+                                Image(systemName: selectedFriendID == friend.userID
+                                    ? "checkmark.circle.fill" : "chevron.right")
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                            }
+                            .padding(12)
+                            .frame(maxWidth: .infinity, minHeight: 64)
+                            .background(ATHLTHTheme.surfaceStone,
+                                        in: RoundedRectangle(cornerRadius: 16))
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    private var invitationReferenceStep: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 14) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Choose a race reference",
+                    norwegian: "Velg løpegrunnlag"
+                ))
+                .font(.title3.weight(.bold))
+
+                if let selectedFriend {
+                    Label(selectedFriend.resolvedName,
+                          systemImage: "person.crop.circle")
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                if advancedMode && agreedArenaRouteID == nil {
+                    Picker(ATHLTHLocalization.choose(
+                        english: "Reference", norwegian: "Grunnlag"
+                    ), selection: $courseMode) {
+                        ForEach(GhostFriendCourseMode.allCases) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                if courseMode == .previousWorkout {
+                    if loadingRuns {
+                        ProgressView(ATHLTHLocalization.choose(
+                            english: "Loading previous runs...",
+                            norwegian: "Henter tidligere løp..."
+                        ))
+                    } else if runs.isEmpty {
+                        ContentUnavailableView(
+                            ATHLTHLocalization.choose(
+                                english: "No previous runs",
+                                norwegian: "Ingen tidligere løp"
+                            ),
+                            systemImage: "figure.run",
+                            description: Text(ATHLTHLocalization.choose(
+                                english: "Record a GPS run or choose a saved course.",
+                                norwegian: "Registrer et GPS-løp eller velg en lagret rute."
+                            ))
+                        )
+
+                        Button {
+                            courseMode = .plannedRoute
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Use a saved course",
+                                norwegian: "Bruk en lagret rute"
+                            ), systemImage: "map")
+                        }
+                        .buttonStyle(.bordered)
+                    } else {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Use a previous run as your Ghost.",
+                            norwegian: "Bruk et tidligere løp som Ghost."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                        ForEach(Array(runs.prefix(advancedMode ? 30 : 5))) { workout in
+                            Button {
+                                selectedWorkoutID = workout.id
+                                withAnimation(.easeInOut(duration: 0.18)) {
+                                    inviteStep = .confirm
+                                }
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "figure.run")
+                                        .font(.headline)
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                        .frame(width: 42, height: 42)
+                                        .background(ATHLTHTheme.accentSoft,
+                                                    in: RoundedRectangle(cornerRadius: 13))
+
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(workout.startDate.formatted(
+                                            date: .abbreviated, time: .omitted
+                                        ))
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(ATHLTHTheme.primaryText)
+
+                                        Text(runTitle(workout))
+                                            .font(.caption)
+                                            .foregroundStyle(ATHLTHTheme.mutedText)
+                                            .lineLimit(1)
+                                    }
+                                    Spacer(minLength: 4)
+                                    Image(systemName: selectedWorkoutID == workout.id
+                                        ? "checkmark.circle.fill" : "chevron.right")
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 58)
+                                .padding(11)
+                                .background(ATHLTHTheme.surfaceStone,
+                                            in: RoundedRectangle(cornerRadius: 15))
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                } else {
+                    Button {
+                        showingRoutePicker = true
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "map.fill")
+                            Text(selectedPlannedRoute?.title ??
+                                 ATHLTHLocalization.choose(
+                                     english: "Choose a saved course",
+                                     norwegian: "Velg en lagret rute"
+                                 ))
+                            Spacer(minLength: 4)
+                            Image(systemName: "chevron.right")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .padding(14)
+                        .background(ATHLTHTheme.surfaceStone,
+                                    in: RoundedRectangle(cornerRadius: 15))
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(agreedArenaRouteID != nil)
+
+                    if let route = selectedPlannedRoute {
+                        Label(String(format: "%.2f km", route.distanceKilometers),
+                              systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+
+                    if advancedMode {
+                        TextField(ATHLTHLocalization.choose(
+                            english: "Target time (MM:SS)",
+                            norwegian: "Måltid (MM:SS)"
+                        ), text: $targetTimeText)
+                        .keyboardType(.numbersAndPunctuation)
+                        .font(.title3.weight(.semibold))
+                        .padding(13)
+                        .background(ATHLTHTheme.surfaceStone,
+                                    in: RoundedRectangle(cornerRadius: 15))
+                    } else if let targetTime {
+                        Label(ATHLTHLocalization.format(
+                            english: "Suggested time: %@",
+                            norwegian: "Foreslått tid: %@",
+                            GhostTargetTimeFormatter.string(targetTime)
+                        ), systemImage: "clock")
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+
+                    if agreedArenaRouteID != nil {
+                        Label(ATHLTHLocalization.choose(
+                            english: "The Arena course is locked for this round.",
+                            norwegian: "Arena-ruten er låst for denne runden."
+                        ), systemImage: "lock.shield")
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+
+                    if targetTime == nil {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Choose a valid finish time (1 min–24 h).",
+                            norwegian: "Velg en gyldig sluttid (1 min–24 t)."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                    }
+                }
+            }
+        }
+    }
+
+    private var invitationConfirmationStep: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 14) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Ready to invite?",
+                    norwegian: "Klar til å invitere?"
+                ))
+                .font(.title3.weight(.bold))
+
+                if let selectedFriend {
+                    confirmationLine(
+                        icon: "person.crop.circle.fill",
+                        title: ATHLTHLocalization.choose(
+                            english: "Opponent", norwegian: "Motstander"
+                        ),
+                        value: selectedFriend.resolvedName
+                    )
+                }
+
+                if courseMode == .previousWorkout,
+                   let workout = runs.first(where: { $0.id == selectedWorkoutID }) {
+                    confirmationLine(
+                        icon: "figure.run",
+                        title: ATHLTHLocalization.choose(
+                            english: "Reference", norwegian: "Løp"
+                        ),
+                        value: runTitle(workout)
+                    )
+                } else if let route = selectedPlannedRoute {
+                    confirmationLine(
+                        icon: "map",
+                        title: ATHLTHLocalization.choose(
+                            english: "Course", norwegian: "Løype"
+                        ),
+                        value: route.title
+                    )
+                    if let targetTime {
+                        confirmationLine(
+                            icon: "stopwatch",
+                            title: ATHLTHLocalization.choose(
+                                english: "Finish time", norwegian: "Sluttid"
+                            ),
+                            value: GhostTargetTimeFormatter.string(targetTime)
+                        )
+                    }
+                }
+
+                Label(ATHLTHLocalization.choose(
+                    english: "The race starts together only after your friend accepts.",
+                    norwegian: "Dere starter sammen først når vennen har godkjent."
+                ), systemImage: "person.2.wave.2.fill")
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                Divider()
+
+                Label(
+                    settings.hideRouteStartAndEnd
+                        ? ATHLTHLocalization.choose(
+                            english: "Start/end trimmed before sharing.",
+                            norwegian: "Start og slutt skjules før deling."
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Full GPS reference will be shared with this friend. You can enable route trimming in Privacy Settings.",
+                            norwegian: "Hele GPS-referansen deles med vennen. Du kan skjule start og slutt i personverninnstillingene."
+                        ),
+                    systemImage: settings.hideRouteStartAndEnd
+                        ? "lock.shield.fill" : "exclamationmark.shield"
+                )
+                .font(.caption)
+                .foregroundStyle(settings.hideRouteStartAndEnd
+                    ? ATHLTHTheme.mutedText : .orange)
+
+                if advancedMode {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Heart rate, calories and HealthKit identifiers are not shared.",
+                        norwegian: "Puls, kalorier og HealthKit-ID-er deles ikke."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+            }
+        }
+    }
+
+    private func confirmationLine(
+        icon: String, title: String, value: String
+    ) -> some View {
+        HStack(alignment: .top, spacing: 11) {
+            Image(systemName: icon)
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                Text(value)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 4)
+        }
+        .padding(12)
+        .background(ATHLTHTheme.surfaceStone,
+                    in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var inviteActions: some View {
+        HStack(spacing: 10) {
+            if inviteStep != .friend {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        inviteStep = inviteStep == .confirm
+                            ? .reference : .friend
+                    }
+                } label: {
+                    Image(systemName: "arrow.left")
+                        .font(.headline)
+                        .frame(width: 48, height: 48)
+                        .background(ATHLTHTheme.surfaceStone,
+                                    in: RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Previous step", norwegian: "Forrige steg"
+                ))
+            }
+
+            Button {
+                if inviteStep == .confirm {
+                    Task { await sendChallenge() }
+                } else {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        inviteStep = inviteStep == .friend
+                            ? .reference : .confirm
+                    }
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    if sending || friendRaces.isSending {
+                        ProgressView().tint(.white)
+                    } else {
+                        Image(systemName: inviteStep == .confirm
+                            ? "paperplane.fill" : "arrow.right")
+                    }
+                    Text(
+                        inviteStep == .confirm
+                            ? ATHLTHLocalization.choose(
+                                english: "Send invitation",
+                                norwegian: "Send invitasjon"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Continue", norwegian: "Fortsett"
+                            )
+                    )
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .background(ATHLTHTheme.accentDeep,
+                            in: RoundedRectangle(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
+            .disabled(
+                sending || friendRaces.isSending ||
+                (inviteStep == .friend && selectedFriend == nil) ||
+                (inviteStep != .friend && !canSendSelectedCourse)
             )
         }
     }
@@ -768,6 +1252,9 @@ struct GhostFriendRaceHubView: View {
         }
 
         if sent {
+            showSentConfirmation = true
+            showingInviteComposer = false
+            inviteStep = .friend
             selectedFriendID = nil
             selectedWorkoutID = nil
         }
