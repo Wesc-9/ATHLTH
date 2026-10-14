@@ -238,7 +238,13 @@ extension Array where Element == WorkoutTemplateBlock {
                 let members = Array(self[start..<cursor])
                 let rounds = min(max(current.groupRounds ?? 1, 1), 20)
                 for round in 1...rounds {
-                    for member in members {
+                    for (position, member) in members.enumerated() {
+                        // A recovery at the end of an interval group is a
+                        // between-round break, not a mandatory final pause.
+                        if round == rounds && position == members.count - 1
+                            && member.kind == .rest && rounds > 1 {
+                            continue
+                        }
                         append(member, title: rounds > 1
                             ? "\(member.title) · \(round)/\(rounds)"
                             : member.title)
@@ -2043,14 +2049,14 @@ struct WorkoutTemplateBuilderView: View {
             case .exercise:
                 if block.groupID == nil {
                     Stepper(value: Binding(
-                        get: { blocks[index].setCount ?? 3 },
+                        get: { blocks[index].setCount ?? 1 },
                         set: { blocks[index].setCount = $0 }
                     ), in: 1...20) {
-                        Text("\(blocks[index].setCount ?? 3) " + tr("sets", "sett"))
+                        Text("\(blocks[index].setCount ?? 1) " + tr("sets", "sett"))
                             .font(.subheadline.weight(.semibold))
                     }
 
-                    if (blocks[index].setCount ?? 3) > 1 {
+                    if (blocks[index].setCount ?? 1) > 1 {
                         Stepper(value: Binding(
                             get: { blocks[index].restBetweenSetsSeconds ?? 90 },
                             set: { blocks[index].restBetweenSetsSeconds = $0 }
