@@ -206,6 +206,7 @@ struct RunningRepetitionOverride: Codable, Hashable {
     var work: RunningStepTarget? = nil
     var recovery: RunningStepTarget? = nil
     var skipRecovery: Bool? = nil
+    var ghostPaceSecondsPerKilometer: Double? = nil
     var notes: String? = nil
 }
 
@@ -273,6 +274,7 @@ struct RunningWorkoutTemplate: Identifiable, Codable, Hashable {
     /// When enabled, Ghost matches measured reduced running pace in recoveries
     /// instead of remaining hidden. Recovery never causes a pace penalty.
     var intervalGhostFollowRecovery: Bool? = nil
+    var intervalGhostRecoverySlowdownPercent: Int? = nil
     /// Optional instructions set before the workout for Audio Coach.
     var coachBrief: String? = nil
 
