@@ -11057,7 +11057,6 @@ struct ATHLTHRecoveryView: View {
     @State private var showingInsightAIConsentSheet = false
     @State private var showingSorenessLog = false
     @State private var showingRecoveryInfo = false
-    @State private var showingMoreInsightMetrics = false
     @State private var showingRecoveryCoach = false
     @State private var selectedRecoveryTool: RecoveryTool?
     @State private var recoveryDerivedSnapshot =
@@ -11150,8 +11149,7 @@ struct ATHLTHRecoveryView: View {
                         // comparison and meaning first here instead.
                         recoveryScoreCard
 
-                        // Help users decide what to do with their actual plan
-                        // before presenting deeper analytics.
+                        // Help users decide what to do with their actual plan.
                         plannedWorkoutInsightCard
 
                         if recoveryTodaySessions.isEmpty {
@@ -11190,58 +11188,8 @@ struct ATHLTHRecoveryView: View {
                             RecoveryCoachEntryCard {
                                 showingRecoveryCoach = true
                             }
-                        }
 
-                        insightMoreAnalysisToggle
-
-                        if showingMoreInsightMetrics {
-                            // Keep the original detailed tools available,
-                            // but avoid duplicating Home on first impression.
-                            if session.hasPaidAccess &&
-                                insightAISharingAllowed {
-                                RecoveryAIInsightCard(
-                                    insight:
-                                        recoveryAIInsight ??
-                                        fallbackRecoveryAIInsight,
-                                    context: recoveryAIContext,
-                                    isLoading: isLoadingRecoveryAI
-                                )
-
-                                // Preserve the existing Coach workout advice
-                                // for users who opt into automatic AI insights.
-                                RecoverySuggestedTodayCard(
-                                    suggestion:
-                                        (recoveryAIInsight ??
-                                            fallbackRecoveryAIInsight)
-                                            .suggestion
-                                ) {
-                                    onSelectTab(1)
-                                }
-                            }
-
-                            RecoveryReadinessBreakdownCard(
-                                recovery: health.recovery,
-                                sleep: health.sleep,
-                                heart: health.heart
-                            )
-
-                            todaysSignalsCard
-                            loadBalanceCard
-                            recoveryPatternsCard
-
-                            if health.sleep.totalAsleep > 0 {
-                                RecoveryLastNightCard(
-                                    sleep: health.sleep
-                                )
-                            }
-
-                            RecoveryToolsCard { tool in
-                                selectedRecoveryTool = tool
-                            }
-
-                            if session.hasPaidAccess {
-                                insightAIPrivacySettingsButton
-                            }
+                            insightAIPrivacySettingsButton
                         }
                     } else {
                         // Don't fabricate readiness when HealthKit or a
@@ -11618,69 +11566,6 @@ struct ATHLTHRecoveryView: View {
             .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.top, 14)
-    }
-
-    private var insightMoreAnalysisToggle: some View {
-        Button {
-            showingMoreInsightMetrics.toggle()
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "chart.xyaxis.line")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .frame(width: 42, height: 42)
-                    .background(
-                        ATHLTHTheme.accentSoft,
-                        in: RoundedRectangle(cornerRadius: 13)
-                    )
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(
-                        insightText(
-                            "Detailed analysis",
-                            "Dypere analyse"
-                        )
-                    )
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-
-                    Text(
-                        insightText(
-                            "Health measurements, load and recovery tools",
-                            "Helsemålinger, belastning og restitusjonsverktøy"
-                        )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 8)
-
-                Image(
-                    systemName: showingMoreInsightMetrics
-                        ? "chevron.up"
-                        : "chevron.down"
-                )
-                .font(.caption.weight(.bold))
-                .foregroundStyle(ATHLTHTheme.accentDeep)
-            }
-            .padding(16)
-            .background(
-                Color.white.opacity(0.90),
-                in: RoundedRectangle(cornerRadius: 20)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.primary.opacity(0.07), lineWidth: 0.8)
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityValue(
-            showingMoreInsightMetrics
-                ? insightText("Expanded", "Utvidet")
-                : insightText("Collapsed", "Lukket")
-        )
     }
 
     private var insightAIPrivacySettingsButton: some View {
