@@ -171,3 +171,7 @@ The current code prepares for HealthKit background delivery. Device verification
 10. Add nutrition planning after the core training experience is stable.
 
 > ATHLTH is a working product name and has not yet been represented as a completed trademark clearance.
+
+## Exercise library attribution and offline packaging
+
+ATHLTH uses the [RepDB](https://repdb.co) free-tier exercise catalog in-app. **Exercise data by [RepDB](https://repdb.co)**. The official free license allows personal and commercial in-app use with visible attribution but forbids republishing the raw dataset or a dataset API. The build pipeline packages the official JSON and free-tier 512px WebP images into the iOS app for offline use. Run `python3 scripts/prepare_repdb_offline.py` before `xcodegen generate` when producing a distributable build. Never commit the downloaded bundle. Paid-tier preview assets are not included.
