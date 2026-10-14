@@ -308,7 +308,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
                 }
             }
 
-            let filteredExercises = exerciseLibrary.allExercises.filter { item in
+            let filteredExercises = exerciseLibrary.selectableExercises.filter { item in
                 let nameMatch = matches(item.name, item.canonicalName,
                                         item.bodyPart ?? "", item.category ?? "")
                 let muscleMatch = exerciseGroup.isEmpty
