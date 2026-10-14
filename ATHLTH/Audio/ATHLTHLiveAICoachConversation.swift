@@ -576,6 +576,18 @@ struct ATHLTHLiveAICoachConversationView: View {
             .onChange(of: scenePhase) { _, updated in
                 if updated != .active { finish() }
             }
+            .onChange(of: recorder.active?.id) { _, currentID in
+                if case .phoneWorkout = source, currentID == nil {
+                    finish()
+                    dismiss()
+                }
+            }
+            .onChange(of: mirroring.hasActiveMirroredWorkout) { _, active in
+                if case .mirroredWatchWorkout = source, !active {
+                    finish()
+                    dismiss()
+                }
+            }
             .onDisappear { finish() }
         }
     }
@@ -608,6 +620,14 @@ struct ATHLTHLiveAICoachConversationView: View {
     }
 
     private func begin() {
+        switch source {
+        case .phoneWorkout where recorder.active == nil:
+            return
+        case .mirroredWatchWorkout where !mirroring.hasActiveMirroredWorkout:
+            return
+        default:
+            break
+        }
         switch source {
         case .phoneWorkout:
             if !recorder.coachSpeechPaused {
