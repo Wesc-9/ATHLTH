@@ -199,6 +199,16 @@ struct RunningStepTarget: Codable, Hashable {
     )
 }
 
+/// Individual effort plus its following recovery (pause 3 belongs to drag 3).
+/// Legacy templates keep using the block defaults when no override is present.
+struct RunningRepetitionOverride: Codable, Hashable {
+    var repetition: Int
+    var work: RunningStepTarget? = nil
+    var recovery: RunningStepTarget? = nil
+    var skipRecovery: Bool? = nil
+    var notes: String? = nil
+}
+
 struct RunningWorkoutBlock: Identifiable, Codable, Hashable {
     let id: UUID
     var kind: RunningBlockKind
@@ -207,6 +217,21 @@ struct RunningWorkoutBlock: Identifiable, Codable, Hashable {
     var work: RunningStepTarget
     var recovery: RunningStepTarget?
     var notes: String?
+    var repetitionOverrides: [RunningRepetitionOverride]? = nil
+
+    func override(for repetition: Int) -> RunningRepetitionOverride? {
+        repetitionOverrides?.first { $0.repetition == repetition }
+    }
+
+    func resolvedWork(at repetition: Int) -> RunningStepTarget {
+        override(for: repetition)?.work ?? work
+    }
+
+    func resolvedRecovery(after repetition: Int) -> RunningStepTarget? {
+        guard repetition < max(repetitions, 1),
+              override(for: repetition)?.skipRecovery != true else { return nil }
+        return override(for: repetition)?.recovery ?? recovery
+    }
 
     init(
         id: UUID = UUID(),
@@ -215,7 +240,8 @@ struct RunningWorkoutBlock: Identifiable, Codable, Hashable {
         repetitions: Int = 1,
         work: RunningStepTarget,
         recovery: RunningStepTarget? = nil,
-        notes: String? = nil
+        notes: String? = nil,
+        repetitionOverrides: [RunningRepetitionOverride]? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -224,6 +250,7 @@ struct RunningWorkoutBlock: Identifiable, Codable, Hashable {
         self.work = work
         self.recovery = recovery
         self.notes = notes
+        self.repetitionOverrides = repetitionOverrides
     }
 }
 
@@ -243,66 +270,32 @@ struct RunningWorkoutTemplate: Identifiable, Codable, Hashable {
     /// Virtual interval pacer, active only during work reps (not recovery).
     /// This is independent of route-matched Ghost Race.
     var intervalGhostPaceSecondsPerKilometer: Double? = nil
+    /// When enabled, Ghost matches measured reduced running pace in recoveries
+    /// instead of remaining hidden. Recovery never causes a pace penalty.
+    var intervalGhostFollowRecovery: Bool? = nil
     /// Optional instructions set before the workout for Audio Coach.
     var coachBrief: String? = nil
 
     var estimatedDistanceMeters: Double? {
-        let values = blocks.compactMap { block -> Double? in
-            guard block.work.measure == .distance,
-                  let workDistance = block.work.distanceMeters
-            else {
-                return nil
+        let parts: [RunningStepTarget] = blocks.flatMap { block in
+            (0..<max(block.repetitions, 1)).flatMap { i -> [RunningStepTarget] in
+                [block.resolvedWork(at: i + 1)] +
+                    (block.resolvedRecovery(after: i + 1).map { [$0] } ?? [])
             }
-
-            let recoveryDistance: Double
-            if let recovery = block.recovery,
-               recovery.measure == .distance {
-                recoveryDistance = recovery.distanceMeters ?? 0
-            } else {
-                recoveryDistance = 0
-            }
-
-            return (
-                workDistance * Double(max(block.repetitions, 1))
-            ) + (
-                recoveryDistance * Double(max(block.repetitions - 1, 0))
-            )
         }
-
-        guard values.count == blocks.count else { return nil }
-        return values.reduce(0, +)
+        guard parts.allSatisfy({ $0.measure == .distance }) else { return nil }
+        return parts.reduce(0) { $0 + max($1.distanceMeters ?? 0, 0) }
     }
 
     var estimatedDurationSeconds: TimeInterval? {
-        let values = blocks.compactMap { block -> TimeInterval? in
-            guard block.work.measure == .time,
-                  let workDuration = block.work.durationSeconds
-            else {
-                return nil
+        let parts: [RunningStepTarget] = blocks.flatMap { block in
+            (0..<max(block.repetitions, 1)).flatMap { i -> [RunningStepTarget] in
+                [block.resolvedWork(at: i + 1)] +
+                    (block.resolvedRecovery(after: i + 1).map { [$0] } ?? [])
             }
-
-            let repetitions = max(block.repetitions, 1)
-            var total =
-                workDuration * Double(repetitions)
-
-            if repetitions > 1,
-               let recovery = block.recovery {
-                guard recovery.measure == .time,
-                      let recoveryDuration =
-                        recovery.durationSeconds
-                else {
-                    return nil
-                }
-
-                total +=
-                    recoveryDuration * Double(repetitions - 1)
-            }
-
-            return total
         }
-
-        guard values.count == blocks.count else { return nil }
-        return values.reduce(0, +)
+        guard parts.allSatisfy({ $0.measure == .time }) else { return nil }
+        return parts.reduce(0) { $0 + max($1.durationSeconds ?? 0, 0) }
     }
 }
 
