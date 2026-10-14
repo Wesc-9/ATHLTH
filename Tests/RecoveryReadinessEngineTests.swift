@@ -377,6 +377,38 @@ final class RecoveryReadinessEngineTests:
         )
     }
 
+    func testLowValidSignalsCanReachRecoverCategory() throws {
+        let now = Date()
+        let days = baselineDays(count: 7, endingAt: now)
+        let result = RecoveryReadinessEngine.evaluate(
+            currentSleep: SleepSummary(totalAsleep: 2 * 3_600, sleepEnd: now),
+            currentHeart: HeartSummary(restingHeartRate: 120, restingHeartRateDate: now,
+                                       hrvMilliseconds: 10, hrvDate: now),
+            sleepDays: dictionary(days, value: 8 * 3_600),
+            hrvDays: dictionary(days, value: 60),
+            restingHeartRateDays: dictionary(days, value: 60), now: now
+        )
+        XCTAssertLessThan(try XCTUnwrap(result.score), 50)
+        XCTAssertEqual(result.state, .recover)
+    }
+
+    func testEstablishedBaselineExplainsStaleDataInsteadOfLearningHistory() {
+        let now = Date()
+        let days = baselineDays(count: 7, endingAt: now)
+        let stale = now.addingTimeInterval(-49 * 3_600)
+        let result = RecoveryReadinessEngine.evaluate(
+            currentSleep: SleepSummary(totalAsleep: 8 * 3_600, sleepEnd: stale),
+            currentHeart: HeartSummary(restingHeartRate: 60, restingHeartRateDate: now,
+                                       hrvMilliseconds: 60, hrvDate: now),
+            sleepDays: dictionary(days, value: 8 * 3_600),
+            hrvDays: dictionary(days, value: 60),
+            restingHeartRateDays: dictionary(days, value: 60), now: now
+        )
+        XCTAssertNil(result.score)
+        XCTAssertTrue(result.detail.contains("48"))
+        XCTAssertEqual(result.baselineDays, 7)
+    }
+
     private func baselineDays(
         count: Int,
         endingAt date: Date

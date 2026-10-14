@@ -546,6 +546,7 @@ final class AppSessionStore: ObservableObject {
             // Coach history and generated insights can contain health data.
             // Remove both separately from the regular training-data cleanup.
             RecoveryCoachConversationPersistence.delete(userID: deletedID)
+            PhoneWorkoutCompletionJournal.remove(userID: deletedID)
             RecoveryCoachConsentPreferences.revoke(userID: deletedID)
             RecoveryInsightAIConsentPreferences.removeForDeletedAccount(
                 userID: deletedID,
@@ -565,7 +566,7 @@ final class AppSessionStore: ObservableObject {
         if let deletedID {
             defaults.removeObject(forKey: AccountLocalStorage.key("training", userID: deletedID))
             defaults.removeObject(forKey: AccountLocalStorage.key("coach", userID: deletedID))
-            for name in ["arenaDrafts", "goals", "strengthHistory", "strengthActive", "phoneHistory", "phoneActive", "coachHistoryConsent", "aiHealthDataConsent", "cloudBackupConsent", "cloudBackupConsentChangedAt"] {
+            for name in ["arenaDrafts", "goals", "strengthHistory", "strengthActive", "phoneHistory", "phoneActive", "workoutCompletionImpacts", "coachHistoryConsent", "aiHealthDataConsent", "cloudBackupConsent", "cloudBackupConsentChangedAt"] {
                 defaults.removeObject(forKey: AccountLocalStorage.key(name, userID: deletedID))
             }
             AccountLocalStorage.write([RunningWorkoutTemplate](), name: "runningLibrary", userID: deletedID, defaults: defaults)

@@ -70,8 +70,31 @@ final class WorkoutCompletionCoordinator: ObservableObject {
 
     private var baselines: [UUID: Baseline] = [:]
 
-    init() {
-        impacts = Self.loadImpacts()
+    private var accountID: UUID?
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        impacts = [:]
+        // The legacy file has no owner identity; never migrate its private text.
+        if let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            let legacy = directory.appendingPathComponent("ATHLTH/workout-completion-impacts-v1.json")
+            try? FileManager.default.removeItem(at: legacy)
+        }
+    }
+
+    func switchAccount(_ userID: UUID?) {
+        guard accountID != userID else { return }
+        accountID = userID
+        baselines = [:]
+        impacts = [:]
+        guard let userID,
+              !defaults.bool(forKey: AccountLocalStorage.key("deleted", userID: userID)) else { return }
+        // Do not assign the old ownerless cache to whichever account signs in first.
+        let records = AccountLocalStorage.read(
+            [WorkoutCompletionImpact].self, name: "workoutCompletionImpacts", userID: userID, defaults: defaults
+        ) ?? []
+        for record in records { impacts[record.workoutID] = record }
         trimPersistedImpacts()
     }
 
@@ -207,6 +230,7 @@ final class WorkoutCompletionCoordinator: ObservableObject {
         gear: ProfileGearStore,
         trophies: TrophyStore
     ) {
+        guard accountID == userID else { return }
         let key = baselineKey ?? workout.id
 
         guard var baseline = baselines[key] else {
@@ -705,73 +729,10 @@ final class WorkoutCompletionCoordinator: ObservableObject {
     }
 
     private func persistImpacts() {
-        guard let url = Self.impactsURL else {
-            return
-        }
-
-        do {
-            let directory =
-                url.deletingLastPathComponent()
-
-            try FileManager.default
-                .createDirectory(
-                    at: directory,
-                    withIntermediateDirectories: true
-                )
-
-            let data =
-                try JSONEncoder()
-                    .encode(
-                        Array(impacts.values)
-                    )
-
-            try data.write(
-                to: url,
-                options: .atomic
-            )
-        } catch {
-            return
-        }
-    }
-
-    private static func loadImpacts()
-        -> [UUID: WorkoutCompletionImpact] {
-        guard let url = impactsURL,
-              let data =
-                try? Data(
-                    contentsOf: url
-                ),
-              let decoded =
-                try? JSONDecoder().decode(
-                    [WorkoutCompletionImpact].self,
-                    from: data
-                )
-        else {
-            return [:]
-        }
-
-        return Dictionary(
-            uniqueKeysWithValues:
-                decoded.map {
-                    ($0.workoutID, $0)
-                }
+        guard let accountID,
+              !defaults.bool(forKey: AccountLocalStorage.key("deleted", userID: accountID)) else { return }
+        AccountLocalStorage.write(
+            Array(impacts.values), name: "workoutCompletionImpacts", userID: accountID, defaults: defaults
         )
-    }
-
-    private static var impactsURL: URL? {
-        FileManager.default
-            .urls(
-                for: .applicationSupportDirectory,
-                in: .userDomainMask
-            )
-            .first?
-            .appendingPathComponent(
-                "ATHLTH",
-                isDirectory: true
-            )
-            .appendingPathComponent(
-                "workout-completion-impacts-v1.json",
-                isDirectory: false
-            )
     }
 }

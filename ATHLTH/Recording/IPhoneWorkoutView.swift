@@ -220,10 +220,10 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
             let isTreadmill = workout.runEnvironment == .treadmill
             // Phone treadmill workouts must never reuse GPS pace (including
             // a delayed GPS callback from a previous outdoor session).
-            let currentPace = isTreadmill ? nil :
-                workout.currentPaceSecondsPerKilometer.map {
-                    isMetric ? $0 : $0 * 1.609344
-                }
+            let paceSeconds = isTreadmill
+                ? workout.treadmillSpeedKilometersPerHour.flatMap { $0 > 0 ? 3_600 / $0 : nil }
+                : workout.currentPaceSecondsPerKilometer
+            let currentPace = paceSeconds.map { isMetric ? $0 : $0 * 1.609344 }
             let treadmillAveragePace = isTreadmill
                 ? ATHLTHRunningPace.average(
                     elapsedSeconds: elapsed,
@@ -876,6 +876,7 @@ struct IPhoneWorkoutView: View {
     @State private var showingTreadmillInclineEditor = false
     @State private var showingLiveAudioCoach = false
     @State private var showingAIConversation = false
+    @State private var showingTreadmillSpeedEditor = false
     @State private var treadmillInclineDraft = 0.0
     @State private var treadmillInclineEditingWorkoutID:
         UUID?
@@ -1424,6 +1425,14 @@ struct IPhoneWorkoutView: View {
 
                                 if workout.runEnvironment ==
                                     .treadmill {
+                                    if workout.treadmillSpeedKilometersPerHour != nil {
+                                        Text(ATHLTHLocalization.choose(
+                                            english: "Distance from entered belt speed",
+                                            norwegian: "Distanse fra oppgitt møllehastighet"
+                                        ))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    }
                                     HStack(spacing: 8) {
                                         Label(
                                             ATHLTHLocalization.format(
@@ -1531,6 +1540,12 @@ struct IPhoneWorkoutView: View {
                     .environmentObject(settings)
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showingTreadmillSpeedEditor) {
+                TreadmillSpeedEditorView(
+                    initialValue: recorder.active?.treadmillSpeedKilometersPerHour ?? 0
+                ) { recorder.setTreadmillSpeedKilometersPerHour($0) }
+                .presentationDetents([.medium])
             }
             .sheet(isPresented: $showingAIConversation) {
                 ATHLTHLiveAICoachConversationView()
@@ -1912,6 +1927,37 @@ struct IPhoneWorkoutView: View {
                 }
                 .buttonStyle(.plain)
                 ATHLTHAudioRouteControl()
+            }
+
+            if workout.runEnvironment == .treadmill {
+                Button { showingTreadmillSpeedEditor = true } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "speedometer")
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(workout.treadmillSpeedKilometersPerHour.map {
+                                ATHLTHLocalization.format(
+                                    english: "Belt speed · %.1f km/h",
+                                    norwegian: "Møllehastighet · %.1f km/t", $0
+                                )
+                            } ?? ATHLTHLocalization.choose(
+                                english: "Enter belt speed", norwegian: "Oppgi møllehastighet"
+                            ))
+                            .font(.subheadline.weight(.semibold))
+                            Text(ATHLTHLocalization.choose(
+                                english: "Distance calculated from entered speed and active time",
+                                norwegian: "Distanse beregnes fra oppgitt hastighet og aktiv tid"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        Spacer()
+                        Image(systemName: "slider.horizontal.3")
+                    }
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .padding(14)
+                    .background(Color.white.opacity(0.93), in: RoundedRectangle(cornerRadius: 17))
+                }
+                .buttonStyle(.plain)
             }
 
             Text(workout.title)
@@ -3850,6 +3896,52 @@ struct TreadmillInclineEditorView: View {
                         )
                     ) {
                         onSave(value)
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+struct TreadmillSpeedEditorView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var speed: Double
+    let onSave: (Double) -> Void
+
+    init(initialValue: Double, onSave: @escaping (Double) -> Void) {
+        _speed = State(initialValue: initialValue.isFinite ? min(max(initialValue, 0), 30) : 0)
+        self.onSave = onSave
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Stepper(value: $speed, in: 0...30, step: 0.1) {
+                        Text(ATHLTHLocalization.format(
+                            english: "Belt speed: %.1f km/h",
+                            norwegian: "Møllehastighet: %.1f km/t", speed
+                        )).monospacedDigit()
+                    }
+                    Slider(value: $speed, in: 0...30, step: 0.1)
+                } footer: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Enter the speed shown on the treadmill. Changes apply from now. Pauses add no distance; iPhone does not measure belt speed.",
+                        norwegian: "Oppgi hastigheten som vises på mølla. Endringer gjelder fra nå. Pauser gir ingen distanse; iPhone måler ikke møllehastigheten."
+                    ))
+                }
+            }
+            .navigationTitle(ATHLTHLocalization.choose(english: "Belt speed", norwegian: "Møllehastighet"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt")) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Save", norwegian: "Lagre")) {
+                        onSave(speed)
                         dismiss()
                     }
                 }

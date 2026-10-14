@@ -1570,6 +1570,7 @@ struct AppRootView: View {
             syncHomeAssistantWatchConfiguration()
             ATHLTHSurfaceCoordinator.clearAccountSurfaces()
             ATHLTHArtworkImage.clearRemoteCache()
+            workoutCompletion.switchAccount(userID)
             phoneWorkout.switchAccount(userID)
             trainingBackups.switchAccount(userID)
             goals.switchAccount(userID)

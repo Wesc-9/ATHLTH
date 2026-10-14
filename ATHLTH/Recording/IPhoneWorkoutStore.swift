@@ -94,6 +94,9 @@ struct PhoneWorkout: Codable, Identifiable {
     var runEnvironment: RunEnvironment? = nil
     var treadmillInclinePercent: Double? = nil
     var distanceMeters: Double = 0
+    // Optional for compatibility with workouts from earlier builds.
+    var treadmillSpeedKilometersPerHour: Double? = nil
+    var treadmillDistanceElapsedSeconds: TimeInterval? = nil
     var points: [PhoneRoutePoint] = []
     var healthID: UUID?
     // Explicit plan origin, optional to preserve previous history.
@@ -152,6 +155,27 @@ struct PhoneWorkout: Codable, Identifiable {
                 ? "iPhone Walk"
                 : "iPhone Run"
     }
+    /// Integrate entered belt speed over active time only, never GPS or pause time.
+    mutating func advanceTreadmillDistance(at date: Date) {
+        guard runEnvironment == .treadmill else { return }
+        let elapsed = self.elapsed(at: date)
+        guard elapsed.isFinite else { return }
+        defer { treadmillDistanceElapsedSeconds = elapsed }
+        guard let previous = treadmillDistanceElapsedSeconds,
+              let speed = treadmillSpeedKilometersPerHour,
+              speed.isFinite, (0...30).contains(speed), elapsed >= previous
+        else { return }
+        distanceMeters += speed / 3.6 * (elapsed - previous)
+    }
+
+    mutating func setTreadmillSpeed(_ speed: Double, at date: Date) {
+        guard runEnvironment == .treadmill,
+              speed.isFinite, (0...30).contains(speed) else { return }
+        advanceTreadmillDistance(at: date)
+        treadmillSpeedKilometersPerHour = speed
+        treadmillDistanceElapsedSeconds = elapsed(at: date)
+    }
+
     func elapsed(at date: Date) -> TimeInterval {
         accumulatedSeconds + (resumedAt.map { max(0, date.timeIntervalSince($0)) } ?? 0)
     }
@@ -279,6 +303,7 @@ final class IPhoneWorkoutStore:
     private var lastActiveCheckpointWriteAt: Date?
     private var livePresentationRetryTask: Task<Void, Never>?
     private let activeCheckpointInterval: TimeInterval = 5
+    private var treadmillTickTask: Task<Void, Never>?
     private let manager = CLLocationManager()
     private let healthStore = HKHealthStore()
 
@@ -296,6 +321,8 @@ final class IPhoneWorkoutStore:
     func switchAccount(_ userID: UUID?) {
         guard accountID != userID else { return }
         pause()
+        treadmillTickTask?.cancel()
+        treadmillTickTask = nil
         manager.stopUpdatingLocation()
         accountID = userID
         pendingWalking = nil
@@ -318,6 +345,7 @@ final class IPhoneWorkoutStore:
         lastCompletedWorkout = nil
         active = userID.flatMap { AccountLocalStorage.read(PhoneWorkout.self, name: "phoneActive", userID: $0) }
         if var workout = active, workout.resumedAt != nil {
+            workout.advanceTreadmillDistance(at: workout.lastCheckpoint)
             workout.accumulatedSeconds = workout.elapsed(at: workout.lastCheckpoint)
             workout.resumedAt = nil
 
@@ -335,6 +363,14 @@ final class IPhoneWorkoutStore:
             active = workout
         }
         history = userID.flatMap { AccountLocalStorage.read([PhoneWorkout].self, name: "phoneHistory", userID: $0) } ?? []
+        if let userID,
+           !UserDefaults.standard.bool(forKey: AccountLocalStorage.key("deleted", userID: userID)),
+           let completed = PhoneWorkoutCompletionJournal.read(userID: userID),
+           !history.contains(where: { $0.id == completed.id }) {
+            history.insert(completed, at: 0)
+            history.sort { $0.start > $1.start }
+            persistHistory()
+        }
         treadmillInclineOverrides =
             userID.flatMap {
                 AccountLocalStorage.read(
@@ -349,6 +385,7 @@ final class IPhoneWorkoutStore:
                 where: { $0.id == active.id }
             ) {
             self.active = nil
+            persistActiveCheckpoint(force: true)
         }
 
         recoveredWorkoutLastCheckpoint =
@@ -632,6 +669,7 @@ final class IPhoneWorkoutStore:
                 treadmillInclinePercent ?? 0
             )
         }
+        startTreadmillTicksIfNeeded()
         persistActiveCheckpoint(force: true)
         syncLiveActivity()
 
@@ -685,6 +723,8 @@ final class IPhoneWorkoutStore:
         manager.stopUpdatingLocation()
         manager.allowsBackgroundLocationUpdates = false
         manager.distanceFilter = 5
+        treadmillTickTask?.cancel()
+        treadmillTickTask = nil
         active = nil
         recoveredWorkoutLastCheckpoint = nil
         showingWorkout = false
@@ -1080,6 +1120,7 @@ final class IPhoneWorkoutStore:
             return
         }
 
+        workout.advanceTreadmillDistance(at: now)
         workout.accumulatedSeconds =
             workout.elapsed(at: now)
         workout.resumedAt = nil
@@ -1159,6 +1200,7 @@ final class IPhoneWorkoutStore:
         }
 
         workout.resumedAt = now
+        workout.treadmillDistanceElapsedSeconds = workout.elapsed(at: now)
         workout.lastCheckpoint = now
         recoveredWorkoutLastCheckpoint = nil
         active = workout
@@ -1188,6 +1230,7 @@ final class IPhoneWorkoutStore:
                 workout.treadmillInclinePercent ?? 0
             )
         }
+        startTreadmillTicksIfNeeded()
         persistActiveCheckpoint(force: true)
         syncLiveActivity()
 
@@ -1305,12 +1348,25 @@ final class IPhoneWorkoutStore:
             lastRouteCompletion = completion
         }
 
-        syncLiveActivity(
-            workout: workout,
-            state: .completed
-        )
+        guard !UserDefaults.standard.bool(forKey: AccountLocalStorage.key("deleted", userID: userID)) else { return }
+        var completedHistory = history.filter { $0.id != workout.id }
+        completedHistory.insert(workout, at: 0)
+        do {
+            // Durable completion first; retain active state on any encoding/write failure.
+            try PhoneWorkoutCompletionJournal.save(workout, userID: userID)
+            try AccountLocalStorage.writeChecked(completedHistory, name: "phoneHistory", userID: userID)
+        } catch {
+            message = ATHLTHLocalization.choose(
+                english: "Could not save the workout on this device. It remains paused; try finishing again.",
+                norwegian: "Kunne ikke lagre økten på enheten. Den er fortsatt pauset; prøv å avslutte igjen."
+            )
+            return
+        }
 
-        history.insert(workout, at: 0)
+        syncLiveActivity(workout: workout, state: .completed)
+        treadmillTickTask?.cancel()
+        treadmillTickTask = nil
+        history = completedHistory
         active = nil
         recoveredWorkoutLastCheckpoint = nil
         showingWorkout = false
@@ -1463,6 +1519,10 @@ final class IPhoneWorkoutStore:
                 history[index].healthID = saved.uuid
             }
             persistHistory()
+            if let index = history.firstIndex(where: { $0.id == workout.id }),
+               PhoneWorkoutCompletionJournal.read(userID: userID)?.id == workout.id {
+                try? PhoneWorkoutCompletionJournal.save(history[index], userID: userID)
+            }
 
             await syncRouteAttemptIfNeeded(
                 workout: workout,
@@ -1524,7 +1584,10 @@ final class IPhoneWorkoutStore:
                     HKMetadataKeySyncIdentifier:
                         "athlth-phone-" + workout.id.uuidString,
                     HKMetadataKeySyncVersion: 1,
-                    HKMetadataKeyIndoorWorkout: isIndoor
+                    HKMetadataKeyIndoorWorkout: isIndoor,
+                    "ATHLTHDistanceSource": isIndoor
+                        ? (workout.treadmillSpeedKilometersPerHour != nil ? "entered_belt_speed" : "unavailable")
+                        : "gps"
                 ],
                 to: builder
             )
@@ -1853,10 +1916,32 @@ final class IPhoneWorkoutStore:
         }
     }
 
-    func checkpoint() {
+    func setTreadmillSpeedKilometersPerHour(_ speed: Double) {
+        guard var workout = active, workout.runEnvironment == .treadmill,
+              speed.isFinite, (0...30).contains(speed) else { return }
+        workout.setTreadmillSpeed(speed, at: Date())
+        active = workout
+        checkpoint()
+    }
+
+    private func startTreadmillTicksIfNeeded() {
+        guard active?.runEnvironment == .treadmill, treadmillTickTask == nil else { return }
+        treadmillTickTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled, let self,
+                      self.active?.runEnvironment == .treadmill else { return }
+                if self.active?.resumedAt != nil { self.checkpoint(force: false) }
+            }
+        }
+    }
+
+    func checkpoint(force: Bool = true) {
         guard var workout = active else { return }
 
-        workout.lastCheckpoint = Date()
+        let now = Date()
+        workout.advanceTreadmillDistance(at: now)
+        workout.lastCheckpoint = now
 
         if workout.resumedAt != nil {
             evaluateStructuredWorkout(
@@ -1868,7 +1953,7 @@ final class IPhoneWorkoutStore:
         }
 
         active = workout
-        persistActiveCheckpoint(force: true)
+        persistActiveCheckpoint(force: force)
         syncLiveActivity()
     }
 
@@ -4387,6 +4472,10 @@ final class IPhoneWorkoutStore:
             return
         }
 
+        if let accountID, let journal = PhoneWorkoutCompletionJournal.read(userID: accountID),
+           workoutIDs.contains(journal.id) || journal.healthID.map(workoutIDs.contains) == true {
+            PhoneWorkoutCompletionJournal.remove(userID: accountID)
+        }
         history.removeAll { workout in
             workoutIDs.contains(workout.id) ||
             workout.healthID

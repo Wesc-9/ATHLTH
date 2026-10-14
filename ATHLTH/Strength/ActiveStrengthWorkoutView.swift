@@ -1733,13 +1733,7 @@ struct ActiveStrengthWorkoutView: View {
         strength.finish(
             healthKitWorkoutUUID: nil,
             duration:
-                max(
-                    snapshot.elapsedTime,
-                    Date()
-                        .timeIntervalSince(
-                            workout.startedAt
-                        )
-                ),
+                snapshot.confirmedActiveDuration,
             activeCalories:
                 snapshot.activeCalories,
             averageHeartRate:

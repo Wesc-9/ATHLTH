@@ -20,7 +20,12 @@ enum AccountLocalStorage {
     }
 
     static func write<T: Encodable>(_ value: T, name: String, userID: UUID, defaults: UserDefaults = .standard) {
-        guard let data = try? JSONEncoder().encode(value) else { return }
+        try? writeChecked(value, name: name, userID: userID, defaults: defaults)
+    }
+
+    /// Critical transitions must handle encoding failure instead of discarding it.
+    static func writeChecked<T: Encodable>(_ value: T, name: String, userID: UUID, defaults: UserDefaults = .standard) throws {
+        let data = try JSONEncoder().encode(value)
         defaults.set(data, forKey: key(name, userID: userID))
     }
 }

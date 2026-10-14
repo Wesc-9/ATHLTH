@@ -73,18 +73,21 @@ enum RecoveryReadinessEngine {
                 }
 
         guard baselineDays >= 5,
+              currentSleep.totalAsleep.isFinite,
               currentSleep.totalAsleep > 0,
               let sleepAge,
               sleepAge >= 0,
               sleepAge <= recentWindow,
               let currentHRV =
                 currentHeart.hrvMilliseconds,
+              currentHRV.isFinite,
               currentHRV > 0,
               let hrvAge,
               hrvAge >= 0,
               hrvAge <= recentWindow,
               let currentRestingHeartRate =
                 currentHeart.restingHeartRate,
+              currentRestingHeartRate.isFinite,
               currentRestingHeartRate > 0,
               let restingAge,
               restingAge >= 0,
@@ -100,7 +103,12 @@ enum RecoveryReadinessEngine {
                 score: nil,
                 state: .buildingBaseline,
                 detail:
-                    baselineDays > 0
+                    baselineDays >= 5
+                        ? ATHLTHLocalization.choose(
+                            english: "Recent sleep, HRV or resting heart rate is missing, invalid or outside the last 48 hours. Update Apple Health data to calculate readiness.",
+                            norwegian: "Søvn, HRV eller hvilepuls mangler, er ugyldig eller er utenfor de siste 48 timene. Oppdater Apple Health-data for å beregne dagsform."
+                        )
+                        : baselineDays > 0
                         ? "ATHLTH has \(baselineDays) usable baseline day\(baselineDays == 1 ? "" : "s"). At least 5 days with sleep, HRV and resting heart rate are needed."
                         : "ATHLTH is learning your recent sleep, HRV and resting heart-rate baseline.",
                 baselineDays: baselineDays,
@@ -122,14 +130,14 @@ enum RecoveryReadinessEngine {
             clamp(
                 currentSleep.totalAsleep /
                     sleepReference,
-                lower: 0.45,
+                lower: 0.0,
                 upper: 1.0
             ) * 100
 
         let hrvScore =
             clamp(
                 currentHRV / averageHRV,
-                lower: 0.55,
+                lower: 0.0,
                 upper: 1.0
             ) * 100
 
@@ -137,7 +145,7 @@ enum RecoveryReadinessEngine {
             clamp(
                 averageRestingHeartRate /
                     currentRestingHeartRate,
-                lower: 0.60,
+                lower: 0.0,
                 upper: 1.0
             ) * 100
 

@@ -1189,6 +1189,11 @@ enum WatchWorkoutMirrorState: String, Codable, Hashable {
 }
 
 struct WatchWorkoutLiveSnapshot: Codable, Hashable {
+    /// HealthKit active time is authoritative; delivery time must not add pauses.
+    var confirmedActiveDuration: TimeInterval {
+        elapsedTime.isFinite ? max(elapsedTime, 0) : 0
+    }
+
     var kind: WatchWorkoutKind
     var state: WatchWorkoutMirrorState
     var startedAt: Date?
