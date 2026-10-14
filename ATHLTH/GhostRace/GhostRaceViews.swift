@@ -529,6 +529,9 @@ struct GhostRaceHubView: View {
             } else {
                 basicReplaySection
             }
+            if hasMoreReplayCandidates || verifyingReplay {
+                replayMoreCard
+            }
             if advancedMode {
                 DisclosureGroup(
                     ATHLTHLocalization.choose(
@@ -1386,196 +1389,407 @@ struct GhostRaceHubView: View {
         )
     }
 
-    // Basic Replay has one decision: choose a recent run and race it.
-    // Sorting, search, favorites, and route matching belong to Advanced.
+    // Basic: one featured action, then up to two recent alternatives.
+    // No search, sorting, favorites, or hidden advanced settings.
     private var basicReplaySection: some View {
-        ATHLTHCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(ATHLTHLocalization.choose(
-                    english: "Race one of your recent runs",
-                    norwegian: "Løp mot en tidligere økt"
-                ))
-                .font(.headline)
+        VStack(spacing: 14) {
+            replayRecommendationCard
 
-                if loading {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, minHeight: 96)
-                } else if recentRuns.isEmpty {
-                    ContentUnavailableView(
-                        ATHLTHLocalization.choose(
-                            english: "No previous runs",
-                            norwegian: "Ingen tidligere løp"
-                        ),
-                        systemImage: "figure.run",
-                        description: Text(ATHLTHLocalization.choose(
-                            english: "Record a GPS run to unlock Replay.",
-                            norwegian: "Registrer en GPS-økt for å bruke Replay."
+            if recentRuns.count > 1 {
+                ATHLTHCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Other recent runs",
+                            norwegian: "Andre nylige løp"
                         ))
-                    )
-                } else {
-                    ForEach(Array(recentRuns.prefix(3))) { workout in
-                        Button {
-                            pendingReplayRun = workout
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: "figure.run")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                                    .frame(width: 42, height: 42)
-                                    .background(
-                                        ATHLTHTheme.accentSoft,
-                                        in: RoundedRectangle(cornerRadius: 13)
-                                    )
+                        .font(.headline)
 
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(workout.startDate.formatted(
-                                        date: .abbreviated, time: .omitted
-                                    ))
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(ATHLTHTheme.primaryText)
-
-                                    HStack(spacing: 7) {
-                                        if let distance = workout.distanceKilometers {
-                                            Text(String(format: "%.2f km", distance))
-                                        }
-                                        Text(clock(workout.duration))
-                                    }
-                                    .font(.caption)
-                                    .foregroundStyle(ATHLTHTheme.mutedText)
-                                }
-
-                                Spacer(minLength: 5)
-
-                                if startingWorkoutID == workout.id {
-                                    ProgressView().controlSize(.small)
-                                } else {
-                                    Image(systemName: "arrow.right")
-                                        .font(.subheadline.weight(.bold))
-                                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                                }
-                            }
-                            .padding(12)
-                            .background(
-                                ATHLTHTheme.surfaceStone,
-                                in: RoundedRectangle(cornerRadius: 16)
-                            )
-                            .contentShape(Rectangle())
+                        ForEach(Array(recentRuns.dropFirst().prefix(2))) { workout in
+                            replayRunCard(workout)
                         }
-                        .buttonStyle(.plain)
-                        .disabled(!canStartRace || startingWorkoutID != nil)
-                        .accessibilityHint(ATHLTHLocalization.choose(
-                            english: "Choose this run for your Ghost Race",
-                            norwegian: "Velg økten som Ghost Race-motstander"
-                        ))
                     }
                 }
             }
         }
     }
 
-    private var pastSelfSection: some View {
+    private var replayRecommendationCard: some View {
         ATHLTHCard {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
+            VStack(alignment: .leading, spacing: 13) {
+                HStack(spacing: 9) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
                     Text(ATHLTHLocalization.choose(
-                        english: "Previous runs",
-                        norwegian: "Tidligere løp"
+                        english: "Suggested Replay",
+                        norwegian: "Anbefalt Replay"
                     ))
-                    .font(.headline)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
                     Spacer()
-                    if loading { ProgressView().controlSize(.small) }
-                    Menu {
-                        ForEach(GhostReplaySort.allCases) { option in
-                            Button {
-                                replaySort = option
-                            } label: {
-                                Label(
-                                    option.title,
-                                    systemImage: replaySort == option
-                                        ? "checkmark" : "arrow.up.arrow.down"
-                                )
-                            }
-                        }
-                    } label: {
-                        Label(replaySort.title, systemImage: "line.3.horizontal.decrease")
-                            .font(.caption.weight(.semibold))
+                }
+
+                if let recommendedReplay {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Challenge your latest run",
+                        norwegian: "Utfordre ditt siste løp"
+                    ))
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Use your actual GPS track and finishing time as a Ghost.",
+                        norwegian: "Løp mot din faktiske GPS-rute og sluttid."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    replayRunCard(recommendedReplay, featured: true)
+                } else if loading || verifyingReplay {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                        Text(ATHLTHLocalization.choose(
+                            english: "Checking previous GPS runs...",
+                            norwegian: "Kontrollerer GPS fra tidligere løp ..."
+                        ))
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
                     }
-                }
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-                    TextField(
-                        ATHLTHLocalization.choose(
-                            english: "Find runs by date or distance",
-                            norwegian: "Søk på dato eller distanse"
-                        ),
-                        text: $replaySearch
-                    )
-                    .font(.subheadline)
-                    .textInputAutocapitalization(.never)
-                }
-                .padding(11)
-                .background(
-                    ATHLTHTheme.surfaceStone,
-                    in: RoundedRectangle(cornerRadius: 13)
-                )
-
-                Button {
-                    replayFavoritesOnly.toggle()
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Favorites", norwegian: "Favoritter"
-                        ),
-                        systemImage: replayFavoritesOnly ? "star.fill" : "star"
-                    )
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(replayFavoritesOnly
-                        ? ATHLTHTheme.accentDeep : ATHLTHTheme.mutedText)
-                    .padding(.horizontal, 11)
-                    .padding(.vertical, 7)
-                    .background(
-                        replayFavoritesOnly
-                            ? ATHLTHTheme.accentSoft
-                            : ATHLTHTheme.surfaceStone,
-                        in: Capsule()
-                    )
-                }
-                .buttonStyle(.plain)
-
-                if recentRuns.isEmpty && !loading {
+                    .frame(maxWidth: .infinity, minHeight: 74)
+                } else {
                     ContentUnavailableView(
                         ATHLTHLocalization.choose(
-                            english: "No running history",
-                            norwegian: "Ingen tidligere løp"
+                            english: "No ready Ghost runs",
+                            norwegian: "Ingen klare Ghost-økter"
                         ),
                         systemImage: "figure.run",
                         description: Text(ATHLTHLocalization.choose(
-                            english: "Runs from Apple Health can be used once a GPS route is available.",
-                            norwegian: "Løp fra Apple Helse kan brukes når GPS-rute er tilgjengelig."
+                            english: "A previous outdoor run needs a reliable GPS track. You can check more history below.",
+                            norwegian: "Et tidligere utendørsløp må ha en brukbar GPS-rute. Du kan kontrollere flere økter nedenfor."
                         ))
                     )
-                    .frame(minHeight: 140)
-                } else if visibleReplayRuns.isEmpty {
-                    Text(ATHLTHLocalization.choose(
-                        english: "No runs match your search.",
-                        norwegian: "Ingen løp samsvarer med søket."
-                    ))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 20)
-                } else {
-                    LazyVStack(spacing: 0) {
-                        ForEach(visibleReplayRuns.prefix(30)) { workout in
-                            runRow(workout)
-                            if workout.id != visibleReplayRuns.prefix(30).last?.id {
-                                Divider().opacity(0.65)
+                    .frame(minHeight: 130)
+                }
+            }
+        }
+    }
+
+    private var pastSelfSection: some View {
+        VStack(spacing: 14) {
+            replayRecommendationCard
+
+            if bestReplay(in: .five) != nil ||
+                bestReplay(in: .ten) != nil {
+                ATHLTHCard {
+                    VStack(alignment: .leading, spacing: 11) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "medal.fill")
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Your fastest comparable runs",
+                                norwegian: "Dine raskeste sammenlignbare løp"
+                            ))
+                            .font(.headline)
+                        }
+
+                        if let best5 = bestReplay(in: .five) {
+                            replayRunCard(best5, category: "5 km")
+                        }
+                        if let best10 = bestReplay(in: .ten) {
+                            replayRunCard(best10, category: "10 km")
+                        }
+                    }
+                }
+            }
+
+            ATHLTHCard {
+                VStack(alignment: .leading, spacing: 13) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Previous runs",
+                                norwegian: "Tidligere løp"
+                            ))
+                            .font(.headline)
+
+                            Text(ATHLTHLocalization.choose(
+                                english: "GPS-verified workouts",
+                                norwegian: "Økter med kontrollert GPS"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        Spacer(minLength: 6)
+                        if loading || verifyingReplay {
+                            ProgressView().controlSize(.small)
+                        }
+                    }
+
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(.secondary)
+                        TextField(
+                            ATHLTHLocalization.choose(
+                                english: "Search by date or distance",
+                                norwegian: "Søk etter dato eller distanse"
+                            ),
+                            text: $replaySearch
+                        )
+                        .font(.subheadline)
+                        .textInputAutocapitalization(.never)
+                    }
+                    .padding(12)
+                    .background(ATHLTHTheme.surfaceStone,
+                                in: RoundedRectangle(cornerRadius: 13))
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 7) {
+                            ForEach(GhostReplayDistanceFilter.allCases) { group in
+                                Button {
+                                    replayDistanceFilter = group
+                                    if group == .all && replaySort == .fastest {
+                                        replaySort = .newest
+                                    }
+                                } label: {
+                                    Text(group.title)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(
+                                            replayDistanceFilter == group
+                                                ? Color.white
+                                                : ATHLTHTheme.primaryText
+                                        )
+                                        .padding(.horizontal, 14)
+                                        .frame(minHeight: 38)
+                                        .background(
+                                            replayDistanceFilter == group
+                                                ? ATHLTHTheme.accentDeep
+                                                : ATHLTHTheme.surfaceStone,
+                                            in: Capsule()
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityAddTraits(
+                                    replayDistanceFilter == group
+                                        ? .isSelected : []
+                                )
+                            }
+                        }
+                    }
+
+                    HStack(spacing: 8) {
+                        Button {
+                            replayFavoritesOnly.toggle()
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Favorites",
+                                norwegian: "Favoritter"
+                            ), systemImage: replayFavoritesOnly
+                                ? "star.fill" : "star")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .padding(.horizontal, 11)
+                            .frame(minHeight: 40)
+                            .background(
+                                replayFavoritesOnly
+                                    ? ATHLTHTheme.accentSoft
+                                    : ATHLTHTheme.surfaceStone,
+                                in: Capsule()
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        Spacer()
+
+                        Menu {
+                            ForEach(GhostReplaySort.allCases) { option in
+                                Button {
+                                    replaySort = option
+                                } label: {
+                                    Label(option.title,
+                                          systemImage: replaySort == option
+                                            ? "checkmark" : "arrow.up.arrow.down")
+                                }
+                                .disabled(
+                                    option == .fastest &&
+                                    replayDistanceFilter == .all
+                                )
+                            }
+                        } label: {
+                            Label(replaySort.title,
+                                  systemImage: "line.3.horizontal.decrease")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(minHeight: 40)
+                        }
+                    }
+
+                    if replayDistanceFilter == .all {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Select 5, 10 or 21 km to sort by fastest pace fairly.",
+                            norwegian: "Velg 5, 10 eller 21 km for å sortere etter raskeste tempo."
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+
+                    if visibleReplayRuns.isEmpty {
+                        Text(ATHLTHLocalization.choose(
+                            english: "No verified runs match these filters.",
+                            norwegian: "Ingen GPS-godkjente løp passer med filtrene."
+                        ))
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .frame(maxWidth: .infinity, minHeight: 65)
+                    } else {
+                        LazyVStack(spacing: 9) {
+                            ForEach(Array(visibleReplayRuns.prefix(30))) { workout in
+                                replayRunCard(workout, showFavorite: true)
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    private var replayMoreCard: some View {
+        ATHLTHCard {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "More running history",
+                        norwegian: "Mer løpehistorikk"
+                    ))
+                    .font(.subheadline.weight(.semibold))
+
+                    Text(ATHLTHLocalization.format(
+                        english: "%d of %d runs checked for GPS",
+                        norwegian: "%d av %d løp kontrollert for GPS",
+                        replayCheckedCount,
+                        replayCandidates.count
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                Spacer(minLength: 8)
+
+                if verifyingReplay || loading {
+                    ProgressView()
+                } else {
+                    Button {
+                        Task { await verifyNextReplayBatch() }
+                    } label: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Show more",
+                            norwegian: "Vis flere"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        .frame(minHeight: 44)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(ATHLTHTheme.accentDeep)
+                }
+            }
+        }
+    }
+
+    private func replayRunCard(
+        _ workout: WorkoutSummary,
+        featured: Bool = false,
+        category: String? = nil,
+        showFavorite: Bool = false
+    ) -> some View {
+        HStack(spacing: 6) {
+            Button {
+                pendingReplayRun = workout
+            } label: {
+                HStack(spacing: 11) {
+                    Image(systemName: featured
+                        ? "flag.checkered" : "figure.run")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 44, height: 44)
+                    .background(ATHLTHTheme.accentSoft,
+                                in: RoundedRectangle(cornerRadius: 13))
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(spacing: 6) {
+                            if let category {
+                                Text(category)
+                                    .font(.caption.weight(.bold))
+                            } else {
+                                Text(workout.startDate.formatted(
+                                    date: .abbreviated, time: .omitted
+                                ))
+                                .font(.subheadline.weight(.semibold))
+                            }
+                        }
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        HStack(spacing: 7) {
+                            if let distance = workout.distanceKilometers {
+                                Text(String(format: "%.2f km", distance))
+                            }
+                            Text(clock(workout.duration))
+                        }
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+
+                        if let pace = workout.paceMinutesPerKilometer {
+                            Label(paceText(pace), systemImage: "speedometer")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                        }
+                    }
+
+                    Spacer(minLength: 3)
+
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+                .frame(maxWidth: .infinity, minHeight: featured ? 86 : 72)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(!canStartRace || startingWorkoutID != nil)
+            .accessibilityHint(ATHLTHLocalization.choose(
+                english: "Choose this verified run as your Ghost",
+                norwegian: "Velg dette GPS-godkjente løpet som Ghost"
+            ))
+
+            if showFavorite {
+                Button {
+                    toggleReplayFavorite(workout.id)
+                } label: {
+                    Image(systemName: replayFavoriteIDs.contains(workout.id)
+                        ? "star.fill" : "star")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    replayFavoriteIDs.contains(workout.id)
+                        ? ATHLTHLocalization.choose(
+                            english: "Remove favorite",
+                            norwegian: "Fjern favoritt"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Add favorite",
+                            norwegian: "Legg til favoritt"
+                        )
+                )
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 5)
+        .background(
+            featured ? ATHLTHTheme.accentSoft.opacity(0.65)
+                     : ATHLTHTheme.surfaceStone,
+            in: RoundedRectangle(cornerRadius: 16)
+        )
     }
 
     private var routeSection: some View {
