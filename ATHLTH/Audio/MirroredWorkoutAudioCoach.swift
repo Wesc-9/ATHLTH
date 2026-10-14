@@ -312,6 +312,15 @@ final class MirroredWorkoutAudioCoach:
                 )
         }
 
+        if let extra = ATHLTHIntervalCoachCue.phrase(
+            brief: snapshot.runningStepCoachBrief,
+            phase: snapshot.runningStepPhase,
+            zone: snapshot.runningStepTargetHeartRateZone,
+            norwegian: phrase(english: "en", norwegian: "no") == "no"
+        ) {
+            text += " " + extra
+        }
+
         speak(
             text,
             priority: .structuredStep,
