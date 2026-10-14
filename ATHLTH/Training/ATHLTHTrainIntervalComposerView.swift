@@ -14,6 +14,7 @@ struct ATHLTHTrainIntervalComposerView: View {
     @State private var kind: RunningBlockKind = .work
     @State private var activityName = ""
     @State private var targetEffort: RunningIntensityKind = .easy
+    @State private var showingExercisePicker = false
     @State private var saveAsReusableTemplate = false
     @State private var showingReplaceStructureConfirmation = false
     @State private var measure: RunningMeasureKind = .distance
@@ -120,6 +121,17 @@ struct ATHLTHTrainIntervalComposerView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(tr("Cancel", "Avbryt")) { dismiss() }
                         .foregroundStyle(ink)
+                }
+            }
+        }
+        .sheet(isPresented: $showingExercisePicker) {
+            NavigationStack {
+                ExerciseLibraryView(
+                    source: .library,
+                    selectionTitle: tr("Choose exercise", "Velg øvelse")
+                ) { exercise in
+                    activityName = exercise.name
+                    showingExercisePicker = false
                 }
             }
         }
@@ -335,6 +347,20 @@ struct ATHLTHTrainIntervalComposerView: View {
                 .font(.subheadline)
                 .padding(11)
                 .background(paper, in: RoundedRectangle(cornerRadius: 10))
+            Button {
+                showingExercisePicker = true
+            } label: {
+                Label(tr("Use exercise from library", "Velg øvelse fra biblioteket"),
+                      systemImage: "dumbbell.fill")
+                    .font(.caption.weight(.semibold))
+            }
+            .buttonStyle(.plain)
+            Text(tr(
+                "You can pin multiple jogging, drills or library exercises to this phase.",
+                "Du kan feste flere aktiviteter eller bibliotekøvelser til samme del."
+            ))
+            .font(.caption)
+            .foregroundStyle(muted)
             Picker(tr("Target", "Mål"), selection: $measure) {
                 Text(tr("Distance", "Distanse")).tag(RunningMeasureKind.distance)
                 Text(tr("Time", "Tid")).tag(RunningMeasureKind.time)
