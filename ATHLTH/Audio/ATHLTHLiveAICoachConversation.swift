@@ -222,6 +222,7 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
     ) async throws {
         guard let response = event["response"] as? [String: Any],
               let output = response["output"] as? [[String: Any]] else { return }
+        var replied = false
         for item in output {
             guard item["type"] as? String == "function_call",
                   item["name"] as? String == "get_live_workout_status",
@@ -238,6 +239,9 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
                     "output": current.json
                 ]
             ])
+            replied = true
+        }
+        if replied {
             try await send(["type": "response.create"])
         }
     }
@@ -613,22 +617,28 @@ struct ATHLTHLiveAICoachConversationView: View {
         case .mirroredWatchWorkout:
             mirroring.setAIConversationActive(true)
         }
+        let statusProvider: (@MainActor () -> ATHLTHLiveCoachWorkoutStatus)?
+        if allowLiveWorkoutMetrics {
+            statusProvider = {
+                switch source {
+                case .phoneWorkout:
+                    return recorder.liveAICoachStatus()
+                case .mirroredWatchWorkout:
+                    return ATHLTHLiveCoachWorkoutStatus.fromWatch(
+                        mirroring.snapshot
+                    )
+                }
+            }
+        } else {
+            statusProvider = nil
+        }
         Task {
             await conversation.start(
                 microphoneConsent: allowMicrophone,
                 providerConsent: allowProviderProcessing,
                 language: settings.audioCoachLanguage,
                 style: settings.audioCoachSpeechStyle,
-                liveStatusProvider: allowLiveWorkoutMetrics ? {
-                    switch source {
-                    case .phoneWorkout:
-                        return recorder.liveAICoachStatus()
-                    case .mirroredWatchWorkout:
-                        return ATHLTHLiveCoachWorkoutStatus.fromWatch(
-                            mirroring.snapshot
-                        )
-                    }
-                } : nil
+                liveStatusProvider: statusProvider
             )
         }
     }
@@ -648,5 +658,9 @@ struct ATHLTHLiveAICoachConversationView: View {
     private func finish() {
         conversation.stop()
         restoreOrdinaryCoach()
+        // Consent is for one conversation, never persisted or inherited.
+        allowLiveWorkoutMetrics = false
+        allowMicrophone = false
+        allowProviderProcessing = false
     }
 }
