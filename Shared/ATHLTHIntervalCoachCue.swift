@@ -8,8 +8,15 @@ enum ATHLTHIntervalCoachCue {
         for step: WatchRunningWorkoutStep,
         norwegian: Bool
     ) -> String? {
-        guard step.phase == "work",
-              let brief = step.coachBrief?.lowercased(),
+        phrase(brief: step.coachBrief, phase: step.phase,
+               zone: step.targetHeartRateZone, norwegian: norwegian)
+    }
+
+    static func phrase(
+        brief: String?, phase: String?, zone: Int?, norwegian: Bool
+    ) -> String? {
+        guard phase == "work",
+              let brief = brief?.lowercased(),
               !brief.isEmpty else { return nil }
 
         var cues: [String] = []
@@ -27,7 +34,7 @@ enum ATHLTHIntervalCoachCue {
         }
         if (brief.contains("puls") || brief.contains("heart") ||
             brief.contains("sone") || brief.contains("zone")),
-           let zone = step.targetHeartRateZone {
+           let zone {
             cues.append(norwegian
                 ? "Følg med på pulsen. Målet er sone \(zone)."
                 : "Watch your heart rate. Your target is zone \(zone).")
