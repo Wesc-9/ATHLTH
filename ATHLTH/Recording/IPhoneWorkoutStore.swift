@@ -36,6 +36,13 @@ struct PhoneWorkoutPauseInterval: Codable, Equatable {
     var endedAt: Date?
 }
 
+/// Manually entered treadmill belt speed. Elapsed workout time excludes pauses;
+/// entries are historical observations, not treadmill control commands.
+struct PhoneTreadmillSpeedEntry: Codable, Hashable {
+    let activeElapsedSeconds: TimeInterval
+    let kilometersPerHour: Double
+}
+
 struct PhoneRouteCompletionSummary: Codable, Hashable {
     var routeID: UUID
     var routeTitle: String
@@ -97,6 +104,32 @@ struct PhoneWorkout: Codable, Identifiable {
     // Optional for compatibility with workouts from earlier builds.
     var treadmillSpeedKilometersPerHour: Double? = nil
     var treadmillDistanceElapsedSeconds: TimeInterval? = nil
+    /// Nil for workouts recorded before this feature. Entries are kept with
+    /// phoneHistory so future coaching can refer to verified manual inputs.
+    var treadmillSpeedHistory: [PhoneTreadmillSpeedEntry]? = nil
+
+    var averageLoggedTreadmillSpeedKilometersPerHour: Double? {
+        guard runEnvironment == .treadmill,
+              let speedHistory = treadmillSpeedHistory, !speedHistory.isEmpty else { return nil }
+        let sorted = speedHistory.sorted { $0.activeElapsedSeconds < $1.activeElapsedSeconds }
+        let total = max(elapsed(at: end ?? Date()), 0)
+        var weightedDistance = 0.0
+        var measuredSeconds = 0.0
+        for (index, point) in sorted.enumerated() {
+            let start = max(point.activeElapsedSeconds, 0)
+            let finish = min(max(
+                index + 1 < sorted.count ? sorted[index + 1].activeElapsedSeconds : total,
+                start
+            ), total)
+            let interval = max(finish - start, 0)
+            guard point.kilometersPerHour > 0, point.kilometersPerHour <= 30,
+                  point.kilometersPerHour.isFinite else { continue }
+            measuredSeconds += interval
+            weightedDistance += interval * point.kilometersPerHour
+        }
+        guard measuredSeconds >= 30 else { return nil }
+        return weightedDistance / measuredSeconds
+    }
     var points: [PhoneRoutePoint] = []
     var healthID: UUID?
     // Explicit plan origin, optional to preserve previous history.
@@ -174,6 +207,15 @@ struct PhoneWorkout: Codable, Identifiable {
         advanceTreadmillDistance(at: date)
         treadmillSpeedKilometersPerHour = speed
         treadmillDistanceElapsedSeconds = elapsed(at: date)
+        let elapsed = elapsed(at: date)
+        if treadmillSpeedHistory?.last?.kilometersPerHour != speed {
+            var samples = treadmillSpeedHistory ?? []
+            samples.append(PhoneTreadmillSpeedEntry(
+                activeElapsedSeconds: elapsed,
+                kilometersPerHour: speed
+            ))
+            treadmillSpeedHistory = samples
+        }
     }
 
     func elapsed(at date: Date) -> TimeInterval {
@@ -1940,6 +1982,19 @@ final class IPhoneWorkoutStore:
                 }
             }
         }
+    }
+
+    /// Local, user-specific reference. Never interpreted as live belt speed.
+    var lastTreadmillSpeedReference: (speed: Double, date: Date)? {
+        history
+            .filter { $0.runEnvironment == .treadmill && $0.end != nil }
+            .sorted { $0.start > $1.start }
+            .compactMap { workout -> (speed: Double, date: Date)? in
+                guard let speed = workout.averageLoggedTreadmillSpeedKilometersPerHour,
+                      speed >= 3, speed <= 25 else { return nil }
+                return (speed, workout.end ?? workout.start)
+            }
+            .first
     }
 
     func setTreadmillSpeedKilometersPerHour(_ speed: Double) {
