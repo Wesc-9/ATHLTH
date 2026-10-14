@@ -1,0 +1,50 @@
+{
+  "plank": {
+    "name": "Planke",
+    "summary": "En statisk kjerneøvelse som trener stabilitet i mage og rygg.",
+    "instructions": [
+      "Plasser underarmene i gulvet med albuene rett under skuldrene.",
+      "Strekk ut beina og hold kroppen i en rett linje.",
+      "Stram mage og sete og pust jevnt mens du holder posisjonen."
+    ],
+    "tips": [
+      "Unngå å løfte hoftene for høyt eller svaie i korsryggen."
+    ]
+  },
+  "side-plank": {
+    "name": "Sideplanke",
+    "summary": "Trener stabiliteten på siden av kjernen.",
+    "instructions": [
+      "Legg deg på siden med albuen rett under skulderen.",
+      "Løft hoften til kroppen danner en rett linje.",
+      "Hold posisjonen og bytt side."
+    ],
+    "tips": [
+      "Hold skulderen stabil og hoften løftet."
+    ]
+  },
+  "ab-wheel-rollout": {
+    "name": "Utrulling med magehjul",
+    "summary": "Krevende kjerneøvelse med magehjul.",
+    "instructions": [
+      "Start på knærne med hjulet rett foran deg.",
+      "Rull rolig frem uten å slippe korsryggen i svai.",
+      "Bruk magen til å trekke deg kontrollert tilbake."
+    ],
+    "tips": [
+      "Begrens bevegelsesutslaget til du klarer å holde ryggen stabil."
+    ]
+  },
+  "back-extension": {
+    "name": "Rygghev",
+    "summary": "Styrker ryggstrekkerne med en kontrollert hoftebevegelse.",
+    "instructions": [
+      "Still inn apparatet slik at du kan bøye i hoften.",
+      "Senk overkroppen rolig ned.",
+      "Løft kontrollert tilbake til kroppen er rett."
+    ],
+    "tips": [
+      "Unngå å overstrekkes i korsryggen på toppen."
+    ]
+  }
+}
