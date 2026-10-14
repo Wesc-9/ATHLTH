@@ -2,6 +2,30 @@ import Combine
 import CoreLocation
 import Foundation
 
+/// Checks the exact geometric prerequisites for replaying a HealthKit run.
+/// Used by both Replay and friend invites before displaying a startable run.
+/// The preparation engine still performs its own authoritative validation.
+enum GhostRaceTrackEligibility {
+    static func hasUsableGPS(_ route: [CLLocation]) -> Bool {
+        let valid = route
+            .filter {
+                $0.coordinate.latitude.isFinite &&
+                $0.coordinate.longitude.isFinite &&
+                $0.horizontalAccuracy >= 0 &&
+                $0.horizontalAccuracy <= 65
+            }
+            .sorted { $0.timestamp < $1.timestamp }
+
+        guard valid.count >= 2 else { return false }
+
+        var distance = 0.0
+        for i in 1..<valid.count {
+            distance += valid[i].distance(from: valid[i - 1])
+        }
+        return distance.isFinite && distance >= 250
+    }
+}
+
 /// Determines how a target Ghost distributes its total time along a course.
 /// All strategies preserve the requested finish time and route geometry.
 enum GhostTargetPacingStrategy: String, CaseIterable, Identifiable, Codable {
