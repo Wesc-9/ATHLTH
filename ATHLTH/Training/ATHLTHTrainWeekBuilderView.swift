@@ -546,6 +546,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     @State private var draft: PlannedSession
     @State private var showExerciseSearch = false
     @State private var showRunningTemplates = false
+    @State private var showSharedWorkoutTemplates = false
     @State private var showIntervalComposer = false
     @State private var scheduled = false
     @State private var clockTime = Date()
@@ -637,6 +638,19 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                     if draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         draft.title = template.title
                     }
+                }
+            }
+            .sheet(isPresented: $showSharedWorkoutTemplates) {
+                SavedWorkoutPickerView { template in
+                    draft.title = template.title
+                    draft.kind = template.kind
+                    draft.exercises = template.exercises
+                    draft.workoutBlocks = template.resolvedWorkoutBlocks
+                    draft.workoutCategory = template.workoutCategory
+                    draft.durationMinutes = template.durationMinutes
+                    draft.runningWorkout = template.runningWorkout
+                    draft.runningWorkouts = template.runningWorkouts
+                    showSharedWorkoutTemplates = false
                 }
             }
             .sheet(isPresented: $showRunningTemplates) {
@@ -787,6 +801,37 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                 .editorSurface(line: line)
             }
             .buttonStyle(.plain)
+
+            if advanced {
+                Button {
+                    showSharedWorkoutTemplates = true
+                } label: {
+                    HStack {
+                        Label(tr("Use saved detailed template", "Bruk lagret detaljert øktmal"),
+                              systemImage: "rectangle.stack")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .padding(14)
+                    .editorSurface(line: line)
+                }
+                .buttonStyle(.plain)
+                if let workoutBlocks = draft.workoutBlocks, !workoutBlocks.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(tr("PINNED WORKOUT PHASES", "FESTEDE ØKTDELER"))
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(bronze)
+                        ForEach(workoutBlocks) { block in
+                            Label(block.title + " · " + block.resolvedPhase.title,
+                                  systemImage: block.resolvedPhase.symbol)
+                                .font(.caption)
+                        }
+                    }
+                    .padding(12)
+                    .editorSurface(line: line)
+                }
+            }
 
             if draft.exercises.isEmpty {
                 Text(tr("Begin with your favorite exercises or build your own structure.",
