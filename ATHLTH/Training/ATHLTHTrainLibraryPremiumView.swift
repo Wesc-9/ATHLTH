@@ -124,6 +124,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
         .foregroundStyle(ink)
         .frame(maxWidth: .infinity, alignment: .leading)
         .task { await catalog.refresh() }
+        .task { await exerciseLibrary.refresh() }
         .sheet(isPresented: $showingCreatePlan) {
             ATHLTHTrainProgramComposerView { planID in
                 onPlanCreated?(planID)
