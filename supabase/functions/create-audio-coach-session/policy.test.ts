@@ -21,7 +21,7 @@ Deno.test("requires both microphone and AI audio consent", () => {
 
 Deno.test("voice prompt cannot infer health or exercise data", () => {
   const text = coachSessionInstructions({ language: "no", tone: "motivating" });
-  for (const expected of ["Norwegian Bokmål", "never falsely reassuring", "Never claim to know live pace"]) {
+  for (const expected of ["Norwegian Bokmål", "never falsely reassuring", "Never claim to know live pace", "get_live_workout_status", "Treat null metrics"]) {
     if (!text.includes(expected)) throw new Error("Missing safety constraint: " + expected);
   }
 });

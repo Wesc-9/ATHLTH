@@ -37,11 +37,16 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
     private var generation = UUID()
     private var ownsAudioSession = false
 
+    /// Set only after a separate, in-session workout data opt-in. Never
+    /// poll or proactively stream metrics. Resolved on each AI tool request.
+    private var liveStatusProvider: (@MainActor () -> ATHLTHLiveCoachWorkoutStatus)?
+
     func start(
         microphoneConsent: Bool,
         providerConsent: Bool,
         language: WatchAudioCoachLanguage,
-        style: ATHLTHCoachSpeechStyle
+        style: ATHLTHCoachSpeechStyle,
+        liveStatusProvider: (@MainActor () -> ATHLTHLiveCoachWorkoutStatus)?
     ) async {
         guard !state.isActive else { return }
         guard microphoneConsent && providerConsent else {
@@ -53,6 +58,7 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
         }
 
         state = .connecting
+        self.liveStatusProvider = liveStatusProvider
         lastTranscript = nil
         let sessionID = UUID()
         generation = sessionID
@@ -137,11 +143,9 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
                 switch type {
                 case "session.created":
                     try configureAudio()
-                    try await send([
-                        "type": "session.update",
-                        "session": [
-                            "type": "realtime",
-                            "audio": [
+                    var updatedSession: [String: Any] = [
+                        "type": "realtime",
+                        "audio": [
                                 "input": [
                                     "format": ["type": "audio/pcm", "rate": 24_000],
                                     "turn_detection": [
@@ -153,8 +157,27 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
                                 "output": ["format": [
                                     "type": "audio/pcm", "rate": 24_000
                                 ]],
-                            ],
                         ],
+                    ]
+                    if liveStatusProvider != nil {
+                        updatedSession["tools"] = [[
+                            "type": "function",
+                            "name": "get_live_workout_status",
+                            "description": "Read verified, current ATHLTH workout metrics only after the user separately opted in. No GPS location or history.",
+                            "parameters": [
+                                "type": "object",
+                                "properties": [String: Any](),
+                                "required": [String](),
+                                "additionalProperties": false
+                            ]
+                        ] as [String: Any]]
+                        updatedSession["tool_choice"] = "auto"
+                    } else {
+                        updatedSession["tools"] = [Any]()
+                    }
+                    try await send([
+                        "type": "session.update",
+                        "session": updatedSession
                     ])
                     state = .listening
                 case "input_audio_buffer.speech_started":
@@ -174,6 +197,7 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
                         lastTranscript = String((previous + text).suffix(600))
                     }
                 case "response.done":
+                    try await respondToWorkoutStatusRequests(in: event)
                     state = .listening
                 case "error":
                     throw ATHLTHConversationFailure.provider
@@ -188,6 +212,33 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
                 english: "Voice connection ended. Your workout is still running.",
                 norwegian: "Taleforbindelsen ble brutt. Treningsøkten fortsetter."
             ))
+        }
+    }
+
+    /// Only the locally authorized read-only function can provide workout
+    /// data, and only in response to an explicit model function call.
+    private func respondToWorkoutStatusRequests(
+        in event: [String: Any]
+    ) async throws {
+        guard let response = event["response"] as? [String: Any],
+              let output = response["output"] as? [[String: Any]] else { return }
+        for item in output {
+            guard item["type"] as? String == "function_call",
+                  item["name"] as? String == "get_live_workout_status",
+                  let callID = item["call_id"] as? String,
+                  !callID.isEmpty, callID.count < 256
+            else { continue }
+
+            let current = liveStatusProvider?() ?? .unavailable
+            try await send([
+                "type": "conversation.item.create",
+                "item": [
+                    "type": "function_call_output",
+                    "call_id": callID,
+                    "output": current.json
+                ]
+            ])
+            try await send(["type": "response.create"])
         }
     }
 
@@ -347,6 +398,7 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
         senderTask?.cancel()
         senderTask = nil
         waitingAudio.removeAll(keepingCapacity: false)
+        liveStatusProvider = nil
         socket?.cancel(with: .normalClosure, reason: nil)
         socket = nil
         if let engine = audioEngine {
@@ -394,6 +446,7 @@ struct ATHLTHLiveAICoachConversationView: View {
     @StateObject private var conversation = ATHLTHLiveAICoachConversation()
     @State private var allowMicrophone = false
     @State private var allowProviderProcessing = false
+    @State private var allowLiveWorkoutMetrics = false
     @State private var restoreCoachVoice = false
 
     var body: some View {
@@ -446,10 +499,14 @@ struct ATHLTHLiveAICoachConversationView: View {
                                     english: "I agree that my voice will be processed by the AI provider",
                                     norwegian: "Jeg godtar at stemmen behandles av AI-leverandøren"
                                 ), isOn: $allowProviderProcessing)
+                                Toggle(ATHLTHLocalization.choose(
+                                    english: "Allow AI to read current workout status when I ask",
+                                    norwegian: "La AI lese øktstatus når jeg spør"
+                                ), isOn: $allowLiveWorkoutMetrics)
                             }
                             Text(ATHLTHLocalization.choose(
-                                english: "No live heart rate, route or pace is shared with this AI yet. The recording continues in ATHLTH, and the conversation ends automatically after five minutes.",
-                                norwegian: "AI-en mottar ennå ikke puls, rute eller tempo. Økten registreres videre i ATHLTH. Samtalen avsluttes automatisk etter fem minutter."
+                                english: "Live metrics are shared only if you enable the separate option and the AI requests your workout status. No GPS positions, route geometry or history are shared. The workout continues and the chat stops after five minutes.",
+                                norwegian: "Øktdata deles kun hvis du aktiverer det egne valget og AI-en spør etter øktstatus. GPS-posisjon, rutekart og historikk deles ikke. Treningen fortsetter, og samtalen avsluttes etter fem minutter."
                             ))
                             .font(.caption)
                             .foregroundStyle(ATHLTHTheme.mutedText)
@@ -561,7 +618,17 @@ struct ATHLTHLiveAICoachConversationView: View {
                 microphoneConsent: allowMicrophone,
                 providerConsent: allowProviderProcessing,
                 language: settings.audioCoachLanguage,
-                style: settings.audioCoachSpeechStyle
+                style: settings.audioCoachSpeechStyle,
+                liveStatusProvider: allowLiveWorkoutMetrics ? {
+                    switch source {
+                    case .phoneWorkout:
+                        return recorder.liveAICoachStatus()
+                    case .mirroredWatchWorkout:
+                        return ATHLTHLiveCoachWorkoutStatus.fromWatch(
+                            mirroring.snapshot
+                        )
+                    }
+                } : nil
             )
         }
     }
