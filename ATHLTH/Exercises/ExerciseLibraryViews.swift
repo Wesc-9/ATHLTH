@@ -2,6 +2,7 @@ import AVKit
 import PhotosUI
 import Supabase
 import SwiftUI
+import Translation
 import UniformTypeIdentifiers
 import UIKit
 
@@ -965,6 +966,9 @@ struct ExerciseLibraryView: View {
 struct ExerciseDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var library: ExerciseLibraryStore
+    @ObservedObject private var norwegianTranslations = NorwegianExerciseAutoTranslation.shared
+    @State private var detailTranslationConfig: TranslationSession.Configuration?
+    @State private var languageStatus: LanguageAvailability.Status = .unsupported
 
     let entry: ExerciseLibraryEntry
     let selectionTitle: String?
@@ -1003,6 +1007,22 @@ struct ExerciseDetailView: View {
                    !summary.isEmpty {
                     Text(summary)
                         .font(.subheadline)
+                }
+
+                if ATHLTHLocalization.isNorwegian,
+                   currentEntry.source == .repDB,
+                   languageStatus == .supported,
+                   detailTranslationConfig == nil {
+                    Button {
+                        // iOS asks before installing the language resources.
+                        detailTranslationConfig =
+                            NorwegianExerciseAutoTranslation.configuration()
+                    } label: {
+                        Label("Oversett øvelsesbeskrivelsen til norsk",
+                              systemImage: "character.book.closed")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .buttonStyle(.bordered)
                 }
 
                 if !library.localizedExerciseInstructions(currentEntry).isEmpty {
@@ -1108,6 +1128,25 @@ struct ExerciseDetailView: View {
         }
         .sheet(isPresented: $showingEdit) {
             CustomExerciseEditorView(editing: currentEntry)
+        }
+        .task(id: currentEntry.id) {
+            guard ATHLTHLocalization.isNorwegian,
+                  currentEntry.source == .repDB else { return }
+            languageStatus = await NorwegianExerciseAutoTranslation.availabilityStatus()
+            if languageStatus == .installed {
+                detailTranslationConfig = NorwegianExerciseAutoTranslation.configuration()
+            }
+        }
+        .translationTask(detailTranslationConfig) { session in
+            let exercise = currentEntry
+            guard exercise.source == .repDB else { return }
+            let raw = [exercise.name]
+                + [exercise.summary].compactMap { $0 }
+                + exercise.exercise.instructions
+                + exercise.tips
+            await norwegianTranslations.translate(
+                texts: raw, using: session, batchSize: 14
+            )
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if let onSelect {
