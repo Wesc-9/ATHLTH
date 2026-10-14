@@ -5230,6 +5230,7 @@ struct ATHLTHTrainView: View {
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
 
     @State private var selectedSection = 0
+    @State private var highlightedTrainPlanID: UUID?
     @State private var watchTransferMessage: String?
     @State private var watchTransferError: String?
     @State private var selectedStrengthSession: PlannedSession?
@@ -5270,6 +5271,7 @@ struct ATHLTHTrainView: View {
                     switch selectedSection {
                     case 1:
                         ATHLTHTrainPlanPremiumView(
+                            highlightedPlanID: highlightedTrainPlanID,
                             onStartWorkout: { planID, workout in
                                 openTodayPrimaryWorkout(
                                     workout,
@@ -5349,7 +5351,10 @@ struct ATHLTHTrainView: View {
                 AllTrainingPlansView()
             }
             .sheet(isPresented: $showingTrainProgramCreation) {
-                ATHLTHTrainProgramComposerView()
+                ATHLTHTrainProgramComposerView { planID in
+                    highlightedTrainPlanID = planID
+                    selectedSection = 1
+                }
             }
             .sheet(isPresented: $showingTrainPlanProgress) {
                 if let plan = session.activePlan {

@@ -27,10 +27,21 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var showingCoach = false
     @State private var showingRecoveryAdvice = false
     @State private var showingAIHelp = false
-    @State private var editingDayID: UUID?
-    @State private var editingExistingWorkout: PlannedSession?
-    @State private var openingWorkout: PlannedSession?
-    @State private var openingWorkoutPlanID: UUID?
+    private struct WorkoutEditDestination: Identifiable {
+        let planID: UUID
+        let dayID: UUID
+        let version: Int
+        let workout: PlannedSession?
+        var id: UUID { workout?.id ?? dayID }
+    }
+    @State private var editingWorkout: WorkoutEditDestination?
+    private struct WorkoutDestination: Identifiable {
+        let planID: UUID
+        let workout: PlannedSession
+        var id: UUID { workout.id }
+    }
+    @State private var openingWorkout: WorkoutDestination?
+    @State private var selectedDayID: UUID?
     @State private var queuedLaunchPlanID: UUID?
     @State private var queuedLaunchWorkout: PlannedSession?
     @State private var deletingWorkout: PlannedSession?
@@ -58,7 +69,7 @@ struct ATHLTHTrainPlanPremiumView: View {
            let selected = session.trainingPlans.first(where: { $0.id == id }) {
             return selected
         }
-        return session.activePlan
+        return session.activePlan ?? session.trainingPlans.first
     }
 
     private var selectedWeek: TrainingPlanWeek? {
@@ -219,6 +230,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                                             to: Calendar.current.startOfDay(for: moveTargetDate)
                                         ).day ?? 0
                                         selectedWeekIndex = max(0, days / 7)
+                    selectedDayID = nil
                                     }
                                     movingWorkout = nil
                                     movingPlanID = nil
@@ -262,6 +274,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     private var planContent: some View {
         VStack(alignment: .leading, spacing: 18) {
             header
+            if !session.trainingPlans.isEmpty { savedPlansOverview }
             if let plan {
                 overview(plan)
                 weekWorkspace(plan)
@@ -281,9 +294,13 @@ struct ATHLTHTrainPlanPremiumView: View {
         }
         .onChange(of: plan?.id) { _, _ in
             selectedWeekIndex = nil
+            selectedDayID = nil
             if let plan {
                 advanced = plan.builderProfile?.mode == .advanced
             }
+        }
+        .onChange(of: selectedWeekIndex) { _, _ in
+            selectedDayID = nil
         }
         .onChange(of: highlightedPlanID) { _, next in
             focusedPlanID = next
@@ -356,7 +373,6 @@ struct ATHLTHTrainPlanPremiumView: View {
                let launchWorkout = queuedLaunchWorkout {
                 queuedLaunchPlanID = nil
                 queuedLaunchWorkout = nil
-                openingWorkoutPlanID = nil
                 // Resolve the current record again after the detail sheet
                 // closes. A plan may have changed while the sheet was open.
                 if let sourcePlan = session.trainingPlan(withID: launchPlanID),
@@ -375,9 +391,9 @@ struct ATHLTHTrainPlanPremiumView: View {
                     onStartWorkout?(launchPlanID, current)
                 }
             }
-        }) { workout in
-            if let openingWorkoutPlanID,
-               let plan = session.trainingPlan(withID: openingWorkoutPlanID),
+        }) { destination in
+            let workout = destination.workout
+            if let plan = session.trainingPlan(withID: destination.planID),
                let dayID = workoutDayID(workout, plan: plan) {
                 if plan.builderProfile?.mode == .advanced {
                     ATHLTHTrainWorkoutBuilderView(
@@ -400,6 +416,14 @@ struct ATHLTHTrainPlanPremiumView: View {
                         onStartWorkout: launchFromWorkoutDetails
                     )
                 }
+            } else {
+                VStack(spacing: 12) {
+                    Text(tr("This workout is no longer in the plan.", "Denne økten finnes ikke lenger i planen."))
+                        .font(.headline)
+                    Button(tr("Close", "Lukk")) { openingWorkout = nil }
+                        .buttonStyle(.borderedProminent)
+                }
+                .padding(24)
             }
         }
         .confirmationDialog(
@@ -458,23 +482,13 @@ struct ATHLTHTrainPlanPremiumView: View {
         .sheet(isPresented: $showingAIHelp) {
             CoachPlanAdaptationView()
         }
-        .sheet(isPresented: Binding(
-            get: { editingDayID != nil },
-            set: { visible in
-                if !visible {
-                    editingDayID = nil
-                    editingExistingWorkout = nil
-                }
-            }
-        )) {
-            if let plan, let dayID = editingDayID {
-                ATHLTHTrainWorkoutBuilderView(
-                    planID: plan.id,
-                    dayID: dayID,
-                    expectedPlanVersion: plan.version,
-                    existingWorkout: editingExistingWorkout
-                )
-            }
+        .sheet(item: $editingWorkout) { destination in
+            ATHLTHTrainWorkoutBuilderView(
+                planID: destination.planID,
+                dayID: destination.dayID,
+                expectedPlanVersion: destination.version,
+                existingWorkout: destination.workout
+            )
         }
     }
 
@@ -501,6 +515,83 @@ struct ATHLTHTrainPlanPremiumView: View {
             }
         }
         return nil
+    }
+
+    private var savedPlansOverview: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(tr("My training plans", "Mine treningsplaner"))
+                .font(.headline)
+            ForEach(session.trainingPlans) { item in
+                let selected = item.id == plan?.id
+                Button {
+                    focusedPlanID = item.id
+                    selectedWeekIndex = nil
+                    selectedDayID = nil
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: selected ? "checkmark.circle.fill" : "calendar")
+                            .foregroundStyle(warmGold)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(item.title).font(.subheadline.weight(.semibold))
+                            if let start = item.startDate {
+                                Text(start.formatted(.dateTime.day().month(.abbreviated).year()))
+                                    .font(.caption).foregroundStyle(secondaryInk)
+                            }
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.caption)
+                    }
+                    .foregroundStyle(graphite)
+                    .padding(16)
+                    .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+                    .background(selected ? soft : Color.white, in: RoundedRectangle(cornerRadius: 17))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+    }
+
+    private func clickableWeekOverview(_ week: TrainingPlanWeek, plan: TrainingPlan) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(tr("Choose a day to view or add a workout", "Velg en dag for å se eller legge til en økt"))
+                .font(.subheadline).foregroundStyle(secondaryInk)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 78))], spacing: 8) {
+                ForEach(week.days.sorted { $0.dayIndex < $1.dayIndex }) { day in
+                    let selected = selectedDayID == day.id
+                    let date = planDayDate(day.dayIndex, plan: plan)
+                    Button {
+                        selectedDayID = day.id
+                    } label: {
+                        VStack(spacing: 5) {
+                            Text(date.formatted(.dateTime.weekday(.abbreviated)))
+                                .font(.subheadline.weight(.semibold))
+                            Text(date.formatted(.dateTime.day()))
+                                .font(.title3.weight(.semibold))
+                            Text(day.sessions.isEmpty
+                                 ? tr("Rest", "Fri")
+                                 : tr("\(day.sessions.count) workouts", "\(day.sessions.count) økter"))
+                                .font(.caption2)
+                        }
+                        .foregroundStyle(selected ? Color.white : graphite)
+                        .frame(maxWidth: .infinity, minHeight: 90)
+                        .background(selected ? graphite : soft, in: RoundedRectangle(cornerRadius: 14))
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(date.formatted(.dateTime.weekday(.wide).day().month(.wide)))
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+                }
+            }
+            if selectedDayID != nil {
+                Button(tr("Show the whole week", "Vis hele uken")) { selectedDayID = nil }
+                    .font(.subheadline.weight(.semibold))
+                    .frame(minHeight: 44)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(graphite)
+            }
+        }
     }
 
     private var planChooser: some View {
@@ -559,11 +650,6 @@ struct ATHLTHTrainPlanPremiumView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(tr("Create training plan", "Opprett treningsplan"))
-            }
-
-            if !session.trainingPlans.isEmpty {
-                planChooser
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             HStack {
@@ -895,10 +981,13 @@ struct ATHLTHTrainPlanPremiumView: View {
                     .foregroundStyle(warmGold)
                 }
                 weekPager(plan, week: selectedWeek)
+                clickableWeekOverview(selectedWeek, plan: plan)
 
                 if advanced {
                     VStack(spacing: 0) {
-                        ForEach(selectedWeek.days.sorted(by: {
+                        ForEach(selectedWeek.days.filter {
+                            selectedDayID == nil || selectedDayID == $0.id
+                        }.sorted(by: {
                             $0.dayIndex < $1.dayIndex
                         })) { day in
                             dayRow(day, plan: plan)
@@ -1034,15 +1123,21 @@ struct ATHLTHTrainPlanPremiumView: View {
     private func simpleWeekRows(
         _ week: TrainingPlanWeek, plan: TrainingPlan
     ) -> some View {
-        let days = week.days.filter { !$0.sessions.isEmpty }
+        let days = week.days.filter {
+            !$0.sessions.isEmpty && (selectedDayID == nil || selectedDayID == $0.id)
+        }
             .sorted { $0.dayIndex < $1.dayIndex }
         return VStack(alignment: .leading, spacing: 10) {
             if days.isEmpty {
-                Text(tr("No workouts this week", "Ingen økter denne uken"))
+                Text(selectedDayID == nil
+                     ? tr("No workouts this week", "Ingen økter denne uken")
+                     : tr("No workout on this day", "Ingen økt denne dagen"))
                     .font(.subheadline)
                     .foregroundStyle(secondaryInk)
                 Button {
-                    showingEditor = true
+                    if let dayID = selectedDayID ?? week.days.sorted(by: { $0.dayIndex < $1.dayIndex }).first?.id {
+                        editingWorkout = WorkoutEditDestination(planID: plan.id, dayID: dayID, version: plan.version, workout: nil)
+                    }
                 } label: {
                     Label(tr("Add workout", "Legg til økt"), systemImage: "plus")
                 }
@@ -1064,8 +1159,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                         )
                         VStack(spacing: 0) {
                         Button {
-                            openingWorkoutPlanID = plan.id
-                            openingWorkout = workout
+                            openingWorkout = WorkoutDestination(planID: plan.id, workout: workout)
                         } label: {
                             HStack(spacing: 12) {
                                 Image(systemName: workout.kind.systemImage)
@@ -1121,8 +1215,23 @@ struct ATHLTHTrainPlanPremiumView: View {
                             }
                             .padding(16)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                            if !completed && !skipped {
+                                Divider().overlay(line.opacity(0.55)).padding(.horizontal, 16)
+                                Button {
+                                    editingWorkout = WorkoutEditDestination(planID: plan.id, dayID: day.id, version: plan.version, workout: workout)
+                                } label: {
+                                    Label(tr("Change workout", "Endre økt"), systemImage: "slider.horizontal.3")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(graphite)
+                                        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                                        .padding(.horizontal, 18)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                            }
                             if !completed && !skipped &&
                                planDayDate(day.dayIndex, plan: plan) >= Calendar.current.startOfDay(for: Date()) {
                                 Divider()
@@ -1233,15 +1342,13 @@ struct ATHLTHTrainPlanPremiumView: View {
                                 }
                             }
                             Button {
-                                openingWorkoutPlanID = plan.id
-                                openingWorkout = workout
+                                openingWorkout = WorkoutDestination(planID: plan.id, workout: workout)
                             } label: {
                                 Label(tr("Workout details", "Øktdetaljer"),
                                       systemImage: "info.circle")
                             }
                             Button {
-                                editingExistingWorkout = workout
-                                editingDayID = day.id
+                                editingWorkout = WorkoutEditDestination(planID: plan.id, dayID: day.id, version: plan.version, workout: workout)
                             } label: {
                                 Label(tr("Change workout", "Endre økten"),
                                       systemImage: "slider.horizontal.3")
@@ -1353,9 +1460,11 @@ struct ATHLTHTrainPlanPremiumView: View {
                     }
                 }
                 Button {
-                    showingEditor = true
+                    if let dayID = selectedDayID ?? week.days.sorted(by: { $0.dayIndex < $1.dayIndex }).first?.id {
+                        editingWorkout = WorkoutEditDestination(planID: plan.id, dayID: dayID, version: plan.version, workout: nil)
+                    }
                 } label: {
-                    Label(tr("Add workout to week", "Legg til økt i uken"),
+                    Label(tr("Add workout", "Legg til økt"),
                           systemImage: "plus.circle")
                         .font(.subheadline.weight(.medium))
                         .frame(maxWidth: .infinity, minHeight: 42)
@@ -1363,8 +1472,8 @@ struct ATHLTHTrainPlanPremiumView: View {
                 .buttonStyle(.bordered)
                 .tint(warmGold)
                 .accessibilityHint(tr(
-                    "Open the week editor to plan another workout",
-                    "Åpner ukeplanleggeren for å legge til en ny økt"
+                    "Choose the activity and exercises for this day",
+                    "Velg treningsform og øvelser for denne dagen"
                 ))
             }
         }
@@ -1416,8 +1525,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                     } else {
                         ForEach(day.sessions) { workout in
                             Button {
-                                openingWorkoutPlanID = plan.id
-                                openingWorkout = workout
+                                openingWorkout = WorkoutDestination(planID: plan.id, workout: workout)
                             } label: {
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack(spacing: 7) {
@@ -1475,6 +1583,8 @@ struct ATHLTHTrainPlanPremiumView: View {
                                             in: RoundedRectangle(cornerRadius: 9))
                                     }
                                 }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                         }
@@ -1484,12 +1594,12 @@ struct ATHLTHTrainPlanPremiumView: View {
                 .padding(.vertical, 3)
 
                 Button {
-                    editingDayID = day.id
+                    editingWorkout = WorkoutEditDestination(planID: plan.id, dayID: day.id, version: plan.version, workout: nil)
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(graphite)
-                        .frame(width: 30, height: 30)
+                        .frame(width: 44, height: 44)
                         .background(soft, in: Circle())
                 }
                 .buttonStyle(.plain)
@@ -1671,6 +1781,7 @@ private extension View {
             .overlay {
                 RoundedRectangle(cornerRadius: 17)
                     .stroke(line, lineWidth: 0.7)
+                    .allowsHitTesting(false)
             }
             .shadow(color: .black.opacity(0.035), radius: 9, y: 4)
     }

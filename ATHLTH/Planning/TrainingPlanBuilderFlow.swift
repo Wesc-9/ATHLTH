@@ -315,10 +315,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                if step == .source {
-                    sourceContinueBar
-                } else if step != .mode {
-                    bottomActionBar
+                if !showingCreatedPlan {
+                    if step == .source {
+                        sourceContinueBar
+                    } else if step != .mode {
+                        bottomActionBar
+                    }
                 }
             }
             .navigationDestination(
@@ -338,15 +340,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             ) {
                 if let createdPlanID {
                     ScrollView {
-                        if mode == .basic {
-                            ATHLTHTrainPlanPremiumView(highlightedPlanID: createdPlanID)
-                                .padding(.horizontal, 18)
-                                .padding(.vertical, 14)
-                        } else {
-                            AdvancedPlannerView(planID: createdPlanID)
-                                .padding(.horizontal, 18)
-                                .padding(.vertical, 14)
-                        }
+                        ATHLTHTrainPlanPremiumView(highlightedPlanID: createdPlanID)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 14)
                     }
                     .background(
                         ATHLTHPremiumCanvas(
@@ -355,22 +351,32 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     )
                     .navigationTitle(
                         ATHLTHLocalization.choose(
-                            english: mode == .basic ? "Your plan" : "Build your workouts",
-                            norwegian: mode == .basic ? "Planen din" : "Bygg treningsøktene"
+                            english: "Review your plan",
+                            norwegian: "Se over planen din"
                         )
                     )
                     .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button(
-                                ATHLTHLocalization.choose(
-                                    english: "Done",
-                                    norwegian: "Ferdig"
-                                )
-                            ) {
-                                dismiss()
+                    .safeAreaInset(edge: .bottom) {
+                        Button {
+                            onCreated?(createdPlanID)
+                            dismiss()
+                        } label: {
+                            HStack {
+                                Text(ATHLTHLocalization.choose(english: "Finish and open my plan", norwegian: "Fullfør og gå til planen min"))
+                                    .font(.headline)
+                                Spacer(minLength: 8)
+                                Image(systemName: "arrow.right")
                             }
+                            .foregroundStyle(.white)
+                            .padding(18)
+                            .frame(maxWidth: .infinity, minHeight: 58)
+                            .background(ATHLTHPlanDesign.ink, in: RoundedRectangle(cornerRadius: 18))
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 12)
+                        .background(.ultraThinMaterial)
                     }
                 }
             }
@@ -4803,7 +4809,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         createdPlanID = created.id
         completedPlanCreation = true
         draftStore.clear(userID: session.profile.userID)
-        onCreated?(created.id)
         showingCreatedPlan = true
     }
 }
