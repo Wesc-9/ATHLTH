@@ -1277,36 +1277,36 @@ struct PostWorkoutReviewView: View {
 
                     Spacer()
 
-                    Text(workout.source.uppercased())
-                        .font(.system(size: 9, weight: .bold))
-                        .tracking(1.2)
-                        .padding(.horizontal, 10)
-                        .frame(height: 28)
-                        .background(
-                            Color.white.opacity(0.12),
-                            in: Capsule()
-                        )
+                    Label(
+                        workout.isIndoor == true &&
+                        (workout.activity == .running || workout.activity == .walking)
+                            ? ATHLTHLocalization.choose(
+                                english: "TREADMILL", norwegian: "TREDEMØLLE")
+                            : workout.source.uppercased(),
+                        systemImage: workout.isIndoor == true &&
+                            workout.activity == .running
+                            ? "figure.run.treadmill" : workout.activity.icon
+                    )
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1.0)
+                    .padding(.horizontal, 11)
+                    .frame(height: 29)
+                    .background(Color.black.opacity(0.29), in: Capsule())
                 }
 
                 Spacer()
 
-                Text(completionActivityTitle)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(
-                        Color.white.opacity(0.70)
-                    )
-                    .padding(.bottom, 4)
-
-                Text(completionWorkoutTitle)
-                    .font(
-                        .system(
-                            size: 31,
-                            weight: .bold,
-                            design: .rounded
-                        )
-                    )
+                Text(heroHeadline)
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
                     .lineLimit(2)
-                    .minimumScaleFactor(0.74)
+                    .minimumScaleFactor(0.72)
+
+                Text(heroSubtitle)
+                    .font(.system(size: 20, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.white.opacity(0.93))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .padding(.top, 5)
 
                 Text(
                     workout.startDate.formatted(
@@ -1323,7 +1323,7 @@ struct PostWorkoutReviewView: View {
             .foregroundStyle(.white)
             .padding(20)
         }
-        .frame(height: 224)
+        .frame(height: 225)
         .clipShape(
             RoundedRectangle(
                 cornerRadius: 30,
@@ -1345,6 +1345,33 @@ struct PostWorkoutReviewView: View {
             radius: 22,
             y: 12
         )
+    }
+
+    private var heroHeadline: String {
+        if workout.isIndoor == true, workout.activity == .running {
+            return ATHLTHLocalization.choose(
+                english: "Indoor running", norwegian: "Løping innendørs")
+        }
+        if workout.isIndoor == true, workout.activity == .walking {
+            return ATHLTHLocalization.choose(
+                english: "Indoor walking", norwegian: "Gange innendørs")
+        }
+        return completionWorkoutTitle
+    }
+
+    private var heroSubtitle: String {
+        if workout.isIndoor == true,
+           workout.activity == .running || workout.activity == .walking {
+            let trimmed = workout.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty || trimmed == "iPhone Run" ||
+                trimmed == "iPhone Walk" || trimmed == "Running" ||
+                trimmed == "Walking" {
+                return ATHLTHLocalization.choose(
+                    english: "Treadmill", norwegian: "Tredemølle")
+            }
+            return trimmed
+        }
+        return completionActivityTitle
     }
 
     private var completionActivityTitle: String {
@@ -1395,7 +1422,16 @@ struct PostWorkoutReviewView: View {
 
     @ViewBuilder
     private var summaryBackground: some View {
-        if (workout.activity == .running ||
+        if workout.isIndoor == true,
+           workout.activity == .running || workout.activity == .walking {
+            Image("TreadmillRecentCardHero")
+                .resizable()
+                .scaledToFill()
+                .athlthBoundedFill()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+
+        } else if (workout.activity == .running ||
                 workout.activity == .walking),
            completionRoute.count >= 2 {
             Map(
