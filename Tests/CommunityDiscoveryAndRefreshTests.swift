@@ -1,7 +1,7 @@
 import XCTest
 @testable import ATHLTH
 
-final class CommunityDiscoveryPolicyTests: XCTestCase {
+final class CommunityDiscoveryAndRefreshSearchTests: XCTestCase {
     func testAllCategoryVariantsAndIdentifiersAreStable() {
         XCTAssertEqual(ATHLTHCommunityDiscoveryCategory.allCases.map(\.rawValue), [
             "all", "clubs", "events", "challenges",
@@ -31,7 +31,7 @@ final class CommunityDiscoveryPolicyTests: XCTestCase {
     }
 }
 
-final class CommunityRefreshPolicyTests: XCTestCase {
+final class CommunityDiscoveryAndRefreshNoticeTests: XCTestCase {
     func testOnlyFailedAreaAppearsInMessage() {
         let areas = ATHLTHCommunityRefreshPolicy.failedAreas(
             events: false, clubs: true, weekly: false,
