@@ -794,6 +794,9 @@ struct WatchRunningWorkoutStep: Identifiable, Codable, Hashable {
     var phase: String? = nil
     var targetHeartRateZone: Int? = nil
     var ghostPaceSecondsPerKilometer: Double? = nil
+    /// Optional on old Watch transfers. In recovery the pacer follows actual
+    /// reduced speed without imposing a work-pace target.
+    var ghostFollowsRecovery: Bool? = nil
     var coachBrief: String? = nil
 }
 
