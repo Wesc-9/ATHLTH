@@ -149,40 +149,39 @@ struct PlannedWorkoutWatchBuilder {
         from template: RunningWorkoutTemplate
     ) -> [WatchRunningWorkoutStep] {
         template.blocks.flatMap { block in
-            let repetitions = max(block.repetitions, 1)
-            var result: [WatchRunningWorkoutStep] = []
+            let count = max(block.repetitions, 1)
+            var steps: [WatchRunningWorkoutStep] = []
 
-            for repetition in 0..<repetitions {
+            for position in 1...count {
+                let resolved = block.resolvedWork(at: position)
+                let override = block.override(for: position)
+                let title = override?.notes.flatMap { $0.isEmpty ? nil : $0 }
+                    ?? (count > 1 ? "\(block.title) \(position)/\(count)" : block.title)
                 let working = block.kind == .work
-                result.append(
-                    runningStep(
-                        title: repetitions > 1
-                            ? "\(block.title) \(repetition + 1)/\(repetitions)"
-                            : block.title,
-                        target: block.work,
-                        phase: block.kind.rawValue,
-                        ghostPace: working ? template.intervalGhostPaceSecondsPerKilometer : nil,
-                        coachBrief: working ? template.coachBrief : nil
-                    )
-                )
+                steps.append(runningStep(
+                    title: title, target: resolved,
+                    phase: block.kind.rawValue,
+                    ghostPace: working ? template.intervalGhostPaceSecondsPerKilometer : nil,
+                    coachBrief: working ? template.coachBrief : nil
+                ))
 
-                // Skip the recovery after the final effort; the cooldown
-                // starts immediately. Recovery never receives a Ghost pacer.
-                if repetition < repetitions - 1,
-                   let recovery = block.recovery {
-                    result.append(
-                        runningStep(
-                            title: ATHLTHLocalization.choose(
-                                english: "Recovery", norwegian: "Pause"
-                            ),
-                            target: recovery,
-                            phase: RunningBlockKind.recovery.rawValue
-                        )
-                    )
+                if let recovery = block.resolvedRecovery(after: position) {
+                    steps.append(runningStep(
+                        title: ATHLTHLocalization.choose(
+                            english: "Recovery \(position)",
+                            norwegian: "Pause \(position)"
+                        ),
+                        target: recovery,
+                        phase: RunningBlockKind.recovery.rawValue,
+                        ghostPace: template.intervalGhostFollowRecovery == true
+                            ? template.intervalGhostPaceSecondsPerKilometer : nil,
+                        ghostFollowsRecovery:
+                            template.intervalGhostFollowRecovery == true &&
+                            template.intervalGhostPaceSecondsPerKilometer != nil
+                    ))
                 }
             }
-
-            return result
+            return steps
         }
     }
 
@@ -191,6 +190,7 @@ struct PlannedWorkoutWatchBuilder {
         target: RunningStepTarget,
         phase: String,
         ghostPace: Double? = nil,
+        ghostFollowsRecovery: Bool? = nil,
         coachBrief: String? = nil
     ) -> WatchRunningWorkoutStep {
         let measure: WatchRunningStepMeasure
@@ -206,13 +206,12 @@ struct PlannedWorkoutWatchBuilder {
             distanceMeters: target.distanceMeters,
             durationSeconds: target.durationSeconds,
             intensityText: runningIntensityText(target.intensity),
-            targetPaceMinSecondsPerKilometer:
-                target.intensity.paceMinSecondsPerKilometer,
-            targetPaceMaxSecondsPerKilometer:
-                target.intensity.paceMaxSecondsPerKilometer,
+            targetPaceMinSecondsPerKilometer: target.intensity.paceMinSecondsPerKilometer,
+            targetPaceMaxSecondsPerKilometer: target.intensity.paceMaxSecondsPerKilometer,
             phase: phase,
             targetHeartRateZone: target.intensity.heartRateZone,
             ghostPaceSecondsPerKilometer: ghostPace,
+            ghostFollowsRecovery: ghostFollowsRecovery,
             coachBrief: coachBrief
         )
     }
