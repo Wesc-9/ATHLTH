@@ -115,80 +115,97 @@ enum ATHLTHRouteGuidanceEngine {
         routeLocations: [CLLocation],
         cumulativeMeters: [Double],
         geometryTotalMeters: Double,
-        advertisedDistanceMeters: Double?
+        advertisedDistanceMeters: Double?,
+        workoutDistanceMeters: Double? = nil,
+        previousRouteMeters: Double? = nil
     ) -> ATHLTHRouteGuidanceState? {
         guard routeLocations.count >= 2,
-              cumulativeMeters.count == routeLocations.count
+              cumulativeMeters.count == routeLocations.count,
+              geometryTotalMeters.isFinite, geometryTotalMeters > 0
         else {
             return nil
         }
 
-        var nearestIndex = 0
-        var nearestDistance =
-            Double.greatestFiniteMagnitude
+        // A route can return to its start or cross itself. Geographical
+        // proximity alone MUST NOT choose the finish when the workout has
+        // just begun. Real workout distance anchors us near the beginning
+        // and only makes later route segments eligible as we run.
+        let measuredWorkoutDistance = workoutDistanceMeters.flatMap {
+            $0.isFinite && $0 >= 0 ? $0 : nil
+        }
+        let progressTolerance: Double
+        let forwardLimit: Double
+        if let measuredWorkoutDistance {
+            progressTolerance = max(75, min(measuredWorkoutDistance * 0.10, 180))
+            forwardLimit = min(
+                geometryTotalMeters,
+                measuredWorkoutDistance + progressTolerance
+            )
+        } else {
+            // Preserve previous callers that don't have workout distance.
+            progressTolerance = geometryTotalMeters
+            forwardLimit = geometryTotalMeters
+        }
 
-        for (index, point) in
-            routeLocations.enumerated()
-        {
-            let distance =
-                location.distance(from: point)
+        let stablePrevious = previousRouteMeters.flatMap {
+            $0.isFinite && $0 >= 0 && $0 <= forwardLimit + 75
+                ? $0 : nil
+        }
+        // Allow small backward corrections from GPS jitter without switching
+        // to an earlier pass through a crossing or a nearby parallel road.
+        let backwardLimit = stablePrevious.map {
+            max(0, $0 - 85)
+        } ?? 0
 
-            if distance < nearestDistance {
+        var nearestIndex: Int?
+        var nearestDistance = Double.greatestFiniteMagnitude
+        var bestScore = Double.greatestFiniteMagnitude
+
+        for (index, point) in routeLocations.enumerated() {
+            let routeMeters = cumulativeMeters[index]
+            guard routeMeters.isFinite,
+                  routeMeters >= backwardLimit,
+                  routeMeters <= forwardLimit else {
+                continue
+            }
+
+            let distance = location.distance(from: point)
+            guard distance.isFinite else { continue }
+
+            // At self-intersections, prefer the part of the route consistent
+            // with measured workout progress; preserve visual GPS proximity
+            // as the dominant signal elsewhere.
+            let progressPenalty = measuredWorkoutDistance.map {
+                abs(routeMeters - min($0, geometryTotalMeters)) * 0.12
+            } ?? 0
+            let continuityPenalty = stablePrevious.map {
+                abs(routeMeters - $0) * 0.015
+            } ?? 0
+            let score = distance + progressPenalty + continuityPenalty
+
+            if score < bestScore {
+                bestScore = score
                 nearestDistance = distance
                 nearestIndex = index
             }
         }
 
-        let geometryTotal =
-            max(geometryTotalMeters, 1)
-        let traveledAlongRoute =
-            cumulativeMeters[nearestIndex]
-        let progress =
-            min(
-                max(
-                    traveledAlongRoute /
-                        geometryTotal,
-                    0
-                ),
-                1
-            )
-        let routeTotal =
-            max(
-                advertisedDistanceMeters ?? 0,
-                0
-            )
-        let effectiveTotal =
-            routeTotal > 0
-                ? routeTotal
-                : geometryTotal
+        guard let nearestIndex else { return nil }
+
+        let geometryTotal = max(geometryTotalMeters, 1)
+        let traveledAlongRoute = cumulativeMeters[nearestIndex]
+        let progress = min(max(traveledAlongRoute / geometryTotal, 0), 1)
+        let routeTotal = max(advertisedDistanceMeters ?? 0, 0)
+        let effectiveTotal = routeTotal > 0 ? routeTotal : geometryTotal
 
         return ATHLTHRouteGuidanceState(
-            progressPercent:
-                progress * 100,
-            remainingMeters:
-                max(
-                    effectiveTotal *
-                        (1 - progress),
-                    0
-                ),
-            deviationMeters:
-                max(nearestDistance, 0),
-            traveledAlongRouteMeters:
-                max(traveledAlongRoute, 0),
-            distanceToStartMeters:
-                location.distance(
-                    from:
-                        routeLocations[0]
-                ),
-            distanceToFinishMeters:
-                location.distance(
-                    from:
-                        routeLocations[
-                            routeLocations.count - 1
-                        ]
-                ),
-            nearestRoutePointIndex:
-                nearestIndex
+            progressPercent: progress * 100,
+            remainingMeters: max(effectiveTotal * (1 - progress), 0),
+            deviationMeters: max(nearestDistance, 0),
+            traveledAlongRouteMeters: max(traveledAlongRoute, 0),
+            distanceToStartMeters: location.distance(from: routeLocations[0]),
+            distanceToFinishMeters: location.distance(from: routeLocations[routeLocations.count - 1]),
+            nearestRoutePointIndex: nearestIndex
         )
     }
 
