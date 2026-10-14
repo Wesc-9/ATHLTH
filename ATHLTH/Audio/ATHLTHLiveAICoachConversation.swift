@@ -35,6 +35,7 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
     private var waitingAudio: [Data] = []
     private var senderTask: Task<Void, Never>?
     private var generation = UUID()
+    private var ownsAudioSession = false
 
     func start(
         microphoneConsent: Bool,
@@ -52,6 +53,7 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
         }
 
         state = .connecting
+        lastTranscript = nil
         let sessionID = UUID()
         generation = sessionID
         let permission = await withCheckedContinuation { continuation in
@@ -95,12 +97,13 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
             // A session is never left listening indefinitely. Network loss,
             // navigation away or app background also stops capture.
             readerTask = Task { [weak self] in
-                await self?.receiveEvents(for: sessionID)
+                guard let self else { return }
+                await self.receiveEvents(for: sessionID)
             }
             expiryTask = Task { [weak self] in
                 try? await Task.sleep(for: .seconds(300))
-                guard !Task.isCancelled else { return }
-                self?.stop()
+                guard !Task.isCancelled, let self else { return }
+                self.stop()
             }
         } catch {
             guard generation == sessionID else { return }
@@ -196,6 +199,7 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
             options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers]
         )
         try session.setActive(true)
+        ownsAudioSession = true
 
         let engine = AVAudioEngine()
         let player = AVAudioPlayerNode()
@@ -275,7 +279,8 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
         waitingAudio.append(data)
         guard senderTask == nil else { return }
         senderTask = Task { [weak self] in
-            await self?.sendQueuedAudio()
+            guard let self else { return }
+            await self.sendQueuedAudio()
         }
     }
 
@@ -351,9 +356,13 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
         outputPlayer?.stop()
         outputPlayer = nil
         audioEngine = nil
-        try? AVAudioSession.sharedInstance().setActive(
-            false, options: .notifyOthersOnDeactivation
-        )
+        if ownsAudioSession {
+            ownsAudioSession = false
+            try? AVAudioSession.sharedInstance().setActive(
+                false, options: .notifyOthersOnDeactivation
+            )
+        }
+        lastTranscript = nil
         state = .idle
     }
 

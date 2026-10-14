@@ -1,6 +1,6 @@
 # ATHLTH Live AI Coach — phase 1 security foundation
 
-**Status:** Backend token issuer and iPhone token client code only. There is **no microphone connection, audio chat UI, WebRTC transport, deployment or TestFlight release** in this change. Standard offline Audio Coach continues without AI.
+**Status (phase 2):** Added an opt-in live-workout conversation view and an initial native AVAudioEngine/WebSocket transport for iPhone. Microphone handling, PCM audio and response playback are implemented in source, but **hardware validation, latency testing, billing approval and deployment are still outstanding**. The new server function remains **disabled by default**. Standard offline Audio Coach continues without AI.
 
 ## Safeguards before enabling
 
@@ -11,9 +11,12 @@
 - A short-lived provider secret (120 seconds to begin the conversation) is returned after auth. The upstream API key never leaves the backend.
 - No HealthKit/route/location metrics are submitted to OpenAI by this phase. Do not describe this as a live data-aware coach yet.
 - Validate audio session lifetime/spending, interruption rules, offline fallback, AirPods/Spotify ducking, microphone stop, and app foreground/background behavior before exposing it.
-- For future realtime voice transport use WebRTC on iOS with the ephemeral credential. Restore offline voice announcements when conversation is closed, so users do not hear two coaches.
+- Phase 2 uses native WebSocket streaming with PCM16 24 kHz, explicitly started/stopped by the user; the app resumes its prior offline Audio Coach mute state when conversation ends. Assess WebRTC before production release for more robust network jitter handling, audio playback interruption and AirPods/mixed-audio behavior.
 - Apple Watch should act as a remote controller first; keep the iPhone as audio host. Do not put a long-lived provider key or session token in WatchConnectivity payloads.
 - Add a real live-status tool only when it can return fresh, user-consented telemetry, explicitly identified as unverified when no fresh measurements are available.
+- iPhone conversation screen is only reachable from an active workout, requests both consent toggles and native microphone permission, stops on dismissal/background, and limits conversations to five minutes on the client.
+- A client time limit is **not** a server-enforced usage cap. Confirm backend provider spending controls and server-side session termination/accounting before enabling the feature for customers.
+- No watch microphone or remote controls are implemented in this phase.
 
 ## Environment
 
