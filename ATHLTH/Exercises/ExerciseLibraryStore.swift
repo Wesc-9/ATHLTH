@@ -184,6 +184,15 @@ final class ExerciseLibraryStore: ObservableObject {
     private var cachedBodyParts: [String]?
     private var cachedEquipmentOptions: [String]?
 
+    private struct SearchRequest: Equatable {
+        let query: String
+        let bodyPart: String?
+        let equipment: String?
+    }
+    private var cachedSearchText: [UUID: String] = [:]
+    private var lastSearchRequest: SearchRequest?
+    private var lastSearchResults: [ExerciseLibraryEntry] = []
+
     init() {
         loadCachedRepDB()
     }
@@ -562,6 +571,9 @@ final class ExerciseLibraryStore: ObservableObject {
         cachedAllExercises = nil
         cachedBodyParts = nil
         cachedEquipmentOptions = nil
+        cachedSearchText = [:]
+        lastSearchRequest = nil
+        lastSearchResults = []
     }
 
     /// Bundled exercises are available immediately and require no network connection.
@@ -581,7 +593,11 @@ final class ExerciseLibraryStore: ObservableObject {
                      locale: Locale(identifier: "nb_NO"))
             .lowercased()
 
-        return allExercises.filter { entry in
+        let request = SearchRequest(query: cleanQuery, bodyPart: bodyPart, equipment: equipment)
+        if lastSearchRequest == request { return lastSearchResults }
+        let queryTokens = cleanQuery.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+
+        let matches = allExercises.filter { entry in
             // Third-party cached items are retained for old workout IDs,
             // never shown as new choices or fetched from the network.
             guard entry.source != .repDB else { return false }
@@ -589,28 +605,29 @@ final class ExerciseLibraryStore: ObservableObject {
             if cleanQuery.isEmpty {
                 matchesText = true
             } else {
-                let haystack = [
-                    entry.exercise.searchNames.joined(separator: " "),
-                    entry.summary ?? "",
-                    entry.bodyPart ?? "",
-                    entry.exercise.primaryMuscles.joined(separator: " "),
-                    entry.exercise.secondaryMuscles.joined(separator: " "),
-                    entry.exercise.equipment.joined(separator: " "),
-                    Self.searchableNorwegianTerms(
-                        sourceIdentifier: entry.sourceIdentifier,
-                        bodyPart: entry.bodyPart,
-                        primaryMuscles: entry.exercise.primaryMuscles
-                    )
-                ]
-                .joined(separator: " ")
-                .folding(options: [.diacriticInsensitive, .caseInsensitive],
-                         locale: Locale(identifier: "nb_NO"))
-                .lowercased()
-
-                let queryTokens =
-                    cleanQuery
-                        .split(whereSeparator: { $0.isWhitespace })
-                        .map(String.init)
+                let haystack: String
+                if let cached = cachedSearchText[entry.id] {
+                    haystack = cached
+                } else {
+                    haystack = [
+                        entry.exercise.searchNames.joined(separator: " "),
+                        entry.summary ?? "",
+                        entry.bodyPart ?? "",
+                        entry.exercise.primaryMuscles.joined(separator: " "),
+                        entry.exercise.secondaryMuscles.joined(separator: " "),
+                        entry.exercise.equipment.joined(separator: " "),
+                        Self.searchableNorwegianTerms(
+                            sourceIdentifier: entry.sourceIdentifier,
+                            bodyPart: entry.bodyPart,
+                            primaryMuscles: entry.exercise.primaryMuscles
+                        )
+                    ]
+                    .joined(separator: " ")
+                    .folding(options: [.diacriticInsensitive, .caseInsensitive],
+                             locale: Locale(identifier: "nb_NO"))
+                    .lowercased()
+                    cachedSearchText[entry.id] = haystack
+                }
 
                 matchesText =
                     queryTokens.allSatisfy {
@@ -630,6 +647,9 @@ final class ExerciseLibraryStore: ObservableObject {
 
             return matchesText && matchesBodyPart && matchesEquipment
         }
+        lastSearchRequest = request
+        lastSearchResults = matches
+        return matches
     }
 
     func createCustomExercise(

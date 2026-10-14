@@ -1096,6 +1096,7 @@ struct AppRootView: View {
             HomeActivityRouteSnapshotRendererV2
                 .shared
                 .clearCache()
+            RouteMapSnapshotCache.clearCache()
         }
         )
     }
@@ -1570,6 +1571,7 @@ struct AppRootView: View {
             syncHomeAssistantWatchConfiguration()
             ATHLTHSurfaceCoordinator.clearAccountSurfaces()
             ATHLTHArtworkImage.clearRemoteCache()
+            RouteMapSnapshotCache.clearCache()
             workoutCompletion.switchAccount(userID)
             phoneWorkout.switchAccount(userID)
             trainingBackups.switchAccount(userID)

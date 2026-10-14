@@ -3,19 +3,27 @@ import SwiftUI
 import UIKit
 
 @MainActor
-private enum RouteMapSnapshotCache {
-    static let images =
-        NSCache<NSString, UIImage>()
+enum RouteMapSnapshotCache {
+    private static let images: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.countLimit = 12
+        cache.totalCostLimit = 12 * 1_024 * 1_024
+        return cache
+    }()
+
+    private static var generation: UInt64 = 0
+
+    static func clearCache() {
+        generation &+= 1
+        images.removeAllObjects()
+    }
 
     static func image(
         for route: TrainingRoute,
-        size: CGSize
+        size: CGSize,
+        requestID: String
     ) async -> UIImage? {
-        let key =
-            cacheKey(
-                route: route,
-                size: size
-            ) as NSString
+        let key = requestID as NSString
 
         if let cached =
             images.object(
@@ -24,6 +32,7 @@ private enum RouteMapSnapshotCache {
             return cached
         }
 
+        let requestedGeneration = generation
         let coordinates =
             route.coordinates
                 .sorted {
@@ -58,6 +67,7 @@ private enum RouteMapSnapshotCache {
                 )
                 .start()
 
+            guard !Task.isCancelled else { return nil }
             let rendered =
                 drawRoute(
                     coordinates,
@@ -65,56 +75,18 @@ private enum RouteMapSnapshotCache {
                     size: size
                 )
 
-            images.setObject(
-                rendered,
-                forKey: key,
-                cost:
-                    Int(
-                        size.width *
-                        size.height *
-                        options.scale *
-                        options.scale
-                    )
-            )
+            if requestedGeneration == generation {
+                images.setObject(
+                    rendered,
+                    forKey: key,
+                    cost: rendered.cgImage.map { $0.bytesPerRow * $0.height } ?? 0
+                )
+            }
 
             return rendered
         } catch {
             return nil
         }
-    }
-
-    private static func cacheKey(
-        route: TrainingRoute,
-        size: CGSize
-    ) -> String {
-        let first =
-            route.coordinates.first
-        let last =
-            route.coordinates.last
-
-        return [
-            route.id.uuidString,
-            String(route.coordinates.count),
-            String(
-                format: "%.5f",
-                first?.latitude ?? 0
-            ),
-            String(
-                format: "%.5f",
-                first?.longitude ?? 0
-            ),
-            String(
-                format: "%.5f",
-                last?.latitude ?? 0
-            ),
-            String(
-                format: "%.5f",
-                last?.longitude ?? 0
-            ),
-            String(Int(size.width)),
-            String(Int(size.height))
-        ]
-        .joined(separator: "-")
     }
 
     private static func region(
@@ -332,9 +304,14 @@ struct RouteMapSnapshotThumbnail: View {
 
     @State private var image:
         UIImage?
+    @State private var imageRequestID: String?
 
     var body: some View {
         GeometryReader { proxy in
+            let size = CGSize(width: max(proxy.size.width, 220), height: height)
+            let requestID = RouteMapSnapshotIdentity.key(
+                route: route, size: size, scale: UIScreen.main.scale
+            )
             ZStack {
                 RoundedRectangle(
                     cornerRadius: 18,
@@ -345,7 +322,7 @@ struct RouteMapSnapshotThumbnail: View {
                         .surfaceStone
                 )
 
-                if let image {
+                if imageRequestID == requestID, let image {
                     Image(
                         uiImage: image
                     )
@@ -392,48 +369,18 @@ struct RouteMapSnapshotThumbnail: View {
                     lineWidth: 0.8
                 )
             }
-            .task(
-                id: snapshotID(
-                    width:
-                        proxy.size.width
+            .task(id: requestID) {
+                guard proxy.size.width > 20 else { return }
+                let loaded = await RouteMapSnapshotCache.image(
+                    for: route, size: size, requestID: requestID
                 )
-            ) {
-                guard image == nil,
-                      proxy.size.width > 20
-                else {
-                    return
-                }
-
-                image =
-                    await RouteMapSnapshotCache
-                        .image(
-                            for: route,
-                            size:
-                                CGSize(
-                                    width:
-                                        max(
-                                            proxy
-                                                .size
-                                                .width,
-                                            220
-                                        ),
-                                    height:
-                                        height
-                                )
-                        )
+                guard !Task.isCancelled else { return }
+                image = loaded
+                imageRequestID = requestID
             }
         }
         .frame(height: height)
         .accessibilityHidden(true)
     }
 
-    private func snapshotID(
-        width: CGFloat
-    ) -> String {
-        route.id.uuidString +
-        "-" +
-        String(route.coordinates.count) +
-        "-" +
-        String(Int(width))
-    }
 }

@@ -112,11 +112,12 @@ struct ExerciseLibraryView: View {
         }
     }
 
-    private var firstExerciseIDByLetter:
-        [String: UUID] {
+    private func firstExerciseIDByLetter(
+        in entries: [ExerciseLibraryEntry]
+    ) -> [String: UUID] {
         var firstIDs: [String: UUID] = [:]
 
-        for entry in displayedResults {
+        for entry in entries {
             let letter =
                 exerciseIndexLetter(
                     for: entry.name
@@ -176,7 +177,9 @@ struct ExerciseLibraryView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        // Reuse one filtered/sorted list for empty state, rows and alphabet targets.
+        let entries = displayedResults
+        return VStack(spacing: 0) {
             if source == nil {
                 ATHLTHPremiumSegmentedControl(
                     titles:
@@ -298,7 +301,7 @@ struct ExerciseLibraryView: View {
                     english: "Loading exercises…", norwegian: "Laster øvelser…"
                 ))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if results.isEmpty {
+            } else if entries.isEmpty {
                 if selectedSection == .mine && query.isEmpty {
                     ContentUnavailableView {
                         Label("No custom exercises yet", systemImage: "dumbbell")
@@ -327,7 +330,7 @@ struct ExerciseLibraryView: View {
                     ScrollView {
                         LazyVStack(spacing: 10) {
                             ForEach(
-                                displayedResults
+                                entries
                             ) { entry in
                                 ZStack(
                                     alignment:
@@ -453,7 +456,8 @@ struct ExerciseLibraryView: View {
                             )
                             .isEmpty {
                             exerciseAlphabetIndex(
-                                proxy: proxy
+                                proxy: proxy,
+                                entries: entries
                             )
                             .padding(.trailing, 4)
                         }
@@ -502,10 +506,10 @@ struct ExerciseLibraryView: View {
     }
 
     private func exerciseAlphabetIndex(
-        proxy: ScrollViewProxy
+        proxy: ScrollViewProxy,
+        entries: [ExerciseLibraryEntry]
     ) -> some View {
-        let targets =
-            firstExerciseIDByLetter
+        let targets = firstExerciseIDByLetter(in: entries)
 
         return VStack(spacing: 0) {
             ForEach(

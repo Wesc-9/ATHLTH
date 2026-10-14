@@ -1378,7 +1378,8 @@ final class IPhoneWorkoutStore:
         manager.distanceFilter = 5
         resetRouteRuntime()
         persistActiveCheckpoint(force: true)
-        persistHistory()
+        // completedHistory was already encoded and written before clearing active.
+        ATHLTHTrainingDataChangeSignal.post(userID: userID)
 
         if workout
             .audioCoachConfiguration?
