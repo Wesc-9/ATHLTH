@@ -51,7 +51,7 @@ Deno.serve(async (request: Request) => {
   if (entitlementError) return reply({ error: "Entitlement temporarily unavailable" }, 503);
   const now = Date.now();
   const validUntil = (value: unknown) => typeof value === "string" && Date.parse(value) > now;
-  const subscribed = entitlement?.tier === "plus" &&
+  const subscribed = entitlement?.tier === "athlth_plus" &&
     ((entitlement.status === "active" &&
         (entitlement.current_period_ends_at == null || validUntil(entitlement.current_period_ends_at))) ||
       (entitlement.status === "trialing" && validUntil(entitlement.trial_ends_at)));
