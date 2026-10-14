@@ -39,6 +39,8 @@ struct GhostFriendRaceHubView: View {
     @State private var selectedPlannedRoute: TrainingRoute?
     @State private var courseMode: GhostFriendCourseMode = .previousWorkout
     @State private var targetTimeText = "40:00"
+    @AppStorage("athlth.ghostRace.live.advancedMode")
+    private var advancedMode = false
     @State private var showingRoutePicker = false
     @State private var loadingRuns = false
     @State private var sending = false
@@ -99,11 +101,15 @@ struct GhostFriendRaceHubView: View {
 
     var body: some View {
         List {
-            Section {
-                privacyCard
+            if advancedMode {
+                Section {
+                    privacyCard
+                }
             }
 
-            Section("Incoming") {
+            Section(ATHLTHLocalization.choose(
+                english: "Incoming", norwegian: "Mottatte invitasjoner"
+            )) {
                 if friendRaces.incoming.isEmpty {
                     Text("No active Ghost Race invites.")
                         .foregroundStyle(.secondary)
@@ -114,7 +120,9 @@ struct GhostFriendRaceHubView: View {
                 }
             }
 
-            Section("Challenge a friend") {
+            Section(ATHLTHLocalization.choose(
+                english: "Invite a friend", norwegian: "Inviter en venn"
+            )) {
                 if social.mutualFollows.isEmpty {
                     ContentUnavailableView(
                         "No friends yet",
@@ -137,17 +145,19 @@ struct GhostFriendRaceHubView: View {
                         }
                     }
 
-                    Picker(
-                        ATHLTHLocalization.choose(
-                            english: "Course source", norwegian: "Velg grunnlag"
-                        ),
-                        selection: $courseMode
-                    ) {
-                        ForEach(GhostFriendCourseMode.allCases) { option in
-                            Text(option.title).tag(option)
+                    if advancedMode && agreedArenaRouteID == nil {
+                        Picker(
+                            ATHLTHLocalization.choose(
+                                english: "Course source", norwegian: "Velg grunnlag"
+                            ),
+                            selection: $courseMode
+                        ) {
+                            ForEach(GhostFriendCourseMode.allCases) { option in
+                                Text(option.title).tag(option)
+                            }
                         }
+                        .pickerStyle(.segmented)
                     }
-                    .pickerStyle(.segmented)
 
                     if courseMode == .previousWorkout {
                         Picker(
@@ -176,12 +186,14 @@ struct GhostFriendRaceHubView: View {
                             )
                         }
 
-                        Text(ATHLTHLocalization.choose(
-                            english: "The selected run's GPS course and pace are used as the reference. You choose whether to share it.",
-                            norwegian: "GPS-løypen og tiden fra den valgte økten brukes som grunnlag. Du velger selv om du vil dele."
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        if advancedMode {
+                            Text(ATHLTHLocalization.choose(
+                                english: "The selected GPS run is used as the reference. You choose whether to send it.",
+                                norwegian: "Den valgte GPS-økten brukes som grunnlag. Du bestemmer om den skal sendes."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
 
                         if arenaRoundID != nil {
                             Label(
@@ -265,6 +277,18 @@ struct GhostFriendRaceHubView: View {
                         .foregroundStyle(.secondary)
                     }
 
+                    if !advancedMode {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Only a reduced GPS reference is shared.",
+                                norwegian: "Bare en forenklet GPS-referanse deles."
+                            ),
+                            systemImage: "lock.shield"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+
                     Button {
                         Task {
                             await sendChallenge()
@@ -309,21 +333,27 @@ struct GhostFriendRaceHubView: View {
                 }
             }
 
-            Section {
-                NavigationLink {
-                    ChallengeCreationView()
-                } label: {
-                    Label(
-                        "Create a standard challenge",
-                        systemImage: "trophy.fill"
-                    )
-                }
+            if advancedMode {
+                Section {
+                    NavigationLink {
+                        ChallengeCreationView()
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Create a standard challenge",
+                                norwegian: "Opprett en vanlig utfordring"
+                            ),
+                            systemImage: "trophy.fill"
+                        )
+                    }
 
-                Text(
-                    "Standard challenges still support distance, route and verification rules. Ghost Race is the live head-to-head mode."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Standard challenges have separate distance, route and verification rules.",
+                        norwegian: "Vanlige utfordringer har egne regler for distanse, rute og verifisering."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
             }
         }
         .navigationTitle(ATHLTHLocalization.choose(
