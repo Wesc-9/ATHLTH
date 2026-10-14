@@ -87,7 +87,9 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         latestVoiceLeaseRequestID = nil
         lastVoiceLeaseOfferAt = nil
         voiceLeaseAcknowledgedUntil = nil
-        iPhoneAudioCoach.suspendForWatchFallback()
+        if !aiConversationActive {
+            iPhoneAudioCoach.suspendForWatchFallback()
+        }
     }
 
     private func offerVoiceLeaseIfNeeded(
@@ -176,7 +178,9 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
                   !self.hasAcknowledgedVoiceLease
             else { return }
             self.voiceLeaseAcknowledgedUntil = nil
-            self.iPhoneAudioCoach.suspendForWatchFallback()
+            if !self.aiConversationActive {
+                self.iPhoneAudioCoach.suspendForWatchFallback()
+            }
         }
 
         if !wasActive {
@@ -537,7 +541,8 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
 
         if iPhoneAudioCoachAttached {
             if aiConversationActive {
-                iPhoneAudioCoach.suspendForWatchFallback()
+                // Already muted when AI conversation began. Never deactivate
+                // the audio session again while AI uses the microphone.
             } else if latestSnapshot.supportsAudioCoachVoiceLease != true {
                 // Preserve the pre-lease phone speech path while the
                 // paired Watch app is still on an older build.
