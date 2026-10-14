@@ -138,7 +138,8 @@ enum GhostTargetPaceFormatter {
         guard parts.count == 2,
               let minutes = Int(parts[0]),
               let seconds = Int(parts[1]),
-              minutes >= 0, seconds >= 0, seconds < 60 else { return nil }
+              minutes >= 0, minutes <= 30,
+              seconds >= 0, seconds < 60 else { return nil }
         let value = Double(minutes * 60 + seconds)
         return (120...1_800).contains(value) ? value : nil
     }
@@ -264,7 +265,8 @@ enum GhostTargetRouteEligibility {
         let coordinates = route.coordinates.sorted {
             $0.sequence < $1.sequence
         }
-        guard coordinates.count >= 2 else { return false }
+        guard coordinates.count >= 2,
+              route.distanceKilometers.isFinite else { return false }
 
         var previous: CLLocation?
         var totalMeters = 0.0
@@ -359,13 +361,17 @@ struct TargetGhostSetupView: View {
         let sharedTime = suggestedDurationSeconds.flatMap { seconds -> Double? in
             seconds.isFinite && (60...86_400).contains(seconds) ? seconds : nil
         }
-        let rawSuggestion =
-            sharedTime ??
+        let distanceBasedSuggestion: TimeInterval =
+            route.distanceKilometers.isFinite &&
+            route.distanceKilometers > 0
+            ? min(max(route.distanceKilometers * 330, 300), 86_400)
+            : 1_800
+        let rawSuggestion = sharedTime ??
             route.expectedTravelTimeSeconds ??
-            max(route.distanceKilometers * 330, 5 * 60)
+            distanceBasedSuggestion
         let suggested = rawSuggestion.isFinite
             ? min(max(rawSuggestion.rounded(), 60), 86_400)
-            : max(min(route.distanceKilometers * 330, 86_400), 300)
+            : distanceBasedSuggestion
 
         self.suggestedBaselineDuration = suggested
         self.routeReady = GhostTargetRouteEligibility.isUsable(route)
@@ -813,11 +819,18 @@ struct TargetGhostSetupView: View {
 
                 if !routeReady {
                     Label(ATHLTHLocalization.choose(
-                        english: "This route has too little valid GPS geometry for Ghost Race. Choose another saved route.",
-                        norwegian: "Løypa mangler nok gyldige GPS-punkter til Ghost Race. Velg en annen lagret rute."
+                        english: "This route cannot be used as a Ghost. Choose another saved GPS route.",
+                        norwegian: "Denne løypa kan ikke brukes som Ghost. Velg en annen lagret GPS-løype."
                     ), systemImage: "exclamationmark.triangle")
                     .font(.subheadline)
                     .foregroundStyle(.orange)
+                } else if phoneWorkout.active != nil {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Finish the active workout before starting a new Ghost.",
+                        norwegian: "Avslutt den aktive økten før du starter en ny Ghost."
+                    ), systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
                 }
 
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
