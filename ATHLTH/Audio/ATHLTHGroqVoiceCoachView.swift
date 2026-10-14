@@ -6,7 +6,7 @@ import SwiftUI
 /// Groq pilot: user-initiated, short push-to-talk turns rather than a
 /// permanently open microphone. Apple system speech handles Norwegian TTS.
 @MainActor
-final class ATHLTHGroqVoiceTurn: ObservableObject {
+final class ATHLTHGroqVoiceTurn: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
     enum Phase: Equatable {
         case idle, recording, processing, speaking
         case error(String)
@@ -25,6 +25,22 @@ final class ATHLTHGroqVoiceTurn: ObservableObject {
     private var previousCategory: AVAudioSession.Category?
     private var previousMode: AVAudioSession.Mode?
     private var previousOptions: AVAudioSession.CategoryOptions?
+
+    override init() {
+        super.init()
+        synthesizer.delegate = self
+    }
+
+    nonisolated func speechSynthesizer(
+        _ synthesizer: AVSpeechSynthesizer,
+        didFinish utterance: AVSpeechUtterance
+    ) {
+        Task { @MainActor [weak self] in
+            guard let self, self.phase == .speaking else { return }
+            self.restoreAudioSession()
+            self.phase = .idle
+        }
+    }
 
     var isBusy: Bool {
         switch phase {
@@ -87,6 +103,7 @@ final class ATHLTHGroqVoiceTurn: ObservableObject {
                 self.recorder?.stop()
                 self.recorder = nil
                 self.recordingExpiryTask = nil
+                self.restoreAudioSession()
                 self.phase = .idle
                 // User must explicitly tap Send. A timed-out clip never
                 // silently leaves the device.
@@ -116,11 +133,12 @@ final class ATHLTHGroqVoiceTurn: ObservableObject {
         voiceVolume: Float
     ) {
         guard phase == .recording, let recorder, let recordingURL else { return }
+        let recordingSeconds = recorder.currentTime
         recorder.stop()
         self.recorder = nil
         recordingExpiryTask?.cancel()
         recordingExpiryTask = nil
-        guard recorder.currentTime >= 0.25,
+        guard recordingSeconds >= 0.25,
               let raw = try? Data(contentsOf: recordingURL),
               raw.count >= 3200,
               raw.count <= 390_000 else {
@@ -154,8 +172,8 @@ final class ATHLTHGroqVoiceTurn: ObservableObject {
                 self.question = output.transcript
                 self.answer = output.reply
                 self.phase = .speaking
-                self.restoreAudioSession()
                 let session = AVAudioSession.sharedInstance()
+                try? session.setActive(false, options: .notifyOthersOnDeactivation)
                 try? session.setCategory(.playback, mode: .spokenAudio,
                                          options: [.mixWithOthers])
                 try? session.setActive(true)
@@ -210,13 +228,12 @@ final class ATHLTHGroqVoiceTurn: ObservableObject {
     }
 
     private func restoreAudioSession() {
+        guard let category = previousCategory,
+              let mode = previousMode,
+              let options = previousOptions else { return }
         let session = AVAudioSession.sharedInstance()
         try? session.setActive(false, options: .notifyOthersOnDeactivation)
-        if let category = previousCategory,
-           let mode = previousMode,
-           let options = previousOptions {
-            try? session.setCategory(category, mode: mode, options: options)
-        }
+        try? session.setCategory(category, mode: mode, options: options)
         previousCategory = nil
         previousMode = nil
         previousOptions = nil
@@ -343,8 +360,8 @@ struct ATHLTHGroqVoiceCoachView: View {
                                     language: settings.audioCoachLanguage,
                                     motivating: settings.audioCoachSpeechStyle == .motivating,
                                     selectedVoice: settings.audioCoachVoiceIdentifier,
-                                    voiceRate: settings.audioCoachSpeechRate,
-                                    voiceVolume: settings.audioCoachSpeechVolume
+                                    voiceRate: Float(settings.audioCoachSpeechRate),
+                                    voiceVolume: Float(settings.audioCoachSpeechVolume)
                                 )
                             } label: {
                                 Label(ATHLTHLocalization.choose(
