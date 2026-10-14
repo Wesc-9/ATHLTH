@@ -322,7 +322,7 @@ struct ATHLTHTrainPlanPremiumView: View {
             MyTrainingPlansLibraryView()
         }
         .sheet(isPresented: $showingTemplates) {
-            TrainingPlanLibraryView()
+            TrainingPlanLibrarySheet()
         }
         .sheet(isPresented: $showingAllPlans) {
             AllTrainingPlansView()

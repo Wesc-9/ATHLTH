@@ -1562,6 +1562,27 @@ extension TrainingPlanCatalogEntry {
     ]
 }
 
+/// A library presented as a sheet needs its own navigation and exit.
+/// Keep the content view reusable in existing navigation destinations.
+struct TrainingPlanLibrarySheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            TrainingPlanLibraryView(onPlanCreated: { dismiss() })
+                .toolbar(.visible, for: .navigationBar)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(ATHLTHLocalization.choose(english: "Close", norwegian: "Lukk")) {
+                            dismiss()
+                        }
+                        .fontWeight(.semibold)
+                    }
+                }
+        }
+    }
+}
+
 struct TrainingPlanLibraryView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
@@ -1611,10 +1632,10 @@ struct TrainingPlanLibraryView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
                 LibraryPremiumIntro(
-                    eyebrow: "PLAN LIBRARY",
-                    title: "Train with a clear direction",
+                    eyebrow: ATHLTHLocalization.choose(english: "PLAN LIBRARY", norwegian: "TRENINGSMALER"),
+                    title: ATHLTHLocalization.choose(english: "Train with a clear direction", norwegian: "Finn en plan som passer deg"),
                     subtitle:
-                        "Start from a curated structure, save it to My Plans, then make every week and workout your own.",
+                        ATHLTHLocalization.choose(english: "Choose a plan, set its start date, then adapt your workouts.", norwegian: "Velg en plan og startdato. Etterpå kan du tilpasse dagene og øktene."),
                     icon: "sparkles.rectangle.stack.fill",
                     accent: Color.orange
                 ) {
@@ -1690,6 +1711,7 @@ struct TrainingPlanLibraryView: View {
                                 )
                             } label: {
                                 catalogCard(entry)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
 
@@ -1715,11 +1737,11 @@ struct TrainingPlanLibraryView: View {
                 accent: Color.orange.opacity(0.20)
             )
         )
-        .navigationTitle("Plan Library")
+        .navigationTitle(ATHLTHLocalization.choose(english: "Training templates", norwegian: "Treningsmaler"))
         .navigationBarTitleDisplayMode(.inline)
         .searchable(
             text: $query,
-            prompt: "Search plans or goals"
+            prompt: ATHLTHLocalization.choose(english: "Search plans or goals", norwegian: "Søk etter planer eller mål")
         )
         .task {
             async let plans: Void = catalog.refresh()
@@ -2139,46 +2161,6 @@ struct TrainingPlanCatalogDetailView: View {
                 planPreview
 
                 Button {
-                    createEditableCopy = false
-                    showingPersonalizePlan = true
-                } label: {
-                    HStack {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Make it mine",
-                                norwegian: "Gjør den til min"
-                            ),
-                            systemImage: "slider.horizontal.3"
-                        )
-                        .font(.headline)
-
-                        Spacer()
-
-                        Image(systemName: "arrow.right")
-                            .font(.caption.bold())
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 17)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 54)
-                    .background(
-                        LinearGradient(
-                            colors: [
-                                ATHLTHTheme.accent,
-                                ATHLTHTheme.accentDeep
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        in: RoundedRectangle(
-                            cornerRadius: 16,
-                            style: .continuous
-                        )
-                    )
-                }
-                .buttonStyle(.plain)
-
-                Button {
                     createEditableCopy = true
                     showingPersonalizePlan = true
                 } label: {
@@ -2226,6 +2208,28 @@ struct TrainingPlanCatalogDetailView: View {
                 accent: ATHLTHTheme.accent.opacity(0.32)
             )
         )
+        .safeAreaInset(edge: .bottom) {
+            Button {
+                createEditableCopy = false
+                showingPersonalizePlan = true
+            } label: {
+                HStack {
+                    Text(ATHLTHLocalization.choose(english: "Choose start date and use plan", norwegian: "Velg startdato og bruk planen"))
+                        .font(.headline)
+                    Spacer(minLength: 8)
+                    Image(systemName: "arrow.right")
+                }
+                .foregroundStyle(.white)
+                .padding(18)
+                .frame(maxWidth: .infinity, minHeight: 58)
+                .background(ATHLTHPlanDesign.ink, in: RoundedRectangle(cornerRadius: 18))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+            .background(.ultraThinMaterial)
+        }
         .navigationTitle(entry.title)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
@@ -3022,6 +3026,13 @@ struct PersonalizeTrainingPlanView: View {
                                     .opacity(0.35)
                         )
                     )
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(ATHLTHLocalization.choose(english: "Close", norwegian: "Lukk")) {
+                                existingPlanToOpen = nil
+                            }
+                        }
+                    }
                     .navigationTitle(plan.title)
                     .navigationBarTitleDisplayMode(
                         .inline

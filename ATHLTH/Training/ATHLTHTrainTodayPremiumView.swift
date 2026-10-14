@@ -56,6 +56,7 @@ struct ATHLTHTrainTodayPremiumView: View {
 
             quickTrainSection
             ghostRaceSection
+                .padding(.top, 6)
 
             if let plan {
                 activePlanSection(plan)
@@ -400,33 +401,15 @@ struct ATHLTHTrainTodayPremiumView: View {
                     .foregroundStyle(muted)
             }
 
-            LazyVGrid(
-                columns: [
-                    GridItem(.flexible(), spacing: 9),
-                    GridItem(.flexible(), spacing: 9)
-                ],
-                spacing: 9
-            ) {
-                quickChoice(
-                    "figure.run",
-                    tr("Run", "Løping"),
-                    kind: .running
-                )
-                quickChoice(
-                    "figure.walk",
-                    tr("Walk", "Gå"),
-                    kind: .walking
-                )
-                quickChoice(
-                    "dumbbell.fill",
-                    tr("Strength", "Styrke"),
-                    kind: .strength
-                )
-                quickChoice(
-                    "square.grid.2x2.fill",
-                    tr("Other", "Andre"),
-                    kind: .custom
-                )
+            VStack(spacing: 12) {
+                HStack(spacing: 12) {
+                    quickChoice("figure.run", tr("Run", "Løping"), kind: .running)
+                    quickChoice("figure.walk", tr("Walk", "Gå"), kind: .walking)
+                }
+                HStack(spacing: 12) {
+                    quickChoice("dumbbell.fill", tr("Strength", "Styrke"), kind: .strength)
+                    quickChoice("square.grid.2x2.fill", tr("Other", "Andre"), kind: .custom)
+                }
             }
         }
         .padding(14)
@@ -444,6 +427,7 @@ struct ATHLTHTrainTodayPremiumView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 21, style: .continuous)
                 .stroke(.white.opacity(0.94), lineWidth: 1)
+                .allowsHitTesting(false)
         }
         .shadow(color: ink.opacity(0.045), radius: 12, y: 5)
     }
@@ -474,7 +458,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 11)
-            .frame(maxWidth: .infinity, minHeight: 59)
+            .frame(maxWidth: .infinity, minHeight: 68)
             .background(
                 Color.white.opacity(0.92),
                 in: RoundedRectangle(cornerRadius: 15, style: .continuous)
@@ -482,10 +466,9 @@ struct ATHLTHTrainTodayPremiumView: View {
             .overlay {
                 RoundedRectangle(cornerRadius: 15, style: .continuous)
                     .stroke(hairline.opacity(0.55), lineWidth: 0.8)
+                    .allowsHitTesting(false)
             }
-            .contentShape(
-                RoundedRectangle(cornerRadius: 15, style: .continuous)
-            )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
@@ -504,8 +487,10 @@ struct ATHLTHTrainTodayPremiumView: View {
                             height: 79
                         )
                         .clipped()
+                        .allowsHitTesting(false)
                 }
                 .frame(height: 79)
+                .allowsHitTesting(false)
                 LinearGradient(
                     colors: [
                         Color.black.opacity(0.69),
@@ -514,6 +499,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                     startPoint: .leading,
                     endPoint: .trailing
                 )
+                .allowsHitTesting(false)
                 HStack(spacing: 13) {
                     Image(systemName: "flag.checkered")
                         .font(.system(size: 19, weight: .medium))
@@ -534,6 +520,7 @@ struct ATHLTHTrainTodayPremiumView: View {
             }
             .frame(height: 79)
             .clipShape(RoundedRectangle(cornerRadius: 16))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
