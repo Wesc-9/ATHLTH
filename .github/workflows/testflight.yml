@@ -143,6 +143,9 @@ jobs:
         shell: bash
         run: bash scripts/optimize_hero_assets.sh
 
+      - name: Embed licensed RepDB catalog and images for offline use
+        run: python3 scripts/prepare_repdb_offline.py
+
       - name: Generate Xcode project
         run: xcodegen generate
 
