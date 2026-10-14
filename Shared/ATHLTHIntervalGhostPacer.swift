@@ -19,8 +19,29 @@ enum ATHLTHIntervalGhostPacer {
         return distanceMeters - expectedMeters
     }
 
+    /// Recovery does not advance the virtual target at work pace. With
+    /// follow enabled Ghost matches actual recovery progress, not a target
+    /// distance. Threshold prevents misclassifying brief pace sensor spikes.
+    static func followsRecovery(
+        step: WatchRunningWorkoutStep,
+        observedPaceSecondsPerKilometer: Double?
+    ) -> Bool {
+        guard step.phase == "recovery",
+              step.ghostFollowsRecovery == true,
+              let workPace = step.ghostPaceSecondsPerKilometer,
+              workPace.isFinite, workPace > 0,
+              let observedPaceSecondsPerKilometer,
+              observedPaceSecondsPerKilometer.isFinite,
+              observedPaceSecondsPerKilometer > 0 else { return false }
+        let slowdown = Double(
+            min(max(step.ghostRecoverySlowdownPercent ?? 25, 10), 60)
+        ) / 100
+        return observedPaceSecondsPerKilometer >= workPace / (1 - slowdown)
+    }
+
     static func isGhostEnabled(_ step: WatchRunningWorkoutStep) -> Bool {
-        step.phase == "work" &&
+        (step.phase == "work" ||
+         (step.phase == "recovery" && step.ghostFollowsRecovery == true)) &&
             (step.ghostPaceSecondsPerKilometer ?? 0) > 0
     }
 }
