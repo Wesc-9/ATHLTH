@@ -14,6 +14,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
     @State private var section: LibrarySection = .plans
     @State private var query = ""
     @State private var exerciseGroup = ""
+    @State private var exerciseVisibleCount = 65
     @State private var selectedTemplate: TrainingPlan?
     @State private var selectedCatalogPlan: TrainingPlanCatalogEntry?
     @State private var selectedWorkout: PlannedSession?
@@ -69,6 +70,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
                     Button {
                         section = item
                         query = ""
+                        exerciseVisibleCount = 65
                     } label: {
                         Text(item.label)
                             .font(.caption.weight(section == item ? .semibold : .medium))
@@ -326,7 +328,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
                 )
             }
 
-            ForEach(filteredExercises.prefix(65)) { entry in
+            ForEach(filteredExercises.prefix(exerciseVisibleCount)) { entry in
                 Button { selectedExercise = entry } label: {
                     HStack(spacing: 11) {
                         Image(systemName: "dumbbell")
@@ -356,11 +358,26 @@ struct ATHLTHTrainLibraryPremiumView: View {
                 .buttonStyle(.plain)
             }
 
-            if filteredExercises.count > 65 {
-                Text(tr("Use search to narrow down more exercises.",
-                        "Bruk søk eller filter for å finne flere øvelser."))
-                    .font(.caption)
-                    .foregroundStyle(secondary)
+            if filteredExercises.count > exerciseVisibleCount {
+                Button {
+                    exerciseVisibleCount = min(filteredExercises.count, exerciseVisibleCount + 65)
+                } label: {
+                    Text(tr("Show more exercises", "Vis flere øvelser"))
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(12)
+                        .background(paper, in: RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+            }
+
+            if !exerciseLibrary.repDBExercises.isEmpty {
+                Link(destination: URL(string: "https://repdb.co")!) {
+                    Text("Exercise data by RepDB (repdb.co)")
+                        .font(.caption2)
+                        .foregroundStyle(secondary)
+                }
+                .padding(.top, 4)
             }
         }
     }
