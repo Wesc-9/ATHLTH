@@ -83,6 +83,30 @@ private enum GhostRaceHubMode:
     }
 }
 
+private enum GhostReplayDistanceFilter: String, CaseIterable, Identifiable {
+    case all, five, ten, half
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: return ATHLTHLocalization.choose(english: "All", norwegian: "Alle")
+        case .five: return "5 km"
+        case .ten: return "10 km"
+        case .half: return "21 km"
+        }
+    }
+
+    var distanceRange: ClosedRange<Double>? {
+        switch self {
+        case .all: return nil
+        case .five: return 4.5...5.5
+        case .ten: return 9.0...11.0
+        case .half: return 19.0...23.0
+        }
+    }
+}
+
 private enum GhostReplaySort: String, CaseIterable, Identifiable {
     case newest, fastest, longest
     var id: String { rawValue }
@@ -153,6 +177,7 @@ struct GhostRaceHubView: View {
     }
     @State private var replaySearch = ""
     @State private var replaySort: GhostReplaySort = .newest
+    @State private var replayDistanceFilter: GhostReplayDistanceFilter = .all
     @State private var replayFavoritesOnly = false
     @State private var replayFavoriteIDs: Set<UUID> = []
     @State private var pendingReplayRun: WorkoutSummary?
@@ -1287,6 +1312,10 @@ struct GhostRaceHubView: View {
             if replayFavoritesOnly && !replayFavoriteIDs.contains(workout.id) {
                 return false
             }
+            if let distanceRange = replayDistanceFilter.distanceRange,
+               !(workout.distanceKilometers.map(distanceRange.contains) ?? false) {
+                return false
+            }
             guard !query.isEmpty else { return true }
             let searchable = [
                 workout.startDate.formatted(date: .abbreviated, time: .omitted),
@@ -1296,10 +1325,15 @@ struct GhostRaceHubView: View {
             ].joined(separator: " ").lowercased()
             return searchable.localizedStandardContains(query)
         }
+
         switch replaySort {
         case .newest:
             return filtered.sorted { $0.startDate > $1.startDate }
         case .fastest:
+            // Only meaningful for an explicit comparable distance range.
+            guard replayDistanceFilter != .all else {
+                return filtered.sorted { $0.startDate > $1.startDate }
+            }
             return filtered.sorted {
                 ($0.paceMinutesPerKilometer ?? .infinity) <
                 ($1.paceMinutesPerKilometer ?? .infinity)
@@ -1309,6 +1343,24 @@ struct GhostRaceHubView: View {
                 ($0.distanceMeters ?? 0) > ($1.distanceMeters ?? 0)
             }
         }
+    }
+
+    private var recommendedReplay: WorkoutSummary? {
+        recentRuns.first
+    }
+
+    private func bestReplay(
+        in distance: GhostReplayDistanceFilter
+    ) -> WorkoutSummary? {
+        guard let range = distance.distanceRange else { return nil }
+        return recentRuns
+            .filter {
+                $0.distanceKilometers.map(range.contains) ?? false
+            }
+            .min {
+                ($0.paceMinutesPerKilometer ?? .infinity) <
+                ($1.paceMinutesPerKilometer ?? .infinity)
+            }
     }
 
     private var replayFavoritesKey: String {
