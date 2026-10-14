@@ -6,23 +6,36 @@ import Foundation
 /// Do not ship guessed safety-critical instructions.
 enum NorwegianExerciseText {
     struct Record: Decodable, Sendable {
-        let name: String?
         let summary: String?
         let instructions: [String]?
         let tips: [String]?
     }
 
-    // Lazy, read once. Bundled translation text is small and separate from
-    // RepDB's large media snapshot. Missing entries use existing fallbacks.
+    // Short names load independently from potentially longer exercise
+    // instructions. Opening the exercise list never decodes the detail pack.
+    private static let names: [String: String] = {
+        guard let url = Bundle.main.url(
+            forResource: "ExerciseNames", withExtension: "json"
+        ), let data = try? Data(contentsOf: url),
+           let result = try? JSONDecoder().decode([String: String].self, from: data)
+        else { return [:] }
+        return result
+    }()
+
     private static let records: [String: Record] = {
         guard let url = Bundle.main.url(
-            forResource: "ExerciseTranslations",
-            withExtension: "json"
+            forResource: "ExerciseDetails", withExtension: "json"
         ), let data = try? Data(contentsOf: url),
-           let values = try? JSONDecoder().decode([String: Record].self, from: data)
+           let result = try? JSONDecoder().decode([String: Record].self, from: data)
         else { return [:] }
-        return values
+        return result
     }()
+
+    static func name(for identifier: String?) -> String? {
+        guard ATHLTHLocalization.isNorwegian,
+              let identifier else { return nil }
+        return names[identifier]
+    }
 
     static func record(for identifier: String?) -> Record? {
         guard ATHLTHLocalization.isNorwegian,
