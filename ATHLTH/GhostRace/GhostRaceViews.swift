@@ -111,10 +111,42 @@ struct GhostRaceHubView: View {
     @State private var loading = false
     @State private var startingWorkoutID: UUID?
     @State private var liveStartingSessionID: UUID?
-    @AppStorage("athlth.ghostRace.advancedMode")
-    private var advancedMode = false
+    // Each race category keeps its own experience level.
+    @AppStorage("athlth.ghostRace.live.advancedMode")
+    private var liveAdvancedMode = false
+    @AppStorage("athlth.ghostRace.replay.advancedMode")
+    private var replayAdvancedMode = false
+    @AppStorage("athlth.ghostRace.target.advancedMode")
+    private var targetAdvancedMode = false
     @State private var selectedMode:
         GhostRaceHubMode = .past
+
+    private var advancedMode: Bool {
+        switch selectedMode {
+        case .live: return liveAdvancedMode
+        case .past: return replayAdvancedMode
+        case .target: return targetAdvancedMode
+        }
+    }
+
+    private func setExperience(advanced: Bool) {
+        withAnimation(.easeInOut(duration: 0.18)) {
+            switch selectedMode {
+            case .live: liveAdvancedMode = advanced
+            case .past: replayAdvancedMode = advanced
+            case .target: targetAdvancedMode = advanced
+            }
+            if !advanced {
+                // Hidden advanced choices must never affect a basic start.
+                captureDevice = .iPhone
+                if selectedMode == .past {
+                    replaySearch = ""
+                    replayFavoritesOnly = false
+                    replaySort = .newest
+                }
+            }
+        }
+    }
     @State private var replaySearch = ""
     @State private var replaySort: GhostReplaySort = .newest
     @State private var replayFavoritesOnly = false
@@ -146,9 +178,9 @@ struct GhostRaceHubView: View {
             LazyVStack(spacing: 14) {
                 hero
                 modeOverview
+                ghostExperiencePicker
                 modeContent
-                if selectedMode != .target &&
-                    (advancedMode || watchConnection.isReady) {
+                if selectedMode != .target && advancedMode {
                     workoutDeviceCard
                 }
                 if advancedMode {
@@ -173,11 +205,6 @@ struct GhostRaceHubView: View {
         )
         .navigationTitle("Ghost Race")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                ghostExperiencePicker
-            }
-        }
         .task {
             loadReplayFavorites()
             async let runs: Void =
@@ -241,8 +268,10 @@ struct GhostRaceHubView: View {
             of: selectedMode
         ) { _, mode in
             if mode != .live {
-                realtime
-                    .selectLiveGhost(nil)
+                realtime.selectLiveGhost(nil)
+            }
+            if !advancedMode {
+                captureDevice = .iPhone
             }
         }
         .refreshable {
@@ -373,59 +402,64 @@ struct GhostRaceHubView: View {
         )
     }
 
-    // The experience level adjusts detail, not which race modes are available.
-    // Keep it secondary to Live / Replay / Mål, for both novice and advanced users.
+    // An unobtrusive level choice belongs to the active category, never
+    // to the Ghost Race title bar. One level can differ from another.
     private var ghostExperiencePicker: some View {
-        Menu {
-            Button {
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    advancedMode = false
-                }
-            } label: {
-                Label(
-                    ATHLTHLocalization.choose(english: "Basic", norwegian: "Enkel"),
-                    systemImage: advancedMode ? "figure.run" : "checkmark.circle.fill"
-                )
-            }
+        HStack(spacing: 8) {
+            Text(ATHLTHLocalization.choose(
+                english: "Display",
+                norwegian: "Visning"
+            ))
+            .font(.caption.weight(.medium))
+            .foregroundStyle(ATHLTHTheme.mutedText)
 
-            Button {
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    advancedMode = true
-                }
-            } label: {
-                Label(
-                    ATHLTHLocalization.choose(english: "Advanced", norwegian: "Avansert"),
-                    systemImage: advancedMode ? "checkmark.circle.fill" : "slider.horizontal.3"
+            Spacer(minLength: 8)
+
+            HStack(spacing: 2) {
+                experienceButton(
+                    title: ATHLTHLocalization.choose(
+                        english: "Basic", norwegian: "Enkel"
+                    ),
+                    isAdvanced: false
+                )
+                experienceButton(
+                    title: ATHLTHLocalization.choose(
+                        english: "Advanced", norwegian: "Avansert"
+                    ),
+                    isAdvanced: true
                 )
             }
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: advancedMode ? "slider.horizontal.3" : "figure.run")
-                    .font(.system(size: 12, weight: .semibold))
-                Text(ATHLTHLocalization.choose(
-                    english: advancedMode ? "Advanced" : "Basic",
-                    norwegian: advancedMode ? "Avansert" : "Enkel"
-                ))
-                .font(.system(size: 12, weight: .semibold))
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .bold))
-            }
-            .foregroundStyle(ATHLTHTheme.accentDeep)
-            .padding(.horizontal, 11)
-            .padding(.vertical, 8)
+            .padding(3)
             .background(ATHLTHTheme.surfaceStone, in: Capsule())
-            .overlay {
-                Capsule().stroke(ATHLTHTheme.border, lineWidth: 0.7)
-            }
         }
-        .accessibilityLabel(ATHLTHLocalization.choose(
-            english: advancedMode ? "Experience: Advanced" : "Experience: Basic",
-            norwegian: advancedMode ? "Nivå: Avansert" : "Nivå: Enkel"
-        ))
-        .accessibilityHint(ATHLTHLocalization.choose(
-            english: "Choose how many race settings to display",
-            norwegian: "Velg hvor mange konkurranseinnstillinger som vises"
-        ))
+        .padding(.horizontal, 3)
+    }
+
+    private func experienceButton(
+        title: String,
+        isAdvanced: Bool
+    ) -> some View {
+        Button {
+            setExperience(advanced: isAdvanced)
+        } label: {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(
+                    advancedMode == isAdvanced
+                        ? ATHLTHTheme.primaryText
+                        : ATHLTHTheme.mutedText
+                )
+                .padding(.horizontal, 13)
+                .frame(minHeight: 38)
+                .background(
+                    advancedMode == isAdvanced ? Color.white : Color.clear,
+                    in: Capsule()
+                )
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(advancedMode == isAdvanced ? .isSelected : [])
     }
 
     private var modeOverview: some View {
@@ -461,7 +495,11 @@ struct GhostRaceHubView: View {
             liveNowSection
 
         case .past:
-            pastSelfSection
+            if advancedMode {
+                pastSelfSection
+            } else {
+                basicReplaySection
+            }
             if advancedMode {
                 DisclosureGroup(
                     ATHLTHLocalization.choose(
@@ -1361,6 +1399,93 @@ struct GhostRaceHubView: View {
             replayFavoriteIDs.map(\.uuidString).sorted(),
             forKey: replayFavoritesKey
         )
+    }
+
+    // Basic Replay has one decision: choose a recent run and race it.
+    // Sorting, search, favorites, and route matching belong to Advanced.
+    private var basicReplaySection: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Race one of your recent runs",
+                    norwegian: "Løp mot en tidligere økt"
+                ))
+                .font(.headline)
+
+                if loading {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, minHeight: 96)
+                } else if recentRuns.isEmpty {
+                    ContentUnavailableView(
+                        ATHLTHLocalization.choose(
+                            english: "No previous runs",
+                            norwegian: "Ingen tidligere løp"
+                        ),
+                        systemImage: "figure.run",
+                        description: Text(ATHLTHLocalization.choose(
+                            english: "Record a GPS run to unlock Replay.",
+                            norwegian: "Registrer en GPS-økt for å bruke Replay."
+                        ))
+                    )
+                } else {
+                    ForEach(Array(recentRuns.prefix(3))) { workout in
+                        Button {
+                            pendingReplayRun = workout
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "figure.run")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    .frame(width: 42, height: 42)
+                                    .background(
+                                        ATHLTHTheme.accentSoft,
+                                        in: RoundedRectangle(cornerRadius: 13)
+                                    )
+
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(workout.startDate.formatted(
+                                        date: .abbreviated, time: .omitted
+                                    ))
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                                    HStack(spacing: 7) {
+                                        if let distance = workout.distanceKilometers {
+                                            Text(String(format: "%.2f km", distance))
+                                        }
+                                        Text(clock(workout.duration))
+                                    }
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+
+                                Spacer(minLength: 5)
+
+                                if startingWorkoutID == workout.id {
+                                    ProgressView().controlSize(.small)
+                                } else {
+                                    Image(systemName: "arrow.right")
+                                        .font(.subheadline.weight(.bold))
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                }
+                            }
+                            .padding(12)
+                            .background(
+                                ATHLTHTheme.surfaceStone,
+                                in: RoundedRectangle(cornerRadius: 16)
+                            )
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!canStartRace || startingWorkoutID != nil)
+                        .accessibilityHint(ATHLTHLocalization.choose(
+                            english: "Choose this run for your Ghost Race",
+                            norwegian: "Velg økten som Ghost Race-motstander"
+                        ))
+                    }
+                }
+            }
+        }
     }
 
     private var pastSelfSection: some View {
