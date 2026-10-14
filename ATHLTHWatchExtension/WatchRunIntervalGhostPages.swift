@@ -101,22 +101,60 @@ struct WatchRunIntervalFocusPage: View {
                         .watchSurface(radius: 15)
                     }
 
+                    // The interval page prioritizes the three metrics a
+                    // runner needs at a glance: remaining, pulse and pace.
                     HStack(spacing: 8) {
                         metric(
                             title: ATHLTHLocalization.choose(
-                                english: "STEP TIME", norwegian: "TID"
+                                english: "HEART RATE", norwegian: "PULS"
                             ),
-                            value: clock(workout.currentStructuredStepElapsedTime)
+                            value: workout.heartRate > 0
+                                ? "\(Int(workout.heartRate.rounded())) bpm"
+                                : "—"
                         )
                         metric(
                             title: ATHLTHLocalization.choose(
-                                english: "STEP DIST", norwegian: "DISTANSE"
+                                english: "CURRENT PACE", norwegian: "TEMPO NÅ"
                             ),
-                            value: String(
-                                format: "%.2f km",
-                                max(workout.currentStructuredStepDistanceMeters, 0) / 1_000
-                            )
+                            value: workout.currentPaceSecondsPerKilometer.map {
+                                "\(clock($0))/km"
+                            } ?? "—"
                         )
+                    }
+
+                    if let zone = step.targetHeartRateZone {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Target heart-rate zone",
+                                norwegian: "Målsone for puls"
+                            ) + " \(zone)",
+                            systemImage: "heart.fill"
+                        )
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(WatchTheme.textSecondary)
+                    }
+
+                    if let lead = ATHLTHIntervalGhostPacer.leadMeters(
+                        step: step,
+                        elapsedSeconds: workout.currentStructuredStepElapsedTime,
+                        distanceMeters: workout.currentStructuredStepDistanceMeters
+                    ) {
+                        HStack {
+                            Image(systemName: "figure.run.circle")
+                            Text(ATHLTHLocalization.choose(
+                                english: "WORK-ONLY GHOST", norwegian: "GHOST · KUN DRAG"
+                            ))
+                            Spacer()
+                            Text("\(Int(abs(lead).rounded())) m " + ATHLTHLocalization.choose(
+                                english: lead >= 0 ? "ahead" : "behind",
+                                norwegian: lead >= 0 ? "foran" : "bak"
+                            ))
+                            .monospacedDigit()
+                        }
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(WatchTheme.liveLime)
+                        .padding(9)
+                        .watchSurface(radius: 14)
                     }
 
                     if let next = workout.nextStructuredRunningStep {
