@@ -2461,7 +2461,11 @@ final class IPhoneWorkoutStore:
                     advertisedDistanceMeters:
                         workout
                             .plannedRouteDistanceKilometers
-                            .map { $0 * 1_000 }
+                            .map { $0 * 1_000 },
+                    workoutDistanceMeters: workout.distanceMeters,
+                    previousRouteMeters: workout.routeProgressPercent.map {
+                        $0 / 100 * plannedRouteGeometryMeters
+                    }
                 )
         else {
             return
