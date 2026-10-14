@@ -4440,6 +4440,9 @@ final class IPhoneWorkoutStore:
                 runningStepRemainingMeters:
                     runningStepReadout?.unit == .meters
                         ? runningStepReadout?.remaining : nil,
+                runningStepCoachBrief: currentStep?.coachBrief,
+                runningStepPhase: currentStep?.phase,
+                runningStepTargetHeartRateZone: currentStep?.targetHeartRateZone,
                 ghostRaceTitle:
                     workout.ghostRaceTitle,
                 ghostDistanceDeltaMeters:
