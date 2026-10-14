@@ -235,7 +235,7 @@ extension Array where Element == WorkoutTemplateBlock {
                     cursor += 1
                 }
                 let members = Array(self[start..<cursor])
-                let rounds = min(max(current.groupRounds ?? 1, 1), 20)
+                let rounds = Swift.min(Swift.max(current.groupRounds ?? 1, 1), 20)
                 for round in 1...rounds {
                     for (position, member) in members.enumerated() {
                         // A recovery at the end of an interval group is a
@@ -252,7 +252,7 @@ extension Array where Element == WorkoutTemplateBlock {
             } else {
                 cursor += 1
                 let sets = current.kind == .exercise
-                    ? min(max(current.setCount ?? 1, 1), 20) : 1
+                    ? Swift.min(Swift.max(current.setCount ?? 1, 1), 20) : 1
                 for set in 1...sets {
                     append(current, title: sets > 1
                         ? "\(current.title) · \(set)/\(sets)"
