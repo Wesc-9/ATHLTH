@@ -30,6 +30,7 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
     private var socket: URLSessionWebSocketTask?
     private var readerTask: Task<Void, Never>?
     private var expiryTask: Task<Void, Never>?
+    private var connectionTimeoutTask: Task<Void, Never>?
     private var audioEngine: AVAudioEngine?
     private var outputPlayer: AVAudioPlayerNode?
     private var waitingAudio: [Data] = []
@@ -100,6 +101,21 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
             socket = connection
             connection.resume()
 
+            // Do not open AVAudioEngine until the provider acknowledges our
+            // requested audio format / tool permissions. Drop dead connections.
+            connectionTimeoutTask = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(20))
+                guard !Task.isCancelled, let self,
+                      self.generation == sessionID,
+                      self.state == .connecting
+                else { return }
+                self.stop()
+                self.state = .failed(ATHLTHLocalization.choose(
+                    english: "The AI voice connection timed out. Your workout is still running.",
+                    norwegian: "Tilkoblingen til AI-stemmen tok for lang tid. Treningsøkten fortsetter."
+                ))
+            }
+
             // A session is never left listening indefinitely. Network loss,
             // navigation away or app background also stops capture.
             readerTask = Task { [weak self] in
@@ -142,7 +158,6 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
                 let type = event["type"] as? String else { continue }
                 switch type {
                 case "session.created":
-                    try configureAudio()
                     var updatedSession: [String: Any] = [
                         "type": "realtime",
                         "audio": [
@@ -179,7 +194,13 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
                         "type": "session.update",
                         "session": updatedSession
                     ])
-                    state = .listening
+                case "session.updated":
+                    if audioEngine == nil {
+                        try configureAudio()
+                        connectionTimeoutTask?.cancel()
+                        connectionTimeoutTask = nil
+                        state = .listening
+                    }
                 case "input_audio_buffer.speech_started":
                     outputPlayer?.stop()
                     outputPlayer?.play()
@@ -399,6 +420,8 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
         readerTask = nil
         expiryTask?.cancel()
         expiryTask = nil
+        connectionTimeoutTask?.cancel()
+        connectionTimeoutTask = nil
         senderTask?.cancel()
         senderTask = nil
         waitingAudio.removeAll(keepingCapacity: false)
