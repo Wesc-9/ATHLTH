@@ -4255,7 +4255,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                                     1_000,
                                 0
                             )
-                        }
+                        },
+                    workoutDistanceMeters: distanceMeters,
+                    previousRouteMeters: routeProgressPercent.map {
+                        $0 / 100 * plannedRouteGeometryMeters
+                    }
                 )
         else {
             return
