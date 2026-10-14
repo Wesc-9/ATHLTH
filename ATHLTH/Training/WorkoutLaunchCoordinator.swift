@@ -161,7 +161,10 @@ struct PlannedWorkoutWatchBuilder {
                 steps.append(runningStep(
                     title: title, target: resolved,
                     phase: block.kind.rawValue,
-                    ghostPace: working ? template.intervalGhostPaceSecondsPerKilometer : nil,
+                    ghostPace: working
+                        ? (override?.ghostPaceSecondsPerKilometer ??
+                           template.intervalGhostPaceSecondsPerKilometer)
+                        : nil,
                     coachBrief: working ? template.coachBrief : nil
                 ))
 
@@ -177,7 +180,8 @@ struct PlannedWorkoutWatchBuilder {
                             ? template.intervalGhostPaceSecondsPerKilometer : nil,
                         ghostFollowsRecovery:
                             template.intervalGhostFollowRecovery == true &&
-                            template.intervalGhostPaceSecondsPerKilometer != nil
+                            template.intervalGhostPaceSecondsPerKilometer != nil,
+                        slowdownPercent: template.intervalGhostRecoverySlowdownPercent
                     ))
                 }
             }
@@ -191,6 +195,7 @@ struct PlannedWorkoutWatchBuilder {
         phase: String,
         ghostPace: Double? = nil,
         ghostFollowsRecovery: Bool? = nil,
+        slowdownPercent: Int? = nil,
         coachBrief: String? = nil
     ) -> WatchRunningWorkoutStep {
         let measure: WatchRunningStepMeasure
@@ -212,6 +217,7 @@ struct PlannedWorkoutWatchBuilder {
             targetHeartRateZone: target.intensity.heartRateZone,
             ghostPaceSecondsPerKilometer: ghostPace,
             ghostFollowsRecovery: ghostFollowsRecovery,
+            ghostRecoverySlowdownPercent: slowdownPercent,
             coachBrief: coachBrief
         )
     }
