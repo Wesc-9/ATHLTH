@@ -144,13 +144,8 @@ struct GhostRaceHubView: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 14) {
-                ghostExperiencePicker
                 hero
-                if advancedMode {
-                    modeOverview
-                } else {
-                    basicStartChoices
-                }
+                modeOverview
                 modeContent
                 if selectedMode != .target &&
                     (advancedMode || watchConnection.isReady) {
@@ -178,6 +173,11 @@ struct GhostRaceHubView: View {
         )
         .navigationTitle("Ghost Race")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                ghostExperiencePicker
+            }
+        }
         .task {
             loadReplayFavorites()
             async let runs: Void =
@@ -373,170 +373,81 @@ struct GhostRaceHubView: View {
         )
     }
 
+    // The experience level adjusts detail, not which race modes are available.
+    // Keep it secondary to Live / Replay / Mål, for both novice and advanced users.
     private var ghostExperiencePicker: some View {
-        HStack(spacing: 4) {
-            experienceButton(
-                title: ATHLTHLocalization.choose(
-                    english: "Basic", norwegian: "Enkel"
-                ),
-                symbol: "figure.run",
-                isAdvanced: false
-            )
-            experienceButton(
-                title: ATHLTHLocalization.choose(
-                    english: "Advanced", norwegian: "Avansert"
-                ),
-                symbol: "slider.horizontal.3",
-                isAdvanced: true
-            )
-        }
-        .padding(4)
-        .background(ATHLTHTheme.surfaceStone,
-                    in: RoundedRectangle(cornerRadius: 16))
-        .accessibilityElement(children: .contain)
-    }
-
-    private func experienceButton(
-        title: String,
-        symbol: String,
-        isAdvanced: Bool
-    ) -> some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.18)) {
-                advancedMode = isAdvanced
-                if !isAdvanced { selectedMode = .past }
-            }
-        } label: {
-            Label(title, systemImage: symbol)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(advancedMode == isAdvanced
-                    ? ATHLTHTheme.primaryText : ATHLTHTheme.mutedText)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(advancedMode == isAdvanced
-                    ? Color.white : Color.clear,
-                    in: RoundedRectangle(cornerRadius: 13))
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(advancedMode == isAdvanced
-            ? .isSelected : [])
-    }
-
-    private var basicStartChoices: some View {
-        ATHLTHCard {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(ATHLTHLocalization.choose(
-                    english: "How would you like to race?",
-                    norwegian: "Hva vil du konkurrere mot?"
-                ))
-                .font(.headline)
-                Text(ATHLTHLocalization.choose(
-                    english: "Choose one. The workout and Ghost are prepared together.",
-                    norwegian: "Velg ett alternativ. Treningsøkten og Ghost klargjøres sammen."
-                ))
-                .font(.caption)
-                .foregroundStyle(ATHLTHTheme.mutedText)
-
-                basicGhostChoice(
-                    mode: .past,
-                    symbol: "clock.arrow.circlepath",
-                    title: ATHLTHLocalization.choose(
-                        english: "My previous run", norwegian: "Mitt forrige løp"
-                    ),
-                    description: ATHLTHLocalization.choose(
-                        english: "Try to beat yourself", norwegian: "Prøv å slå din egen tid"
-                    )
-                )
-                basicGhostChoice(
-                    mode: .target,
-                    symbol: "timer",
-                    title: ATHLTHLocalization.choose(
-                        english: "A finish-time goal", norwegian: "En ønsket sluttid"
-                    ),
-                    description: ATHLTHLocalization.choose(
-                        english: "Run against your chosen pace", norwegian: "Løp mot ditt eget mål"
-                    )
-                )
-                basicGhostChoice(
-                    mode: .live,
-                    symbol: "person.2.fill",
-                    title: ATHLTHLocalization.choose(
-                        english: "Another runner", norwegian: "En annen løper"
-                    ),
-                    description: ATHLTHLocalization.choose(
-                        english: "Race together live", norwegian: "Konkurrer direkte sammen"
-                    )
-                )
-            }
-        }
-    }
-
-    private func basicGhostChoice(
-        mode: GhostRaceHubMode,
-        symbol: String,
-        title: String,
-        description: String
-    ) -> some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.18)) {
-                selectedMode = mode
-            }
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: symbol)
-                    .font(.system(size: 19, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .frame(width: 44, height: 44)
-                    .background(ATHLTHTheme.accentSoft,
-                                in: RoundedRectangle(cornerRadius: 13))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                    Text(description)
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+        Menu {
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    advancedMode = false
                 }
-                Spacer(minLength: 2)
-                Image(systemName: selectedMode == mode
-                    ? "checkmark.circle.fill" : "chevron.right")
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(english: "Basic", norwegian: "Enkel"),
+                    systemImage: advancedMode ? "figure.run" : "checkmark.circle.fill"
+                )
             }
-            .padding(11)
-            .background(
-                selectedMode == mode
-                    ? ATHLTHTheme.accentSoft.opacity(0.55)
-                    : ATHLTHTheme.surfaceStone.opacity(0.65),
-                in: RoundedRectangle(cornerRadius: 16)
-            )
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    advancedMode = true
+                }
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(english: "Advanced", norwegian: "Avansert"),
+                    systemImage: advancedMode ? "checkmark.circle.fill" : "slider.horizontal.3"
+                )
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: advancedMode ? "slider.horizontal.3" : "figure.run")
+                    .font(.system(size: 12, weight: .semibold))
+                Text(ATHLTHLocalization.choose(
+                    english: advancedMode ? "Advanced" : "Basic",
+                    norwegian: advancedMode ? "Avansert" : "Enkel"
+                ))
+                .font(.system(size: 12, weight: .semibold))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .bold))
+            }
+            .foregroundStyle(ATHLTHTheme.accentDeep)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 8)
+            .background(ATHLTHTheme.surfaceStone, in: Capsule())
+            .overlay {
+                Capsule().stroke(ATHLTHTheme.border, lineWidth: 0.7)
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selectedMode == mode ? .isSelected : [])
+        .accessibilityLabel(ATHLTHLocalization.choose(
+            english: advancedMode ? "Experience: Advanced" : "Experience: Basic",
+            norwegian: advancedMode ? "Nivå: Avansert" : "Nivå: Enkel"
+        ))
+        .accessibilityHint(ATHLTHLocalization.choose(
+            english: "Choose how many race settings to display",
+            norwegian: "Velg hvor mange konkurranseinnstillinger som vises"
+        ))
     }
 
     private var modeOverview: some View {
-        HStack(spacing: 5) {
-            ForEach(
-                GhostRaceHubMode.allCases
-            ) { mode in
+        HStack(spacing: 4) {
+            ForEach(GhostRaceHubMode.allCases) { mode in
                 Button {
-                    withAnimation(
-                        .easeInOut(
-                            duration: 0.20
-                        )
-                    ) {
+                    withAnimation(.easeInOut(duration: 0.20)) {
                         selectedMode = mode
                     }
                 } label: {
-                    modeTile(
-                        mode,
-                        selected:
-                            selectedMode == mode
-                    )
+                    modeTile(mode, selected: selectedMode == mode)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(mode.title)
+                .accessibilityAddTraits(selectedMode == mode ? .isSelected : [])
             }
         }
+        .padding(4)
+        .background(
+            ATHLTHTheme.surfaceStone,
+            in: RoundedRectangle(cornerRadius: 17, style: .continuous)
+        )
     }
 
     @ViewBuilder
@@ -554,12 +465,11 @@ struct GhostRaceHubView: View {
             if advancedMode {
                 DisclosureGroup(
                     ATHLTHLocalization.choose(
-                        english: "Other ways to compete",
-                        norwegian: "Flere konkurransemuligheter"
+                        english: "Race on a saved route",
+                        norwegian: "Konkurrer på en lagret rute"
                     )
                 ) {
                     routeSection
-                    friendSection
                 }
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(ATHLTHTheme.accentDeep)
@@ -577,26 +487,40 @@ struct GhostRaceHubView: View {
             VStack(alignment: .leading, spacing: 13) {
                 HStack {
                     Text(ATHLTHLocalization.choose(
-                        english: "Choose your opponent",
-                        norwegian: "Velg motstander"
+                        english: "Race with others",
+                        norwegian: "Konkurrer mot andre"
                     ))
                     .font(.headline)
+
                     Spacer()
+
                     Image(systemName: "person.2.fill")
                         .foregroundStyle(ATHLTHTheme.accentDeep)
                 }
 
-                HStack(spacing: 8) {
-                    liveOption(
-                        title: ATHLTHLocalization.choose(
-                            english: "Live runners", norwegian: "Live nå"
-                        ),
-                        detail: ATHLTHLocalization.choose(
-                            english: "Available below", norwegian: "Se løpere under"
-                        ),
-                        icon: "dot.radiowaves.left.and.right",
-                        selected: true
-                    )
+                HStack(spacing: 10) {
+                    Button {
+                        Task {
+                            await realtime.refreshVisibleLiveSessions()
+                        }
+                    } label: {
+                        liveOption(
+                            title: ATHLTHLocalization.choose(
+                                english: "Live now", norwegian: "Live nå"
+                            ),
+                            detail: ATHLTHLocalization.choose(
+                                english: "Refresh runners", norwegian: "Oppdater løpere"
+                            ),
+                            icon: "dot.radiowaves.left.and.right",
+                            selected: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(ATHLTHLocalization.choose(
+                        english: "Refresh the visible live runners below",
+                        norwegian: "Oppdater listen over synlige løpere nedenfor"
+                    ))
+
                     NavigationLink {
                         GhostFriendRaceHubView()
                     } label: {
@@ -605,30 +529,15 @@ struct GhostRaceHubView: View {
                                 english: "Friends", norwegian: "Venner"
                             ),
                             detail: ATHLTHLocalization.choose(
-                                english: "Send invitation", norwegian: "Inviter en venn"
+                                english: "Invite a friend", norwegian: "Inviter en venn"
                             ),
                             icon: "person.2",
                             selected: false
                         )
                     }
                     .buttonStyle(.plain)
-
-                    Button {
-                        withAnimation { selectedMode = .past }
-                    } label: {
-                        liveOption(
-                            title: ATHLTHLocalization.choose(
-                                english: "Your Ghost", norwegian: "Eget løp"
-                            ),
-                            detail: ATHLTHLocalization.choose(
-                                english: "Previous run", norwegian: "Tidligere økt"
-                            ),
-                            icon: "clock.arrow.circlepath",
-                            selected: false
-                        )
-                    }
-                    .buttonStyle(.plain)
                 }
+
                 Text(ATHLTHLocalization.choose(
                     english: "Only runners who share their activity appear in the list.",
                     norwegian: "Bare løpere som deler aktiviteten sin, vises i listen."
@@ -1992,16 +1901,12 @@ struct GhostRaceHubView: View {
                 .lineLimit(1)
         }
         .foregroundStyle(selected ? Color.white : ATHLTHTheme.primaryText)
-        .frame(maxWidth: .infinity)
-        .frame(height: 43)
+        .frame(maxWidth: .infinity, minHeight: 44)
         .background(
-            selected ? ATHLTHTheme.accentDeep : Color.white.opacity(0.85),
+            selected ? ATHLTHTheme.accentDeep : Color.clear,
             in: RoundedRectangle(cornerRadius: 13, style: .continuous)
         )
-        .overlay {
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .stroke(selected ? Color.clear : ATHLTHTheme.border, lineWidth: 0.7)
-        }
+        .contentShape(Rectangle())
     }
 
     private func clock(
