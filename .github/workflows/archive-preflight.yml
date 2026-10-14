@@ -34,6 +34,27 @@ jobs:
           set -euo pipefail
           xcodebuild             -project ATHLTH.xcodeproj             -scheme ATHLTH             -configuration Release             -destination 'generic/platform=iOS'             -archivePath "$RUNNER_TEMP/ATHLTH.xcarchive"             CODE_SIGNING_ALLOWED=NO             archive
 
+      - name: Verify RepDB offline library in archived iOS app
+        run: |
+          set -euo pipefail
+          BUNDLE="$RUNNER_TEMP/ATHLTH.xcarchive/Products/Applications/ATHLTH.app/RepDBOffline.bundle"
+          test -s "$BUNDLE/exercises.json" || { echo "::error::RepDB catalog is missing from iOS archive"; exit 1; }
+          python3 - "$BUNDLE" <<'PY'
+          import json, pathlib, sys
+          root = pathlib.Path(sys.argv[1])
+          document = json.loads((root / "exercises.json").read_text())
+          exercises = document["exercises"]
+          images = {
+              x for ex in exercises
+              for x in ((ex.get("images") or {}).get("flat") or {}).values()
+              if isinstance(x, str) and x.startswith("images/flat/")
+          }
+          missing = [x for x in images if not (root / x).is_file()]
+          assert len(exercises) >= 400, f"Insufficient exercises: {len(exercises)}"
+          assert not missing, f"Missing offline exercise art: {missing[:5]}"
+          print(f"Verified {len(exercises)} offline exercises and {len(images)} illustrated assets")
+          PY
+
       - name: Verify archive contents
         shell: bash
         run: |
