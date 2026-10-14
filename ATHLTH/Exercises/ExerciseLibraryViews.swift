@@ -968,6 +968,7 @@ struct ExerciseDetailView: View {
     @EnvironmentObject private var library: ExerciseLibraryStore
     @ObservedObject private var norwegianTranslations = NorwegianExerciseAutoTranslation.shared
     @State private var detailTranslationConfig: TranslationSession.Configuration?
+    @State private var showOriginalEnglish = false
     @State private var languageStatus: LanguageAvailability.Status = .unsupported
 
     let entry: ExerciseLibraryEntry
@@ -979,6 +980,24 @@ struct ExerciseDetailView: View {
 
     private var currentEntry: ExerciseLibraryEntry {
         library.allExercises.first(where: { $0.id == entry.id }) ?? entry
+    }
+
+    private var displayedSummary: String? {
+        showOriginalEnglish
+            ? currentEntry.summary
+            : library.localizedExerciseSummary(currentEntry)
+    }
+
+    private var displayedInstructions: [String] {
+        showOriginalEnglish
+            ? currentEntry.exercise.instructions
+            : library.localizedExerciseInstructions(currentEntry)
+    }
+
+    private var displayedTips: [String] {
+        showOriginalEnglish
+            ? currentEntry.tips
+            : library.localizedExerciseTips(currentEntry)
     }
 
     var body: some View {
@@ -1003,10 +1022,22 @@ struct ExerciseDetailView: View {
                     .foregroundStyle(.secondary)
                 }
 
-                if let summary = library.localizedExerciseSummary(currentEntry),
-                   !summary.isEmpty {
-                    Text(summary)
-                        .font(.subheadline)
+                if let summary = displayedSummary, !summary.isEmpty {
+                    Text(summary).font(.subheadline)
+                }
+
+                if ATHLTHLocalization.isNorwegian,
+                   currentEntry.source == .repDB {
+                    HStack(spacing: 8) {
+                        Text("Norsk tekst kan være automatisk oversatt.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Spacer(minLength: 0)
+                        Button(showOriginalEnglish ? "Vis norsk" : "Vis original (EN)") {
+                            showOriginalEnglish.toggle()
+                        }
+                        .font(.caption2.weight(.semibold))
+                    }
                 }
 
                 if ATHLTHLocalization.isNorwegian,
@@ -1025,13 +1056,13 @@ struct ExerciseDetailView: View {
                     .buttonStyle(.bordered)
                 }
 
-                if !library.localizedExerciseInstructions(currentEntry).isEmpty {
+                if !displayedInstructions.isEmpty {
                     detailCard(ATHLTHLocalization.choose(
                         english: "How to perform",
                         norwegian: "Slik utfører du øvelsen"
                     )) {
                         ForEach(
-                            Array(library.localizedExerciseInstructions(currentEntry).enumerated()),
+                            Array(displayedInstructions.enumerated()),
                             id: \.offset
                         ) { index, instruction in
                             HStack(alignment: .top, spacing: 10) {
@@ -1076,9 +1107,9 @@ struct ExerciseDetailView: View {
                     }
                 }
 
-                if !library.localizedExerciseTips(currentEntry).isEmpty {
+                if !displayedTips.isEmpty {
                     detailCard("Tips") {
-                        ForEach(library.localizedExerciseTips(currentEntry), id: \.self) { tip in
+                        ForEach(displayedTips, id: \.self) { tip in
                             Label(tip, systemImage: "lightbulb.fill")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
