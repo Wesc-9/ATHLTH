@@ -19,6 +19,8 @@ struct ATHLTHTrainIntervalComposerView: View {
     @State private var pauseSeconds = 120
     @State private var paceEnabled = false
     @State private var paceSeconds = 300
+    @State private var speedInputEnabled = false
+    @State private var speedKilometersPerHour = 12.0
     @State private var notes = ""
     @State private var heartRateTargetEnabled = false
     @State private var heartRateZone = 4
@@ -249,11 +251,18 @@ struct ATHLTHTrainIntervalComposerView: View {
                 Toggle(tr("Target pace", "Måltempo"), isOn: $paceEnabled)
                     .tint(bronze)
                 if paceEnabled {
-                    Stepper(paceLabel(paceSeconds),
-                            value: $paceSeconds,
-                            in: 150...1200,
-                            step: 5)
-                        .font(.subheadline)
+                    Toggle(tr("Enter target as speed", "Bruk hastighet (km/t)"),
+                           isOn: $speedInputEnabled)
+                        .tint(bronze)
+                    if speedInputEnabled {
+                        Stepper(String(format: "%.1f km/t", speedKilometersPerHour),
+                                value: $speedKilometersPerHour,
+                                in: 3...25, step: 0.5)
+                    } else {
+                        Stepper(paceLabel(paceSeconds),
+                                value: $paceSeconds,
+                                in: 150...1200, step: 5)
+                    }
                 }
                 Toggle(tr("Heart-rate zone target", "Målsone for puls"),
                        isOn: $heartRateTargetEnabled)
@@ -373,17 +382,21 @@ struct ATHLTHTrainIntervalComposerView: View {
         }
         paceEnabled = block.work.intensity.paceMinSecondsPerKilometer != nil
         paceSeconds = Int(block.work.intensity.paceMinSecondsPerKilometer ?? 300)
+        speedInputEnabled = false
+        speedKilometersPerHour = 3_600 / Double(max(paceSeconds, 1))
         heartRateTargetEnabled = block.work.intensity.heartRateZone != nil
         heartRateZone = block.work.intensity.heartRateZone ?? 4
         notes = block.notes ?? ""
     }
 
     private func addBlock() {
+        let resolvedPace = speedInputEnabled
+            ? 3_600 / max(speedKilometersPerHour, 0.5) : Double(paceSeconds)
         let intensity = RunningIntensityTarget(
             kind: paceEnabled ? .pace :
                   heartRateTargetEnabled ? .heartRateZone : .easy,
-            paceMinSecondsPerKilometer: paceEnabled ? Double(paceSeconds) : nil,
-            paceMaxSecondsPerKilometer: paceEnabled ? Double(paceSeconds) : nil,
+            paceMinSecondsPerKilometer: paceEnabled ? resolvedPace : nil,
+            paceMaxSecondsPerKilometer: paceEnabled ? resolvedPace : nil,
             heartRateZone: heartRateTargetEnabled ? heartRateZone : nil,
             rpe: nil
         )
