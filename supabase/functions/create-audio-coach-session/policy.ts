@@ -39,3 +39,20 @@ export function coachSessionInstructions(choices: LiveCoachSessionChoices): stri
     "Do not claim to be a human coach or an emergency service.",
   ].join("\n");
 }
+
+/**
+ * Keep spoken responses short. This per-response cap does not replace
+ * account-level usage limits or provider billing controls.
+ */
+export function realtimeCoachSessionConfiguration(
+  choices: LiveCoachSessionChoices,
+  model = "gpt-realtime-2.1",
+) {
+  return {
+    type: "realtime",
+    model,
+    max_output_tokens: 512,
+    instructions: coachSessionInstructions(choices),
+    audio: { output: { voice: "marin" } },
+  };
+}

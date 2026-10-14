@@ -33,3 +33,9 @@ The model and API availability must be checked against the provider account befo
 ```sh
 deno test supabase/functions/create-audio-coach-session/policy.test.ts
 ```
+
+## Audio robustness
+- Each model response is capped at 512 output tokens. This is **not** a server-enforced total conversation minute limit or account budget.
+- Server VAD explicitly creates responses and interrupts a previous response when the athlete starts speaking again.
+- The iPhone stops sharing voice audio on an incoming audio interruption or removal of an existing headset (e.g., unplugged AirPods).
+- Live AI remains disabled at the backend until hardware validation and provider spending limits have been approved.

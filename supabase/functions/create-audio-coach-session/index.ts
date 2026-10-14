@@ -2,7 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { enforceAIRequestBudget } from "../_shared/ai-request-budget.ts";
 import {
   checkLiveCoachConsent,
-  coachSessionInstructions,
+  realtimeCoachSessionConfiguration,
 } from "./policy.ts";
 
 const headers = {
@@ -96,12 +96,10 @@ Deno.serve(async (request: Request) => {
   const hashedID = Array.from(new Uint8Array(digest))
     .map((v) => v.toString(16).padStart(2, "0")).join("");
 
-  const session = {
-    type: "realtime",
-    model: Deno.env.get("OPENAI_REALTIME_MODEL") ?? "gpt-realtime-2.1",
-    instructions: coachSessionInstructions(choices),
-    audio: { output: { voice: "marin" } },
-  };
+  const session = realtimeCoachSessionConfiguration(
+    choices,
+    Deno.env.get("OPENAI_REALTIME_MODEL") ?? "gpt-realtime-2.1",
+  );
 
   let response: Response;
   try {

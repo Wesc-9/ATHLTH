@@ -40,6 +40,8 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
     private var previousAudioCategory: AVAudioSession.Category?
     private var previousAudioMode: AVAudioSession.Mode?
     private var previousAudioOptions: AVAudioSession.CategoryOptions?
+    private var interruptionObserver: NSObjectProtocol?
+    private var routeChangeObserver: NSObjectProtocol?
 
     /// Set only after a separate, in-session workout data opt-in. Never
     /// poll or proactively stream metrics. Resolved on each AI tool request.
@@ -170,6 +172,8 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
                                         "type": "server_vad",
                                         "silence_duration_ms": 550,
                                         "prefix_padding_ms": 300,
+                                        "create_response": true,
+                                        "interrupt_response": true,
                                     ],
                                 ],
                                 "output": ["format": [
@@ -358,10 +362,51 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
             player.play()
             audioEngine = engine
             outputPlayer = player
+            observeAudioSafetyEvents()
         } catch {
             inputNode.removeTap(onBus: 0)
             throw error
         }
+    }
+
+    /// Stop capture if a call interrupts audio or a headset disconnects.
+    /// Never switch private AI output silently to the phone loudspeaker.
+    private func observeAudioSafetyEvents() {
+        guard interruptionObserver == nil, routeChangeObserver == nil else { return }
+        let center = NotificationCenter.default
+        interruptionObserver = center.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] event in
+            guard let raw = event.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  AVAudioSession.InterruptionType(rawValue: raw) == .began
+            else { return }
+            Task { @MainActor [weak self] in
+                self?.stopForAudioSafety()
+            }
+        }
+        routeChangeObserver = center.addObserver(
+            forName: AVAudioSession.routeChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] event in
+            guard let raw = event.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
+                  AVAudioSession.RouteChangeReason(rawValue: raw) == .oldDeviceUnavailable
+            else { return }
+            Task { @MainActor [weak self] in
+                self?.stopForAudioSafety()
+            }
+        }
+    }
+
+    private func stopForAudioSafety() {
+        guard state.isActive else { return }
+        stop()
+        state = .failed(ATHLTHLocalization.choose(
+            english: "Audio was interrupted or your headphones disconnected. The AI microphone is off. Your workout continues.",
+            norwegian: "Lyden ble avbrutt eller hodetelefonene ble koblet fra. AI-mikrofonen er av. Treningsøkten fortsetter."
+        ))
     }
 
     private func enqueueMicrophone(_ data: Data) {
@@ -410,6 +455,11 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
     private func playPCM(_ bytes: Data) {
         guard let player = outputPlayer,
               bytes.count >= 2 else { return }
+        // Reject unexpectedly large provider audio chunks to bound allocations.
+        guard bytes.count <= 480_000 else {
+            stopForAudioSafety()
+            return
+        }
         let frameCount = bytes.count / 2
         let format = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
@@ -433,6 +483,14 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
     }
 
     func stop() {
+        if let interruptionObserver {
+            NotificationCenter.default.removeObserver(interruptionObserver)
+            self.interruptionObserver = nil
+        }
+        if let routeChangeObserver {
+            NotificationCenter.default.removeObserver(routeChangeObserver)
+            self.routeChangeObserver = nil
+        }
         generation = UUID()
         readerTask?.cancel()
         readerTask = nil

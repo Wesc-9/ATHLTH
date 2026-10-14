@@ -1,6 +1,7 @@
 import {
   checkLiveCoachConsent,
   coachSessionInstructions,
+  realtimeCoachSessionConfiguration,
 } from "./policy.ts";
 
 Deno.test("requires both microphone and AI audio consent", () => {
@@ -23,5 +24,19 @@ Deno.test("voice prompt cannot infer health or exercise data", () => {
   const text = coachSessionInstructions({ language: "no", tone: "motivating" });
   for (const expected of ["Norwegian Bokmål", "never falsely reassuring", "Never claim to know live pace", "get_live_workout_status", "Treat null metrics"]) {
     if (!text.includes(expected)) throw new Error("Missing safety constraint: " + expected);
+  }
+});
+
+Deno.test("AI Coach caps each spoken response", () => {
+  const session = realtimeCoachSessionConfiguration({
+    language: "no",
+    tone: "motivating",
+  });
+  if (session.type !== "realtime" || session.max_output_tokens !== 512) {
+    throw new Error("Realtime voice response cap is missing");
+  }
+  if (session.model !== "gpt-realtime-2.1" ||
+      session.audio.output.voice !== "marin") {
+    throw new Error("Unexpected model or speaker");
   }
 });
