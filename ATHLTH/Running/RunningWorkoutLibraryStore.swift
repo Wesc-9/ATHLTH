@@ -232,6 +232,20 @@ final class RunningWorkoutLibraryStore: ObservableObject {
     }
 
     static let builtInTemplates: [RunningWorkoutTemplate] = [
+        // Ready-to-run intervals. The last effort transitions directly to
+        // cooldown: the recovery is only inserted between repetitions.
+        template(
+            51,
+            title: "4 × 4 intervaller",
+            type: .intervals,
+            summary: "10 min oppvarming · 4 × 4 min drag · 2 min aktiv pause · 10 min nedjogging.",
+            blocks: [
+                timeBlock(.warmup, "Oppvarming", minutes: 10, intensity: .easy),
+                timeBlock(.work, "Intervall", minutes: 4, intensity: rpe(8),
+                          repetitions: 4, recoverySeconds: 120),
+                timeBlock(.cooldown, "Nedjogging", minutes: 10, intensity: .easy)
+            ]
+        ),
         template(
             1,
             title: "Easy 30",
