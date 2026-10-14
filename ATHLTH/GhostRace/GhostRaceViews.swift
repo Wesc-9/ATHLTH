@@ -1213,95 +1213,130 @@ struct GhostRaceHubView: View {
         .buttonStyle(.plain)
     }
 
+    private var availableTargetGhostRoutes: [TrainingRoute] {
+        session.savedRoutes
+            .filter { GhostTargetRouteEligibility.isUsable($0) }
+            .sorted { $0.createdAt > $1.createdAt }
+    }
+
     private var targetGhostSection: some View {
         ATHLTHCard {
             VStack(alignment: .leading, spacing: 13) {
-                HStack {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Choose your course", norwegian: "Velg løype"
-                    ))
-                    .font(.headline)
-                    Spacer()
-                    NavigationLink {
-                        TargetGhostRoutePickerView()
-                    } label: {
-                        HStack(spacing: 5) {
-                            Text(ATHLTHLocalization.choose(
-                                english: "See all", norwegian: "Se alle"
-                            ))
-                            Image(systemName: "chevron.right")
-                        }
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Choose a course",
+                            norwegian: "Velg en løype"
+                        ))
+                        .font(.headline)
+
+                        Text(ATHLTHLocalization.choose(
+                            english: advancedMode
+                                ? "Choose a GPS course, then fine-tune time, pace and Ghost strategy."
+                                : "Select a course. A finish-time suggestion is ready for you.",
+                            norwegian: advancedMode
+                                ? "Velg GPS-løype og finjuster tid, tempo og Ghost-strategi."
+                                : "Velg en løype. Du får et ferdig forslag til sluttid."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
                     }
+
+                    Spacer(minLength: 8)
                 }
 
-                if session.savedRoutes.isEmpty {
+                if availableTargetGhostRoutes.isEmpty {
                     ContentUnavailableView(
                         ATHLTHLocalization.choose(
-                            english: "No saved courses",
-                            norwegian: "Ingen lagrede løyper"
+                            english: "No ready GPS courses",
+                            norwegian: "Ingen klare GPS-løyper"
                         ),
                         systemImage: "map",
                         description: Text(ATHLTHLocalization.choose(
-                            english: "Save a route to create a target Ghost.",
-                            norwegian: "Lagre en rute for å opprette en mål-Ghost."
+                            english: "A target Ghost needs a saved route with GPS geometry. Find or save a route to get started.",
+                            norwegian: "Mål-Ghost trenger en lagret løype med GPS-punkter. Finn eller lagre en løype for å komme i gang."
                         ))
                     )
+
                     NavigationLink {
                         RouteLibraryListView(source: .database)
                     } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Browse routes",
-                                norwegian: "Finn løyper"
-                            ),
-                            systemImage: "map.fill"
-                        )
+                        Label(ATHLTHLocalization.choose(
+                            english: "Find courses",
+                            norwegian: "Finn løyper"
+                        ), systemImage: "map.fill")
+                            .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .buttonStyle(.bordered)
                 } else {
-                    ForEach(
-                        Array(session.savedRoutes.sorted {
-                            $0.createdAt > $1.createdAt
-                        }.prefix(3))
-                    ) { route in
+                    ForEach(Array(availableTargetGhostRoutes.prefix(
+                        advancedMode ? 5 : 3
+                    ))) { route in
                         NavigationLink {
                             TargetGhostSetupView(route: route)
                         } label: {
                             HStack(spacing: 12) {
-                                RouteMapSnapshotThumbnail(route: route, height: 80)
-                                    .frame(width: 103, height: 80)
-                                VStack(alignment: .leading, spacing: 5) {
+                                RouteMapSnapshotThumbnail(
+                                    route: route, height: 76
+                                )
+                                .frame(width: 98, height: 76)
+
+                                VStack(alignment: .leading, spacing: 6) {
                                     Text(route.title)
                                         .font(.subheadline.weight(.semibold))
                                         .foregroundStyle(ATHLTHTheme.primaryText)
-                                        .lineLimit(1)
-                                    Text(
-                                        String(format: "%.1f km", route.distanceKilometers)
+                                        .lineLimit(2)
+
+                                    Label(
+                                        String(format: "%.1f km", route.distanceKilometers),
+                                        systemImage: "figure.run"
                                     )
                                     .font(.caption)
                                     .foregroundStyle(ATHLTHTheme.mutedText)
+
                                     Text(ATHLTHLocalization.choose(
-                                        english: "Choose finish time or pace",
-                                        norwegian: "Velg sluttid eller tempo"
+                                        english: advancedMode
+                                            ? "Configure Ghost" : "Choose finish time",
+                                        norwegian: advancedMode
+                                            ? "Tilpass Ghost" : "Velg sluttid"
                                     ))
-                                    .font(.caption2)
+                                    .font(.caption2.weight(.semibold))
                                     .foregroundStyle(ATHLTHTheme.accentDeep)
                                 }
+
                                 Spacer(minLength: 0)
-                                Image(systemName: "chevron.right")
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(.secondary)
+
+                                Image(systemName: "arrow.up.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
                             }
-                            .padding(8)
+                            .padding(9)
                             .background(
                                 ATHLTHTheme.surfaceStone,
                                 in: RoundedRectangle(cornerRadius: 16)
                             )
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }
+
+                    NavigationLink {
+                        TargetGhostRoutePickerView()
+                    } label: {
+                        HStack(spacing: 7) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "See all saved courses",
+                                norwegian: "Se alle lagrede løyper"
+                            ))
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
