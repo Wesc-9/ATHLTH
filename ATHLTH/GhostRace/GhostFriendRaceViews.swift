@@ -51,6 +51,7 @@ struct GhostFriendRaceHubView: View {
     @State private var inviteStep: GhostInvitationStep = .friend
     @State private var friendSearch = ""
     @State private var showSentConfirmation = false
+    @State private var didAutoOpenInvitation = false
     @AppStorage("athlth.ghostRace.live.advancedMode")
     private var advancedMode = false
     @State private var showingRoutePicker = false
@@ -62,14 +63,17 @@ struct GhostFriendRaceHubView: View {
         WorkoutCaptureDevice = .iPhone
     private let arenaRoundID: UUID?
     private let agreedArenaRouteID: UUID?
+    private let openInvitationOnAppear: Bool
 
     /// Opening a duel from an active Arena 1v1 series can suggest its
     /// opponent; the existing mutual-follow and permission checks remain.
     init(
         preferredFriendID: UUID? = nil,
         preferredRoute: TrainingRoute? = nil,
-        arenaRoundID: UUID? = nil
+        arenaRoundID: UUID? = nil,
+        openInvitationOnAppear: Bool = false
     ) {
+        self.openInvitationOnAppear = openInvitationOnAppear
         self.arenaRoundID = arenaRoundID
         self.agreedArenaRouteID = arenaRoundID == nil ? nil : preferredRoute?.id
         _selectedFriendID = State(initialValue: preferredFriendID)
@@ -188,6 +192,11 @@ struct GhostFriendRaceHubView: View {
             invitationComposer
         }
         .task {
+            if openInvitationOnAppear && !didAutoOpenInvitation {
+                didAutoOpenInvitation = true
+                inviteStep = selectedFriendID == nil ? .friend : .reference
+                showingInviteComposer = true
+            }
             await social.refresh()
             await friendRaces.refresh()
             await realtime.refreshOnlineUsers()
