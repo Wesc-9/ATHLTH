@@ -240,6 +240,12 @@ struct RunningWorkoutTemplate: Identifiable, Codable, Hashable {
     var sharedSourceOwnerID: UUID? = nil
     var sharedSourceWorkoutID: UUID? = nil
 
+    /// Virtual interval pacer, active only during work reps (not recovery).
+    /// This is independent of route-matched Ghost Race.
+    var intervalGhostPaceSecondsPerKilometer: Double? = nil
+    /// Optional instructions set before the workout for Audio Coach.
+    var coachBrief: String? = nil
+
     var estimatedDistanceMeters: Double? {
         let values = blocks.compactMap { block -> Double? in
             guard block.work.measure == .distance,
