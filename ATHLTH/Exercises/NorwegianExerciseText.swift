@@ -17,7 +17,7 @@ enum NorwegianExerciseText {
     private static let records: [String: Record] = {
         guard let url = Bundle.main.url(
             forResource: "ExerciseTranslations",
-            withExtension: "nb.json"
+            withExtension: "json"
         ), let data = try? Data(contentsOf: url),
            let values = try? JSONDecoder().decode([String: Record].self, from: data)
         else { return [:] }
@@ -35,7 +35,10 @@ enum NorwegianExerciseText {
     static func equipment(_ value: String) -> String {
         guard ATHLTHLocalization.isNorwegian else { return value }
         let key = normalize(value)
-        let names: [String: String] = [
+        return equipmentNames[key] ?? value
+    }
+
+    private static let equipmentNames: [String: String] = [
             "ab crunch machine": "Magemaskin",
             "ab wheel": "Magehjul",
             "air bike": "Airbike",
@@ -96,8 +99,6 @@ enum NorwegianExerciseText {
             "weight": "Vekt",
             "weighted vest": "Vektvest"
         ]
-        return names[key] ?? value
-    }
 
     static func difficulty(_ value: String) -> String {
         guard ATHLTHLocalization.isNorwegian else { return value }
