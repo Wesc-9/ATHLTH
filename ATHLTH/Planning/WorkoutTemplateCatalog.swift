@@ -1404,218 +1404,92 @@ struct MyWorkoutTemplatesView: View {
 struct WorkoutTemplateBuilderView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
-    @EnvironmentObject private var exerciseLibrary:
-        ExerciseLibraryStore
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
 
     @State private var title = ""
-    @State private var category = "hybrid"
     @State private var blocks: [WorkoutTemplateBlock] = []
     @State private var selectedRouteID: UUID?
     @State private var showingExercisePicker = false
     @State private var selectedPhase: WorkoutPhaseKind = .main
+    @State private var expandedBlockIndex: Int?
+
+    private func tr(_ english: String, _ norwegian: String) -> String {
+        ATHLTHLocalization.choose(english: english, norwegian: norwegian)
+    }
+
+    private var hasRunning: Bool {
+        blocks.contains(where: { $0.kind == .run })
+    }
+
+    private var hasStrength: Bool {
+        blocks.contains(where: { $0.kind == .exercise })
+    }
+
+    // Infer the workout type from its actual content, instead of forcing a type
+    // before the user has added any blocks.
+    private var category: String {
+        if hasRunning && hasStrength { return "hybrid" }
+        if hasRunning { return "running" }
+        if hasStrength { return "strength" }
+        return "custom"
+    }
+
+    private var categoryTitle: String {
+        switch category {
+        case "hybrid": return tr("Hybrid", "Hybrid")
+        case "running": return tr("Running", "Løping")
+        case "strength": return tr("Strength", "Styrke")
+        default: return tr("Custom", "Egendefinert")
+        }
+    }
 
     private var canSave: Bool {
-        !title.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        ).isEmpty &&
-        !blocks.isEmpty
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && (hasRunning || hasStrength)
+    }
+
+    private var knownDurationMinutes: Int? {
+        let total = blocks.compactMap(\.durationSeconds).reduce(0, +)
+        return total > 0 ? Int(ceil(total / 60)) : nil
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    ATHLTHCard {
-                        Text("BUILD WORKOUT")
-                            .font(.caption2.weight(.bold))
-                            .tracking(1.8)
-                            .foregroundStyle(
-                                ATHLTHTheme.mutedText
-                            )
-
-                        TextField(
-                            "Workout name",
-                            text: $title
-                        )
-                        .font(.title3.weight(.semibold))
-                        .padding(.top, 8)
-
-                        Picker(
-                            "Workout type",
-                            selection: $category
-                        ) {
-                            Text("Hybrid")
-                                .tag("hybrid")
-                            Text("Running")
-                                .tag("running")
-                            Text("Strength")
-                                .tag("strength")
-                            Text("Custom")
-                                .tag("custom")
-                        }
-                        .pickerStyle(.segmented)
-                        .padding(.top, 12)
+                VStack(alignment: .leading, spacing: 18) {
+                    workoutOverview
+                    timeline
+                    addBlockSection
+                    if hasRunning {
+                        routeSection
                     }
-
-                    if category == "running" ||
-                        category == "hybrid" {
-                        ATHLTHCard {
-                            HStack {
-                                Label(
-                                    "Route",
-                                    systemImage: "map"
-                                )
-                                .font(.headline)
-
-                                Spacer()
-
-                                Picker(
-                                    "Route",
-                                    selection: $selectedRouteID
-                                ) {
-                                    Text("–")
-                                        .tag(nil as UUID?)
-
-                                    ForEach(
-                                        session.savedRoutes
-                                    ) { route in
-                                        Text(route.title)
-                                            .tag(
-                                                route.id as UUID?
-                                            )
-                                    }
-                                }
-                                .labelsHidden()
-                            }
-
-                            Text(
-                                "Optional. The route is attached to this workout, not treated as a separate workout."
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 4)
-                        }
-                    }
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("BLOCKS")
-                                .font(.caption2.weight(.bold))
-                                .tracking(1.8)
-                                .foregroundStyle(
-                                    ATHLTHTheme.mutedText
-                                )
-
-                            Spacer()
-
-                            Text("\(blocks.count)")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                        }
-
-                        if blocks.isEmpty {
-                            ATHLTHCard {
-                                Text(
-                                    "Build the workout in the order it should be performed. A block can be a run, an exercise or recovery."
-                                )
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            }
-                        } else {
-                            ForEach(
-                                Array(blocks.indices),
-                                id: \.self
-                            ) { index in
-                                builderBlockRow(index)
-                            }
-                        }
-                    }
-
-                    ATHLTHCard {
-                        Text(ATHLTHLocalization.choose(
-                            english: "PIN A WORKOUT PHASE",
-                            norwegian: "FEST EN DEL AV ØKTEN"
-                        ))
-                            .font(.caption2.weight(.bold))
-                            .tracking(1.5)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                        Picker(ATHLTHLocalization.choose(english: "Phase", norwegian: "Fase"),
-                               selection: $selectedPhase) {
-                            ForEach(WorkoutPhaseKind.allCases) { phase in
-                                Text(phase.title).tag(phase)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .padding(.top, 9)
-
-                        HStack(spacing: 9) {
-                            blockAddButton(
-                                "Run",
-                                icon: "figure.run"
-                            ) {
-                                addRunBlock()
-                            }
-
-                            blockAddButton(
-                                "Exercise",
-                                icon: "dumbbell.fill"
-                            ) {
-                                showingExercisePicker = true
-                            }
-
-                            blockAddButton(
-                                "Rest",
-                                icon: "pause.fill"
-                            ) {
-                                addRestBlock()
-                            }
-                        }
-                        .padding(.top, 10)
-                    }
-
-                    Button {
-                        saveWorkout()
-                    } label: {
-                        Label(
-                            "Save Workout",
-                            systemImage:
-                                "checkmark.circle.fill"
-                        )
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 52)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.accentDeep)
-                    .disabled(!canSave)
                 }
-                .padding(18)
+                .padding(.horizontal, 18)
+                .padding(.top, 14)
+                .padding(.bottom, 24)
                 .frame(maxWidth: 720)
                 .frame(maxWidth: .infinity)
             }
-            .background(
-                ATHLTHPremiumCanvas(
-                    accent: Color.teal.opacity(0.12)
-                )
-            )
-            .navigationTitle("Create Workout")
+            .background(ATHLTHPremiumCanvas(accent: Color.teal.opacity(0.12)))
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                saveBar
+            }
+            .navigationTitle(tr("Create Workout", "Lag treningsøkt"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(
-                    placement: .cancellationAction
-                ) {
-                    Button("Cancel") {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(tr("Cancel", "Avbryt")) {
                         dismiss()
                     }
                 }
             }
-            .sheet(
-                isPresented: $showingExercisePicker
-            ) {
+            .sheet(isPresented: $showingExercisePicker) {
                 NavigationStack {
+                    // No fixed source: allow switching between the ATHLTH
+                    // library and exercises created by the user.
                     ExerciseLibraryView(
-                        source: .library,
-                        selectionTitle: "Add Exercise"
+                        source: nil,
+                        selectionTitle: tr("Add Exercise", "Legg til øvelse")
                     ) { entry in
                         addExerciseBlock(entry)
                         showingExercisePicker = false
@@ -1630,74 +1504,204 @@ struct WorkoutTemplateBuilderView: View {
         }
     }
 
-    private func builderBlockRow(
-        _ index: Int
-    ) -> some View {
-        let block = blocks[index]
-
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Text("\(index + 1)")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(
-                        ATHLTHTheme.accentDeep
-                    )
-                    .frame(width: 28, height: 28)
-                    .background(
-                        ATHLTHTheme.accentSoft,
-                        in: Circle()
-                    )
-
-                Image(systemName: block.kind.systemImage)
-                    .foregroundStyle(
-                        block.kind == .run
-                            ? ATHLTHTheme.vitality
-                            : ATHLTHTheme.accentDeep
-                    )
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Label(block.resolvedPhase.title, systemImage: block.resolvedPhase.symbol)
-                        .font(.caption2.weight(.semibold))
+    private var workoutOverview: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(tr("NEW WORKOUT", "NY TRENINGSØKT"))
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.6)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    Spacer()
+                    Label(categoryTitle, systemImage: "circle.grid.2x2")
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(ATHLTHTheme.accentDeep)
-                    Text(block.title)
-                        .font(.subheadline.weight(.semibold))
                 }
 
+                TextField(tr("Name your workout", "Gi økten et navn"), text: $title)
+                    .font(.title2.weight(.bold))
+                    .textInputAutocapitalization(.sentences)
+
+                HStack(spacing: 14) {
+                    Label("\(blocks.count) " + tr("blocks", "blokker"),
+                          systemImage: "rectangle.stack")
+                    if let knownDurationMinutes {
+                        Label("\(knownDurationMinutes) " + tr("min", "min"),
+                              systemImage: "clock")
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var timeline: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(tr("YOUR WORKOUT", "DIN TRENINGSØKT"))
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.6)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
                 Spacer()
-
-                Menu {
-                    ForEach(WorkoutPhaseKind.allCases) { phase in
-                        Button {
-                            blocks[index].phase = phase
-                        } label: {
-                            Label(phase.title, systemImage: phase.symbol)
-                        }
-                    }
-                    if index > 0 {
-                        Button(ATHLTHLocalization.choose(english: "Move up", norwegian: "Flytt opp")) {
-                            blocks.swapAt(index, index - 1)
-                            resequence()
-                        }
-                    }
-                    if index < blocks.count - 1 {
-                        Button(ATHLTHLocalization.choose(english: "Move down", norwegian: "Flytt ned")) {
-                            blocks.swapAt(index, index + 1)
-                            resequence()
-                        }
-                    }
-                    Button(role: .destructive) {
-                        blocks.remove(at: index)
-                        resequence()
-                    } label: {
-                        Label(ATHLTHLocalization.choose(english: "Remove", norwegian: "Fjern"), systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.caption)
+                if !blocks.isEmpty {
+                    Text(tr("Tap a block to edit", "Trykk på en blokk for å redigere"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
             }
 
+            if blocks.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "figure.run.square.stack")
+                        .font(.system(size: 29, weight: .light))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    Text(tr("Build your session, one block at a time",
+                            "Bygg økten, én blokk om gangen"))
+                        .font(.headline)
+                        .multilineTextAlignment(.center)
+                    Text(tr("Start with an exercise, run or warm-up. The timeline will appear here.",
+                            "Start med en øvelse, løpetur eller oppvarming. Økten vises her etter hvert."))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button {
+                        showingExercisePicker = true
+                    } label: {
+                        Label(tr("Add exercise", "Legg til øvelse"),
+                              systemImage: "plus.circle.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 46)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accentDeep)
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity)
+                .background(Color.white.opacity(0.82),
+                            in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            } else {
+                VStack(spacing: 2) {
+                    ForEach(Array(blocks.indices), id: \.self) { index in
+                        builderBlockRow(index)
+                    }
+                }
+            }
+        }
+    }
+
+    private func builderBlockRow(_ index: Int) -> some View {
+        let block = blocks[index]
+        let isExpanded = expandedBlockIndex == index
+
+        return HStack(alignment: .top, spacing: 11) {
+            VStack(spacing: 4) {
+                Image(systemName: block.resolvedPhase.symbol)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 30, height: 30)
+                    .background(ATHLTHTheme.accentSoft, in: Circle())
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(ATHLTHTheme.accentDeep.opacity(0.16))
+                    .frame(width: 2, height: isExpanded ? 170 : 64)
+            }
+            .frame(width: 30)
+
+            VStack(alignment: .leading, spacing: 11) {
+                HStack(spacing: 8) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            expandedBlockIndex = isExpanded ? nil : index
+                        }
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: block.kind.systemImage)
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundStyle(
+                                    block.kind == .run
+                                        ? ATHLTHTheme.vitality
+                                        : ATHLTHTheme.accentDeep
+                                )
+                                .frame(width: 26)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(block.resolvedPhase.title.uppercased())
+                                    .font(.caption2.weight(.bold))
+                                    .tracking(0.8)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                Text(block.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.primary)
+                                if let targetText = block.targetText {
+                                    Text(targetText)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(2)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Menu {
+                        ForEach(WorkoutPhaseKind.allCases) { phase in
+                            Button {
+                                blocks[index].phase = phase
+                            } label: {
+                                Label(phase.title, systemImage: phase.symbol)
+                            }
+                        }
+                        if index > 0 {
+                            Button(tr("Move up", "Flytt opp"), systemImage: "arrow.up") {
+                                blocks.swapAt(index, index - 1)
+                                resequence()
+                                expandedBlockIndex = index - 1
+                            }
+                        }
+                        if index < blocks.count - 1 {
+                            Button(tr("Move down", "Flytt ned"), systemImage: "arrow.down") {
+                                blocks.swapAt(index, index + 1)
+                                resequence()
+                                expandedBlockIndex = index + 1
+                            }
+                        }
+                        Button(role: .destructive) {
+                            blocks.remove(at: index)
+                            resequence()
+                            expandedBlockIndex = nil
+                        } label: {
+                            Label(tr("Remove", "Fjern"), systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 32, height: 36)
+                            .contentShape(Rectangle())
+                    }
+                }
+
+                if isExpanded {
+                    Divider()
+                    blockDetails(index)
+                }
+            }
+            .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.white.opacity(0.87),
+                        in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+    }
+
+    @ViewBuilder
+    private func blockDetails(_ index: Int) -> some View {
+        let block = blocks[index]
             switch block.kind {
             case .run:
                 TextField(ATHLTHLocalization.choose(english: "Activity (jogging, strides, drills)",
@@ -1757,9 +1761,7 @@ struct WorkoutTemplateBuilderView: View {
                     value: repetitionsBinding(index),
                     in: 1...300
                 ) {
-                    Text(
-                        "Target · \(blocks[index].repetitions ?? 10) reps"
-                    )
+                    Text(tr("Target", "Mål") + " · \(blocks[index].repetitions ?? 10) " + tr("reps", "reps"))
                     .font(.caption)
                 }
 
@@ -1769,48 +1771,134 @@ struct WorkoutTemplateBuilderView: View {
                     in: 15...900,
                     step: 15
                 ) {
-                    Text(
-                        "Recovery · \(Int((blocks[index].durationSeconds ?? 60).rounded())) sec"
-                    )
+                    Text(tr("Recovery", "Pause") + " · \(Int((blocks[index].durationSeconds ?? 60).rounded())) " + tr("sec", "sek"))
                     .font(.caption)
                 }
 
             case .note:
                 EmptyView()
             }
+    }
+
+    private var addBlockSection: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 13) {
+                HStack {
+                    Text(tr("ADD A BLOCK", "LEGG TIL BLOKK"))
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.5)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    Spacer()
+                    Menu {
+                        ForEach(WorkoutPhaseKind.allCases) { phase in
+                            Button {
+                                selectedPhase = phase
+                            } label: {
+                                Label(phase.title, systemImage: phase.symbol)
+                            }
+                        }
+                    } label: {
+                        Label(selectedPhase.title, systemImage: selectedPhase.symbol)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+                }
+
+                Button {
+                    showingExercisePicker = true
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "dumbbell.fill")
+                            .font(.title3)
+                            .frame(width: 30)
+                        Text(tr("Add exercise from library",
+                                "Legg til øvelse fra biblioteket"))
+                            .font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title3)
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .frame(height: 54)
+                    .background(ATHLTHTheme.accentDeep,
+                                in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                .buttonStyle(.plain)
+
+                HStack(spacing: 10) {
+                    blockAddButton(tr("Running", "Løping"), icon: "figure.run") {
+                        addRunBlock()
+                    }
+                    blockAddButton(tr("Rest", "Pause"), icon: "pause.fill") {
+                        addRestBlock()
+                    }
+                }
+            }
         }
-        .padding(13)
-        .background(
-            Color.white.opacity(0.80),
-            in: RoundedRectangle(
-                cornerRadius: 18,
-                style: .continuous
-            )
-        )
+    }
+
+    private var routeSection: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Label(tr("Route", "Rute"), systemImage: "map")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Picker(tr("Route", "Rute"), selection: $selectedRouteID) {
+                        Text(tr("No route", "Ingen rute")).tag(nil as UUID?)
+                        ForEach(session.savedRoutes) { route in
+                            Text(route.title).tag(route.id as UUID?)
+                        }
+                    }
+                    .labelsHidden()
+                }
+                Text(tr("Optional route for the running parts of this workout.",
+                        "Valgfri rute for løpedelene av treningsøkten."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var saveBar: some View {
+        Button {
+            saveWorkout()
+        } label: {
+            Label(tr("Save Workout", "Lagre treningsøkt"),
+                  systemImage: "checkmark.circle.fill")
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(ATHLTHTheme.accentDeep)
+        .disabled(!canSave)
+        .padding(.horizontal, 18)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .background(.regularMaterial)
     }
 
     private func blockAddButton(
-        _ title: String,
+        _ label: String,
         icon: String,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            VStack(spacing: 7) {
+            HStack(spacing: 9) {
                 Image(systemName: icon)
-                    .font(.system(size: 18, weight: .semibold))
-                Text(title)
-                    .font(.caption.weight(.semibold))
+                Text(label)
+                Spacer(minLength: 0)
+                Image(systemName: "plus")
             }
+            .font(.subheadline.weight(.semibold))
             .foregroundStyle(ATHLTHTheme.accentDeep)
+            .padding(.horizontal, 14)
             .frame(maxWidth: .infinity)
-            .frame(height: 68)
-            .background(
-                ATHLTHTheme.accentSoft.opacity(0.72),
-                in: RoundedRectangle(
-                    cornerRadius: 16,
-                    style: .continuous
-                )
-            )
+            .frame(height: 51)
+            .background(ATHLTHTheme.accentSoft.opacity(0.72),
+                        in: RoundedRectangle(cornerRadius: 15, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -1820,7 +1908,7 @@ struct WorkoutTemplateBuilderView: View {
             WorkoutTemplateBlock(
                 sequence: blocks.count + 1,
                 kind: .run,
-                title: "Run",
+                title: tr("Running", "Løping"),
                 exerciseSlug: nil,
                 distanceMeters: 1_000,
                 repetitions: nil,
@@ -1831,6 +1919,7 @@ struct WorkoutTemplateBuilderView: View {
                 phase: selectedPhase
             )
         )
+        expandedBlockIndex = blocks.count - 1
     }
 
     private func addRestBlock() {
@@ -1838,7 +1927,7 @@ struct WorkoutTemplateBuilderView: View {
             WorkoutTemplateBlock(
                 sequence: blocks.count + 1,
                 kind: .rest,
-                title: "Recovery",
+                title: tr("Rest", "Pause"),
                 exerciseSlug: nil,
                 distanceMeters: nil,
                 repetitions: nil,
@@ -1849,11 +1938,10 @@ struct WorkoutTemplateBuilderView: View {
                 phase: .recovery
             )
         )
+        expandedBlockIndex = blocks.count - 1
     }
 
-    private func addExerciseBlock(
-        _ entry: ExerciseLibraryEntry
-    ) {
+    private func addExerciseBlock(_ entry: ExerciseLibraryEntry) {
         blocks.append(
             WorkoutTemplateBlock(
                 sequence: blocks.count + 1,
@@ -1869,11 +1957,11 @@ struct WorkoutTemplateBuilderView: View {
                 phase: selectedPhase
             )
         )
+        expandedBlockIndex = blocks.count - 1
     }
 
     private func resequence() {
-        blocks = blocks.enumerated().map {
-            index, block in
+        blocks = blocks.enumerated().map { index, block in
             WorkoutTemplateBlock(
                 sequence: index + 1,
                 kind: block.kind,
@@ -1882,8 +1970,7 @@ struct WorkoutTemplateBuilderView: View {
                 distanceMeters: block.distanceMeters,
                 repetitions: block.repetitions,
                 durationSeconds: block.durationSeconds,
-                targetWeightKilograms:
-                    block.targetWeightKilograms,
+                targetWeightKilograms: block.targetWeightKilograms,
                 loadNote: block.loadNote,
                 notes: block.notes,
                 phase: block.phase,
@@ -1894,26 +1981,23 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private func saveWorkout() {
-        let cleanTitle =
-            title.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard canSave else { return }
 
         var workout = PlannedSession(
             id: UUID(),
             title: cleanTitle,
             kind: resolvedWorkoutKind,
             scheduledStart: nil,
-            durationMinutes: nil,
+            durationMinutes: knownDurationMinutes,
             targetDistanceKilometers: nil,
             targetPaceSecondsPerKilometer: nil,
-            routeID: selectedRouteID,
+            routeID: hasRunning ? selectedRouteID : nil,
             exercises: [],
             notes: nil
         )
         workout.workoutBlocks = blocks
         workout.workoutCategory = category
-
         session.saveSharedWorkout(workout)
         dismiss()
     }
@@ -1926,46 +2010,27 @@ struct WorkoutTemplateBuilderView: View {
         }
     }
 
-    private func distanceBinding(
-        _ index: Int
-    ) -> Binding<Double> {
+    private func distanceBinding(_ index: Int) -> Binding<Double> {
         Binding(
-            get: {
-                blocks[index].distanceMeters ?? 1_000
-            },
-            set: {
-                blocks[index].distanceMeters = $0
-            }
+            get: { blocks[index].distanceMeters ?? 1_000 },
+            set: { blocks[index].distanceMeters = $0 }
         )
     }
 
-    private func repetitionsBinding(
-        _ index: Int
-    ) -> Binding<Int> {
+    private func repetitionsBinding(_ index: Int) -> Binding<Int> {
         Binding(
-            get: {
-                blocks[index].repetitions ?? 10
-            },
-            set: {
-                blocks[index].repetitions = $0
-            }
+            get: { blocks[index].repetitions ?? 10 },
+            set: { blocks[index].repetitions = $0 }
         )
     }
 
-    private func durationBinding(
-        _ index: Int
-    ) -> Binding<Double> {
+    private func durationBinding(_ index: Int) -> Binding<Double> {
         Binding(
-            get: {
-                blocks[index].durationSeconds ?? 60
-            },
-            set: {
-                blocks[index].durationSeconds = $0
-            }
+            get: { blocks[index].durationSeconds ?? 60 },
+            set: { blocks[index].durationSeconds = $0 }
         )
     }
 }
-
 
 struct SavedWorkoutPickerView: View {
     @Environment(\.dismiss) private var dismiss
