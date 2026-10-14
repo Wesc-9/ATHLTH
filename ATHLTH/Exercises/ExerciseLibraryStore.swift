@@ -200,6 +200,7 @@ final class ExerciseLibraryStore: ObservableObject {
     }
     private var cachedSearchText: [UUID: String] = [:]
     private var lastSearchRequest: SearchRequest?
+    private var lastSearchTranslationRevision = -1
     private var lastSearchResults: [ExerciseLibraryEntry] = []
 
     init() {
@@ -634,6 +635,7 @@ final class ExerciseLibraryStore: ObservableObject {
         cachedEquipmentOptions = nil
         cachedSearchText = [:]
         lastSearchRequest = nil
+        lastSearchTranslationRevision = -1
         lastSearchResults = []
     }
 
@@ -700,7 +702,11 @@ final class ExerciseLibraryStore: ObservableObject {
             .lowercased()
 
         let request = SearchRequest(query: cleanQuery, bodyPart: bodyPart, equipment: equipment)
-        if lastSearchRequest == request { return lastSearchResults }
+        let translationRevision = NorwegianExerciseAutoTranslation.shared.revision
+        if lastSearchRequest == request &&
+           lastSearchTranslationRevision == translationRevision {
+            return lastSearchResults
+        }
         let queryTokens = cleanQuery.split(whereSeparator: { $0.isWhitespace }).map(String.init)
 
         let matches = selectableExercises.filter { entry in
@@ -736,10 +742,17 @@ final class ExerciseLibraryStore: ObservableObject {
                     cachedSearchText[entry.id] = haystack
                 }
 
-                matchesText =
-                    queryTokens.allSatisfy {
-                        haystack.contains($0)
-                    }
+                let liveNorwegianName = (
+                    NorwegianExerciseAutoTranslation.shared.translated(entry.name) ?? ""
+                )
+                .folding(
+                    options: [.diacriticInsensitive, .caseInsensitive],
+                    locale: Locale(identifier: "nb_NO")
+                )
+                .lowercased()
+                matchesText = queryTokens.allSatisfy {
+                    haystack.contains($0) || liveNorwegianName.contains($0)
+                }
             }
 
             let matchesBodyPart =
@@ -755,6 +768,7 @@ final class ExerciseLibraryStore: ObservableObject {
             return matchesText && matchesBodyPart && matchesEquipment
         }
         lastSearchRequest = request
+        lastSearchTranslationRevision = translationRevision
         lastSearchResults = matches
         return matches
     }
