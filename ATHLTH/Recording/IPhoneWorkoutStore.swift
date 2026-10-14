@@ -1413,6 +1413,7 @@ final class IPhoneWorkoutStore:
             workout,
             userID: userID
         )
+        guard accountID == userID else { return }
 
         // Emit completion only after the Health save attempt has settled so
         // downstream Goals, Challenges and the review all see the final

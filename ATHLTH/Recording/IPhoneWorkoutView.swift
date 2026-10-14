@@ -1591,6 +1591,7 @@ struct IPhoneWorkoutView: View {
                 Button("Finish & save") {
                     Task {
                         await recorder.finish()
+                        guard recorder.active == nil else { return }
                         await realtime
                             .leaveCurrentLiveWorkout()
                     }
