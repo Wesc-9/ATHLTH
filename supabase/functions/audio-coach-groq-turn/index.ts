@@ -71,7 +71,10 @@ Deno.serve(async (request: Request) => {
     const wav = decodeWavBase64(turn.audioBase64);
     if (!wav) return reply({ error: "Audio must be short PCM mono WAV, 16 kHz" }, 400);
     const form = new FormData();
-    form.append("file", new File([wav], "question.wav", { type: "audio/wav" }));
+    // Copy to a guaranteed ArrayBuffer-backed Uint8Array for Blob/File.
+    const audioCopy = new Uint8Array(wav.byteLength);
+    audioCopy.set(wav);
+    form.append("file", new File([audioCopy.buffer], "question.wav", { type: "audio/wav" }));
     form.append("model", "whisper-large-v3-turbo");
     form.append("language", turn.language);
     form.append("response_format", "json");
