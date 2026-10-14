@@ -24,6 +24,14 @@ targets:
     platform: iOS
     sources:
       - path: ATHLTH
+        excludes:
+          - Resources/RepDBOffline.bundle/**
+      # A folder reference copies the complete licensed snapshot as one resource.
+      # The files are created by prepare_repdb_offline.py and never committed.
+      - path: ATHLTH/Resources/RepDBOffline.bundle
+        type: folder
+        buildPhase: resources
+        optional: true
       - path: Shared
     dependencies:
       - target: ATHLTHWatchApp
