@@ -11,6 +11,8 @@ struct ATHLTHTrainIntervalComposerView: View {
     @State private var name: String
     @State private var blocks: [RunningWorkoutBlock]
     @State private var kind: RunningBlockKind = .work
+    @State private var activityName = ""
+    @State private var targetEffort: RunningIntensityKind = .easy
     @State private var measure: RunningMeasureKind = .distance
     @State private var minutes = 5
     @State private var distanceMeters = 1000
@@ -50,6 +52,7 @@ struct ATHLTHTrainIntervalComposerView: View {
         self.onSave = onSave
         _name = State(initialValue: initial?.title ?? "")
         _blocks = State(initialValue: initial?.blocks ?? [])
+        _activityName = State(initialValue: "")
         _ghostEnabled = State(initialValue: initial?.intervalGhostPaceSecondsPerKilometer != nil)
         _ghostPaceSeconds = State(initialValue: Int(initial?.intervalGhostPaceSecondsPerKilometer ?? 300))
         _ghostFollowRecovery = State(initialValue: initial?.intervalGhostFollowRecovery == true)
@@ -75,7 +78,7 @@ struct ATHLTHTrainIntervalComposerView: View {
                 Button(action: save) {
                     HStack {
                         Spacer()
-                        Text(tr("Use interval structure", "Bruk intervalloppsettet"))
+                        Text(tr("Save detailed session", "Lagre detaljert økt"))
                         Spacer()
                         Image(systemName: "checkmark")
                     }
@@ -94,7 +97,7 @@ struct ATHLTHTrainIntervalComposerView: View {
                 .background(.white)
             }
             .background(paper.ignoresSafeArea())
-            .navigationTitle(tr("Running intervals", "Løpeintervaller"))
+            .navigationTitle(tr("Advanced session builder", "Avansert øktbygger"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -128,7 +131,7 @@ struct ATHLTHTrainIntervalComposerView: View {
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(1.7)
                 .foregroundStyle(bronze)
-            Text(tr("Every interval counts.", "Hvert drag teller."))
+            Text(tr("Design every phase.", "Bygg hver eneste del."))
                 .font(.system(size: 29, weight: .regular, design: .serif))
             Text(tr(
                 "Mix warm-up, timed or distance-based efforts, recoveries and cool-downs.",
@@ -183,6 +186,9 @@ struct ATHLTHTrainIntervalComposerView: View {
                         .foregroundStyle(bronze)
                         .frame(width: 25)
                     VStack(alignment: .leading, spacing: 4) {
+                        Label(phaseLabel(block.kind), systemImage: phaseIcon(block.kind))
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(bronze)
                         Text(block.title)
                             .font(.subheadline.weight(.semibold))
                         Text(summary(block))
@@ -267,7 +273,9 @@ struct ATHLTHTrainIntervalComposerView: View {
 
     private var blockComposer: some View {
         VStack(alignment: .leading, spacing: 13) {
-            Text(tr("ADD A BLOCK", "LEGG TIL BLOKK"))
+            Text(editingBlockID == nil
+                ? tr("PIN A NEW PHASE", "FEST EN NY DEL")
+                : tr("EDIT PINNED PHASE", "REDIGER VALGT DEL"))
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(1.4)
                 .foregroundStyle(bronze)
@@ -278,6 +286,12 @@ struct ATHLTHTrainIntervalComposerView: View {
                 }
             }
             .tint(ink)
+            TextField(tr("Activity name, e.g. jogging, drills or strides",
+                         "Aktivitet, f.eks. jogging, løpsdrill eller stigningsløp"),
+                      text: $activityName)
+                .font(.subheadline)
+                .padding(11)
+                .background(paper, in: RoundedRectangle(cornerRadius: 10))
             Picker(tr("Target", "Mål"), selection: $measure) {
                 Text(tr("Distance", "Distanse")).tag(RunningMeasureKind.distance)
                 Text(tr("Time", "Tid")).tag(RunningMeasureKind.time)
@@ -299,6 +313,17 @@ struct ATHLTHTrainIntervalComposerView: View {
                     in: 1...180
                 )
                 .font(.subheadline)
+            }
+
+            if kind == .work || kind == .steady || kind == .warmup || kind == .cooldown || kind == .recovery {
+                if kind != .work {
+                    Picker(tr("Intensity", "Intensitet"), selection: $targetEffort) {
+                        Text(tr("Easy", "Rolig")).tag(RunningIntensityKind.easy)
+                        Text(tr("Target pace", "Måltempo")).tag(RunningIntensityKind.pace)
+                        Text(tr("HR zone", "Pulssone")).tag(RunningIntensityKind.heartRateZone)
+                        Text(tr("No target", "Uten mål")).tag(RunningIntensityKind.none)
+                    }
+                }
             }
 
             if kind == .work {
@@ -447,6 +472,8 @@ struct ATHLTHTrainIntervalComposerView: View {
     private func edit(_ block: RunningWorkoutBlock) {
         editingBlockID = block.id
         kind = block.kind
+        activityName = block.title
+        targetEffort = block.work.intensity.kind
         repetitions = block.repetitions
         if block.work.measure == .distance {
             measure = .distance
@@ -475,7 +502,7 @@ struct ATHLTHTrainIntervalComposerView: View {
             ? 3_600 / max(speedKilometersPerHour, 0.5) : Double(paceSeconds)
         let intensity = RunningIntensityTarget(
             kind: paceEnabled ? .pace :
-                  heartRateTargetEnabled ? .heartRateZone : .easy,
+                  heartRateTargetEnabled ? .heartRateZone : targetEffort,
             paceMinSecondsPerKilometer: paceEnabled ? resolvedPace : nil,
             paceMaxSecondsPerKilometer: paceEnabled ? resolvedPace : nil,
             heartRateZone: heartRateTargetEnabled ? heartRateZone : nil,
@@ -493,7 +520,9 @@ struct ATHLTHTrainIntervalComposerView: View {
         }
         let entry = RunningWorkoutBlock(
             id: editingBlockID ?? UUID(),
-            kind: kind, title: kind.title,
+            kind: kind,
+            title: activityName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? kind.title : activityName.trimmingCharacters(in: .whitespacesAndNewlines),
             repetitions: kind == .work ? repetitions : 1,
             work: work, recovery: recovery,
             notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -507,6 +536,7 @@ struct ATHLTHTrainIntervalComposerView: View {
         }
         editingBlockID = nil
         notes = ""
+        activityName = ""
     }
 
     private func repetitionSummary(_ block: RunningWorkoutBlock,
@@ -552,8 +582,9 @@ struct ATHLTHTrainIntervalComposerView: View {
         var result = RunningWorkoutTemplate(
             id: initial?.isBuiltIn == false ? initial!.id : UUID(),
             title: name.trimmingCharacters(in: .whitespacesAndNewlines),
-            type: .intervals,
-            summary: tr("Custom interval workout", "Egendefinert intervalløkt"),
+            type: initial?.type ?? .intervals,
+            summary: tr("Advanced structured running session",
+                        "Detaljert strukturert løpeøkt"),
             blocks: blocks,
             routeID: initial?.routeID,
             isBuiltIn: false,
@@ -568,6 +599,26 @@ struct ATHLTHTrainIntervalComposerView: View {
             ? nil : String(coachBrief.prefix(300))
         onSave(result)
         dismiss()
+    }
+
+    private func phaseLabel(_ phase: RunningBlockKind) -> String {
+        switch phase {
+        case .warmup: return tr("PINNED WARM-UP", "FESTET OPPVARMING")
+        case .work: return tr("PINNED MAIN SET", "FESTET HOVEDDEL")
+        case .recovery: return tr("PINNED RECOVERY", "FESTET PAUSE")
+        case .steady: return tr("PINNED STEADY RUN", "FESTET JEVN ØKT")
+        case .cooldown: return tr("PINNED COOL-DOWN", "FESTET NEDTRAPPING")
+        }
+    }
+
+    private func phaseIcon(_ phase: RunningBlockKind) -> String {
+        switch phase {
+        case .warmup: return "flame"
+        case .work: return "figure.run"
+        case .recovery: return "pause.circle"
+        case .steady: return "figure.walk"
+        case .cooldown: return "wind"
+        }
     }
 
     private func paceLabel(_ seconds: Int) -> String {
