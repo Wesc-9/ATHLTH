@@ -1527,6 +1527,8 @@ struct WorkoutTemplateBuilderView: View {
     @State private var showingExercisePicker = false
     @State private var selectedPhase: WorkoutPhaseKind = .main
     @State private var expandedBlockIndex: Int?
+    @State private var exerciseTargetGroupID: UUID?
+    @State private var pendingNewGroupKind: WorkoutBlockGroupKind?
 
     private func tr(_ english: String, _ norwegian: String) -> String {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
@@ -1561,12 +1563,40 @@ struct WorkoutTemplateBuilderView: View {
     private var canSave: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && (hasRunning || hasStrength)
+            && !hasIncompleteSuperset
+    }
+
+    private var hasIncompleteSuperset: Bool {
+        let groups = Set(blocks.compactMap { block -> UUID? in
+            block.groupKind == .superset ? block.groupID : nil
+        })
+        return groups.contains { id in
+            blocks.filter { $0.groupID == id && $0.kind == .exercise }.count < 2
+        }
+    }
+
+    private var timelineStarts: [Int] {
+        blocks.indices.filter { index in
+            guard index > 0, let id = blocks[index].groupID else { return true }
+            return blocks[index - 1].groupID != id
+        }
+    }
+
+    private func groupIndices(startingAt start: Int) -> [Int] {
+        guard blocks.indices.contains(start), let id = blocks[start].groupID else {
+            return [start]
+        }
+        var index = start
+        while blocks.indices.contains(index), blocks[index].groupID == id {
+            index += 1
+        }
+        return Array(start..<index)
     }
 
     private var knownDurationMinutes: Int? {
         guard !blocks.isEmpty else { return nil }
         var seconds = 0.0
-        for block in blocks {
+        for block in blocks.expandedForExecution() {
             if let duration = block.durationSeconds, duration > 0 {
                 seconds += duration
             } else if block.kind == .run,
@@ -1621,9 +1651,15 @@ struct WorkoutTemplateBuilderView: View {
                         source: nil,
                         selectionTitle: tr("Add Exercise", "Legg til øvelse")
                     ) { entry in
-                        addExerciseBlock(entry)
+                        addExerciseBlock(entry, toGroup: exerciseTargetGroupID)
                         showingExercisePicker = false
                     }
+                }
+            }
+            .onChange(of: showingExercisePicker) { _, showing in
+                if !showing {
+                    exerciseTargetGroupID = nil
+                    pendingNewGroupKind = nil
                 }
             }
             .task {
@@ -1655,6 +1691,9 @@ struct WorkoutTemplateBuilderView: View {
                 HStack(spacing: 14) {
                     Label("\(blocks.count) " + tr("blocks", "blokker"),
                           systemImage: "rectangle.stack")
+                    if blocks.expandedForExecution().count != blocks.count {
+                        Text("· \(blocks.expandedForExecution().count) " + tr("steps", "steg"))
+                    }
                     if let knownDurationMinutes {
                         Label("\(knownDurationMinutes) " + tr("min", "min"),
                               systemImage: "clock")
@@ -1696,7 +1735,7 @@ struct WorkoutTemplateBuilderView: View {
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                     Button {
-                        showingExercisePicker = true
+                        openExercisePicker()
                     } label: {
                         Label(tr("Add exercise", "Legg til øvelse"),
                               systemImage: "plus.circle.fill")
@@ -1712,12 +1751,118 @@ struct WorkoutTemplateBuilderView: View {
                 .background(Color.white.opacity(0.82),
                             in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             } else {
-                VStack(spacing: 2) {
-                    ForEach(Array(blocks.indices), id: \.self) { index in
-                        builderBlockRow(index)
+                VStack(spacing: 9) {
+                    ForEach(timelineStarts, id: \.self) { index in
+                        if blocks[index].groupID != nil {
+                            groupTimelineCard(startingAt: index)
+                        } else {
+                            builderBlockRow(index)
+                        }
                     }
                 }
             }
+        }
+    }
+
+    private func groupTimelineCard(startingAt firstIndex: Int) -> some View {
+        let first = blocks[firstIndex]
+        let members = groupIndices(startingAt: firstIndex)
+        let kind = first.groupKind ?? .intervals
+        let id = first.groupID!
+
+        return VStack(alignment: .leading, spacing: 11) {
+            HStack(spacing: 9) {
+                Image(systemName: kind.symbol)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 28, height: 28)
+                    .background(ATHLTHTheme.accentSoft, in: Circle())
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(kind.title).font(.subheadline.weight(.bold))
+                    Text("\(members.count) " + tr("blocks", "blokker"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+
+                Menu {
+                    Button(tr("Ungroup", "Løs opp gruppe"), systemImage: "square.stack.3d.up") {
+                        for i in members {
+                            blocks[i].groupID = nil
+                            blocks[i].groupKind = nil
+                            blocks[i].groupRounds = nil
+                        }
+                    }
+                    Button(role: .destructive) {
+                        blocks.removeAll { $0.groupID == id }
+                        resequence()
+                        expandedBlockIndex = nil
+                    } label: {
+                        Label(tr("Delete group", "Slett gruppe"), systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .frame(width: 30, height: 34)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Stepper(
+                value: Binding(
+                    get: { blocks.first(where: { $0.groupID == id })?.groupRounds ?? 3 },
+                    set: { rounds in
+                        for index in blocks.indices where blocks[index].groupID == id {
+                            blocks[index].groupRounds = rounds
+                        }
+                    }
+                ),
+                in: 1...20
+            ) {
+                Label("\(first.groupRounds ?? 3) " + tr("rounds", "runder"),
+                      systemImage: "repeat")
+                    .font(.subheadline.weight(.medium))
+            }
+
+            ForEach(members, id: \.self) { index in
+                builderBlockRow(index)
+            }
+
+            if kind == .superset && members.count < 2 {
+                Label(tr("Add at least one more exercise",
+                         "Legg til minst én øvelse til"),
+                      systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Menu {
+                Button(tr("Exercise", "Øvelse"), systemImage: "dumbbell.fill") {
+                    openExercisePicker(for: id)
+                }
+                if kind == .intervals {
+                    Button(tr("Running", "Løping"), systemImage: "figure.run") {
+                        addRunBlock(toGroup: id)
+                    }
+                    Button(tr("Rest", "Pause"), systemImage: "pause.fill") {
+                        addRestBlock(toGroup: id)
+                    }
+                }
+            } label: {
+                Label(tr("Add to group", "Legg til i gruppen"), systemImage: "plus.circle")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 40)
+            }
+            .buttonStyle(.bordered)
+            .tint(ATHLTHTheme.accentDeep)
+        }
+        .padding(13)
+        .background(ATHLTHTheme.accentSoft.opacity(0.33),
+                    in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(ATHLTHTheme.accentDeep.opacity(0.12), lineWidth: 1)
         }
     }
 
@@ -1787,14 +1932,14 @@ struct WorkoutTemplateBuilderView: View {
                                 Label(phase.title, systemImage: phase.symbol)
                             }
                         }
-                        if index > 0 {
+                        if index > 0 && blocks[index - 1].groupID == block.groupID {
                             Button(tr("Move up", "Flytt opp"), systemImage: "arrow.up") {
                                 blocks.swapAt(index, index - 1)
                                 resequence()
                                 expandedBlockIndex = index - 1
                             }
                         }
-                        if index < blocks.count - 1 {
+                        if index < blocks.count - 1 && blocks[index + 1].groupID == block.groupID {
                             Button(tr("Move down", "Flytt ned"), systemImage: "arrow.down") {
                                 blocks.swapAt(index, index + 1)
                                 resequence()
@@ -1802,7 +1947,16 @@ struct WorkoutTemplateBuilderView: View {
                             }
                         }
                         Button(role: .destructive) {
+                            let removedGroup = blocks[index].groupID
                             blocks.remove(at: index)
+                            if let removedGroup,
+                               blocks.filter({ $0.groupID == removedGroup }).count < 2 {
+                                for i in blocks.indices where blocks[i].groupID == removedGroup {
+                                    blocks[i].groupID = nil
+                                    blocks[i].groupKind = nil
+                                    blocks[i].groupRounds = nil
+                                }
+                            }
                             resequence()
                             expandedBlockIndex = nil
                         } label: {
@@ -1887,6 +2041,36 @@ struct WorkoutTemplateBuilderView: View {
                 }
 
             case .exercise:
+                if block.groupID == nil {
+                    Stepper(value: Binding(
+                        get: { blocks[index].setCount ?? 3 },
+                        set: { blocks[index].setCount = $0 }
+                    ), in: 1...20) {
+                        Text("\(blocks[index].setCount ?? 3) " + tr("sets", "sett"))
+                            .font(.subheadline.weight(.semibold))
+                    }
+
+                    if (blocks[index].setCount ?? 3) > 1 {
+                        Stepper(value: Binding(
+                            get: { blocks[index].restBetweenSetsSeconds ?? 90 },
+                            set: { blocks[index].restBetweenSetsSeconds = $0 }
+                        ), in: 0...600, step: 15) {
+                            Text(tr("Rest between sets", "Pause mellom sett") +
+                                 " · \(Int(blocks[index].restBetweenSetsSeconds ?? 90)) " +
+                                 tr("sec", "sek"))
+                                .font(.caption)
+                        }
+                    }
+                }
+                Stepper(value: Binding(
+                    get: { blocks[index].targetWeightKilograms ?? 0 },
+                    set: { blocks[index].targetWeightKilograms = $0 }
+                ), in: 0...500, step: 2.5) {
+                    Text(String(format: "%.1f kg",
+                        blocks[index].targetWeightKilograms ?? 0))
+                        .font(.caption)
+                }
+
                 Stepper(
                     value: repetitionsBinding(index),
                     in: 1...300
@@ -1935,7 +2119,7 @@ struct WorkoutTemplateBuilderView: View {
                 }
 
                 Button {
-                    showingExercisePicker = true
+                    openExercisePicker()
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "dumbbell.fill")
@@ -1962,6 +2146,20 @@ struct WorkoutTemplateBuilderView: View {
                     }
                     blockAddButton(tr("Rest", "Pause"), icon: "pause.fill") {
                         addRestBlock()
+                    }
+                }
+                Divider()
+                Text(tr("ADVANCED", "AVANSERT"))
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.3)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                HStack(spacing: 10) {
+                    blockAddButton(tr("Superset", "Supersett"), icon: "dumbbell.fill") {
+                        createSuperset()
+                    }
+                    blockAddButton(tr("Intervals", "Intervaller"), icon: "repeat") {
+                        createIntervals()
                     }
                 }
             }
@@ -2033,69 +2231,116 @@ struct WorkoutTemplateBuilderView: View {
         .buttonStyle(.plain)
     }
 
-    private func addRunBlock() {
-        blocks.append(
-            WorkoutTemplateBlock(
-                sequence: blocks.count + 1,
-                kind: .run,
-                title: tr("Running", "Løping"),
-                exerciseSlug: nil,
-                distanceMeters: 1_000,
-                repetitions: nil,
-                durationSeconds: nil,
-                targetWeightKilograms: nil,
-                loadNote: nil,
-                notes: nil,
-                phase: selectedPhase
-            )
-        )
-        expandedBlockIndex = blocks.count - 1
+    private func openExercisePicker(for groupID: UUID? = nil) {
+        exerciseTargetGroupID = groupID
+        pendingNewGroupKind = nil
+        showingExercisePicker = true
     }
 
-    private func addRestBlock() {
-        blocks.append(
-            WorkoutTemplateBlock(
-                sequence: blocks.count + 1,
-                kind: .rest,
-                title: tr("Rest", "Pause"),
-                exerciseSlug: nil,
-                distanceMeters: nil,
-                repetitions: nil,
-                durationSeconds: 60,
-                targetWeightKilograms: nil,
-                loadNote: nil,
-                notes: nil,
-                phase: .recovery
-            )
-        )
-        expandedBlockIndex = blocks.count - 1
+    private func createSuperset() {
+        exerciseTargetGroupID = UUID()
+        pendingNewGroupKind = .superset
+        showingExercisePicker = true
     }
 
-    private func addExerciseBlock(_ entry: ExerciseLibraryEntry) {
-        blocks.append(
-            WorkoutTemplateBlock(
-                sequence: blocks.count + 1,
-                kind: .exercise,
-                title: entry.name,
-                exerciseSlug: entry.sourceIdentifier,
-                distanceMeters: nil,
-                repetitions: 10,
-                durationSeconds: nil,
-                targetWeightKilograms: nil,
-                loadNote: nil,
-                notes: nil,
-                phase: selectedPhase
-            )
+    private func createIntervals() {
+        let id = UUID()
+        var run = WorkoutTemplateBlock(
+            sequence: 0, kind: .run,
+            title: tr("Run interval", "Løpeintervall"),
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 120,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: .main
         )
-        expandedBlockIndex = blocks.count - 1
+        run.groupID = id
+        run.groupKind = .intervals
+        run.groupRounds = 4
+        insertBlock(run, toGroup: nil)
+
+        var rest = WorkoutTemplateBlock(
+            sequence: 0, kind: .rest,
+            title: tr("Recovery", "Pause"),
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 60,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: .recovery
+        )
+        rest.groupID = id
+        rest.groupKind = .intervals
+        rest.groupRounds = 4
+        insertBlock(rest, toGroup: id)
+    }
+
+    private func insertBlock(_ source: WorkoutTemplateBlock, toGroup groupID: UUID?) {
+        var block = source
+        if let id = groupID,
+           let first = blocks.first(where: { $0.groupID == id }) {
+            block.groupID = id
+            block.groupKind = first.groupKind
+            block.groupRounds = first.groupRounds
+            block.setCount = nil
+            block.restBetweenSetsSeconds = nil
+        }
+        if let id = groupID,
+           let last = blocks.indices.last(where: { blocks[$0].groupID == id }) {
+            blocks.insert(block, at: last + 1)
+            expandedBlockIndex = last + 1
+        } else {
+            blocks.append(block)
+            expandedBlockIndex = blocks.count - 1
+        }
+        resequence()
+    }
+
+    private func addRunBlock(toGroup groupID: UUID? = nil) {
+        insertBlock(WorkoutTemplateBlock(
+            sequence: 0, kind: .run,
+            title: tr("Running", "Løping"),
+            exerciseSlug: nil, distanceMeters: 1_000,
+            repetitions: nil, durationSeconds: nil,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: selectedPhase
+        ), toGroup: groupID)
+    }
+
+    private func addRestBlock(toGroup groupID: UUID? = nil) {
+        insertBlock(WorkoutTemplateBlock(
+            sequence: 0, kind: .rest,
+            title: tr("Rest", "Pause"),
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 60,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: .recovery
+        ), toGroup: groupID)
+    }
+
+    private func addExerciseBlock(_ entry: ExerciseLibraryEntry, toGroup groupID: UUID? = nil) {
+        var block = WorkoutTemplateBlock(
+            sequence: 0, kind: .exercise,
+            title: entry.name,
+            exerciseSlug: entry.sourceIdentifier,
+            distanceMeters: nil, repetitions: 10,
+            durationSeconds: nil, targetWeightKilograms: nil,
+            loadNote: nil, notes: nil, phase: selectedPhase
+        )
+        if let groupID, let pendingNewGroupKind,
+           !blocks.contains(where: { $0.groupID == groupID }) {
+            block.groupID = groupID
+            block.groupKind = pendingNewGroupKind
+            block.groupRounds = 3
+        } else if groupID == nil {
+            block.setCount = 3
+            block.restBetweenSetsSeconds = 90
+        }
+        insertBlock(block, toGroup: groupID)
     }
 
     private func resequence() {
         blocks = blocks.enumerated().map { index, block in
-            WorkoutTemplateBlock(
+            var copy = WorkoutTemplateBlock(
                 sequence: index + 1,
-                kind: block.kind,
-                title: block.title,
+                kind: block.kind, title: block.title,
                 exerciseSlug: block.exerciseSlug,
                 distanceMeters: block.distanceMeters,
                 repetitions: block.repetitions,
@@ -2107,6 +2352,12 @@ struct WorkoutTemplateBuilderView: View {
                 targetPaceSecondsPerKilometer: block.targetPaceSecondsPerKilometer,
                 targetHeartRateZone: block.targetHeartRateZone
             )
+            copy.setCount = block.setCount
+            copy.restBetweenSetsSeconds = block.restBetweenSetsSeconds
+            copy.groupID = block.groupID
+            copy.groupKind = block.groupKind
+            copy.groupRounds = block.groupRounds
+            return copy
         }
     }
 
