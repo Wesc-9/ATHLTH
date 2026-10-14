@@ -3312,6 +3312,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     func reset() {
+        setAIConversationVoiceSuppressed(false)
         stopTimer()
         workoutSession = nil
         workoutBuilder = nil
@@ -3510,6 +3511,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         guidancePriorityGate.reset()
         coachEventLedger.reset()
         coachCueQueue.reset()
+        setAIConversationVoiceSuppressed(false)
         coachSpeechPaused = false
         coachReplayMemory.reset()
         lastCoachMessage = nil
