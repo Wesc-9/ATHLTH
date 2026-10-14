@@ -299,6 +299,8 @@ struct TargetGhostSetupView: View {
     @State private var targetPaceText: String
     @State private var goalType: GhostTargetGoalType = .finishTime
     @State private var pacingStrategy: GhostTargetPacingStrategy = .even
+    @AppStorage("athlth.ghostRace.target.advancedMode")
+    private var advancedMode = false
     @State private var confirmingStart = false
     @State private var starting = false
     @State private var loadingHistory = false
@@ -562,15 +564,18 @@ struct TargetGhostSetupView: View {
             VStack(spacing: 18) {
                 summaryCard
                 targetChoiceCard
-                ghostStrategyCard
 
-                if personalBest != nil ||
-                    latestAttempt != nil ||
-                    loadingHistory {
-                    historyCard
+                if advancedMode {
+                    ghostStrategyCard
+
+                    if personalBest != nil ||
+                        latestAttempt != nil ||
+                        loadingHistory {
+                        historyCard
+                    }
+
+                    workoutDeviceCard
                 }
-
-                workoutDeviceCard
             }
             .padding()
             .padding(.bottom, 12)
@@ -591,8 +596,20 @@ struct TargetGhostSetupView: View {
                         .opacity(0.20)
             )
         )
-        .navigationTitle("Target Ghost")
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Target Ghost", norwegian: "Mål-Ghost"
+        ))
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: advancedMode) { _, isAdvanced in
+            if !isAdvanced {
+                // Do not retain invisible pace/device/strategy choices in Basic.
+                if let duration = targetDuration {
+                    setTarget(duration)
+                }
+                pacingStrategy = .even
+                captureDevice = .iPhone
+            }
+        }
         .task(id: route.id) {
             await loadAttemptHistory()
         }
@@ -719,7 +736,9 @@ struct TargetGhostSetupView: View {
                     ) {
                         HStack(spacing: 10) {
                             ForEach(
-                                smartTargets
+                                Array(smartTargets.prefix(
+                                    advancedMode ? smartTargets.count : 2
+                                ))
                             ) { suggestion in
                                 targetSuggestion(
                                     suggestion
@@ -729,19 +748,21 @@ struct TargetGhostSetupView: View {
                     }
                 }
 
-                Picker(
-                    ATHLTHLocalization.choose(
-                        english: "Goal type", norwegian: "Måltype"
-                    ),
-                    selection: $goalType
-                ) {
-                    ForEach(GhostTargetGoalType.allCases) { type in
-                        Text(type.title).tag(type)
+                if advancedMode {
+                    Picker(
+                        ATHLTHLocalization.choose(
+                            english: "Goal type", norwegian: "Måltype"
+                        ),
+                        selection: $goalType
+                    ) {
+                        ForEach(GhostTargetGoalType.allCases) { type in
+                            Text(type.title).tag(type)
+                        }
                     }
+                    .pickerStyle(.segmented)
                 }
-                .pickerStyle(.segmented)
 
-                if goalType == .pace {
+                if advancedMode && goalType == .pace {
                     VStack(alignment: .leading, spacing: 9) {
                         Text(ATHLTHLocalization.choose(
                             english: "Desired pace", norwegian: "Ønsket tempo"
@@ -827,7 +848,9 @@ struct TargetGhostSetupView: View {
                     .foregroundStyle(.secondary)
                 }
 
-                quickAdjuster
+                if advancedMode {
+                    quickAdjuster
+                }
                 }
 
                 if let duration = targetDuration {
