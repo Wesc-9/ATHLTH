@@ -3848,82 +3848,89 @@ struct PostWorkoutReviewView: View {
 
     private var saveBar: some View {
         VStack(spacing: 0) {
-            Divider()
-                .opacity(0.55)
+            Rectangle()
+                .fill(ATHLTHTheme.divider.opacity(0.55))
+                .frame(height: 0.7)
 
             HStack(spacing: 12) {
-                VStack(
-                    alignment: .leading,
-                    spacing: 2
-                ) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Workout review",
-                            norwegian: "Øktoppsummering"
-                        )
-                    )
-                        .font(
-                            .caption.weight(
-                                .semibold
-                            )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme.mutedText
-                        )
-
-                    Text(
-                        visibility ==
-                            .privateOnly
-                            ? "Private"
-                            : visibility.title
-                    )
-                    .font(
-                        .subheadline.weight(
-                            .bold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
-                }
-
-                Spacer()
-
-                Button {
-                    Task {
-                        await save()
-                    }
-                } label: {
-                    HStack(spacing: 8) {
-                        if saving {
-                            ProgressView()
-                                .tint(.white)
-                        } else {
-                            Image(
-                                systemName:
-                                    visibility ==
-                                        .privateOnly
-                                        ? "checkmark"
-                                        : "square.and.arrow.up"
+                Menu {
+                    ForEach(ProfileVisibility.allCases) { option in
+                        Button {
+                            visibility = option
+                        } label: {
+                            Label(
+                                option.title,
+                                systemImage: visibility == option
+                                    ? "checkmark.circle.fill" : "eye"
                             )
                         }
+                    }
+                } label: {
+                    HStack(alignment: .bottom, spacing: 7) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Workout review", norwegian: "Øktoppsummering"
+                            ))
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            Text(visibility == .privateOnly
+                                 ? ATHLTHLocalization.choose(english: "Private", norwegian: "Privat")
+                                 : visibility.title)
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                        }
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .padding(.bottom, 3)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(ATHLTHLocalization.choose(
+                    english: "Change who can see this workout",
+                    norwegian: "Endre hvem som kan se denne økten"
+                ))
 
+                Spacer(minLength: 2)
+
+                Button {
+                    Task { await save() }
+                } label: {
+                    HStack(spacing: 10) {
+                        if saving {
+                            ProgressView().tint(.white)
+                        } else {
+                            Image(systemName: visibility == .privateOnly
+                                ? "checkmark" : "square.and.arrow.up")
+                                .font(.system(size: 19, weight: .semibold))
+                        }
                         Text(saveButtonTitle)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.82)
                     }
                     .font(.headline)
+                    .foregroundStyle(.white)
                     .padding(.horizontal, 18)
-                    .frame(height: 50)
+                    .frame(minWidth: 160, minHeight: 54)
+                    .background(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.09, green: 0.38, blue: 0.32),
+                                Color(red: 0.20, green: 0.52, blue: 0.41)
+                            ],
+                            startPoint: .leading, endPoint: .trailing
+                        ),
+                        in: Capsule()
+                    )
                 }
-                .buttonStyle(
-                    .borderedProminent
-                )
-                .tint(completionAccent)
+                .buttonStyle(.plain)
                 .disabled(saving)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.vertical, 11)
         }
-        .background(.ultraThinMaterial)
+        .background(.regularMaterial)
     }
 
     private func sectionLabel(
