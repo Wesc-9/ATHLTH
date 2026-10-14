@@ -149,30 +149,34 @@ struct PlannedWorkoutWatchBuilder {
         from template: RunningWorkoutTemplate
     ) -> [WatchRunningWorkoutStep] {
         template.blocks.flatMap { block in
-            let repetitions = max(
-                block.repetitions,
-                1
-            )
-            var result:
-                [WatchRunningWorkoutStep] = []
+            let repetitions = max(block.repetitions, 1)
+            var result: [WatchRunningWorkoutStep] = []
 
             for repetition in 0..<repetitions {
+                let working = block.kind == .work
                 result.append(
                     runningStep(
-                        title:
-                            repetitions > 1
-                                ? "\(block.title) \(repetition + 1)/\(repetitions)"
-                                : block.title,
-                        target: block.work
+                        title: repetitions > 1
+                            ? "\(block.title) \(repetition + 1)/\(repetitions)"
+                            : block.title,
+                        target: block.work,
+                        phase: block.kind.rawValue,
+                        ghostPace: working ? template.intervalGhostPaceSecondsPerKilometer : nil,
+                        coachBrief: working ? template.coachBrief : nil
                     )
                 )
 
+                // Skip the recovery after the final effort; the cooldown
+                // starts immediately. Recovery never receives a Ghost pacer.
                 if repetition < repetitions - 1,
                    let recovery = block.recovery {
                     result.append(
                         runningStep(
-                            title: "Recovery",
-                            target: recovery
+                            title: ATHLTHLocalization.choose(
+                                english: "Recovery", norwegian: "Pause"
+                            ),
+                            target: recovery,
+                            phase: RunningBlockKind.recovery.rawValue
                         )
                     )
                 }
@@ -184,35 +188,32 @@ struct PlannedWorkoutWatchBuilder {
 
     private static func runningStep(
         title: String,
-        target: RunningStepTarget
+        target: RunningStepTarget,
+        phase: String,
+        ghostPace: Double? = nil,
+        coachBrief: String? = nil
     ) -> WatchRunningWorkoutStep {
         let measure: WatchRunningStepMeasure
-
         switch target.measure {
-        case .distance:
-            measure = .distance
-        case .time:
-            measure = .time
-        case .open:
-            measure = .open
+        case .distance: measure = .distance
+        case .time: measure = .time
+        case .open: measure = .open
         }
-
         return WatchRunningWorkoutStep(
             id: UUID(),
             title: title,
             measure: measure,
             distanceMeters: target.distanceMeters,
             durationSeconds: target.durationSeconds,
-            intensityText:
-                runningIntensityText(
-                    target.intensity
-                ),
+            intensityText: runningIntensityText(target.intensity),
             targetPaceMinSecondsPerKilometer:
-                target.intensity
-                    .paceMinSecondsPerKilometer,
+                target.intensity.paceMinSecondsPerKilometer,
             targetPaceMaxSecondsPerKilometer:
-                target.intensity
-                    .paceMaxSecondsPerKilometer
+                target.intensity.paceMaxSecondsPerKilometer,
+            phase: phase,
+            targetHeartRateZone: target.intensity.heartRateZone,
+            ghostPaceSecondsPerKilometer: ghostPace,
+            coachBrief: coachBrief
         )
     }
 
