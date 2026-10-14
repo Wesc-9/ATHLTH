@@ -423,41 +423,70 @@ final class ExerciseLibraryStore: ObservableObject {
     ]
 
     func localizedExerciseInstructions(_ entry: ExerciseLibraryEntry) -> [String] {
-        guard ATHLTHLocalization.isNorwegian,
-              let key = entry.sourceIdentifier else {
-            return entry.exercise.instructions
+        guard ATHLTHLocalization.isNorwegian else { return entry.exercise.instructions }
+        if let reviewed = NorwegianExerciseText.record(for: entry.sourceIdentifier)?.instructions,
+           !reviewed.isEmpty {
+            return reviewed
         }
-        if let nativeSteps = Self.nativeNorwegianInstructions[key] {
-            return nativeSteps
-        }
+        guard let key = entry.sourceIdentifier else { return entry.exercise.instructions }
+        if let nativeSteps = Self.nativeNorwegianInstructions[key] { return nativeSteps }
         if (entry.source == .repDB ||
             (entry.source == .athlthCatalog && key.hasPrefix("athlth-core-"))),
            let steps = Self.norwegianCoreInstructions[key] {
             return steps
         }
+        // Never fabricate technical safety instructions: use original text
+        // when a reviewed Norwegian translation is not yet available.
         return entry.exercise.instructions
     }
 
     func localizedExerciseName(_ entry: ExerciseLibraryEntry) -> String {
-        guard ATHLTHLocalization.isNorwegian,
-              let id = entry.sourceIdentifier else { return entry.name }
-        if let nativeName = Self.nativeNorwegianNames[id] {
-            return nativeName
+        guard ATHLTHLocalization.isNorwegian, entry.source != .custom else {
+            return entry.name
         }
-        if entry.source == .repDB ||
-           (entry.source == .athlthCatalog && id.hasPrefix("athlth-core-")) {
-            return Self.norwegianExerciseNames[id] ?? entry.name
+        if let reviewed = NorwegianExerciseText.record(for: entry.sourceIdentifier)?.name,
+           !reviewed.isEmpty {
+            return reviewed
         }
-        return entry.name
+        if let id = entry.sourceIdentifier {
+            if let nativeName = Self.nativeNorwegianNames[id] { return nativeName }
+            if let alias = Self.norwegianExerciseNames[id] { return alias }
+        }
+        return ATHLTHExerciseNameLocalization.norwegianName(for: entry.name)
     }
 
     func localizedExerciseSummary(_ entry: ExerciseLibraryEntry) -> String? {
-        guard ATHLTHLocalization.isNorwegian,
-              let id = entry.sourceIdentifier,
-              let steps = Self.nativeNorwegianInstructions[id] else {
-            return entry.summary
+        guard ATHLTHLocalization.isNorwegian else { return entry.summary }
+        if let reviewed = NorwegianExerciseText.record(for: entry.sourceIdentifier)?.summary,
+           !reviewed.isEmpty {
+            return reviewed
         }
-        return steps.first
+        if let id = entry.sourceIdentifier,
+           let nativeSteps = Self.nativeNorwegianInstructions[id] {
+            return nativeSteps.first
+        }
+        return entry.summary
+    }
+
+    func localizedExerciseTips(_ entry: ExerciseLibraryEntry) -> [String] {
+        guard ATHLTHLocalization.isNorwegian else { return entry.tips }
+        if let reviewed = NorwegianExerciseText.record(for: entry.sourceIdentifier)?.tips,
+           !reviewed.isEmpty {
+            return reviewed
+        }
+        return entry.tips
+    }
+
+    func localizedEquipmentTitle(_ value: String) -> String {
+        NorwegianExerciseText.equipment(value)
+    }
+
+    func localizedDifficultyTitle(_ value: String) -> String {
+        NorwegianExerciseText.difficulty(value)
+    }
+
+    func localizedCategoryTitle(_ value: String) -> String {
+        NorwegianExerciseText.category(value)
     }
 
     private static let norwegianMuscleSearchTerms: [String: [String]] = [
@@ -668,6 +697,10 @@ final class ExerciseLibraryStore: ObservableObject {
                         entry.exercise.primaryMuscles.joined(separator: " "),
                         entry.exercise.secondaryMuscles.joined(separator: " "),
                         entry.exercise.equipment.joined(separator: " "),
+                        ATHLTHExerciseNameLocalization.norwegianName(for: entry.name),
+                        entry.exercise.equipment
+                            .map(NorwegianExerciseText.equipment)
+                            .joined(separator: " "),
                         Self.searchableNorwegianTerms(
                             sourceIdentifier: entry.sourceIdentifier,
                             bodyPart: entry.bodyPart,
