@@ -573,7 +573,7 @@ struct GhostRaceHubView: View {
                     }
 
                     NavigationLink {
-                        GhostFriendRaceHubView()
+                        GhostFriendRaceHubView(openInvitationOnAppear: true)
                     } label: {
                         VStack(alignment: .leading, spacing: 5) {
                             Label(ATHLTHLocalization.choose(
@@ -935,7 +935,7 @@ struct GhostRaceHubView: View {
                     Spacer()
 
                     Button {
-                        Task { await realtime.refreshVisibleLiveSessions() }
+                        Task { await realtime.refreshVisibleLiveSessions(force: true) }
                     } label: {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 14, weight: .semibold))
@@ -972,7 +972,7 @@ struct GhostRaceHubView: View {
                         .multilineTextAlignment(.center)
 
                         NavigationLink {
-                            GhostFriendRaceHubView()
+                            GhostFriendRaceHubView(openInvitationOnAppear: true)
                         } label: {
                             Label(ATHLTHLocalization.choose(
                                 english: "Invite a friend",
