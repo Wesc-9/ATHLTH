@@ -27,6 +27,34 @@ enum WorkoutTemplateBlockKind: String, Codable, CaseIterable, Hashable {
     }
 }
 
+/// Common phase taxonomy for running, strength, mobility and hybrid blocks.
+enum WorkoutPhaseKind: String, Codable, CaseIterable, Identifiable {
+    case warmup
+    case main
+    case recovery
+    case cooldown
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .warmup: return ATHLTHLocalization.choose(english: "Warm-up", norwegian: "Oppvarming")
+        case .main: return ATHLTHLocalization.choose(english: "Main set", norwegian: "Hoveddel")
+        case .recovery: return ATHLTHLocalization.choose(english: "Recovery", norwegian: "Pause")
+        case .cooldown: return ATHLTHLocalization.choose(english: "Cool-down", norwegian: "Nedtrapping")
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .warmup: return "flame"
+        case .main: return "figure.run"
+        case .recovery: return "pause.circle"
+        case .cooldown: return "wind"
+        }
+    }
+}
+
 struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     let sequence: Int
     var kind: WorkoutTemplateBlockKind
@@ -38,6 +66,14 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     var targetWeightKilograms: Double?
     var loadNote: String?
     var notes: String?
+    /// Missing in historic templates; assume the main section except rests.
+    var phase: WorkoutPhaseKind? = nil
+    var targetPaceSecondsPerKilometer: Double? = nil
+    var targetHeartRateZone: Int? = nil
+
+    var resolvedPhase: WorkoutPhaseKind {
+        phase ?? (kind == .rest ? .recovery : .main)
+    }
 
     var id: String {
         "\(sequence)|\(kind.rawValue)|\(title)"
@@ -54,6 +90,9 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         case targetWeightKilograms = "target_weight_kg"
         case loadNote = "load_note"
         case notes
+        case phase
+        case targetPaceSecondsPerKilometer = "target_pace_seconds_per_km"
+        case targetHeartRateZone = "target_hr_zone"
     }
 
     var targetText: String? {
@@ -98,6 +137,16 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
                     targetWeightKilograms
                 )
             )
+        }
+
+        if let targetPaceSecondsPerKilometer,
+           targetPaceSecondsPerKilometer > 0 {
+            let seconds = Int(targetPaceSecondsPerKilometer.rounded())
+            parts.append(String(format: "%d:%02d/km", seconds / 60, seconds % 60))
+        }
+
+        if let targetHeartRateZone, (1...5).contains(targetHeartRateZone) {
+            parts.append("Puls sone \(targetHeartRateZone)")
         }
 
         if let loadNote,
