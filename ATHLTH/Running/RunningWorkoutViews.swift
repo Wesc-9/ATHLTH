@@ -234,8 +234,11 @@ struct RunningWorkoutLibraryView: View {
             }
         }
         .sheet(isPresented: $showingBuilder) {
-            RunningWorkoutBuilderView()
-                .environmentObject(library)
+            ATHLTHTrainIntervalComposerView { template in
+                library.save(template)
+                selectedSection = .mine
+            }
+            .environmentObject(library)
         }
     }
 
@@ -408,13 +411,12 @@ struct RunningWorkoutDetailView: View {
                     .tint(ATHLTHTheme.accent)
                 }
 
-                if workout.type == .intervals || workout.type == .threshold {
-                    Button {
+                Button {
                         showingIntervalEditor = true
                     } label: {
                         Label(
                             ATHLTHLocalization.choose(
-                                english: "Customize intervals", norwegian: "Tilpass intervaller"
+                                english: "Edit detailed workout", norwegian: "Rediger detaljert økt"
                             ),
                             systemImage: "slider.horizontal.3"
                         )
@@ -422,7 +424,6 @@ struct RunningWorkoutDetailView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(ATHLTHTheme.accent)
-                }
 
                 if workout.isBuiltIn {
                     Button {
