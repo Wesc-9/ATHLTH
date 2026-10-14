@@ -2053,7 +2053,7 @@ struct WorkoutTemplateBuilderView: View {
                     }
                 } label: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(block.title)
+                        Text(localizedBlockTitle(block))
                             .font(.system(size: nested ? 13 : 14, weight: .semibold))
                             .foregroundStyle(studioInk)
                             .lineLimit(2)
@@ -2171,6 +2171,19 @@ struct WorkoutTemplateBuilderView: View {
         }
         .shadow(color: studioInk.opacity(nested ? 0 : 0.05),
                 radius: 12, y: 5)
+    }
+
+    private func localizedBlockTitle(_ block: WorkoutTemplateBlock) -> String {
+        guard block.kind == .exercise else { return block.title }
+        if let entry = exerciseLibrary.allExercises.first(where: { entry in
+            (block.exerciseSlug != nil && entry.sourceIdentifier == block.exerciseSlug)
+                || entry.name.localizedCaseInsensitiveCompare(block.title) == .orderedSame
+        }) {
+            return exerciseLibrary.localizedExerciseName(entry)
+        }
+        return ATHLTHLocalization.isNorwegian
+            ? ATHLTHExerciseNameLocalization.norwegianName(for: block.title)
+            : block.title
     }
 
     @ViewBuilder
