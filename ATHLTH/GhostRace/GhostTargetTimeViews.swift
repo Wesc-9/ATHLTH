@@ -1,3 +1,4 @@
+import CoreLocation
 import SwiftUI
 
 enum GhostTargetTimeFormatter {
@@ -28,42 +29,30 @@ enum GhostTargetTimeFormatter {
             return nil
         }
 
-        let values =
-            parts.compactMap {
-                Int($0)
-            }
+        let values = parts.compactMap { Int($0) }
+        guard values.count == parts.count,
+              values.allSatisfy({ $0 >= 0 }) else { return nil }
 
         let total: Int
-
         switch values.count {
         case 1:
-            total =
-                values[0] * 60
+            guard values[0] <= 1_440 else { return nil }
+            total = values[0] * 60
         case 2:
-            guard values[1] < 60 else {
-                return nil
-            }
-            total =
-                values[0] * 60 +
-                values[1]
+            guard values[0] <= 1_440,
+                  values[1] < 60 else { return nil }
+            total = values[0] * 60 + values[1]
         case 3:
-            guard values[1] < 60,
-                  values[2] < 60
-            else {
-                return nil
-            }
-            total =
-                values[0] * 3_600 +
-                values[1] * 60 +
-                values[2]
+            guard values[0] <= 24,
+                  values[1] < 60,
+                  values[2] < 60 else { return nil }
+            total = values[0] * 3_600 + values[1] * 60 + values[2]
         default:
             return nil
         }
 
-        guard total >= 60 else {
-            return nil
-        }
-
+        // Both UI and engine use the same 1 minute - 24 hour range.
+        guard (60...86_400).contains(total) else { return nil }
         return TimeInterval(total)
     }
 
@@ -165,7 +154,8 @@ enum GhostTargetPaceFormatter {
     ) -> TimeInterval? {
         guard paceSeconds.isFinite, (120...1_800).contains(paceSeconds),
               routeKilometers.isFinite, routeKilometers > 0 else { return nil }
-        return max((paceSeconds * routeKilometers).rounded(), 60)
+        let duration = (paceSeconds * routeKilometers).rounded()
+        return (60...86_400).contains(duration) ? duration : nil
     }
 }
 
@@ -258,6 +248,44 @@ struct TargetGhostRoutePickerView: View {
         .navigationTitle("Ghost Race")
         .navigationBarTitleDisplayMode(.inline)
     }
+}
+
+// Target Ghost needs real, continuous route geometry. Checking just a
+// saved route's reported distance would offer races that cannot start.
+enum GhostTargetRouteEligibility {
+    static func isUsable(_ route: TrainingRoute) -> Bool {
+        let coordinates = route.coordinates.sorted {
+            $0.sequence < $1.sequence
+        }
+        guard coordinates.count >= 2 else { return false }
+
+        var previous: CLLocation?
+        var totalMeters = 0.0
+        for coordinate in coordinates {
+            guard coordinate.latitude.isFinite,
+                  coordinate.longitude.isFinite,
+                  (-90...90).contains(coordinate.latitude),
+                  (-180...180).contains(coordinate.longitude) else {
+                return false
+            }
+            let location = CLLocation(
+                latitude: coordinate.latitude,
+                longitude: coordinate.longitude
+            )
+            if let previous {
+                totalMeters += location.distance(from: previous)
+            }
+            previous = location
+        }
+        return totalMeters.isFinite && totalMeters >= 200
+    }
+}
+
+private struct GhostQuickTargetOption: Identifiable {
+    let id: String
+    let title: String
+    let icon: String
+    let duration: TimeInterval
 }
 
 private struct GhostTargetSuggestion: Identifiable {
