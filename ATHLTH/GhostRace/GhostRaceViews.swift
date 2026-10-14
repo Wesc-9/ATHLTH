@@ -479,7 +479,7 @@ struct GhostRaceHubView: View {
                         : ATHLTHTheme.mutedText
                 )
                 .padding(.horizontal, 13)
-                .frame(minHeight: 38)
+                .frame(minHeight: 44)
                 .background(
                     advancedMode == isAdvanced ? Color.white : Color.clear,
                     in: Capsule()
@@ -529,7 +529,9 @@ struct GhostRaceHubView: View {
             } else {
                 basicReplaySection
             }
-            if hasMoreReplayCandidates || verifyingReplay {
+            if verifyingReplay ||
+                (hasMoreReplayCandidates &&
+                 (advancedMode || recentRuns.count < 3)) {
                 replayMoreCard
             }
             if advancedMode {
@@ -580,29 +582,42 @@ struct GhostRaceHubView: View {
                 }
 
                 HStack(spacing: 10) {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Label(ATHLTHLocalization.choose(
-                            english: "Live now", norwegian: "Live nå"
-                        ), systemImage: "dot.radiowaves.left.and.right")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
+                    Button {
+                        Task {
+                            await realtime.refreshVisibleLiveSessions(force: true)
+                        }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Live now", norwegian: "Live nå"
+                            ), systemImage: "dot.radiowaves.left.and.right")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
 
-                        Text(ATHLTHLocalization.choose(
-                            english: "See shared runs", norwegian: "Se delte økter"
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Refresh runners",
+                                norwegian: "Oppdater løpere"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .frame(minHeight: 88)
+                        .background(ATHLTHTheme.accentSoft.opacity(0.75),
+                                    in: RoundedRectangle(cornerRadius: 16))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(ATHLTHTheme.accentDeep.opacity(0.55),
+                                        lineWidth: 1)
+                        }
+                        .contentShape(Rectangle())
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
-                    .frame(minHeight: 80)
-                    .background(ATHLTHTheme.accentSoft.opacity(0.75),
-                                in: RoundedRectangle(cornerRadius: 16))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(ATHLTHTheme.accentDeep.opacity(0.55),
-                                    lineWidth: 1)
-                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(ATHLTHLocalization.choose(
+                        english: "Refresh available shared live runs below",
+                        norwegian: "Oppdater tilgjengelige delte løp nedenfor"
+                    ))
 
                     NavigationLink {
                         GhostFriendRaceHubView(openInvitationOnAppear: true)
@@ -2174,28 +2189,20 @@ struct GhostRaceHubView: View {
         verifyingReplay = true
         defer { verifyingReplay = false }
 
-        let batchEnd = min(replayCheckedCount + 12, replayCandidates.count)
-        while replayCheckedCount < batchEnd {
+        // In Basic, keep looking for up to three usable runs instead of
+        // forcing the user to repeatedly press "Show more" after empty batches.
+        // The fixed cap prevents a large HealthKit history from stalling UI.
+        let desiredCount = replayAdvancedMode ? 12 : 3
+        let batchEnd = min(replayCheckedCount + 36, replayCandidates.count)
+
+        while replayCheckedCount < batchEnd &&
+              recentRuns.count < desiredCount {
+            if Task.isCancelled { break }
             let workout = replayCandidates[replayCheckedCount]
             let route = await health.workoutRoute(for: workout.id)
             replayCheckedCount += 1
 
-            // Match the actual GhostRaceStore.prepare() requirements.
-            let valid = route
-                .filter {
-                    $0.coordinate.latitude.isFinite &&
-                    $0.coordinate.longitude.isFinite &&
-                    $0.horizontalAccuracy >= 0 &&
-                    $0.horizontalAccuracy <= 65
-                }
-                .sorted { $0.timestamp < $1.timestamp }
-
-            guard valid.count >= 2 else { continue }
-            var distance = 0.0
-            for index in 1..<valid.count {
-                distance += valid[index].distance(from: valid[index - 1])
-            }
-            if distance >= 250 {
+            if GhostRaceTrackEligibility.hasUsableGPS(route) {
                 recentRuns.append(workout)
             }
         }
