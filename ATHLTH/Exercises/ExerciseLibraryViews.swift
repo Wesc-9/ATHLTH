@@ -1104,16 +1104,25 @@ struct ExerciseDetailView: View {
         HStack(spacing: 10) {
             ExerciseArtwork(entry: currentEntry, size: 160)
 
-            if currentEntry.imagePeakURL != nil &&
-               currentEntry.imagePeakURL != currentEntry.imageStartURL {
-                ATHLTHStorageImage(url: currentEntry.imagePeakURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
+            if let peakURL = currentEntry.imagePeakURL,
+               peakURL != currentEntry.imageStartURL {
+                Group {
+                    if peakURL.isFileURL,
+                       let image = UIImage(contentsOfFile: peakURL.path) {
+                        Image(uiImage: image)
                             .resizable()
                             .scaledToFit()
-                    default:
-                        Color(.secondarySystemGroupedBackground)
+                    } else {
+                        ATHLTHStorageImage(url: peakURL) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .scaledToFit()
+                            default:
+                                Color(.secondarySystemGroupedBackground)
+                            }
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity)
