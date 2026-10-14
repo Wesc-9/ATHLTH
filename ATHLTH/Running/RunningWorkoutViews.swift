@@ -476,10 +476,10 @@ struct RunningWorkoutDetailView: View {
         .sheet(isPresented: $showingIntervalEditor) {
             ATHLTHTrainIntervalComposerView(initial: workout) { edited in
                 library.save(edited)
-                if let onSelect {
-                    onSelect(edited)
-                    dismiss()
-                }
+                onSelect?(edited)
+                // The detail held a snapshot of the old workout. Return to
+                // the refreshed library after saving to avoid showing stale data.
+                dismiss()
             }
         }
         .confirmationDialog(
