@@ -1099,6 +1099,7 @@ struct RunQuickStartSheet: View {
 
     @State private var showingRoutes = false
     @State private var showingRunningLibrary = false
+    @State private var showingDetailedWorkoutBuilder = false
 
     @State private var audioCoachDraft = AudioCoachDraft()
     @State private var routeGuardianDraft =
@@ -1259,6 +1260,12 @@ struct RunQuickStartSheet: View {
                         selectedWorkout = workout
                         showingRunningLibrary = false
                     }
+                }
+            }
+            .sheet(isPresented: $showingDetailedWorkoutBuilder) {
+                ATHLTHTrainIntervalComposerView(initial: selectedWorkout) { workout in
+                    selectedWorkout = workout
+                    mode = .structured
                 }
             }
             .sheet(isPresented: $showingSpotifyPicker) {
@@ -2198,6 +2205,24 @@ struct RunQuickStartSheet: View {
                     .controlSize(.small)
                     .tint(ATHLTHTheme.accent)
                 }
+
+                Button {
+                    showingDetailedWorkoutBuilder = true
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: selectedWorkout == nil
+                                ? "Build detailed session" : "Customize every phase",
+                            norwegian: selectedWorkout == nil
+                                ? "Bygg detaljert økt" : "Tilpass hver enkelt del"
+                        ),
+                        systemImage: "slider.horizontal.3"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 9)
 
                 if let workout = selectedWorkout {
                     Label(
