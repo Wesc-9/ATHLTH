@@ -53,6 +53,96 @@ extension View {
     }
 }
 
+/// A tiny, offline product illustration for every catalog choice. These
+/// silhouettes suggest the equipment type; they are not manufacturer photos.
+/// They add no downloads, image caches or database columns.
+enum ProfileGearCatalogVisualKind: Equatable {
+    case runningShoe, watch, inEar, openEar, overEar, other
+
+    static func resolve(
+        category: ProfileGearCategory,
+        brand: String,
+        model: String
+    ) -> Self {
+        switch category {
+        case .shoes:
+            return .runningShoe
+        case .watch:
+            return .watch
+        case .headphones:
+            let text = (brand + " " + model).lowercased()
+            if text.contains("openrun") || text.contains("openswim") ||
+               text.contains("openfit") || text.contains("aerofit") ||
+               text.contains("freeclip") || text.contains("linkbuds open") {
+                return .openEar
+            }
+            if text.contains("max") && text.contains("airpods") ||
+                text.contains("headphone") || text.contains("headphones") ||
+                text.contains("wh-") || text.contains("h100") ||
+                text.contains("px8") || text.contains("px7") ||
+                text.contains("monitor") || text.contains("studio pro") ||
+                text.contains("solo 4") || text.contains("ace") ||
+                text.contains("space one") || text.contains("ult wear") ||
+                text.contains("momentum 4") || text.contains("tune 770") {
+                return .overEar
+            }
+            return .inEar
+        case .other:
+            return .other
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .runningShoe: return "shoeprints.fill"
+        case .watch: return "applewatch"
+        case .inEar: return "earbuds"
+        case .openEar: return "earpods"
+        case .overEar: return "headphones"
+        case .other: return "square.grid.2x2.fill"
+        }
+    }
+}
+
+struct ProfileGearCatalogThumbnail: View {
+    let category: ProfileGearCategory
+    let brand: String
+    let model: String
+    var size: CGFloat = 36
+
+    private var kind: ProfileGearCatalogVisualKind {
+        .resolve(category: category, brand: brand, model: model)
+    }
+
+    var body: some View {
+        let tint = ATHLTHGearGhostStyle.tint(for: category)
+        ZStack {
+            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.white, tint.opacity(0.14)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                .strokeBorder(tint.opacity(0.13), lineWidth: 0.6)
+
+            if kind == .runningShoe {
+                RunningShoeIcon(color: tint)
+                    .frame(width: size * 0.76, height: size * 0.51)
+            } else {
+                Image(systemName: kind.symbolName)
+                    .font(.system(size: size * 0.49, weight: .medium))
+                    .foregroundStyle(tint)
+                    .symbolRenderingMode(.hierarchical)
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
 /// Icon-only familiar product silhouettes. No image downloads or new binary
 /// assets: a real uploaded photo still takes precedence in the management UI.
 struct ProfileGearProductMark: View {

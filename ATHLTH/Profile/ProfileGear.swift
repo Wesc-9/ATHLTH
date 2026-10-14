@@ -1495,7 +1495,11 @@ struct ProfileGearManagerView: View {
         let stats = gear.usageStats(for: item)
 
         return HStack(spacing: 12) {
-            ProfileGearThumb(item: item)
+            ProfileGearThumb(
+                item: item,
+                brand: details?.brand,
+                model: details?.model
+            )
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
@@ -1595,6 +1599,8 @@ struct ProfileGearManagerView: View {
 
 struct ProfileGearThumb: View {
     let item: ProfileGearItem
+    var brand: String? = nil
+    var model: String? = nil
 
     var body: some View {
         ZStack {
@@ -1636,11 +1642,20 @@ struct ProfileGearThumb: View {
     }
 
     private var fallback: some View {
-        ProfileGearProductMark(
-            item: item,
-            size: 23
+        ProfileGearCatalogThumbnail(
+            category: item.category,
+            brand: brand ?? "",
+            model: model ?? item.name,
+            size: 45
         )
     }
+}
+
+private enum ProfileGearCatalogPicker: String, Identifiable {
+    case brand
+    case model
+
+    var id: String { rawValue }
 }
 
 private enum ProfileGearEditorMode: String, CaseIterable, Identifiable {
@@ -1709,6 +1724,8 @@ struct ProfileGearEditorView: View {
     @State private var manualModel = false
     @State private var manualColor = false
     @State private var lastAutoName: String?
+    @State private var catalogPicker: ProfileGearCatalogPicker?
+    @State private var catalogSearchText = ""
 
     private static let colorChoices: [ProfileGearColorChoice] = [
         .init(english: "Black", norwegian: "Svart"),
@@ -1926,6 +1943,11 @@ struct ProfileGearEditorView: View {
                 )
             }
         }
+        .sheet(item: $catalogPicker) { picker in
+            catalogChoiceSheet(for: picker)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
         .onChange(of: detailDraft.status) { _, status in
             if status == .retired {
                 detailDraft.isDefaultForRunning = false
@@ -1999,6 +2021,144 @@ struct ProfileGearEditorView: View {
 
     private var catalogBrands: [String] {
         catalog.brands(for: category)
+    }
+
+    private var visibleCatalogBrands: [String] {
+        guard !catalogSearchText.isEmpty else { return catalogBrands }
+        return catalogBrands.filter {
+            $0.localizedStandardContains(catalogSearchText)
+        }
+    }
+
+    private var visibleCatalogModels: [GearCatalogEntry] {
+        guard !catalogSearchText.isEmpty else { return catalogModels }
+        return catalogModels.filter {
+            $0.model.localizedStandardContains(catalogSearchText) ||
+            $0.brand.localizedStandardContains(catalogSearchText)
+        }
+    }
+
+    private func openCatalogPicker(_ picker: ProfileGearCatalogPicker) {
+        catalogSearchText = ""
+        catalogPicker = picker
+    }
+
+    private func catalogChoiceSheet(
+        for picker: ProfileGearCatalogPicker
+    ) -> some View {
+        NavigationStack {
+            List {
+                if picker == .brand {
+                    ForEach(visibleCatalogBrands, id: \.self) { brand in
+                        Button {
+                            selectCatalogBrand(brand)
+                            catalogPicker = nil
+                        } label: {
+                            HStack(spacing: 11) {
+                                ProfileGearCatalogThumbnail(
+                                    category: category,
+                                    brand: brand,
+                                    model: catalog.models(
+                                        for: category,
+                                        brand: brand
+                                    ).first?.model ?? "",
+                                    size: 36
+                                )
+                                Text(brand)
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                                Spacer(minLength: 8)
+                                if detailDraft.brand == brand {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                }
+                            }
+                            .padding(.vertical, 3)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } else {
+                    ForEach(visibleCatalogModels) { item in
+                        Button {
+                            selectCatalogEntry(item)
+                            catalogPicker = nil
+                        } label: {
+                            HStack(spacing: 11) {
+                                ProfileGearCatalogThumbnail(
+                                    category: category,
+                                    brand: item.brand,
+                                    model: item.model,
+                                    size: 36
+                                )
+                                Text(item.model)
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                                    .lineLimit(2)
+                                Spacer(minLength: 8)
+                                if detailDraft.model == item.model {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                }
+                            }
+                            .padding(.vertical, 3)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                Section {
+                    Button {
+                        detailDraft.catalogItemID = nil
+                        if picker == .brand {
+                            detailDraft.brand = ""
+                            detailDraft.model = ""
+                            manualBrand = true
+                            manualModel = true
+                        } else {
+                            detailDraft.model = ""
+                            manualModel = true
+                        }
+                        detailDraft.variantLabel = ""
+                        catalogPicker = nil
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Enter manually",
+                                norwegian: "Skriv inn manuelt"
+                            ),
+                            systemImage: "square.and.pencil"
+                        )
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(ATHLTHTheme.canvasBottom)
+            .searchable(
+                text: $catalogSearchText,
+                prompt: ATHLTHLocalization.choose(
+                    english: "Search equipment",
+                    norwegian: "Søk etter utstyr"
+                )
+            )
+            .navigationTitle(
+                picker == .brand
+                    ? ATHLTHLocalization.choose(english: "Choose brand", norwegian: "Velg merke")
+                    : ATHLTHLocalization.choose(english: "Choose model", norwegian: "Velg modell")
+            )
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Close", norwegian: "Lukk")) {
+                        catalogPicker = nil
+                    }
+                }
+            }
+        }
+        .tint(ATHLTHTheme.accentDeep)
     }
 
     private var catalogModels: [GearCatalogEntry] {
@@ -2110,39 +2270,30 @@ struct ProfileGearEditorView: View {
                     }
                 } else {
                     LabeledContent("Brand") {
-                        Menu {
-                            ForEach(catalogBrands, id: \.self) { brand in
-                                Button(brand) {
-                                    selectCatalogBrand(brand)
-                                }
-                            }
-
-                            Divider()
-
-                            Button {
-                                detailDraft.catalogItemID = nil
-                                detailDraft.brand = ""
-                                detailDraft.model = ""
-                                detailDraft.variantLabel = ""
-                                manualBrand = true
-                                manualModel = true
-                            } label: {
-                                Label(
-                                    "Enter manually",
-                                    systemImage: "square.and.pencil"
-                                )
-                            }
+                        Button {
+                            openCatalogPicker(.brand)
                         } label: {
-                            HStack(spacing: 5) {
+                            HStack(spacing: 6) {
+                                if !detailDraft.brand.isEmpty {
+                                    ProfileGearCatalogThumbnail(
+                                        category: category,
+                                        brand: detailDraft.brand,
+                                        model: detailDraft.model,
+                                        size: 27
+                                    )
+                                }
                                 Text(
                                     detailDraft.brand.isEmpty
-                                        ? "Choose"
+                                        ? ATHLTHLocalization.choose(english: "Choose", norwegian: "Velg")
                                         : detailDraft.brand
                                 )
+                                .lineLimit(1)
                                 Image(systemName: "chevron.up.chevron.down")
                                     .font(.caption2)
                             }
+                            .foregroundStyle(ATHLTHTheme.primaryText)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
 
@@ -2169,37 +2320,30 @@ struct ProfileGearEditorView: View {
                         }
                     } else {
                         LabeledContent("Model") {
-                            Menu {
-                                ForEach(catalogModels) { item in
-                                    Button(item.model) {
-                                        selectCatalogEntry(item)
-                                    }
-                                }
-
-                                Divider()
-
-                                Button {
-                                    detailDraft.catalogItemID = nil
-                                    detailDraft.model = ""
-                                    detailDraft.variantLabel = ""
-                                    manualModel = true
-                                } label: {
-                                    Label(
-                                        "Enter manually",
-                                        systemImage: "square.and.pencil"
-                                    )
-                                }
+                            Button {
+                                openCatalogPicker(.model)
                             } label: {
-                                HStack(spacing: 5) {
+                                HStack(spacing: 6) {
+                                    if !detailDraft.model.isEmpty {
+                                        ProfileGearCatalogThumbnail(
+                                            category: category,
+                                            brand: detailDraft.brand,
+                                            model: detailDraft.model,
+                                            size: 27
+                                        )
+                                    }
                                     Text(
                                         detailDraft.model.isEmpty
-                                            ? "Choose"
+                                            ? ATHLTHLocalization.choose(english: "Choose", norwegian: "Velg")
                                             : detailDraft.model
                                     )
+                                    .lineLimit(1)
                                     Image(systemName: "chevron.up.chevron.down")
                                         .font(.caption2)
                                 }
+                                .foregroundStyle(ATHLTHTheme.primaryText)
                             }
+                            .buttonStyle(.plain)
                         }
                     }
 
@@ -2220,17 +2364,24 @@ struct ProfileGearEditorView: View {
                                         Button {
                                             selectCatalogEntry(item)
                                         } label: {
-                                            Text(item.model)
-                                                .font(.caption.weight(.semibold))
-                                                .foregroundStyle(
-                                                    ATHLTHTheme.primaryText
+                                            HStack(spacing: 6) {
+                                                ProfileGearCatalogThumbnail(
+                                                    category: category,
+                                                    brand: item.brand,
+                                                    model: item.model,
+                                                    size: 28
                                                 )
-                                                .padding(.horizontal, 11)
-                                                .frame(height: 34)
-                                                .background(
-                                                    ATHLTHTheme.accentSoft,
-                                                    in: Capsule()
-                                                )
+                                                Text(item.model)
+                                                    .font(.caption.weight(.semibold))
+                                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                                                    .lineLimit(1)
+                                            }
+                                            .padding(.horizontal, 7)
+                                            .frame(height: 40)
+                                            .background(
+                                                ATHLTHTheme.accentSoft,
+                                                in: RoundedRectangle(cornerRadius: 13)
+                                            )
                                         }
                                         .buttonStyle(.plain)
                                     }
@@ -2653,16 +2804,17 @@ struct ProfileGearEditorView: View {
 
     private var defaultPreview: some View {
         Group {
-            if let existing {
-                ProfileGearProductMark(
-                    item: existing,
-                    size: 34
-                )
-            } else {
-                ProfileGearCategoryIcon(
+            if !detailDraft.brand.isEmpty || !detailDraft.model.isEmpty {
+                ProfileGearCatalogThumbnail(
                     category: category,
-                    size: 34
+                    brand: detailDraft.brand,
+                    model: detailDraft.model,
+                    size: 78
                 )
+            } else if let existing {
+                ProfileGearProductMark(item: existing, size: 34)
+            } else {
+                ProfileGearCategoryIcon(category: category, size: 34)
             }
         }
         .frame(width: 82, height: 82)
