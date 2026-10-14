@@ -47,10 +47,17 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
         XCTAssertTrue(exercises.allSatisfy { $0.source == .athlthCatalog })
         XCTAssertTrue(exercises.allSatisfy { !$0.exercise.primaryMuscles.isEmpty })
 
+        // Historical native IDs remain resolvable, but the restored RepDB
+        // catalog is now the source for new selections. Its display names
+        // need not be identical to the retired native exercises.
+        XCTAssertTrue(exercises.contains { $0.name == "Bench Press" })
+        XCTAssertGreaterThanOrEqual(library.repDBExercises.count, 400)
         let benchPress = library.search(query: "benkpress")
-        XCTAssertTrue(benchPress.contains { $0.name == "Bench Press" })
+        XCTAssertFalse(benchPress.isEmpty)
+        XCTAssertTrue(benchPress.contains { $0.source == .repDB })
+        XCTAssertFalse(benchPress.contains { $0.source == .athlthCatalog })
         XCTAssertTrue(library.search(query: "knebøy").contains {
-            $0.name == "Barbell Back Squat"
+            $0.source == .repDB
         })
 
         let beforeRefresh = exercises.map(\.id)

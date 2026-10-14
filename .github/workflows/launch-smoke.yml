@@ -51,6 +51,9 @@ jobs:
         shell: bash
         run: bash scripts/optimize_hero_assets.sh
 
+      - name: Embed RepDB offline exercise assets
+        run: python3 scripts/prepare_repdb_offline.py
+
       - name: Generate iPhone-only smoke-test project
         shell: bash
         run: |

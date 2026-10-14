@@ -16,6 +16,7 @@ concurrency:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   testflight:
@@ -491,6 +492,44 @@ jobs:
           </dict>
           </plist>
           EOF
+
+      - name: Require successful build and backend tests before upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHECKS="$RUNNER_TEMP/release-checks.json"
+          for attempt in $(seq 1 80); do
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA&per_page=100" > "$CHECKS"
+            if python3 - "$CHECKS" <<'PY'
+          import json, sys
+          runs = json.load(open(sys.argv[1]))["workflow_runs"]
+          required = ["Build ATHLTH", "ATHLTH backend regressions"]
+          pending = False
+          for name in required:
+              matches = sorted((r for r in runs if r["name"] == name), key=lambda r: r["id"], reverse=True)
+              if not matches or matches[0]["status"] != "completed":
+                  print(f"Waiting for {name}")
+                  pending = True
+              elif matches[0]["conclusion"] != "success":
+                  print(f"Release check failed: {name} ({matches[0]['conclusion']})")
+                  sys.exit(1)
+          sys.exit(2 if pending else 0)
+          PY
+            then
+              echo "Build and backend tests passed for this release commit."
+              break
+            else
+              status=$?
+              if [ "$status" -ne 2 ]; then exit "$status"; fi
+              if [ "$attempt" -eq 80 ]; then
+                echo "::error::Release checks did not complete before the upload deadline."
+                exit 1
+              fi
+              sleep 30
+            fi
+          done
 
       - name: Upload to App Store Connect / TestFlight
         shell: bash

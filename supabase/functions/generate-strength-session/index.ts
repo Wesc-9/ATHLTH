@@ -1,6 +1,6 @@
 import { compactStrengthCandidates } from "../_shared/strength-session-prompt.ts";
 import { enforceAIRequestBudget } from "../_shared/ai-request-budget.ts";
-import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.57.4";
 
 type ExerciseCandidate = {
   exerciseID: string;
@@ -93,7 +93,7 @@ async function verifyAccess(
       ok: true;
       userID: string;
       groqKey: string;
-      admin: ReturnType<typeof createClient>;
+      admin: SupabaseClient;
     }
   | { ok: false; response: Response }
 > {

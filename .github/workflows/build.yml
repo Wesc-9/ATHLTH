@@ -168,15 +168,8 @@ jobs:
 
       - name: Generate Xcode project
         run: xcodegen generate
-      - name: Build for iOS Simulator
-        run: |
-          xcodebuild \
-            -project ATHLTH.xcodeproj \
-            -scheme ATHLTH \
-            -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO \
-            build
-
+      # xcodebuild test builds the application and its Watch dependencies.
+      # Avoid a second generic simulator build before the same compilation.
       - name: Test privacy, plan completion and account storage
         shell: bash
         run: |
