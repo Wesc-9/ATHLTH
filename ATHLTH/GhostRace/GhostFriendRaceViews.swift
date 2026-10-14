@@ -102,7 +102,13 @@ struct GhostFriendRaceHubView: View {
         switch courseMode {
         case .previousWorkout:
             return runs.contains { $0.id == selectedWorkoutID }
-        case .plannedRoute: return selectedPlannedRoute != nil && targetTime != nil
+        case .plannedRoute:
+            guard let route = selectedPlannedRoute,
+                  let targetTime else { return false }
+            return GhostTargetRouteEligibility.isUsable(route) &&
+                (60...86_400).contains(targetTime) &&
+                (0.1...500).contains(route.distanceKilometers) &&
+                route.coordinates.count <= 10_000
         }
     }
 
@@ -214,7 +220,9 @@ struct GhostFriendRaceHubView: View {
             await loadRuns()
         }
         .alert(
-            "Race a Friend",
+            ATHLTHLocalization.choose(
+                english: "Race a friend", norwegian: "Løp mot en venn"
+            ),
             isPresented: Binding(
                 get: {
                     localError != nil ||
@@ -954,7 +962,10 @@ struct GhostFriendRaceHubView: View {
     private var privacyCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Label(
-                "Private by design",
+                ATHLTHLocalization.choose(
+                    english: "Private by design",
+                    norwegian: "Personvern som standard"
+                ),
                 systemImage: "lock.shield.fill"
             )
             .font(.headline)
@@ -971,14 +982,20 @@ struct GhostFriendRaceHubView: View {
 
             if settings.hideRouteStartAndEnd {
                 Label(
-                    "Your first and last 250 m are removed before the ghost is uploaded.",
+                    ATHLTHLocalization.choose(
+                        english: "The first and last 250 m are removed before sharing.",
+                        norwegian: "De første og siste 250 meterne fjernes før deling."
+                    ),
                     systemImage: "location.slash.fill"
                 )
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
             } else {
                 Label(
-                    "Hide route start/end is off. The full selected route will be shared with the chosen friend.",
+                    ATHLTHLocalization.choose(
+                        english: "Route trimming is off. The full selected GPS route will be shared with this friend.",
+                        norwegian: "Skjuling av start/slutt er av. Hele den valgte GPS-ruten deles med vennen."
+                    ),
                     systemImage: "location.fill"
                 )
                 .font(.caption.weight(.semibold))
@@ -1061,7 +1078,9 @@ struct GhostFriendRaceHubView: View {
 
                 if challenge.privacyTrimmed {
                     Label(
-                        "Trimmed",
+                        ATHLTHLocalization.choose(
+                            english: "Trimmed", norwegian: "Skjult start/slutt"
+                        ),
                         systemImage:
                             "lock.shield.fill"
                     )
@@ -1072,7 +1091,9 @@ struct GhostFriendRaceHubView: View {
 
             if challenge.status == .pending {
                 HStack(spacing: 10) {
-                    Button("Accept") {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Accept", norwegian: "Godta"
+                    )) {
                         Task {
                             await friendRaces.respond(
                                 challenge,
@@ -1082,8 +1103,12 @@ struct GhostFriendRaceHubView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(ATHLTHTheme.vitality)
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity)
 
-                    Button("Decline") {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Decline", norwegian: "Avslå"
+                    )) {
                         Task {
                             await friendRaces.respond(
                                 challenge,
@@ -1092,6 +1117,8 @@ struct GhostFriendRaceHubView: View {
                         }
                     }
                     .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity)
                 }
             } else if challenge.status == .accepted {
                 if let liveSession =
@@ -1108,7 +1135,10 @@ struct GhostFriendRaceHubView: View {
                         )
                     } label: {
                         Label(
-                            "Open live Ghost Run",
+                            ATHLTHLocalization.choose(
+                                english: "Open live Ghost run",
+                                norwegian: "Åpne live Ghost-løp"
+                            ),
                             systemImage:
                                 "location.circle.fill"
                         )
@@ -1196,7 +1226,9 @@ struct GhostFriendRaceHubView: View {
 
                 if challenge.status == .pending {
                     Button(
-                        "Cancel",
+                        ATHLTHLocalization.choose(
+                            english: "Cancel", norwegian: "Avbryt"
+                        ),
                         role: .destructive
                     ) {
                         Task {
@@ -1466,13 +1498,21 @@ struct GhostFriendRaceHubView: View {
     ) -> String {
         switch status {
         case .pending:
-            return "PENDING"
+            return ATHLTHLocalization.choose(
+                english: "PENDING", norwegian: "VENTER"
+            )
         case .accepted:
-            return "ACCEPTED"
+            return ATHLTHLocalization.choose(
+                english: "ACCEPTED", norwegian: "GODTATT"
+            )
         case .declined:
-            return "DECLINED"
+            return ATHLTHLocalization.choose(
+                english: "DECLINED", norwegian: "AVSLÅTT"
+            )
         case .cancelled:
-            return "CANCELLED"
+            return ATHLTHLocalization.choose(
+                english: "CANCELLED", norwegian: "AVBRUTT"
+            )
         }
     }
 
