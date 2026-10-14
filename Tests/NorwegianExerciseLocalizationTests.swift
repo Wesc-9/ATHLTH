@@ -57,7 +57,7 @@ final class NorwegianExerciseLocalizationTests: XCTestCase {
         }
 
         let reviewed = NorwegianExerciseText.record(for: "plank")
-        XCTAssertEqual(reviewed?.name, "Planke")
+        XCTAssertEqual(NorwegianExerciseText.name(for: "plank"), "Planke")
         XCTAssertNotNil(reviewed?.summary)
         XCTAssertEqual(reviewed?.instructions?.count, 3)
         XCTAssertNotNil(reviewed?.tips?.first)
