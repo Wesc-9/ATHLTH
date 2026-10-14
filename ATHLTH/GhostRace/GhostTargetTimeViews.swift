@@ -162,6 +162,12 @@ enum GhostTargetPaceFormatter {
 struct TargetGhostRoutePickerView: View {
     @EnvironmentObject private var session: AppSessionStore
 
+    private var availableRoutes: [TrainingRoute] {
+        session.savedRoutes
+            .filter { GhostTargetRouteEligibility.isUsable($0) }
+            .sorted { $0.createdAt > $1.createdAt }
+    }
+
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 13) {
@@ -180,22 +186,20 @@ struct TargetGhostRoutePickerView: View {
                 }
                 .padding(.bottom, 4)
 
-                if session.savedRoutes.isEmpty {
+                if availableRoutes.isEmpty {
                     ContentUnavailableView(
                         ATHLTHLocalization.choose(
-                            english: "No saved routes",
-                            norwegian: "Ingen lagrede ruter"
+                            english: "No usable GPS routes",
+                            norwegian: "Ingen brukbare GPS-løyper"
                         ),
                         systemImage: "map",
                         description: Text(ATHLTHLocalization.choose(
-                            english: "Save or create a route to start.",
-                            norwegian: "Lagre eller opprett en rute for å starte."
+                            english: "Target Ghost needs at least 200 m of GPS geometry. Save a valid route to start.",
+                            norwegian: "Mål-Ghost trenger minst 200 meter GPS-løype. Lagre en gyldig rute for å starte."
                         ))
                     )
                 } else {
-                    ForEach(session.savedRoutes.sorted {
-                        $0.createdAt > $1.createdAt
-                    }) { route in
+                    ForEach(availableRoutes) { route in
                         NavigationLink {
                             TargetGhostSetupView(route: route)
                         } label: {
@@ -245,7 +249,10 @@ struct TargetGhostRoutePickerView: View {
             .frame(maxWidth: .infinity)
         }
         .background(ATHLTHTheme.canvasTop.ignoresSafeArea())
-        .navigationTitle("Ghost Race")
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Choose a route",
+            norwegian: "Velg løype"
+        ))
         .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -1086,13 +1093,21 @@ struct TargetGhostSetupView: View {
                     alignment: .leading,
                     spacing: 4
                 ) {
-                    Text("Choose your target")
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose your target", norwegian: "Velg målet ditt"
+                    ))
                         .font(.headline)
 
                     Text(
                         smartTargets.isEmpty
-                            ? "Set the exact finish time you want. Once ATHLTH has a matched attempt on this route, personal targets appear here automatically."
-                            : "Use one of your personal targets or enter any finish time."
+                            ? ATHLTHLocalization.choose(
+                                english: "Choose your finish time or switch to a pace target. Matched runs can provide personal suggestions later.",
+                                norwegian: "Velg sluttid eller tempomål. Tidligere løp på samme rute kan senere gi personlige forslag."
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Choose a personal suggestion or enter an exact goal.",
+                                norwegian: "Velg et personlig forslag eller angi et nøyaktig mål."
+                            )
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -1241,7 +1256,10 @@ struct TargetGhostSetupView: View {
                             alignment: .leading,
                             spacing: 2
                         ) {
-                            Text("Required average pace")
+                            Text(ATHLTHLocalization.choose(
+                                english: "Required average pace",
+                                norwegian: "Nødvendig gjennomsnittstempo"
+                            ))
                                 .font(.caption)
                                 .foregroundStyle(
                                     .secondary
@@ -1366,7 +1384,10 @@ struct TargetGhostSetupView: View {
             alignment: .leading,
             spacing: 8
         ) {
-            Text("Fine tune")
+            Text(ATHLTHLocalization.choose(
+                english: "Fine tune",
+                norwegian: "Finjuster"
+            ))
                 .font(
                     .caption
                         .weight(.semibold)
