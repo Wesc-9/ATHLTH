@@ -444,7 +444,7 @@ final class ExerciseLibraryStore: ObservableObject {
         guard ATHLTHLocalization.isNorwegian, entry.source != .custom else {
             return entry.name
         }
-        if let reviewed = NorwegianExerciseText.record(for: entry.sourceIdentifier)?.name,
+        if let reviewed = NorwegianExerciseText.name(for: entry.sourceIdentifier),
            !reviewed.isEmpty {
             return reviewed
         }
