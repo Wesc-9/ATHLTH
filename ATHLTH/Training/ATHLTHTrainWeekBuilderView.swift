@@ -817,12 +817,12 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                     .editorSurface(line: line)
                 }
                 .buttonStyle(.plain)
-                if let workoutBlocks = draft.workoutBlocks, !workoutBlocks.isEmpty {
+                if !draft.resolvedWorkoutBlocks.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(tr("PINNED WORKOUT PHASES", "FESTEDE ØKTDELER"))
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(bronze)
-                        ForEach(workoutBlocks) { block in
+                        ForEach(draft.resolvedWorkoutBlocks) { block in
                             Label(block.title + " · " + block.resolvedPhase.title,
                                   systemImage: block.resolvedPhase.symbol)
                                 .font(.caption)
