@@ -37,6 +37,9 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
     private var senderTask: Task<Void, Never>?
     private var generation = UUID()
     private var ownsAudioSession = false
+    private var previousAudioCategory: AVAudioSession.Category?
+    private var previousAudioMode: AVAudioSession.Mode?
+    private var previousAudioOptions: AVAudioSession.CategoryOptions?
 
     /// Set only after a separate, in-session workout data opt-in. Never
     /// poll or proactively stream metrics. Resolved on each AI tool request.
@@ -269,12 +272,27 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
 
     private func configureAudio() throws {
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(
-            .playAndRecord,
-            mode: .voiceChat,
-            options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers]
-        )
-        try session.setActive(true)
+        let previousCategory = session.category
+        let previousMode = session.mode
+        let previousOptions = session.categoryOptions
+        do {
+            try session.setCategory(
+                .playAndRecord,
+                mode: .voiceChat,
+                options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers]
+            )
+            try session.setActive(true)
+        } catch {
+            // Do not strand the existing Audio Coach/music audio category
+            // if setting up the AI session fails partway through.
+            try? session.setCategory(
+                previousCategory, mode: previousMode, options: previousOptions
+            )
+            throw error
+        }
+        previousAudioCategory = previousCategory
+        previousAudioMode = previousMode
+        previousAudioOptions = previousOptions
         ownsAudioSession = true
 
         let engine = AVAudioEngine()
@@ -437,10 +455,19 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
         audioEngine = nil
         if ownsAudioSession {
             ownsAudioSession = false
-            try? AVAudioSession.sharedInstance().setActive(
+            let session = AVAudioSession.sharedInstance()
+            try? session.setActive(
                 false, options: .notifyOthersOnDeactivation
             )
+            if let category = previousAudioCategory,
+               let mode = previousAudioMode,
+               let options = previousAudioOptions {
+                try? session.setCategory(category, mode: mode, options: options)
+            }
         }
+        previousAudioCategory = nil
+        previousAudioMode = nil
+        previousAudioOptions = nil
         lastTranscript = nil
         state = .idle
     }
