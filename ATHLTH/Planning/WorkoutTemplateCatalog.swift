@@ -1449,8 +1449,23 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private var knownDurationMinutes: Int? {
-        let total = blocks.compactMap(\.durationSeconds).reduce(0, +)
-        return total > 0 ? Int(ceil(total / 60)) : nil
+        guard !blocks.isEmpty else { return nil }
+        var seconds = 0.0
+        for block in blocks {
+            if let duration = block.durationSeconds, duration > 0 {
+                seconds += duration
+            } else if block.kind == .run,
+                      let distance = block.distanceMeters,
+                      let pace = block.targetPaceSecondsPerKilometer,
+                      distance > 0, pace > 0 {
+                seconds += distance / 1_000 * pace
+            } else {
+                // A repetition-based exercise or unpaced distance has no
+                // reliable duration. Avoid displaying or saving a false total.
+                return nil
+            }
+        }
+        return Int(ceil(seconds / 60))
     }
 
     var body: some View {
