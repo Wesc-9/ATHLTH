@@ -55,6 +55,27 @@ enum WorkoutPhaseKind: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum WorkoutBlockGroupKind: String, Codable, Hashable {
+    case superset
+    case intervals
+
+    var title: String {
+        switch self {
+        case .superset:
+            return ATHLTHLocalization.choose(english: "Superset", norwegian: "Supersett")
+        case .intervals:
+            return ATHLTHLocalization.choose(english: "Intervals", norwegian: "Intervaller")
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .superset: return "dumbbell.fill"
+        case .intervals: return "repeat"
+        }
+    }
+}
+
 struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     let sequence: Int
     var kind: WorkoutTemplateBlockKind
@@ -70,6 +91,12 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     var phase: WorkoutPhaseKind? = nil
     var targetPaceSecondsPerKilometer: Double? = nil
     var targetHeartRateZone: Int? = nil
+    // Optional fields preserve compatibility with all existing saved workouts.
+    var setCount: Int? = nil
+    var restBetweenSetsSeconds: TimeInterval? = nil
+    var groupID: UUID? = nil
+    var groupKind: WorkoutBlockGroupKind? = nil
+    var groupRounds: Int? = nil
 
     var resolvedPhase: WorkoutPhaseKind {
         phase ?? (kind == .rest ? .recovery : .main)
@@ -93,6 +120,11 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         case phase
         case targetPaceSecondsPerKilometer = "target_pace_seconds_per_km"
         case targetHeartRateZone = "target_hr_zone"
+        case setCount = "set_count"
+        case restBetweenSetsSeconds = "rest_between_sets_seconds"
+        case groupID = "group_id"
+        case groupKind = "group_kind"
+        case groupRounds = "group_rounds"
     }
 
     var targetText: String? {
@@ -113,6 +145,9 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
             }
         }
 
+        if let setCount, setCount > 1, kind == .exercise {
+            parts.append("\(setCount) sett")
+        }
         if let repetitions, repetitions > 0 {
             parts.append("\(repetitions) reps")
         }
@@ -159,6 +194,86 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         return parts.isEmpty
             ? nil
             : parts.joined(separator: " · ")
+    }
+}
+
+/// Converts a compact editor recipe to the actual ordered steps the structured
+/// session player completes. Old recipes with no new metadata remain unchanged.
+/// Rounds are expanded per group, whereas stand-alone exercises repeat by set.
+/// Explicit rest blocks inside groups are respected; stand-alone sets insert
+/// recovery only *between* sets, never after the final set.
+extension Array where Element == WorkoutTemplateBlock {
+    func expandedForExecution() -> [WorkoutTemplateBlock] {
+        var output: [WorkoutTemplateBlock] = []
+        var cursor = 0
+
+        func append(_ source: WorkoutTemplateBlock, title: String? = nil) {
+            guard output.count < 1000 else { return }
+            var item = source
+            item = WorkoutTemplateBlock(
+                sequence: output.count + 1,
+                kind: source.kind,
+                title: title ?? source.title,
+                exerciseSlug: source.exerciseSlug,
+                distanceMeters: source.distanceMeters,
+                repetitions: source.repetitions,
+                durationSeconds: source.durationSeconds,
+                targetWeightKilograms: source.targetWeightKilograms,
+                loadNote: source.loadNote,
+                notes: source.notes,
+                phase: source.phase,
+                targetPaceSecondsPerKilometer: source.targetPaceSecondsPerKilometer,
+                targetHeartRateZone: source.targetHeartRateZone
+            )
+            output.append(item)
+        }
+
+        while cursor < count && output.count < 1000 {
+            let current = self[cursor]
+            if let groupID = current.groupID, current.groupKind != nil {
+                let start = cursor
+                while cursor < count && self[cursor].groupID == groupID {
+                    cursor += 1
+                }
+                let members = Array(self[start..<cursor])
+                let rounds = min(max(current.groupRounds ?? 1, 1), 20)
+                for round in 1...rounds {
+                    for member in members {
+                        append(member, title: rounds > 1
+                            ? "\(member.title) · \(round)/\(rounds)"
+                            : member.title)
+                    }
+                }
+            } else {
+                cursor += 1
+                let sets = current.kind == .exercise
+                    ? min(max(current.setCount ?? 1, 1), 20) : 1
+                for set in 1...sets {
+                    append(current, title: sets > 1
+                        ? "\(current.title) · \(set)/\(sets)"
+                        : current.title)
+                    if set < sets,
+                       let rest = current.restBetweenSetsSeconds,
+                       rest > 0 {
+                        append(WorkoutTemplateBlock(
+                            sequence: 0,
+                            kind: .rest,
+                            title: ATHLTHLocalization.choose(
+                                english: "Between sets", norwegian: "Mellom sett"),
+                            exerciseSlug: nil,
+                            distanceMeters: nil,
+                            repetitions: nil,
+                            durationSeconds: rest,
+                            targetWeightKilograms: nil,
+                            loadNote: nil,
+                            notes: nil,
+                            phase: .recovery
+                        ))
+                    }
+                }
+            }
+        }
+        return output
     }
 }
 
