@@ -1221,16 +1221,69 @@ struct IPhoneWorkoutView: View {
                                     Text(
                                         structuredRemainingText(
                                             step: step,
-                                            workout:
-                                                workout,
-                                            date:
-                                                context.date
+                                            workout: workout,
+                                            date: context.date
                                         )
                                     )
-                                    .font(.caption)
-                                    .foregroundStyle(
-                                        .secondary
+                                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                                    .monospacedDigit()
+
+                                    HStack(spacing: 12) {
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(ATHLTHLocalization.choose(
+                                                english: "PACE", norwegian: "TEMPO"
+                                            ))
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                            if let pace = workout.currentPaceSecondsPerKilometer,
+                                               pace.isFinite, pace > 0 {
+                                                Text(String(format: "%d:%02d /km",
+                                                    Int(pace) / 60, Int(pace) % 60))
+                                                .font(.headline.monospacedDigit())
+                                            } else {
+                                                Text("—").font(.headline)
+                                            }
+                                        }
+                                        if let zone = step.targetHeartRateZone {
+                                            VStack(alignment: .leading, spacing: 3) {
+                                                Text(ATHLTHLocalization.choose(
+                                                    english: "TARGET ZONE", norwegian: "MÅLSONE"
+                                                ))
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                                Text("\(zone)")
+                                                    .font(.headline.monospacedDigit())
+                                            }
+                                        }
+                                        Spacer()
+                                    }
+
+                                    let effortSeconds = max(
+                                        workout.elapsed(at: context.date) -
+                                            (workout.structuredStepStartElapsedTime ?? 0), 0
                                     )
+                                    let effortMeters = max(
+                                        workout.distanceMeters -
+                                            (workout.structuredStepStartDistanceMeters ?? 0), 0
+                                    )
+                                    if let ghostLead = ATHLTHIntervalGhostPacer.leadMeters(
+                                        step: step,
+                                        elapsedSeconds: effortSeconds,
+                                        distanceMeters: effortMeters
+                                    ) {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Interval Ghost",
+                                                norwegian: "Intervall-Ghost"
+                                            ) + " · \(Int(abs(ghostLead).rounded())) m " +
+                                            ATHLTHLocalization.choose(
+                                                english: ghostLead >= 0 ? "ahead" : "behind",
+                                                norwegian: ghostLead >= 0 ? "foran" : "bak"
+                                            ),
+                                            systemImage: "figure.run.circle"
+                                        )
+                                        .font(.subheadline.weight(.semibold))
+                                    }
 
                                     if let next =
                                         recorder
