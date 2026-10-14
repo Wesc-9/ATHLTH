@@ -85,6 +85,9 @@ final class RunningWorkoutLibraryStore: ObservableObject {
             createdAt: Date(),
             updatedAt: Date()
         )
+        copy.intervalGhostPaceSecondsPerKilometer =
+            source.intervalGhostPaceSecondsPerKilometer
+        copy.coachBrief = source.coachBrief
         copy.sharedSourceOwnerID =
             source.sharedSourceOwnerID ?? sourceOwnerID
         copy.sharedSourceWorkoutID =
@@ -117,9 +120,13 @@ final class RunningWorkoutLibraryStore: ObservableObject {
             updatedAt: Date()
         )
 
-        customTemplates.append(duplicate)
+        var editable = duplicate
+        editable.intervalGhostPaceSecondsPerKilometer =
+            source.intervalGhostPaceSecondsPerKilometer
+        editable.coachBrief = source.coachBrief
+        customTemplates.append(editable)
         persist()
-        return duplicate
+        return editable
     }
 
     private func persist() {
