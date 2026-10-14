@@ -20,6 +20,12 @@ struct ATHLTHTrainIntervalComposerView: View {
     @State private var paceEnabled = false
     @State private var paceSeconds = 300
     @State private var notes = ""
+    @State private var heartRateTargetEnabled = false
+    @State private var heartRateZone = 4
+    @State private var ghostEnabled: Bool
+    @State private var ghostPaceSeconds: Int
+    @State private var coachBrief: String
+    @State private var editingBlockID: UUID?
 
     private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
     private let muted = Color(red: 0.46, green: 0.44, blue: 0.43)
@@ -33,6 +39,9 @@ struct ATHLTHTrainIntervalComposerView: View {
         self.onSave = onSave
         _name = State(initialValue: initial?.title ?? "")
         _blocks = State(initialValue: initial?.blocks ?? [])
+        _ghostEnabled = State(initialValue: initial?.intervalGhostPaceSecondsPerKilometer != nil)
+        _ghostPaceSeconds = State(initialValue: Int(initial?.intervalGhostPaceSecondsPerKilometer ?? 300))
+        _coachBrief = State(initialValue: initial?.coachBrief ?? "")
     }
 
     var body: some View {
@@ -43,6 +52,7 @@ struct ATHLTHTrainIntervalComposerView: View {
                         titleArea
                         blockList
                         blockComposer
+                        sessionGuidance
                     }
                     .frame(maxWidth: 720, alignment: .leading)
                     .frame(maxWidth: .infinity)
@@ -97,6 +107,18 @@ struct ATHLTHTrainIntervalComposerView: View {
             ))
             .font(.subheadline)
             .foregroundStyle(muted)
+            Button {
+                loadFourByFour()
+            } label: {
+                Label(tr("Use 4 × 4 preset", "Bruk 4 × 4-mal"),
+                      systemImage: "square.stack.3d.up")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(13)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+
             TextField(tr("Workout title", "Navn på løpeøkten"), text: $name)
                 .padding(14)
                 .background(.white, in: RoundedRectangle(cornerRadius: 12))
@@ -138,6 +160,13 @@ struct ATHLTHTrainIntervalComposerView: View {
                             .foregroundStyle(muted)
                     }
                     Spacer()
+                    Button {
+                        edit(block)
+                    } label: {
+                        Text(tr("Edit", "Rediger"))
+                            .font(.caption.weight(.semibold))
+                    }
+                    .buttonStyle(.plain)
                     Menu {
                         if index > 0 {
                             Button(tr("Move up", "Flytt opp")) {
@@ -226,6 +255,14 @@ struct ATHLTHTrainIntervalComposerView: View {
                             step: 5)
                         .font(.subheadline)
                 }
+                Toggle(tr("Heart-rate zone target", "Målsone for puls"),
+                       isOn: $heartRateTargetEnabled)
+                    .tint(bronze)
+                if heartRateTargetEnabled {
+                    Stepper(tr("Zone", "Sone") + " \(heartRateZone)",
+                            value: $heartRateZone, in: 1...5)
+                        .font(.subheadline)
+                }
             }
 
             TextField(tr("Optional instructions", "Valgfri beskrivelse"),
@@ -239,7 +276,9 @@ struct ATHLTHTrainIntervalComposerView: View {
             } label: {
                 HStack {
                     Image(systemName: "plus")
-                    Text(tr("Add to structure", "Legg til i økten"))
+                    Text(editingBlockID == nil
+                         ? tr("Add to structure", "Legg til i økten")
+                         : tr("Save block changes", "Lagre endringer"))
                     Spacer()
                     Image(systemName: "arrow.right")
                 }
@@ -258,18 +297,96 @@ struct ATHLTHTrainIntervalComposerView: View {
         }
     }
 
-    private func addBlock() {
-        let intensity: RunningIntensityTarget
-        if kind == .work && paceEnabled {
-            intensity = RunningIntensityTarget(
-                kind: .pace,
-                paceMinSecondsPerKilometer: Double(paceSeconds),
-                paceMaxSecondsPerKilometer: Double(paceSeconds),
-                heartRateZone: nil, rpe: nil
-            )
-        } else {
-            intensity = .easy
+    private var sessionGuidance: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            Text(tr("INTERVAL TOOLS", "VERKTØY FOR INTERVALL"))
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(1.4)
+                .foregroundStyle(bronze)
+
+            Toggle(tr("Virtual Ghost on work efforts", "Virtuell Ghost på drag"),
+                   isOn: $ghostEnabled)
+                .tint(bronze)
+            if ghostEnabled {
+                Stepper(tr("Ghost pace", "Ghost-tempo") + " · " + paceLabel(ghostPaceSeconds),
+                        value: $ghostPaceSeconds, in: 150...1200, step: 5)
+                Text(tr(
+                    "Ghost tracks each work interval separately. Warm-up, rests and cooldown never count against you.",
+                    "Ghost sammenligner bare hvert aktive drag. Oppvarming, pauser og nedjogging teller ikke mot deg."
+                ))
+                .font(.caption)
+                .foregroundStyle(muted)
+            }
+
+            Text(tr("Tell Audio Coach what matters", "Fortell Audio Coach hva som er viktig"))
+                .font(.subheadline.weight(.semibold))
+            TextField(tr("e.g. Motivate me and focus on pace", "F.eks. Motiver meg og følg med på tempo"),
+                      text: $coachBrief, axis: .vertical)
+                .lineLimit(2...4)
+                .font(.subheadline)
+            Text(tr(
+                "Coaching preferences are saved with the workout. Voice coaching must be enabled when starting.",
+                "Ønskene lagres med økten. Lydcoach må aktiveres ved start."
+            ))
+            .font(.caption)
+            .foregroundStyle(muted)
         }
+        .padding(16)
+        .background(.white, in: RoundedRectangle(cornerRadius: 15))
+    }
+
+    private func loadFourByFour() {
+        name = tr("4 × 4 intervals", "4 × 4 intervaller")
+        let relaxed = RunningIntensityTarget.easy
+        blocks = [
+            RunningWorkoutBlock(kind: .warmup,
+                                title: tr("Warm-up", "Oppvarming"),
+                                work: .time(600, intensity: relaxed)),
+            RunningWorkoutBlock(kind: .work,
+                                title: tr("Effort", "Drag"),
+                                repetitions: 4,
+                                work: .time(240, intensity: .easy),
+                                recovery: .time(120, intensity: relaxed)),
+            RunningWorkoutBlock(kind: .cooldown,
+                                title: tr("Cool-down", "Nedjogging"),
+                                work: .time(600, intensity: relaxed))
+        ]
+        editingBlockID = nil
+    }
+
+    private func edit(_ block: RunningWorkoutBlock) {
+        editingBlockID = block.id
+        kind = block.kind
+        repetitions = block.repetitions
+        if block.work.measure == .distance {
+            measure = .distance
+            distanceMeters = max(Int(block.work.distanceMeters ?? 1000), 100)
+        } else {
+            measure = .time
+            minutes = max(Int((block.work.durationSeconds ?? 300) / 60), 1)
+        }
+        if let recovery = block.recovery {
+            pauseEnabled = true
+            pauseSeconds = Int(recovery.durationSeconds ?? 120)
+        } else {
+            pauseEnabled = false
+        }
+        paceEnabled = block.work.intensity.paceMinSecondsPerKilometer != nil
+        paceSeconds = Int(block.work.intensity.paceMinSecondsPerKilometer ?? 300)
+        heartRateTargetEnabled = block.work.intensity.heartRateZone != nil
+        heartRateZone = block.work.intensity.heartRateZone ?? 4
+        notes = block.notes ?? ""
+    }
+
+    private func addBlock() {
+        let intensity = RunningIntensityTarget(
+            kind: paceEnabled ? .pace :
+                  heartRateTargetEnabled ? .heartRateZone : .easy,
+            paceMinSecondsPerKilometer: paceEnabled ? Double(paceSeconds) : nil,
+            paceMaxSecondsPerKilometer: paceEnabled ? Double(paceSeconds) : nil,
+            heartRateZone: heartRateTargetEnabled ? heartRateZone : nil,
+            rpe: nil
+        )
         let work = measure == .distance
             ? RunningStepTarget.distance(Double(distanceMeters), intensity: intensity)
             : RunningStepTarget.time(Double(minutes * 60), intensity: intensity)
@@ -277,15 +394,20 @@ struct ATHLTHTrainIntervalComposerView: View {
             && repetitions > 1 && pauseEnabled
             ? .time(Double(pauseSeconds), intensity: .easy)
             : nil
-        blocks.append(RunningWorkoutBlock(
-            kind: kind,
-            title: kind.title,
+        let entry = RunningWorkoutBlock(
+            id: editingBlockID ?? UUID(),
+            kind: kind, title: kind.title,
             repetitions: kind == .work ? repetitions : 1,
-            work: work,
-            recovery: recovery,
+            work: work, recovery: recovery,
             notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ? nil : notes
-        ))
+        )
+        if let id = editingBlockID, let index = blocks.firstIndex(where: { $0.id == id }) {
+            blocks[index] = entry
+        } else {
+            blocks.append(entry)
+        }
+        editingBlockID = nil
         notes = ""
     }
 
@@ -309,17 +431,21 @@ struct ATHLTHTrainIntervalComposerView: View {
 
     private func save() {
         let now = Date()
-        let result = RunningWorkoutTemplate(
-            id: UUID(),
+        var result = RunningWorkoutTemplate(
+            id: initial?.isBuiltIn == false ? initial!.id : UUID(),
             title: name.trimmingCharacters(in: .whitespacesAndNewlines),
             type: .intervals,
             summary: tr("Custom interval workout", "Egendefinert intervalløkt"),
             blocks: blocks,
             routeID: initial?.routeID,
             isBuiltIn: false,
-            createdAt: now,
+            createdAt: initial?.createdAt ?? now,
             updatedAt: now
         )
+        result.intervalGhostPaceSecondsPerKilometer =
+            ghostEnabled ? Double(ghostPaceSeconds) : nil
+        result.coachBrief = coachBrief.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? nil : String(coachBrief.prefix(300))
         onSave(result)
         dismiss()
     }
