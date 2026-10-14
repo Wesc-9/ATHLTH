@@ -86,7 +86,7 @@ struct StructuredWorkoutSessionView: View {
     @State private var savedCompletion = false
 
     private var blocks: [WorkoutTemplateBlock] {
-        workout.resolvedWorkoutBlocks
+        workout.resolvedWorkoutBlocks.expandedForExecution()
     }
 
     private var currentBlock: WorkoutTemplateBlock? {
