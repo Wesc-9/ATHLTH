@@ -7,6 +7,7 @@ on:
       - release/v1.7.3
       - release/v1.7.4
       - release/v1.7.5
+      - release/v1.7.6
     paths:
       - .github/testflight-trigger
 
@@ -585,12 +586,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if gh release view "v1.7.5" >/dev/null 2>&1; then
-            echo "GitHub release v1.7.5 already exists; TestFlight build uploaded without recreating the release."
+          if gh release view "v1.7.6" >/dev/null 2>&1; then
+            echo "GitHub release v1.7.6 already exists; TestFlight build uploaded without recreating the release."
           else
-            gh release create "v1.7.5" \
+            gh release create "v1.7.6" \
               --target "$GITHUB_SHA" \
-              --title "ATHLTH 1.7.5" \
+              --title "ATHLTH 1.7.6" \
               --generate-notes
           fi
 

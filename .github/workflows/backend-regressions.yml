@@ -3,9 +3,9 @@ name: ATHLTH backend regressions
 on:
   workflow_dispatch:
   pull_request:
-    branches: [release/v1.6.9, release/v1.7.2, release/v1.7.3, release/v1.7.4, release/v1.7.5]
+    branches: [release/v1.6.9, release/v1.7.2, release/v1.7.3, release/v1.7.4, release/v1.7.5, release/v1.7.6]
   push:
-    branches: [release/v1.6.9, release/v1.7.2, release/v1.7.3, release/v1.7.4, release/v1.7.5]
+    branches: [release/v1.6.9, release/v1.7.2, release/v1.7.3, release/v1.7.4, release/v1.7.5, release/v1.7.6]
 
 permissions:
   contents: read

@@ -1,6 +1,7 @@
 # ATHLTH development baseline
 
-- Active development version: 1.7.5 on `release/v1.7.5`, initial build number 81.
+- Active development version: 1.7.6 on `release/v1.7.6`, initial build number 82.
+- Version 1.7.5 is locked for new development. Frozen commit: `183dc8c578a33d2c238d5b9ead026bf503c87d50` (build 81; TestFlight upload succeeded). Preservation branch: `backup/v1.7.5-locked-before-v1.7.6-20261014`.
 - Version 1.7.4 is locked for new development. Frozen commit: `61038f37a11a69cb9e4163d85fb24a82514b0a85` (build 80; TestFlight upload succeeded). Preservation branch: `backup/v1.7.4-locked-before-v1.7.5-20261014`.
 - Version 1.7.3 is locked for new development. Frozen commit: `f551ffb02fa78e6b370a7a40288092b3f70e9106` (build 79). Preservation branch: `backup/v1.7.3-locked-before-v1.7.4-20261012`.
 - Versions 1.7.2 and 1.7.1 are locked; preservation branches: `backup/v1.7.2-locked-before-v1.7.3-20261011` and `backup/v1.7.1-locked-before-v1.7.2-20261011`.
