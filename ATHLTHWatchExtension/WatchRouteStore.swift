@@ -568,6 +568,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 )
 
         case .route,
+             .aiCoachConversationRequest,
              .workoutResult,
              .workoutActivityQuery,
              .workoutStartGuard,
