@@ -155,9 +155,15 @@ struct PlannedWorkoutWatchBuilder {
             for position in 1...count {
                 let resolved = block.resolvedWork(at: position)
                 let override = block.override(for: position)
-                let title = override?.notes.flatMap { $0.isEmpty ? nil : $0 }
-                    ?? (count > 1 ? "\(block.title) \(position)/\(count)" : block.title)
+                let title = count > 1
+                    ? "\(block.title) \(position)/\(count)" : block.title
                 let working = block.kind == .work
+                // Notes are spoken as guidance, not substituted for the
+                // interval's actual title on the Watch and iPhone.
+                let guidance = [template.coachBrief, block.notes, override?.notes]
+                    .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+                    .joined(separator: ". ")
                 steps.append(runningStep(
                     title: title, target: resolved,
                     phase: block.kind.rawValue,
@@ -165,7 +171,7 @@ struct PlannedWorkoutWatchBuilder {
                         ? (override?.ghostPaceSecondsPerKilometer ??
                            template.intervalGhostPaceSecondsPerKilometer)
                         : nil,
-                    coachBrief: working ? template.coachBrief : nil
+                    coachBrief: working && !guidance.isEmpty ? guidance : nil
                 ))
 
                 if let recovery = block.resolvedRecovery(after: position) {
