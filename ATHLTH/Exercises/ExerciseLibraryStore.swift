@@ -182,6 +182,12 @@ final class ExerciseLibraryStore: ObservableObject {
     private let datasetURL = URL(string: "https://exercise-dataset.com/exercises.json")!
     private let imageBaseURL = URL(string: "https://exercise-dataset.com/")!
 
+    /// Full catalog and images packaged into the app at release build time.
+    /// Users can browse every shipped exercise on the very first offline launch.
+    private static var bundledRepDBRoot: URL? {
+        Bundle.main.url(forResource: "RepDBOffline", withExtension: "bundle")
+    }
+
     private var accountID: UUID?
     private var cachedAllExercises: [ExerciseLibraryEntry]?
     private var cachedBodyParts: [String]?
@@ -197,6 +203,7 @@ final class ExerciseLibraryStore: ObservableObject {
     private var lastSearchResults: [ExerciseLibraryEntry] = []
 
     init() {
+        loadBundledRepDB()
         loadCachedRepDB()
     }
 
@@ -606,7 +613,7 @@ final class ExerciseLibraryStore: ObservableObject {
 
             let dataset = try JSONDecoder().decode(RepDBDataset.self, from: data)
             let mapped = dataset.exercises.map(mapRepDB)
-            guard mapped.count >= 400,
+            guard mapped.count >= max(400, repDBExercises.count),
                   Set(mapped.map(\.id)).count == mapped.count else {
                 throw ExerciseLibraryError.invalidDataset
             }
@@ -834,8 +841,13 @@ final class ExerciseLibraryStore: ObservableObject {
             category: source.category?.humanizedRepDB,
             difficulty: source.difficulty?.humanizedRepDB,
             bodyPart: source.bodyPart?.humanizedRepDB,
-            imageStartURL: startURL ?? mainURL,
-            imagePeakURL: peakURL
+            imageStartURL:
+                bundledRepDBImageURL(source.images?.flat?.start)
+                ?? bundledRepDBImageURL(source.images?.flat?.main)
+                ?? startURL ?? mainURL,
+            imagePeakURL:
+                bundledRepDBImageURL(source.images?.flat?.peak)
+                ?? peakURL
         )
     }
 
@@ -914,6 +926,31 @@ final class ExerciseLibraryStore: ObservableObject {
         return url
     }
 
+    private func bundledRepDBImageURL(_ relativePath: String?) -> URL? {
+        guard let relativePath,
+              relativePath.hasPrefix("images/flat/"),
+              relativePath.hasSuffix(".webp"),
+              !relativePath.split(separator: "/").contains(".."),
+              let root = Self.bundledRepDBRoot else { return nil }
+        let url = root.appendingPathComponent(relativePath)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
+    private func loadBundledRepDB() {
+        guard let root = Self.bundledRepDBRoot,
+              let data = try? Data(contentsOf: root.appendingPathComponent("exercises.json")),
+              let dataset = try? JSONDecoder().decode(RepDBDataset.self, from: data) else {
+            return
+        }
+        let bundled = dataset.exercises.map(mapRepDB)
+        guard bundled.count >= 400,
+              Set(bundled.map(\.id)).count == bundled.count else { return }
+        repDBExercises = bundled
+        repDBExpectedCount = dataset.count ?? bundled.count
+        lastUpdated = Date()
+        invalidateDerivedCaches()
+    }
+
     private func loadCachedRepDB() {
         guard let url = Self.repDBCacheURL,
               let data = try? Data(contentsOf: url),
@@ -927,7 +964,7 @@ final class ExerciseLibraryStore: ObservableObject {
 
         let restored = dataset.exercises.map(mapRepDB)
         // Do not promote an old broken/partial cache to a usable catalog.
-        guard restored.count >= 400,
+        guard restored.count >= max(400, repDBExercises.count),
               Set(restored.map(\.id)).count == restored.count else { return }
         repDBExercises = restored
         repDBExpectedCount = dataset.count ?? restored.count
