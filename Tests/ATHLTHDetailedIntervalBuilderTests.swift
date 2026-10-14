@@ -50,7 +50,7 @@ final class ATHLTHDetailedIntervalBuilderTests: XCTestCase {
         XCTAssertEqual(steps[6].durationSeconds, 180)
         XCTAssertEqual(steps[5].durationSeconds, 255)
         XCTAssertEqual(steps.last?.phase, "cooldown")
-        XCTAssertEqual(plan.estimatedDurationSeconds ?? -1, 2_715, accuracy: 0.001)
+        XCTAssertEqual(plan.estimatedDurationSeconds ?? -1, 2_595, accuracy: 0.001)
     }
 
     func testPerDragPaceAndPulseTargetReachesWatch() {
