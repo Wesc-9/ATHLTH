@@ -26,7 +26,16 @@ struct ATHLTHTrainIntervalComposerView: View {
     @State private var heartRateZone = 4
     @State private var ghostEnabled: Bool
     @State private var ghostPaceSeconds: Int
+    @State private var ghostFollowRecovery: Bool
+    @State private var ghostRecoverySlowdownPercent: Int
+    @State private var editingRepetition: IntervalRepetitionSelection?
     @State private var coachBrief: String
+
+    private struct IntervalRepetitionSelection: Identifiable {
+        let blockID: UUID
+        let repetition: Int
+        var id: String { blockID.uuidString + "-\(repetition)" }
+    }
     @State private var editingBlockID: UUID?
 
     private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
@@ -43,6 +52,8 @@ struct ATHLTHTrainIntervalComposerView: View {
         _blocks = State(initialValue: initial?.blocks ?? [])
         _ghostEnabled = State(initialValue: initial?.intervalGhostPaceSecondsPerKilometer != nil)
         _ghostPaceSeconds = State(initialValue: Int(initial?.intervalGhostPaceSecondsPerKilometer ?? 300))
+        _ghostFollowRecovery = State(initialValue: initial?.intervalGhostFollowRecovery == true)
+        _ghostRecoverySlowdownPercent = State(initialValue: initial?.intervalGhostRecoverySlowdownPercent ?? 25)
         _coachBrief = State(initialValue: initial?.coachBrief ?? "")
     }
 
@@ -89,6 +100,22 @@ struct ATHLTHTrainIntervalComposerView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(tr("Cancel", "Avbryt")) { dismiss() }
                         .foregroundStyle(ink)
+                }
+            }
+        }
+        .sheet(item: $editingRepetition) { selection in
+            if let block = blocks.first(where: { $0.id == selection.blockID }) {
+                ATHLTHIntervalRepetitionEditorView(
+                    block: block,
+                    repetition: selection.repetition
+                ) { modification in
+                    guard let blockIndex = blocks.firstIndex(where: { $0.id == selection.blockID }) else { return }
+                    var updated = blocks[blockIndex]
+                    var overrides = updated.repetitionOverrides ?? []
+                    overrides.removeAll { $0.repetition == selection.repetition }
+                    overrides.append(modification)
+                    updated.repetitionOverrides = overrides.sorted { $0.repetition < $1.repetition }
+                    blocks[blockIndex] = updated
                 }
             }
         }
@@ -149,7 +176,8 @@ struct ATHLTHTrainIntervalComposerView: View {
                     .background(.white, in: RoundedRectangle(cornerRadius: 12))
             }
             ForEach(Array(blocks.enumerated()), id: \.element.id) { index, block in
-                HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 12) {
                     Image(systemName: block.kind == .work
                           ? "figure.run" : "clock")
                         .foregroundStyle(bronze)
@@ -189,6 +217,46 @@ struct ATHLTHTrainIntervalComposerView: View {
                         Image(systemName: "ellipsis")
                             .foregroundStyle(ink)
                             .frame(width: 35, height: 38)
+                    }
+                    }
+                    if block.kind == .work {
+                        Text(tr("INDIVIDUAL EFFORTS AND RECOVERIES",
+                                "HVERT DRAG OG HVER PAUSE"))
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(bronze)
+                        ForEach(1...max(block.repetitions, 1), id: \.self) { repetition in
+                            Button {
+                                editingRepetition = IntervalRepetitionSelection(
+                                    blockID: block.id, repetition: repetition
+                                )
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "slider.horizontal.3")
+                                        .foregroundStyle(bronze)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(tr("Effort", "Drag") + " \(repetition)")
+                                            .font(.subheadline.weight(.semibold))
+                                        Text(repetitionSummary(block, repetition: repetition))
+                                            .font(.caption)
+                                            .foregroundStyle(muted)
+                                    }
+                                    Spacer()
+                                    if block.override(for: repetition) != nil {
+                                        Text(tr("Custom", "Tilpasset"))
+                                            .font(.caption2)
+                                            .foregroundStyle(bronze)
+                                    }
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption2)
+                                        .foregroundStyle(muted)
+                                }
+                                .padding(.vertical, 8)
+                            }
+                            .buttonStyle(.plain)
+                            if repetition < max(block.repetitions, 1) {
+                                Divider().opacity(0.35)
+                            }
+                        }
                     }
                 }
                 .padding(14)
@@ -319,9 +387,22 @@ struct ATHLTHTrainIntervalComposerView: View {
             if ghostEnabled {
                 Stepper(tr("Ghost pace", "Ghost-tempo") + " · " + paceLabel(ghostPaceSeconds),
                         value: $ghostPaceSeconds, in: 150...1200, step: 5)
+                Toggle(tr("Follow me during recovery", "Følg meg i pausene"),
+                       isOn: $ghostFollowRecovery)
+                    .tint(bronze)
+                if ghostFollowRecovery {
+                    Stepper(
+                        tr("Follow when pace falls by", "Følg når tempoet faller") +
+                        " \(ghostRecoverySlowdownPercent) %",
+                        value: $ghostRecoverySlowdownPercent,
+                        in: 10...60,
+                        step: 5
+                    )
+                    .font(.subheadline)
+                }
                 Text(tr(
-                    "Ghost tracks each work interval separately. Warm-up, rests and cooldown never count against you.",
-                    "Ghost sammenligner bare hvert aktive drag. Oppvarming, pauser og nedjogging teller ikke mot deg."
+                    "Each effort has its own Ghost timer. In recovery, Ghost can match your slower pace without counting the pause as lost time.",
+                    "Hvert drag har sin egen Ghost-tid. Under pauser kan Ghost følge det lavere tempoet ditt, uten å regne pausen som tapt tid."
                 ))
                 .font(.caption)
                 .foregroundStyle(muted)
@@ -407,13 +488,17 @@ struct ATHLTHTrainIntervalComposerView: View {
             && repetitions > 1 && pauseEnabled
             ? .time(Double(pauseSeconds), intensity: .easy)
             : nil
+        let priorOverrides = editingBlockID.flatMap { id in
+            blocks.first(where: { $0.id == id })?.repetitionOverrides
+        }
         let entry = RunningWorkoutBlock(
             id: editingBlockID ?? UUID(),
             kind: kind, title: kind.title,
             repetitions: kind == .work ? repetitions : 1,
             work: work, recovery: recovery,
             notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? nil : notes
+                ? nil : notes,
+            repetitionOverrides: priorOverrides?.filter { $0.repetition <= (kind == .work ? repetitions : 1) }
         )
         if let id = editingBlockID, let index = blocks.firstIndex(where: { $0.id == id }) {
             blocks[index] = entry
@@ -422,6 +507,26 @@ struct ATHLTHTrainIntervalComposerView: View {
         }
         editingBlockID = nil
         notes = ""
+    }
+
+    private func repetitionSummary(_ block: RunningWorkoutBlock,
+                                   repetition: Int) -> String {
+        let work = block.resolvedWork(at: repetition)
+        let workText = stepSummary(work)
+        guard let recovery = block.resolvedRecovery(after: repetition) else {
+            return workText
+        }
+        return workText + " · " + tr("Recovery", "Pause") + " " + stepSummary(recovery)
+    }
+
+    private func stepSummary(_ step: RunningStepTarget) -> String {
+        switch step.measure {
+        case .distance: return "\(Int(step.distanceMeters ?? 0)) m"
+        case .time:
+            let seconds = Int(step.durationSeconds ?? 0)
+            return "\(seconds / 60):\(String(format: "%02d", seconds % 60))"
+        case .open: return tr("Open", "Åpent")
+        }
     }
 
     private func summary(_ block: RunningWorkoutBlock) -> String {
@@ -457,6 +562,8 @@ struct ATHLTHTrainIntervalComposerView: View {
         )
         result.intervalGhostPaceSecondsPerKilometer =
             ghostEnabled ? Double(ghostPaceSeconds) : nil
+        result.intervalGhostFollowRecovery = ghostEnabled && ghostFollowRecovery
+        result.intervalGhostRecoverySlowdownPercent = ghostRecoverySlowdownPercent
         result.coachBrief = coachBrief.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? nil : String(coachBrief.prefix(300))
         onSave(result)
