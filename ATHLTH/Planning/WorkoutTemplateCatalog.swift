@@ -1126,13 +1126,71 @@ extension WorkoutTemplateCatalogEntry {
 
 struct MyWorkoutTemplatesView: View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
 
     @State private var completionHistory:
         [StructuredWorkoutCompletion] = []
+    @State private var showingRunningBuilder = false
+    @State private var showingHybridBuilder = false
 
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 10) {
+                    Button {
+                        showingRunningBuilder = true
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Advanced run", norwegian: "Detaljert løpeøkt"
+                        ), systemImage: "figure.run")
+                            .frame(maxWidth: .infinity)
+                    }
+                    Button {
+                        showingHybridBuilder = true
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Strength / hybrid", norwegian: "Styrke / hybrid"
+                        ), systemImage: "dumbbell")
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+
+                if !runningLibrary.customTemplates.isEmpty {
+                    Text(ATHLTHLocalization.choose(
+                        english: "SAVED DETAILED RUNS", norwegian: "LAGREDE DETALJØKTER"
+                    ))
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    ForEach(runningLibrary.customTemplates) { workout in
+                        NavigationLink {
+                            RunningWorkoutDetailView(
+                                workout: workout,
+                                selectionTitle: nil,
+                                onSelect: nil,
+                                onStart: nil
+                            )
+                        } label: {
+                            HStack {
+                                Label(workout.title, systemImage: "figure.run")
+                                    .font(.subheadline.weight(.semibold))
+                                Spacer()
+                                Text("\(workout.blocks.count) " +
+                                     ATHLTHLocalization.choose(
+                                         english: "phases", norwegian: "deler"
+                                     ))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Image(systemName: "chevron.right")
+                            }
+                            .padding(14)
+                            .background(.white, in: RoundedRectangle(cornerRadius: 15))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
                 if !completionHistory.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("RECENT COMPLETED")
@@ -1188,7 +1246,8 @@ struct MyWorkoutTemplatesView: View {
                     }
                 }
 
-                if session.savedWorkoutTemplates.isEmpty {
+                if session.savedWorkoutTemplates.isEmpty &&
+                   runningLibrary.customTemplates.isEmpty {
                     ContentUnavailableView(
                         "No saved workouts",
                         systemImage: "rectangle.stack",
@@ -1216,6 +1275,14 @@ struct MyWorkoutTemplatesView: View {
         )
         .navigationTitle("My Workouts")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showingRunningBuilder) {
+            ATHLTHTrainIntervalComposerView { workout in
+                runningLibrary.save(workout)
+            }
+        }
+        .sheet(isPresented: $showingHybridBuilder) {
+            WorkoutTemplateBuilderView()
+        }
         .task {
             completionHistory =
                 StructuredWorkoutCompletionStore.load(
