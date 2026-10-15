@@ -444,6 +444,10 @@ struct WorkoutTemplateLibraryView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
     @EnvironmentObject private var recents: LibraryRecentsStore
+    @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
+
+    /// Keeps legacy running templates available through the unified workout library.
+    var onStartRunning: ((RunningWorkoutTemplate) -> Void)? = nil
 
     @StateObject private var catalog =
         WorkoutTemplateCatalogStore()
@@ -453,8 +457,33 @@ struct WorkoutTemplateLibraryView: View {
 
     private var categories: [String] {
         ["All"] +
-        Array(Set(catalog.entries.map(\.categoryTitle)))
+        Array(Set(catalog.entries.map(\.categoryTitle) + ["Running"]))
             .sorted()
+    }
+
+    private var builtInRunningTemplates: [RunningWorkoutTemplate] {
+        runningLibrary.allTemplates.filter(\.isBuiltIn)
+    }
+
+    /// Built-in running workouts share the same search, category and favorite
+    /// filters as catalog workouts, without creating another library section.
+    private var filteredRunningTemplates: [RunningWorkoutTemplate] {
+        guard selectedCategory == "All" || selectedCategory == "Running" else {
+            return []
+        }
+
+        let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return builtInRunningTemplates.filter { workout in
+            let favoriteMatches =
+                !favoritesOnly ||
+                favorites.isFavorite(.workout, itemID: workout.id.uuidString)
+            let searchMatches =
+                clean.isEmpty ||
+                workout.title.localizedCaseInsensitiveContains(clean) ||
+                workout.summary.localizedCaseInsensitiveContains(clean) ||
+                workout.type.title.localizedCaseInsensitiveContains(clean)
+            return favoriteMatches && searchMatches
+        }
     }
 
     private var filteredEntries:
@@ -501,7 +530,7 @@ struct WorkoutTemplateLibraryView: View {
                 ) {
                     HStack(spacing: 8) {
                         LibraryStatPill(
-                            value: "\(catalog.entries.count)",
+                            value: "\(catalog.entries.count + builtInRunningTemplates.count)",
                             label: "workouts",
                             icon: "rectangle.stack.fill",
                             tint: ATHLTHTheme.accent
@@ -539,7 +568,12 @@ struct WorkoutTemplateLibraryView: View {
                                 selectedCategory = category
                             } label: {
                                 filterChip(
-                                    category,
+                                    category == "Running"
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Running",
+                                            norwegian: "Løping"
+                                        )
+                                        : category,
                                     systemImage: nil,
                                     selected:
                                         selectedCategory ==
@@ -551,7 +585,7 @@ struct WorkoutTemplateLibraryView: View {
                     }
                 }
 
-                if filteredEntries.isEmpty {
+                if filteredEntries.isEmpty && filteredRunningTemplates.isEmpty {
                     ContentUnavailableView(
                         favoritesOnly
                             ? "No favorite workouts yet"
@@ -597,6 +631,42 @@ struct WorkoutTemplateLibraryView: View {
                                 subtitle:
                                     entry.categoryTitle,
                                 icon: entry.systemImage
+                            )
+                            .padding(12)
+                        }
+                    }
+
+                    ForEach(filteredRunningTemplates) { workout in
+                        ZStack(alignment: .topTrailing) {
+                            NavigationLink {
+                                RunningWorkoutDetailView(
+                                    workout: workout,
+                                    selectionTitle: nil,
+                                    onSelect: nil,
+                                    onStart: onStartRunning
+                                )
+                            } label: {
+                                runningWorkoutCard(workout)
+                            }
+                            .buttonStyle(.plain)
+                            .simultaneousGesture(
+                                TapGesture().onEnded {
+                                    recents.markUsed(
+                                        .workout,
+                                        itemID: workout.id.uuidString,
+                                        title: workout.title,
+                                        subtitle: workout.type.title,
+                                        icon: workout.type.systemImage
+                                    )
+                                }
+                            )
+
+                            LibraryFavoriteButton(
+                                kind: .workout,
+                                itemID: workout.id.uuidString,
+                                title: workout.title,
+                                subtitle: workout.type.title,
+                                icon: workout.type.systemImage
                             )
                             .padding(12)
                         }
@@ -718,6 +788,61 @@ struct WorkoutTemplateLibraryView: View {
                 Color.white.opacity(0.94),
                 lineWidth: 0.8
             )
+        }
+    }
+
+    private func runningWorkoutCard(_ workout: RunningWorkoutTemplate) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: workout.type.systemImage)
+                .font(.system(size: 21, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.vitality)
+                .frame(width: 50, height: 50)
+                .background(
+                    ATHLTHTheme.vitality.opacity(0.10),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                )
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(workout.type.title.uppercased())
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1.4)
+                    .foregroundStyle(ATHLTHTheme.vitality)
+
+                Text(workout.title)
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .multilineTextAlignment(.leading)
+
+                Text(workout.summary)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+
+                HStack(spacing: 9) {
+                    Label("\(workout.blocks.count) blocks", systemImage: "list.number")
+                    if let seconds = workout.estimatedDurationSeconds {
+                        Label(
+                            "~\(Int((seconds / 60).rounded(.up))) min",
+                            systemImage: "clock"
+                        )
+                    }
+                }
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .padding(.top, 2)
+            }
+
+            Spacer(minLength: 34)
+        }
+        .padding(16)
+        .background(
+            Color.white.opacity(0.86),
+            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color.white.opacity(0.94), lineWidth: 0.8)
         }
     }
 
