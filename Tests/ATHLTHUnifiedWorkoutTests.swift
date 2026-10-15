@@ -96,6 +96,22 @@ final class ATHLTHUnifiedWorkoutTests: XCTestCase {
         )
     }
 
+    func testWalkingKeepsItsWorkoutClassification() {
+        var workout = makeWorkout(kind: .walking)
+        workout.durationMinutes = 30
+        let blocks = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+        XCTAssertEqual(blocks.count, 1)
+        XCTAssertEqual(blocks.first?.kind, .run)
+
+        ATHLTHUnifiedWorkout.apply(
+            blocks: blocks, title: "", routeID: nil,
+            estimatedMinutes: 30, to: &workout
+        )
+        XCTAssertEqual(workout.kind, .walking)
+        XCTAssertEqual(workout.workoutCategory, "walking")
+        XCTAssertTrue(workout.exercises.isEmpty)
+    }
+
     private func makeWorkout(kind: WorkoutKind) -> PlannedSession {
         PlannedSession(
             id: UUID(), title: "", kind: kind,
