@@ -66,28 +66,6 @@ struct ATHLTHTrainTodayPremiumView: View {
             ghostRaceSection
                 .padding(.top, 6)
 
-            if plan == nil {
-                Button(action: onOpenLibrary) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "square.stack.3d.up")
-                            .font(.system(size: 19, weight: .light))
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(tr("Explore programs", "Utforsk treningsplaner"))
-                                .font(.subheadline.weight(.semibold))
-                            Text(tr("Templates and your saved plans", "Maler og dine lagrede planer"))
-                                .font(.caption)
-                                .foregroundStyle(muted)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
-                    }
-                    .foregroundStyle(ink)
-                    .padding(15)
-                    .premiumTrainSurface(line: hairline)
-                }
-                .buttonStyle(.plain)
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
