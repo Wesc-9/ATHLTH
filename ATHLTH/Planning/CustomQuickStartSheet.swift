@@ -646,7 +646,7 @@ struct CustomQuickStartSheet: View {
                             .foregroundStyle(muted)
                     }
                     Spacer()
-                    Text("\\(Int(workout.durationSeconds / 60)) min")
+                    Text("\(Int(workout.durationSeconds / 60)) min")
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(muted)
                 }
@@ -670,7 +670,7 @@ struct CustomQuickStartSheet: View {
         HStack {
             Text(title).font(.subheadline.weight(.medium))
             Spacer()
-            Text("\\(value.wrappedValue)\\(suffix)")
+            Text("\(value.wrappedValue)\(suffix)")
                 .font(.subheadline.monospacedDigit())
                 .foregroundStyle(muted)
             Stepper("", value: value, in: range, step: step)
