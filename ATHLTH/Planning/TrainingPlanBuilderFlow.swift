@@ -4664,8 +4664,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         let draft = ATHLTHPlanCreationDraft(
             title: resolvedPlanTitle,
             weekCount: weekCount,
-            startDate: startDate,
             usedDefaultTitle: title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            startDate: startDate,
             advanced: mode == .advanced,
             source: selectedSource.rawValue,
             stage: String(describing: step),
