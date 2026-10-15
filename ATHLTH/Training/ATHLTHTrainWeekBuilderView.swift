@@ -741,9 +741,9 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                     initialTitle: draft.title,
                     initialBlocks: ATHLTHUnifiedWorkout.editorBlocks(from: draft),
                     initialRouteID: draft.routeID,
-                    draftContext: "plan-\(planID.uuidString)-day-\(dayID.uuidString)-workout-\(existingWorkout?.id.uuidString ?? "new")",
                     initialDurationOverrideMinutes: durationWasEditedManually
                         ? draft.durationMinutes : nil,
+                    draftContext: "plan-\(planID.uuidString)-day-\(dayID.uuidString)-workout-\(existingWorkout?.id.uuidString ?? "new")",
                     onSaveToPlan: { title, blocks, routeID, knownMinutes, wasManual in
                         var nextDraft = draft
                         ATHLTHUnifiedWorkout.apply(
