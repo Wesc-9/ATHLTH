@@ -19,6 +19,11 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
     var preferredDayIndexes: [Int]?
     var equipmentContext: String?
     var weeklyTimeBudgetMinutes: Int?
+    // Only structural week choices and built-in subtype labels are stored.
+    // Custom session names and personal health notes are intentionally omitted.
+    var workoutKindsByDay: [Int: String]? = nil
+    var workoutPresetsByDay: [Int: String]? = nil
+    var workoutMinutesByDay: [Int: Int]? = nil
     var savedAt: Date
 
     init(
@@ -31,6 +36,9 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         preferredDayIndexes: [Int]? = nil,
         equipmentContext: String? = nil,
         weeklyTimeBudgetMinutes: Int? = nil,
+        workoutKindsByDay: [Int: String]? = nil,
+        workoutPresetsByDay: [Int: String]? = nil,
+        workoutMinutesByDay: [Int: Int]? = nil,
         savedAt: Date = Date()
     ) {
         self.schemaVersion = Self.schemaVersion
@@ -49,6 +57,15 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         self.equipmentContext = equipmentContext
         self.weeklyTimeBudgetMinutes = weeklyTimeBudgetMinutes.map {
             min(max($0, 60), 1200)
+        }
+        self.workoutKindsByDay = workoutKindsByDay?.filter {
+            (1...7).contains($0.key) && $0.value.count <= 30
+        }
+        self.workoutPresetsByDay = workoutPresetsByDay?.filter {
+            (1...7).contains($0.key) && $0.value.count <= 40
+        }
+        self.workoutMinutesByDay = workoutMinutesByDay?.filter {
+            (1...7).contains($0.key) && (15...180).contains($0.value)
         }
         self.savedAt = savedAt
     }
