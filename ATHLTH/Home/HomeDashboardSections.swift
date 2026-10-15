@@ -1934,145 +1934,79 @@ struct HomeHealthMetricStrip: View {
     }
 }
 
-private struct HomeMetricMiniBars:
-    View {
+/// Stateless calculations used by Home's tiny recovery charts. SwiftUI may
+/// render chart layout on AsyncRenderer, so these helpers must not inherit
+/// View / MainActor isolation or access an observable store.
+enum HomeMetricMiniBarMath {
+    nonisolated static func roundedScaleMaximum(_ value: Double) -> Double {
+        guard value > 0 else { return 1 }
+
+        let magnitude = pow(10, floor(log10(value)))
+        let normalized = value / magnitude
+        let rounded: Double
+        switch normalized {
+        case ...1: rounded = 1
+        case ...2: rounded = 2
+        case ...4: rounded = 4
+        case ...5: rounded = 5
+        default: rounded = 10
+        }
+        return max(rounded * magnitude, value)
+    }
+
+    nonisolated static func barHeight(
+        value: Double?,
+        maximum: Double,
+        availableHeight: CGFloat,
+        zeroIsEmpty: Bool
+    ) -> CGFloat {
+        guard let value, value.isFinite, value >= 0 else { return 4 }
+        if zeroIsEmpty && value <= 0 { return 0 }
+        return max(4, availableHeight * CGFloat(min(value / maximum, 1)))
+    }
+}
+
+private struct HomeMetricMiniBars: View {
     let values: [Double?]
     let tint: Color
     let zeroIsEmpty: Bool
 
     var body: some View {
-        GeometryReader { proxy in
-            let resolved =
-                values.isEmpty
-                    ? Array(
-                        repeating: nil,
-                        count: 7
-                    )
-                    : values
-            let valid =
-                resolved
-                    .compactMap { $0 }
-                    .filter {
-                        $0.isFinite &&
-                        $0 >= 0
-                    }
-            let rawMaximum =
-                valid.max() ?? 0
-            let maximum =
-                zeroIsEmpty
-                    ? roundedScaleMaximum(
-                        rawMaximum
-                    )
-                    : max(
-                        rawMaximum,
-                        0.001
-                    )
+        // Snapshot everything before entering SwiftUI's asynchronous geometry
+        // renderer. This closure must not call MainActor-isolated view methods.
+        let resolved: [Double?] = values.isEmpty
+            ? Array(repeating: nil, count: 7)
+            : values
+        let valid = resolved.compactMap { $0 }.filter { $0.isFinite && $0 >= 0 }
+        let rawMaximum = valid.max() ?? 0
+        let maximum = zeroIsEmpty
+            ? HomeMetricMiniBarMath.roundedScaleMaximum(rawMaximum)
+            : max(rawMaximum, 0.001)
+        let color = tint
+        let treatsZeroAsEmpty = zeroIsEmpty
 
-            HStack(
-                alignment: .bottom,
-                spacing: 3
-            ) {
-                ForEach(
-                    Array(
-                        resolved.enumerated()
-                    ),
-                    id: \.offset
-                ) { _, value in
+        return GeometryReader { @Sendable proxy in
+            HStack(alignment: .bottom, spacing: 3) {
+                ForEach(Array(resolved.enumerated()), id: \.offset) { _, value in
                     Capsule()
                         .fill(
                             value == nil
-                                ? tint.opacity(
-                                    0.10
-                                )
-                                : tint.opacity(
-                                    0.66
-                                )
+                                ? color.opacity(0.10)
+                                : color.opacity(0.66)
                         )
+                        .frame(maxWidth: .infinity)
                         .frame(
-                            maxWidth:
-                                .infinity
-                        )
-                        .frame(
-                            height:
-                                barHeight(
-                                    value: value,
-                                    maximum:
-                                        maximum,
-                                    availableHeight:
-                                        proxy
-                                            .size
-                                            .height
-                                )
+                            height: HomeMetricMiniBarMath.barHeight(
+                                value: value,
+                                maximum: maximum,
+                                availableHeight: proxy.size.height,
+                                zeroIsEmpty: treatsZeroAsEmpty
+                            )
                         )
                 }
             }
         }
         .accessibilityHidden(true)
-    }
-
-    private func roundedScaleMaximum(
-        _ value: Double
-    ) -> Double {
-        guard value > 0 else {
-            return 1
-        }
-
-        let magnitude =
-            pow(
-                10,
-                floor(log10(value))
-            )
-        let normalized =
-            value / magnitude
-        let rounded:
-            Double
-
-        switch normalized {
-        case ...1:
-            rounded = 1
-        case ...2:
-            rounded = 2
-        case ...4:
-            rounded = 4
-        case ...5:
-            rounded = 5
-        default:
-            rounded = 10
-        }
-
-        return max(
-            rounded * magnitude,
-            value
-        )
-    }
-
-    private func barHeight(
-        value: Double?,
-        maximum: Double,
-        availableHeight: CGFloat
-    ) -> CGFloat {
-        guard let value,
-              value.isFinite,
-              value >= 0
-        else {
-            return 4
-        }
-
-        if zeroIsEmpty &&
-            value <= 0 {
-            return 0
-        }
-
-        return max(
-            4,
-            availableHeight *
-                CGFloat(
-                    min(
-                        value / maximum,
-                        1
-                    )
-                )
-        )
     }
 }
 
