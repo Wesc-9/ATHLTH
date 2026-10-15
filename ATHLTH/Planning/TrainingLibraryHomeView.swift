@@ -249,11 +249,14 @@ struct TrainingLibraryHomeView: View {
                 }
                 libraryDivider
                 NavigationLink {
-                    MyWorkoutTemplatesView()
+                    LibrarySavedWorkoutsHubView(
+                        onStartRunning: onStartRunning
+                    )
                 } label: {
                     LibraryHubCollectionRow(
-                        title: tr("Saved workouts", "Lagrede økter"),
-                        detail: tr("Workouts you have created", "Økter du har laget"),
+                        title: tr("My workouts", "Mine økter"),
+                        detail: tr("Strength, hybrid and running",
+                                   "Styrke, kombinert og løping"),
                         symbol: "bookmark",
                         tint: slate,
                         count: session.savedWorkoutTemplates.count
@@ -294,22 +297,6 @@ struct TrainingLibraryHomeView: View {
                         symbol: "star",
                         tint: gold,
                         count: favorites.favorites.count
-                    )
-                }
-                libraryDivider
-                NavigationLink {
-                    RunningWorkoutLibraryView(
-                        source: .mine,
-                        onStart: onStartRunning
-                    )
-                } label: {
-                    LibraryHubCollectionRow(
-                        title: tr("My running sessions", "Mine løpeøkter"),
-                        detail: tr("Saved running workouts",
-                                   "Lagrede løpeøkter"),
-                        symbol: "figure.run",
-                        tint: green,
-                        count: nil
                     )
                 }
             }
@@ -512,6 +499,67 @@ private struct LibraryHubCollectionRow: View {
         .frame(minHeight: 67)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// My Workouts unifies the two existing sources without duplicating them
+/// on the library home screen. Opening either source still uses its existing
+/// editor and launching behavior.
+private struct LibrarySavedWorkoutsHubView: View {
+    @EnvironmentObject private var session: AppSessionStore
+    let onStartRunning: (RunningWorkoutTemplate) -> Void
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 15) {
+                Text(tr("All saved workouts", "Alle lagrede økter"))
+                    .font(.system(size: 28, weight: .semibold, design: .serif))
+                Text(tr(
+                    "Your strength, hybrid and running workouts in one place.",
+                    "Styrkeøkter, kombinasjonsøkter og løpeøkter samlet på ett sted."
+                ))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+                NavigationLink {
+                    MyWorkoutTemplatesView()
+                } label: {
+                    LibraryHubCollectionRow(
+                        title: tr("Strength and mixed workouts", "Styrke og kombinasjonsøkter"),
+                        detail: tr("Detailed sessions and templates", "Detaljerte økter og maler"),
+                        symbol: "dumbbell",
+                        tint: Color(red: 0.46, green: 0.41, blue: 0.66),
+                        count: session.savedWorkoutTemplates.count
+                    )
+                }
+
+                NavigationLink {
+                    RunningWorkoutLibraryView(
+                        source: .mine,
+                        onStart: onStartRunning
+                    )
+                } label: {
+                    LibraryHubCollectionRow(
+                        title: tr("Running workouts", "Løpeøkter"),
+                        detail: tr("Intervals, tempo and distance", "Intervaller, tempo og distanse"),
+                        symbol: "figure.run",
+                        tint: Color(red: 0.32, green: 0.47, blue: 0.40),
+                        count: nil
+                    )
+                }
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: 720, alignment: .leading)
+            .padding(18)
+            .frame(maxWidth: .infinity)
+        }
+        .background(Color(red: 0.986, green: 0.978, blue: 0.964).ignoresSafeArea())
+        .navigationTitle(tr("My workouts", "Mine økter"))
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
