@@ -309,26 +309,59 @@ struct ExerciseLibraryView: View {
             } else if entries.isEmpty {
                 if selectedSection == .mine && query.isEmpty {
                     ContentUnavailableView {
-                        Label("No custom exercises yet", systemImage: "dumbbell")
+                        Label(ATHLTHLocalization.choose(
+                            english: "No personal exercises yet",
+                            norwegian: "Ingen egne øvelser ennå"
+                        ), systemImage: "dumbbell")
                     } description: {
-                        Text("Create your own exercise and it will appear here.")
+                        Text(ATHLTHLocalization.choose(
+                            english: "Create an exercise to see it here.",
+                            norwegian: "Lag en egen øvelse for å se den her."
+                        ))
                     } actions: {
-                        Button("Create Exercise") {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Create exercise", norwegian: "Opprett øvelse"
+                        )) {
                             showingCreateExercise = true
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(ATHLTHTheme.accent)
                     }
                 } else {
-                    ContentUnavailableView(
-                        query.isEmpty ? "No exercises" : "No matches",
-                        systemImage: "dumbbell",
-                        description: Text(
-                            selectedSection == .library
-                                ? (library.errorMessage ?? "Try another search or filter.")
-                                : "Try another search or filter."
-                        )
-                    )
+                    VStack(spacing: 12) {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                            .font(.system(size: 34, weight: .ultraLight))
+                            .foregroundStyle(ATHLTHPlanDesign.accent)
+                            .frame(width: 72, height: 72)
+                            .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+                        Text(ATHLTHLocalization.choose(
+                            english: "No matching exercises",
+                            norwegian: "Ingen øvelser funnet"
+                        ))
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        Text(library.errorMessage ?? ATHLTHLocalization.choose(
+                            english: "Try a different search or adjust the filters.",
+                            norwegian: "Prøv et annet søk eller juster filtrene."
+                        ))
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        .multilineTextAlignment(.center)
+                        if selectedBodyPart != "All" || selectedEquipment != "All" || !query.isEmpty {
+                            Button(ATHLTHLocalization.choose(
+                                english: "Clear filters", norwegian: "Nullstill filtrene"
+                            )) {
+                                selectedBodyPart = "All"
+                                selectedEquipment = "All"
+                                query = ""
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .tint(ATHLTHPlanDesign.accent)
+                            .padding(.top, 4)
+                        }
+                    }
+                    .padding(28)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             } else {
                 ScrollViewReader { proxy in
@@ -871,7 +904,9 @@ struct ExerciseLibraryView: View {
                         .lineLimit(2)
 
                     if entry.source == .custom {
-                        Text("CUSTOM")
+                        Text(ATHLTHLocalization.choose(
+                             english: "CUSTOM", norwegian: "EGEN"
+                         ))
                             .font(.system(size: 8, weight: .bold))
                             .foregroundStyle(ATHLTHTheme.accent)
                             .padding(.horizontal, 5)
@@ -1007,7 +1042,9 @@ struct ExerciseDetailView: View {
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(library.localizedExerciseName(currentEntry))
-                        .font(.largeTitle.bold())
+                        .font(.system(size: 29, weight: .semibold, design: .rounded))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     Text(
                         [
@@ -1023,7 +1060,26 @@ struct ExerciseDetailView: View {
                 }
 
                 if let summary = displayedSummary, !summary.isEmpty {
-                    Text(summary).font(.subheadline)
+                    detailCard(ATHLTHLocalization.choose(
+                        english: "About the exercise", norwegian: "Om øvelsen"
+                    )) {
+                        Text(summary)
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                if !currentEntry.exercise.primaryMuscles.isEmpty ||
+                    !currentEntry.exercise.secondaryMuscles.isEmpty {
+                    detailCard(ATHLTHLocalization.choose(
+                        english: "Muscles used", norwegian: "Muskler i bruk"
+                    )) {
+                        ExerciseMuscleOverview(
+                            primaryMuscles: currentEntry.exercise.primaryMuscles,
+                            secondaryMuscles: currentEntry.exercise.secondaryMuscles
+                        )
+                    }
                 }
 
                 if ATHLTHLocalization.isNorwegian,
@@ -2124,5 +2180,126 @@ struct ExerciseArtwork: View {
                 .font(.system(size: size * 0.28))
                 .foregroundStyle(ATHLTHTheme.accent)
             }
+    }
+}
+
+
+/// Compact anatomy summary shared by the library and workout planning.
+/// Renders the existing vector atlas; never downloads extra muscle imagery.
+struct ExerciseMuscleOverview: View {
+    @EnvironmentObject private var library: ExerciseLibraryStore
+
+    let primaryMuscles: [String]
+    let secondaryMuscles: [String]
+
+    private var primaryRegions: Set<StrengthMuscleRegion> {
+        Set(primaryMuscles.flatMap { StrengthMuscleResolver.regions(for: $0) })
+    }
+
+    private var secondaryRegions: Set<StrengthMuscleRegion> {
+        Set(secondaryMuscles.flatMap { StrengthMuscleResolver.regions(for: $0) })
+            .subtracting(primaryRegions)
+    }
+
+    private var profile: StrengthMuscleProfile {
+        let regions = primaryRegions.union(secondaryRegions)
+        return StrengthMuscleProfile(
+            activations: regions.map {
+                StrengthMuscleActivation(
+                    region: $0, score: primaryRegions.contains($0) ? 1 : 0.45
+                )
+            },
+            primaryRegions: primaryRegions,
+            secondaryRegions: secondaryRegions
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if !primaryRegions.isEmpty || !secondaryRegions.isEmpty {
+                HStack(spacing: 18) {
+                    ForEach([true, false], id: \.self) { isFront in
+                        VStack(spacing: 5) {
+                            ATHLTHPremiumMuscleFigure(
+                                profile: profile,
+                                isFront: isFront,
+                                activationTint: ATHLTHPlanDesign.accent
+                            )
+                            .frame(width: 82, height: 148)
+                            Text(ATHLTHLocalization.choose(
+                                english: isFront ? "Front" : "Back",
+                                norwegian: isFront ? "Forside" : "Bakside"
+                            ))
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity)
+                .background(
+                    ATHLTHPlanDesign.selectedSurface.opacity(0.42),
+                    in: RoundedRectangle(cornerRadius: 16)
+                )
+            }
+            if !primaryMuscles.isEmpty {
+                muscleList(
+                    primaryMuscles,
+                    title: ATHLTHLocalization.choose(
+                        english: "Primary", norwegian: "Primære"
+                    ),
+                    emphasized: true
+                )
+            }
+            if !secondaryMuscles.isEmpty {
+                muscleList(
+                    secondaryMuscles,
+                    title: ATHLTHLocalization.choose(
+                        english: "Supporting", norwegian: "Sekundære"
+                    ),
+                    emphasized: false
+                )
+            }
+        }
+    }
+
+    private func muscleList(
+        _ muscles: [String], title: String, emphasized: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(title.uppercased())
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(1)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 6) {
+                    ForEach(Array(Set(muscles)).sorted(), id: \.self) {
+                        muscleChip($0, emphasized: emphasized)
+                    }
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(Set(muscles)).sorted(), id: \.self) {
+                        muscleChip($0, emphasized: emphasized)
+                    }
+                }
+            }
+        }
+    }
+
+    private func muscleChip(_ muscle: String, emphasized: Bool) -> some View {
+        Text(library.localizedBodyPartTitle(muscle))
+            .font(.caption.weight(emphasized ? .semibold : .regular))
+            .foregroundStyle(
+                emphasized ? ATHLTHPlanDesign.ink : ATHLTHPlanDesign.secondaryInk
+            )
+            .padding(.horizontal, 11)
+            .padding(.vertical, 7)
+            .background(
+                emphasized
+                    ? ATHLTHPlanDesign.selectedSurface
+                    : ATHLTHPlanDesign.outline.opacity(0.30),
+                in: Capsule()
+            )
     }
 }
