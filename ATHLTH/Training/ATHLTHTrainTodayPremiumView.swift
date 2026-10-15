@@ -57,11 +57,8 @@ struct ATHLTHTrainTodayPremiumView: View {
                     restDayCard(plan)
                 }
 
-                quickTrainSection
                 suggestedWorkoutSection
-                if suggestedWorkouts.isEmpty {
-                    workoutLibraryShortcut
-                }
+                quickTrainSection
                 activePlanSection(plan)
             } else {
                 // Starting a workout must not require creating a training plan.
@@ -407,40 +404,6 @@ struct ATHLTHTrainTodayPremiumView: View {
 
     // Shortcuts reuse the existing training library. No new recommendation
     // engine or Quick Train changes are needed for this navigation improvement.
-    private var workoutLibraryShortcut: some View {
-        Button(action: onOpenLibrary) {
-            HStack(spacing: 12) {
-                Image(systemName: "rectangle.stack")
-                    .font(.system(size: 19, weight: .medium))
-                    .foregroundStyle(champagne)
-                    .frame(width: 38, height: 38)
-                    .background(
-                        Color(red: 0.96, green: 0.94, blue: 0.91),
-                        in: RoundedRectangle(cornerRadius: 11)
-                    )
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(tr("Choose a workout", "Velg en økt"))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ink)
-                    Text(tr(
-                        "Saved workouts, intervals and your favorites",
-                        "Lagrede økter, intervaller og favoritter"
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(muted)
-                }
-                Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(muted)
-            }
-            .padding(14)
-            .premiumTrainSurface(line: hairline)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
     private func completedTodayCard(_ plan: TrainingPlan) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
