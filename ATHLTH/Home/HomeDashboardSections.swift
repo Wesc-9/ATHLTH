@@ -4441,33 +4441,27 @@ private struct HomeWeeklyProgressDaySheet: View {
                         .datePickerStyle(.compact)
                         .padding(.vertical, 10)
 
-                        Button {
-                            var copy = PlannedSession(
-                                id: UUID(),
-                                title: workout.title,
-                                kind: workout.kind,
-                                scheduledStart: suggestionStartTime,
-                                durationMinutes: workout.durationMinutes,
-                                targetDistanceKilometers: workout.targetDistanceKilometers,
-                                targetPaceSecondsPerKilometer: workout.targetPaceSecondsPerKilometer,
-                                routeID: workout.routeID,
-                                exercises: workout.exercises,
-                                notes: workout.notes
+                        if !HomeWorkoutSuggestionPlanner.canSchedule(
+                            on: selection.date, at: suggestionStartTime
+                        ) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Choose a future time on this date.",
+                                    norwegian: "Velg et fremtidig tidspunkt på denne datoen."
+                                ),
+                                systemImage: "clock.badge.exclamationmark"
                             )
-                            copy.runningWorkout = workout.runningWorkout
-                            copy.runningWorkouts = workout.runningWorkouts
-                            copy.workoutTemplateID = workout.workoutTemplateID
-                            copy.workoutBlocks = workout.workoutBlocks
-                            copy.workoutCategory = workout.workoutCategory
-                            copy.gearIDs = workout.gearIDs
-                            copy.audioCoachConfiguration = workout.audioCoachConfiguration
-                            copy.autoPauseEnabled = workout.autoPauseEnabled
-                            copy.spotifyPlaylist = workout.spotifyPlaylist
-                            copy.spotifyAutoplayOnStart = workout.spotifyAutoplayOnStart
-                            copy.targetAlertConfiguration = workout.targetAlertConfiguration
-                            copy.routeAlertConfiguration = workout.routeAlertConfiguration
-                            copy.ghostTargetDurationSeconds = workout.ghostTargetDurationSeconds
-                            copy.ghostUpdates = workout.ghostUpdates
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+
+                        Button {
+                            guard HomeWorkoutSuggestionPlanner.canSchedule(
+                                on: selection.date, at: suggestionStartTime
+                            ) else { return }
+                            let copy = HomeWorkoutSuggestionPlanner.independentSession(
+                                from: workout, start: suggestionStartTime
+                            )
                             session.addStandalonePlannedSession(copy)
                             selectedSuggestion = nil
                             selectedMode = 0
@@ -4483,6 +4477,9 @@ private struct HomeWeeklyProgressDaySheet: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(dayInk)
+                        .disabled(!HomeWorkoutSuggestionPlanner.canSchedule(
+                            on: selection.date, at: suggestionStartTime
+                        ))
                     }
                 }
                 .padding(20)
