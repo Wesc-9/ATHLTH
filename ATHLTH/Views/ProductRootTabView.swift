@@ -10074,7 +10074,8 @@ struct ATHLTHTrainView: View {
 
     private var customQuickStartAvailable: Bool {
         phoneWorkout.active == nil &&
-        strengthWorkout.activeWorkout == nil
+        strengthWorkout.activeWorkout == nil &&
+        !watchConnection.hasActiveWatchWorkout
     }
 
     private var quickStartCustomSubtitle: String {
