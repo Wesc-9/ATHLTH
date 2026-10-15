@@ -344,8 +344,49 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             .navigationDestination(
                 isPresented: $showingCreatedPlan
             ) {
-                if let createdPlanID {
+                if let createdPlanID,
+                   let savedPlan = session.trainingPlan(withID: createdPlanID) {
                     ScrollView {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Your plan has been saved",
+                                    norwegian: "Treningsplanen er lagret"
+                                ),
+                                systemImage: "checkmark.seal.fill"
+                            )
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                            Text(savedPlan.title)
+                                .font(.system(size: 28, weight: .bold, design: .rounded))
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                            HStack(spacing: 12) {
+                                Label("\(savedPlan.weeks.count) " +
+                                      ATHLTHLocalization.choose(english: "weeks", norwegian: "uker"),
+                                      systemImage: "calendar")
+                                Label("\(savedPlan.weeks.first?.days.flatMap(\\.sessions).count ?? 0) " +
+                                      ATHLTHLocalization.choose(english: "sessions/week", norwegian: "økter/uke"),
+                                      systemImage: "figure.run")
+                            }
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+
+                            Text(ATHLTHLocalization.choose(
+                                english: "You can review your workouts below. The entire plan is available under Train → Plan.",
+                                norwegian: "Se gjennom øktene nedenfor. Hele planen finner du under Tren → Plan."
+                            ))
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        .padding(18)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.white.opacity(0.9),
+                                    in: RoundedRectangle(cornerRadius: 22))
+                        .padding(.horizontal, 18)
+                        .padding(.top, 14)
+
                         ATHLTHTrainPlanPremiumView(highlightedPlanID: createdPlanID)
                             .padding(.horizontal, 18)
                             .padding(.vertical, 14)
@@ -368,7 +409,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             dismiss()
                         } label: {
                             HStack {
-                                Text(ATHLTHLocalization.choose(english: "Finish and open my plan", norwegian: "Fullfør og gå til planen min"))
+                                Text(ATHLTHLocalization.choose(english: "Open in Plan", norwegian: "Åpne i Plan"))
                                     .font(.headline)
                                 Spacer(minLength: 8)
                                 Image(systemName: "arrow.right")
