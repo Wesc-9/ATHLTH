@@ -15,6 +15,14 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var sourceRoute: [ExistingPlanDestination] = []
 
     @State private var title = ""
+
+    private var defaultPlanTitle: String {
+        ATHLTHLocalization.choose(english: "My training plan", norwegian: "Min treningsplan")
+    }
+    private var resolvedPlanTitle: String {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? defaultPlanTitle : trimmed
+    }
     @State private var weekCount = 8
     @State private var startDate =
         ATHLTHTrainingPlanBuilderFlow.defaultStartDate()
@@ -1727,16 +1735,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private func updateSimplePlanChoices() {
         if simpleActivities.count > 1 {
             focus = .hybrid
-            title = ATHLTHLocalization.choose(english: "My training plan", norwegian: "Min treningsplan")
+            // Keep the user's title untouched when changing preferred activities.
         } else if simpleActivities.contains(.running) {
             focus = .running
-            title = ATHLTHLocalization.choose(english: "My running plan", norwegian: "Min løpeplan")
+            // Activity changes should not overwrite a custom plan title.
         } else if simpleActivities.contains(.strength) {
             focus = .strength
-            title = ATHLTHLocalization.choose(english: "My strength plan", norwegian: "Min styrkeplan")
+            // Plan name stays independent of chosen activity.
         } else {
             focus = .generalFitness
-            title = ATHLTHLocalization.choose(english: "My walking plan", norwegian: "Min gåplan")
+            // No forced plan title: the default appears as placeholder.
         }
         weekCount = 8
         setSimpleKinds()
@@ -1796,10 +1804,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
                     TextField(
                         ATHLTHLocalization.choose(
-                            english:
-                                "e.g. Stronger this autumn",
-                            norwegian:
-                                "f.eks. Sterkere i høst"
+                            english: "My training plan",
+                            norwegian: "Min treningsplan"
                         ),
                         text: $title
                     )
@@ -3618,9 +3624,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 norwegian: "Plan"
                             ),
                         value:
-                            title.isEmpty
-                            ? "—"
-                            : title
+                            resolvedPlanTitle
                     )
 
                     reviewDivider
@@ -4379,11 +4383,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private var canCreatePlan: Bool {
-        !title
-            .trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-            .isEmpty &&
         !selectedDays.isEmpty &&
         conflictingPlan == nil &&
         (
@@ -5051,7 +5050,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         let created =
             session
                 .createConfiguredTrainingPlan(
-                    title: title,
+                    title: resolvedPlanTitle,
                     summary: planSummary,
                     weekCount: weekCount,
                     startDate: startDate,
