@@ -113,20 +113,29 @@ enum ATHLTHUnifiedWorkout {
         estimatedMinutes: Int?,
         to workout: inout PlannedSession
     ) {
-        let hasRunning = blocks.contains { $0.kind == .run }
+        let hasCardio = blocks.contains { $0.kind == .run }
+        let hasWalking = blocks.contains {
+            $0.kind == .run && $0.cardioActivity == .walking
+        }
+        let hasRunning = blocks.contains {
+            $0.kind == .run && $0.cardioActivity != .walking
+        }
         let hasStrength = blocks.contains { $0.kind == .exercise }
 
         workout.workoutBlocks = blocks
         let plannedKind = workout.kind
-        workout.kind = hasRunning && hasStrength ? .custom :
-            hasRunning ? (plannedKind == .walking ? .walking : .running) :
-            (plannedKind == .mobility ? .mobility : .strength)
-        workout.workoutCategory = hasRunning && hasStrength ? "hybrid" :
-            hasRunning ? (workout.kind == .walking ? "walking" : "running") :
+        workout.kind = (hasStrength && hasCardio) || (hasWalking && hasRunning)
+            ? .custom
+            : hasRunning ? .running
+            : hasWalking ? .walking
+            : (plannedKind == .mobility ? .mobility : .strength)
+        workout.workoutCategory = workout.kind == .custom ? "hybrid" :
+            workout.kind == .walking ? "walking" :
+            workout.kind == .running ? "running" :
             (workout.kind == .mobility ? "mobility" : "strength")
         workout.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
             .isEmpty ? workout.kind.title : title
-        workout.routeID = hasRunning ? routeID : nil
+        workout.routeID = blocks.contains { $0.kind == .run && $0.isIndoor != true } ? routeID : nil
         workout.durationMinutes = estimatedMinutes ?? workout.durationMinutes
         workout.exercises = []
         workout.runningWorkout = nil
