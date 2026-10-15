@@ -710,6 +710,34 @@ private struct ATHLTHArenaLiveDuelsSection: View {
     }
 }
 
+/// Full competition history, status and archive controls. Opened only on
+/// demand so the Arena landing page stays focused on active competitions.
+struct ATHLTHArenaAllCompetitionsView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text(ATHLTHLocalization.choose(
+                    english: "All competitions",
+                    norwegian: "Alle konkurranser"
+                ))
+                .font(ATHLTHArenaLightStyle.editorialTitle(31))
+                .foregroundStyle(ATHLTHArenaLightStyle.ink)
+
+                ATHLTHArenaOnlineSection()
+            }
+            .padding(17)
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
+        }
+        .background(ATHLTHArenaLightStyle.canvasBackground)
+        .environment(\.colorScheme, .light)
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Competitions", norwegian: "Konkurranser"
+        ))
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
 struct ATHLTHArenaHomeView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
@@ -738,7 +766,7 @@ struct ATHLTHArenaHomeView: View {
 
                 // Keep one competition overview rather than multiple
                 // competing quick-start dashboards.
-                ATHLTHArenaOnlineSection()
+                ATHLTHArenaOnlineSection(compact: true)
                     .id(remoteRevision)
                 ATHLTHArenaChallengeOverviewSection(hideWhenEmpty: true)
 
