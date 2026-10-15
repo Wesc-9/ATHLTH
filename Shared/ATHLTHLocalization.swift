@@ -274,7 +274,6 @@ enum ATHLTHExerciseNameLocalization {
         "russian twist": "Russisk twist",
         "ab wheel rollout": "Utrulling med magehjul",
         "rowing": "Roing",
-        "rowing machine": "Romaskin",
         "skierg": "SkiErg",
         "sled push": "Sledepush",
         "sled pull": "Slededrag",
