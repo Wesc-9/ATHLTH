@@ -2368,7 +2368,8 @@ final class AppSessionStore: ObservableObject {
 
         func makeSession(
             kind: WorkoutKind,
-            slot: Int
+            slot: Int,
+            dayIndex: Int
         ) -> PlannedSession {
             let duration: Int
             let distance: Double?
@@ -2414,16 +2415,21 @@ final class AppSessionStore: ObservableObject {
                 distance = nil
             }
 
+            let specifiedTitle = builderProfile
+                .preferredWorkoutTitlesByDay?[dayIndex]?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let chosenTitle = specifiedTitle.flatMap { $0.isEmpty ? nil : $0 }
+                ?? suggestedTitle(kind: kind, slot: slot)
+            let chosenDuration = builderProfile
+                .preferredWorkoutMinutesByDay?[dayIndex]
+                .map { min(max($0, 5), 240) } ?? duration
+
             return PlannedSession(
                 id: UUID(),
-                title:
-                    suggestedTitle(
-                        kind: kind,
-                        slot: slot
-                    ),
+                title: chosenTitle,
                 kind: kind,
                 scheduledStart: nil,
-                durationMinutes: duration,
+                durationMinutes: chosenDuration,
                 targetDistanceKilometers:
                     distance,
                 targetPaceSecondsPerKilometer:
@@ -2474,7 +2480,8 @@ final class AppSessionStore: ObservableObject {
                         .sessions = [
                             makeSession(
                                 kind: kind,
-                                slot: slot
+                                slot: slot,
+                                dayIndex: dayIndex
                             )
                         ]
                 }
