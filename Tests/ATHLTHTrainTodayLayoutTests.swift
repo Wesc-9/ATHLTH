@@ -23,6 +23,7 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
         let scenarios: [TrainingPlan?] = [nil, plan]
         for width in [320.0, 375.0, 430.0] {
             for currentPlan in scenarios {
+                for hasActiveWorkout in [false, true] {
                 let today = ATHLTHTrainTodayPremiumView(
                     plan: currentPlan,
                     sessions: [],
@@ -32,6 +33,7 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
                     nextWorkoutDate: nil,
                     completionFraction: 0,
                     planPosition: "",
+                    hasActiveWorkout: hasActiveWorkout,
                     onOpenPlan: {},
                     onCreatePlan: {},
                     onOpenLibrary: {},
@@ -51,6 +53,7 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
                     width + 1,
                     "Today content exceeds a \(Int(width))-point viewport"
                 )
+                }
             }
         }
     }
