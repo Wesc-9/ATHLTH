@@ -30,6 +30,9 @@ enum ATHLTHArenaActionSelection {
 /// A read-only inbox for Arena. The existing destination views remain the
 /// authority for acceptance, rules, scores and every server-side mutation.
 struct ATHLTHArenaNextStepsSection: View {
+    /// Landing pages can omit the repeated "nothing pending" card;
+    /// the standalone section still shows it by default.
+    var showEmptyState = true
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var challenges: ChallengeStore
@@ -124,6 +127,7 @@ struct ATHLTHArenaNextStepsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 11) {
+            if showEmptyState || !items.isEmpty || loadError != nil || isLoading {
             HStack(spacing: 9) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("ATHLTH · ARENA")
@@ -157,13 +161,14 @@ struct ATHLTHArenaNextStepsSection: View {
                 }
             }
 
+            }
             if let loadError {
                 Text(loadError)
                     .font(.caption)
                     .foregroundStyle(ATHLTHArenaLightStyle.secondary)
             }
 
-            if items.isEmpty {
+            if items.isEmpty && showEmptyState {
                 HStack(spacing: 10) {
                     Image(systemName: "checkmark.circle")
                         .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
