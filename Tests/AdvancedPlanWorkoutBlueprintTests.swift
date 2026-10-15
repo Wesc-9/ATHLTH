@@ -109,6 +109,61 @@ final class AdvancedPlanWorkoutBlueprintTests: XCTestCase {
         XCTAssertEqual(restored.workoutBlocks?.expandedForExecution().count, 9)
     }
 
+    func testDatedOverridesOnlyChangeSelectedWeek() throws {
+        let monday = try XCTUnwrap(Calendar.current.date(
+            from: DateComponents(year: 2026, month: 10, day: 19)
+        ))
+        let repeated = ATHLTHPlanStructuredWorkoutBlueprint(
+            title: "Upper body", kind: .strength,
+            durationMinutes: 45, routeID: nil,
+            blocks: [exercise()]
+        )
+        var weeks = [makeWeek(1), makeWeek(2), makeWeek(3)]
+        ATHLTHPlanStructuredWorkoutBlueprint.apply([1: repeated], to: &weeks)
+
+        let firstWorkoutID = try XCTUnwrap(weeks[0].days[0].sessions.first?.id)
+        let edited = ATHLTHPlanWeekDayEdit(
+            kind: .walking,
+            title: "Walk outside",
+            durationMinutes: 40,
+            detailedWorkout: nil
+        )
+        // Key 8 = Monday in the second week, leaving weeks 1 and 3 intact.
+        ATHLTHPlanWeekDayEdit.apply([8: edited], to: &weeks, startDate: monday)
+
+        XCTAssertEqual(weeks[0].days[0].sessions.first?.title, "Upper body")
+        XCTAssertEqual(weeks[0].days[0].sessions.first?.id, firstWorkoutID)
+        XCTAssertEqual(weeks[1].days[0].sessions.first?.title, "Walk outside")
+        XCTAssertEqual(weeks[1].days[0].sessions.first?.kind, .walking)
+        XCTAssertEqual(weeks[1].days[0].sessions.first?.durationMinutes, 40)
+        XCTAssertEqual(weeks[2].days[0].sessions.first?.title, "Upper body")
+    }
+
+    func testWeekOverrideCanReplaceDetailedTemplateWithoutAParallelWorkout() {
+        let monday = Calendar.current.date(
+            from: DateComponents(year: 2026, month: 10, day: 19)
+        )!
+        let original = ATHLTHPlanStructuredWorkoutBlueprint(
+            title: "Upper body", kind: .strength,
+            durationMinutes: 45, routeID: nil, blocks: [exercise()]
+        )
+        var weeks = [makeWeek(1), makeWeek(2)]
+        ATHLTHPlanStructuredWorkoutBlueprint.apply([1: original], to: &weeks)
+        var choice = ATHLTHPlanWeekDayEdit(
+            kind: .running,
+            title: "Intervals",
+            durationMinutes: 30,
+            detailedWorkout: nil
+        )
+        choice.removeTemplateDetail = true
+        ATHLTHPlanWeekDayEdit.apply([8: choice], to: &weeks, startDate: monday)
+
+        XCTAssertEqual(weeks[1].days[0].sessions.count, 1)
+        XCTAssertEqual(weeks[1].days[0].sessions.first?.kind, .running)
+        XCTAssertTrue(weeks[1].days[0].sessions.first?.resolvedWorkoutBlocks.isEmpty ?? false)
+        XCTAssertEqual(weeks[0].days[0].sessions.first?.workoutBlocks?.count, 1)
+    }
+
     func testNoDetailsMeansOriginalBasicSessionsRemainUnmodified() {
         var weeks = [makeWeek(1)]
         let before = weeks
