@@ -4144,7 +4144,7 @@ struct ChallengeCreationView: View {
             return false
         }
 
-        if meetupEnabled  &&
+        if meetupEnabled &&
             meetupCoordinate == nil {
             return false
         }
@@ -6619,7 +6619,7 @@ struct ChallengeCreationView: View {
 
         case 3:
             if hasEnd && endsAt <= startsAt { return false }
-            if meetupEnabled  &&
+            if meetupEnabled &&
                 meetupCoordinate == nil { return false }
             return true
 
