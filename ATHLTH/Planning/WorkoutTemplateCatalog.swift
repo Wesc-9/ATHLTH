@@ -2153,6 +2153,14 @@ struct WorkoutTemplateBuilderView: View {
                 }
             }
 
+            if kind == .intervals {
+                Text(intervalGroupSummary(members: members, rounds: first.groupRounds ?? 1))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(studioInk.opacity(0.68))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 51)
+            }
+
             if !collapsed {
                 VStack(spacing: 0) {
                     ForEach(members, id: \.self) { index in
@@ -2161,6 +2169,37 @@ struct WorkoutTemplateBuilderView: View {
                             Divider()
                                 .padding(.leading, 57)
                         }
+                    }
+                }
+
+                if kind == .intervals {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            if allRoundsExpandedIDs.contains(id) {
+                                allRoundsExpandedIDs.remove(id)
+                            } else {
+                                allRoundsExpandedIDs.insert(id)
+                            }
+                        }
+                    } label: {
+                        Label(
+                            allRoundsExpandedIDs.contains(id)
+                                ? tr("Hide all rounds", "Skjul alle intervaller")
+                                : tr("Show all rounds", "Vis alle intervaller"),
+                            systemImage: allRoundsExpandedIDs.contains(id)
+                                ? "chevron.up" : "list.number"
+                        )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(studioAccent)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.vertical, 5)
+
+                    if allRoundsExpandedIDs.contains(id) {
+                        intervalFullTimeline(
+                            memberIndices: members,
+                            rounds: first.groupRounds ?? 1
+                        )
                     }
                 }
 
@@ -2207,6 +2246,74 @@ struct WorkoutTemplateBuilderView: View {
                 .strokeBorder(studioInk.opacity(0.045), lineWidth: 0.8)
         }
         .shadow(color: studioInk.opacity(0.055), radius: 13, y: 5)
+    }
+
+    private func intervalGroupSummary(members: [Int], rounds: Int) -> String {
+        let description = members.map { intervalStepLabel(blocks[$0]) }
+            .joined(separator: "  +  ")
+        return String(max(rounds, 1)) + " " + tr("rounds", "runder") + " · " + description
+    }
+
+    private func intervalStepLabel(_ block: WorkoutTemplateBlock) -> String {
+        let activity = block.kind == .rest
+            ? tr("Rest", "Pause")
+            : block.kind == .run
+            ? (block.cardioActivity ?? .running).title
+            : localizedBlockTitle(block)
+        let duration: String
+        if let seconds = block.durationSeconds {
+            duration = shortDuration(seconds)
+        } else {
+            duration = block.targetText ?? ""
+        }
+        return duration.isEmpty ? activity : duration + " " + activity.lowercased()
+    }
+
+    private func shortDuration(_ seconds: TimeInterval) -> String {
+        let whole = max(0, Int(seconds.rounded()))
+        let mins = whole / 60
+        let secs = whole % 60
+        if mins > 0 && secs > 0 {
+            return "\(mins) " + tr("min", "min") + " \(secs) " + tr("sec", "sek")
+        }
+        return mins > 0
+            ? "\(mins) " + tr("min", "min")
+            : "\(secs) " + tr("sec", "sek")
+    }
+
+    private func intervalFullTimeline(
+        memberIndices: [Int], rounds: Int
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(1...min(max(rounds, 1), 20), id: \.self) { round in
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(tr("Round", "Runde") + " \(round)")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(studioInk)
+                    ForEach(memberIndices, id: \.self) { index in
+                        if !(round == min(max(rounds, 1), 20) &&
+                             index == memberIndices.last &&
+                             blocks[index].kind == .rest &&
+                             rounds > 1) {
+                            HStack(spacing: 8) {
+                                Image(systemName: blocks[index].kind == .rest
+                                      ? "pause.fill"
+                                      : blocks[index].cardioActivity == .walking
+                                      ? "figure.walk" : "figure.run")
+                                    .frame(width: 20)
+                                Text(intervalStepLabel(blocks[index]))
+                            }
+                            .font(.caption)
+                            .foregroundStyle(studioInk.opacity(0.78))
+                        }
+                    }
+                }
+                .padding(11)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(studioBackground, in: RoundedRectangle(cornerRadius: 13))
+            }
+        }
+        .padding(.top, 4)
     }
 
     private func builderBlockRow(_ index: Int, nested: Bool = false) -> some View {
