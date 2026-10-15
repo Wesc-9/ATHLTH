@@ -326,68 +326,25 @@ struct ATHLTHHomeDashboardHero: View {
                     .clipped()
                     .accessibilityHidden(true)
 
-                LinearGradient(
-                    stops: [
-                        .init(
-                            color: Color.white.opacity(0.10),
-                            location: 0
-                        ),
-                        .init(
-                            color: Color.clear,
-                            location: 0.42
-                        ),
-                        .init(
-                            color: Color.black.opacity(0.08),
-                            location: 0.62
-                        ),
-                        .init(
-                            color: Color.black.opacity(0.47),
-                            location: 1
-                        )
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .allowsHitTesting(false)
-
-                LinearGradient(
-                    colors: [
-                        Color.black.opacity(0.17),
-                        Color.clear
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-                .allowsHitTesting(false)
+                // The artwork is the Home identity. Only dim its lower
+                // edge when a planned-workout action needs readable text.
+                if workout != nil {
+                    LinearGradient(
+                        stops: [
+                            .init(color: .clear, location: 0.32),
+                            .init(color: Color.black.opacity(0.10), location: 0.62),
+                            .init(color: Color.black.opacity(0.47), location: 1)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .allowsHitTesting(false)
+                }
 
                 VStack(alignment: .leading, spacing: 0) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("ATHLTH")
-                            .font(
-                                .system(
-                                    size: 29,
-                                    weight: .medium,
-                                    design: .rounded
-                                )
-                            )
-                            .tracking(6.6)
-                            .foregroundStyle(.white)
-
-                        Text("MOVE  BETTER  LIVE  LONGER")
-                            .font(
-                                .system(
-                                    size: 8.5,
-                                    weight: .semibold
-                                )
-                            )
-                            .tracking(2.7)
-                            .foregroundStyle(
-                                .white.opacity(0.82)
-                            )
-                    }
-                    .padding(.top, 58)
-
-                    Spacer(minLength: 16)
+                    // No promotional title or tagline over the image.
+                    // Keep the functional planned-workout launcher below.
+                    Spacer(minLength: 0)
 
                     if let workout {
                         plannedWorkoutContent(
@@ -404,12 +361,16 @@ struct ATHLTHHomeDashboardHero: View {
                 )
 
                 weatherBadge
-                    .padding(.trailing, 18)
-                    .padding(.top, 118)
+                    .frame(
+                        width: min(160, max(78, proxy.size.width - 225)),
+                        alignment: .leading
+                    )
+                    .padding(.leading, 16)
+                    .padding(.top, 64)
                     .frame(
                         maxWidth: .infinity,
                         maxHeight: .infinity,
-                        alignment: .topTrailing
+                        alignment: .topLeading
                     )
             }
         }
@@ -597,74 +558,52 @@ struct ATHLTHHomeDashboardHero: View {
         )
     }
 
+    // Compact, informational weather glass pill. ViewThatFits hides the
+    // city on small phones before the pill can collide with Home actions.
     @ViewBuilder
-    private var weatherBadge:
-        some View {
+    private var weatherBadge: some View {
         if let weather {
-            VStack(
-                alignment: .trailing,
-                spacing: 1
-            ) {
-                HStack(spacing: 5) {
-                    Image(
-                        systemName:
-                            weather.symbolName
-                    )
-                    .symbolRenderingMode(
-                        .multicolor
-                    )
-                    .font(
-                        .system(
-                            size: 18,
-                            weight: .semibold
-                        )
-                    )
-
-                    Text(
-                        "\(Int(weather.temperatureCelsius.rounded()))°"
-                    )
-                    .font(
-                        .system(
-                            size: 18,
-                            weight: .bold,
-                            design: .rounded
-                        )
-                    )
-                    .foregroundStyle(.white)
-                }
-
-                if let location =
-                        weather.locationName,
-                   !location.isEmpty {
-                    Text(location)
-                        .font(
-                            .system(
-                                size: 10.5,
-                                weight: .medium
-                            )
-                        )
-                        .foregroundStyle(
-                            .white.opacity(0.86)
-                        )
-                        .lineLimit(1)
-                }
+            ViewThatFits(in: .horizontal) {
+                weatherContent(weather, showsLocation: true)
+                weatherContent(weather, showsLocation: false)
             }
-            .padding(
-                .horizontal,
-                9
-            )
-            .padding(
-                .vertical,
-                6
-            )
-            .background(
-                Color.black.opacity(0.16),
-                in: RoundedRectangle(
-                    cornerRadius: 12,
-                    style: .continuous
-                )
-            )
+            .accessibilityElement(children: .combine)
         }
+    }
+
+    private func weatherContent(
+        _ weather: HomeWeatherSnapshot,
+        showsLocation: Bool
+    ) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: weather.symbolName)
+                .symbolRenderingMode(.hierarchical)
+                .font(.system(size: 13, weight: .semibold))
+
+            Text("\(Int(weather.temperatureCelsius.rounded()))°")
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+
+            if showsLocation,
+               let city = weather.locationName,
+               !city.isEmpty {
+                Text(city)
+                    .font(.system(size: 10, weight: .medium))
+                    .lineLimit(1)
+            }
+        }
+        .foregroundStyle(.white)
+        .fixedSize(horizontal: true, vertical: false)
+        .padding(.horizontal, 10)
+        .frame(height: 36)
+        .background(Color.black.opacity(0.27), in: Capsule())
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay {
+            Capsule().strokeBorder(.white.opacity(0.38), lineWidth: 0.8)
+        }
+        .accessibilityLabel(
+            "\(Int(weather.temperatureCelsius.rounded())) grader" +
+            (weather.locationName.map { ", \($0)" } ?? "")
+        )
     }
 
     private func heroMetric(
