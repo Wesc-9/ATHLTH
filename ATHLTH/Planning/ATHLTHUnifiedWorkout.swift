@@ -117,10 +117,13 @@ enum ATHLTHUnifiedWorkout {
         let hasStrength = blocks.contains { $0.kind == .exercise }
 
         workout.workoutBlocks = blocks
+        let plannedKind = workout.kind
         workout.kind = hasRunning && hasStrength ? .custom :
-            (hasRunning ? .running : .strength)
+            hasRunning ? (plannedKind == .walking ? .walking : .running) :
+            (plannedKind == .mobility ? .mobility : .strength)
         workout.workoutCategory = hasRunning && hasStrength ? "hybrid" :
-            (hasRunning ? "running" : "strength")
+            hasRunning ? (workout.kind == .walking ? "walking" : "running") :
+            (workout.kind == .mobility ? "mobility" : "strength")
         workout.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
             .isEmpty ? workout.kind.title : title
         workout.routeID = hasRunning ? routeID : nil
