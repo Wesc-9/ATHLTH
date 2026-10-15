@@ -1536,19 +1536,22 @@ struct WorkoutTemplateBuilderView: View {
     @State private var pendingNewGroupKind: WorkoutBlockGroupKind?
     @State private var collapsedGroupIDs: Set<UUID> = []
     @State private var showingDiscardConfirmation = false
+    @State private var manualDurationMinutes: Int?
     /// Present from advanced plan creation to edit a specific weekday
     /// without creating an unwanted shared workout template.
-    private let onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?) -> Void)?
+    private let onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool) -> Void)?
 
     init(
         initialTitle: String = "",
         initialBlocks: [WorkoutTemplateBlock] = [],
         initialRouteID: UUID? = nil,
-        onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?) -> Void)? = nil
+        initialDurationOverrideMinutes: Int? = nil,
+        onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool) -> Void)? = nil
     ) {
         _title = State(initialValue: initialTitle)
         _blocks = State(initialValue: initialBlocks)
         _selectedRouteID = State(initialValue: initialRouteID)
+        _manualDurationMinutes = State(initialValue: initialDurationOverrideMinutes)
         self.onSaveToPlan = onSaveToPlan
     }
 
@@ -1621,11 +1624,66 @@ struct WorkoutTemplateBuilderView: View {
         ATHLTHWorkoutDurationEstimator.minutes(for: blocks)
     }
 
+    private var resolvedDurationMinutes: Int? {
+        manualDurationMinutes ?? knownDurationMinutes
+    }
+
+    private var durationSettings: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label(tr("Workout duration", "Varighet på økten"),
+                      systemImage: "clock")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(studioInk)
+                Spacer()
+                if manualDurationMinutes == nil {
+                    Text(knownDurationMinutes.map { "~\($0) min" }
+                         ?? tr("Not estimated yet", "Kan ikke beregnes ennå"))
+                        .font(.caption)
+                        .foregroundStyle(studioInk.opacity(0.65))
+                }
+            }
+            Toggle(
+                tr("Set duration manually", "Angi varighet selv"),
+                isOn: Binding(
+                    get: { manualDurationMinutes != nil },
+                    set: { manually in
+                        manualDurationMinutes = manually
+                            ? (knownDurationMinutes ?? 45) : nil
+                    }
+                )
+            )
+            .font(.subheadline)
+            .tint(studioAccent)
+            if manualDurationMinutes != nil {
+                Stepper(
+                    "\(manualDurationMinutes ?? 45) min",
+                    value: Binding(
+                        get: { manualDurationMinutes ?? 45 },
+                        set: { manualDurationMinutes = $0 }
+                    ),
+                    in: 5...240, step: 5
+                )
+                .font(.subheadline)
+            } else {
+                Text(tr(
+                    "Calculated from exercises, repetitions, pace and rest. Add a time or pace to distance-based running to estimate it.",
+                    "Beregnes fra øvelser, repetisjoner, tempo og pauser. Legg inn tid eller tempo på distansebasert løping for å få et anslag."
+                ))
+                .font(.caption)
+                .foregroundStyle(studioInk.opacity(0.58))
+            }
+        }
+        .padding(15)
+        .background(.white, in: RoundedRectangle(cornerRadius: 18))
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     workoutOverview
+                    durationSettings
                     addBlockSection
                     timeline
                     if hasRunning {
@@ -1735,8 +1793,11 @@ struct WorkoutTemplateBuilderView: View {
                             "\(blocks.expandedForExecution().count) " + tr("steps", "steg"),
                             icon: "square.stack.3d.up"
                         )
-                        if let knownDurationMinutes {
-                            metricPill("~\(knownDurationMinutes) min", icon: "clock")
+                        if let resolvedDurationMinutes {
+                            metricPill(
+                                "\(manualDurationMinutes == nil ? "~" : "")\(resolvedDurationMinutes) min",
+                                icon: "clock"
+                            )
                         }
                         metricPill(categoryTitle, icon: "chart.bar.fill")
                     }
@@ -2670,7 +2731,7 @@ struct WorkoutTemplateBuilderView: View {
             title: cleanTitle,
             kind: resolvedWorkoutKind,
             scheduledStart: nil,
-            durationMinutes: knownDurationMinutes,
+            durationMinutes: resolvedDurationMinutes,
             targetDistanceKilometers: nil,
             targetPaceSecondsPerKilometer: nil,
             routeID: hasRunning ? selectedRouteID : nil,
@@ -2680,7 +2741,10 @@ struct WorkoutTemplateBuilderView: View {
         workout.workoutBlocks = blocks
         workout.workoutCategory = category
         if let onSaveToPlan {
-            onSaveToPlan(cleanTitle, blocks, hasRunning ? selectedRouteID : nil, knownDurationMinutes)
+            onSaveToPlan(
+                cleanTitle, blocks, hasRunning ? selectedRouteID : nil,
+                resolvedDurationMinutes, manualDurationMinutes != nil
+            )
         } else {
             session.saveSharedWorkout(workout)
         }
