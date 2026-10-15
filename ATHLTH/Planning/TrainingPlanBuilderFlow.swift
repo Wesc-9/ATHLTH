@@ -713,6 +713,44 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     mode = .advanced
                     goForward()
                 }
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "ALREADY HAVE A PLAN?",
+                        norwegian: "HAR DU EN PLAN FRA FØR?"
+                    ))
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.4)
+                    .foregroundStyle(sourceMuted)
+
+                    HStack(spacing: 8) {
+                        Button {
+                            sourceRoute.append(.library)
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Plan library", norwegian: "Planbibliotek"
+                                ), systemImage: "square.stack.3d.up"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        Button {
+                            sourceRoute.append(.mine)
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "My plans", norwegian: "Mine planer"
+                                ), systemImage: "bookmark"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(sourceInk)
+                }
+                .padding(.top, 7)
+
             }
             .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
