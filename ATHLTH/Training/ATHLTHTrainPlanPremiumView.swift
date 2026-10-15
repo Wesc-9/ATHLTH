@@ -1023,74 +1023,12 @@ struct ATHLTHTrainPlanPremiumView: View {
                 .frame(height: 5)
             }
 
-            HStack(spacing: 9) {
-                actionButton(
-                    title: tr("Edit workouts", "Bygg og rediger økter"),
-                    icon: "arrow.right"
-                ) { showingEditor = true }
-                Button { showingProgress = true } label: {
-                    Image(systemName: "chart.xyaxis.line")
-                        .font(.system(size: 16))
-                        .foregroundStyle(graphite)
-                        .frame(width: 48, height: 45)
-                        .background(soft, in: RoundedRectangle(cornerRadius: 11))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(tr("View progress", "Se fremgang"))
+            actionButton(
+                title: tr("Edit your training week", "Rediger treningsuken"),
+                icon: "arrow.right"
+            ) {
+                showingEditor = true
             }
-            Button {
-                showingGoals = true
-            } label: {
-                HStack(spacing: 9) {
-                    Image(systemName: "target")
-                        .foregroundStyle(warmGold)
-                    Text(tr("Goals and program progress", "Mål og programfremgang"))
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Image(systemName: "arrow.right")
-                        .font(.caption)
-                }
-                .foregroundStyle(graphite)
-                .padding(13)
-                .background(soft, in: RoundedRectangle(cornerRadius: 11))
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                showingRecoveryAdvice = true
-            } label: {
-                HStack(spacing: 9) {
-                    Image(systemName: "leaf")
-                        .foregroundStyle(warmGold)
-                    Text(tr("Recovery suggestions", "Forslag til roligere økter"))
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Image(systemName: "arrow.right")
-                        .font(.caption)
-                }
-                .foregroundStyle(graphite)
-                .padding(13)
-                .background(soft, in: RoundedRectangle(cornerRadius: 11))
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                showingCoach = true
-            } label: {
-                HStack(spacing: 9) {
-                    Image(systemName: "arrow.up.forward")
-                        .foregroundStyle(warmGold)
-                    Text(tr("Progression suggestions", "Forslag til neste belastning"))
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Image(systemName: "arrow.right")
-                        .font(.caption)
-                }
-                .foregroundStyle(graphite)
-                .padding(13)
-                .background(soft, in: RoundedRectangle(cornerRadius: 11))
-            }
-            .buttonStyle(.plain)
             }
         }
         .padding(17)
@@ -1658,7 +1596,7 @@ struct ATHLTHTrainPlanPremiumView: View {
         VStack(spacing: 0) {
             HStack(alignment: .top, spacing: 11) {
                 VStack(spacing: 2) {
-                    Text(weekday(day.dayIndex))
+                    Text(weekday(day.dayIndex, plan: plan))
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(secondaryInk)
                     Text(
@@ -1762,8 +1700,8 @@ struct ATHLTHTrainPlanPremiumView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(
-                    tr("Add workout on \(weekday(day.dayIndex))",
-                       "Legg til økt på \(weekday(day.dayIndex))")
+                    tr("Add workout on \(weekday(day.dayIndex, plan: plan))",
+                       "Legg til økt på \(weekday(day.dayIndex, plan: plan))")
                 )
             }
             .padding(.vertical, 12)
@@ -1919,11 +1857,14 @@ struct ATHLTHTrainPlanPremiumView: View {
         }
     }
 
-    private func weekday(_ dayIndex: Int) -> String {
+    private func weekday(_ dayIndex: Int, plan: TrainingPlan) -> String {
         let norwegian = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"]
         let english = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-        let index = min(max(dayIndex - 1, 0), 6)
-        return tr(english[index], norwegian[index])
+        let calendarWeekday = Calendar.current.component(
+            .weekday, from: planDayDate(dayIndex, plan: plan)
+        )
+        let mondayBasedIndex = (calendarWeekday + 5) % 7
+        return tr(english[mondayBasedIndex], norwegian[mondayBasedIndex])
     }
 
     private func tr(_ en: String, _ no: String) -> String {
