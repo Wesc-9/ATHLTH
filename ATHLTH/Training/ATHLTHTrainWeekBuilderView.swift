@@ -552,6 +552,8 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     @State private var showRunningTemplates = false
     @State private var showSharedWorkoutTemplates = false
     @State private var showIntervalComposer = false
+    @State private var showDetailedComposer = false
+    @State private var showStructureConflict = false
     @State private var scheduled = false
     @State private var clockTime = Date()
     @State private var durationWasEditedManually: Bool
@@ -593,7 +595,12 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                     VStack(alignment: .leading, spacing: 18) {
                         heading
                         information
-                        if draft.kind == .strength || draft.kind == .custom {
+                        if advanced {
+                            detailedStructureEntry
+                        }
+                        if !draft.resolvedWorkoutBlocks.isEmpty {
+                            detailedBlocksSummary
+                        } else if draft.kind == .strength || draft.kind == .custom {
                             strengthEditing
                         } else if draft.kind == .running || draft.kind == .walking {
                             runningEditing
@@ -662,6 +669,47 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                         draft.title = template.title
                     }
                 }
+            }
+            .sheet(isPresented: $showDetailedComposer) {
+                WorkoutTemplateBuilderView(
+                    initialTitle: draft.title,
+                    initialBlocks: draft.resolvedWorkoutBlocks,
+                    initialRouteID: draft.routeID,
+                    onSaveToPlan: { title, blocks, routeID, knownMinutes in
+                        // Never silently discard sets, weights or set-specific goals.
+                        // A structured workout is authored as a separate execution
+                        // recipe and should not coexist with legacy exercises.
+                        guard draft.exercises.isEmpty,
+                              draft.runningWorkout == nil,
+                              (draft.runningWorkouts ?? []).isEmpty else {
+                            return
+                        }
+                        let hasRun = blocks.contains { $0.kind == .run }
+                        let hasStrength = blocks.contains { $0.kind == .exercise }
+                        draft.kind = hasRun && hasStrength
+                            ? .custom : hasRun ? .running : .strength
+                        draft.workoutCategory = hasRun && hasStrength
+                            ? "hybrid" : hasRun ? "running" : "strength"
+                        draft.workoutBlocks = blocks
+                        draft.routeID = hasRun ? routeID : nil
+                        draft.title = title
+                        if !durationWasEditedManually, let knownMinutes {
+                            draft.durationMinutes = min(max(knownMinutes, 5), 240)
+                        }
+                    }
+                )
+            }
+            .alert(
+                tr("Existing exercises must be preserved",
+                   "Eksisterende øvelser må bevares"),
+                isPresented: $showStructureConflict
+            ) {
+                Button(tr("OK", "OK"), role: .cancel) {}
+            } message: {
+                Text(tr(
+                    "The detailed block builder uses a different execution format. Keep editing existing sets here; to build a mixed workout with independent rests, start a new empty workout. Nothing has been removed.",
+                    "Den detaljerte blokkbyggeren bruker et annet øktformat. Du kan fortsette å redigere sett her. For økter med egne pauseblokker, start med en tom økt og velg detaljert øktbygger. Ingenting slettes."
+                ))
             }
             .sheet(isPresented: $showSharedWorkoutTemplates) {
                 SavedWorkoutPickerView { template in
@@ -855,6 +903,74 @@ struct ATHLTHTrainWorkoutBuilderView: View {
         .foregroundStyle(ink)
         .padding(13)
         .editorSurface(line: line)
+    }
+
+    /// Shared structured editor for new and already-structured sessions.
+    /// Legacy set-based workouts remain editable without destructive migration.
+    private var detailedStructureEntry: some View {
+        Button {
+            if !draft.exercises.isEmpty || draft.runningWorkout != nil
+                || !(draft.runningWorkouts ?? []).isEmpty {
+                showStructureConflict = true
+            } else {
+                showDetailedComposer = true
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "square.stack.3d.up")
+                    .font(.title3)
+                    .foregroundStyle(bronze)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(draft.resolvedWorkoutBlocks.isEmpty
+                         ? tr("Build a detailed workout", "Bygg detaljert økt")
+                         : tr("Edit detailed workout", "Rediger detaljert økt"))
+                        .font(.subheadline.weight(.semibold))
+                    Text(tr(
+                        "Warm-up, exercises, running, pauses and cool-down",
+                        "Oppvarming, øvelser, løping, pauser og nedtrapping"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(muted)
+                }
+                Spacer(minLength: 3)
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+            }
+            .foregroundStyle(ink)
+            .padding(15)
+            .editorSurface(line: line)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var detailedBlocksSummary: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                sectionTitle(tr("Workout timeline", "Øktens innhold"))
+                Spacer()
+                Text("\(draft.resolvedWorkoutBlocks.count) " + tr("blocks", "blokker"))
+                    .font(.caption)
+                    .foregroundStyle(muted)
+            }
+            ForEach(draft.resolvedWorkoutBlocks) { block in
+                HStack(spacing: 10) {
+                    Image(systemName: block.kind.systemImage)
+                        .frame(width: 26)
+                        .foregroundStyle(bronze)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(block.title)
+                            .font(.subheadline.weight(.medium))
+                        Text(block.resolvedPhase.title
+                             + (block.targetText.map { " · " + $0 } ?? ""))
+                            .font(.caption)
+                            .foregroundStyle(muted)
+                    }
+                    Spacer()
+                }
+                .padding(10)
+                .editorSurface(line: line)
+            }
+        }
     }
 
     private var strengthEditing: some View {
