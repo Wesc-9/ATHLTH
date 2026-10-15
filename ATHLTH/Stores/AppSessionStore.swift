@@ -2267,17 +2267,25 @@ final class AppSessionStore: ObservableObject {
                 to: resolvedStart
             )
 
-        let normalizedDays =
-            Array(
-                Set(
-                    builderProfile
-                        .preferredDayIndexes
-                        .filter {
-                            (1...7).contains($0)
-                        }
-                )
+        // The setup screen chooses real calendar weekdays (Monday = 1).
+        // Stored plan days are offsets from the program's first date.
+        // Translate only when creating the plan; all existing week views
+        // then read and render the same relative day-index convention.
+        func dayOffset(for weekday: Int) -> Int {
+            ATHLTHTrainingPlanSchedule.relativeDayIndex(
+                forCalendarWeekday: weekday, planStart: resolvedStart
             )
-            .sorted()
+        }
+        func calendarWeekday(for dayOffset: Int) -> Int {
+            ATHLTHTrainingPlanSchedule.calendarWeekdayIndex(
+                forRelativeDayIndex: dayOffset, planStart: resolvedStart
+            )
+        }
+        let normalizedDays =
+            Array(Set(builderProfile.preferredDayIndexes
+                .filter { (1...7).contains($0) }
+                .map(dayOffset(for:))))
+                .sorted()
         let targetDays =
             normalizedDays.isEmpty
                 ? [1, 3, 5]
@@ -2416,13 +2424,14 @@ final class AppSessionStore: ObservableObject {
                 distance = nil
             }
 
+            let calendarDay = calendarWeekday(for: dayIndex)
             let specifiedTitle = builderProfile
-                .preferredWorkoutTitlesByDay?[dayIndex]?
+                .preferredWorkoutTitlesByDay?[calendarDay]?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             let chosenTitle = specifiedTitle.flatMap { $0.isEmpty ? nil : $0 }
                 ?? suggestedTitle(kind: kind, slot: slot)
             let chosenDuration = builderProfile
-                .preferredWorkoutMinutesByDay?[dayIndex]
+                .preferredWorkoutMinutesByDay?[calendarDay]
                 .map { min(max($0, 5), 240) } ?? duration
 
             return PlannedSession(
@@ -2472,7 +2481,9 @@ final class AppSessionStore: ObservableObject {
                        !kinds.isEmpty {
                         kind = kinds[(weekIndex * targetDays.count + slot) % kinds.count]
                     } else {
-                        kind = builderProfile.preferredWorkoutKindsByDay?[dayIndex]
+                        kind = builderProfile.preferredWorkoutKindsByDay?[
+                            calendarWeekday(for: dayIndex)
+                        ]
                             ?? pattern[slot % max(pattern.count, 1)]
                     }
 
@@ -2490,8 +2501,13 @@ final class AppSessionStore: ObservableObject {
         }
 
         if builderProfile.mode == .advanced {
+            let scheduledBlueprints = Dictionary(
+                uniqueKeysWithValues: structuredWorkoutsByDay.map {
+                    (dayOffset(for: $0.key), $0.value)
+                }
+            )
             ATHLTHPlanStructuredWorkoutBlueprint.apply(
-                structuredWorkoutsByDay,
+                scheduledBlueprints,
                 to: &weeks
             )
         }
