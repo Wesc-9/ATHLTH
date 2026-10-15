@@ -588,35 +588,116 @@ struct ATHLTHTrainPlanPremiumView: View {
         .background(soft, in: RoundedRectangle(cornerRadius: 17))
     }
 
+    private func planLibraryPriority(_ item: TrainingPlan) -> Int {
+        if item.id == session.activePlan?.id { return 0 }
+        guard let start = item.startDate else { return 2 }
+        let today = Calendar.current.startOfDay(for: Date())
+        let planStart = Calendar.current.startOfDay(for: start)
+        if planStart > today { return 1 }
+        let endExclusive = Calendar.current.date(
+            byAdding: .day, value: max(item.weeks.count * 7, 0),
+            to: planStart
+        ) ?? planStart
+        return endExclusive <= today ? 3 : 2
+    }
+
+    private func planLibraryStatus(_ item: TrainingPlan) -> String {
+        switch planLibraryPriority(item) {
+        case 0: return tr("Active", "Aktiv")
+        case 1: return tr("Upcoming", "Kommende")
+        case 3: return tr("Previous", "Tidligere")
+        default: return tr("Saved", "Lagret")
+        }
+    }
+
     private var savedPlansOverview: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(tr("My training plans", "Mine treningsplaner"))
-                .font(.headline)
-            ForEach(session.trainingPlans) { item in
+        let plans = session.trainingPlans.sorted { lhs, rhs in
+            let firstPriority = planLibraryPriority(lhs)
+            let secondPriority = planLibraryPriority(rhs)
+            if firstPriority != secondPriority { return firstPriority < secondPriority }
+            return (lhs.startDate ?? lhs.createdAt) >
+                (rhs.startDate ?? rhs.createdAt)
+        }
+        return VStack(alignment: .leading, spacing: 11) {
+            HStack {
+                Text(tr("My training plans", "Mine treningsplaner"))
+                    .font(.system(size: 23, weight: .regular, design: .serif))
+                Spacer()
+                Text("\(plans.count) " + tr("plans", "planer"))
+                    .font(.caption)
+                    .foregroundStyle(secondaryInk)
+            }
+
+            if plans.isEmpty {
+                Text(tr("No plans yet. Create your first plan to get started.",
+                        "Ingen planer ennå. Opprett en plan for å komme i gang."))
+                    .font(.subheadline)
+                    .foregroundStyle(secondaryInk)
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .surface(line: line)
+            }
+            ForEach(plans) { item in
                 let selected = item.id == plan?.id
+                let priority = planLibraryPriority(item)
                 Button {
                     focusedPlanID = item.id
                     browsingMyPlans = false
                     selectedWeekIndex = nil
                     selectedDayID = nil
                 } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: selected ? "checkmark.circle.fill" : "calendar")
+                    HStack(alignment: .center, spacing: 12) {
+                        Image(systemName: priority == 0
+                              ? "checkmark.circle.fill" : "calendar")
                             .foregroundStyle(warmGold)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(item.title).font(.subheadline.weight(.semibold))
-                            if let start = item.startDate {
-                                Text(start.formatted(.dateTime.day().month(.abbreviated).year()))
-                                    .font(.caption).foregroundStyle(secondaryInk)
+                            .frame(width: 27)
+                        VStack(alignment: .leading, spacing: 5) {
+                            HStack(spacing: 8) {
+                                Text(item.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .lineLimit(2)
+                                if priority == 0 {
+                                    Text(planLibraryStatus(item))
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundStyle(warmGold)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 3)
+                                        .background(
+                                            warmGold.opacity(0.10),
+                                            in: Capsule()
+                                        )
+                                }
                             }
+                            HStack(spacing: 5) {
+                                Text("\(item.weeks.count) " + tr("weeks", "uker"))
+                                Text("·")
+                                if let start = item.startDate {
+                                    Text(start.formatted(
+                                        .dateTime.day().month(.abbreviated).year()
+                                    ))
+                                } else {
+                                    Text(tr("No start date", "Uten startdato"))
+                                }
+                                if priority != 0 {
+                                    Text("·")
+                                    Text(planLibraryStatus(item))
+                                }
+                            }
+                            .font(.caption)
+                            .foregroundStyle(secondaryInk)
                         }
-                        Spacer()
-                        Image(systemName: "chevron.right").font(.caption)
+                        Spacer(minLength: 3)
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(secondaryInk)
                     }
                     .foregroundStyle(graphite)
-                    .padding(16)
-                    .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
-                    .background(selected ? soft : Color.white, in: RoundedRectangle(cornerRadius: 17))
+                    .padding(15)
+                    .frame(maxWidth: .infinity, minHeight: 66, alignment: .leading)
+                    .background(
+                        selected ? soft : Color.white,
+                        in: RoundedRectangle(cornerRadius: 17)
+                    )
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
