@@ -304,8 +304,16 @@ final class AdvancedPlanWorkoutBlueprintTests: XCTestCase {
         XCTAssertEqual(restored.builderProfile?.preferredWorkoutKindsByDay?[1], .running)
         XCTAssertEqual(restored.builderProfile?.preferredWorkoutTitlesByDay?[1], "Bakkeintervaller")
         XCTAssertEqual(restored.builderProfile?.preferredWorkoutMinutesByDay?[4], 65)
-        XCTAssertEqual(restored.summary, "User-approved plan")
+        // Keep Coach's useful explanation, not just the generic wizard summary.
+        XCTAssertEqual(restored.summary, "Generic summary")
         XCTAssertEqual(restored.visibility, .privateOnly)
+
+        var noCoachSummary = draft.makeTrainingPlan(
+            ownerID: UUID(), startDate: seed.startDate
+        )
+        noCoachSummary.summary = ""
+        seed.applyWizardMetadata(to: &noCoachSummary)
+        XCTAssertEqual(noCoachSummary.summary, "User-approved plan")
     }
 
     func testStandaloneCoachStillWorksWithoutWizardMetadata() {
