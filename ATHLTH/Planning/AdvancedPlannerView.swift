@@ -5716,7 +5716,7 @@ struct SessionEditorView: View {
                                 showingSavedWorkoutPicker = true
                             } label: {
                                 Label(
-                                    "Workout",
+                                    ATHLTHLocalization.choose(english: "Saved workout", norwegian: "Lagret økt"),
                                     systemImage: "rectangle.stack.fill"
                                 )
                             }
@@ -5726,7 +5726,7 @@ struct SessionEditorView: View {
                                 showingExerciseLibrary = true
                             } label: {
                                 Label(
-                                    "Exercise",
+                                    ATHLTHLocalization.choose(english: "Exercise", norwegian: "Øvelse"),
                                     systemImage: "dumbbell.fill"
                                 )
                             }
@@ -5745,13 +5745,13 @@ struct SessionEditorView: View {
                                     alignment: .leading,
                                     spacing: 2
                                 ) {
-                                    Text("Add exercise or workout")
+                                    Text(ATHLTHLocalization.choose(english: "Add to workout", norwegian: "Legg til i økten"))
                                         .foregroundStyle(
                                             ATHLTHTheme.primaryText
                                         )
 
                                     Text(
-                                        "Choose one exercise, or insert a complete workout with all of its exercises."
+                                        ATHLTHLocalization.choose(english: "Choose an exercise or insert a saved workout.", norwegian: "Velg en øvelse eller sett inn en lagret økt.")
                                     )
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -5832,8 +5832,8 @@ struct SessionEditorView: View {
                             "Planlegg ekstra økt"
                     )
                     : existingWorkout == nil
-                        ? "Add Session"
-                        : "Edit Workout"
+                        ? ATHLTHLocalization.choose(english: "Add workout", norwegian: "Legg til økt")
+                        : ATHLTHLocalization.choose(english: "Edit workout", norwegian: "Rediger økt")
             )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -5856,8 +5856,8 @@ struct SessionEditorView: View {
                                 norwegian: "Planlegg"
                             )
                             : existingWorkout == nil
-                                ? "Add"
-                                : "Save"
+                                ? ATHLTHLocalization.choose(english: "Add", norwegian: "Legg til")
+                                : ATHLTHLocalization.choose(english: "Save", norwegian: "Lagre")
                     ) {
                         saveSession()
                     }
@@ -6735,7 +6735,7 @@ struct SessionEditorView: View {
     }
 
     private var strengthBuilder: some View {
-        Section("Strength Exercises") {
+        Section(ATHLTHLocalization.choose(english: "Strength exercises", norwegian: "Styrkeøvelser")) {
             if plannedExercises.isEmpty {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("Freestyle strength workout")
@@ -6751,20 +6751,40 @@ struct SessionEditorView: View {
                     Button {
                         exerciseBeingEdited = planned
                     } label: {
-                        HStack(spacing: 10) {
-                            Text("\(index + 1)")
-                                .font(.caption.bold())
-                                .foregroundStyle(ATHLTHTheme.accent)
-                                .frame(width: 26, height: 26)
-                                .background(
-                                    ATHLTHTheme.accent.opacity(0.10),
-                                    in: Circle()
-                                )
+                        HStack(spacing: 12) {
+                            ZStack(alignment: .topLeading) {
+                                if let entry = exerciseLibrary.allExercises.first(
+                                    where: { $0.id == planned.embeddedExercise.id }
+                                ) {
+                                    ExerciseArtwork(entry: entry, size: 62)
+                                } else {
+                                    Image(systemName: "dumbbell")
+                                        .font(.system(size: 22, weight: .light))
+                                        .foregroundStyle(ATHLTHPlanDesign.accent)
+                                        .frame(width: 62, height: 62)
+                                        .background(
+                                            ATHLTHPlanDesign.selectedSurface,
+                                            in: RoundedRectangle(cornerRadius: 13)
+                                        )
+                                }
+                                Text("\(index + 1)")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                    .frame(width: 21, height: 21)
+                                    .background(.white, in: Circle())
+                                    .offset(x: -6, y: -6)
+                            }
 
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(planned.embeddedExercise.name)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(
+                                    exerciseLibrary.allExercises.first(
+                                        where: { $0.id == planned.embeddedExercise.id }
+                                    ).map { exerciseLibrary.localizedExerciseName($0) }
+                                    ?? planned.embeddedExercise.displayName
+                                )
                                     .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                    .lineLimit(2)
 
                                 if planned.isWarmUpExercise {
                                     Label(
@@ -6845,7 +6865,7 @@ struct SessionEditorView: View {
                             Spacer()
 
                             if planned.supersetGroupID != nil {
-                                Text("SUPERSET")
+                                Image(systemName: "link")
                                     .font(.system(size: 8, weight: .bold))
                                     .foregroundStyle(.orange)
                             }
@@ -6901,8 +6921,8 @@ struct SessionEditorView: View {
                         } label: {
                             Label(
                                 planned.supersetGroupID == nil
-                                    ? "Superset with previous"
-                                    : "Remove superset",
+                                    ? ATHLTHLocalization.choose(english: "Superset with previous", norwegian: "Koble til supersett")
+                                    : ATHLTHLocalization.choose(english: "Remove superset", norwegian: "Fjern supersett"),
                                 systemImage: "arrow.triangle.2.circlepath"
                             )
                             .font(.caption)
