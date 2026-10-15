@@ -14,6 +14,14 @@ private enum AIProgramTimelineMode: String, CaseIterable, Identifiable {
     }
 }
 
+/// What the athlete already chose for a weekday. AI can fill
+/// exercises and running targets, but must not replace these decisions.
+struct ATHLTHPlanDayPreference: Hashable {
+    let title: String
+    let kind: WorkoutKind
+    let durationMinutes: Int
+}
+
 struct AIProgramBuilderSeed: Hashable {
     var preferredTitle: String
     var startDate: Date
@@ -29,6 +37,7 @@ struct AIProgramBuilderSeed: Hashable {
     /// Advanced, user-authored sessions are authoritative and are applied
     /// to every week after AI generation. Basic always leaves this empty.
     var structuredWorkoutsByDay: [Int: ATHLTHPlanStructuredWorkoutBlueprint] = [:]
+    var preferredWorkoutsByDay: [Int: ATHLTHPlanDayPreference] = [:]
 }
 
 private struct CoachIntakePreferences: Codable, Equatable {
@@ -1367,9 +1376,12 @@ struct AIProgramBuilderView: View {
             // detailed manually. Overlay the authoritative Studio workout
             // before validation, so we never reject a safe proposal merely
             // because it would otherwise duplicate a protected session.
-            let effectiveProposal = result.displayingLockedWorkouts(
-                seed?.structuredWorkoutsByDay ?? [:]
-            )
+            let effectiveProposal = result
+                .displayingLockedWorkouts(seed?.structuredWorkoutsByDay ?? [:])
+                .honoringWeekdayChoices(
+                    seed?.preferredWorkoutsByDay ?? [:],
+                    protectedDays: Set(seed?.structuredWorkoutsByDay.keys.map { $0 } ?? [])
+                )
             let validationIssues = draftValidationIssues(effectiveProposal)
             guard validationIssues.isEmpty else {
                 preview = nil
