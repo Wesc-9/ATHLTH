@@ -4914,8 +4914,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 focusNotes.joined(
                     separator: " "
                 ),
-            selectedGoalIDs:
-                selectedGoalIDs
+            selectedGoalIDs: selectedGoalIDs,
+            structuredWorkoutsByDay: mode == .advanced
+                ? structuredWorkoutsByDay : [:]
         )
     }
 
