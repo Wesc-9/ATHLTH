@@ -9,6 +9,7 @@ import SwiftUI
 struct TrainingLibraryHomeView: View {
     @EnvironmentObject private var favorites: LibraryFavoritesStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
+    @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var session: AppSessionStore
 
     let onStartRunning: (RunningWorkoutTemplate) -> Void
@@ -260,6 +261,7 @@ struct TrainingLibraryHomeView: View {
                         symbol: "bookmark",
                         tint: slate,
                         count: session.savedWorkoutTemplates.count
+                            + runningLibrary.customTemplates.count
                     )
                 }
                 libraryDivider
@@ -507,6 +509,7 @@ private struct LibraryHubCollectionRow: View {
 /// editor and launching behavior.
 private struct LibrarySavedWorkoutsHubView: View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
     let onStartRunning: (RunningWorkoutTemplate) -> Void
 
     private func tr(_ en: String, _ no: String) -> String {
@@ -548,7 +551,7 @@ private struct LibrarySavedWorkoutsHubView: View {
                         detail: tr("Intervals, tempo and distance", "Intervaller, tempo og distanse"),
                         symbol: "figure.run",
                         tint: Color(red: 0.32, green: 0.47, blue: 0.40),
-                        count: nil
+                        count: runningLibrary.customTemplates.count
                     )
                 }
             }
