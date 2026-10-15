@@ -4931,8 +4931,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         kind: resolvedWorkoutKind(for: day),
                         durationMinutes: resolvedWorkoutMinutes(for: day)
                     ))
-                }) : [:]
-            ,builderProfile: currentPlanBuilderProfile,
+                }) : [:],
+            builderProfile: currentPlanBuilderProfile,
             planVisibility: visibility,
             planSummary: planSummary
         )
