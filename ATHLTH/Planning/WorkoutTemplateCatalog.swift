@@ -2517,9 +2517,19 @@ struct WorkoutTemplateBuilderView: View {
                             blocks[index].title == "Løping" ||
                             blocks[index].title == "Running" ||
                             blocks[index].title == "Gåing" ||
-                            blocks[index].title == "Walking" {
-                            blocks[index].title = activity == .walking
-                                ? tr("Walking", "Gåing") : tr("Running", "Løping")
+                            blocks[index].title == "Walking" ||
+                            blocks[index].title == "Løpeintervall" ||
+                            blocks[index].title == "Run interval" ||
+                            blocks[index].title == "Gåintervall" ||
+                            blocks[index].title == "Walking interval" {
+                            let isInterval = blocks[index].groupKind == .intervals
+                            blocks[index].title = isInterval
+                                ? (activity == .walking
+                                    ? tr("Walking interval", "Gåintervall")
+                                    : tr("Run interval", "Løpeintervall"))
+                                : (activity == .walking
+                                    ? tr("Walking", "Gåing")
+                                    : tr("Running", "Løping"))
                         }
                     }
                 )) {
