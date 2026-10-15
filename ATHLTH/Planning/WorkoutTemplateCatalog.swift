@@ -1552,9 +1552,9 @@ struct WorkoutTemplateBuilderView: View {
         self.onSaveToPlan = onSaveToPlan
     }
 
-    private let studioInk = Color(red: 0.08, green: 0.14, blue: 0.27)
-    private let studioBlue = Color(red: 0.04, green: 0.43, blue: 0.98)
-    private let studioBackground = Color(red: 0.958, green: 0.973, blue: 0.988)
+    private let studioInk = Color(red: 0.17, green: 0.17, blue: 0.18)
+    private let studioAccent = Color(red: 0.65, green: 0.53, blue: 0.37)
+    private let studioBackground = Color(red: 0.986, green: 0.978, blue: 0.964)
 
     private func tr(_ english: String, _ norwegian: String) -> String {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
@@ -1698,22 +1698,21 @@ struct WorkoutTemplateBuilderView: View {
     private var workoutOverview: some View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
-                Image("TreadmillRecentCardHero")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: proxy.size.width, height: 184)
-                    .clipped()
-
                 LinearGradient(
-                    stops: [
-                        .init(color: Color(red: 0.92, green: 0.96, blue: 1).opacity(0.99), location: 0),
-                        .init(color: Color(red: 0.92, green: 0.96, blue: 1).opacity(0.96), location: 0.36),
-                        .init(color: Color(red: 0.92, green: 0.96, blue: 1).opacity(0.36), location: 0.68),
-                        .init(color: .clear, location: 1)
+                    colors: [
+                        .white,
+                        Color(red: 0.965, green: 0.952, blue: 0.932)
                     ],
-                    startPoint: .leading,
-                    endPoint: .trailing
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                 )
+                .frame(width: proxy.size.width, height: 184)
+
+                Circle()
+                    .fill(studioAccent.opacity(0.10))
+                    .frame(width: 225, height: 225)
+                    .offset(x: proxy.size.width - 154, y: -69)
+                    .blur(radius: 18)
 
                 VStack(alignment: .leading, spacing: 11) {
                     Text("A T H L T H")
@@ -1726,7 +1725,7 @@ struct WorkoutTemplateBuilderView: View {
                     )
                     .font(.system(size: 27, weight: .bold, design: .rounded))
                     .foregroundStyle(studioInk)
-                    .tint(studioBlue)
+                    .tint(studioAccent)
                     .lineLimit(1)
                     .textInputAutocapitalization(.sentences)
                     .accessibilityLabel(tr("Workout name", "Navn på treningsøkt"))
@@ -1798,7 +1797,7 @@ struct WorkoutTemplateBuilderView: View {
                 VStack(spacing: 9) {
                     Image(systemName: "square.stack.3d.up")
                         .font(.system(size: 27))
-                        .foregroundStyle(studioBlue)
+                        .foregroundStyle(studioAccent)
                     Text(tr("Your workout starts here",
                             "Treningsøkten din starter her"))
                         .font(.headline)
@@ -1813,7 +1812,7 @@ struct WorkoutTemplateBuilderView: View {
                               systemImage: "plus.circle.fill")
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(studioBlue)
+                    .tint(studioAccent)
                     .padding(.top, 7)
                 }
                 .frame(maxWidth: .infinity)
@@ -1844,7 +1843,7 @@ struct WorkoutTemplateBuilderView: View {
                 }
                 .background(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 1)
-                        .fill(studioBlue.opacity(0.17))
+                        .fill(studioAccent.opacity(0.17))
                         .frame(width: 2)
                         .padding(.leading, 16)
                         .padding(.vertical, 22)
@@ -1856,7 +1855,7 @@ struct WorkoutTemplateBuilderView: View {
     private func timelineNumber(_ number: Int) -> some View {
         Text("\(number)")
             .font(.system(size: 13, weight: .bold))
-            .foregroundStyle(studioBlue)
+            .foregroundStyle(studioAccent)
             .frame(width: 33, height: 33)
             .background(Color(red: 0.87, green: 0.93, blue: 1.0), in: Circle())
             .overlay { Circle().strokeBorder(.white, lineWidth: 1.4) }
@@ -1889,9 +1888,9 @@ struct WorkoutTemplateBuilderView: View {
 
                 Image(systemName: kind == .superset ? "dumbbell.fill" : "figure.run")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(studioBlue)
+                    .foregroundStyle(studioAccent)
                     .frame(width: 40, height: 40)
-                    .background(studioBlue.opacity(0.085),
+                    .background(studioAccent.opacity(0.085),
                                 in: RoundedRectangle(cornerRadius: 12))
 
                 Button {
@@ -1932,7 +1931,7 @@ struct WorkoutTemplateBuilderView: View {
                         .lineLimit(1)
                         .padding(.horizontal, 9)
                         .frame(height: 25)
-                        .background(studioBlue.opacity(0.075), in: Capsule())
+                        .background(studioAccent.opacity(0.075), in: Capsule())
                 }
 
                 Menu {
@@ -2010,10 +2009,10 @@ struct WorkoutTemplateBuilderView: View {
                     Label(tr("Add to group", "Legg til i gruppen"),
                           systemImage: "plus.circle")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(studioBlue)
+                        .foregroundStyle(studioAccent)
                         .frame(maxWidth: .infinity)
                         .frame(height: 34)
-                        .background(studioBlue.opacity(0.065),
+                        .background(studioAccent.opacity(0.065),
                                     in: RoundedRectangle(cornerRadius: 11))
                 }
             }
@@ -2468,7 +2467,7 @@ struct WorkoutTemplateBuilderView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)
-                    .background(studioBlue, in: Capsule())
+                    .background(studioAccent, in: Capsule())
                     .opacity(canSave ? 1 : 0.48)
             }
             .disabled(!canSave)
