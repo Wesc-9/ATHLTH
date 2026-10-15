@@ -2,218 +2,47 @@ import Foundation
 import Supabase
 import SwiftUI
 
+/// A content-first Library for ATHLTH.
+/// The Library discovers, creates and organizes reusable training content.
+/// It intentionally avoids a 'recently used' feed; the Today tab owns
+/// in-progress activity and the Plan tab owns the active training schedule.
 struct TrainingLibraryHomeView: View {
     @EnvironmentObject private var favorites: LibraryFavoritesStore
-    @EnvironmentObject private var recents: LibraryRecentsStore
-    @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var session: AppSessionStore
 
     let onStartRunning: (RunningWorkoutTemplate) -> Void
 
-    @StateObject private var planCatalog = TrainingPlanLibraryStore()
-    @StateObject private var workoutCatalog =
-        WorkoutTemplateCatalogStore()
     @State private var showingCreatePlan = false
     @State private var showingCreateWorkout = false
 
+    private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
+    private let muted = Color(red: 0.47, green: 0.46, blue: 0.45)
+    private let gold = Color(red: 0.65, green: 0.53, blue: 0.37)
+    private let slate = Color(red: 0.30, green: 0.36, blue: 0.47)
+    private let green = Color(red: 0.32, green: 0.47, blue: 0.40)
+    private let lavender = Color(red: 0.46, green: 0.41, blue: 0.66)
+
+    private var layout: [GridItem] {
+        [GridItem(.flexible(), spacing: 11), GridItem(.flexible(), spacing: 11)]
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            libraryHomeHero
+        VStack(alignment: .leading, spacing: 25) {
+            introduction
 
-            if !recents.items.isEmpty {
-                recentSection
-            }
+            createSection
 
-            librarySection(
-                "Training Plans",
-                subtitle:
-                    "Choose a complete plan from the Library or start with a blank calendar."
-            ) {
-                NavigationLink {
-                    TrainingPlanLibraryView()
-                } label: {
-                    LibraryDestinationTile(
-                        title: "Plan Library",
-                        subtitle: "Curated running, strength & hybrid",
-                        icon: "square.stack.3d.up.fill",
-                        tint: ATHLTHTheme.premiumGold
-                    )
-                }
+            exploreSection
 
-                Button {
-                    showingCreatePlan = true
-                } label: {
-                    LibraryDestinationTile(
-                        title: "Build from Scratch",
-                        subtitle: "Blank calendar · full control",
-                        icon: "calendar.badge.plus",
-                        tint: ATHLTHTheme.accentDeep
-                    )
-                }
-            }
+            personalLibrarySection
 
-            librarySection(
-                "Your Library",
-                subtitle: "Keep saved plans and favourites close at hand."
-            ) {
-                NavigationLink {
-                    MyTrainingPlansLibraryView()
-                } label: {
-                    LibraryDestinationTile(
-                        title: "My Plans",
-                        subtitle: "Created, saved & scheduled",
-                        icon: "calendar.badge.clock",
-                        tint: ATHLTHTheme.accent
-                    )
-                }
-
-                NavigationLink {
-                    LibraryFavoritesView(
-                        onStartRunning: onStartRunning
-                    )
-                } label: {
-                    LibraryDestinationTile(
-                        title: "Favorites",
-                        subtitle:
-                            favorites.favorites.isEmpty
-                                ? "Save plans, workouts & more"
-                                : "\(favorites.favorites.count) saved items",
-                        icon: "star.fill",
-                        tint: ATHLTHTheme.premiumGold
-                    )
-                }
-            }
-
-            librarySection(
-                "Workouts",
-                subtitle:
-                    "Complete sessions that can combine running, exercises, rest and targets."
-            ) {
-                NavigationLink {
-                    WorkoutTemplateLibraryView()
-                } label: {
-                    LibraryDestinationTile(
-                        title: "Workout Library",
-                        subtitle: "Hybrid, running, strength & more",
-                        icon: "rectangle.stack.fill",
-                        tint: ATHLTHTheme.accent
-                    )
-                }
-
-                NavigationLink {
-                    MyWorkoutTemplatesView()
-                } label: {
-                    LibraryDestinationTile(
-                        title: "My Workouts",
-                        subtitle:
-                            session.savedWorkoutTemplates.isEmpty
-                                ? "Save or build complete sessions"
-                                : "\(session.savedWorkoutTemplates.count) saved sessions",
-                        icon: "bookmark.square.fill",
-                        tint: ATHLTHTheme.accentDeep
-                    )
-                }
-
-                Button {
-                    showingCreateWorkout = true
-                } label: {
-                    LibraryDestinationTile(
-                        title: "Create Workout",
-                        subtitle: "Combine blocks your way",
-                        icon: "plus.rectangle.on.rectangle",
-                        tint: Color.teal
-                    )
-                }
-            }
-
-            librarySection(
-                "Running",
-                subtitle: "Intervals, tempo sessions and saved workouts."
-            ) {
-                NavigationLink {
-                    RunningWorkoutLibraryView(
-                        source: .library,
-                        onStart: onStartRunning
-                    )
-                } label: {
-                    LibraryDestinationTile(
-                        title: "Run Library",
-                        subtitle: "Intervals, tempo & more",
-                        icon: "figure.run",
-                        tint: ATHLTHTheme.vitality
-                    )
-                }
-
-                NavigationLink {
-                    RunningWorkoutLibraryView(
-                        source: .mine,
-                        onStart: onStartRunning
-                    )
-                } label: {
-                    LibraryDestinationTile(
-                        title: "My Workouts",
-                        subtitle: "Saved running sessions",
-                        icon: "stopwatch",
-                        tint: ATHLTHTheme.vitality
-                    )
-                }
-            }
-
-            librarySection(
-                "Strength",
-                subtitle: "Build from the exercise database or your own movements."
-            ) {
-                NavigationLink {
-                    ExerciseLibraryView(source: .library)
-                } label: {
-                    LibraryDestinationTile(
-                        title: "Exercises",
-                        subtitle: "Muscles & equipment",
-                        icon: "dumbbell.fill",
-                        tint: Color.indigo
-                    )
-                }
-
-                NavigationLink {
-                    ExerciseLibraryView(source: .mine)
-                } label: {
-                    LibraryDestinationTile(
-                        title: "My Exercises",
-                        subtitle: "Created by you",
-                        icon: "person.crop.square",
-                        tint: Color.indigo
-                    )
-                }
-            }
-
-            librarySection(
-                "Routes",
-                subtitle: "Discover a new route or return to a favourite."
-            ) {
-                NavigationLink {
-                    RouteLibraryListView(source: .database)
-                } label: {
-                    LibraryDestinationTile(
-                        title: "Explore Routes",
-                        subtitle: "Discover & filter",
-                        icon: "map.fill",
-                        tint: Color.green
-                    )
-                }
-
-                NavigationLink {
-                    RouteLibraryListView(source: .mine)
-                } label: {
-                    LibraryDestinationTile(
-                        title: "My Routes",
-                        subtitle: "Saved & created by you",
-                        icon: "bookmark.fill",
-                        tint: Color.green
-                    )
-                }
-            }
+            // One relevant hint, without fabricated recommendations or
+            // additional empty 'recent' and 'recommended' carousels.
+            learningHint
         }
+        .frame(maxWidth: 720, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .center)
         .buttonStyle(.plain)
         .sheet(isPresented: $showingCreatePlan) {
             AdvancedTrainingPlanCreationView()
@@ -222,517 +51,467 @@ struct TrainingLibraryHomeView: View {
             WorkoutTemplateBuilderView()
         }
         .task {
-            recents.refresh()
-            async let favoriteRefresh: Void = favorites.refresh()
-            async let planRefresh: Void = planCatalog.refresh()
-            async let workoutRefresh: Void =
-                workoutCatalog.refresh()
-            _ = await (
-                favoriteRefresh,
-                planRefresh,
-                workoutRefresh
-            )
+            await favorites.refresh()
         }
     }
 
-    private var libraryHomeHero: some View {
-        HStack(
-            alignment: .center,
-            spacing: 13
-        ) {
-            ZStack {
-                RoundedRectangle(
-                    cornerRadius: 17,
-                    style: .continuous
-                )
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            ATHLTHTheme.accent
-                                .opacity(0.16),
-                            ATHLTHTheme.accentDeep
-                                .opacity(0.07)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-
-                Image(
-                    systemName:
-                        "square.grid.2x2.fill"
-                )
-                .font(
-                    .system(
-                        size: 20,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.accentDeep
-                )
-            }
-            .frame(
-                width: 52,
-                height: 52
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: 17,
-                    style: .continuous
-                )
-                .stroke(
-                    Color.white.opacity(
-                        0.86
-                    ),
-                    lineWidth: 0.8
-                )
-            }
-
-            VStack(
-                alignment: .leading,
-                spacing: 4
-            ) {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Training Library",
-                        norwegian:
-                            "Treningsbibliotek"
-                    )
-                )
-                .font(
-                    .system(
-                        size: 22,
-                        weight: .bold,
-                        design: .rounded
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.primaryText
-                )
-
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Plans, workouts, exercises and routes — ready when you need them.",
-                        norwegian:
-                            "Planer, økter, øvelser og ruter – klare når du trenger dem."
-                    )
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-                .lineLimit(2)
-            }
-
-            Spacer(minLength: 6)
-        }
-        .padding(15)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(0.96),
-                    ATHLTHTheme.accent
-                        .opacity(0.035)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in:
-                RoundedRectangle(
-                    cornerRadius: 24,
-                    style: .continuous
-                )
-        )
-        .overlay(alignment: .bottomLeading) {
-            HStack(spacing: 8) {
-                LibraryStatPill(
-                    value:
-                        "\(favorites.favorites.count)",
-                    label:
-                        ATHLTHLocalization.choose(
-                            english: "favorites",
-                            norwegian: "favoritter"
-                        ),
-                    icon: "star.fill",
-                    tint:
-                        ATHLTHTheme.premiumGold
-                )
-
-                LibraryStatPill(
-                    value: "4",
-                    label:
-                        ATHLTHLocalization.choose(
-                            english: "categories",
-                            norwegian: "kategorier"
-                        ),
-                    icon:
-                        "square.stack.3d.up.fill",
-                    tint:
-                        ATHLTHTheme.accent
-                )
-            }
-            .padding(.horizontal, 15)
-            .offset(y: 16)
-        }
-        .padding(.bottom, 16)
-        .shadow(
-            color:
-                ATHLTHTheme.accentDeep
-                    .opacity(0.035),
-            radius: 12,
-            y: 5
-        )
-    }
-
-    private var recentSection: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("RECENTLY USED")
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(1.8)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-
-                    Text("Jump back in")
-                        .font(.title3.weight(.bold))
-                }
-
-                Spacer()
-
-                Text(ATHLTHLocalization.format(
-                            english: "%d recent",
-                            norwegian: "%d nylige",
-                            min(recents.items.count, 4)
-                        ))
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-            }
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 10) {
-                    ForEach(recents.items.prefix(4)) { item in
-                        NavigationLink {
-                            recentDestination(item)
-                        } label: {
-                            recentCard(item)
-                        }
-                        .buttonStyle(.plain)
-                        .simultaneousGesture(
-                            TapGesture().onEnded {
-                                recents.markUsed(
-                                    item.itemType,
-                                    itemID: item.itemID,
-                                    title: item.title,
-                                    subtitle: item.subtitle,
-                                    icon: item.icon
-                                )
-                            }
-                        )
-                    }
-                }
-                .padding(.vertical, 2)
-            }
-        }
-    }
-
-    private func recentCard(
-        _ item: LibraryRecentRecord
-    ) -> some View {
-        let tint = recentTint(item.itemType)
-
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(
-                    systemName:
-                        item.icon ??
-                        item.itemType.systemImage
-                )
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(tint)
-                .frame(width: 38, height: 38)
+    private var introduction: some View {
+        HStack(alignment: .center, spacing: 13) {
+            Image(systemName: "square.stack.3d.up")
+                .font(.system(size: 23, weight: .medium))
+                .foregroundStyle(gold)
+                .frame(width: 57, height: 57)
                 .background(
-                    tint.opacity(0.10),
-                    in: RoundedRectangle(
-                        cornerRadius: 12,
-                        style: .continuous
-                    )
+                    gold.opacity(0.10),
+                    in: RoundedRectangle(cornerRadius: 18)
                 )
 
-                Spacer()
-
-                Image(systemName: "arrow.up.right")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText.opacity(0.72)
-                    )
+            VStack(alignment: .leading, spacing: 5) {
+                Text(tr("Your training library", "Ditt treningsbibliotek"))
+                    .font(.system(size: 23, weight: .semibold, design: .serif))
+                    .foregroundStyle(ink)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
+                Text(tr("Find, build and save what you want to train.",
+                        "Finn, bygg og lagre treningen du ønsker."))
+                    .font(.subheadline)
+                    .foregroundStyle(muted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(item.title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-                    .lineLimit(1)
-
-                Text(
-                    item.subtitle ??
-                    item.itemType.title
-                )
-                .font(.caption2)
-                .foregroundStyle(ATHLTHTheme.mutedText)
-                .lineLimit(1)
-            }
+            Spacer(minLength: 0)
         }
-        .padding(13)
-        .frame(width: 164, height: 116, alignment: .topLeading)
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             LinearGradient(
-                colors: [
-                    Color.white.opacity(0.94),
-                    tint.opacity(0.03)
-                ],
+                colors: [.white, Color(red: 0.973, green: 0.965, blue: 0.95)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             ),
-            in: RoundedRectangle(
-                cornerRadius: 20,
-                style: .continuous
-            )
+            in: RoundedRectangle(cornerRadius: 23)
         )
         .overlay {
-            RoundedRectangle(
-                cornerRadius: 20,
-                style: .continuous
-            )
-            .stroke(
-                Color.white.opacity(0.94),
-                lineWidth: 0.8
-            )
+            RoundedRectangle(cornerRadius: 23)
+                .strokeBorder(.white.opacity(0.85), lineWidth: 1)
         }
     }
 
-    @ViewBuilder
-    private func recentDestination(
-        _ item: LibraryRecentRecord
-    ) -> some View {
-        switch item.itemType {
-        case .plan:
-            if let entry = planCatalog.entries.first(
-                where: {
-                    $0.id.uuidString
-                        .caseInsensitiveCompare(item.itemID)
-                        == .orderedSame
+    private var createSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeading(
+                tr("START HERE", "START HER"),
+                title: tr("What would you like to create?", "Hva vil du lage?")
+            )
+
+            LazyVGrid(columns: layout, spacing: 11) {
+                Button {
+                    showingCreatePlan = true
+                } label: {
+                    LibraryHubActionTile(
+                        title: tr("New training plan", "Ny treningsplan"),
+                        detail: tr("Simple or advanced", "Enkel eller avansert"),
+                        symbol: "calendar.badge.plus",
+                        tint: gold
+                    )
                 }
-            ) {
-                TrainingPlanCatalogDetailView(entry: entry)
-            } else {
-                TrainingPlanLibraryView()
+                .accessibilityHint(tr("Open training plan creation",
+                                      "Åpner opprettelse av treningsplan"))
+
+                Button {
+                    showingCreateWorkout = true
+                } label: {
+                    LibraryHubActionTile(
+                        title: tr("Build a workout", "Bygg en økt"),
+                        detail: tr("Exercises, intervals and rest",
+                                   "Øvelser, intervaller og pauser"),
+                        symbol: "plus.square.on.square",
+                        tint: slate
+                    )
+                }
+                .accessibilityHint(tr("Open the complete workout builder",
+                                      "Åpner øktbyggeren"))
+            }
+        }
+    }
+
+    private var exploreSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeading(
+                tr("DISCOVER", "UTFORSK"),
+                title: tr("Explore the library", "Utforsk biblioteket"),
+                detail: tr("Ready-made content and exercises for every level.",
+                           "Ferdig innhold og øvelser for alle nivåer.")
+            )
+
+            LazyVGrid(columns: layout, spacing: 11) {
+                NavigationLink {
+                    TrainingPlanLibraryView()
+                } label: {
+                    LibraryHubCategoryTile(
+                        title: tr("Training plans", "Treningsplaner"),
+                        detail: tr("Find a complete plan", "Finn en ferdig plan"),
+                        symbol: "square.stack.3d.up.fill",
+                        tint: gold
+                    )
+                }
+
+                NavigationLink {
+                    WorkoutTemplateLibraryView()
+                } label: {
+                    LibraryHubCategoryTile(
+                        title: tr("Workouts", "Treningsøkter"),
+                        detail: tr("Strength, running and more",
+                                   "Styrke, løping og mer"),
+                        symbol: "dumbbell.fill",
+                        tint: lavender
+                    )
+                }
+
+                NavigationLink {
+                    ExerciseLibraryView(source: .library)
+                } label: {
+                    LibraryHubCategoryTile(
+                        title: tr("Exercises", "Øvelser"),
+                        detail: tr("Search by muscle and equipment",
+                                   "Søk på muskel og utstyr"),
+                        symbol: "figure.strengthtraining.traditional",
+                        tint: slate
+                    )
+                }
+
+                NavigationLink {
+                    RouteLibraryListView(source: .database)
+                } label: {
+                    LibraryHubCategoryTile(
+                        title: tr("Routes", "Ruter"),
+                        detail: tr("Find a route to explore",
+                                   "Finn en ny tur eller løperute"),
+                        symbol: "map.fill",
+                        tint: green
+                    )
+                }
             }
 
-        case .workout:
-            if let id = UUID(uuidString: item.itemID),
-               let workout = runningLibrary.allTemplates.first(
-                    where: { $0.id == id }
-               ) {
-                RunningWorkoutDetailView(
-                    workout: workout,
-                    selectionTitle: nil,
-                    onSelect: nil,
+            NavigationLink {
+                RunningWorkoutLibraryView(
+                    source: .library,
                     onStart: onStartRunning
                 )
-            } else if let id =
-                        UUID(uuidString: item.itemID),
-                      let workout =
-                        workoutCatalog.entries.first(
-                            where: { $0.id == id }
-                        ) {
-                WorkoutTemplateDetailView(
-                    entry: workout
-                )
-            } else {
-                WorkoutTemplateLibraryView()
-            }
-
-        case .exercise:
-            if let id = UUID(uuidString: item.itemID),
-               let entry = exerciseLibrary.search(
-                    query: "",
-                    bodyPart: "All",
-                    equipment: "All"
-               ).first(where: { $0.id == id }) {
-                ExerciseDetailView(
-                    entry: entry,
-                    selectionTitle: nil,
-                    onSelect: nil
-                )
-            } else {
-                ExerciseLibraryView(source: .library)
-            }
-
-        case .route:
-            if let id = UUID(uuidString: item.itemID),
-               let saved = session.savedRoutes.first(
-                    where: { $0.id == id }
-               ) {
-                RouteDetailView(route: saved)
-            } else if let id = UUID(uuidString: item.itemID) {
-                RouteLibraryDetailLoader(routeID: id)
-            } else {
-                RouteLibraryListView(source: .database)
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "figure.run")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(green)
+                        .frame(width: 39, height: 39)
+                        .background(green.opacity(0.10),
+                                    in: RoundedRectangle(cornerRadius: 12))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(tr("Running sessions and intervals",
+                                "Løpeøkter og intervaller"))
+                            .font(.subheadline.weight(.semibold))
+                        Text(tr("Easy runs, speed work and more",
+                                "Rolige turer, tempo og intervalløkter"))
+                            .font(.caption)
+                            .foregroundStyle(muted)
+                    }
+                    Spacer(minLength: 2)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(muted)
+                }
+                .foregroundStyle(ink)
+                .padding(12)
+                .background(.white.opacity(0.9),
+                            in: RoundedRectangle(cornerRadius: 17))
             }
         }
     }
 
-    private func recentTint(
-        _ kind: LibraryFavoriteKind
-    ) -> Color {
-        switch kind {
-        case .plan:
-            return Color.orange
-        case .workout:
-            return ATHLTHTheme.vitality
-        case .exercise:
-            return Color.indigo
-        case .route:
-            return Color.green
-        }
-    }
-
-    private func librarySection<Content: View>(
-        _ title: String, subtitle: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
+    private var personalLibrarySection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.title3.weight(.bold))
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+            sectionHeading(
+                tr("YOUR COLLECTION", "DITT INNHOLD"),
+                title: tr("My library", "Mitt bibliotek"),
+                detail: tr("Everything you have created and saved.",
+                           "Alt du har opprettet og lagret.")
+            )
+            VStack(spacing: 0) {
+                NavigationLink {
+                    MyTrainingPlansLibraryView()
+                } label: {
+                    LibraryHubCollectionRow(
+                        title: tr("My training plans", "Mine treningsplaner"),
+                        detail: tr("Created and scheduled", "Opprettede og planlagte"),
+                        symbol: "calendar",
+                        tint: gold,
+                        count: session.trainingPlans.count
+                    )
+                }
+                libraryDivider
+                NavigationLink {
+                    MyWorkoutTemplatesView()
+                } label: {
+                    LibraryHubCollectionRow(
+                        title: tr("Saved workouts", "Lagrede økter"),
+                        detail: tr("Workouts you have created", "Økter du har laget"),
+                        symbol: "bookmark",
+                        tint: slate,
+                        count: session.savedWorkoutTemplates.count
+                    )
+                }
+                libraryDivider
+                NavigationLink {
+                    ExerciseLibraryView(source: .mine)
+                } label: {
+                    LibraryHubCollectionRow(
+                        title: tr("My exercises", "Mine øvelser"),
+                        detail: tr("Custom movements", "Egne øvelser"),
+                        symbol: "dumbbell",
+                        tint: lavender,
+                        count: exerciseLibrary.customExercises.count
+                    )
+                }
+                libraryDivider
+                NavigationLink {
+                    RouteLibraryListView(source: .mine)
+                } label: {
+                    LibraryHubCollectionRow(
+                        title: tr("My routes", "Mine ruter"),
+                        detail: tr("Saved and created routes", "Lagrede og opprettede ruter"),
+                        symbol: "map",
+                        tint: green,
+                        count: session.savedRoutes.count
+                    )
+                }
+                libraryDivider
+                NavigationLink {
+                    LibraryFavoritesView(onStartRunning: onStartRunning)
+                } label: {
+                    LibraryHubCollectionRow(
+                        title: tr("Favorites", "Favoritter"),
+                        detail: tr("Quick access to your favorites",
+                                   "Dine favoritter på ett sted"),
+                        symbol: "star",
+                        tint: gold,
+                        count: favorites.favorites.count
+                    )
+                }
+                libraryDivider
+                NavigationLink {
+                    RunningWorkoutLibraryView(
+                        source: .mine,
+                        onStart: onStartRunning
+                    )
+                } label: {
+                    LibraryHubCollectionRow(
+                        title: tr("My running sessions", "Mine løpeøkter"),
+                        detail: tr("Saved running workouts",
+                                   "Lagrede løpeøkter"),
+                        symbol: "figure.run",
+                        tint: green,
+                        count: nil
+                    )
+                }
             }
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                content()
+            .background(.white.opacity(0.92),
+                        in: RoundedRectangle(cornerRadius: 22))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22)
+                    .strokeBorder(Color.black.opacity(0.035), lineWidth: 1)
             }
         }
+    }
+
+    private var learningHint: some View {
+        HStack(alignment: .top, spacing: 9) {
+            Image(systemName: "lightbulb")
+                .font(.system(size: 15))
+                .foregroundStyle(gold)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(tr("Start simple. Add details when you need them.",
+                        "Start enkelt. Legg til detaljer når du trenger dem."))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ink)
+                Text(tr(
+                    "The same workout builder works for single sessions and training plans.",
+                    "Den samme øktbyggeren brukes til både enkeltøkter og treningsplaner."
+                ))
+                .font(.caption)
+                .foregroundStyle(muted)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(15)
+        .background(gold.opacity(0.065),
+                    in: RoundedRectangle(cornerRadius: 17))
+    }
+
+    private var libraryDivider: some View {
+        Rectangle()
+            .fill(Color.black.opacity(0.055))
+            .frame(height: 0.5)
+            .padding(.leading, 67)
+    }
+
+    private func sectionHeading(
+        _ eyebrow: String,
+        title: String,
+        detail: String? = nil
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(eyebrow)
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(1.6)
+                .foregroundStyle(gold)
+            Text(title)
+                .font(.system(size: 24, weight: .semibold, design: .serif))
+                .foregroundStyle(ink)
+            if let detail {
+                Text(detail)
+                    .font(.subheadline)
+                    .foregroundStyle(muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
     }
 }
 
-private struct LibraryDestinationTile: View {
+private struct LibraryHubActionTile: View {
     let title: String
-    let subtitle: String
-    let icon: String
+    let detail: String
+    let symbol: String
     let tint: Color
 
     var body: some View {
         VStack(alignment: .leading, spacing: 11) {
-            HStack(alignment: .top) {
-                Image(systemName: icon)
-                    .font(.system(size: 20, weight: .semibold))
+            HStack {
+                Image(systemName: symbol)
+                    .font(.system(size: 22, weight: .medium))
                     .foregroundStyle(tint)
-                    .frame(width: 42, height: 42)
-                    .background(
-                        LinearGradient(
-                            colors: [
-                                tint.opacity(0.16),
-                                tint.opacity(0.07)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        in: RoundedRectangle(
-                            cornerRadius: 14,
-                            style: .continuous
-                        )
-                    )
-                    .overlay {
-                        RoundedRectangle(
-                            cornerRadius: 14,
-                            style: .continuous
-                        )
-                        .stroke(
-                            Color.white.opacity(0.82),
-                            lineWidth: 0.8
-                        )
-                    }
-
-                Spacer(minLength: 8)
-
+                    .frame(width: 45, height: 45)
+                    .background(tint.opacity(0.12),
+                                in: RoundedRectangle(cornerRadius: 15))
+                Spacer()
                 Image(systemName: "arrow.up.right")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText.opacity(0.76)
-                    )
-                    .frame(width: 30, height: 30)
-                    .background(
-                        Color.white.opacity(0.66),
-                        in: Circle()
-                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(tint)
             }
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text(title)
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                    .fixedSize(
-                        horizontal: false,
-                        vertical: true
-                    )
-                    .lineLimit(2)
-            }
-
-            Spacer(minLength: 0)
-
-            Capsule()
-                .fill(tint.opacity(0.26))
-                .frame(width: 34, height: 3)
+            Spacer(minLength: 1)
+            Text(title)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(Color(red: 0.17, green: 0.17, blue: 0.18))
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(detail)
+                .font(.caption)
+                .foregroundStyle(Color(red: 0.47, green: 0.46, blue: 0.45))
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(14)
-        .frame(
-            maxWidth: .infinity,
-            minHeight: 128,
-            alignment: .topLeading
-        )
+        .padding(15)
+        .frame(maxWidth: .infinity, minHeight: 166,
+               alignment: .topLeading)
         .background(
             LinearGradient(
-                colors: [
-                    Color.white.opacity(0.96),
-                    tint.opacity(0.035)
-                ],
+                colors: [.white.opacity(0.98), tint.opacity(0.08)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             ),
-            in: RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
+            in: RoundedRectangle(cornerRadius: 22)
         )
         .overlay {
-            RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-            .stroke(
-                Color.white.opacity(0.96),
-                lineWidth: 1
-            )
+            RoundedRectangle(cornerRadius: 22)
+                .strokeBorder(.white.opacity(0.90), lineWidth: 1)
         }
-        .shadow(
-            color: ATHLTHTheme.accentDeep.opacity(0.035),
-            radius: 14,
-            y: 7
-        )
-        .contentShape(
-            RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-        )
+        .contentShape(RoundedRectangle(cornerRadius: 22))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct LibraryHubCategoryTile: View {
+    let title: String
+    let detail: String
+    let symbol: String
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: symbol)
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: 42, height: 42)
+                    .background(tint.opacity(0.11),
+                                in: RoundedRectangle(cornerRadius: 13))
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.gray.opacity(0.7))
+            }
+            Text(title)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Color(red: 0.17, green: 0.17, blue: 0.18))
+            Text(detail)
+                .font(.caption)
+                .foregroundStyle(Color(red: 0.47, green: 0.46, blue: 0.45))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 139,
+               alignment: .topLeading)
+        .background(.white.opacity(0.94),
+                    in: RoundedRectangle(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(Color.black.opacity(0.035), lineWidth: 1)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 20))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct LibraryHubCollectionRow: View {
+    let title: String
+    let detail: String
+    let symbol: String
+    let tint: Color
+    let count: Int?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbol)
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(tint)
+                .frame(width: 38, height: 38)
+                .background(tint.opacity(0.10),
+                            in: RoundedRectangle(cornerRadius: 12))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color(red: 0.17, green: 0.17, blue: 0.18))
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(Color(red: 0.47, green: 0.46, blue: 0.45))
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 2)
+            if let count, count > 0 {
+                Text("\(count)")
+                    .font(.caption.monospacedDigit().weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Color.gray.opacity(0.68))
+        }
+        .padding(.horizontal, 14)
+        .frame(minHeight: 67)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
     }
 }
 
