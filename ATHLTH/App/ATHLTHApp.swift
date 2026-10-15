@@ -6,6 +6,25 @@ import SwiftUI
 struct ATHLTHApp: App {
     @UIApplicationDelegateAdaptor(ATHLTHAppDelegate.self)
     private var appDelegate
+
+    init() {
+        // Scene state is deliberately owned by a View rather than captured by
+        // WindowGroup. SwiftUI may evaluate the WindowGroup content closure
+        // on its AsyncRenderer executor.
+        ATHLTHKeyboardCoordinator.shared.install()
+    }
+
+    var body: some Scene {
+        WindowGroup {
+            ATHLTHSceneRootView()
+        }
+    }
+}
+
+/// Own the observable dependency graph inside a normal SwiftUI View.
+/// A stateless WindowGroup content closure avoids actor-bound captures from
+/// App.body, the crash site observed in iOS 27 / ATHLTH 1.7.6 build 83.
+private struct ATHLTHSceneRootView: View {
     @StateObject private var health = HealthKitManager.shared
     @StateObject private var exerciseLibrary = ExerciseLibraryStore()
     @StateObject private var runningWorkoutLibrary = RunningWorkoutLibraryStore()
@@ -43,135 +62,10 @@ struct ATHLTHApp: App {
     @StateObject private var accountService = SupabaseAccountService()
     @StateObject private var deviceRelay = WorkoutDeviceRelayStore.shared
 
-    init() {
-        let homeAssistantStore =
-            HomeAssistantConnectionStore()
-        let healthStore =
-            HealthKitManager.shared
+    @State private var didInstallBackgroundRefreshHandlers = false
 
-        _homeAssistant =
-            StateObject(
-                wrappedValue:
-                    homeAssistantStore
-            )
-        _health =
-            StateObject(
-                wrappedValue:
-                    healthStore
-            )
-
-        healthStore
-            .backgroundRefreshDidComplete = {
-                [weak homeAssistantStore,
-                 weak healthStore] in
-
-                guard ATHLTHDeviceRole.isIPhone,
-                      let homeAssistantStore,
-                      let healthStore
-                else {
-                    return
-                }
-
-                let backgroundTrainingLoad:
-                    Double?
-                if homeAssistantStore
-                    .shareTrainingLoad {
-                    backgroundTrainingLoad =
-                        await healthStore
-                            .recoveryTrendSnapshot(
-                                days: 28
-                            )
-                            .trainingLoad
-                            .ratio
-                } else {
-                    backgroundTrainingLoad =
-                        nil
-                }
-
-                await homeAssistantStore
-                    .syncBackgroundHealthSnapshot(
-                        workouts:
-                            healthStore.workouts,
-                        sleep:
-                            healthStore.sleep,
-                        heart:
-                            healthStore.heart,
-                        training:
-                            healthStore.training,
-                        recoveryScore:
-                            healthStore
-                                .recovery
-                                .score,
-                        recoveryState:
-                            homeAssistantRecoveryStateValue(
-                                healthStore
-                                    .recovery
-                                    .state
-                            ),
-                        trainingLoad:
-                            backgroundTrainingLoad
-                    )
-            }
-
-        ATHLTHHomeAssistantBackgroundRefresh
-            .refreshHandler = {
-                [weak homeAssistantStore,
-                 weak healthStore] in
-
-                guard ATHLTHDeviceRole.isIPhone,
-                      let homeAssistantStore,
-                      let healthStore,
-                      homeAssistantStore.isConnected
-                else {
-                    return false
-                }
-
-                await healthStore.refreshIfStale(
-                    maxAge: 5 * 60
-                )
-
-                let backgroundTrainingLoad:
-                    Double?
-                if homeAssistantStore
-                    .shareTrainingLoad {
-                    backgroundTrainingLoad =
-                        await healthStore
-                            .recoveryTrendSnapshot(
-                                days: 28
-                            )
-                            .trainingLoad
-                            .ratio
-                } else {
-                    backgroundTrainingLoad =
-                        nil
-                }
-
-                await homeAssistantStore
-                    .syncBackgroundHealthSnapshot(
-                        workouts: healthStore.workouts,
-                        sleep: healthStore.sleep,
-                        heart: healthStore.heart,
-                        training: healthStore.training,
-                        recoveryScore:
-                            healthStore.recovery.score,
-                        recoveryState:
-                            homeAssistantRecoveryStateValue(
-                                healthStore
-                                    .recovery
-                                    .state
-                            ),
-                        trainingLoad:
-                            backgroundTrainingLoad
-                    )
-
-                return true
-            }
-
-                ATHLTHKeyboardCoordinator.shared.install()
-    }
-
-    var body: some Scene {
-        WindowGroup {
+    var body: some View {
+        Group {
             if !appSession.signedIn &&
                 !appSession.previewModeEnabled {
                 // Render signed-out onboarding directly on iPhone and iPad.
@@ -281,8 +175,127 @@ struct ATHLTHApp: App {
                 .tint(ATHLTHTheme.accent)
             }
         }
+        .onAppear {
+            installBackgroundRefreshHandlersIfNeeded()
+        }
+    }
+
+    private func installBackgroundRefreshHandlersIfNeeded() {
+        guard !didInstallBackgroundRefreshHandlers else { return }
+        didInstallBackgroundRefreshHandlers = true
+
+        health
+            )
+
+        health
+            .backgroundRefreshDidComplete = {
+                [weak homeAssistant,
+                 weak health] in
+
+                guard ATHLTHDeviceRole.isIPhone,
+                      let homeAssistant,
+                      let health
+                else {
+                    return
+                }
+
+                let backgroundTrainingLoad:
+                    Double?
+                if homeAssistant
+                    .shareTrainingLoad {
+                    backgroundTrainingLoad =
+                        await health
+                            .recoveryTrendSnapshot(
+                                days: 28
+                            )
+                            .trainingLoad
+                            .ratio
+                } else {
+                    backgroundTrainingLoad =
+                        nil
+                }
+
+                await homeAssistant
+                    .syncBackgroundHealthSnapshot(
+                        workouts:
+                            health.workouts,
+                        sleep:
+                            health.sleep,
+                        heart:
+                            health.heart,
+                        training:
+                            health.training,
+                        recoveryScore:
+                            health
+                                .recovery
+                                .score,
+                        recoveryState:
+                            homeAssistantRecoveryStateValue(
+                                health
+                                    .recovery
+                                    .state
+                            ),
+                        trainingLoad:
+                            backgroundTrainingLoad
+                    )
+            }
+
+        ATHLTHHomeAssistantBackgroundRefresh
+            .refreshHandler = {
+                [weak homeAssistant,
+                 weak health] in
+
+                guard ATHLTHDeviceRole.isIPhone,
+                      let homeAssistant,
+                      let health,
+                      homeAssistant.isConnected
+                else {
+                    return false
+                }
+
+                await health.refreshIfStale(
+                    maxAge: 5 * 60
+                )
+
+                let backgroundTrainingLoad:
+                    Double?
+                if homeAssistant
+                    .shareTrainingLoad {
+                    backgroundTrainingLoad =
+                        await health
+                            .recoveryTrendSnapshot(
+                                days: 28
+                            )
+                            .trainingLoad
+                            .ratio
+                } else {
+                    backgroundTrainingLoad =
+                        nil
+                }
+
+                await homeAssistant
+                    .syncBackgroundHealthSnapshot(
+                        workouts: health.workouts,
+                        sleep: health.sleep,
+                        heart: health.heart,
+                        training: health.training,
+                        recoveryScore:
+                            health.recovery.score,
+                        recoveryState:
+                            homeAssistantRecoveryStateValue(
+                                health
+                                    .recovery
+                                    .state
+                            ),
+                        trainingLoad:
+                            backgroundTrainingLoad
+                    )
+
+                return true
+            }
     }
 }
+
 
 private struct ATHLTHCompatibilityPreviewRootView: View {
     @State private var trainNavigationRequest:
