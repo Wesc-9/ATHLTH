@@ -42,6 +42,30 @@ struct CustomQuickWorkoutRecord: Identifiable, Codable, Hashable {
 
     var manuallyEnteredMetricsAreUnverified: Bool { true }
 
+    /// Plausibility ceiling with 10% headroom, not verification.
+    static func maximumRunningSpeedKilometersPerHour(for seconds: TimeInterval) -> Double {
+        let minutes = seconds / 60
+        let benchmark: Double
+        switch minutes {
+        case ..<1: benchmark = 44.72
+        case ..<3: benchmark = 30
+        case ..<10: benchmark = 26
+        case ..<30: benchmark = 23
+        case ..<90: benchmark = 21.1
+        default: benchmark = 19
+        }
+        return benchmark * 1.10
+    }
+
+    static func validDistance(_ value: Double?, durationSeconds: TimeInterval,
+                              activity: CustomQuickWorkoutActivity) -> Bool {
+        guard let value else { return true }
+        guard value.isFinite && value > 0 && value <= 1_000 else { return false }
+        if activity == .cycling || activity == .rowing { return true }
+        return value <= maximumRunningSpeedKilometersPerHour(for: durationSeconds)
+            * durationSeconds / 3600
+    }
+
     static func validDistance(_ value: Double?) -> Bool {
         guard let value else { return true }
         return value.isFinite && value > 0 && value <= 1_000
@@ -61,7 +85,7 @@ struct CustomQuickWorkoutRecord: Identifiable, Codable, Hashable {
         evidence: CustomQuickWorkoutEvidence
     ) -> CustomQuickWorkoutRecord? {
         guard validDuration(durationSeconds),
-              validDistance(distanceKilometers),
+              validDistance(distanceKilometers, durationSeconds: durationSeconds, activity: configuration.activity),
               perceivedEffort.map({ (1...10).contains($0) }) ?? true
         else { return nil }
         return CustomQuickWorkoutRecord(
