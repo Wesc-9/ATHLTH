@@ -50,7 +50,10 @@ struct AIProgramBuilderSeed: Hashable {
         if let planVisibility {
             plan.visibility = planVisibility
         }
-        if let planSummary,
+        // Preserve Coach's specific explanation when it exists. The
+        // wizard summary is a fallback, not permission to discard AI insight.
+        if plan.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           let planSummary,
            !planSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             plan.summary = planSummary
         }
