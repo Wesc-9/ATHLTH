@@ -2,6 +2,20 @@ import Foundation
 import Supabase
 import SwiftUI
 
+/// Movement identity is stored separately from the existing run timeline
+/// kind so old planned workouts and their playback remain compatible.
+enum WorkoutCardioActivity: String, Codable, Hashable {
+    case running
+    case walking
+
+    var title: String {
+        switch self {
+        case .running: return ATHLTHLocalization.choose(english: "Run", norwegian: "Løp")
+        case .walking: return ATHLTHLocalization.choose(english: "Walk", norwegian: "Gå")
+        }
+    }
+}
+
 enum WorkoutTemplateBlockKind: String, Codable, CaseIterable, Hashable {
     case run
     case exercise
@@ -97,6 +111,10 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     var groupID: UUID? = nil
     var groupKind: WorkoutBlockGroupKind? = nil
     var groupRounds: Int? = nil
+    /// Nil is an old running block. New walk blocks keep their real identity.
+    var cardioActivity: WorkoutCardioActivity? = nil
+    /// Nil remains outdoors for backward compatibility.
+    var isIndoor: Bool? = nil
 
     var resolvedPhase: WorkoutPhaseKind {
         phase ?? (kind == .rest ? .recovery : .main)
@@ -125,6 +143,8 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         case groupID = "group_id"
         case groupKind = "group_kind"
         case groupRounds = "group_rounds"
+        case cardioActivity = "cardio_activity"
+        case isIndoor = "is_indoor"
     }
 
     var targetText: String? {
@@ -160,7 +180,9 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
             } else if minutes > 0 {
                 parts.append("\(minutes) min")
             } else {
-                parts.append("\(seconds) sec")
+                parts.append("\(seconds) " + ATHLTHLocalization.choose(
+                    english: "sec", norwegian: "sek"
+                ))
             }
         }
 
@@ -222,7 +244,9 @@ extension Array where Element == WorkoutTemplateBlock {
                 notes: source.notes,
                 phase: source.phase,
                 targetPaceSecondsPerKilometer: source.targetPaceSecondsPerKilometer,
-                targetHeartRateZone: source.targetHeartRateZone
+                targetHeartRateZone: source.targetHeartRateZone,
+                cardioActivity: source.cardioActivity,
+                isIndoor: source.isIndoor
             )
             output.append(item)
         }
