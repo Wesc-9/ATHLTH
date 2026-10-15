@@ -57,8 +57,8 @@ struct ATHLTHTrainTodayPremiumView: View {
                     restDayCard(plan)
                 }
 
-                suggestedWorkoutSection
                 quickTrainSection
+                suggestedWorkoutSection
                 if suggestedWorkouts.isEmpty {
                     workoutLibraryShortcut
                 }
