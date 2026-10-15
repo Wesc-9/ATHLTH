@@ -199,6 +199,9 @@ enum ATHLTHArenaArchiveAccountScope {
 /// Shared Arena series with live invitations, consensual scoring and
 /// deadline-based completion. Club and Weekly Challenges remain separate.
 struct ATHLTHArenaOnlineSection: View {
+    /// Compact Arena landing preview; the full destination owns history,
+    /// filters and all previously available competition actions.
+    var compact = false
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
 
@@ -266,6 +269,21 @@ struct ATHLTHArenaOnlineSection: View {
                 .font(ATHLTHArenaLightStyle.editorialTitle(23))
                 .foregroundStyle(ATHLTHArenaLightStyle.ink)
                 Spacer()
+                if compact {
+                    NavigationLink {
+                        ATHLTHArenaAllCompetitionsView()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "View all", norwegian: "Se alle"
+                            ))
+                            Image(systemName: "chevron.right")
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
+                    }
+                    .buttonStyle(.plain)
+                }
                 if loading {
                     ProgressView().controlSize(.small)
                 } else {
@@ -307,7 +325,7 @@ struct ATHLTHArenaOnlineSection: View {
                     count: activeSeries.count,
                     icon: "bolt.fill"
                 )
-                ForEach(activeSeries) { item in
+                ForEach(Array(activeSeries.prefix(compact ? 3 : activeSeries.count))) { item in
                     seriesRow(item)
                 }
             }
@@ -320,12 +338,12 @@ struct ATHLTHArenaOnlineSection: View {
                     count: awaitingSeries.count,
                     icon: "checkmark.shield"
                 )
-                ForEach(awaitingSeries) { item in
+                ForEach(Array(awaitingSeries.prefix(compact ? 2 : awaitingSeries.count))) { item in
                     seriesRow(item)
                 }
             }
 
-            if !finishedSeries.isEmpty || hasMoreArchive {
+            if !compact && (!finishedSeries.isEmpty || hasMoreArchive) {
                 HStack {
                     sectionHeading(
                         title: ATHLTHLocalization.choose(
@@ -470,7 +488,7 @@ struct ATHLTHArenaOnlineSection: View {
                 }
             }
 
-            if !otherSeries.isEmpty {
+            if !compact && !otherSeries.isEmpty {
                 sectionHeading(
                     title: ATHLTHLocalization.choose(
                         english: "Other competitions", norwegian: "Andre konkurranser"
