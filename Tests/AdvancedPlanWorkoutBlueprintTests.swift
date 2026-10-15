@@ -132,4 +132,54 @@ final class AdvancedPlanWorkoutBlueprintTests: XCTestCase {
         ATHLTHPlanStructuredWorkoutBlueprint.apply([1: draft], to: &weeks)
         XCTAssertEqual(weeks, before)
     }
+    func testAIProjectionPreventsDuplicateOnProtectedWeekdayBeforeValidation() {
+        let first = exercise("Squat")
+        let locked = ATHLTHPlanStructuredWorkoutBlueprint(
+            title: "Manual leg day", kind: .strength,
+            durationMinutes: 55, routeID: nil, blocks: [first]
+        )
+        let generated = AIProgramDraft(
+            title: "Program", summary: "AI suggested",
+            weeks: (1...2).map { week in
+                AIProgramDraftWeek(
+                    weekNumber: week,
+                    title: "Week \(week)",
+                    days: (1...7).map { day in
+                        AIProgramDraftDay(
+                            dayIndex: day, title: "Day \(day)",
+                            sessions: day == 1 ? (1...2).map { _ in
+                                AIProgramDraftSession(
+                                    title: "Conflicting AI session", kind: "running",
+                                    durationMinutes: 40,
+                                    targetDistanceKilometers: nil,
+                                    targetPaceSecondsPerKilometer: nil,
+                                    notes: nil, exercises: []
+                                )
+                            } : []
+                        )
+                    }
+                )
+            }
+        )
+        let effective = generated.displayingLockedWorkouts([1: locked])
+        XCTAssertEqual(effective.sessionCount, 2)
+        XCTAssertEqual(effective.weeks[0].days[0].sessions.count, 1)
+        XCTAssertEqual(effective.weeks[0].days[0].sessions.first?.title, "Manual leg day")
+
+        let issues = ATHLTHPlanDraftValidator.issues(
+            in: effective, expectedWeeks: 2,
+            allowedDayIndexes: [1], maximumSessionsPerWeek: 1,
+            requireFullWeeks: true
+        )
+        XCTAssertTrue(issues.isEmpty, "Projection must validate: \(issues)")
+
+        var final = effective.makeTrainingPlan(
+            ownerID: UUID(), startDate: Calendar.current.startOfDay(for: Date())
+        )
+        ATHLTHPlanStructuredWorkoutBlueprint.apply([1: locked], to: &final.weeks)
+        XCTAssertEqual(final.weeks[1].days[0].sessions.count, 1)
+        XCTAssertEqual(final.weeks[1].days[0].sessions[0].workoutBlocks?.first?.setCount, 3)
+    }
+
+
 }
