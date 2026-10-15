@@ -34,6 +34,7 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
                     completionFraction: 0,
                     planPosition: "",
                     hasActiveWorkout: hasActiveWorkout,
+                    onChooseSuggestedWorkout: { _ in },
                     onOpenPlan: {},
                     onCreatePlan: {},
                     onOpenLibrary: {},
