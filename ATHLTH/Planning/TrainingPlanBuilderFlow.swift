@@ -511,7 +511,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             )) {
                 if let draft = resumablePlanDraft {
                     mode = draft.advanced ? .advanced : .basic
-                    title = draft.title
+                    title = draft.usedDefaultTitle == true ? "" : draft.title
                     weekCount = draft.weekCount
                     // A stale date must never point back in time.
                     startDate = max(Calendar.current.startOfDay(for: Date()), draft.startDate)
@@ -537,6 +537,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         workoutTitleOverridesByDay = draft.workoutPresetsByDay ?? [:]
                         workoutMinutesByDay = draft.workoutMinutesByDay ?? [:]
                         structuredWorkoutsByDay = draft.structuredWorkoutsByDay ?? [:]
+                        weekDayEdits = draft.weekDayEdits ?? [:]
                     }
                     // We intentionally resume the basics step so any goals,
                     // limitations and AI permissions must be reconfirmed.
@@ -3646,17 +3647,17 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
             .sheet(item: $composingAdvancedDay) { selection in
                 WorkoutTemplateBuilderView(
-                    initialTitle: resolvedWorkoutTitle(for: selection.id),
-                    initialBlocks: structuredWorkoutsByDay[selection.id]?.blocks ?? [],
-                    initialRouteID: structuredWorkoutsByDay[selection.id]?.routeID,
-                    draftContext: "new-program-weekday-\(selection.id.uuidString)",
+                    initialTitle: effectiveWorkoutTitle(for: selection.id),
+                    initialBlocks: effectiveDetailedWorkout(for: selection.id)?.blocks ?? [],
+                    initialRouteID: effectiveDetailedWorkout(for: selection.id)?.routeID,
+                    draftContext: "new-program-week-\(selectedPlanWeekIndex)-day-\(selection.id)",
+                    plannedDate: dateForWeekDay(selection.id, weekIndex: selectedPlanWeekIndex),
                     onSaveToPlan: { name, blocks, routeID, knownMinutes, _ in
                         guard mode == .advanced, selectedDays.contains(selection.id) else {
                             return
                         }
-                        if workoutMinutesByDay[selection.id] == nil, let knownMinutes {
-                            workoutMinutesByDay[selection.id] = min(max(knownMinutes, 5), 180)
-                        }
+                        // The detailed recipe belongs to this selected date.
+                        // The weekly template remains unchanged for other weeks.
                         let containsRunning = blocks.contains {
                             $0.kind == .run && $0.cardioActivity != .walking
                         }
@@ -3673,14 +3674,17 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         let choice = ATHLTHPlanStructuredWorkoutBlueprint(
                             title: name,
                             kind: workoutKind,
-                            durationMinutes: resolvedWorkoutMinutes(for: selection.id),
+                            durationMinutes: knownMinutes ?? effectiveWorkoutMinutes(for: selection.id),
                             routeID: routeID,
                             blocks: blocks
                         )
                         guard choice.isValid else { return }
-                        structuredWorkoutsByDay[selection.id] = choice
-                        workoutTitleOverridesByDay[selection.id] = name
-                        workoutKindOverridesByDay[selection.id] = workoutKind
+                        updateWeekDay(selection.id) { edit in
+                            edit.detailedWorkout = choice
+                            edit.kind = workoutKind
+                            edit.title = name
+                            edit.durationMinutes = choice.durationMinutes
+                        }
                     }
                 )
             }
@@ -4597,9 +4601,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             return
         }
         let draft = ATHLTHPlanCreationDraft(
-            title: title,
+            title: resolvedPlanTitle,
             weekCount: weekCount,
             startDate: startDate,
+            usedDefaultTitle: title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
             advanced: mode == .advanced,
             source: selectedSource.rawValue,
             stage: String(describing: step),
@@ -4616,7 +4621,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             workoutMinutesByDay: mode == .advanced
                 ? workoutMinutesByDay : nil,
             structuredWorkoutsByDay: mode == .advanced
-                ? structuredWorkoutsByDay : nil
+                ? structuredWorkoutsByDay : nil,
+            weekDayEdits: mode == .advanced ? weekDayEdits : nil
         )
         draftStore.save(draft, userID: session.profile.userID)
     }
@@ -5201,7 +5207,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     builderProfile: profile,
                     seedSuggestedWeek: seedSuggestedWeek,
                     structuredWorkoutsByDay: mode == .advanced
-                        ? structuredWorkoutsByDay : [:]
+                        ? structuredWorkoutsByDay : [:],
+                    weekDayEdits: mode == .advanced ? weekDayEdits : [:]
                 )
 
         guard let created else {
