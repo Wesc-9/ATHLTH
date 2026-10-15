@@ -53,15 +53,18 @@ struct AIProgramBuilderView: View {
     let mode: AIProgramGenerationMode
     let seed: AIProgramBuilderSeed?
     let onProgramCreated: (() -> Void)?
+    let onProgramCreatedPlanID: ((UUID) -> Void)?
 
     init(
         mode: AIProgramGenerationMode,
         seed: AIProgramBuilderSeed? = nil,
-        onProgramCreated: (() -> Void)? = nil
+        onProgramCreated: (() -> Void)? = nil,
+        onProgramCreatedPlanID: ((UUID) -> Void)? = nil
     ) {
         self.mode = mode
         self.seed = seed
         self.onProgramCreated = onProgramCreated
+        self.onProgramCreatedPlanID = onProgramCreatedPlanID
     }
 
     @State private var selectedGoalIDs: Set<UUID> = []
@@ -160,7 +163,7 @@ struct AIProgramBuilderView: View {
     }
 
     private var canGenerate: Bool {
-        questionsAnswered &&
+        (seed != nil || questionsAnswered) &&
         !availableDays.isEmpty &&
         sessionsPerWeek >= 1 &&
         !isGenerating
@@ -172,7 +175,16 @@ struct AIProgramBuilderView: View {
                 LazyVStack(alignment: .leading, spacing: 18) {
                     coachHero
 
-                    if showingQuestions {
+                    if seed != nil && mode == .generate {
+                        // The upstream wizard already collected duration,
+                        // goals, sessions and days. Never ask them twice.
+                        seededPlanSummary
+                        if let preview {
+                            previewSection(preview)
+                        } else {
+                            generateCard
+                        }
+                    } else if showingQuestions {
                         coachQuestions
                     } else {
                         coachSummary
@@ -211,7 +223,7 @@ struct AIProgramBuilderView: View {
                 )
             }
             .navigationTitle(
-                showingQuestions ? "Meet your coach" : "ATHLTH Coach"
+                seed == nil && showingQuestions ? "Meet your coach" : "ATHLTH Coach"
             )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -255,6 +267,58 @@ struct AIProgramBuilderView: View {
                 }
             }
         }
+    }
+
+    private var seededPlanSummary: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack {
+                Text(ATHLTHLocalization.choose(
+                    english: "YOUR CHOSEN PLAN", norwegian: "DIN VALGTE PLAN"
+                ))
+                .font(.caption2.weight(.bold))
+                .tracking(1.5)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                Spacer()
+                Button(ATHLTHLocalization.choose(
+                    english: "Change setup", norwegian: "Endre oppsett"
+                )) {
+                    dismiss()
+                }
+                .font(.caption.weight(.semibold))
+            }
+
+            Text(seed?.preferredTitle ?? "")
+                .font(.title2.weight(.bold))
+            HStack(spacing: 8) {
+                coachChip("\(resolvedWeeks) " + ATHLTHLocalization.choose(
+                    english: "weeks", norwegian: "uker"
+                ))
+                coachChip("\(sessionsPerWeek) " + ATHLTHLocalization.choose(
+                    english: "sessions/week", norwegian: "økter/uke"
+                ))
+                coachChip("\(sessionDurationMinutes) min")
+            }
+
+            Text(ATHLTHLocalization.choose(
+                english: "Coach uses your selected days, focus, workout types and duration. Nothing is saved before you review and approve the proposal.",
+                norwegian: "Coach bruker dagene, fokuset, økttypene og varigheten du allerede har valgt. Ingenting lagres før du ser over og godkjenner forslaget."
+            ))
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+
+            if !availableDays.isEmpty {
+                Text(availableDays.sorted().map { day in
+                    ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"][
+                        min(max(day - 1, 0), 6)
+                    ]
+                }.joined(separator: " · "))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+            }
+        }
+        .padding(18)
+        .background(.white.opacity(0.88),
+                    in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private var coachHero: some View {
@@ -1363,6 +1427,8 @@ struct AIProgramBuilderView: View {
             }
         }
 
+        onProgramCreatedPlanID?(mode == .generate
+            ? generated.id : (completingPlanID ?? generated.id))
         onProgramCreated?()
         dismiss()
     }
@@ -1478,8 +1544,10 @@ struct AIProgramBuilderView: View {
                     seededGymAccess
             }
 
-            showingQuestions =
-                !questionsAnswered
+            // All core plan questions were already collected by the wizard.
+            // Advanced Coach intake remains available from the standalone
+            // Coach entry, never as a second mandatory wizard here.
+            showingQuestions = false
         }
 
         if selectedGoalIDs.isEmpty,
