@@ -20,6 +20,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var showingCreation = false
     @State private var pendingCreatedPlanID: UUID?
     @State private var showingMyPlans = false
+    @State private var browsingMyPlans = false
     @State private var showingTemplates = false
     @State private var showingAllPlans = false
     @State private var showingEditor = false
@@ -275,8 +276,36 @@ struct ATHLTHTrainPlanPremiumView: View {
     private var planContent: some View {
         VStack(alignment: .leading, spacing: 18) {
             header
-            if !session.trainingPlans.isEmpty { savedPlansOverview }
-            if let plan {
+            workspaceNavigation
+            if browsingMyPlans {
+                savedPlansOverview
+                actionButton(
+                    title: tr("Create another plan", "Opprett ny treningsplan"),
+                    icon: "plus"
+                ) {
+                    showingCreation = true
+                }
+            } else if let plan {
+                if session.activePlan?.id != plan.id {
+                    HStack(spacing: 9) {
+                        Image(systemName: "info.circle")
+                        Text(tr("Viewing a saved or upcoming plan",
+                                "Du ser på en lagret eller kommende plan"))
+                        Spacer(minLength: 3)
+                        if let activeID = session.activePlan?.id {
+                            Button(tr("Active plan", "Aktiv plan")) {
+                                focusedPlanID = activeID
+                                selectedWeekIndex = nil
+                                selectedDayID = nil
+                            }
+                            .fontWeight(.semibold)
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(secondaryInk)
+                    .padding(12)
+                    .background(soft, in: RoundedRectangle(cornerRadius: 12))
+                }
                 overview(plan)
                 weekWorkspace(plan)
                 if advanced { libraryShortcuts }
@@ -305,6 +334,7 @@ struct ATHLTHTrainPlanPremiumView: View {
         }
         .onChange(of: highlightedPlanID) { _, next in
             focusedPlanID = next
+            if next != nil { browsingMyPlans = false }
         }
     }
 
@@ -313,6 +343,7 @@ struct ATHLTHTrainPlanPremiumView: View {
         .sheet(isPresented: $showingCreation, onDismiss: {
             if let planID = pendingCreatedPlanID {
                 focusedPlanID = planID
+                browsingMyPlans = false
                 selectedWeekIndex = 0
                 if let created = session.trainingPlan(withID: planID) {
                     advanced = created.builderProfile?.mode == .advanced
@@ -523,6 +554,40 @@ struct ATHLTHTrainPlanPremiumView: View {
         return nil
     }
 
+    private var workspaceNavigation: some View {
+        HStack(spacing: 5) {
+            Button {
+                browsingMyPlans = false
+            } label: {
+                Text(tr("Plan overview", "Planoversikt"))
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 42)
+                    .foregroundStyle(browsingMyPlans ? secondaryInk : Color.white)
+                    .background(
+                        browsingMyPlans ? Color.clear : graphite,
+                        in: RoundedRectangle(cornerRadius: 12)
+                    )
+            }
+            Button {
+                browsingMyPlans = true
+            } label: {
+                Text(tr("My plans", "Mine planer"))
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 42)
+                    .foregroundStyle(browsingMyPlans ? Color.white : secondaryInk)
+                    .background(
+                        browsingMyPlans ? graphite : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 12)
+                    )
+            }
+        }
+        .buttonStyle(.plain)
+        .padding(5)
+        .background(soft, in: RoundedRectangle(cornerRadius: 17))
+    }
+
     private var savedPlansOverview: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(tr("My training plans", "Mine treningsplaner"))
@@ -531,6 +596,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                 let selected = item.id == plan?.id
                 Button {
                     focusedPlanID = item.id
+                    browsingMyPlans = false
                     selectedWeekIndex = nil
                     selectedDayID = nil
                 } label: {
@@ -605,6 +671,7 @@ struct ATHLTHTrainPlanPremiumView: View {
             ForEach(session.trainingPlans) { item in
                 Button {
                     focusedPlanID = item.id
+                    browsingMyPlans = false
                     selectedWeekIndex = nil
                     advanced = item.builderProfile?.mode == .advanced
                 } label: {
@@ -658,25 +725,29 @@ struct ATHLTHTrainPlanPremiumView: View {
                 .accessibilityLabel(tr("Create training plan", "Opprett treningsplan"))
             }
 
-            HStack {
-                Image(systemName: advanced ? "slider.horizontal.3" : "checkmark.circle")
+            HStack(spacing: 8) {
+                Text(advanced
+                     ? tr("Detailed plan view", "Detaljert planvisning")
+                     : tr("Simple plan overview", "Enkel planoversikt"))
                     .font(.caption)
-                    .foregroundStyle(warmGold)
-                Text(
-                    advanced
-                        ? tr("Precise control", "Full detaljkontroll")
-                        : tr("Easy overview", "Enkel planlegging")
-                )
-                .font(.caption)
-                .foregroundStyle(secondaryInk)
+                    .foregroundStyle(secondaryInk)
                 Spacer()
-                Picker("", selection: $advanced) {
-                    Text(tr("Simple", "Enkel")).tag(false)
-                    Text(tr("Advanced", "Avansert")).tag(true)
+                Menu {
+                    Button(tr("Simple view", "Enkel visning")) {
+                        advanced = false
+                    }
+                    Button(tr("Detailed view", "Detaljert visning")) {
+                        advanced = true
+                    }
+                } label: {
+                    Label(tr("View options", "Visning"),
+                          systemImage: "slider.horizontal.3")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(graphite)
+                        .padding(.horizontal, 12)
+                        .frame(height: 34)
+                        .background(soft, in: Capsule())
                 }
-                .pickerStyle(.segmented)
-                .frame(width: 174)
-                .accessibilityLabel(tr("Plan detail level", "Detaljnivå"))
             }
         }
     }
