@@ -397,6 +397,9 @@ final class WorkoutTemplateCatalogStore: ObservableObject {
         [WorkoutTemplateCatalogEntry] =
             WorkoutTemplateCatalogEntry.fallbackCatalog
     @Published private(set) var isLoading = false
+    /// Whether the catalogue contains live published data rather than the
+    /// bundled HYROX-only fallback. Used by general Train suggestions.
+    @Published private(set) var hasPublishedCatalog = false
     @Published private(set) var errorMessage: String?
 
     private let client: SupabaseClient
@@ -428,6 +431,7 @@ final class WorkoutTemplateCatalogStore: ObservableObject {
             if !remote.isEmpty {
                 entries = remote
                 loadedRemote = true
+                hasPublishedCatalog = true
             }
             errorMessage = nil
         } catch {
