@@ -93,3 +93,5 @@ ATHLTH 1.7.5 build 81 TestFlight upload — user-authorized 2026-10-14 20:33 Eur
 ATHLTH 1.7.6 build 82 — user-authorized TestFlight upload on 2026-10-15, following Train, Library, and Messages improvements; upload only after workflow signing, archive, and validation succeed.
 
 ATHLTH 1.7.6 build 82 TestFlight retry — 2026-10-15: fixed duplicate Norwegian exercise dictionary key that caused Xcode unit tests to crash; user-authorized upload only if build, tests, signing and validation succeed.
+
+ATHLTH 1.7.6 build 83 — user-authorized TestFlight upload for custom quick workout Watch presence, iPhone timer, manual/retrospective logging and provenance; upload only when archive, unit tests, backend and signing checks all pass (2026-10-15).
