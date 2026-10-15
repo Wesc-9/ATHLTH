@@ -308,10 +308,9 @@ struct ATHLTHTrainPlanPremiumView: View {
                 }
                 overview(plan)
                 weekWorkspace(plan)
-                if advanced { libraryShortcuts }
+
             } else {
                 firstPlanInvitation
-                libraryShortcuts
             }
         }
         .foregroundStyle(graphite)
