@@ -5226,6 +5226,7 @@ struct ATHLTHTrainView: View {
                         }
                     default:
                         unfinishedWorkoutRecoveryCards
+                        activeTrainWorkoutCard
                         premiumTodayScreen
                     }
                 }
@@ -5831,6 +5832,119 @@ struct ATHLTHTrainView: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
+    // A single live-session priority surface, independent of plan status.
+    // Recovered workouts already have a dedicated checkpoint review above;
+    // never show two competing resume buttons for the same session.
+    private var hasOngoingTrainWorkout: Bool {
+        phoneWorkout.active != nil ||
+        strengthWorkout.activeWorkout != nil ||
+        ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
+    }
+
+    @ViewBuilder
+    private var activeTrainWorkoutCard: some View {
+        if let workout = phoneWorkout.active,
+           !phoneWorkout.hasRecoveredActiveWorkout {
+            liveTrainCard(
+                title: workout.title,
+                source: "iPhone",
+                symbol: workout.walking ? "figure.walk" : "figure.run"
+            ) {
+                phoneWorkout.presentWorkout()
+            }
+        } else if let workout = strengthWorkout.activeWorkout,
+                  !strengthWorkout.hasRecoveredActiveWorkout {
+            liveTrainCard(
+                title: workout.title,
+                source: workout.captureDevice.title,
+                symbol: "dumbbell"
+            ) {
+                strengthWorkout.acknowledgeRecoveredWorkout()
+                showingStrengthWorkout = true
+            }
+        } else if ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive,
+                  phoneWorkout.active == nil,
+                  strengthWorkout.activeWorkout == nil {
+            HStack(spacing: 12) {
+                Image(systemName: "applewatch")
+                    .font(.system(size: 22))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Workout active on Apple Watch",
+                        norwegian: "Aktiv økt på Apple Watch"
+                    ))
+                    .font(.subheadline.weight(.semibold))
+                    Text(ATHLTHLocalization.choose(
+                        english: "Continue on Watch. Do not start another session.",
+                        norwegian: "Fortsett på klokken. Ikke start en ny økt."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(16)
+            .background(.white, in: RoundedRectangle(cornerRadius: 17))
+        }
+    }
+
+    private func liveTrainCard(
+        title: String,
+        source: String,
+        symbol: String,
+        onContinue: @escaping () -> Void
+    ) -> some View {
+        Button(action: onContinue) {
+            HStack(spacing: 13) {
+                Image(systemName: symbol)
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(.white)
+                    .frame(width: 49, height: 49)
+                    .background(
+                        Color(red: 0.22, green: 0.24, blue: 0.29),
+                        in: RoundedRectangle(cornerRadius: 13)
+                    )
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "WORKOUT IN PROGRESS",
+                        norwegian: "ØKT PÅGÅR"
+                    ))
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.1)
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(1)
+                    Text(source)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                Spacer(minLength: 0)
+                VStack(spacing: 4) {
+                    Image(systemName: "play.fill")
+                    Text(ATHLTHLocalization.choose(
+                        english: "Continue", norwegian: "Fortsett"
+                    ))
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+            }
+            .padding(15)
+            .background(.white, in: RoundedRectangle(cornerRadius: 17))
+            .overlay {
+                RoundedRectangle(cornerRadius: 17)
+                    .stroke(ATHLTHTheme.accentDeep.opacity(0.3), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(ATHLTHLocalization.choose(
+            english: "Return to the current workout",
+            norwegian: "Åpner økten som allerede pågår"
+        ))
+    }
+
     @ViewBuilder
     private var premiumTodayScreen: some View {
         let active = session.activePlan
@@ -5869,6 +5983,7 @@ struct ATHLTHTrainView: View {
             planPosition: active.map {
                 trainTodayPlanPositionText($0)
             } ?? "",
+            hasActiveWorkout: hasOngoingTrainWorkout,
             onOpenPlan: { selectedSection = 1 },
             onCreatePlan: { showingTrainProgramCreation = true },
             onOpenLibrary: { showingLibrary = true },
