@@ -553,7 +553,6 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     @State private var showSharedWorkoutTemplates = false
     @State private var showIntervalComposer = false
     @State private var showDetailedComposer = false
-    @State private var showStructureConflict = false
     @State private var showRemoveDetailedStructure = false
     @State private var scheduled = false
     @State private var clockTime = Date()
@@ -598,8 +597,10 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                         information
                         if advanced {
                             detailedStructureEntry
-                        }
-                        if !draft.resolvedWorkoutBlocks.isEmpty {
+                            if !ATHLTHUnifiedWorkout.editorBlocks(from: draft).isEmpty {
+                                detailedBlocksSummary
+                            }
+                        } else if !draft.resolvedWorkoutBlocks.isEmpty {
                             detailedBlocksSummary
                         } else if draft.kind == .strength || draft.kind == .custom {
                             strengthEditing
@@ -674,47 +675,17 @@ struct ATHLTHTrainWorkoutBuilderView: View {
             .sheet(isPresented: $showDetailedComposer) {
                 WorkoutTemplateBuilderView(
                     initialTitle: draft.title,
-                    initialBlocks: draft.resolvedWorkoutBlocks,
+                    initialBlocks: ATHLTHUnifiedWorkout.editorBlocks(from: draft),
                     initialRouteID: draft.routeID,
                     onSaveToPlan: { title, blocks, routeID, knownMinutes in
-                        // Never silently discard sets, weights or set-specific goals.
-                        // A structured workout is authored as a separate execution
-                        // recipe and should not coexist with legacy exercises.
-                        guard draft.exercises.isEmpty,
-                              draft.runningWorkout == nil,
-                              (draft.runningWorkouts ?? []).isEmpty else {
-                            return
-                        }
-                        let hasRun = blocks.contains { $0.kind == .run }
-                        let hasStrength = blocks.contains { $0.kind == .exercise }
-                        draft.kind = hasRun && hasStrength
-                            ? .custom : hasRun ? .running : .strength
-                        draft.workoutCategory = hasRun && hasStrength
-                            ? "hybrid" : hasRun ? "running" : "strength"
-                        draft.workoutBlocks = blocks
-                        draft.routeID = hasRun ? routeID : nil
-                        // These legacy single-run fields must not compete with
-                        // the structured steps when launching this workout.
-                        draft.targetDistanceKilometers = nil
-                        draft.targetPaceSecondsPerKilometer = nil
-                        draft.title = title
-                        if !durationWasEditedManually, let knownMinutes {
-                            draft.durationMinutes = min(max(knownMinutes, 5), 240)
-                        }
+                        ATHLTHUnifiedWorkout.apply(
+                            blocks: blocks, title: title, routeID: routeID,
+                            estimatedMinutes: durationWasEditedManually
+                                ? nil : knownMinutes,
+                            to: &draft
+                        )
                     }
                 )
-            }
-            .alert(
-                tr("Existing exercises must be preserved",
-                   "Eksisterende øvelser må bevares"),
-                isPresented: $showStructureConflict
-            ) {
-                Button(tr("OK", "OK"), role: .cancel) {}
-            } message: {
-                Text(tr(
-                    "The detailed block builder uses a different execution format. Keep editing existing sets here; to build a mixed workout with independent rests, start a new empty workout. Nothing has been removed.",
-                    "Den detaljerte blokkbyggeren bruker et annet øktformat. Du kan fortsette å redigere sett her. For økter med egne pauseblokker, start med en tom økt og velg detaljert øktbygger. Ingenting slettes."
-                ))
             }
             .confirmationDialog(
                 tr("Remove detailed workout structure?",
@@ -852,6 +823,11 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     // Estimates change with sets, reps and pauses until the athlete overrides
     // the duration. Existing workouts keep their saved duration unchanged.
     private var estimatedDurationMinutes: Int? {
+        if !draft.resolvedWorkoutBlocks.isEmpty {
+            return ATHLTHWorkoutDurationEstimator.minutes(
+                for: draft.resolvedWorkoutBlocks
+            )
+        }
         guard draft.kind == .strength || draft.kind == .custom,
               !draft.exercises.isEmpty else {
             return nil
@@ -935,19 +911,14 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     /// Legacy set-based workouts remain editable without destructive migration.
     private var detailedStructureEntry: some View {
         Button {
-            if !draft.exercises.isEmpty || draft.runningWorkout != nil
-                || !(draft.runningWorkouts ?? []).isEmpty {
-                showStructureConflict = true
-            } else {
-                showDetailedComposer = true
-            }
+            showDetailedComposer = true
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "square.stack.3d.up")
                     .font(.title3)
                     .foregroundStyle(bronze)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(draft.resolvedWorkoutBlocks.isEmpty
+                    Text(ATHLTHUnifiedWorkout.editorBlocks(from: draft).isEmpty
                          ? tr("Build a detailed workout", "Bygg detaljert økt")
                          : tr("Edit detailed workout", "Rediger detaljert økt"))
                         .font(.subheadline.weight(.semibold))
@@ -974,11 +945,11 @@ struct ATHLTHTrainWorkoutBuilderView: View {
             HStack {
                 sectionTitle(tr("Workout timeline", "Øktens innhold"))
                 Spacer()
-                Text("\(draft.resolvedWorkoutBlocks.count) " + tr("blocks", "blokker"))
+                Text("\(ATHLTHUnifiedWorkout.editorBlocks(from: draft).count) " + tr("blocks", "blokker"))
                     .font(.caption)
                     .foregroundStyle(muted)
             }
-            ForEach(draft.resolvedWorkoutBlocks) { block in
+            ForEach(ATHLTHUnifiedWorkout.editorBlocks(from: draft)) { block in
                 HStack(spacing: 10) {
                     Image(systemName: block.kind.systemImage)
                         .frame(width: 26)
