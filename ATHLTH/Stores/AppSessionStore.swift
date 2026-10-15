@@ -2284,7 +2284,7 @@ final class AppSessionStore: ObservableObject {
         let normalizedDays =
             Array(Set(builderProfile.preferredDayIndexes
                 .filter { (1...7).contains($0) }
-                .map(dayOffset(for:))))
+                .map { dayOffset(for: $0) }))
                 .sorted()
         let targetDays =
             normalizedDays.isEmpty
