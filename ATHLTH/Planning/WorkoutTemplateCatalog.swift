@@ -2351,6 +2351,17 @@ struct WorkoutTemplateBuilderView: View {
                                  tr("sec", "sek"))
                                 .font(.caption)
                         }
+                        Button {
+                            splitExerciseIntoIndividualSets(at: index)
+                        } label: {
+                            Label(
+                                tr("Customize each set", "Tilpass hvert sett"),
+                                systemImage: "slider.horizontal.3"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(studioAccent)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 Stepper(value: Binding(
@@ -2601,6 +2612,15 @@ struct WorkoutTemplateBuilderView: View {
         rest.groupKind = .intervals
         rest.groupRounds = 4
         insertBlock(rest, toGroup: id)
+    }
+
+    private func splitExerciseIntoIndividualSets(at index: Int) {
+        guard blocks.indices.contains(index) else { return }
+        let separated = ATHLTHWorkoutSetExpansion.separateSets(in: blocks[index])
+        guard separated.count > 1 else { return }
+        blocks.replaceSubrange(index...index, with: separated)
+        resequence()
+        expandedBlockIndex = index
     }
 
     private func insertBlock(_ source: WorkoutTemplateBlock, toGroup groupID: UUID?) {
