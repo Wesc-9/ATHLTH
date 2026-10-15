@@ -1717,7 +1717,9 @@ private struct HomeActivityMotionArtworkV3:
                 activity == .walking ||
                 activity == .hiking ||
                 activity == .cycling {
-                Canvas { context, size in
+                // Canvas renderer may execute off the main actor; this drawing
+                // closure uses only its local path and graphics context.
+                Canvas { @Sendable context, size in
                     var path = Path()
                     path.move(
                         to: CGPoint(
