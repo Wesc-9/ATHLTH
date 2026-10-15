@@ -3387,7 +3387,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 get: { resolvedWorkoutMinutes(for: day) },
                                 set: { workoutMinutesByDay[day] = $0 }
                             ),
-                            in: 15...180,
+                            in: 5...180,
                             step: 5
                         )
                     }
@@ -3493,9 +3493,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     initialTitle: resolvedWorkoutTitle(for: selection.id),
                     initialBlocks: structuredWorkoutsByDay[selection.id]?.blocks ?? [],
                     initialRouteID: structuredWorkoutsByDay[selection.id]?.routeID,
-                    onSaveToPlan: { name, blocks, routeID in
+                    onSaveToPlan: { name, blocks, routeID, knownMinutes in
                         guard mode == .advanced, selectedDays.contains(selection.id) else {
                             return
+                        }
+                        if workoutMinutesByDay[selection.id] == nil, let knownMinutes {
+                            workoutMinutesByDay[selection.id] = min(max(knownMinutes, 5), 180)
                         }
                         let containsRunning = blocks.contains { $0.kind == .run }
                         let containsStrength = blocks.contains { $0.kind == .exercise }
