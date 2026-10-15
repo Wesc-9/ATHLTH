@@ -678,12 +678,14 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                     initialBlocks: ATHLTHUnifiedWorkout.editorBlocks(from: draft),
                     initialRouteID: draft.routeID,
                     onSaveToPlan: { title, blocks, routeID, knownMinutes in
+                        var nextDraft = draft
                         ATHLTHUnifiedWorkout.apply(
                             blocks: blocks, title: title, routeID: routeID,
                             estimatedMinutes: durationWasEditedManually
                                 ? nil : knownMinutes,
-                            to: &draft
+                            to: &nextDraft
                         )
+                        draft = nextDraft
                     }
                 )
             }
