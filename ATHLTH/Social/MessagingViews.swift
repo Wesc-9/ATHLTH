@@ -25,8 +25,10 @@ private enum MessageInboxFilter: String, CaseIterable, Identifiable {
     case groups
     case archive
 
+    // Open private messages first for every account. Group and mixed
+    // conversations remain available as separate, explicit filters.
     static let mainFilters: [MessageInboxFilter] = [
-        .all, .unread, .direct, .groups
+        .direct, .unread, .groups, .all
     ]
 
     var id: String { rawValue }
@@ -38,7 +40,7 @@ private enum MessageInboxFilter: String, CaseIterable, Identifiable {
         case .unread:
             return ATHLTHLocalization.choose(english: "Unread", norwegian: "Uleste")
         case .direct:
-            return ATHLTHLocalization.choose(english: "Direct", norwegian: "Direkte")
+            return ATHLTHLocalization.choose(english: "Messages", norwegian: "Meldinger")
         case .groups:
             return ATHLTHLocalization.choose(english: "Groups", norwegian: "Grupper")
         case .archive:
@@ -72,7 +74,7 @@ struct MessageInboxView: View {
     @State private var searchText = ""
     @State private var showingSearch = false
     @State private var selectedFilter:
-        MessageInboxFilter = .all
+        MessageInboxFilter = .direct
     @State private var selectedWorkoutInvite:
         SocialWorkoutInviteDisplay?
     @State private var coachPinned = true
@@ -993,7 +995,7 @@ struct MessageInboxView: View {
             )
         case .direct:
             return ATHLTHLocalization.choose(
-                english: "No direct messages", norwegian: "Ingen direktemeldinger"
+                english: "No messages yet", norwegian: "Ingen meldinger ennå"
             )
         case .groups:
             return ATHLTHLocalization.choose(
@@ -1219,6 +1221,8 @@ struct MessageInboxView: View {
                 case .unread:
                     return !archived && item.unreadCount > 0
                 case .direct:
+                    // Only actual one-to-one conversations (including
+                    // pending message requests), never invite-only people.
                     return !archived && item.conversation != nil
                 case .groups:
                     // Actual group conversations are presented by Arena and Clubs,
