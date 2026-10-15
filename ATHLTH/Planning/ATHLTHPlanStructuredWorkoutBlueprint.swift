@@ -26,7 +26,12 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
         let hasRun = blocks.contains { $0.kind == .run }
         let hasStrength = blocks.contains { $0.kind == .exercise }
         if hasRun && hasStrength { return "hybrid" }
-        if hasRun { return "running" }
+        if hasRun {
+            let walkingOnly = blocks.filter { $0.kind == .run }.allSatisfy {
+                $0.cardioActivity == .walking
+            }
+            return walkingOnly ? "walking" : "running"
+        }
         if hasStrength { return "strength" }
         return "custom"
     }
@@ -49,7 +54,9 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
         workout.title = title
         workout.kind = kind
         workout.durationMinutes = min(max(durationMinutes, 5), 240)
-        workout.routeID = blocks.contains(where: { $0.kind == .run }) ? routeID : nil
+        workout.routeID = blocks.contains(where: {
+            $0.kind == .run && $0.isIndoor != true
+        }) ? routeID : nil
         workout.exercises = []
         workout.workoutBlocks = blocks
         workout.workoutCategory = category
@@ -100,8 +107,17 @@ struct ATHLTHPlanWeekDayEdit: Codable, Hashable {
         if let detailedWorkout, detailedWorkout.isValid {
             result = detailedWorkout.applying(to: result)
         } else {
+            if kind != nil && kind != result.kind {
+                // Changing from strength to walking/running cannot inherit the
+                // exercises, targets or route of the old seeded session.
+                result.exercises = []
+                result.targetDistanceKilometers = nil
+                result.targetPaceSecondsPerKilometer = nil
+                result.routeID = nil
+            }
             if removeTemplateDetail {
                 result.workoutBlocks = nil
+                result.exercises = []
                 result.workoutTemplateID = nil
                 result.runningWorkout = nil
                 result.runningWorkouts = nil
