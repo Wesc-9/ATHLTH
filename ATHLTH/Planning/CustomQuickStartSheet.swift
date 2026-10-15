@@ -219,6 +219,7 @@ struct CustomQuickStartSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
 
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
@@ -370,6 +371,9 @@ struct CustomQuickStartSheet: View {
             if !canUseWatch {
                 captureDevice = .iPhone
             }
+            // Probe availability whenever the chooser is opened. Paired
+            // does not mean the athlete brought their Watch to the gym.
+            watchConnection.connect()
         }
         .onChange(of: watchConnected) { _, connected in
             if !connected { captureDevice = .iPhone }
