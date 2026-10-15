@@ -420,15 +420,22 @@ struct CustomQuickStartSheet: View {
                 }
             }
             if !canUseWatch {
-                Label(
-                    tr(
-                        "No Apple Watch connected. Use your iPhone or enter the workout manually.",
-                        "Ingen Apple Watch tilkoblet. Bruk iPhone eller registrer økten manuelt."
-                    ),
-                    systemImage: "info.circle"
-                )
-                .font(.caption)
-                .foregroundStyle(muted)
+                HStack(alignment: .top, spacing: 9) {
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(accent)
+                    Text(tr(
+                        "Apple Watch isn't verified nearby. You can always time or log the workout on iPhone.",
+                        "Apple Watch er ikke bekreftet i nærheten. Du kan alltid ta tiden eller registrere økten på iPhone."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(muted)
+                    Spacer(minLength: 0)
+                    Button(tr("Check", "Sjekk")) {
+                        watchConnection.connect()
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(accent)
+                }
                 .fixedSize(horizontal: false, vertical: true)
             } else if captureDevice == .appleWatch && method != .open {
                 Text(tr(
