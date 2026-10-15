@@ -9696,6 +9696,7 @@ private struct PlannedAudioCoachEditorView: View {
 }
 
 struct PlannedExerciseEditorView: View {
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @Environment(\.dismiss) private var dismiss
 
     let original: PlannedExercise
@@ -9870,6 +9871,24 @@ struct PlannedExerciseEditorView: View {
         )
     }
 
+    private var catalogEntry: ExerciseLibraryEntry? {
+        exerciseLibrary.allExercises.first {
+            $0.id == original.embeddedExercise.id
+        }
+    }
+
+    private var exerciseInstructions: [String] {
+        if let entry = catalogEntry {
+            let localized = exerciseLibrary.localizedExerciseInstructions(entry)
+            if !localized.isEmpty { return localized }
+        }
+        return original.embeddedExercise.instructions
+    }
+
+    private var exerciseVideoURL: URL? {
+        original.embeddedExercise.videoURL ?? catalogEntry?.exercise.videoURL
+    }
+
     private var entireWarmUpBinding: Binding<Bool> {
         Binding(
             get: {
@@ -9903,51 +9922,27 @@ struct PlannedExerciseEditorView: View {
                         spacing: 12
                     ) {
                         HStack(spacing: 12) {
-                            Image(
-                                systemName:
-                                    "dumbbell.fill"
-                            )
-                            .font(
-                                .system(
-                                    size: 18,
-                                    weight: .semibold
-                                )
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme.accentDeep
-                            )
-                            .frame(
-                                width: 44,
-                                height: 44
-                            )
-                            .background(
-                                LinearGradient(
-                                    colors: [
-                                        ATHLTHTheme
-                                            .champagneSoft,
-                                        ATHLTHTheme
-                                            .accentSoft
-                                    ],
-                                    startPoint:
-                                        .topLeading,
-                                    endPoint:
-                                        .bottomTrailing
-                                ),
-                                in:
-                                    RoundedRectangle(
-                                        cornerRadius: 14,
-                                        style: .continuous
+                            if let entry = catalogEntry {
+                                ExerciseArtwork(entry: entry, size: 66)
+                            } else {
+                                Image(systemName: "dumbbell.fill")
+                                    .font(.system(size: 20, weight: .medium))
+                                    .foregroundStyle(ATHLTHPlanDesign.accent)
+                                    .frame(width: 66, height: 66)
+                                    .background(
+                                        ATHLTHPlanDesign.selectedSurface,
+                                        in: RoundedRectangle(cornerRadius: 14)
                                     )
-                            )
+                            }
 
                             VStack(
                                 alignment: .leading,
                                 spacing: 3
                             ) {
                                 Text(
-                                    original
-                                        .embeddedExercise
-                                        .displayName
+                                    catalogEntry.map {
+                                        exerciseLibrary.localizedExerciseName($0)
+                                    } ?? original.embeddedExercise.displayName
                                 )
                                 .font(
                                     .headline
@@ -10081,6 +10076,35 @@ struct PlannedExerciseEditorView: View {
                     .padding(.vertical, 5)
                 }
                 .listRowBackground(ATHLTHTheme.card)
+
+                if let entry = catalogEntry,
+                   let summary = exerciseLibrary.localizedExerciseSummary(entry),
+                   !summary.isEmpty {
+                    Section(ATHLTHLocalization.choose(
+                        english: "About the exercise", norwegian: "Om øvelsen"
+                    )) {
+                        Text(summary)
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.vertical, 5)
+                    }
+                    .listRowBackground(ATHLTHTheme.card)
+                }
+
+                if !original.embeddedExercise.primaryMuscles.isEmpty ||
+                   !original.embeddedExercise.secondaryMuscles.isEmpty {
+                    Section(ATHLTHLocalization.choose(
+                        english: "Muscles used", norwegian: "Muskler i bruk"
+                    )) {
+                        ExerciseMuscleOverview(
+                            primaryMuscles: original.embeddedExercise.primaryMuscles,
+                            secondaryMuscles: original.embeddedExercise.secondaryMuscles
+                        )
+                        .padding(.vertical, 6)
+                    }
+                    .listRowBackground(ATHLTHTheme.card)
+                }
 
                 Section(
                     ATHLTHLocalization.choose(
@@ -10525,25 +10549,21 @@ struct PlannedExerciseEditorView: View {
                     )
                 }
 
-                if !original.embeddedExercise.instructions.isEmpty ||
-                    original.embeddedExercise.videoURL != nil {
+                if !exerciseInstructions.isEmpty || exerciseVideoURL != nil {
                     Section(
                         ATHLTHLocalization.choose(
                             english: "Technique",
                             norwegian: "Teknikk"
                         )
                     ) {
-                        if !original.embeddedExercise.instructions.isEmpty {
+                        if !exerciseInstructions.isEmpty {
                             VStack(
                                 alignment: .leading,
                                 spacing: 9
                             ) {
                                 ForEach(
                                     Array(
-                                        original
-                                            .embeddedExercise
-                                            .instructions
-                                            .prefix(4)
+                                        exerciseInstructions.prefix(4)
                                             .enumerated()
                                     ),
                                     id: \.offset
@@ -10578,9 +10598,7 @@ struct PlannedExerciseEditorView: View {
                         }
 
                         if let videoURL =
-                                original
-                                    .embeddedExercise
-                                    .videoURL {
+                                exerciseVideoURL {
                             Link(
                                 destination: videoURL
                             ) {
