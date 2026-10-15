@@ -112,6 +112,89 @@ final class ATHLTHUnifiedWorkoutTests: XCTestCase {
         XCTAssertTrue(workout.exercises.isEmpty)
     }
 
+    func testWalkingBlocksKeepActivityRouteAndExactSeconds() throws {
+        let groupID = UUID()
+        var walk = WorkoutTemplateBlock(
+            sequence: 1, kind: .run, title: "Gåintervall",
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 525,
+            targetWeightKilograms: nil, loadNote: nil, notes: nil
+        )
+        walk.cardioActivity = .walking
+        walk.isIndoor = false
+        walk.groupID = groupID
+        walk.groupKind = .intervals
+        walk.groupRounds = 4
+
+        var rest = WorkoutTemplateBlock(
+            sequence: 2, kind: .rest, title: "Pause",
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 45,
+            targetWeightKilograms: nil, loadNote: nil, notes: nil
+        )
+        rest.groupID = groupID
+        rest.groupKind = .intervals
+        rest.groupRounds = 4
+
+        let route = UUID()
+        var workout = makeWorkout(kind: .walking)
+        ATHLTHUnifiedWorkout.apply(
+            blocks: [walk, rest], title: "Gåintervaller",
+            routeID: route, estimatedMinutes: 38, to: &workout
+        )
+        XCTAssertEqual(workout.kind, .walking)
+        XCTAssertEqual(workout.routeID, route)
+
+        let restored = try JSONDecoder().decode(
+            PlannedSession.self, from: JSONEncoder().encode(workout)
+        )
+        XCTAssertEqual(restored.workoutBlocks?.first?.cardioActivity, .walking)
+        XCTAssertEqual(restored.workoutBlocks?.first?.durationSeconds, 525)
+        let timeline = restored.resolvedWorkoutBlocks.expandedForExecution()
+        XCTAssertEqual(timeline.filter { $0.kind == .run }.count, 4)
+        XCTAssertEqual(timeline.filter { $0.kind == .rest }.count, 3)
+        XCTAssertTrue(timeline.filter { $0.kind == .run }.allSatisfy {
+            $0.cardioActivity == .walking && $0.durationSeconds == 525
+        })
+    }
+
+    func testIndoorWalkDoesNotPersistGPSRoute() {
+        var block = WorkoutTemplateBlock(
+            sequence: 1, kind: .run, title: "Walk indoors",
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 120,
+            targetWeightKilograms: nil, loadNote: nil, notes: nil
+        )
+        block.cardioActivity = .walking
+        block.isIndoor = true
+        var workout = makeWorkout(kind: .walking)
+        ATHLTHUnifiedWorkout.apply(
+            blocks: [block], title: "Indoor walk", routeID: UUID(),
+            estimatedMinutes: 2, to: &workout
+        )
+        XCTAssertNil(workout.routeID)
+        XCTAssertEqual(workout.kind, .walking)
+    }
+
+    func testRunAndWalkTogetherIsHybrid() {
+        var run = WorkoutTemplateBlock(
+            sequence: 1, kind: .run, title: "Run",
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 240,
+            targetWeightKilograms: nil, loadNote: nil, notes: nil
+        )
+        run.cardioActivity = .running
+        var walk = run
+        walk.cardioActivity = .walking
+        var workout = makeWorkout(kind: .running)
+        ATHLTHUnifiedWorkout.apply(
+            blocks: [run, walk], title: "Mixed", routeID: nil,
+            estimatedMinutes: 8, to: &workout
+        )
+        XCTAssertEqual(workout.kind, .custom)
+        XCTAssertEqual(workout.workoutCategory, "hybrid")
+    }
+
     private func makeWorkout(kind: WorkoutKind) -> PlannedSession {
         PlannedSession(
             id: UUID(), title: "", kind: kind,
