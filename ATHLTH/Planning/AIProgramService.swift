@@ -164,6 +164,47 @@ struct AIProgramDraft: Codable, Hashable {
     }
 }
 
+extension AIProgramDraft {
+    /// An AI proposal must show the same user-authored sessions that will be
+    /// saved. This is only a readable preview projection: structured blocks
+    /// themselves are applied to the TrainingPlan before persistence.
+    func displayingLockedWorkouts(
+        _ locked: [Int: ATHLTHPlanStructuredWorkoutBlueprint]
+    ) -> AIProgramDraft {
+        guard !locked.isEmpty else { return self }
+        let updated = weeks.map { week -> AIProgramDraftWeek in
+            let days = week.days.map { day -> AIProgramDraftDay in
+                guard let workout = locked[day.dayIndex], workout.isValid else {
+                    return day
+                }
+                let planned = AIProgramDraftSession(
+                    title: workout.title,
+                    kind: workout.kind.rawValue,
+                    durationMinutes: workout.durationMinutes,
+                    targetDistanceKilometers: nil,
+                    targetPaceSecondsPerKilometer: nil,
+                    notes: ATHLTHLocalization.choose(
+                        english: "Detailed ATHLTH Studio workout is kept when saving.",
+                        norwegian: "Detaljert ATHLTH Studio-økt beholdes ved lagring."
+                    ),
+                    exercises: []
+                )
+                return AIProgramDraftDay(
+                    dayIndex: day.dayIndex,
+                    title: day.title,
+                    sessions: [planned]
+                )
+            }
+            return AIProgramDraftWeek(
+                weekNumber: week.weekNumber,
+                title: week.title,
+                days: days
+            )
+        }
+        return AIProgramDraft(title: title, summary: summary, weeks: updated)
+    }
+}
+
 struct AIProgramDraftWeek: Codable, Hashable {
     let weekNumber: Int
     let title: String
