@@ -92,7 +92,7 @@ struct MessageInboxView: View {
                         )
                 }
 
-                if !recentPeople.isEmpty {
+                if selectedFilter == .all && !recentPeople.isEmpty {
                     recentPeopleStrip
                 }
 
