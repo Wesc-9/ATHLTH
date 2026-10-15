@@ -86,6 +86,8 @@ struct ATHLTHPlanWeekDayEdit: Codable, Hashable {
     var title: String?
     var durationMinutes: Int?
     var detailedWorkout: ATHLTHPlanStructuredWorkoutBlueprint?
+    var isCustomTitle = false
+    var removeTemplateDetail = false
 
     func applying(to original: PlannedSession?) -> PlannedSession {
         var result = original ?? PlannedSession(
@@ -98,6 +100,13 @@ struct ATHLTHPlanWeekDayEdit: Codable, Hashable {
         if let detailedWorkout, detailedWorkout.isValid {
             result = detailedWorkout.applying(to: result)
         } else {
+            if removeTemplateDetail {
+                result.workoutBlocks = nil
+                result.workoutTemplateID = nil
+                result.runningWorkout = nil
+                result.runningWorkouts = nil
+                result.workoutCategory = nil
+            }
             if let kind { result.kind = kind }
             if let title, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 result.title = title
