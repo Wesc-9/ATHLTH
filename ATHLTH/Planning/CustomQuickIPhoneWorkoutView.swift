@@ -224,8 +224,8 @@ struct CustomQuickIPhoneWorkoutView: View {
             )
             .tint(accent)
             Stepper(
-                tr("Duration: \\(manualMinutes) min",
-                   "Varighet: \\(manualMinutes) min"),
+                tr("Duration: \(manualMinutes) min",
+                   "Varighet: \(manualMinutes) min"),
                 value: $manualMinutes,
                 in: 1...720
             )
@@ -267,7 +267,7 @@ struct CustomQuickIPhoneWorkoutView: View {
                 Picker("", selection: $effort) {
                     Text(tr("Not specified", "Ikke oppgitt")).tag(0)
                     ForEach(1...10, id: \.self) { value in
-                        Text("\\(value) / 10").tag(value)
+                        Text("\(value) / 10").tag(value)
                     }
                 }
                 .tint(accent)
@@ -400,18 +400,18 @@ struct CustomQuickIPhoneWorkoutView: View {
             let offset = time % cycle
             let isWorking = offset < work
             return tr(
-                "Round \\(round)/\\(configuration.rounds) · \\(isWorking ? "Work" : "Rest")",
-                "Drag \\(round)/\\(configuration.rounds) · \\(isWorking ? "Jobb" : "Pause")"
+                "Round \(round)/\(configuration.rounds) · \(isWorking ? "Work" : "Rest")",
+                "Drag \(round)/\(configuration.rounds) · \(isWorking ? "Jobb" : "Pause")"
             )
         case .emom:
             return tr(
-                "Minute \\(time / 60 + 1) · EMOM",
-                "Minutt \\(time / 60 + 1) · EMOM"
+                "Minute \(time / 60 + 1) · EMOM",
+                "Minutt \(time / 60 + 1) · EMOM"
             )
         case .amrap, .forTime:
             let remaining = max(0, configuration.durationMinutes * 60 - time)
-            return tr("Remaining \\(clockText(seconds: Double(remaining)))",
-                      "Gjenstår \\(clockText(seconds: Double(remaining)))")
+            return tr("Remaining \(clockText(seconds: Double(remaining)))",
+                      "Gjenstår \(clockText(seconds: Double(remaining)))")
         case .open:
             return nil
         }
