@@ -3932,41 +3932,6 @@ struct ATHLTHHomeView: View {
         ATHLTHTrainingPlanSchedule.sessions(in: plan)
     }
 
-    private func structuredWorkoutFocusSummary(
-        _ workout: PlannedSession
-    ) -> String? {
-        let blocks = workout.resolvedWorkoutBlocks
-        guard !blocks.isEmpty else { return nil }
-
-        let exerciseNames = Set(
-            blocks.filter { $0.kind == .exercise }
-                .map { $0.exerciseSlug ?? $0.title }
-        )
-        let runParts = blocks.filter { $0.kind == .run }.count
-        let pauses = blocks.filter { $0.kind == .rest }.count
-
-        var parts: [String] = []
-        if !exerciseNames.isEmpty {
-            parts.append(ATHLTHLocalization.choose(
-                english: "\(exerciseNames.count) exercises",
-                norwegian: "\(exerciseNames.count) øvelser"
-            ))
-        }
-        if runParts > 0 {
-            parts.append(ATHLTHLocalization.choose(
-                english: "\(runParts) running sections",
-                norwegian: "\(runParts) løpedeler"
-            ))
-        }
-        if pauses > 0 {
-            parts.append(ATHLTHLocalization.choose(
-                english: "\(pauses) pauses",
-                norwegian: "\(pauses) pauser"
-            ))
-        }
-        return parts.isEmpty ? workout.kind.title : parts.joined(separator: " · ")
-    }
-
     private func homeSessionSummary(
         _ workout: PlannedSession
     ) -> String {
@@ -3987,7 +3952,7 @@ struct ATHLTHHomeView: View {
             )
         }
 
-        if let structuredSummary = structuredWorkoutFocusSummary(workout) {
+        if let structuredSummary = ATHLTHWorkoutContentSummary.text(for: workout) {
             parts.append(structuredSummary)
         } else if !workout.exercises.isEmpty {
             parts.append(ATHLTHLocalization.choose(
@@ -7207,7 +7172,7 @@ struct ATHLTHTrainView: View {
     private func todayWorkoutFocusSummary(
         _ workout: PlannedSession
     ) -> String {
-        if let structuredSummary = structuredWorkoutFocusSummary(workout) {
+        if let structuredSummary = ATHLTHWorkoutContentSummary.text(for: workout) {
             return structuredSummary
         }
         if !workout.exercises.isEmpty {
