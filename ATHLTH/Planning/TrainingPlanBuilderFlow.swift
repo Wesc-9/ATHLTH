@@ -4932,6 +4932,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         durationMinutes: resolvedWorkoutMinutes(for: day)
                     ))
                 }) : [:]
+            ,builderProfile: currentPlanBuilderProfile,
+            planVisibility: visibility,
+            planSummary: planSummary
         )
     }
 
@@ -4953,18 +4956,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
-    private func createPlan(
-        seedSuggestedWeek: Bool
-    ) {
-        guard canCreatePlan else {
-            return
-        }
-
-        if mode == .basic {
-            weekCount = 8
-            updateSimplePlanChoices()
-        }
-
+    /// One authoritative set of plan preferences for both standard saving
+    /// and AI-assisted advanced plan creation.
+    private var currentPlanBuilderProfile: TrainingPlanBuilderProfile {
         let cleanLimitations =
             injuriesOrLimitations
                 .trimmingCharacters(
@@ -4976,7 +4970,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     in: .whitespacesAndNewlines
                 )
 
-        let profile =
+        return
             TrainingPlanBuilderProfile(
                 mode: mode,
                 primaryFocus: focus,
@@ -5027,6 +5021,22 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             }
                     ) : nil
             )
+
+    }
+
+    private func createPlan(
+        seedSuggestedWeek: Bool
+    ) {
+        guard canCreatePlan else {
+            return
+        }
+
+        if mode == .basic {
+            weekCount = 8
+            updateSimplePlanChoices()
+        }
+
+        let profile = currentPlanBuilderProfile
 
         let created =
             session
