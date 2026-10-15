@@ -98,20 +98,40 @@ struct MessageInboxView: View {
 
                 inboxFilterBar
 
+                if selectedFilter == .all && requestCount > 0 {
+                    inboxSectionLabel(
+                        ATHLTHLocalization.choose(
+                            english: "NEEDS YOUR RESPONSE",
+                            norwegian: "KREVER SVAR"
+                        ),
+                        count: requestCount
+                    )
+                    LazyVStack(spacing: 10) {
+                        ForEach(requestPersonItems) { item in
+                            inboxPersonRow(item)
+                        }
+                        ATHLTHCommunityClubInboxSection()
+                    }
+                }
+
+                if selectedFilter == .groups {
+                    ATHLTHCommunityClubInboxSection()
+                }
+
+                if selectedFilter == .all || selectedFilter == .groups {
+                    ATHLTHClubChatInboxSection(searchText: searchText)
+                }
+
                 ATHLTHArenaInboxSection(
                     filterKey: selectedFilter.rawValue,
                     onVisibleCountChanged: { arenaInboxVisibleCount = $0 }
                 )
 
-                if selectedFilter == .all || selectedFilter == .groups {
-                    ATHLTHCommunityClubInboxSection()
-                }
-
                 if let error = displayableError {
                     inboxErrorCard(error)
                 }
 
-                if !displayedPersonItems.isEmpty ||
+                if !regularPersonItems.isEmpty ||
                     shouldShowCoachConversation {
                     inboxSectionLabel(
                         normalizedSearch.isEmpty
@@ -122,7 +142,7 @@ struct MessageInboxView: View {
                                 norwegian: "RESULTATER"
                             ),
                         count:
-                            displayedPersonItems.count +
+                            regularPersonItems.count +
                             (
                                 shouldShowCoachConversation
                                     ? 1
@@ -136,7 +156,66 @@ struct MessageInboxView: View {
                             coachInboxLink
                         }
 
-                        ForEach(displayedPersonItems) { item in
+                        ForEach(regularPersonItems) { item in
+                            inboxPersonRow(item)
+                        }
+
+                        if shouldShowCoachConversation &&
+                            !coachPinned {
+                            coachInboxLink
+                        }
+                    }
+                }
+
+                if shouldShowEmptyState {
+                    premiumEmptyState
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 0)
+            .padding(.bottom, 34)
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
+        }
+        .scrollIndicators(.hidden)
+        .scrollDismissesKeyboard(.interactively)
+        .background(
+            ATHLTHPremiumCanvas(
+                accent: ATHLTHTheme.accent.opacity(0.10)
+            )
+        )
+        .refreshable {
+            async let socialRefresh: Void = social.refresh(
+                challengeStore: challenges
+            )
+            async let messageRefresh: Void = messaging.refresh(force: true)
+            async let clubRefresh: Void = groups.refresh(force: true)
+            _ = await (socialRefresh, messageRefresh, clubRefresh)
+        }
+        .task {
+            refreshCoachInboxState()
+            await social.refresh(
+                challengeStore: challenges
+            )
+            await messaging.refresh()
+            await groups.refresh()
+            messaging.loadPinnedConversations()
+            await realtime.refreshOnlineUsers()
+        }
+        .onAppear {
+            refreshCoachInboxState()
+        }
+        .sheet(
+            item: $selectedWorkoutInvite
+        ) { invite in
+            WorkoutInviteLaunchSheet(
+                invite: invite
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func inboxPersonRow(_ item: MessagePersonInboxItem) -> some View {
                             Group {
                                 if let workoutInvite =
                                         item.pendingWorkoutInvites.first {
@@ -246,60 +325,6 @@ struct MessageInboxView: View {
                                     }
                                 }
                             }
-                        }
-
-                        if shouldShowCoachConversation &&
-                            !coachPinned {
-                            coachInboxLink
-                        }
-                    }
-                }
-
-                if shouldShowEmptyState {
-                    premiumEmptyState
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 0)
-            .padding(.bottom, 34)
-            .frame(maxWidth: 760)
-            .frame(maxWidth: .infinity)
-        }
-        .scrollIndicators(.hidden)
-        .scrollDismissesKeyboard(.interactively)
-        .background(
-            ATHLTHPremiumCanvas(
-                accent: ATHLTHTheme.accent.opacity(0.10)
-            )
-        )
-        .refreshable {
-            async let socialRefresh: Void = social.refresh(
-                challengeStore: challenges
-            )
-            async let messageRefresh: Void = messaging.refresh(force: true)
-            async let clubRefresh: Void = groups.refresh(force: true)
-            _ = await (socialRefresh, messageRefresh, clubRefresh)
-        }
-        .task {
-            refreshCoachInboxState()
-            await social.refresh(
-                challengeStore: challenges
-            )
-            await messaging.refresh()
-            await groups.refresh()
-            messaging.loadPinnedConversations()
-            await realtime.refreshOnlineUsers()
-        }
-        .onAppear {
-            refreshCoachInboxState()
-        }
-        .sheet(
-            item: $selectedWorkoutInvite
-        ) { invite in
-            WorkoutInviteLaunchSheet(
-                invite: invite
-            )
-        }
     }
 
     private var messagesHeader: some View {
@@ -1221,12 +1246,43 @@ struct MessageInboxView: View {
         }
     }
 
+    private var requestPersonItems: [MessagePersonInboxItem] {
+        guard selectedFilter == .all else { return [] }
+        return displayedPersonItems.filter { $0.needsResponse }
+    }
+
+    private var regularPersonItems: [MessagePersonInboxItem] {
+        guard selectedFilter == .all else { return displayedPersonItems }
+        return displayedPersonItems.filter { !$0.needsResponse }
+    }
+
+    private var requestCount: Int {
+        requestPersonItems.count + groups.ownInvites.filter {
+            $0.status == "pending"
+        }.count
+    }
+
+    private var hasVisibleClubChats: Bool {
+        guard selectedFilter == .all || selectedFilter == .groups else {
+            return false
+        }
+        let query = normalizedSearch
+        return groups.joinedGroups.contains { club in
+            query.isEmpty ||
+            club.name.localizedCaseInsensitiveContains(query) ||
+            groups.messages(in: club.id).contains {
+                $0.body.localizedCaseInsensitiveContains(query)
+            }
+        }
+    }
+
     private var shouldShowEmptyState: Bool {
         let hasClubInvites = (selectedFilter == .all || selectedFilter == .groups)
             && groups.ownInvites.contains { $0.status == "pending" }
         return displayedPersonItems.isEmpty &&
             arenaInboxVisibleCount == 0 &&
             !hasClubInvites &&
+            !hasVisibleClubChats &&
             !shouldShowCoachConversation
     }
 
