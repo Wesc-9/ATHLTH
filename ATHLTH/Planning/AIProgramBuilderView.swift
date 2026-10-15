@@ -38,6 +38,23 @@ struct AIProgramBuilderSeed: Hashable {
     /// to every week after AI generation. Basic always leaves this empty.
     var structuredWorkoutsByDay: [Int: ATHLTHPlanStructuredWorkoutBlueprint] = [:]
     var preferredWorkoutsByDay: [Int: ATHLTHPlanDayPreference] = [:]
+    /// Retain the original wizard mode, focus and per-day choices. Without
+    /// this metadata, AI-generated advanced plans can reopen as Basic.
+    var builderProfile: TrainingPlanBuilderProfile? = nil
+    var planVisibility: ProfileVisibility? = nil
+    var planSummary: String? = nil
+
+    func applyWizardMetadata(to plan: inout TrainingPlan) {
+        guard let builderProfile else { return }
+        plan.builderProfile = builderProfile
+        if let planVisibility {
+            plan.visibility = planVisibility
+        }
+        if let planSummary,
+           !planSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            plan.summary = planSummary
+        }
+    }
 }
 
 private struct CoachIntakePreferences: Codable, Equatable {
@@ -1460,8 +1477,12 @@ struct AIProgramBuilderView: View {
         }
 
         if mode == .generate, let seed {
+            // Keep all setup details from the first wizard, including
+            // Advanced mode, per-day commitments and selected visibility.
+            seed.applyWizardMetadata(to: &generated)
             ATHLTHPlanStructuredWorkoutBlueprint.apply(
-                seed.structuredWorkoutsByDay,
+                seed.builderProfile?.mode == .advanced
+                    ? seed.structuredWorkoutsByDay : [:],
                 to: &generated.weeks
             )
         }
