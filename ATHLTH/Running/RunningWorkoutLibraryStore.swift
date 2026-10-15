@@ -353,11 +353,11 @@ final class RunningWorkoutLibraryStore: ObservableObject {
             5,
             title: "6 × 400 m",
             type: .intervals,
-            summary: "Short, fast repetitions with relaxed jogging recovery.",
+            summary: "12 min oppvarming · 6 × 400 m raskt / 90 sek aktiv pause · 10 min nedjogging.",
             blocks: [
-                timeBlock(.warmup, "Warm-up", minutes: 12, intensity: .easy),
-                distanceBlock(.work, "400 m repeats", meters: 400, intensity: rpe(8), repetitions: 6, recoverySeconds: 90),
-                timeBlock(.cooldown, "Cool-down", minutes: 10, intensity: .easy)
+                timeBlock(.warmup, "Oppvarming", minutes: 12, intensity: .easy),
+                distanceBlock(.work, "400 m intervall", meters: 400, intensity: rpe(8), repetitions: 6, recoverySeconds: 90),
+                timeBlock(.cooldown, "Nedjogging", minutes: 10, intensity: .easy)
             ]
         ),
         template(
@@ -558,13 +558,13 @@ final class RunningWorkoutLibraryStore: ObservableObject {
         ),
         template(
             26,
-            title: "Threshold 5 × 1 km",
+            title: "5 × 1 km terskel",
             type: .threshold,
-            summary: "Five kilometre repeats at a strong but repeatable effort.",
+            summary: "15 min oppvarming · 5 × 1 km kontrollert hardt / 2 min rolig jogg · 10 min nedjogging.",
             blocks: [
-                timeBlock(.warmup, "Warm-up", minutes: 15, intensity: .easy),
-                distanceBlock(.work, "Threshold reps", meters: 1_000, intensity: rpe(8), repetitions: 5, recoverySeconds: 120),
-                timeBlock(.cooldown, "Cool-down", minutes: 10, intensity: .easy)
+                timeBlock(.warmup, "Oppvarming", minutes: 15, intensity: .easy),
+                distanceBlock(.work, "1 km terskeldrag", meters: 1_000, intensity: rpe(7.5), repetitions: 5, recoverySeconds: 120),
+                timeBlock(.cooldown, "Nedjogging", minutes: 10, intensity: .easy)
             ]
         ),
         template(
