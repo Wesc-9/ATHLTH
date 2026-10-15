@@ -659,7 +659,9 @@ struct MessageInboxView: View {
 
     private var inboxFilterBar: some View {
         HStack(spacing: 5) {
-            ForEach(MessageInboxFilter.mainFilters) { filter in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 5) {
+                    ForEach(MessageInboxFilter.mainFilters) { filter in
                 Button {
                     withAnimation(.easeInOut(duration: 0.18)) {
                         selectedFilter = filter
@@ -695,9 +697,9 @@ struct MessageInboxView: View {
                 .accessibilityAddTraits(
                     selectedFilter == filter ? .isSelected : []
                 )
+                    }
+                }
             }
-
-            Spacer(minLength: 0)
 
             Menu {
                 Button {
@@ -948,40 +950,89 @@ struct MessageInboxView: View {
         .padding(.top, 2)
     }
 
+    private var inboxEmptyTitle: String {
+        guard normalizedSearch.isEmpty else {
+            return ATHLTHLocalization.choose(
+                english: "No conversations found",
+                norwegian: "Ingen samtaler funnet"
+            )
+        }
+        switch selectedFilter {
+        case .all:
+            return ATHLTHLocalization.choose(
+                english: "No messages yet", norwegian: "Ingen meldinger ennå"
+            )
+        case .unread:
+            return ATHLTHLocalization.choose(
+                english: "You're all caught up", norwegian: "Du er ajour"
+            )
+        case .direct:
+            return ATHLTHLocalization.choose(
+                english: "No direct messages", norwegian: "Ingen direktemeldinger"
+            )
+        case .groups:
+            return ATHLTHLocalization.choose(
+                english: "No group conversations", norwegian: "Ingen gruppesamtaler"
+            )
+        case .archive:
+            return ATHLTHLocalization.choose(
+                english: "Your archive is empty", norwegian: "Arkivet er tomt"
+            )
+        }
+    }
+
+    private var inboxEmptyDescription: String {
+        guard normalizedSearch.isEmpty else {
+            return ATHLTHLocalization.choose(
+                english: "Try another name, username or message keyword.",
+                norwegian: "Prøv et annet navn, brukernavn eller søkeord."
+            )
+        }
+        switch selectedFilter {
+        case .all:
+            return ATHLTHLocalization.choose(
+                english: "Your conversations and requests appear here.",
+                norwegian: "Samtaler og forespørsler vises her."
+            )
+        case .unread:
+            return ATHLTHLocalization.choose(
+                english: "There are no unread conversations.",
+                norwegian: "Du har ingen uleste samtaler."
+            )
+        case .direct:
+            return ATHLTHLocalization.choose(
+                english: "Start a conversation with someone you follow.",
+                norwegian: "Start en samtale med noen du følger."
+            )
+        case .groups:
+            return ATHLTHLocalization.choose(
+                english: "Your Arena and group conversations appear here.",
+                norwegian: "Arena- og gruppesamtaler vises her."
+            )
+        case .archive:
+            return ATHLTHLocalization.choose(
+                english: "Archived conversations will appear here.",
+                norwegian: "Arkiverte samtaler vises her."
+            )
+        }
+    }
+
     private var premiumEmptyState: some View {
         VStack(spacing: 14) {
-            Image(
-                systemName:
-                    normalizedSearch.isEmpty
-                        ? "bubble.left.and.bubble.right"
-                        : "magnifyingglass"
-            )
-            .font(.system(size: 28, weight: .medium))
-            .foregroundStyle(ATHLTHTheme.accentDeep)
-            .frame(width: 66, height: 66)
-            .background(
-                ATHLTHTheme.vitalitySoft,
-                in: Circle()
-            )
+            Image(systemName: normalizedSearch.isEmpty
+                  ? selectedFilter.icon : "magnifyingglass")
+                .font(.system(size: 28, weight: .medium))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(width: 66, height: 66)
+                .background(ATHLTHTheme.vitalitySoft, in: Circle())
 
             VStack(spacing: 5) {
-                Text(
-                    normalizedSearch.isEmpty
-                        ? "No messages yet"
-                        : "No conversations found"
-                )
-                .font(.title3.weight(.semibold))
-
-                Text(
-                    normalizedSearch.isEmpty
-                        ? "Your conversations and message requests will appear here."
-                        : "Try another name, username or message keyword."
-                )
-                .font(.subheadline)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-                .multilineTextAlignment(.center)
+                Text(inboxEmptyTitle)
+                    .font(.title3.weight(.semibold))
+                Text(inboxEmptyDescription)
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .multilineTextAlignment(.center)
             }
         }
         .frame(maxWidth: .infinity)
@@ -989,10 +1040,7 @@ struct MessageInboxView: View {
         .padding(.horizontal, 24)
         .background(
             Color.white.opacity(0.72),
-            in: RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
+            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
         )
     }
 
@@ -1174,9 +1222,12 @@ struct MessageInboxView: View {
     }
 
     private var shouldShowEmptyState: Bool {
-        displayedPersonItems.isEmpty &&
-        arenaInboxVisibleCount == 0 &&
-        !shouldShowCoachConversation
+        let hasClubInvites = (selectedFilter == .all || selectedFilter == .groups)
+            && groups.ownInvites.contains { $0.status == "pending" }
+        return displayedPersonItems.isEmpty &&
+            arenaInboxVisibleCount == 0 &&
+            !hasClubInvites &&
+            !shouldShowCoachConversation
     }
 
     private var shouldShowCoachConversation:
