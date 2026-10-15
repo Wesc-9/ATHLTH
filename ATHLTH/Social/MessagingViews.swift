@@ -18,55 +18,40 @@ struct MessageInboxDestinationView: View {
     }
 }
 
-private enum MessageInboxFilter:
-    String,
-    CaseIterable,
-    Identifiable
-{
-    case priority
+private enum MessageInboxFilter: String, CaseIterable, Identifiable {
+    case all
+    case unread
     case direct
-    case voice
     case groups
     case archive
+
+    static let mainFilters: [MessageInboxFilter] = [
+        .all, .unread, .direct, .groups
+    ]
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .priority:
-            return ATHLTHLocalization.choose(
-                english: "Priority",
-                norwegian: "Prioritet"
-            )
+        case .all:
+            return ATHLTHLocalization.choose(english: "All", norwegian: "Alle")
+        case .unread:
+            return ATHLTHLocalization.choose(english: "Unread", norwegian: "Uleste")
         case .direct:
-            return ATHLTHLocalization.choose(
-                english: "Direct",
-                norwegian: "Direkte"
-            )
-        case .voice:
-            return ATHLTHLocalization.choose(
-                english: "Voice Notes",
-                norwegian: "Lydnotater"
-            )
+            return ATHLTHLocalization.choose(english: "Direct", norwegian: "Direkte")
         case .groups:
-            return ATHLTHLocalization.choose(
-                english: "Groups",
-                norwegian: "Grupper"
-            )
+            return ATHLTHLocalization.choose(english: "Groups", norwegian: "Grupper")
         case .archive:
-            return ATHLTHLocalization.choose(
-                english: "Archive",
-                norwegian: "Arkiv"
-            )
+            return ATHLTHLocalization.choose(english: "Archive", norwegian: "Arkiv")
         }
     }
 
     var icon: String {
         switch self {
-        case .priority: return "star.fill"
+        case .all: return "tray.full"
+        case .unread: return "envelope.badge"
         case .direct: return "bubble.left"
-        case .voice: return "waveform"
-        case .groups: return "person.3.fill"
+        case .groups: return "person.3"
         case .archive: return "archivebox"
         }
     }
@@ -87,7 +72,7 @@ struct MessageInboxView: View {
     @State private var searchText = ""
     @State private var showingSearch = false
     @State private var selectedFilter:
-        MessageInboxFilter = .priority
+        MessageInboxFilter = .all
     @State private var selectedWorkoutInvite:
         SocialWorkoutInviteDisplay?
     @State private var coachPinned = true
@@ -118,7 +103,7 @@ struct MessageInboxView: View {
                     onVisibleCountChanged: { arenaInboxVisibleCount = $0 }
                 )
 
-                if selectedFilter == .priority || selectedFilter == .groups {
+                if selectedFilter == .all || selectedFilter == .groups {
                     ATHLTHCommunityClubInboxSection()
                 }
 
@@ -672,133 +657,83 @@ struct MessageInboxView: View {
         }
     }
 
-    private var inboxFilterBar:
-        some View {
-        ScrollView(
-            .horizontal,
-            showsIndicators: false
-        ) {
-            HStack(spacing: 8) {
-                ForEach(
-                    MessageInboxFilter
-                        .allCases
-                ) { filter in
-                    Button {
-                        withAnimation(
-                            .easeInOut(
-                                duration: 0.18
-                            )
-                        ) {
-                            selectedFilter =
-                                filter
-                        }
-                    } label: {
-                        HStack(spacing: 7) {
-                            Image(
-                                systemName:
-                                    filter.icon
-                            )
-
-                            Text(filter.title)
-
-                            if filter ==
-                                .priority,
-                               priorityCount > 0 {
-                                Text(
-                                    "\(priorityCount)"
-                                )
-                                .font(
-                                    .system(
-                                        size: 10,
-                                        weight:
-                                            .bold
-                                    )
-                                )
-                                .foregroundStyle(
-                                    .white
-                                )
-                                .frame(
-                                    minWidth: 20,
-                                    minHeight: 20
-                                )
-                                .background(
-                                    Color.orange,
-                                    in: Capsule()
-                                )
-                            }
-                        }
-                        .font(
-                            .system(
-                                size: 12,
-                                weight: .semibold
-                            )
-                        )
-                        .foregroundStyle(
-                            selectedFilter ==
-                                filter
-                                ? (
-                                    filter ==
-                                        .priority
-                                        ? Color.orange
-                                        : ATHLTHTheme
-                                            .accentDeep
-                                )
-                                : ATHLTHTheme
-                                    .mutedText
-                        )
-                        .padding(
-                            .horizontal,
-                            12
-                        )
-                        .frame(height: 40)
-                        .background(
-                            selectedFilter ==
-                                filter
-                                ? (
-                                    filter ==
-                                        .priority
-                                        ? Color.orange
-                                            .opacity(
-                                                0.10
-                                            )
-                                        : ATHLTHTheme
-                                            .accentSoft
-                                )
-                                : Color.white
-                                    .opacity(
-                                        0.74
-                                    ),
-                            in: Capsule()
-                        )
-                        .overlay {
-                            Capsule()
-                                .stroke(
-                                    Color.black
-                                        .opacity(
-                                            0.035
-                                        ),
-                                    lineWidth:
-                                        0.7
-                                )
-                        }
+    private var inboxFilterBar: some View {
+        HStack(spacing: 5) {
+            ForEach(MessageInboxFilter.mainFilters) { filter in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        selectedFilter = filter
                     }
-                    .buttonStyle(.plain)
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: filter.icon)
+                            .font(.system(size: 12, weight: .medium))
+                        Text(filter.title)
+                            .lineLimit(1)
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(
+                        selectedFilter == filter
+                            ? ATHLTHTheme.accentDeep
+                            : ATHLTHTheme.mutedText
+                    )
+                    .padding(.horizontal, 9)
+                    .frame(height: 40)
+                    .background(
+                        selectedFilter == filter
+                            ? ATHLTHTheme.accentSoft
+                            : Color.white.opacity(0.74),
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(Color.black.opacity(0.035),
+                                          lineWidth: 0.7)
+                    }
                 }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(
+                    selectedFilter == filter ? .isSelected : []
+                )
             }
-            .padding(
-                .horizontal,
-                1
-            )
-        }
-    }
 
-    private var priorityCount: Int {
-        personInboxItems.filter {
-            $0.isPinned ||
-            $0.needsResponse ||
-            $0.unreadCount > 0
+            Spacer(minLength: 0)
+
+            Menu {
+                Button {
+                    selectedFilter = .archive
+                } label: {
+                    Label(MessageInboxFilter.archive.title,
+                          systemImage: "archivebox")
+                }
+                if selectedFilter == .archive {
+                    Button {
+                        selectedFilter = .all
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Back to all messages",
+                                norwegian: "Tilbake til alle meldinger"
+                            ),
+                            systemImage: "tray.full"
+                        )
+                    }
+                }
+            } label: {
+                Image(systemName:
+                        selectedFilter == .archive ? "archivebox" : "ellipsis")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .frame(width: 37, height: 40)
+                    .background(
+                        selectedFilter == .archive
+                            ? ATHLTHTheme.accentSoft
+                            : Color.white.opacity(0.74),
+                        in: Capsule()
+                    )
+            }
+            .accessibilityLabel(MessageInboxFilter.archive.title)
         }
-        .count
     }
 
     private func inboxMetric(
@@ -1206,19 +1141,18 @@ struct MessageInboxView: View {
                 switch selectedFilter {
                 case .archive:
                     return archived
-                case .direct:
-                    return !archived &&
-                        item.conversation !=
-                            nil
-                case .voice:
-                    return !archived &&
-                        item.isVoiceNote
-                case .groups:
-                    return !archived &&
-                        item.hasGroupLikeActivity
-                case .priority:
+                case .all:
                     return !archived
+                case .unread:
+                    return !archived && item.unreadCount > 0
+                case .direct:
+                    return !archived && item.conversation != nil
+                case .groups:
+                    // Actual group conversations are presented by Arena and Clubs,
+                    // not inferred from workout/challenge invitations in a DM.
+                    return false
                 }
+
             }
 
         return matching.sorted {
@@ -1226,7 +1160,7 @@ struct MessageInboxView: View {
             rhs in
 
             if selectedFilter ==
-                .priority {
+                .all {
                 if lhs.priorityRank !=
                     rhs.priorityRank {
                     return lhs.priorityRank >
@@ -1247,7 +1181,7 @@ struct MessageInboxView: View {
 
     private var shouldShowCoachConversation:
         Bool {
-        guard selectedFilter == .priority ||
+        guard selectedFilter == .all ||
                 selectedFilter == .direct
         else {
             return false
