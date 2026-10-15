@@ -19,7 +19,7 @@ final class ATHLTHFeaturedIntervalsTests: XCTestCase {
             "4 × 4 intervaller",
             "30/30 – 20 drag",
             "45/15 – 15 drag",
-            "Threshold 5 × 1 km",
+            "5 × 1 km terskel",
             "6 × 400 m",
             "5 × 3 minutter"
         ])
