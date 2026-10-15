@@ -49,6 +49,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var composingAdvancedDay: WeekDayEditorSelection?
     @State private var structuredWorkoutsByDay:
         [Int: ATHLTHPlanStructuredWorkoutBlueprint] = [:]
+    @State private var selectedPlanWeekIndex = 0
+    @State private var weekDayEdits: [Int: ATHLTHPlanWeekDayEdit] = [:]
 
     private struct WeekDayEditorSelection: Identifiable {
         let id: Int
@@ -477,6 +479,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .onChange(of: workoutTitleOverridesByDay) { _, _ in saveResumableDraft() }
         .onChange(of: workoutMinutesByDay) { _, _ in saveResumableDraft() }
         .onChange(of: structuredWorkoutsByDay) { _, _ in saveResumableDraft() }
+        .onChange(of: weekDayEdits) { _, _ in saveResumableDraft() }
+        .onChange(of: weekCount) { _, value in
+            selectedPlanWeekIndex = min(selectedPlanWeekIndex, max(0, value - 1))
+            weekDayEdits = weekDayEdits.filter { $0.key <= value * 7 }
+        }
         .onChange(of: selectedDays) { _, _ in
             structuredWorkoutsByDay = structuredWorkoutsByDay
                 .filter { selectedDays.contains($0.key) }
@@ -3157,6 +3164,121 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
+    private func weekDayKey(_ day: Int, weekIndex: Int? = nil) -> Int {
+        (weekIndex ?? selectedPlanWeekIndex) * 7 + day
+    }
+
+    private func dateForWeekDay(_ day: Int, weekIndex: Int) -> Date {
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: startDate)
+        let startWeekday = (calendar.component(.weekday, from: start) + 5) % 7 + 1
+        let dayOffset = (day - startWeekday + 7) % 7 + weekIndex * 7
+        return calendar.date(byAdding: .day, value: dayOffset, to: start) ?? start
+    }
+
+    private func updateWeekDay(
+        _ day: Int, change: (inout ATHLTHPlanWeekDayEdit) -> Void
+    ) {
+        let key = weekDayKey(day)
+        var edit = weekDayEdits[key] ?? ATHLTHPlanWeekDayEdit()
+        change(&edit)
+        weekDayEdits[key] = edit
+    }
+
+    private func effectiveWorkoutKind(for day: Int) -> WorkoutKind {
+        weekDayEdits[weekDayKey(day)]?.detailedWorkout?.kind ??
+        weekDayEdits[weekDayKey(day)]?.kind ??
+        resolvedWorkoutKind(for: day)
+    }
+
+    private func effectiveWorkoutTitle(for day: Int) -> String {
+        weekDayEdits[weekDayKey(day)]?.detailedWorkout?.title ??
+        weekDayEdits[weekDayKey(day)]?.title ??
+        resolvedWorkoutTitle(for: day)
+    }
+
+    private func effectiveWorkoutMinutes(for day: Int) -> Int {
+        weekDayEdits[weekDayKey(day)]?.detailedWorkout?.durationMinutes ??
+        weekDayEdits[weekDayKey(day)]?.durationMinutes ??
+        resolvedWorkoutMinutes(for: day)
+    }
+
+    private func effectiveDetailedWorkout(for day: Int) -> ATHLTHPlanStructuredWorkoutBlueprint? {
+        weekDayEdits[weekDayKey(day)]?.detailedWorkout ??
+        structuredWorkoutsByDay[day]
+    }
+
+    private var weekSelector: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Button {
+                    selectedPlanWeekIndex = max(0, selectedPlanWeekIndex - 1)
+                } label: { Image(systemName: "chevron.left") }
+                    .disabled(selectedPlanWeekIndex == 0)
+                Spacer()
+                VStack(spacing: 2) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Week", norwegian: "Uke"
+                    ) + " \(selectedPlanWeekIndex + 1) " +
+                    ATHLTHLocalization.choose(english: "of", norwegian: "av") +
+                    " \(weekCount)")
+                        .font(.subheadline.weight(.semibold))
+                    Text(dateForWeekDay(1, weekIndex: selectedPlanWeekIndex)
+                        .formatted(date: .abbreviated, time: .omitted) + " – " +
+                        dateForWeekDay(7, weekIndex: selectedPlanWeekIndex)
+                        .formatted(date: .abbreviated, time: .omitted))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                Spacer()
+                Button {
+                    selectedPlanWeekIndex = min(weekCount - 1, selectedPlanWeekIndex + 1)
+                } label: { Image(systemName: "chevron.right") }
+                    .disabled(selectedPlanWeekIndex >= weekCount - 1)
+            }
+            .buttonStyle(.plain)
+            .padding(12)
+            .background(ATHLTHTheme.accentSoft.opacity(0.6),
+                        in: RoundedRectangle(cornerRadius: 14))
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 7) {
+                    ForEach(1...7, id: \.self) { day in
+                        Button {
+                            if !selectedDays.contains(day) {
+                                selectedDays.insert(day)
+                                sessionsPerWeek = selectedDays.count
+                            }
+                            editingWeekDay = WeekDayEditorSelection(id: day)
+                        } label: {
+                            VStack(spacing: 5) {
+                                Text(shortDayName(day))
+                                    .font(.caption2.weight(.medium))
+                                Text(dateForWeekDay(day, weekIndex: selectedPlanWeekIndex)
+                                    .formatted(.dateTime.day()))
+                                    .font(.subheadline.weight(.semibold))
+                                Circle()
+                                    .fill(selectedDays.contains(day)
+                                          ? ATHLTHTheme.accentDeep : Color.clear)
+                                    .frame(width: 5, height: 5)
+                            }
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .frame(width: 44, height: 56)
+                            .background(.white, in: RoundedRectangle(cornerRadius: 12))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            Text(ATHLTHLocalization.choose(
+                english: "Weeks repeat the template until you customize a date.",
+                norwegian: "Ukene følger grunnmønsteret til du tilpasser en dato."
+            ))
+            .font(.caption2)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+        }
+    }
+
     private var weeklyPreview: some View {
         VStack(spacing: 8) {
             HStack {
@@ -3307,12 +3429,14 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private func weekDayEditSheet(for day: Int) -> some View {
-        let kind = resolvedWorkoutKind(for: day)
+        let kind = effectiveWorkoutKind(for: day)
         return NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     VStack(alignment: .leading, spacing: 5) {
-                        Text(fullDayName(day).uppercased())
+                        Text(fullDayName(day).uppercased() + " · " +
+                             dateForWeekDay(day, weekIndex: selectedPlanWeekIndex)
+                                .formatted(date: .abbreviated, time: .omitted))
                             .font(.caption.weight(.bold))
                             .tracking(1.5)
                             .foregroundStyle(ATHLTHTheme.mutedText)
@@ -3327,10 +3451,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             .font(.subheadline.weight(.bold))
                         Picker(ATHLTHLocalization.choose(english: "Activity", norwegian: "Treningsform"),
                                selection: Binding(
-                                get: { resolvedWorkoutKind(for: day) },
+                                get: { effectiveWorkoutKind(for: day) },
                                 set: { newKind in
-                                    workoutKindOverridesByDay[day] = newKind
-                                    workoutTitleOverridesByDay[day] = nil
+                                    updateWeekDay(day) { edit in
+                                        edit.kind = newKind
+                                        edit.title = nil
+                                    }
                                 }
                                )) {
                             ForEach(selectableWorkoutKinds, id: \.self) { option in
@@ -3352,7 +3478,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 8)], spacing: 8) {
                             ForEach(subtypeTitles(for: kind), id: \.self) { choice in
                                 Button {
-                                    workoutTitleOverridesByDay[day] = choice
+                                    updateWeekDay(day) { edit in edit.title = choice }
                                 } label: {
                                     Text(choice)
                                         .font(.caption.weight(.semibold))
@@ -3371,17 +3497,29 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 .buttonStyle(.plain)
                             }
                         }
-                        TextField(
-                            ATHLTHLocalization.choose(english: "Workout name", norwegian: "Navn på økten"),
-                            text: Binding(
-                                get: { workoutTitleOverridesByDay[day] ?? resolvedWorkoutTitle(for: day) },
-                                set: { workoutTitleOverridesByDay[day] = $0 }
+                        if effectiveWorkoutTitle(for: day) == "Egendefinert" ||
+                            weekDayEdits[weekDayKey(day)]?.title == "Egendefinert" {
+                            TextField(
+                                ATHLTHLocalization.choose(
+                                    english: "Custom workout name", norwegian: "Navn på egen økt"
+                                ),
+                                text: Binding(
+                                    get: {
+                                        let name = weekDayEdits[weekDayKey(day)]?.title ?? ""
+                                        return name == "Egendefinert" ? "" : name
+                                    },
+                                    set: { newName in
+                                        updateWeekDay(day) { edit in
+                                            edit.title = newName.isEmpty ? "Egendefinert" : newName
+                                        }
+                                    }
+                                )
                             )
-                        )
-                        .textInputAutocapitalization(.sentences)
-                        .padding(12)
-                        .background(ATHLTHTheme.accentSoft.opacity(0.7),
-                                    in: RoundedRectangle(cornerRadius: 12))
+                            .textInputAutocapitalization(.sentences)
+                            .padding(12)
+                            .background(ATHLTHTheme.accentSoft.opacity(0.7),
+                                        in: RoundedRectangle(cornerRadius: 12))
+                        }
                     }
                     .padding(16)
                     .background(.white, in: RoundedRectangle(cornerRadius: 18))
@@ -3390,10 +3528,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         Text(ATHLTHLocalization.choose(english: "Duration", norwegian: "Varighet"))
                             .font(.subheadline.weight(.bold))
                         Stepper(
-                            "\(resolvedWorkoutMinutes(for: day)) min",
+                            "\(effectiveWorkoutMinutes(for: day)) min",
                             value: Binding(
-                                get: { resolvedWorkoutMinutes(for: day) },
-                                set: { workoutMinutesByDay[day] = $0 }
+                                get: { effectiveWorkoutMinutes(for: day) },
+                                set: { newValue in
+                                    updateWeekDay(day) { edit in edit.durationMinutes = newValue }
+                                }
                             ),
                             in: 5...180,
                             step: 5
@@ -3420,7 +3560,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             .font(.subheadline)
                             .foregroundStyle(ATHLTHTheme.mutedText)
 
-                            if let detail = structuredWorkoutsByDay[day] {
+                            if let detail = effectiveDetailedWorkout(for: day) {
                                 Label(
                                     "\(detail.blocks.count) " + ATHLTHLocalization.choose(
                                         english: "blocks ready", norwegian: "blokker klare"
@@ -3436,7 +3576,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             } label: {
                                 HStack(spacing: 10) {
                                     Image(systemName: "dumbbell.fill")
-                                    Text(structuredWorkoutsByDay[day] == nil
+                                    Text(effectiveDetailedWorkout(for: day) == nil
                                         ? ATHLTHLocalization.choose(
                                             english: "Build workout in ATHLTH Studio",
                                             norwegian: "Bygg økten i ATHLTH Studio"
@@ -3456,9 +3596,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             }
                             .buttonStyle(.plain)
 
-                            if structuredWorkoutsByDay[day] != nil {
+                            if effectiveDetailedWorkout(for: day) != nil {
                                 Button(role: .destructive) {
-                                    structuredWorkoutsByDay.removeValue(forKey: day)
+                                    updateWeekDay(day) { edit in edit.detailedWorkout = nil }
                                 } label: {
                                     Label(
                                         ATHLTHLocalization.choose(
@@ -4360,13 +4500,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         case .source:
             return true
         case .basics:
-            return
-                !title
-                    .trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    )
-                    .isEmpty &&
-                conflictingPlan == nil
+            return conflictingPlan == nil
         case .profile:
             return
                 injuryFree ||
