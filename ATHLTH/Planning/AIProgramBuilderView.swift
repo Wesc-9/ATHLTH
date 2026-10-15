@@ -1202,6 +1202,22 @@ struct AIProgramBuilderView: View {
                                                 .font(.caption2)
                                                 .foregroundStyle(.secondary)
                                         }
+                                        if let locked = seed?.structuredWorkoutsByDay[day.dayIndex] {
+                                            Label(
+                                                ATHLTHLocalization.choose(
+                                                    english: "Built in ATHLTH Studio – protected",
+                                                    norwegian: "Bygget i ATHLTH Studio – beholdes"
+                                                ), systemImage: "lock.shield"
+                                            )
+                                            .font(.caption2.weight(.semibold))
+                                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                                            ForEach(locked.blocks, id: \.id) { block in
+                                                Text("• \(block.title)" +
+                                                     (block.targetText.map { " · " + $0 } ?? ""))
+                                                .font(.caption2)
+                                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                            }
+                                        }
                                         ForEach(workout.exercises.indices, id: \.self) { exerciseIndex in
                                             let exercise = workout.exercises[exerciseIndex]
                                             Text(
@@ -1212,22 +1228,25 @@ struct AIProgramBuilderView: View {
                                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                                             .fixedSize(horizontal: false, vertical: true)
                                         }
-                                        Button {
-                                            editingDraftWorkout = ATHLTHPlanDraftWorkoutSelection(
-                                                weekNumber: week.weekNumber,
-                                                dayIndex: day.dayIndex,
-                                                sessionIndex: sessionIndex
-                                            )
-                                        } label: {
-                                            Label(
-                                                ATHLTHLocalization.choose(english: "Edit workout", norwegian: "Rediger økt"),
-                                                systemImage: "pencil"
-                                            )
-                                            .font(.caption.weight(.semibold))
+                                        if seed?.structuredWorkoutsByDay[day.dayIndex] == nil {
+                                            Button {
+                                                editingDraftWorkout = ATHLTHPlanDraftWorkoutSelection(
+                                                    weekNumber: week.weekNumber,
+                                                    dayIndex: day.dayIndex,
+                                                    sessionIndex: sessionIndex
+                                                )
+                                            } label: {
+                                                Label(
+                                                    ATHLTHLocalization.choose(english: "Edit workout", norwegian: "Rediger økt"),
+                                                    systemImage: "pencil"
+                                                )
+                                                .font(.caption.weight(.semibold))
+                                            }
+                                            .buttonStyle(.bordered)
+                                            .controlSize(.small)
                                         }
-                                        .buttonStyle(.bordered)
-                                        .controlSize(.small)
-                                        if mode == .generate,
+                                        if seed?.structuredWorkoutsByDay[day.dayIndex] == nil,
+                                           mode == .generate,
                                            week.days.contains(where: {
                                                $0.dayIndex != day.dayIndex &&
                                                $0.sessions.isEmpty &&
@@ -1354,7 +1373,11 @@ struct AIProgramBuilderView: View {
                 return
             }
             expandedPreviewWeeks.removeAll()
-            preview = result
+            // Reflect locked ATHLTH Studio sessions in the review *before*
+            // the user approves anything, not only at final save.
+            preview = result.displayingLockedWorkouts(
+                seed?.structuredWorkoutsByDay ?? [:]
+            )
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
