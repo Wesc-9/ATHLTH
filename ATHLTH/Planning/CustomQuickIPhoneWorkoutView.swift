@@ -22,6 +22,7 @@ struct CustomQuickIPhoneWorkoutView: View {
 
     @State private var resumedAt: Date?
     @State private var accumulatedSeconds: TimeInterval = 0
+    @State private var approvedTimeLimit: TimeInterval = 5 * 3600
     @State private var manualMinutes = 30
     @State private var workoutDate = Date()
     @State private var distanceText = ""
@@ -177,6 +178,17 @@ struct CustomQuickIPhoneWorkoutView: View {
                         .font(.system(size: 52, weight: .light, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(ink)
+                    if elapsed(at: context.date) >= approvedTimeLimit {
+                        Text(tr("Time limit reached · confirm to continue", "Tidsgrense nådd · bekreft for å fortsette"))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.orange)
+                        Button(tr("Continue for one hour", "Fortsett én time til")) {
+                            accumulatedSeconds = elapsed(at: Date())
+                            resumedAt = Date()
+                            approvedTimeLimit += 3600
+                        }
+                        .font(.subheadline.weight(.semibold))
+                    }
                     if let cue = intervalCue(at: context.date) {
                         Text(cue)
                             .font(.subheadline.weight(.semibold))
@@ -347,6 +359,17 @@ struct CustomQuickIPhoneWorkoutView: View {
             return
         }
         let seconds = isTimed ? elapsed(at: Date()) : Double(manualMinutes * 60)
+        if let distance, !CustomQuickWorkoutRecord.validDistance(
+            distance, durationSeconds: seconds, activity: configuration.activity
+        ) {
+            let limit = CustomQuickWorkoutRecord.maximumRunningSpeedKilometersPerHour(for: seconds)
+                * seconds / 3600
+            invalidInputMessage = tr(
+                "Distance exceeds the plausible limit for this duration (max \(String(format: "%.2f", limit)) km).",
+                "Distansen overstiger rimelig grense for denne varigheten (maks \(String(format: "%.2f", limit)) km)."
+            )
+            return
+        }
         guard let record = CustomQuickWorkoutRecord.make(
             configuration: configuration,
             recordedAt: isTimed ? Date() : workoutDate,
@@ -370,9 +393,9 @@ struct CustomQuickIPhoneWorkoutView: View {
     }
 
     private func elapsed(at now: Date) -> TimeInterval {
-        accumulatedSeconds + (resumedAt.map {
+        min(approvedTimeLimit, accumulatedSeconds + (resumedAt.map {
             max(0, now.timeIntervalSince($0))
-        } ?? 0)
+        } ?? 0))
     }
 
     private func clockText(seconds: TimeInterval) -> String {
