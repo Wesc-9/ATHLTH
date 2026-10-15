@@ -71,6 +71,46 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testMuscleFiltersMatchSelectableRepDBExercises() {
+        let library = ExerciseLibraryStore()
+
+        XCTAssertEqual(
+            ExerciseLibraryStore.canonicalMuscleFilter("biceps brachii"),
+            "Biceps"
+        )
+        XCTAssertEqual(
+            ExerciseLibraryStore.canonicalMuscleFilter("triceps brachii"),
+            "Triceps"
+        )
+        XCTAssertEqual(
+            ExerciseLibraryStore.canonicalMuscleFilter("Deltoid"),
+            "Shoulders"
+        )
+
+        // All menu choices must actually return an exercise in the same
+        // selectable dataset; historical hidden entries must not create
+        // misleading empty categories.
+        for part in library.bodyParts {
+            XCTAssertFalse(
+                library.search(query: "", bodyPart: part, equipment: "All").isEmpty,
+                "Empty muscle filter: \(part)"
+            )
+        }
+
+        XCTAssertTrue(library.bodyParts.contains("Biceps"))
+        let bicepsExercises = library.search(
+            query: "", bodyPart: "Biceps", equipment: "All"
+        )
+        XCTAssertFalse(bicepsExercises.isEmpty)
+        XCTAssertTrue(bicepsExercises.allSatisfy { entry in
+            entry.source != .athlthCatalog &&
+                entry.exercise.primaryMuscles.contains {
+                    ExerciseLibraryStore.canonicalMuscleFilter($0) == "Biceps"
+                }
+        })
+    }
+
     func testExerciseStudioCanImportAndDiscardLocalDemoVideo() throws {
         let source = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
