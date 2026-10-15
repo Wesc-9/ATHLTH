@@ -124,10 +124,15 @@ enum ATHLTHUnifiedWorkout {
 
         workout.workoutBlocks = blocks
         let plannedKind = workout.kind
-        workout.kind = (hasStrength && hasCardio) || (hasWalking && hasRunning)
+        // Old walking sessions used .run timeline blocks without a mode tag.
+        let legacyWalking = plannedKind == .walking && hasCardio && !hasWalking &&
+            blocks.filter { $0.kind == .run }.allSatisfy { $0.cardioActivity == nil }
+        let effectiveWalking = hasWalking || legacyWalking
+        let effectiveRunning = hasRunning && !legacyWalking
+        workout.kind = (hasStrength && hasCardio) || (effectiveWalking && effectiveRunning)
             ? .custom
-            : hasRunning ? .running
-            : hasWalking ? .walking
+            : effectiveWalking && !effectiveRunning ? .walking
+            : effectiveRunning ? .running
             : (plannedKind == .mobility ? .mobility : .strength)
         workout.workoutCategory = workout.kind == .custom ? "hybrid" :
             workout.kind == .walking ? "walking" :
