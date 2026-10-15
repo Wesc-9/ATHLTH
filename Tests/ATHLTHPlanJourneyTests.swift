@@ -14,9 +14,9 @@ final class ATHLTHPlanJourneyTests: XCTestCase {
     func testAdvancedKeepsAllSixPlanningStages() {
         XCTAssertEqual(
             ATHLTHPlanJourney.sequence(advanced: true),
-            [.mode, .source, .basics, .profile, .week, .review]
+            [.mode, .basics, .profile, .week, .review]
         )
-        XCTAssertEqual(ATHLTHPlanJourney.position(of: .review, advanced: true), 6)
+        XCTAssertEqual(ATHLTHPlanJourney.position(of: .review, advanced: true), 5)
     }
 
     func testEveryNextAndPreviousStepIsReversible() {
