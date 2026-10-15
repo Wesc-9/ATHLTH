@@ -526,6 +526,7 @@ struct ATHLTHTrainWeekBuilderView: View {
 /// Advanced reveals individual set targets without clearing hidden values.
 struct ATHLTHTrainWorkoutBuilderView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
@@ -550,6 +551,46 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     @State private var durationWasEditedManually: Bool
     @State private var errorMessage: String?
     @State private var detailExerciseID: UUID?
+    @State private var localDraftReady = false
+    @State private var localDraftSaved = false
+    @State private var localDraftRecovered = false
+
+    private struct StoredWorkoutEditorDraft: Codable {
+        let version: Int
+        let workout: PlannedSession
+        let scheduled: Bool
+        let startTime: Date
+        let manualDuration: Bool
+    }
+
+    private var localDraftKey: String {
+        let workoutID = existingWorkout?.id.uuidString ?? "new"
+        return "athlth.planWorkout.draft.v1.\(session.profile.userID.uuidString).\(planID.uuidString).\(dayID.uuidString).\(workoutID)"
+    }
+
+    private func restoreLocalDraft() {
+        guard let data = UserDefaults.standard.data(forKey: localDraftKey),
+              let saved = try? JSONDecoder().decode(StoredWorkoutEditorDraft.self, from: data),
+              saved.version == expectedPlanVersion else { return }
+        draft = saved.workout
+        scheduled = saved.scheduled
+        clockTime = saved.startTime
+        durationWasEditedManually = saved.manualDuration
+        localDraftRecovered = true
+    }
+
+    private func persistLocalDraft() {
+        guard localDraftReady, !localDraftSaved else { return }
+        let saved = StoredWorkoutEditorDraft(
+            version: expectedPlanVersion,
+            workout: draft,
+            scheduled: scheduled,
+            startTime: clockTime,
+            manualDuration: durationWasEditedManually
+        )
+        guard let data = try? JSONEncoder().encode(saved) else { return }
+        UserDefaults.standard.set(data, forKey: localDraftKey)
+    }
 
     private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
     private let bronze = Color(red: 0.65, green: 0.53, blue: 0.37)
@@ -585,6 +626,12 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         heading
+                        if localDraftRecovered {
+                            Label(tr("Recovered your workout draft", "Utkastet ditt er gjenopprettet"),
+                                  systemImage: "checkmark.circle.fill")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(bronze)
+                        }
                         information
                         if advanced {
                             detailedStructureEntry
@@ -746,6 +793,23 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                     }
                 }
             }
+            .onAppear {
+                guard !localDraftReady else { return }
+                restoreLocalDraft()
+                localDraftReady = true
+            }
+            .onChange(of: draft.title) { _, _ in persistLocalDraft() }
+            .onChange(of: draft.kind) { _, _ in persistLocalDraft() }
+            .onChange(of: draft.workoutBlocks) { _, _ in persistLocalDraft() }
+            .onChange(of: draft.notes) { _, _ in persistLocalDraft() }
+            .onChange(of: draft.durationMinutes) { _, _ in persistLocalDraft() }
+            .onChange(of: draft.exercises.count) { _, _ in persistLocalDraft() }
+            .onChange(of: scheduled) { _, _ in persistLocalDraft() }
+            .onChange(of: clockTime) { _, _ in persistLocalDraft() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { persistLocalDraft() }
+            }
+            .onDisappear { persistLocalDraft() }
             .alert(tr("Could not save workout", "Kunne ikke lagre økten"),
                    isPresented: Binding(
                     get: { errorMessage != nil },
@@ -1483,6 +1547,8 @@ struct ATHLTHTrainWorkoutBuilderView: View {
             strengthHistory: strength.workoutHistory
         )
         if saved {
+            localDraftSaved = true
+            UserDefaults.standard.removeObject(forKey: localDraftKey)
             dismiss()
         } else {
             errorMessage = tr(
