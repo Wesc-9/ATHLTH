@@ -413,11 +413,19 @@ enum ATHLTHArenaTeamStartRules {
 /// Shows existing Challenge activity in Arena without copying its rules or data.
 private struct ATHLTHArenaChallengeOverviewSection: View {
     var hideWhenEmpty = false
+    var showInvitations = true
+
+    init(hideWhenEmpty: Bool = false, showInvitations: Bool = true) {
+        self.hideWhenEmpty = hideWhenEmpty
+        self.showInvitations = showInvitations
+    }
     @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var session: AppSessionStore
 
     private var incoming: [ATHLTHChallenge] {
-        challenges.incomingInvitations(for: session.profile.userID)
+        showInvitations
+            ? challenges.incomingInvitations(for: session.profile.userID)
+            : []
     }
 
     private var active: [ATHLTHChallenge] {
@@ -516,6 +524,10 @@ private struct ATHLTHArenaChallengeOverviewSection: View {
 /// server-enforced round-to-race link exists. No GPS tracks are loaded here.
 private struct ATHLTHArenaLiveDuelsSection: View {
     var hideWhenInactive = false
+
+    init(hideWhenInactive: Bool = false) {
+        self.hideWhenInactive = hideWhenInactive
+    }
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var races = GhostFriendRaceStore()
 
@@ -701,6 +713,10 @@ private struct ATHLTHArenaLiveDuelsSection: View {
             .font(.caption)
             .foregroundStyle(ATHLTHTheme.mutedText)
                 }
+            } else {
+                // Keep the view mounted so its refresh task can discover
+                // an invitation or live race after an initially empty load.
+                Color.clear.frame(height: 0)
             }
         }
         .task { await races.refresh() }
@@ -768,7 +784,10 @@ struct ATHLTHArenaHomeView: View {
                 // competing quick-start dashboards.
                 ATHLTHArenaOnlineSection(compact: true)
                     .id(remoteRevision)
-                ATHLTHArenaChallengeOverviewSection(hideWhenEmpty: true)
+                ATHLTHArenaChallengeOverviewSection(
+                    hideWhenEmpty: true,
+                    showInvitations: false
+                )
 
                 // Live activity stays prominent; inactive marketing and
                 // deeper tools are available through the secondary area.
