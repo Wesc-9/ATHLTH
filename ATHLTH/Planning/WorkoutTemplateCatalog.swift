@@ -1570,6 +1570,7 @@ struct WorkoutTemplateBuilderView: View {
     @AppStorage("athlth.workoutBuilder.durationInput.v1")
     private var durationInputMode = "clock"
     private let draftContext: String
+    private let plannedDate: Date?
     private let initialDraftSignature: String
     /// Present from advanced plan creation to edit a specific weekday
     /// without creating an unwanted shared workout template.
@@ -1581,6 +1582,7 @@ struct WorkoutTemplateBuilderView: View {
         initialRouteID: UUID? = nil,
         initialDurationOverrideMinutes: Int? = nil,
         draftContext: String = "shared-template",
+        plannedDate: Date? = nil,
         onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool) -> Void)? = nil
     ) {
         _title = State(initialValue: initialTitle)
@@ -1588,6 +1590,7 @@ struct WorkoutTemplateBuilderView: View {
         _selectedRouteID = State(initialValue: initialRouteID)
         _manualDurationMinutes = State(initialValue: initialDurationOverrideMinutes)
         self.draftContext = draftContext
+        self.plannedDate = plannedDate
         let originalBlocks = (try? JSONEncoder().encode(initialBlocks))?.base64EncodedString() ?? ""
         self.initialDraftSignature = initialTitle + "|" + originalBlocks +
             "|" + (initialRouteID?.uuidString ?? "") +
@@ -1778,6 +1781,18 @@ struct WorkoutTemplateBuilderView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
+                    if let plannedDate {
+                        Label(
+                            plannedDate.formatted(.dateTime.weekday(.wide).day().month(.wide)),
+                            systemImage: "calendar"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(studioInk)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 9)
+                        .background(.white.opacity(0.95),
+                                    in: RoundedRectangle(cornerRadius: 12))
+                    }
                     workoutOverview
                     durationSettings
                     addBlockSection
