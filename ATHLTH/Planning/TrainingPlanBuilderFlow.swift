@@ -3245,10 +3245,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 HStack(spacing: 7) {
                     ForEach(1...7, id: \.self) { day in
                         Button {
-                            if !selectedDays.contains(day) {
-                                selectedDays.insert(day)
-                                sessionsPerWeek = selectedDays.count
-                            }
                             editingWeekDay = WeekDayEditorSelection(id: day)
                         } label: {
                             VStack(spacing: 5) {
@@ -3303,8 +3299,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
             .padding(.bottom, 3)
 
+            weekSelector
+
             ForEach(1...7, id: \.self) { day in
-                if selectedDays.contains(day) {
+                if selectedDays.contains(day) || weekDayEdits[weekDayKey(day)] != nil {
                     Button {
                         editingWeekDay = WeekDayEditorSelection(id: day)
                     } label: {
@@ -3316,14 +3314,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 .background(ATHLTHTheme.accentSoft,
                                             in: RoundedRectangle(cornerRadius: 13))
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(fullDayName(day))
+                                Text(fullDayName(day) + " · " +
+                                     dateForWeekDay(day, weekIndex: selectedPlanWeekIndex)
+                                         .formatted(date: .abbreviated, time: .omitted))
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(ATHLTHTheme.mutedText)
-                                Text(resolvedWorkoutTitle(for: day))
+                                Text(effectiveWorkoutTitle(for: day))
                                     .font(.subheadline.weight(.bold))
                                     .foregroundStyle(ATHLTHTheme.primaryText)
-                                Text(resolvedWorkoutKind(for: day).title + " · " +
-                                     "\(resolvedWorkoutMinutes(for: day)) min")
+                                Text(effectiveWorkoutKind(for: day).title + " · " +
+                                     "\(effectiveWorkoutMinutes(for: day)) min")
                                     .font(.caption)
                                     .foregroundStyle(ATHLTHTheme.mutedText)
                                 if mode == .advanced,
@@ -3354,7 +3354,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(
-                        fullDayName(day) + ", " + resolvedWorkoutTitle(for: day) +
+                        fullDayName(day) + ", " + effectiveWorkoutTitle(for: day) +
                         ". " + ATHLTHLocalization.choose(english: "Edit workout", norwegian: "Rediger økten")
                     )
                 } else {
@@ -3365,15 +3365,21 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             .background(ATHLTHTheme.recoveryBlueSoft,
                                         in: RoundedRectangle(cornerRadius: 13))
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(fullDayName(day)).font(.caption.weight(.semibold))
+                            Text(fullDayName(day) + " · " +
+                                 dateForWeekDay(day, weekIndex: selectedPlanWeekIndex)
+                                     .formatted(date: .abbreviated, time: .omitted))
+                                .font(.caption.weight(.semibold))
                             Text(ATHLTHLocalization.choose(english: "Rest day", norwegian: "Hviledag"))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
                         Button(ATHLTHLocalization.choose(english: "Add", norwegian: "Legg til")) {
-                            selectedDays.insert(day)
-                            sessionsPerWeek = selectedDays.count
+                            updateWeekDay(day) { edit in
+                                edit.kind = resolvedWorkoutKind(for: day)
+                                edit.title = resolvedWorkoutTitle(for: day)
+                                edit.durationMinutes = resolvedWorkoutMinutes(for: day)
+                            }
                             editingWeekDay = WeekDayEditorSelection(id: day)
                         }
                         .font(.caption.weight(.semibold))
@@ -3446,6 +3452,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         .font(.title2.weight(.bold))
                     }
 
+                    weekSelector
+
                     VStack(alignment: .leading, spacing: 13) {
                         Text(ATHLTHLocalization.choose(english: "Activity", norwegian: "Treningsform"))
                             .font(.subheadline.weight(.bold))
@@ -3465,7 +3473,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             }
                         }
                         .pickerStyle(.menu)
-                        .disabled(mode == .advanced && structuredWorkoutsByDay[day] != nil)
+                        .disabled(mode == .advanced && effectiveDetailedWorkout(for: day) != nil)
                     }
                     .padding(16)
                     .background(.white, in: RoundedRectangle(cornerRadius: 18))
@@ -3747,9 +3755,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 subtitle:
                     ATHLTHLocalization.choose(
                         english:
-                            "Check the foundation. You can edit every detail after the plan is created.",
+                            "Review every week and tap a date to customize the workout before saving.",
                         norwegian:
-                            "Sjekk grunnlaget. Alle detaljer kan redigeres etter at planen er opprettet."
+                            "Se gjennom alle ukene og trykk på datoene for å tilpasse øktene før lagring."
                     ),
                 icon: "checkmark.seal.fill"
             )
@@ -3884,8 +3892,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 VStack(alignment: .leading, spacing: 11) {
                     Label(
                         ATHLTHLocalization.choose(
-                            english: "Review and edit your training week",
-                            norwegian: "Se gjennom og rediger treningsuken"
+                            english: "Review every week",
+                            norwegian: "Se gjennom og rediger alle ukene"
                         ),
                         systemImage: "calendar.badge.checkmark"
                     )
