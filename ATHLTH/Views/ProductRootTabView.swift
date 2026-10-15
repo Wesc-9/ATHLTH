@@ -5244,6 +5244,7 @@ struct ATHLTHTrainView: View {
     @State private var showingTrainPlanWorkspace = false
     @State private var showingTrainAllPlans = false
     @State private var showingTrainProgramCreation = false
+    @State private var newlyCreatedPlanToOpen: UUID?
     @State private var showingTrainPlanProgress = false
     @State private var showingTrainExerciseLibrary = false
     @State private var selectedTrainPlanWeekIndex: Int?
@@ -5347,10 +5348,19 @@ struct ATHLTHTrainView: View {
             .sheet(isPresented: $showingTrainAllPlans) {
                 AllTrainingPlansView()
             }
-            .sheet(isPresented: $showingTrainProgramCreation) {
-                ATHLTHTrainProgramComposerView { planID in
+            .sheet(isPresented: $showingTrainProgramCreation, onDismiss: {
+                // Switch tabs only once the creation sheet has fully closed.
+                // Updating the underlying tab while the sheet is dismissing
+                // could otherwise expose "I dag" instead of the saved plan.
+                if let planID = newlyCreatedPlanToOpen {
                     highlightedTrainPlanID = planID
+                    selectedTrainPlanWeekIndex = 0
                     selectedSection = 1
+                    newlyCreatedPlanToOpen = nil
+                }
+            }) {
+                ATHLTHTrainProgramComposerView { planID in
+                    newlyCreatedPlanToOpen = planID
                 }
             }
             .sheet(isPresented: $showingTrainPlanProgress) {
