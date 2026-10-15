@@ -48,6 +48,42 @@ final class ATHLTHTrainingPlanScheduleTests: XCTestCase {
         XCTAssertTrue(ATHLTHTrainingPlanSchedule.sessions(in: plan, on: after, calendar: calendar).isEmpty)
     }
 
+    func testSelectedCalendarWeekdaysMapToActualDatesForThursdayStart() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let thursday = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 15
+        )))
+
+        // Day 1 of this plan is Thursday, not Monday.
+        XCTAssertEqual(
+            ATHLTHTrainingPlanSchedule.relativeDayIndex(
+                forCalendarWeekday: 4, planStart: thursday, calendar: calendar
+            ), 1
+        )
+        XCTAssertEqual(
+            ATHLTHTrainingPlanSchedule.relativeDayIndex(
+                forCalendarWeekday: 5, planStart: thursday, calendar: calendar
+            ), 2
+        )
+        XCTAssertEqual(
+            ATHLTHTrainingPlanSchedule.relativeDayIndex(
+                forCalendarWeekday: 1, planStart: thursday, calendar: calendar
+            ), 5
+        )
+        for weekday in 1...7 {
+            let relative = ATHLTHTrainingPlanSchedule.relativeDayIndex(
+                forCalendarWeekday: weekday, planStart: thursday, calendar: calendar
+            )
+            XCTAssertEqual(
+                ATHLTHTrainingPlanSchedule.calendarWeekdayIndex(
+                    forRelativeDayIndex: relative, planStart: thursday,
+                    calendar: calendar
+                ), weekday
+            )
+        }
+    }
+
     private func workout(_ title: String, kind: WorkoutKind) -> PlannedSession {
         PlannedSession(
             id: UUID(), title: title, kind: kind,
