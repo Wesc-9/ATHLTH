@@ -254,4 +254,81 @@ final class AdvancedPlanWorkoutBlueprintTests: XCTestCase {
         XCTAssertEqual(after, original)
     }
 
+    func testAIPlanKeepsAdvancedModeAndSelectedSubcategoriesAfterSave() throws {
+        let selected = TrainingPlanBuilderProfile(
+            mode: .advanced,
+            primaryFocus: .hybrid,
+            goal: .improveFitness,
+            sessionsPerWeek: 2,
+            preferredDayIndexes: [1, 4],
+            preferredWorkoutKindsByDay: [1: .running, 4: .strength],
+            preferredWorkoutTitlesByDay: [1: "Bakkeintervaller", 4: "Overkropp"],
+            preferredWorkoutMinutesByDay: [1: 40, 4: 65]
+        )
+        let draft = AIProgramDraft(
+            title: "AI generated",
+            summary: "Generic summary",
+            weeks: [AIProgramDraftWeek(
+                weekNumber: 1,
+                title: "Week 1",
+                days: (1...7).map {
+                    AIProgramDraftDay(dayIndex: $0, title: "Day \($0)", sessions: [])
+                }
+            )]
+        )
+        let seed = AIProgramBuilderSeed(
+            preferredTitle: "Hybrid",
+            startDate: Date(),
+            weekCount: 1,
+            sessionsPerWeek: 2,
+            sessionDurationMinutes: 50,
+            availableDays: [1, 4],
+            trainingFocus: .hybrid,
+            gymAccess: "Yes",
+            limitations: "",
+            coachFocusNotes: "",
+            selectedGoalIDs: [],
+            builderProfile: selected,
+            planVisibility: .privateOnly,
+            planSummary: "User-approved plan"
+        )
+        var generated = draft.makeTrainingPlan(ownerID: UUID(), startDate: seed.startDate)
+        XCTAssertNil(generated.builderProfile)
+        seed.applyWizardMetadata(to: &generated)
+        let restored = try JSONDecoder().decode(
+            TrainingPlan.self,
+            from: JSONEncoder().encode(generated)
+        )
+        XCTAssertEqual(restored.builderProfile?.mode, .advanced)
+        XCTAssertEqual(restored.builderProfile?.preferredDayIndexes, [1, 4])
+        XCTAssertEqual(restored.builderProfile?.preferredWorkoutKindsByDay?[1], .running)
+        XCTAssertEqual(restored.builderProfile?.preferredWorkoutTitlesByDay?[1], "Bakkeintervaller")
+        XCTAssertEqual(restored.builderProfile?.preferredWorkoutMinutesByDay?[4], 65)
+        XCTAssertEqual(restored.summary, "User-approved plan")
+        XCTAssertEqual(restored.visibility, .privateOnly)
+    }
+
+    func testStandaloneCoachStillWorksWithoutWizardMetadata() {
+        let draft = AIProgramDraft(
+            title: "Standalone",
+            summary: "Coach summary",
+            weeks: [AIProgramDraftWeek(
+                weekNumber: 1, title: "First",
+                days: [AIProgramDraftDay(dayIndex: 1, title: "Mon", sessions: [])]
+            )]
+        )
+        var plan = draft.makeTrainingPlan(ownerID: UUID(), startDate: Date())
+        let seed = AIProgramBuilderSeed(
+            preferredTitle: "Standalone",
+            startDate: Date(), weekCount: 1,
+            sessionsPerWeek: 1, sessionDurationMinutes: 30,
+            availableDays: [1], trainingFocus: .generalFitness,
+            gymAccess: nil, limitations: "", coachFocusNotes: "",
+            selectedGoalIDs: []
+        )
+        let before = plan
+        seed.applyWizardMetadata(to: &plan)
+        XCTAssertEqual(plan, before)
+    }
+
 }
