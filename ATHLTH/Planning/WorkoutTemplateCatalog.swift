@@ -2749,6 +2749,15 @@ struct WorkoutTemplateBuilderView: View {
                         "Én valgfri rute for utendørs løpe- og gåblokker."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                NavigationLink {
+                    RunRouteBuilderView()
+                } label: {
+                    Label(tr("Create a new route", "Opprett ny rute"),
+                          systemImage: "map.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(studioAccent)
+                }
             }
         }
     }
