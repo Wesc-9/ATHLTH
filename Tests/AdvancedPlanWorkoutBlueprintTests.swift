@@ -182,4 +182,76 @@ final class AdvancedPlanWorkoutBlueprintTests: XCTestCase {
     }
 
 
+    func testAISuggestionsRespectChosenDayTypeAndKeepMatchingExercises() {
+        let squat = AIProgramDraftExercise(
+            name: "Squat", sets: 3, reps: 8,
+            targetRPE: nil, restSeconds: 90, notes: nil
+        )
+        let generated = AIProgramDraft(
+            title: "AI week", summary: "",
+            weeks: [AIProgramDraftWeek(
+                weekNumber: 1, title: "Week 1",
+                days: (1...7).map { day in
+                    AIProgramDraftDay(
+                        dayIndex: day, title: "Day \(day)",
+                        sessions: day <= 2
+                            ? [AIProgramDraftSession(
+                                title: "AI suggestion",
+                                kind: "strength",
+                                durationMinutes: 25,
+                                targetDistanceKilometers: nil,
+                                targetPaceSecondsPerKilometer: nil,
+                                notes: nil, exercises: [squat]
+                            )]
+                            : []
+                    )
+                }
+            )]
+        )
+        let choices: [Int: ATHLTHPlanDayPreference] = [
+            1: ATHLTHPlanDayPreference(
+                title: "Easy run", kind: .running, durationMinutes: 40
+            ),
+            2: ATHLTHPlanDayPreference(
+                title: "Upper body", kind: .strength, durationMinutes: 55
+            )
+        ]
+        let effective = generated.honoringWeekdayChoices(choices)
+        let run = effective.weeks[0].days[0].sessions[0]
+        XCTAssertEqual(run.title, "Easy run")
+        XCTAssertEqual(run.kind, WorkoutKind.running.rawValue)
+        XCTAssertEqual(run.durationMinutes, 40)
+        XCTAssertTrue(run.exercises.isEmpty, "Strength work must not be mixed into a running session")
+        let strength = effective.weeks[0].days[1].sessions[0]
+        XCTAssertEqual(strength.title, "Upper body")
+        XCTAssertEqual(strength.durationMinutes, 55)
+        XCTAssertEqual(strength.exercises.first?.name, "Squat")
+    }
+
+    func testWeekdayPreferenceNeverOverwritesAlreadyProtectedStudioWorkout() {
+        let original = AIProgramDraft(
+            title: "Week", summary: "",
+            weeks: [AIProgramDraftWeek(
+                weekNumber: 1, title: "First",
+                days: [AIProgramDraftDay(
+                    dayIndex: 1, title: "Monday",
+                    sessions: [AIProgramDraftSession(
+                        title: "My detailed interval", kind: "running",
+                        durationMinutes: 45,
+                        targetDistanceKilometers: nil,
+                        targetPaceSecondsPerKilometer: nil,
+                        notes: nil, exercises: []
+                    )]
+                )]
+            )]
+        )
+        let after = original.honoringWeekdayChoices(
+            [1: ATHLTHPlanDayPreference(
+                title: "Old generic name", kind: .strength, durationMinutes: 60
+            )],
+            protectedDays: [1]
+        )
+        XCTAssertEqual(after, original)
+    }
+
 }
