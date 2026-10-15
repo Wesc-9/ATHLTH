@@ -612,21 +612,38 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                 }
             }
             .sheet(isPresented: $showExerciseSearch) {
-                ATHLTHTrainExercisePicker { exercise in
-                    let newExercise = PlannedExercise(
-                        id: UUID(),
-                        exerciseID: exercise.exercise.id,
-                        embeddedExercise: exercise.exercise.snapshot,
-                        sets: 3,
-                        reps: 10,
-                        targetWeightKilograms: nil,
-                        targetRPE: nil,
-                        restSeconds: 90,
-                        notes: nil
-                    )
-                    draft.exercises.append(newExercise)
-                    detailExerciseID = newExercise.id
-                    showExerciseSearch = false
+                NavigationStack {
+                    ExerciseLibraryView(
+                        selectionTitle: tr("Add exercise", "Legg til øvelse"),
+                        selectedExerciseCounts: Dictionary(
+                            draft.exercises.compactMap { exercise in
+                                exercise.exerciseID.map { ($0, 1) }
+                            },
+                            uniquingKeysWith: +
+                        )
+                    ) { exercise in
+                        let newExercise = PlannedExercise(
+                            id: UUID(),
+                            exerciseID: exercise.exercise.id,
+                            embeddedExercise: exercise.exercise.snapshot,
+                            sets: 3,
+                            reps: 10,
+                            targetWeightKilograms: nil,
+                            targetRPE: nil,
+                            restSeconds: 90,
+                            notes: nil
+                        )
+                        draft.exercises.append(newExercise)
+                        detailExerciseID = newExercise.id
+                        showExerciseSearch = false
+                    }
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(tr("Close", "Lukk")) {
+                                showExerciseSearch = false
+                            }
+                        }
+                    }
                 }
             }
             .sheet(isPresented: $showIntervalComposer) {
@@ -725,7 +742,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     private var information: some View {
         VStack(alignment: .leading, spacing: 14) {
             sectionTitle(tr("About the session", "Om økten"))
-            TextField(tr("Workout name", "Navn på økten"), text: $draft.title)
+            TextField(tr("Workout name (optional)", "Navn på økten (valgfritt)"), text: $draft.title)
                 .padding(13)
                 .editorSurface(line: line)
             Picker(tr("Activity", "Treningsform"), selection: $draft.kind) {
@@ -1226,8 +1243,6 @@ struct ATHLTHTrainWorkoutBuilderView: View {
             .background(ink, in: RoundedRectangle(cornerRadius: 13))
         }
         .buttonStyle(.plain)
-        .disabled(draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        .opacity(draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
         .padding(.horizontal, 18)
         .padding(.vertical, 12)
         .background(.white)
@@ -1244,8 +1259,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                         return nil
                     }
                     return (weekOffset, index)
-                }).first,
-              !draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                }).first
         else {
             errorMessage = tr("Workout could not be found.",
                             "Kunne ikke finne treningsdagen.")
@@ -1254,6 +1268,9 @@ struct ATHLTHTrainWorkoutBuilderView: View {
 
         let (weekIndex, dayIndex) = location
         var updated = draft
+        // A name is optional; persist a useful localized title for other views.
+        let requestedTitle = updated.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        updated.title = requestedTitle.isEmpty ? updated.kind.title : requestedTitle
         let day = plan.weeks[weekIndex].days[dayIndex]
         if scheduled, let start = plan.startDate {
             let calendar = Calendar.current
@@ -1300,62 +1317,6 @@ struct ATHLTHTrainWorkoutBuilderView: View {
 
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
-    }
-}
-
-/// Contextual access to the existing exercise data, not a legacy library UI.
-private struct ATHLTHTrainExercisePicker: View {
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var library: ExerciseLibraryStore
-
-    let onSelect: (ExerciseLibraryEntry) -> Void
-    @State private var search = ""
-
-    private var results: [ExerciseLibraryEntry] {
-        Array(library.search(query: search).prefix(75))
-    }
-
-    var body: some View {
-        NavigationStack {
-            List(results) { item in
-                Button {
-                    onSelect(item)
-                } label: {
-                    HStack(spacing: 11) {
-                        Image(systemName: "dumbbell")
-                            .foregroundStyle(.secondary)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(item.name)
-                                .font(.subheadline.weight(.medium))
-                            Text(item.bodyPart ?? item.category ?? "")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Image(systemName: "plus.circle")
-                    }
-                    .foregroundStyle(.primary)
-                }
-            }
-            .searchable(
-                text: $search,
-                prompt: ATHLTHLocalization.choose(
-                    english: "Search exercises or muscle groups",
-                    norwegian: "Søk etter øvelse eller muskelgruppe"
-                )
-            )
-            .navigationTitle(ATHLTHLocalization.choose(
-                english: "Add exercise", norwegian: "Legg til øvelse"
-            ))
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(ATHLTHLocalization.choose(english: "Close", norwegian: "Lukk")) {
-                        dismiss()
-                    }
-                }
-            }
-        }
-        .preferredColorScheme(.light)
     }
 }
 
