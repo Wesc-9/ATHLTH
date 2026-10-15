@@ -26,6 +26,9 @@ struct AIProgramBuilderSeed: Hashable {
     var limitations: String
     var coachFocusNotes: String
     var selectedGoalIDs: Set<UUID>
+    /// Advanced, user-authored sessions are authoritative and are applied
+    /// to every week after AI generation. Basic always leaves this empty.
+    var structuredWorkoutsByDay: [Int: ATHLTHPlanStructuredWorkoutBlueprint] = [:]
 }
 
 private struct CoachIntakePreferences: Codable, Equatable {
@@ -314,6 +317,36 @@ struct AIProgramBuilderView: View {
                 }.joined(separator: " · "))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(ATHLTHTheme.accentDeep)
+            }
+            if let locked = seed?.structuredWorkoutsByDay, !locked.isEmpty {
+                VStack(alignment: .leading, spacing: 7) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Your detailed sessions are protected",
+                            norwegian: "Dine detaljerte økter blir bevart"
+                        ), systemImage: "lock.shield.fill"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    ForEach(locked.keys.sorted(), id: \.self) { day in
+                        if let workout = locked[day] {
+                            Text("\(day). \(workout.title) · \(workout.blocks.count) " +
+                                 ATHLTHLocalization.choose(
+                                    english: "blocks", norwegian: "blokker"
+                                 ))
+                            .font(.caption)
+                        }
+                    }
+                    Text(ATHLTHLocalization.choose(
+                        english: "AI only fills the rest. These sessions are retained exactly when you approve the final plan.",
+                        norwegian: "AI fyller bare resten. Disse øktene beholdes når du godkjenner planen."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
+                .padding(12)
+                .background(ATHLTHTheme.accentSoft.opacity(0.6),
+                            in: RoundedRectangle(cornerRadius: 14))
             }
         }
         .padding(18)
@@ -1386,6 +1419,13 @@ struct AIProgramBuilderView: View {
                     ),
            !preferredTitle.isEmpty {
             generated.title = preferredTitle
+        }
+
+        if mode == .generate, let seed {
+            ATHLTHPlanStructuredWorkoutBlueprint.apply(
+                seed.structuredWorkoutsByDay,
+                to: &generated.weeks
+            )
         }
 
         switch mode {
