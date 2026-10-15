@@ -5022,8 +5022,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     endDate: resolvedEndDate,
                     visibility: visibility,
                     builderProfile: profile,
-                    seedSuggestedWeek:
-                        seedSuggestedWeek
+                    seedSuggestedWeek: seedSuggestedWeek,
+                    structuredWorkoutsByDay: mode == .advanced
+                        ? structuredWorkoutsByDay : [:]
                 )
 
         guard let created else {
