@@ -4607,6 +4607,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     "Ønsket treningsuke: \(trainingWeekSummary)."
             )
         )
+        let exactSessions = selectedDays.sorted().map { day in
+            "\(fullDayName(day)): \(resolvedWorkoutKind(for: day).title) – " +
+            "\(resolvedWorkoutTitle(for: day)), \(resolvedWorkoutMinutes(for: day)) min"
+        }
+        focusNotes.append(
+            "Respect the athlete's selected weekly workout structure and subtypes: " +
+            exactSessions.joined(separator: "; ") +
+            ". Do not ask the athlete to select days or workout count again."
+        )
 
         if mode == .advanced,
            let secondaryFocus {
@@ -4757,16 +4766,23 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 preferredWorkoutKindsByDay:
                     Dictionary(
                         uniqueKeysWithValues:
-                            selectedDays
-                                .sorted()
-                                .map {
-                                    (
-                                        $0,
-                                        resolvedWorkoutKind(
-                                            for: $0
-                                        )
-                                    )
-                                }
+                            selectedDays.sorted().map {
+                                ($0, resolvedWorkoutKind(for: $0))
+                            }
+                    ),
+                preferredWorkoutTitlesByDay:
+                    Dictionary(
+                        uniqueKeysWithValues:
+                            selectedDays.sorted().map {
+                                ($0, resolvedWorkoutTitle(for: $0))
+                            }
+                    ),
+                preferredWorkoutMinutesByDay:
+                    Dictionary(
+                        uniqueKeysWithValues:
+                            selectedDays.sorted().map {
+                                ($0, resolvedWorkoutMinutes(for: $0))
+                            }
                     )
             )
 
