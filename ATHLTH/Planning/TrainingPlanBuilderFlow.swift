@@ -366,7 +366,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 Label("\(savedPlan.weeks.count) " +
                                       ATHLTHLocalization.choose(english: "weeks", norwegian: "uker"),
                                       systemImage: "calendar")
-                                Label("\(savedPlan.weeks.first?.days.flatMap(\\.sessions).count ?? 0) " +
+                                Label("\(savedPlan.weeks.first?.days.flatMap(\.sessions).count ?? 0) " +
                                       ATHLTHLocalization.choose(english: "sessions/week", norwegian: "økter/uke"),
                                       systemImage: "figure.run")
                             }
