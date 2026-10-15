@@ -5648,7 +5648,7 @@ struct ATHLTHTrainView: View {
                 CustomQuickStartSheet(
                     trainingDeviceProvider:
                         watchConnection.isReady ? .appleWatch : .none,
-                    watchConnected: watchConnection.isReady
+                    watchConnected: watchConnection.isVerifiedForLiveLaunch
                 ) { configuration, destination in
                     switch destination {
                     case .watch:
@@ -10254,7 +10254,7 @@ struct ATHLTHTrainView: View {
     private func startCustomWorkoutOnWatch(
         _ configuration: CustomQuickWorkoutConfiguration
     ) {
-        guard watchConnection.isReady else {
+        guard watchConnection.isVerifiedForLiveLaunch else {
             watchTransferError = ATHLTHLocalization.choose(
                 english: "Apple Watch is not available. Choose iPhone timing or log the workout manually.",
                 norwegian: "Apple Watch er ikke tilgjengelig. Velg tidtaking på iPhone eller registrer økten manuelt."
