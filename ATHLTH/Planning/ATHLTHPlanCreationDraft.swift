@@ -1,6 +1,6 @@
 import Foundation
 
-/// A small, local-only checkpoint for the plan creation wizard.
+/// A compact, local-only checkpoint for the plan creation wizard.
 /// Intentionally excludes injuries, health history, free-text notes, goal details
 /// and other potentially sensitive inputs. It never creates an active plan.
 struct ATHLTHPlanCreationDraft: Codable, Equatable {
@@ -24,6 +24,10 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
     var workoutKindsByDay: [Int: String]? = nil
     var workoutPresetsByDay: [Int: String]? = nil
     var workoutMinutesByDay: [Int: Int]? = nil
+    // Advanced only. Compact local checkpoint retains equipment/sets/intervals
+    // but strips free-text notes and route IDs for privacy.
+    var structuredWorkoutsByDay:
+        [Int: ATHLTHPlanStructuredWorkoutBlueprint]? = nil
     var savedAt: Date
 
     init(
@@ -39,6 +43,8 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         workoutKindsByDay: [Int: String]? = nil,
         workoutPresetsByDay: [Int: String]? = nil,
         workoutMinutesByDay: [Int: Int]? = nil,
+        structuredWorkoutsByDay:
+            [Int: ATHLTHPlanStructuredWorkoutBlueprint]? = nil,
         savedAt: Date = Date()
     ) {
         self.schemaVersion = Self.schemaVersion
@@ -67,6 +73,29 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         self.workoutMinutesByDay = workoutMinutesByDay?.filter {
             (1...7).contains($0.key) && (15...180).contains($0.value)
         }
+        if advanced, let structuredWorkoutsByDay {
+            var sanitized: [Int: ATHLTHPlanStructuredWorkoutBlueprint] = [:]
+            for (day, original) in structuredWorkoutsByDay
+                where (1...7).contains(day) && original.isValid {
+                var safe = original
+                safe.routeID = nil
+                safe.blocks = original.blocks.compactMap { block in
+                    // Personal health notes and arbitrary note-only blocks are
+                    // not part of a convenience checkpoint.
+                    guard block.kind != .note else { return nil }
+                    var copy = block
+                    copy.notes = nil
+                    copy.loadNote = nil
+                    return copy
+                }
+                guard safe.isValid else { continue }
+                sanitized[day] = safe
+            }
+            self.structuredWorkoutsByDay =
+                sanitized.isEmpty ? nil : sanitized
+        } else {
+            self.structuredWorkoutsByDay = nil
+        }
         self.savedAt = savedAt
     }
 
@@ -93,7 +122,9 @@ struct ATHLTHPlanCreationDraftStore {
             clear(userID: userID)
             return
         }
-        guard let encoded = try? JSONEncoder().encode(draft) else {
+        guard let encoded = try? JSONEncoder().encode(draft),
+              encoded.count <= 750_000 else {
+            // Never save an oversized plan snapshot to UserDefaults.
             return
         }
         defaults.set(encoded, forKey: key(userID: userID))
