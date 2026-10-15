@@ -13,7 +13,7 @@ final class AdvancedPlanWorkoutBlueprintTests: XCTestCase {
         )
     }
 
-    private func run(_ title: String = "Run", seq: Int = 1) -> WorkoutTemplateBlock {
+    private func makeRunBlock(_ title: String = "Run", seq: Int = 1) -> WorkoutTemplateBlock {
         WorkoutTemplateBlock(
             sequence: seq, kind: .run, title: title,
             exerciseSlug: nil, distanceMeters: nil,
@@ -77,7 +77,7 @@ final class AdvancedPlanWorkoutBlueprintTests: XCTestCase {
 
     func testHybridGroupsRoundTripWithoutChangingOriginalBlockMetadata() throws {
         let group = UUID()
-        var runBlock = run()
+        var runBlock = makeRunBlock()
         runBlock.groupID = group
         runBlock.groupKind = .intervals
         runBlock.groupRounds = 5
