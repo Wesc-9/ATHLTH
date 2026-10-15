@@ -3254,6 +3254,36 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 7) {
+                    ForEach(0..<weekCount, id: \.self) { week in
+                        Button {
+                            selectedPlanWeekIndex = week
+                        } label: {
+                            HStack(spacing: 5) {
+                                Text(ATHLTHLocalization.choose(english: "Week", norwegian: "Uke") +
+                                     " \(week + 1)")
+                                if weekDayEdits.keys.contains(where: { ($0 - 1) / 7 == week }) {
+                                    Circle()
+                                        .fill(week == selectedPlanWeekIndex
+                                              ? Color.white : ATHLTHTheme.accentDeep)
+                                        .frame(width: 5, height: 5)
+                                }
+                            }
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(week == selectedPlanWeekIndex
+                                             ? .white : ATHLTHTheme.primaryText)
+                            .padding(.horizontal, 12)
+                            .frame(height: 34)
+                            .background(week == selectedPlanWeekIndex
+                                        ? ATHLTHTheme.accentDeep : Color.white,
+                                        in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 7) {
                     ForEach(Array(1...7).sorted {
                         dateForWeekDay($0, weekIndex: selectedPlanWeekIndex) <
                         dateForWeekDay($1, weekIndex: selectedPlanWeekIndex)
