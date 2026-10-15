@@ -5178,6 +5178,8 @@ struct ATHLTHTrainView: View {
     @State private var showingWalkQuickStart = false
     @State private var showingStrengthQuickStart = false
     @State private var showingCustomQuickStart = false
+    @State private var pendingCustomIPhoneQuick: CustomIPhoneQuickLaunch?
+    @State private var activeCustomIPhoneQuick: CustomIPhoneQuickLaunch?
     @State private var showingStrengthWorkout = false
     @State private var selectedStructuredWorkout:
         PlannedSession?
@@ -5636,14 +5638,38 @@ struct ATHLTHTrainView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingCustomQuickStart) {
+            .sheet(isPresented: $showingCustomQuickStart, onDismiss: {
+                // Never compete with the setup sheet's dismissal animation.
+                if let launch = pendingCustomIPhoneQuick {
+                    pendingCustomIPhoneQuick = nil
+                    activeCustomIPhoneQuick = launch
+                }
+            }) {
                 CustomQuickStartSheet(
                     trainingDeviceProvider:
                         watchConnection.isReady ? .appleWatch : .none,
                     watchConnected: watchConnection.isReady
-                ) { configuration in
-                    startCustomWorkoutOnWatch(configuration)
+                ) { configuration, destination in
+                    switch destination {
+                    case .watch:
+                        startCustomWorkoutOnWatch(configuration)
+                    case .phoneTimer:
+                        pendingCustomIPhoneQuick = CustomIPhoneQuickLaunch(
+                            configuration: configuration, mode: .timed
+                        )
+                    case .retrospective:
+                        pendingCustomIPhoneQuick = CustomIPhoneQuickLaunch(
+                            configuration: configuration, mode: .retrospective
+                        )
+                    }
                 }
+            }
+            .fullScreenCover(item: $activeCustomIPhoneQuick) { launch in
+                CustomQuickIPhoneWorkoutView(
+                    configuration: launch.configuration,
+                    mode: launch.mode
+                )
+                .environmentObject(session)
             }
             .fullScreenCover(isPresented: $showingStrengthWorkout) {
                 ActiveStrengthWorkoutView()
@@ -10047,21 +10073,15 @@ struct ATHLTHTrainView: View {
     }
 
     private var customQuickStartAvailable: Bool {
-        watchConnection.isReady &&
         phoneWorkout.active == nil &&
         strengthWorkout.activeWorkout == nil
     }
 
     private var quickStartCustomSubtitle: String {
-        customQuickStartAvailable
-            ? ATHLTHLocalization.choose(
-                english: "Build yours",
-                norwegian: "Lag egen"
-            )
-            : ATHLTHLocalization.choose(
-                english: "Watch",
-                norwegian: "Watch"
-            )
+        ATHLTHLocalization.choose(
+            english: "iPhone or Apple Watch",
+            norwegian: "iPhone eller Apple Watch"
+        )
     }
 
     private func quickStartSubtitle(
@@ -10168,8 +10188,8 @@ struct ATHLTHTrainView: View {
                 showingCustomQuickStart = true
             } else {
                 watchTransferError = ATHLTHLocalization.choose(
-                    english: "Connect Apple Watch and finish the active workout before choosing another training type.",
-                    norwegian: "Koble til Apple Watch og avslutt en aktiv økt før du velger en annen treningsform."
+                    english: "Finish your active workout before starting another.",
+                    norwegian: "Avslutt økten som pågår før du starter en ny."
                 )
             }
         case .mobility, .recovery:
@@ -10234,18 +10254,28 @@ struct ATHLTHTrainView: View {
     private func startCustomWorkoutOnWatch(
         _ configuration: CustomQuickWorkoutConfiguration
     ) {
-        guard watchConnection.isReady
-        else {
+        guard watchConnection.isReady else {
+            watchTransferError = ATHLTHLocalization.choose(
+                english: "Apple Watch is not available. Choose iPhone timing or log the workout manually.",
+                norwegian: "Apple Watch er ikke tilgjengelig. Velg tidtaking på iPhone eller registrer økten manuelt."
+            )
+            return
+        }
+        guard customQuickStartAvailable else {
+            watchTransferError = ATHLTHLocalization.choose(
+                english: "A workout is already active.",
+                norwegian: "Du har allerede en aktiv økt."
+            )
             return
         }
 
         Task {
             do {
-                try await watchConnection.startWorkoutOnWatch(
-                    configuration.activity.watchKind
-                )
                 watchConnection.sendAudioCoachConfiguration(
                     configuration.audioCoach
+                )
+                try await watchConnection.startWorkoutOnWatch(
+                    configuration.activity.watchKind
                 )
                 watchTransferMessage =
                     "\(configuration.title) started on Apple Watch · \(configuration.detail)."
@@ -10954,8 +10984,10 @@ struct ATHLTHTrainView: View {
             if customQuickStartAvailable {
                 showingCustomQuickStart = true
             } else {
-                watchTransferError =
-                    "Connect Apple Watch to use Custom Quick Train."
+                watchTransferError = ATHLTHLocalization.choose(
+                    english: "Finish your current workout first.",
+                    norwegian: "Avslutt økten som pågår først."
+                )
             }
 
         case .ghost:
