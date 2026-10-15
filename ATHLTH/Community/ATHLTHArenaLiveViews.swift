@@ -202,6 +202,10 @@ struct ATHLTHArenaOnlineSection: View {
     /// Compact Arena landing preview; the full destination owns history,
     /// filters and all previously available competition actions.
     var compact = false
+
+    init(compact: Bool = false) {
+        self.compact = compact
+    }
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
 
