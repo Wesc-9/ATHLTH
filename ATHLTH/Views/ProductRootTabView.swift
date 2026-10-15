@@ -723,7 +723,9 @@ struct ATHLTHHomeView: View {
                         }
                     )
 
-                    HStack(spacing: 7) {
+                    // Four equally sized 44pt hit areas in one restrained
+                    // frosted capsule. Keeps all destinations and counters.
+                    HStack(spacing: 0) {
                         HomeHeroUtilityButtons(
                             challengeInviteUnreadCount:
                                 social.inboxEvents.filter {
@@ -741,12 +743,25 @@ struct ATHLTHHomeView: View {
                             ATHLTHProfileView()
                         } label: {
                             homeProfileShortcut
-                                .frame(width: 36, height: 36)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Profile")
+                        .accessibilityLabel(
+                            ATHLTHLocalization.choose(
+                                english: "Profile", norwegian: "Profil"
+                            )
+                        )
                     }
-                    .padding(.top, 64)
+                    .padding(.horizontal, 5)
+                    .background(Color.black.opacity(0.27), in: Capsule())
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(Color.white.opacity(0.38), lineWidth: 0.8)
+                    }
+                    .shadow(color: .black.opacity(0.10), radius: 9, y: 4)
+                    .padding(.top, 60)
                     .padding(.trailing, 16)
                 }
             } content: {
@@ -5072,7 +5087,7 @@ private struct HomeHeroUtilityButtons: View {
     }
 
     var body: some View {
-        HStack(spacing: 7) {
+        HStack(spacing: 0) {
             heroButton(
                 icon: "magnifyingglass",
                 action: onSearch
@@ -5123,25 +5138,10 @@ private struct HomeHeroUtilityButtons: View {
     ) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(
-                    .system(
-                        size: 15,
-                        weight: .semibold
-                    )
-                )
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: 36, height: 36)
-                .background(
-                    Color.black.opacity(0.20),
-                    in: Circle()
-                )
-                .overlay {
-                    Circle()
-                        .stroke(
-                            Color.white.opacity(0.30),
-                            lineWidth: 0.8
-                        )
-                }
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -5152,55 +5152,23 @@ private struct HomeHeroUtilityButtons: View {
     ) -> some View {
         ZStack(alignment: .topTrailing) {
             Image(systemName: icon)
-                .font(
-                    .system(
-                        size: 15,
-                        weight: .semibold
-                    )
-                )
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: 36, height: 36)
-                .background(
-                    Color.black.opacity(0.20),
-                    in: Circle()
-                )
-                .overlay {
-                    Circle()
-                        .stroke(
-                            Color.white.opacity(0.30),
-                            lineWidth: 0.8
-                        )
-                }
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
 
             if count > 0 {
                 Text(count > 99 ? "99+" : "\(count)")
-                    .font(
-                        .system(
-                            size: 8,
-                            weight: .bold
-                        )
-                    )
+                    .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(.white)
-                    .frame(
-                        minWidth: 14,
-                        minHeight: 14
-                    )
-                    .padding(
-                        .horizontal,
-                        count > 9 ? 2 : 0
-                    )
-                    .background(
-                        .red,
-                        in: Capsule()
-                    )
+                    .frame(minWidth: 15, minHeight: 15)
+                    .padding(.horizontal, count > 9 ? 2 : 0)
+                    .background(.red, in: Capsule())
                     .overlay {
-                        Capsule()
-                            .stroke(
-                                .white,
-                                lineWidth: 1
-                            )
+                        Capsule().strokeBorder(.white.opacity(0.9), lineWidth: 0.8)
                     }
-                    .offset(x: 4, y: -4)
+                    .offset(x: -1, y: -1)
+                    .allowsHitTesting(false)
             }
         }
     }
