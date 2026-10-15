@@ -121,6 +121,13 @@ struct ATHLTHTrainProgressPremiumView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .onAppear {
+            // Progress must also be useful to people who train without plans.
+            if plan == nil { selectedProgressArea = .general }
+        }
+        .onChange(of: session.activePlan?.id) { _, newPlanID in
+            if newPlanID == nil { selectedProgressArea = .general }
+        }
         .sheet(isPresented: $showingDetailedAnalysis) {
             if let plan {
                 TrainingPlanProgressDetailView(planID: plan.id)
