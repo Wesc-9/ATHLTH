@@ -37,7 +37,7 @@ final class TrainingPlanWeekEditorTests: XCTestCase {
 
     func testAdvancedPlanJourneyCollectsStartingPointFirst() {
         let stages = ATHLTHPlanJourney.sequence(advanced: true)
-        XCTAssertEqual(stages, [.mode, .source, .basics, .profile, .week, .review])
+        XCTAssertEqual(stages, [.mode, .basics, .profile, .week, .review])
         XCTAssertEqual(
             ATHLTHPlanJourney.previous(before: .week, advanced: true), .profile
         )
