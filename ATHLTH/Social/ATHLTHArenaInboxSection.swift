@@ -6,7 +6,7 @@ import SwiftUI
 struct ATHLTHArenaInboxSection: View {
     @EnvironmentObject private var session: AppSessionStore
 
-    /// priority, direct or groups; other filters hide Arena conversations.
+    /// all, direct or groups; unread and archive omit Arena rows without read state.
     let filterKey: String
     let onVisibleCountChanged: (Int) -> Void
 
@@ -27,7 +27,7 @@ struct ATHLTHArenaInboxSection: View {
     private var visible: [Entry] {
         entries.filter { entry in
             switch filterKey {
-            case "priority":
+            case "all":
                 return entry.isReplacement ||
                     entry.membership?.response == "invited" ||
                     entry.membership?.response == "accepted"
@@ -125,7 +125,7 @@ struct ATHLTHArenaInboxSection: View {
         .task(id: session.profile.userID) { await reload() }
         .task(id: filterKey) {
             onVisibleCountChanged(visible.count)
-            if filterKey == "priority" || filterKey == "groups" || filterKey == "direct" {
+            if filterKey == "all" || filterKey == "groups" || filterKey == "direct" {
                 await reload()
             }
         }
