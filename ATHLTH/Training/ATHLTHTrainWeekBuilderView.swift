@@ -554,6 +554,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     @State private var showIntervalComposer = false
     @State private var showDetailedComposer = false
     @State private var showStructureConflict = false
+    @State private var showRemoveDetailedStructure = false
     @State private var scheduled = false
     @State private var clockTime = Date()
     @State private var durationWasEditedManually: Bool
@@ -692,6 +693,10 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                             ? "hybrid" : hasRun ? "running" : "strength"
                         draft.workoutBlocks = blocks
                         draft.routeID = hasRun ? routeID : nil
+                        // These legacy single-run fields must not compete with
+                        // the structured steps when launching this workout.
+                        draft.targetDistanceKilometers = nil
+                        draft.targetPaceSecondsPerKilometer = nil
                         draft.title = title
                         if !durationWasEditedManually, let knownMinutes {
                             draft.durationMinutes = min(max(knownMinutes, 5), 240)
@@ -709,6 +714,27 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                 Text(tr(
                     "The detailed block builder uses a different execution format. Keep editing existing sets here; to build a mixed workout with independent rests, start a new empty workout. Nothing has been removed.",
                     "Den detaljerte blokkbyggeren bruker et annet øktformat. Du kan fortsette å redigere sett her. For økter med egne pauseblokker, start med en tom økt og velg detaljert øktbygger. Ingenting slettes."
+                ))
+            }
+            .confirmationDialog(
+                tr("Remove detailed workout structure?",
+                   "Fjerne det detaljerte øktoppsettet?"),
+                isPresented: $showRemoveDetailedStructure,
+                titleVisibility: .visible
+            ) {
+                Button(tr("Remove detailed blocks", "Fjern øktblokker"),
+                       role: .destructive) {
+                    draft.workoutBlocks = nil
+                    draft.workoutCategory = nil
+                    draft.routeID = nil
+                    draft.kind = .strength
+                    durationWasEditedManually = false
+                }
+                Button(tr("Cancel", "Avbryt"), role: .cancel) {}
+            } message: {
+                Text(tr(
+                    "The changes apply only when you save this workout.",
+                    "Endringen lagres først når du lagrer treningsøkten."
                 ))
             }
             .sheet(isPresented: $showSharedWorkoutTemplates) {
@@ -970,6 +996,16 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                 .padding(10)
                 .editorSurface(line: line)
             }
+            Button(role: .destructive) {
+                showRemoveDetailedStructure = true
+            } label: {
+                Label(tr("Remove detailed setup", "Fjern detaljert oppsett"),
+                      systemImage: "trash")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(muted)
+                    .padding(.vertical, 6)
+            }
+            .buttonStyle(.plain)
         }
     }
 
