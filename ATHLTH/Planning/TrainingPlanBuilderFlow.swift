@@ -38,6 +38,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var workoutTitleOverridesByDay: [Int: String] = [:]
     @State private var workoutMinutesByDay: [Int: Int] = [:]
     @State private var editingWeekDay: WeekDayEditorSelection?
+    @State private var composingAdvancedDay: WeekDayEditorSelection?
+    @State private var structuredWorkoutsByDay:
+        [Int: ATHLTHPlanStructuredWorkoutBlueprint] = [:]
 
     private struct WeekDayEditorSelection: Identifiable {
         let id: Int
@@ -466,6 +469,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .onChange(of: workoutTitleOverridesByDay) { _, _ in saveResumableDraft() }
         .onChange(of: workoutMinutesByDay) { _, _ in saveResumableDraft() }
         .onChange(of: selectedDays) { _, _ in
+            structuredWorkoutsByDay = structuredWorkoutsByDay
+                .filter { selectedDays.contains($0.key) }
             workoutKindOverridesByDay = workoutKindOverridesByDay
                 .filter { selectedDays.contains($0.key) }
             workoutTitleOverridesByDay = workoutTitleOverridesByDay
@@ -3191,6 +3196,18 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                      "\(resolvedWorkoutMinutes(for: day)) min")
                                     .font(.caption)
                                     .foregroundStyle(ATHLTHTheme.mutedText)
+                                if mode == .advanced,
+                                   let workout = structuredWorkoutsByDay[day] {
+                                    Label(
+                                        "\(workout.blocks.count) " +
+                                        ATHLTHLocalization.choose(
+                                            english: "detailed blocks", norwegian: "øktblokker"
+                                        ),
+                                        systemImage: "checkmark.circle.fill"
+                                    )
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                }
                             }
                             Spacer(minLength: 0)
                             Image(systemName: "slider.horizontal.3")
@@ -3314,6 +3331,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             }
                         }
                         .pickerStyle(.menu)
+                        .disabled(mode == .advanced && structuredWorkoutsByDay[day] != nil)
                     }
                     .padding(16)
                     .background(.white, in: RoundedRectangle(cornerRadius: 18))
@@ -3376,12 +3394,84 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     .padding(16)
                     .background(.white, in: RoundedRectangle(cornerRadius: 18))
 
-                    Text(ATHLTHLocalization.choose(
-                        english: "This is your starting workout. You can add exercises, interval steps, sets and more in the plan editor later.",
-                        norwegian: "Dette er startøkten. Øvelser, intervaller, sett og andre detaljer kan bygges videre på i planredigeringen."
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    if mode == .advanced {
+                        VStack(alignment: .leading, spacing: 13) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "DETAILED WORKOUT", norwegian: "DETALJERT ØKT"
+                                ),
+                                systemImage: "square.stack.3d.up"
+                            )
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                            Text(ATHLTHLocalization.choose(
+                                english: "Build warm-up, running, exercises, sets, supersets, intervals, recovery and cool-down right now, before saving the plan.",
+                                norwegian: "Bygg oppvarming, løping, øvelser, sett, supersett, intervaller, pauser og nedtrapping nå – før du lagrer planen."
+                            ))
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+
+                            if let detail = structuredWorkoutsByDay[day] {
+                                Label(
+                                    "\(detail.blocks.count) " + ATHLTHLocalization.choose(
+                                        english: "blocks ready", norwegian: "blokker klare"
+                                    ),
+                                    systemImage: "checkmark.seal.fill"
+                                )
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .font(.subheadline.weight(.semibold))
+                            }
+
+                            Button {
+                                composingAdvancedDay = WeekDayEditorSelection(id: day)
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "dumbbell.fill")
+                                    Text(structuredWorkoutsByDay[day] == nil
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Build workout in ATHLTH Studio",
+                                            norwegian: "Bygg økten i ATHLTH Studio"
+                                          )
+                                        : ATHLTHLocalization.choose(
+                                            english: "Edit detailed workout",
+                                            norwegian: "Rediger detaljert økt"
+                                          ))
+                                    Spacer()
+                                    Image(systemName: "arrow.up.right")
+                                }
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .padding(15)
+                                .background(ATHLTHTheme.accentDeep,
+                                            in: RoundedRectangle(cornerRadius: 15))
+                            }
+                            .buttonStyle(.plain)
+
+                            if structuredWorkoutsByDay[day] != nil {
+                                Button(role: .destructive) {
+                                    structuredWorkoutsByDay.removeValue(forKey: day)
+                                } label: {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english: "Remove detailed workout",
+                                            norwegian: "Fjern detaljert økt"
+                                        ),
+                                        systemImage: "trash"
+                                    )
+                                    .font(.caption.weight(.medium))
+                                }
+                                Text(ATHLTHLocalization.choose(
+                                    english: "To change the workout type, remove the detailed blocks first. This does not delete other days.",
+                                    norwegian: "For å endre treningsform må du først fjerne de detaljerte blokkene. Andre dager påvirkes ikke."
+                                ))
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                        }
+                        .padding(17)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 18))
+                    }
                 }
                 .padding(18)
             }
@@ -3397,6 +3487,33 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     }
                     .fontWeight(.semibold)
                 }
+            }
+            .sheet(item: $composingAdvancedDay) { selection in
+                WorkoutTemplateBuilderView(
+                    initialTitle: resolvedWorkoutTitle(for: selection.id),
+                    initialBlocks: structuredWorkoutsByDay[selection.id]?.blocks ?? [],
+                    initialRouteID: structuredWorkoutsByDay[selection.id]?.routeID,
+                    onSaveToPlan: { name, blocks, routeID in
+                        guard mode == .advanced, selectedDays.contains(selection.id) else {
+                            return
+                        }
+                        let containsRunning = blocks.contains { $0.kind == .run }
+                        let containsStrength = blocks.contains { $0.kind == .exercise }
+                        let workoutKind: WorkoutKind = containsRunning && containsStrength
+                            ? .custom : containsRunning ? .running : .strength
+                        let choice = ATHLTHPlanStructuredWorkoutBlueprint(
+                            title: name,
+                            kind: workoutKind,
+                            durationMinutes: resolvedWorkoutMinutes(for: selection.id),
+                            routeID: routeID,
+                            blocks: blocks
+                        )
+                        guard choice.isValid else { return }
+                        structuredWorkoutsByDay[selection.id] = choice
+                        workoutTitleOverridesByDay[selection.id] = name
+                        workoutKindOverridesByDay[selection.id] = workoutKind
+                    }
+                )
             }
         }
     }
