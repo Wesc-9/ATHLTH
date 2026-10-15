@@ -596,15 +596,13 @@ final class ExerciseLibraryStore: ObservableObject {
             return cachedBodyParts
         }
 
-        let resolved =
-            Array(
-                Set(
-                    allExercises.compactMap {
-                        $0.bodyPart
-                    }
-                )
-            )
-            .sorted()
+        // Filter options must come from the same catalog users can select.
+        // Include actual primary muscles so "Biceps" finds curl exercises
+        // even when RepDB labels their body part as "Upper Arms".
+        let resolved = Array(Set(selectableExercises.flatMap { entry in
+            ([entry.bodyPart].compactMap { $0 } + entry.exercise.primaryMuscles)
+                .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        })).sorted()
 
         cachedBodyParts = resolved
         return resolved
@@ -618,7 +616,7 @@ final class ExerciseLibraryStore: ObservableObject {
         let resolved =
             Array(
                 Set(
-                    allExercises.flatMap {
+                    selectableExercises.flatMap {
                         $0.exercise.equipment
                     }
                 )
@@ -755,10 +753,16 @@ final class ExerciseLibraryStore: ObservableObject {
                 }
             }
 
-            let matchesBodyPart =
-                bodyPart == nil ||
-                bodyPart == "All" ||
-                entry.bodyPart == bodyPart
+            let matchesBodyPart: Bool
+            if let bodyPart, bodyPart != "All" {
+                matchesBodyPart =
+                    entry.bodyPart?.localizedCaseInsensitiveCompare(bodyPart) == .orderedSame ||
+                    entry.exercise.primaryMuscles.contains {
+                        $0.localizedCaseInsensitiveCompare(bodyPart) == .orderedSame
+                    }
+            } else {
+                matchesBodyPart = true
+            }
 
             let matchesEquipment = equipment.map {
                 $0 == "All" ||
@@ -952,7 +956,18 @@ final class ExerciseLibraryStore: ObservableObject {
         case "shoulders":
             return ["Shoulders"]
         case "upper arms":
-            return ["Biceps", "Triceps"]
+            // An upper-arm exercise does not train both muscles equally.
+            // Avoid labeling a triceps movement as a biceps exercise.
+            let name = source.nameEnglish.lowercased()
+            if name.contains("tricep") || name.contains("pushdown") ||
+                name.contains("push-down") || name.contains("extension") {
+                return ["Triceps"]
+            }
+            if name.contains("bicep") || name.contains("curl") ||
+                name.contains("preacher") || name.contains("hammer") {
+                return ["Biceps"]
+            }
+            return ["Upper Arms"]
         case "lower arms":
             return ["Forearms"]
         case "core", "waist":
