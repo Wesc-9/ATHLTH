@@ -3059,265 +3059,258 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private var weeklyPreview: some View {
-        VStack(spacing: 7) {
-            if !workoutKindOverridesByDay.isEmpty {
-                HStack {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Customised week",
-                            norwegian: "Tilpasset uke"
-                        )
-                    )
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(
-                        ATHLTHTheme.accentDeep
-                    )
+        VStack(spacing: 8) {
+            HStack {
+                Text(ATHLTHLocalization.choose(
+                    english: "Your week, your workouts",
+                    norwegian: "Din uke, dine økter"
+                ))
+                .font(.subheadline.weight(.semibold))
+                Spacer()
+                if !workoutKindOverridesByDay.isEmpty ||
+                   !workoutTitleOverridesByDay.isEmpty ||
+                   !workoutMinutesByDay.isEmpty {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Restore suggestions", norwegian: "Nullstill forslag"
+                    )) {
+                        workoutKindOverridesByDay.removeAll()
+                        workoutTitleOverridesByDay.removeAll()
+                        workoutMinutesByDay.removeAll()
+                    }
+                    .font(.caption.weight(.semibold))
+                }
+            }
+            .padding(.bottom, 3)
 
-                    Spacer()
-
+            ForEach(1...7, id: \.self) { day in
+                if selectedDays.contains(day) {
                     Button {
-                        withAnimation(
-                            .easeOut(duration: 0.16)
-                        ) {
-                            workoutKindOverridesByDay
-                                .removeAll()
-                        }
+                        editingWeekDay = WeekDayEditorSelection(id: day)
                     } label: {
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english: "Use suggestions",
-                                norwegian: "Bruk forslag"
-                            )
-                        )
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(
-                            ATHLTHTheme.accentDeep
-                        )
+                        HStack(spacing: 12) {
+                            Image(systemName: resolvedWorkoutKind(for: day).systemImage)
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .frame(width: 44, height: 44)
+                                .background(ATHLTHTheme.accentSoft,
+                                            in: RoundedRectangle(cornerRadius: 13))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(fullDayName(day))
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                Text(resolvedWorkoutTitle(for: day))
+                                    .font(.subheadline.weight(.bold))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                                Text(resolvedWorkoutKind(for: day).title + " · " +
+                                     "\(resolvedWorkoutMinutes(for: day)) min")
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .frame(width: 36, height: 36)
+                                .background(ATHLTHTheme.accentSoft,
+                                            in: Circle())
+                        }
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.white.opacity(0.85),
+                                    in: RoundedRectangle(cornerRadius: 18))
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        fullDayName(day) + ", " + resolvedWorkoutTitle(for: day) +
+                        ". " + ATHLTHLocalization.choose(english: "Edit workout", norwegian: "Rediger økten")
+                    )
+                } else {
+                    HStack(spacing: 12) {
+                        Image(systemName: "moon.stars.fill")
+                            .foregroundStyle(ATHLTHTheme.recoveryBlue)
+                            .frame(width: 44, height: 44)
+                            .background(ATHLTHTheme.recoveryBlueSoft,
+                                        in: RoundedRectangle(cornerRadius: 13))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(fullDayName(day)).font(.caption.weight(.semibold))
+                            Text(ATHLTHLocalization.choose(english: "Rest day", norwegian: "Hviledag"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button(ATHLTHLocalization.choose(english: "Add", norwegian: "Legg til")) {
+                            selectedDays.insert(day)
+                            sessionsPerWeek = selectedDays.count
+                            editingWeekDay = WeekDayEditorSelection(id: day)
+                        }
+                        .font(.caption.weight(.semibold))
+                    }
+                    .padding(12)
+                    .background(Color.white.opacity(0.46),
+                                in: RoundedRectangle(cornerRadius: 18))
                 }
-                .padding(.bottom, 2)
             }
 
-            ForEach(1...7, id: \.self) {
-                dayIndex in
-                let isTraining =
-                    selectedDays.contains(
-                        dayIndex
-                    )
-                let kind =
-                    isTraining
-                        ? resolvedWorkoutKind(
-                            for: dayIndex
-                        )
-                        : nil
+            Label(ATHLTHLocalization.choose(
+                english: "Tap a workout to choose its type, focus and duration. Your choices are used when creating the plan.",
+                norwegian: "Trykk på en økt for å endre type, underkategori og varighet. Valgene brukes når planen opprettes."
+            ), systemImage: "hand.tap")
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .padding(.top, 6)
+        }
+    }
 
-                HStack(spacing: 10) {
-                    Text(
-                        fullDayName(dayIndex)
-                    )
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
-                    .frame(
-                        width: 73,
-                        alignment: .leading
-                    )
+    private func resolvedWorkoutTitle(for day: Int) -> String {
+        if let chosen = workoutTitleOverridesByDay[day],
+           !chosen.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return chosen
+        }
+        return suggestedWorkoutTitle(
+            kind: resolvedWorkoutKind(for: day),
+            slot: trainingSlot(for: day)
+        )
+    }
 
-                    if let kind,
-                       isTraining {
-                        Image(
-                            systemName:
-                                kind.systemImage
-                        )
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(
-                            ATHLTHTheme.accentDeep
-                        )
-                        .frame(width: 30, height: 30)
-                        .background(
-                            ATHLTHTheme.accentSoft,
-                            in: RoundedRectangle(
-                                cornerRadius: 9,
-                                style: .continuous
-                            )
-                        )
+    private func resolvedWorkoutMinutes(for day: Int) -> Int {
+        if let chosen = workoutMinutesByDay[day] { return chosen }
+        if mode == .basic { return simpleMinutes }
+        return max(20, min(180, weeklyTimeBudgetMinutes / max(selectedDays.count, 1)))
+    }
 
-                        Menu {
-                            ForEach(
-                                selectableWorkoutKinds,
-                                id: \.self
-                            ) { option in
-                                Button {
-                                    workoutKindOverridesByDay[
-                                        dayIndex
-                                    ] = option
-                                } label: {
-                                    Label(
-                                        option.title,
-                                        systemImage:
-                                            option.systemImage
-                                    )
-                                }
-                            }
+    private func subtypeTitles(for kind: WorkoutKind) -> [String] {
+        switch kind {
+        case .strength:
+            return ["Helkropp", "Overkropp", "Underkropp", "Push", "Pull", "Bein", "Kjernestyrke", "Egendefinert"]
+        case .running:
+            return ["Rolig løp", "Intervaller", "Langtur", "Tempoøkt", "Bakkeintervaller", "Tredemølle", "Egendefinert"]
+        case .walking:
+            return ["Rolig gåtur", "Rask gange", "Tur i terrenget", "Egendefinert"]
+        case .mobility:
+            return ["Mobilitet", "Tøying", "Yoga", "Egendefinert"]
+        case .recovery:
+            return ["Aktiv restitusjon", "Lett bevegelse", "Egendefinert"]
+        case .custom:
+            return ["Hybridøkt", "Sirkeltrening", "Egendefinert"]
+        }
+    }
 
-                            if workoutKindOverridesByDay[
-                                dayIndex
-                            ] != nil {
-                                Divider()
-
-                                Button {
-                                    workoutKindOverridesByDay[
-                                        dayIndex
-                                    ] = nil
-                                } label: {
-                                    Label(
-                                        ATHLTHLocalization.choose(
-                                            english:
-                                                "Use suggested type",
-                                            norwegian:
-                                                "Bruk foreslått type"
-                                        ),
-                                        systemImage:
-                                            "arrow.uturn.backward"
-                                    )
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 6) {
-                                VStack(
-                                    alignment: .leading,
-                                    spacing: 2
-                                ) {
-                                    Text(
-                                        suggestedWorkoutTitle(
-                                            kind: kind,
-                                            slot:
-                                                trainingSlot(
-                                                    for: dayIndex
-                                                )
-                                        )
-                                    )
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(
-                                        ATHLTHTheme.primaryText
-                                    )
-                                    .lineLimit(1)
-
-                                    HStack(spacing: 4) {
-                                        Text(kind.title)
-                                            .font(.caption2)
-                                            .foregroundStyle(
-                                                ATHLTHTheme.mutedText
-                                            )
-
-                                        if workoutKindOverridesByDay[
-                                            dayIndex
-                                        ] != nil {
-                                            Text("·")
-                                                .foregroundStyle(
-                                                    ATHLTHTheme.mutedText
-                                                )
-
-                                            Text(
-                                                ATHLTHLocalization.choose(
-                                                    english: "Changed",
-                                                    norwegian: "Endret"
-                                                )
-                                            )
-                                            .font(.caption2.weight(.semibold))
-                                            .foregroundStyle(
-                                                ATHLTHTheme.premiumGold
-                                            )
-                                        }
-                                    }
-                                }
-
-                                Spacer(minLength: 4)
-
-                                Image(
-                                    systemName:
-                                        "chevron.up.chevron.down"
-                                )
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(
-                                    ATHLTHTheme.mutedText
-                                )
-                            }
-                            .contentShape(Rectangle())
-                        }
-
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english: "Planned",
-                                norwegian: "Planlagt"
-                            )
-                        )
-                        .font(.caption2)
-                        .foregroundStyle(
-                            ATHLTHTheme.mutedText
-                        )
-                    } else {
-                        Image(
-                            systemName:
-                                "moon.stars.fill"
-                        )
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(
-                            ATHLTHTheme.recoveryBlue
-                        )
-                        .frame(width: 30, height: 30)
-                        .background(
-                            ATHLTHTheme.recoveryBlueSoft,
-                            in: RoundedRectangle(
-                                cornerRadius: 9,
-                                style: .continuous
-                            )
-                        )
-
-                        VStack(
-                            alignment: .leading,
-                            spacing: 2
-                        ) {
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english: "Rest day",
-                                    norwegian: "Hviledag"
-                                )
-                            )
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(
-                                ATHLTHTheme.mutedText
-                            )
-
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "No workout planned",
-                                    norwegian:
-                                        "Ingen økt planlagt"
-                                )
-                            )
-                            .font(.caption2)
-                            .foregroundStyle(
-                                ATHLTHTheme.mutedText
-                                    .opacity(0.78)
-                            )
-                        }
-
-                        Spacer()
+    private func weekDayEditSheet(for day: Int) -> some View {
+        let kind = resolvedWorkoutKind(for: day)
+        return NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(fullDayName(day).uppercased())
+                            .font(.caption.weight(.bold))
+                            .tracking(1.5)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Customize workout", norwegian: "Tilpass treningsøkten"
+                        ))
+                        .font(.title2.weight(.bold))
                     }
+
+                    VStack(alignment: .leading, spacing: 13) {
+                        Text(ATHLTHLocalization.choose(english: "Activity", norwegian: "Treningsform"))
+                            .font(.subheadline.weight(.bold))
+                        Picker(ATHLTHLocalization.choose(english: "Activity", norwegian: "Treningsform"),
+                               selection: Binding(
+                                get: { resolvedWorkoutKind(for: day) },
+                                set: { newKind in
+                                    workoutKindOverridesByDay[day] = newKind
+                                    workoutTitleOverridesByDay[day] = nil
+                                }
+                               )) {
+                            ForEach(selectableWorkoutKinds, id: \.self) { option in
+                                Label(option.title, systemImage: option.systemImage)
+                                    .tag(option)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+                    .padding(16)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 18))
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "What kind of workout?", norwegian: "Hva slags økt?"
+                        ))
+                        .font(.subheadline.weight(.bold))
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 8)], spacing: 8) {
+                            ForEach(subtypeTitles(for: kind), id: \.self) { choice in
+                                Button {
+                                    workoutTitleOverridesByDay[day] = choice
+                                } label: {
+                                    Text(choice)
+                                        .font(.caption.weight(.semibold))
+                                        .multilineTextAlignment(.center)
+                                        .frame(maxWidth: .infinity, minHeight: 44)
+                                        .foregroundStyle(
+                                            resolvedWorkoutTitle(for: day) == choice
+                                                ? .white : ATHLTHTheme.primaryText
+                                        )
+                                        .background(
+                                            resolvedWorkoutTitle(for: day) == choice
+                                                ? ATHLTHTheme.accentDeep : ATHLTHTheme.accentSoft,
+                                            in: RoundedRectangle(cornerRadius: 12)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        TextField(
+                            ATHLTHLocalization.choose(english: "Workout name", norwegian: "Navn på økten"),
+                            text: Binding(
+                                get: { workoutTitleOverridesByDay[day] ?? resolvedWorkoutTitle(for: day) },
+                                set: { workoutTitleOverridesByDay[day] = $0 }
+                            )
+                        )
+                        .textInputAutocapitalization(.sentences)
+                        .padding(12)
+                        .background(ATHLTHTheme.accentSoft.opacity(0.7),
+                                    in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    .padding(16)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 18))
+
+                    VStack(alignment: .leading, spacing: 9) {
+                        Text(ATHLTHLocalization.choose(english: "Duration", norwegian: "Varighet"))
+                            .font(.subheadline.weight(.bold))
+                        Stepper(
+                            "\(resolvedWorkoutMinutes(for: day)) min",
+                            value: Binding(
+                                get: { resolvedWorkoutMinutes(for: day) },
+                                set: { workoutMinutesByDay[day] = $0 }
+                            ),
+                            in: 15...180,
+                            step: 5
+                        )
+                    }
+                    .padding(16)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 18))
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "This is your starting workout. You can add exercises, interval steps, sets and more in the plan editor later.",
+                        norwegian: "Dette er startøkten. Øvelser, intervaller, sett og andre detaljer kan bygges videre på i planredigeringen."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
                 }
-                .padding(.horizontal, 10)
-                .frame(minHeight: 52)
-                .background(
-                    Color.white.opacity(0.56),
-                    in: RoundedRectangle(
-                        cornerRadius: 13,
-                        style: .continuous
-                    )
-                )
+                .padding(18)
+            }
+            .background(ATHLTHPremiumCanvas(accent: ATHLTHTheme.accent.opacity(0.18)))
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Edit day", norwegian: "Rediger dag"
+            ))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Done", norwegian: "Ferdig")) {
+                        editingWeekDay = nil
+                    }
+                    .fontWeight(.semibold)
+                }
             }
         }
     }
