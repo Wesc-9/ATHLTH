@@ -77,3 +77,53 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
         }
     }
 }
+
+/// A dated override for a single day of a multi-week plan.
+/// Keys use (zero-based weekIndex * 7 + calendar weekday, Monday = 1).
+/// Other weeks retain the template. Optional fields allow incremental edits.
+struct ATHLTHPlanWeekDayEdit: Codable, Hashable {
+    var kind: WorkoutKind?
+    var title: String?
+    var durationMinutes: Int?
+    var detailedWorkout: ATHLTHPlanStructuredWorkoutBlueprint?
+
+    func applying(to original: PlannedSession?) -> PlannedSession {
+        var result = original ?? PlannedSession(
+            id: UUID(), title: title ?? kind?.title ?? "Workout",
+            kind: kind ?? .strength, scheduledStart: nil,
+            durationMinutes: durationMinutes ?? 45,
+            targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [], notes: nil
+        )
+        if let detailedWorkout, detailedWorkout.isValid {
+            result = detailedWorkout.applying(to: result)
+        } else {
+            if let kind { result.kind = kind }
+            if let title, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                result.title = title
+            }
+            if let durationMinutes { result.durationMinutes = min(max(durationMinutes, 5), 240) }
+        }
+        return result
+    }
+
+    static func apply(
+        _ edits: [Int: ATHLTHPlanWeekDayEdit],
+        to weeks: inout [TrainingPlanWeek],
+        startDate: Date
+    ) {
+        let calendar = Calendar.current
+        let startWeekday = (calendar.component(.weekday, from: startDate) + 5) % 7 + 1
+        for (key, edit) in edits where key >= 1 {
+            let weekIndex = (key - 1) / 7
+            let weekday = (key - 1) % 7 + 1
+            guard weeks.indices.contains(weekIndex) else { continue }
+            let relativeDay = (weekday - startWeekday + 7) % 7 + 1
+            guard let dayIndex = weeks[weekIndex].days.firstIndex(
+                where: { $0.dayIndex == relativeDay }
+            ) else { continue }
+            let previous = weeks[weekIndex].days[dayIndex].sessions.first
+            weeks[weekIndex].days[dayIndex].sessions = [edit.applying(to: previous)]
+        }
+    }
+}
