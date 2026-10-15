@@ -107,10 +107,15 @@ struct ATHLTHPlanWeekDayEdit: Codable, Hashable {
         if let detailedWorkout, detailedWorkout.isValid {
             result = detailedWorkout.applying(to: result)
         } else {
-            if kind != nil && kind != result.kind {
-                // Changing from strength to walking/running cannot inherit the
-                // exercises, targets or route of the old seeded session.
+            if let kind, kind != result.kind {
+                // A changed training type cannot inherit a previous activity's
+                // strength exercises, running recipe, route or structured steps.
                 result.exercises = []
+                result.workoutBlocks = nil
+                result.workoutTemplateID = nil
+                result.workoutCategory = nil
+                result.runningWorkout = nil
+                result.runningWorkouts = nil
                 result.targetDistanceKilometers = nil
                 result.targetPaceSecondsPerKilometer = nil
                 result.routeID = nil
