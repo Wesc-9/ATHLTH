@@ -2506,6 +2506,9 @@ final class CommunityGroupStore: ObservableObject {
     func refresh(force: Bool = false) async {
         guard let userID = currentUserID else {
             groups = []
+            recentChatActivityByGroup = [:]
+            recentChatActivityUserID = nil
+            lastRecentChatRefreshAt = nil
             ownMemberships = []
             ownJoinRequests = []
             ownInvites = []
@@ -2663,6 +2666,10 @@ final class CommunityGroupStore: ObservableObject {
             }
 
             groups = loadedGroups
+            let stillJoined = Set(loadedMemberships.map(\.groupID))
+            recentChatActivityByGroup = recentChatActivityByGroup.filter {
+                stillJoined.contains($0.key)
+            }
             canLoadMoreGroups =
                 discoveryGroups.count >= groupFetchLimit
             lastRefreshAt = Date()
