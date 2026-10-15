@@ -5173,6 +5173,8 @@ struct ATHLTHTrainView: View {
     @State private var selectedStrengthSession: PlannedSession?
     @State private var selectedPlanWorkout: PlannedWorkoutSelection?
     @State private var selectedSuggestedWorkout: WorkoutTemplateCatalogEntry?
+    // Retained across Train tabs; avoid reloading the catalog on every visit.
+    @StateObject private var trainWorkoutCatalog = WorkoutTemplateCatalogStore()
     @State private var pendingRunningTemplate: RunningWorkoutTemplate?
     @State private var pendingPlannedEnduranceWorkout: PlannedWorkoutSelection?
     @State private var showingRunQuickStart = false
@@ -5981,6 +5983,7 @@ struct ATHLTHTrainView: View {
         } ?? 0
 
         ATHLTHTrainTodayPremiumView(
+            workoutCatalog: trainWorkoutCatalog,
             plan: active,
             sessions: sessions,
             completedIDs: completedIDs,
