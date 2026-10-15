@@ -1538,13 +1538,13 @@ struct WorkoutTemplateBuilderView: View {
     @State private var showingDiscardConfirmation = false
     /// Present from advanced plan creation to edit a specific weekday
     /// without creating an unwanted shared workout template.
-    private let onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?) -> Void)?
+    private let onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?) -> Void)?
 
     init(
         initialTitle: String = "",
         initialBlocks: [WorkoutTemplateBlock] = [],
         initialRouteID: UUID? = nil,
-        onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?) -> Void)? = nil
+        onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?) -> Void)? = nil
     ) {
         _title = State(initialValue: initialTitle)
         _blocks = State(initialValue: initialBlocks)
@@ -2698,7 +2698,7 @@ struct WorkoutTemplateBuilderView: View {
         workout.workoutBlocks = blocks
         workout.workoutCategory = category
         if let onSaveToPlan {
-            onSaveToPlan(cleanTitle, blocks, hasRunning ? selectedRouteID : nil)
+            onSaveToPlan(cleanTitle, blocks, hasRunning ? selectedRouteID : nil, knownDurationMinutes)
         } else {
             session.saveSharedWorkout(workout)
         }
