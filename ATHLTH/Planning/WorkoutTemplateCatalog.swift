@@ -761,6 +761,16 @@ struct WorkoutTemplateLibraryView: View {
 struct WorkoutTemplateDetailView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
+    @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
+    @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+
+    private var hasActiveWorkout: Bool {
+        phoneWorkout.active != nil ||
+        strengthWorkout.activeWorkout != nil ||
+        watchConnection.hasActiveWatchWorkout ||
+        ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
+    }
 
     let entry: WorkoutTemplateCatalogEntry
 
@@ -906,6 +916,7 @@ struct WorkoutTemplateDetailView: View {
                     .disabled(saved)
 
                     Button {
+                        guard !hasActiveWorkout else { return }
                         showingWorkout = true
                     } label: {
                         Label(
@@ -918,6 +929,16 @@ struct WorkoutTemplateDetailView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(ATHLTHTheme.accentDeep)
+                    .disabled(hasActiveWorkout)
+                }
+
+                if hasActiveWorkout {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Finish the active workout before starting another.",
+                        norwegian: "Fullfør økten som pågår før du starter en ny."
+                    ), systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
                 }
             }
             .padding(18)
