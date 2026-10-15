@@ -591,6 +591,20 @@ final class ExerciseLibraryStore: ObservableObject {
         return resolved
     }
 
+    /// Dataset anatomy can use scientific names such as "biceps brachii".
+    /// Filter labels stay readable while the exercise metadata stays intact.
+    static func canonicalMuscleFilter(_ raw: String) -> String {
+        let key = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if key.contains("biceps") { return "Biceps" }
+        if key.contains("triceps") { return "Triceps" }
+        if key.contains("pectoralis") { return "Chest" }
+        if key.contains("deltoid") { return "Shoulders" }
+        if key.contains("latissimus") { return "Back" }
+        if key.contains("quadriceps") { return "Quads" }
+        if key.contains("gastrocnemius") || key.contains("soleus") { return "Calves" }
+        return raw
+    }
+
     var bodyParts: [String] {
         if let cachedBodyParts {
             return cachedBodyParts
@@ -601,6 +615,7 @@ final class ExerciseLibraryStore: ObservableObject {
         // even when RepDB labels their body part as "Upper Arms".
         let resolved = Array(Set(selectableExercises.flatMap { entry in
             ([entry.bodyPart].compactMap { $0 } + entry.exercise.primaryMuscles)
+                .map(Self.canonicalMuscleFilter)
                 .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         })).sorted()
 
@@ -758,7 +773,8 @@ final class ExerciseLibraryStore: ObservableObject {
                 matchesBodyPart =
                     entry.bodyPart?.localizedCaseInsensitiveCompare(bodyPart) == .orderedSame ||
                     entry.exercise.primaryMuscles.contains {
-                        $0.localizedCaseInsensitiveCompare(bodyPart) == .orderedSame
+                        Self.canonicalMuscleFilter($0)
+                            .localizedCaseInsensitiveCompare(bodyPart) == .orderedSame
                     }
             } else {
                 matchesBodyPart = true
