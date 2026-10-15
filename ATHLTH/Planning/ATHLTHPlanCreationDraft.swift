@@ -9,6 +9,7 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
 
     let schemaVersion: Int
     var title: String
+    var usedDefaultTitle: Bool? = nil
     var weekCount: Int
     var startDate: Date
     var advanced: Bool
@@ -28,11 +29,13 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
     // but strips free-text notes and route IDs for privacy.
     var structuredWorkoutsByDay:
         [Int: ATHLTHPlanStructuredWorkoutBlueprint]? = nil
+    var weekDayEdits: [Int: ATHLTHPlanWeekDayEdit]? = nil
     var savedAt: Date
 
     init(
         title: String,
         weekCount: Int,
+        usedDefaultTitle: Bool = false,
         startDate: Date,
         advanced: Bool,
         source: String,
@@ -45,10 +48,12 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         workoutMinutesByDay: [Int: Int]? = nil,
         structuredWorkoutsByDay:
             [Int: ATHLTHPlanStructuredWorkoutBlueprint]? = nil,
+        weekDayEdits: [Int: ATHLTHPlanWeekDayEdit]? = nil,
         savedAt: Date = Date()
     ) {
         self.schemaVersion = Self.schemaVersion
         self.title = String(title.prefix(40))
+        self.usedDefaultTitle = usedDefaultTitle
         self.weekCount = min(max(weekCount, 1), 52)
         self.startDate = startDate
         self.advanced = advanced
@@ -95,6 +100,28 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
                 sanitized.isEmpty ? nil : sanitized
         } else {
             self.structuredWorkoutsByDay = nil
+        }
+        if advanced, let weekDayEdits {
+            var sanitized: [Int: ATHLTHPlanWeekDayEdit] = [:]
+            for (day, original) in weekDayEdits
+                where (1...(self.weekCount * 7)).contains(day) {
+                var safe = original
+                if let blueprint = safe.detailedWorkout {
+                    var clean = blueprint
+                    clean.routeID = nil
+                    clean.blocks = blueprint.blocks.filter { $0.kind != .note }.map {
+                        var block = $0
+                        block.notes = nil
+                        block.loadNote = nil
+                        return block
+                    }
+                    safe.detailedWorkout = clean.isValid ? clean : nil
+                }
+                sanitized[day] = safe
+            }
+            self.weekDayEdits = sanitized.isEmpty ? nil : sanitized
+        } else {
+            self.weekDayEdits = nil
         }
         self.savedAt = savedAt
     }
