@@ -1298,6 +1298,10 @@ struct TrainingPlanBuilderProfile: Codable, Hashable {
     // per-day workout-type picker was introduced. Missing values keep using
     // the focus-based suggested pattern.
     var preferredWorkoutKindsByDay: [Int: WorkoutKind]? = nil
+    // Optional per-day session details from the plan creation preview.
+    // Existing saved profiles decode unchanged when these are missing.
+    var preferredWorkoutTitlesByDay: [Int: String]? = nil
+    var preferredWorkoutMinutesByDay: [Int: Int]? = nil
 }
 
 /// A named multi-week period inside a training program. This describes
