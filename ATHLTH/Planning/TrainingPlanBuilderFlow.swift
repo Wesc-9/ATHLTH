@@ -3495,7 +3495,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     initialTitle: resolvedWorkoutTitle(for: selection.id),
                     initialBlocks: structuredWorkoutsByDay[selection.id]?.blocks ?? [],
                     initialRouteID: structuredWorkoutsByDay[selection.id]?.routeID,
-                    onSaveToPlan: { name, blocks, routeID, knownMinutes in
+                    onSaveToPlan: { name, blocks, routeID, knownMinutes, _ in
                         guard mode == .advanced, selectedDays.contains(selection.id) else {
                             return
                         }
