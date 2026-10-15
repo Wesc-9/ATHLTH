@@ -168,6 +168,47 @@ extension AIProgramDraft {
     /// An AI proposal must show the same user-authored sessions that will be
     /// saved. This is only a readable preview projection: structured blocks
     /// themselves are applied to the TrainingPlan before persistence.
+    /// The weekly structure was selected *before* opening Coach. Retain it
+    /// even when the model returns a different title/activity or extra slots.
+    /// For a matching activity, preserve AI-generated exercise suggestions.
+    /// For a mismatched activity, never attach incompatible strength exercises
+    /// to an athlete-selected run (or vice versa).
+    func honoringWeekdayChoices(
+        _ choices: [Int: ATHLTHPlanDayPreference],
+        protectedDays: Set<Int> = []
+    ) -> AIProgramDraft {
+        guard !choices.isEmpty else { return self }
+        let updated = weeks.map { week -> AIProgramDraftWeek in
+            let days = week.days.map { day -> AIProgramDraftDay in
+                guard let preference = choices[day.dayIndex],
+                      !protectedDays.contains(day.dayIndex) else {
+                    return day
+                }
+                let proposed = day.sessions.first
+                let sameKind = proposed?.kind == preference.kind.rawValue
+                let matched = AIProgramDraftSession(
+                    title: preference.title,
+                    kind: preference.kind.rawValue,
+                    durationMinutes: min(max(preference.durationMinutes, 5), 240),
+                    targetDistanceKilometers: sameKind
+                        ? proposed?.targetDistanceKilometers : nil,
+                    targetPaceSecondsPerKilometer: sameKind
+                        ? proposed?.targetPaceSecondsPerKilometer : nil,
+                    notes: sameKind ? proposed?.notes : nil,
+                    exercises: sameKind ? (proposed?.exercises ?? []) : []
+                )
+                return AIProgramDraftDay(
+                    dayIndex: day.dayIndex, title: day.title,
+                    sessions: [matched]
+                )
+            }
+            return AIProgramDraftWeek(
+                weekNumber: week.weekNumber, title: week.title, days: days
+            )
+        }
+        return AIProgramDraft(title: title, summary: summary, weeks: updated)
+    }
+
     func displayingLockedWorkouts(
         _ locked: [Int: ATHLTHPlanStructuredWorkoutBlueprint]
     ) -> AIProgramDraft {
