@@ -35,6 +35,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var selectedDays: Set<Int> = [1, 3, 5]
     @State private var workoutKindOverridesByDay:
         [Int: WorkoutKind] = [:]
+    @State private var workoutTitleOverridesByDay: [Int: String] = [:]
+    @State private var workoutMinutesByDay: [Int: Int] = [:]
+    @State private var editingWeekDay: WeekDayEditorSelection?
+
+    private struct WeekDayEditorSelection: Identifiable {
+        let id: Int
+    }
 
     @State private var equipment: EquipmentContext = .gym
     @State private var weeklyTimeBudgetMinutes = 240
@@ -52,7 +59,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var createdPlanID: UUID?
     @State private var showingCreatedPlan = false
     @State private var showingAIBuilder = false
-    @State private var dismissAfterAI = false
     @State private var didApplySuggestedStartDate = false
     @State private var showingPlanDesignLab = false
     @State private var resumablePlanDraft: ATHLTHPlanCreationDraft?
@@ -415,7 +421,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .onChange(of: startDate) { _, _ in saveResumableDraft() }
         .onChange(of: mode) { _, _ in saveResumableDraft() }
         .onChange(of: selectedSource) { _, _ in saveResumableDraft() }
-        .onChange(of: selectedDays) { _, _ in saveResumableDraft() }
+        .onChange(of: selectedDays) { _, _ in
+            workoutKindOverridesByDay = workoutKindOverridesByDay
+                .filter { selectedDays.contains($0.key) }
+            workoutTitleOverridesByDay = workoutTitleOverridesByDay
+                .filter { selectedDays.contains($0.key) }
+            workoutMinutesByDay = workoutMinutesByDay
+                .filter { selectedDays.contains($0.key) }
+            saveResumableDraft()
+        }
         .onChange(of: equipment) { _, _ in saveResumableDraft() }
         .onChange(of: weeklyTimeBudgetMinutes) { _, _ in saveResumableDraft() }
         .onChange(of: step) { _, _ in saveResumableDraft() }
@@ -511,23 +525,25 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .sheet(isPresented: $showingPlanDesignLab) {
             ATHLTHPlanDesignLabView()
         }
-        .sheet(
-            isPresented: $showingAIBuilder,
-            onDismiss: {
-                if dismissAfterAI {
-                    dismiss()
-                }
+        .sheet(isPresented: $showingAIBuilder, onDismiss: {
+            // Coach-created plans use exactly the same persisted preview
+            // and navigation flow as manually created plans.
+            if createdPlanID != nil {
+                showingCreatedPlan = true
             }
-        ) {
+        }) {
             AIProgramBuilderView(
                 mode: .generate,
                 seed: aiBuilderSeed,
-                onProgramCreated: {
+                onProgramCreatedPlanID: { id in
+                    createdPlanID = id
                     completedPlanCreation = true
                     draftStore.clear(userID: session.profile.userID)
-                    dismissAfterAI = true
                 }
             )
+        }
+        .sheet(item: $editingWeekDay) { selection in
+            weekDayEditSheet(for: selection.id)
         }
     }
 
