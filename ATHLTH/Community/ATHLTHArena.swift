@@ -412,6 +412,7 @@ enum ATHLTHArenaTeamStartRules {
 
 /// Shows existing Challenge activity in Arena without copying its rules or data.
 private struct ATHLTHArenaChallengeOverviewSection: View {
+    var hideWhenEmpty = false
     @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var session: AppSessionStore
 
@@ -424,6 +425,8 @@ private struct ATHLTHArenaChallengeOverviewSection: View {
     }
 
     var body: some View {
+        Group {
+        if !hideWhenEmpty || !incoming.isEmpty || !active.isEmpty {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 Image(systemName: "flag.checkered.circle.fill")
@@ -470,6 +473,8 @@ private struct ATHLTHArenaChallengeOverviewSection: View {
                 challengeRow(challenge, invitation: false)
             }
         }
+        }
+        }
     }
 
     private func challengeRow(_ challenge: ATHLTHChallenge, invitation: Bool) -> some View {
@@ -510,6 +515,7 @@ private struct ATHLTHArenaChallengeOverviewSection: View {
 /// Live duels are separate from multi-round scoring until an approved,
 /// server-enforced round-to-race link exists. No GPS tracks are loaded here.
 private struct ATHLTHArenaLiveDuelsSection: View {
+    var hideWhenInactive = false
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var races = GhostFriendRaceStore()
 
@@ -532,7 +538,12 @@ private struct ATHLTHArenaLiveDuelsSection: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 11) {
+        Group {
+            if !hideWhenInactive ||
+                !activeRaces.isEmpty ||
+                !incomingInvites.isEmpty ||
+                !outgoingInvites.isEmpty {
+                VStack(alignment: .leading, spacing: 11) {
             HStack(spacing: 8) {
                 Image(systemName: "bolt.horizontal.circle.fill")
                     .foregroundStyle(ATHLTHTheme.accentDeep)
@@ -689,6 +700,8 @@ private struct ATHLTHArenaLiveDuelsSection: View {
             ))
             .font(.caption)
             .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+            }
         }
         .task { await races.refresh() }
         .onChange(of: scenePhase) { _, phase in
@@ -698,7 +711,6 @@ private struct ATHLTHArenaLiveDuelsSection: View {
 }
 
 struct ATHLTHArenaHomeView: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
 
@@ -727,7 +739,8 @@ struct ATHLTHArenaHomeView: View {
                 // Keep one competition overview rather than multiple
                 // competing quick-start dashboards.
                 ATHLTHArenaOnlineSection()
-                ATHLTHArenaChallengeOverviewSection()
+                    .id(remoteRevision)
+                ATHLTHArenaChallengeOverviewSection(hideWhenEmpty: true)
 
                 // Live activity stays prominent; inactive marketing and
                 // deeper tools are available through the secondary area.
@@ -909,7 +922,6 @@ struct ATHLTHArenaHomeView: View {
             ) {
                 VStack(alignment: .leading, spacing: 14) {
                     ATHLTHArenaSeasonsSection()
-                    ATHLTHArenaLiveDuelsSection()
                     NavigationLink {
                         CommunityGroupsView()
                     } label: {
@@ -1084,7 +1096,15 @@ struct ATHLTHArenaHomeView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityExpanded(showingCreateOptions)
+            .accessibilityValue(
+                showingCreateOptions
+                    ? ATHLTHLocalization.choose(
+                        english: "Expanded", norwegian: "Utvidet"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Collapsed", norwegian: "Sammenslått"
+                    )
+            )
         }
         .padding(19)
         .background(ATHLTHArenaLightStyle.card(25))
