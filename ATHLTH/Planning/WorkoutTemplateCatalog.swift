@@ -1536,6 +1536,21 @@ struct WorkoutTemplateBuilderView: View {
     @State private var pendingNewGroupKind: WorkoutBlockGroupKind?
     @State private var collapsedGroupIDs: Set<UUID> = []
     @State private var showingDiscardConfirmation = false
+    /// Present from advanced plan creation to edit a specific weekday
+    /// without creating an unwanted shared workout template.
+    private let onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?) -> Void)?
+
+    init(
+        initialTitle: String = "",
+        initialBlocks: [WorkoutTemplateBlock] = [],
+        initialRouteID: UUID? = nil,
+        onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?) -> Void)? = nil
+    ) {
+        _title = State(initialValue: initialTitle)
+        _blocks = State(initialValue: initialBlocks)
+        _selectedRouteID = State(initialValue: initialRouteID)
+        self.onSaveToPlan = onSaveToPlan
+    }
 
     private let studioInk = Color(red: 0.08, green: 0.14, blue: 0.27)
     private let studioBlue = Color(red: 0.04, green: 0.43, blue: 0.98)
@@ -1645,7 +1660,9 @@ struct WorkoutTemplateBuilderView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 saveBar
             }
-            .navigationTitle(tr("Create Workout", "Lag treningsøkt"))
+            .navigationTitle(onSaveToPlan == nil
+                ? tr("Create Workout", "Lag treningsøkt")
+                : tr("Build planned workout", "Bygg planlagt økt"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -2680,7 +2697,11 @@ struct WorkoutTemplateBuilderView: View {
         )
         workout.workoutBlocks = blocks
         workout.workoutCategory = category
-        session.saveSharedWorkout(workout)
+        if let onSaveToPlan {
+            onSaveToPlan(cleanTitle, blocks, hasRunning ? selectedRouteID : nil)
+        } else {
+            session.saveSharedWorkout(workout)
+        }
         dismiss()
     }
 
