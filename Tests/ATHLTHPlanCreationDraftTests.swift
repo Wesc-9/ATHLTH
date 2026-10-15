@@ -154,4 +154,58 @@ final class ATHLTHPlanCreationDraftTests: XCTestCase {
         XCTAssertNil(restored.weeklyTimeBudgetMinutes)
     }
 
+    func testAdvancedWorkoutCheckpointRoundTripsWithoutHealthNotesOrRoute() throws {
+        var squat = WorkoutTemplateBlock(
+            sequence: 1, kind: .exercise, title: "Squat",
+            exerciseSlug: "repdb-squat", distanceMeters: nil,
+            repetitions: 8, durationSeconds: nil,
+            targetWeightKilograms: 55, loadNote: "Private load note",
+            notes: "Private exercise note", phase: .main,
+            setCount: 4, restBetweenSetsSeconds: 90
+        )
+        squat.groupRounds = nil
+        let blueprint = ATHLTHPlanStructuredWorkoutBlueprint(
+            title: "Heavy legs", kind: .strength, durationMinutes: 60,
+            routeID: UUID(), blocks: [squat]
+        )
+        let draft = ATHLTHPlanCreationDraft(
+            title: "Strength cycle", weekCount: 4, startDate: Date(),
+            advanced: true, source: "scratch", stage: "week",
+            structuredWorkoutsByDay: [1: blueprint, 8: blueprint]
+        )
+        let bytes = try JSONEncoder().encode(draft)
+        let text = String(decoding: bytes, as: UTF8.self)
+        XCTAssertFalse(text.contains("Private load note"))
+        XCTAssertFalse(text.contains("Private exercise note"))
+        XCTAssertFalse(text.contains(blueprint.routeID!.uuidString))
+        let saved = try JSONDecoder().decode(ATHLTHPlanCreationDraft.self, from: bytes)
+        XCTAssertNil(saved.structuredWorkoutsByDay?[8])
+        let restored = try XCTUnwrap(saved.structuredWorkoutsByDay?[1])
+        XCTAssertNil(restored.routeID)
+        XCTAssertEqual(restored.blocks.first?.setCount, 4)
+        XCTAssertEqual(restored.blocks.first?.restBetweenSetsSeconds, 90)
+        XCTAssertNil(restored.blocks.first?.notes)
+        XCTAssertNil(restored.blocks.first?.loadNote)
+    }
+
+    func testBasicNeverPersistsAdvancedWorkoutBuilder() {
+        let exercise = WorkoutTemplateBlock(
+            sequence: 1, kind: .exercise, title: "Squat",
+            exerciseSlug: "repdb-squat", distanceMeters: nil,
+            repetitions: 10, durationSeconds: nil,
+            targetWeightKilograms: nil, loadNote: nil, notes: nil
+        )
+        let blueprint = ATHLTHPlanStructuredWorkoutBlueprint(
+            title: "Hidden details", kind: .strength,
+            durationMinutes: 30, routeID: nil, blocks: [exercise]
+        )
+        let draft = ATHLTHPlanCreationDraft(
+            title: "Basic walking", weekCount: 8,
+            startDate: Date(), advanced: false,
+            source: "scratch", stage: "basics",
+            structuredWorkoutsByDay: [1: blueprint]
+        )
+        XCTAssertNil(draft.structuredWorkoutsByDay)
+    }
+
 }
