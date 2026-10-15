@@ -5252,17 +5252,21 @@ struct ATHLTHTrainView: View {
                     libraryContent
                         .padding(.horizontal, 16)
                         .padding(.top, 14)
-                        .padding(.bottom, 32)
+                        // Leave room for the floating Train tab bar, including
+                        // the last item of the user's personal library.
+                        .padding(.bottom, 118)
                         .frame(maxWidth: 900)
                         .frame(maxWidth: .infinity)
                 }
                 .scrollIndicators(.hidden)
                 .background(
                     ATHLTHPremiumCanvas(
-                        accent: Color.green.opacity(0.12)
+                        accent: ATHLTHTheme.premiumGold.opacity(0.10)
                     )
                 )
-                .navigationTitle("Library")
+                .navigationTitle(ATHLTHLocalization.choose(
+                    english: "Library", norwegian: "Bibliotek"
+                ))
                 .navigationBarTitleDisplayMode(.inline)
             }
             .navigationDestination(
