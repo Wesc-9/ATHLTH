@@ -3205,8 +3205,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private func effectiveDetailedWorkout(for day: Int) -> ATHLTHPlanStructuredWorkoutBlueprint? {
-        weekDayEdits[weekDayKey(day)]?.detailedWorkout ??
-        structuredWorkoutsByDay[day]
+        if let edit = weekDayEdits[weekDayKey(day)] {
+            if let detailed = edit.detailedWorkout { return detailed }
+            if edit.removeTemplateDetail { return nil }
+        }
+        return structuredWorkoutsByDay[day]
     }
 
     private var weekSelector: some View {
@@ -3328,7 +3331,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                     .font(.caption)
                                     .foregroundStyle(ATHLTHTheme.mutedText)
                                 if mode == .advanced,
-                                   let workout = structuredWorkoutsByDay[day] {
+                                   let workout = effectiveDetailedWorkout(for: day) {
                                     Label(
                                         "\(workout.blocks.count) " +
                                         ATHLTHLocalization.choose(
@@ -3465,6 +3468,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                     updateWeekDay(day) { edit in
                                         edit.kind = newKind
                                         edit.title = nil
+                                        edit.detailedWorkout = nil
+                                        edit.removeTemplateDetail = true
+                                        edit.isCustomTitle = false
                                     }
                                 }
                                )) {
@@ -3487,18 +3493,23 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 8)], spacing: 8) {
                             ForEach(subtypeTitles(for: kind), id: \.self) { choice in
                                 Button {
-                                    updateWeekDay(day) { edit in edit.title = choice }
+                                    updateWeekDay(day) { edit in
+                                        edit.title = choice
+                                        edit.isCustomTitle = choice == "Egendefinert"
+                                        edit.removeTemplateDetail = true
+                                        edit.detailedWorkout = nil
+                                    }
                                 } label: {
                                     Text(choice)
                                         .font(.caption.weight(.semibold))
                                         .multilineTextAlignment(.center)
                                         .frame(maxWidth: .infinity, minHeight: 44)
                                         .foregroundStyle(
-                                            resolvedWorkoutTitle(for: day) == choice
+                                            effectiveWorkoutTitle(for: day) == choice
                                                 ? .white : ATHLTHTheme.primaryText
                                         )
                                         .background(
-                                            resolvedWorkoutTitle(for: day) == choice
+                                            effectiveWorkoutTitle(for: day) == choice
                                                 ? ATHLTHTheme.accentDeep : ATHLTHTheme.accentSoft,
                                             in: RoundedRectangle(cornerRadius: 12)
                                         )
@@ -3506,8 +3517,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 .buttonStyle(.plain)
                             }
                         }
-                        if effectiveWorkoutTitle(for: day) == "Egendefinert" ||
-                            weekDayEdits[weekDayKey(day)]?.title == "Egendefinert" {
+                        if weekDayEdits[weekDayKey(day)]?.isCustomTitle == true {
                             TextField(
                                 ATHLTHLocalization.choose(
                                     english: "Custom workout name", norwegian: "Navn på egen økt"
@@ -3607,7 +3617,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
                             if effectiveDetailedWorkout(for: day) != nil {
                                 Button(role: .destructive) {
-                                    updateWeekDay(day) { edit in edit.detailedWorkout = nil }
+                                    updateWeekDay(day) { edit in
+                                        edit.detailedWorkout = nil
+                                        edit.removeTemplateDetail = true
+                                    }
                                 } label: {
                                     Label(
                                         ATHLTHLocalization.choose(
@@ -3681,6 +3694,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         guard choice.isValid else { return }
                         updateWeekDay(selection.id) { edit in
                             edit.detailedWorkout = choice
+                            edit.removeTemplateDetail = false
                             edit.kind = workoutKind
                             edit.title = name
                             edit.durationMinutes = choice.durationMinutes
