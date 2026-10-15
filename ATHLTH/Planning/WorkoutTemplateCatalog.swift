@@ -2178,7 +2178,10 @@ struct WorkoutTemplateBuilderView: View {
                     }
                     if kind == .intervals {
                         Button(tr("Running", "Løping"), systemImage: "figure.run") {
-                            addRunBlock(toGroup: id)
+                            addRunBlock(toGroup: id, activity: .running)
+                        }
+                        Button(tr("Walking", "Gåing"), systemImage: "figure.walk") {
+                            addRunBlock(toGroup: id, activity: .walking)
                         }
                     }
                     Button(tr("Rest", "Pause"), systemImage: "pause.fill") {
@@ -2381,7 +2384,8 @@ struct WorkoutTemplateBuilderView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 11))
         } else {
             let icon = block.kind == .run
-                ? (block.resolvedPhase == .cooldown ? "figure.walk" : "figure.run")
+                ? ((block.cardioActivity == .walking || block.resolvedPhase == .cooldown)
+                    ? "figure.walk" : "figure.run")
                 : block.kind.systemImage
             Image(systemName: icon)
                 .font(.system(size: 21, weight: .medium))
@@ -2397,6 +2401,25 @@ struct WorkoutTemplateBuilderView: View {
         let block = blocks[index]
             switch block.kind {
             case .run:
+                Picker(tr("Activity", "Aktivitet"), selection: Binding(
+                    get: { blocks[index].cardioActivity ?? .running },
+                    set: { activity in
+                        let oldActivity = blocks[index].cardioActivity ?? .running
+                        blocks[index].cardioActivity = activity
+                        if blocks[index].title == oldActivity.title ||
+                            blocks[index].title == "Løping" ||
+                            blocks[index].title == "Running" ||
+                            blocks[index].title == "Gåing" ||
+                            blocks[index].title == "Walking" {
+                            blocks[index].title = activity == .walking
+                                ? tr("Walking", "Gåing") : tr("Running", "Løping")
+                        }
+                    }
+                )) {
+                    Text(tr("Run", "Løp")).tag(WorkoutCardioActivity.running)
+                    Text(tr("Walk", "Gå")).tag(WorkoutCardioActivity.walking)
+                }
+                .pickerStyle(.segmented)
                 TextField(ATHLTHLocalization.choose(english: "Activity (jogging, strides, drills)",
                                                        norwegian: "Aktivitet (jogg, stigningsløp, drill)"),
                           text: Binding(
@@ -2416,13 +2439,19 @@ struct WorkoutTemplateBuilderView: View {
                 }
                 .pickerStyle(.segmented)
                 if blocks[index].durationSeconds != nil {
-                    Stepper(value: durationBinding(index), in: 15...7200, step: 15) {
-                        Text("\(Int(blocks[index].durationSeconds ?? 600)) s")
-                    }
+                    durationEntryEditor(index)
                 } else {
                     Stepper(value: distanceBinding(index), in: 100...20000, step: 100) {
                         Text("\(Int(blocks[index].distanceMeters ?? 1000)) m")
                     }
+                }
+                Toggle(tr("Outdoor activity", "Utendørs"), isOn: Binding(
+                    get: { blocks[index].isIndoor != true },
+                    set: { blocks[index].isIndoor = !$0 }
+                ))
+                .tint(studioAccent)
+                if blocks[index].isIndoor != true {
+                    routeSection
                 }
                 Toggle(ATHLTHLocalization.choose(english: "Target pace", norwegian: "Måltempo"),
                        isOn: Binding(
@@ -2500,14 +2529,7 @@ struct WorkoutTemplateBuilderView: View {
                 }
 
             case .rest:
-                Stepper(
-                    value: durationBinding(index),
-                    in: 15...900,
-                    step: 15
-                ) {
-                    Text(tr("Recovery", "Pause") + " · \(Int((blocks[index].durationSeconds ?? 60).rounded())) " + tr("sec", "sek"))
-                    .font(.caption)
-                }
+                durationEntryEditor(index)
 
             case .note:
                 EmptyView()
@@ -2537,13 +2559,17 @@ struct WorkoutTemplateBuilderView: View {
                 }
                 .buttonStyle(.plain)
 
-                Button {
-                    addRunBlock()
+                Menu {
+                    Button(tr("Run", "Løp"), systemImage: "figure.run") {
+                        addRunBlock(activity: .running)
+                    }
+                    Button(tr("Walk", "Gå"), systemImage: "figure.walk") {
+                        addRunBlock(activity: .walking)
+                    }
                 } label: {
-                    studioLibraryTile(tr("Running", "Løping"), icon: "figure.run",
+                    studioLibraryTile(tr("Run / Walk", "Løp / gå"), icon: "figure.run",
                                       color: Color(red: 0.04, green: 0.48, blue: 0.47))
                 }
-                .buttonStyle(.plain)
 
                 Button {
                     addRestBlock()
@@ -2612,8 +2638,8 @@ struct WorkoutTemplateBuilderView: View {
                     }
                     .labelsHidden()
                 }
-                Text(tr("Optional route for the running parts of this workout.",
-                        "Valgfri rute for løpedelene av treningsøkten."))
+                Text(tr("One optional route for outdoor running and walking blocks.",
+                        "Én valgfri rute for utendørs løpe- og gåblokker."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -2627,7 +2653,10 @@ struct WorkoutTemplateBuilderView: View {
                     openExercisePicker()
                 }
                 Button(tr("Running", "Løping"), systemImage: "figure.run") {
-                    addRunBlock()
+                    addRunBlock(activity: .running)
+                }
+                Button(tr("Walking", "Gåing"), systemImage: "figure.walk") {
+                    addRunBlock(activity: .walking)
                 }
                 Button(tr("Rest", "Pause"), systemImage: "pause.fill") {
                     addRestBlock()
@@ -2716,6 +2745,8 @@ struct WorkoutTemplateBuilderView: View {
         run.groupID = id
         run.groupKind = .intervals
         run.groupRounds = 4
+        run.cardioActivity = .running
+        run.durationSeconds = 240
         insertBlock(run, toGroup: nil)
 
         var rest = WorkoutTemplateBlock(
@@ -2762,15 +2793,20 @@ struct WorkoutTemplateBuilderView: View {
         resequence()
     }
 
-    private func addRunBlock(toGroup groupID: UUID? = nil) {
-        insertBlock(WorkoutTemplateBlock(
+    private func addRunBlock(
+        toGroup groupID: UUID? = nil,
+        activity: WorkoutCardioActivity = .running
+    ) {
+        var block = WorkoutTemplateBlock(
             sequence: 0, kind: .run,
-            title: tr("Running", "Løping"),
+            title: activity == .walking ? tr("Walking", "Gåing") : tr("Running", "Løping"),
             exerciseSlug: nil, distanceMeters: 1_000,
             repetitions: nil, durationSeconds: nil,
             targetWeightKilograms: nil, loadNote: nil,
             notes: nil, phase: selectedPhase
-        ), toGroup: groupID)
+        )
+        block.cardioActivity = activity
+        insertBlock(block, toGroup: groupID)
     }
 
     private func addRestBlock(toGroup groupID: UUID? = nil) {
@@ -2855,6 +2891,8 @@ struct WorkoutTemplateBuilderView: View {
             copy.groupID = block.groupID
             copy.groupKind = block.groupKind
             copy.groupRounds = block.groupRounds
+            copy.cardioActivity = block.cardioActivity
+            copy.isIndoor = block.isIndoor
             return copy
         }
     }
@@ -2872,7 +2910,7 @@ struct WorkoutTemplateBuilderView: View {
             durationMinutes: resolvedDurationMinutes,
             targetDistanceKilometers: nil,
             targetPaceSecondsPerKilometer: nil,
-            routeID: hasRunning ? selectedRouteID : nil,
+            routeID: hasOutdoorCardio ? selectedRouteID : nil,
             exercises: [],
             notes: nil
         )
@@ -2880,7 +2918,7 @@ struct WorkoutTemplateBuilderView: View {
         workout.workoutCategory = category
         if let onSaveToPlan {
             onSaveToPlan(
-                cleanTitle, blocks, hasRunning ? selectedRouteID : nil,
+                cleanTitle, blocks, hasOutdoorCardio ? selectedRouteID : nil,
                 resolvedDurationMinutes, manualDurationMinutes != nil
             )
         } else {
@@ -2894,6 +2932,7 @@ struct WorkoutTemplateBuilderView: View {
     private var resolvedWorkoutKind: WorkoutKind {
         switch category {
         case "running": return .running
+        case "walking": return .walking
         case "strength": return .strength
         default: return .custom
         }
