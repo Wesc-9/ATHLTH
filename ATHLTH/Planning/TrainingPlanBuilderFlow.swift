@@ -421,6 +421,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .onChange(of: startDate) { _, _ in saveResumableDraft() }
         .onChange(of: mode) { _, _ in saveResumableDraft() }
         .onChange(of: selectedSource) { _, _ in saveResumableDraft() }
+        .onChange(of: workoutKindOverridesByDay) { _, _ in saveResumableDraft() }
+        .onChange(of: workoutTitleOverridesByDay) { _, _ in saveResumableDraft() }
+        .onChange(of: workoutMinutesByDay) { _, _ in saveResumableDraft() }
         .onChange(of: selectedDays) { _, _ in
             workoutKindOverridesByDay = workoutKindOverridesByDay
                 .filter { selectedDays.contains($0.key) }
@@ -467,6 +470,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         if let minutes = draft.weeklyTimeBudgetMinutes {
                             weeklyTimeBudgetMinutes = minutes
                         }
+                        workoutKindOverridesByDay = (draft.workoutKindsByDay ?? [:])
+                            .compactMapValues(WorkoutKind.init(rawValue:))
+                        workoutTitleOverridesByDay = draft.workoutPresetsByDay ?? [:]
+                        workoutMinutesByDay = draft.workoutMinutesByDay ?? [:]
                     }
                     // We intentionally resume the basics step so any goals,
                     // limitations and AI permissions must be reconfirmed.
@@ -4232,7 +4239,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             preferredDayIndexes: mode == .advanced ? selectedDays.sorted() : nil,
             equipmentContext: mode == .advanced ? equipment.rawValue : nil,
             weeklyTimeBudgetMinutes: mode == .advanced
-                ? weeklyTimeBudgetMinutes : nil
+                ? weeklyTimeBudgetMinutes : nil,
+            workoutKindsByDay: mode == .advanced
+                ? workoutKindOverridesByDay.mapValues(\.rawValue) : nil,
+            workoutPresetsByDay: mode == .advanced
+                ? workoutTitleOverridesByDay.filter { day, title in
+                    subtypeTitles(for: resolvedWorkoutKind(for: day)).contains(title)
+                } : nil,
+            workoutMinutesByDay: mode == .advanced
+                ? workoutMinutesByDay : nil
         )
         draftStore.save(draft, userID: session.profile.userID)
     }
