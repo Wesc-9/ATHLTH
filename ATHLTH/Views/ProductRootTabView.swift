@@ -3929,38 +3929,7 @@ struct ATHLTHHomeView: View {
     private func homeTodaySessions(
         in plan: TrainingPlan
     ) -> [PlannedSession] {
-        let calendar = Calendar.current
-        let weekday = calendar.component(.weekday, from: Date())
-        let dayIndex = ((weekday + 5) % 7) + 1
-
-        let week: TrainingPlanWeek?
-
-        if let startDate = plan.startDate {
-            let start = calendar.startOfDay(for: startDate)
-            let today = calendar.startOfDay(for: Date())
-            let days = max(
-                calendar.dateComponents(
-                    [.day],
-                    from: start,
-                    to: today
-                ).day ?? 0,
-                0
-            )
-            let weekIndex = min(
-                days / 7,
-                max(plan.weeks.count - 1, 0)
-            )
-            week = plan.weeks.indices.contains(weekIndex)
-                ? plan.weeks[weekIndex]
-                : plan.weeks.first
-        } else {
-            week = plan.weeks.first
-        }
-
-        return week?
-            .days
-            .first(where: { $0.dayIndex == dayIndex })?
-            .sessions ?? []
+        ATHLTHTrainingPlanSchedule.sessions(in: plan)
     }
 
     private func homeSessionSummary(
@@ -10863,37 +10832,7 @@ struct ATHLTHTrainView: View {
     private func todaySessions(
         in plan: TrainingPlan
     ) -> [PlannedSession] {
-        let calendar = Calendar.current
-        let weekday = calendar.component(.weekday, from: Date())
-        let dayIndex = ((weekday + 5) % 7) + 1
-
-        let week: TrainingPlanWeek?
-        if let startDate = plan.startDate {
-            let start = calendar.startOfDay(for: startDate)
-            let today = calendar.startOfDay(for: Date())
-            let days = max(
-                calendar.dateComponents(
-                    [.day],
-                    from: start,
-                    to: today
-                ).day ?? 0,
-                0
-            )
-            let weekIndex = min(
-                days / 7,
-                max(plan.weeks.count - 1, 0)
-            )
-            week = plan.weeks.indices.contains(weekIndex)
-                ? plan.weeks[weekIndex]
-                : plan.weeks.first
-        } else {
-            week = plan.weeks.first
-        }
-
-        return week?
-            .days
-            .first(where: { $0.dayIndex == dayIndex })?
-            .sessions ?? []
+        ATHLTHTrainingPlanSchedule.sessions(in: plan)
     }
 
     private func todaySessionSummary(
@@ -12172,47 +12111,8 @@ struct ATHLTHRecoveryView: View {
     }
 
     private var recoveryTodaySessions: [PlannedSession] {
-        guard let plan = session.activePlan else {
-            return []
-        }
-
-        let calendar = Calendar.current
-        let weekday =
-            calendar.component(.weekday, from: Date())
-        let dayIndex = ((weekday + 5) % 7) + 1
-
-        let week: TrainingPlanWeek?
-
-        if let startDate = plan.startDate {
-            let start = calendar.startOfDay(for: startDate)
-            let today = calendar.startOfDay(for: Date())
-            let days = max(
-                calendar.dateComponents(
-                    [.day],
-                    from: start,
-                    to: today
-                ).day ?? 0,
-                0
-            )
-            let weekIndex = min(
-                days / 7,
-                max(plan.weeks.count - 1, 0)
-            )
-            week = plan.weeks.indices.contains(weekIndex)
-                ? plan.weeks[weekIndex]
-                : plan.weeks.first
-        } else {
-            week = plan.weeks.first
-        }
-
-        return week?
-            .days
-            .first(
-                where: {
-                    $0.dayIndex == dayIndex
-                }
-            )?
-            .sessions ?? []
+        guard let plan = session.activePlan else { return [] }
+        return ATHLTHTrainingPlanSchedule.sessions(in: plan)
     }
 
     private func recoverySessionSummary(
