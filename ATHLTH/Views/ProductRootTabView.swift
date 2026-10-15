@@ -5838,6 +5838,7 @@ struct ATHLTHTrainView: View {
     private var hasOngoingTrainWorkout: Bool {
         phoneWorkout.active != nil ||
         strengthWorkout.activeWorkout != nil ||
+        watchConnection.hasActiveWatchWorkout ||
         ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
     }
 
@@ -5862,7 +5863,8 @@ struct ATHLTHTrainView: View {
                 strengthWorkout.acknowledgeRecoveredWorkout()
                 showingStrengthWorkout = true
             }
-        } else if ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive,
+        } else if (watchConnection.hasActiveWatchWorkout ||
+                   ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive),
                   phoneWorkout.active == nil,
                   strengthWorkout.activeWorkout == nil {
             HStack(spacing: 12) {
@@ -7492,6 +7494,7 @@ struct ATHLTHTrainView: View {
         // Never replace a live workout with a second one from the plan.
         if phoneWorkout.active != nil ||
             strengthWorkout.activeWorkout != nil ||
+            watchConnection.hasActiveWatchWorkout ||
             ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive {
             watchTransferError = ATHLTHLocalization.choose(
                 english: "A workout is already in progress. Finish it before starting a planned session.",
