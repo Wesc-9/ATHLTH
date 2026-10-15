@@ -3604,6 +3604,21 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
             }
 
+            builderPanel {
+                VStack(alignment: .leading, spacing: 11) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Review and edit your training week",
+                            norwegian: "Se gjennom og rediger treningsuken"
+                        ),
+                        systemImage: "calendar.badge.checkmark"
+                    )
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    weeklyPreview
+                }
+            }
+
             if !goalStore.goals.isEmpty {
                 builderPanel {
                     VStack(
