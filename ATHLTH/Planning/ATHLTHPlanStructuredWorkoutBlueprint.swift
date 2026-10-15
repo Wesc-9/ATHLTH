@@ -3,7 +3,7 @@ import Foundation
 /// A single advanced workout definition shared by the plan wizard and Coach.
 /// Basic never creates these blueprints. IDs, media and exercise snapshots
 /// remain part of the existing ATHLTH training model.
-struct ATHLTHPlanStructuredWorkoutBlueprint: Hashable {
+struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
     var title: String
     var kind: WorkoutKind
     var durationMinutes: Int
