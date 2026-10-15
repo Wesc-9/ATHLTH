@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum CustomQuickWorkoutActivity: String, CaseIterable, Identifiable, Hashable {
+enum CustomQuickWorkoutActivity: String, CaseIterable, Identifiable, Hashable, Codable {
     case hiit
     case circuit
     case functional
@@ -59,6 +59,40 @@ enum CustomQuickWorkoutActivity: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
+    var localizedTitle: String {
+        switch self {
+        case .hiit: return "HIIT"
+        case .circuit: return tr("Circuit", "Sirkeltrening")
+        case .functional: return tr("Functional", "Funksjonell")
+        case .cycling: return tr("Cycling", "Sykling")
+        case .rowing: return tr("Rowing", "Roing")
+        case .stairClimber: return tr("Stairs", "Trapper")
+        case .mobility: return tr("Mobility", "Mobilitet")
+        case .yoga: return "Yoga"
+        case .sports: return tr("Sports", "Idrett")
+        case .other: return tr("Other", "Annet")
+        }
+    }
+
+    var localizedSubtitle: String {
+        switch self {
+        case .hiit: return tr("High intensity", "Høy intensitet")
+        case .circuit: return tr("Stations", "Flere stasjoner")
+        case .functional: return tr("Mixed movement", "Variert trening")
+        case .cycling: return tr("Indoor / outdoor", "Inne eller ute")
+        case .rowing: return tr("Erg / water", "Maskin eller vann")
+        case .stairClimber: return tr("Stair machine", "Trapper eller stepper")
+        case .mobility: return tr("Move better", "Bevegelighet")
+        case .yoga: return tr("Flow", "Flyt og kontroll")
+        case .sports: return tr("Game / practice", "Kamp eller trening")
+        case .other: return tr("Anything else", "Andre aktiviteter")
+        }
+    }
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
     var watchKind: WatchWorkoutKind {
         switch self {
         case .hiit: return .hiit
@@ -72,7 +106,7 @@ enum CustomQuickWorkoutActivity: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
-enum CustomQuickWorkoutMethod: String, CaseIterable, Identifiable, Hashable {
+enum CustomQuickWorkoutMethod: String, CaseIterable, Identifiable, Hashable, Codable {
     case open
     case intervals
     case emom
@@ -104,6 +138,32 @@ enum CustomQuickWorkoutMethod: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
+    var localizedTitle: String {
+        switch self {
+        case .open: return tr("Open", "Fri økt")
+        case .intervals: return tr("Intervals", "Intervaller")
+        case .emom: return "EMOM"
+        case .amrap: return "AMRAP"
+        case .tabata: return "Tabata"
+        case .forTime: return tr("For Time", "På tid")
+        }
+    }
+
+    var localizedSubtitle: String {
+        switch self {
+        case .open: return tr("Stop when done", "Stopp når du er ferdig")
+        case .intervals: return tr("Work and rest", "Drag og pause")
+        case .emom: return tr("Every minute", "Hvert minutt")
+        case .amrap: return tr("As many rounds as possible", "Flest mulig runder")
+        case .tabata: return "20 / 10"
+        case .forTime: return tr("Beat the clock", "Mot klokken")
+        }
+    }
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
     var systemImage: String {
         switch self {
         case .open: return "play.fill"
@@ -127,8 +187,8 @@ struct CustomQuickWorkoutConfiguration: Hashable {
 
     var title: String {
         method == .open
-            ? activity.title
-            : "\(activity.title) · \(method.title)"
+            ? activity.localizedTitle
+            : "\(activity.localizedTitle) · \(method.localizedTitle)"
     }
 
     var detail: String {
@@ -149,16 +209,24 @@ struct CustomQuickWorkoutConfiguration: Hashable {
     }
 }
 
+enum CustomQuickStartDestination {
+    case watch
+    case phoneTimer
+    case retrospective
+}
+
 struct CustomQuickStartSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var session: AppSessionStore
 
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
-    let onStart: (CustomQuickWorkoutConfiguration) -> Void
+    let onStart: (CustomQuickWorkoutConfiguration, CustomQuickStartDestination) -> Void
 
     @State private var activity: CustomQuickWorkoutActivity = .hiit
     @State private var method: CustomQuickWorkoutMethod = .open
+    @State private var captureDevice: WorkoutCaptureDevice = .iPhone
     @State private var durationMinutes = 20
     @State private var workSeconds = 40
     @State private var restSeconds = 20
@@ -166,142 +234,129 @@ struct CustomQuickStartSheet: View {
     @State private var audioCoachDraft = AudioCoachDraft()
     @State private var audioCoachLoaded = false
 
+    private let ink = ATHLTHTheme.primaryText
+    private let muted = ATHLTHTheme.mutedText
+    private let accent = ATHLTHTheme.accentDeep
     private let columns = [
-        GridItem(.flexible(), spacing: 10),
-        GridItem(.flexible(), spacing: 10)
+        GridItem(.flexible(), spacing: 9),
+        GridItem(.flexible(), spacing: 9)
     ]
+
+    private var canUseWatch: Bool {
+        trainingDeviceProvider == .appleWatch && watchConnected
+    }
+
+    private var recordedWorkouts: [CustomQuickWorkoutRecord] {
+        Array(CustomQuickWorkoutJournal.load(
+            userID: session.profile.userID
+        ).prefix(3))
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Build a quick workout")
-                            .font(.title2.weight(.bold))
+                VStack(alignment: .leading, spacing: 19) {
+                    header
+                    devicePicker
 
-                        Text("Choose what you're doing, then pick the structure. ATHLTH keeps the setup fast and sends the workout to Apple Watch when available.")
-                            .font(.subheadline)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                    }
-
-                    sectionTitle("Workout type")
-
-                    LazyVGrid(columns: columns, spacing: 10) {
-                        ForEach(CustomQuickWorkoutActivity.allCases) { item in
-                            selectionTile(
-                                title: item.title,
-                                subtitle: item.subtitle,
-                                icon: item.systemImage,
-                                selected: activity == item
-                            ) {
-                                activity = item
-                            }
+                    sectionTitle(tr("Activity", "Aktivitet"))
+                    LazyVGrid(columns: columns, spacing: 9) {
+                        ForEach(CustomQuickWorkoutActivity.allCases) { kind in
+                            activityTile(kind)
                         }
                     }
 
-                    sectionTitle("Training method")
-
-                    LazyVGrid(columns: columns, spacing: 10) {
-                        ForEach(CustomQuickWorkoutMethod.allCases) { item in
-                            selectionTile(
-                                title: item.title,
-                                subtitle: item.subtitle,
-                                icon: item.systemImage,
-                                selected: method == item
-                            ) {
-                                method = item
+                    sectionTitle(tr("How will you train?", "Øktoppsett"))
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 9) {
+                            ForEach(CustomQuickWorkoutMethod.allCases) { option in
+                                methodTile(option)
                             }
                         }
+                        .padding(.vertical, 2)
                     }
 
                     configurationControls
 
-                    AudioCoachSetupCard(
-                        draft: $audioCoachDraft,
-                        showRouteOptions: false,
-                        showStructuredOptions: false
-                    )
-
-                    ATHLTHCard {
-                        HStack(spacing: 12) {
-                            Image(systemName: activity.systemImage)
-                                .font(.title2)
-                                .foregroundStyle(ATHLTHTheme.accent)
-                                .frame(width: 42, height: 42)
-                                .background(
-                                    ATHLTHTheme.accentSoft,
-                                    in: RoundedRectangle(cornerRadius: 13)
-                                )
-
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(previewConfiguration.title)
-                                    .font(.headline)
-
-                                Text(previewConfiguration.detail)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
+                    if captureDevice == .appleWatch {
+                        DisclosureGroup(tr("Audio coach (optional)", "Lydcoach (valgfritt)")) {
+                            AudioCoachSetupCard(
+                                draft: $audioCoachDraft,
+                                showRouteOptions: false,
+                                showStructuredOptions: false
+                            )
                         }
+                        .font(.subheadline.weight(.medium))
+                        .padding(14)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 17))
                     }
 
-                    if !canStart {
-                        Label(deviceMessage, systemImage: deviceIcon)
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                            .padding(.horizontal, 2)
+                    workoutPreview
+
+                    if !recordedWorkouts.isEmpty {
+                        recentRecordings
                     }
                 }
                 .padding(20)
-                .padding(.bottom, 100)
+                .padding(.bottom, 110)
             }
-            .background(
-                LinearGradient(
-                    colors: [
-                        ATHLTHTheme.canvasTop,
-                        ATHLTHTheme.canvasBottom
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-            )
-            .navigationTitle("Custom")
+            .background(ATHLTHTheme.canvasTop.ignoresSafeArea())
+            .navigationTitle(tr("Custom workout", "Egendefinert økt"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
-                        dismiss()
-                    }
+                    Button(tr("Close", "Lukk")) { dismiss() }
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                VStack(spacing: 0) {
-                    Divider()
-
+                VStack(spacing: 9) {
                     Button {
-                        onStart(previewConfiguration)
+                        if captureDevice == .appleWatch && !canUseWatch { return }
+                        onStart(
+                            previewConfiguration,
+                            captureDevice == .appleWatch ? .watch : .phoneTimer
+                        )
                         dismiss()
                     } label: {
                         Label(
-                            canStart ? "Start on Apple Watch" : "Apple Watch required",
-                            systemImage: canStart ? "applewatch" : "exclamationmark.circle"
+                            captureDevice == .appleWatch
+                                ? tr("Start on Apple Watch", "Start på Apple Watch")
+                                : tr("Start iPhone timer", "Start tidtaking på iPhone"),
+                            systemImage: captureDevice == .appleWatch
+                                ? "applewatch" : "play.fill"
                         )
-                        .font(.headline)
+                        .font(.headline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                         .frame(height: 54)
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.white)
                     .background(
-                        canStart ? ATHLTHTheme.accent : ATHLTHTheme.mutedText.opacity(0.45),
+                        captureDevice == .appleWatch && !canUseWatch
+                            ? Color.gray.opacity(0.45) : accent,
                         in: RoundedRectangle(cornerRadius: 18)
                     )
-                    .disabled(!canStart)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
+                    .disabled(captureDevice == .appleWatch && !canUseWatch)
+
+                    if captureDevice == .iPhone {
+                        Button {
+                            onStart(previewConfiguration, .retrospective)
+                            dismiss()
+                        } label: {
+                            Label(
+                                tr("Log a completed workout", "Registrer økt i etterkant"),
+                                systemImage: "square.and.pencil"
+                            )
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(accent)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 32)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
                 .background(.ultraThinMaterial)
             }
         }
@@ -312,7 +367,197 @@ struct CustomQuickStartSheet: View {
                 audioCoachDraft.load(from: settings)
                 audioCoachLoaded = true
             }
+            if !canUseWatch {
+                captureDevice = .iPhone
+            }
         }
+        .onChange(of: watchConnected) { _, connected in
+            if !connected { captureDevice = .iPhone }
+        }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(tr("Your workout. Your way.", "Din økt. Ditt oppsett."))
+                .font(.system(size: 27, weight: .bold, design: .rounded))
+                .foregroundStyle(ink)
+            Text(tr(
+                "Choose an activity and setup. Use an iPhone timer or Apple Watch, or record the workout afterwards.",
+                "Velg aktivitet og oppsett. Ta tiden på iPhone eller Apple Watch, eller registrer økten i etterkant."
+            ))
+            .font(.subheadline)
+            .foregroundStyle(muted)
+        }
+    }
+
+    private var devicePicker: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            sectionTitle(tr("Record with", "Registrer med"))
+            HStack(spacing: 10) {
+                deviceTile(
+                    title: "iPhone",
+                    icon: "iphone",
+                    subtitle: tr("Timer + manual input", "Tidtaker + manuell føring"),
+                    selected: captureDevice == .iPhone,
+                    enabled: true
+                ) {
+                    captureDevice = .iPhone
+                }
+                deviceTile(
+                    title: "Apple Watch",
+                    icon: "applewatch",
+                    subtitle: canUseWatch
+                        ? tr("Watch capture", "Måling på klokken")
+                        : tr("Not available", "Ikke tilgjengelig"),
+                    selected: captureDevice == .appleWatch,
+                    enabled: canUseWatch
+                ) {
+                    captureDevice = .appleWatch
+                }
+            }
+            if !canUseWatch {
+                Label(
+                    tr(
+                        "No Apple Watch connected. Use your iPhone or enter the workout manually.",
+                        "Ingen Apple Watch tilkoblet. Bruk iPhone eller registrer økten manuelt."
+                    ),
+                    systemImage: "info.circle"
+                )
+                .font(.caption)
+                .foregroundStyle(muted)
+                .fixedSize(horizontal: false, vertical: true)
+            } else if captureDevice == .appleWatch && method != .open {
+                Text(tr(
+                    "Apple Watch records the activity. Custom work/rest instructions are not yet transferred to Watch.",
+                    "Apple Watch registrerer aktiviteten. Egendefinerte drag og pauser overføres ennå ikke til klokken."
+                ))
+                .font(.caption)
+                .foregroundStyle(muted)
+            }
+        }
+        .padding(15)
+        .background(.white, in: RoundedRectangle(cornerRadius: 21))
+    }
+
+    private func deviceTile(
+        title: String, icon: String, subtitle: String,
+        selected: Bool, enabled: Bool, action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: icon)
+                        .font(.system(size: 19, weight: .semibold))
+                    Spacer()
+                    if selected { Image(systemName: "checkmark.circle.fill") }
+                    else if !enabled { Image(systemName: "lock.fill") }
+                }
+                .foregroundStyle(selected ? accent : muted)
+                Text(title)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(ink)
+                Text(subtitle)
+                    .font(.caption2)
+                    .foregroundStyle(muted)
+                    .lineLimit(2)
+                    .frame(height: 28, alignment: .topLeading)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(13)
+            .background(
+                selected ? ATHLTHTheme.accentSoft : ATHLTHTheme.canvasTop,
+                in: RoundedRectangle(cornerRadius: 17)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 17)
+                    .strokeBorder(selected ? accent.opacity(0.40)
+                                           : ATHLTHTheme.border, lineWidth: 1)
+            }
+            .opacity(enabled ? 1 : 0.56)
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+    }
+
+    private func activityTile(_ kind: CustomQuickWorkoutActivity) -> some View {
+        let selected = activity == kind
+        return Button {
+            activity = kind
+        } label: {
+            HStack(spacing: 9) {
+                Image(systemName: kind.systemImage)
+                    .font(.system(size: 18))
+                    .foregroundStyle(selected ? accent : muted)
+                    .frame(width: 33, height: 33)
+                    .background(
+                        selected ? ATHLTHTheme.accentSoft : ATHLTHTheme.canvasTop,
+                        in: RoundedRectangle(cornerRadius: 11)
+                    )
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(kind.localizedTitle)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    Text(kind.localizedSubtitle)
+                        .font(.system(size: 10))
+                        .foregroundStyle(muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+                Spacer(minLength: 0)
+                if selected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(accent)
+                }
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 63)
+            .background(
+                selected ? ATHLTHTheme.accentSoft.opacity(0.55) : .white,
+                in: RoundedRectangle(cornerRadius: 17)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 17)
+                    .strokeBorder(selected ? accent.opacity(0.32)
+                                           : ATHLTHTheme.border, lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func methodTile(_ choice: CustomQuickWorkoutMethod) -> some View {
+        let selected = choice == method
+        return Button {
+            method = choice
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 7) {
+                    Image(systemName: choice.systemImage)
+                    Text(choice.localizedTitle)
+                        .lineLimit(1)
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(selected ? accent : ink)
+                Text(choice.localizedSubtitle)
+                    .font(.caption2)
+                    .foregroundStyle(muted)
+                    .lineLimit(1)
+            }
+            .frame(width: 132, alignment: .leading)
+            .padding(12)
+            .background(
+                selected ? ATHLTHTheme.accentSoft.opacity(0.60) : .white,
+                in: RoundedRectangle(cornerRadius: 15)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 15)
+                    .strokeBorder(selected ? accent.opacity(0.35)
+                                           : ATHLTHTheme.border, lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private var previewConfiguration: CustomQuickWorkoutConfiguration {
@@ -327,171 +572,114 @@ struct CustomQuickStartSheet: View {
         )
     }
 
-    private var canStart: Bool {
-        trainingDeviceProvider == .appleWatch && watchConnected
-    }
-
-    private var deviceMessage: String {
-        switch trainingDeviceProvider {
-        case .appleWatch:
-            return "Connect Apple Watch before starting this custom live workout."
-        case .garmin:
-            return "Garmin live workout launch is not available yet. Your custom setup stays ready for Apple Watch capture."
-        case .none:
-            return "Choose Apple Watch as your training device to launch and record this custom workout live."
-        }
-    }
-
-    private var deviceIcon: String {
-        switch trainingDeviceProvider {
-        case .appleWatch: return "applewatch"
-        case .garmin: return "watch.analog"
-        case .none: return "iphone"
-        }
-    }
-
     @ViewBuilder
     private var configurationControls: some View {
-        switch method {
-        case .open:
-            EmptyView()
-
-        case .intervals:
-            VStack(spacing: 10) {
-                sectionTitle("Interval setup")
-                stepperRow("Rounds", value: $rounds, range: 1...30)
-                stepperRow("Work", value: $workSeconds, range: 10...300, suffix: " sec", step: 5)
-                stepperRow("Rest", value: $restSeconds, range: 5...180, suffix: " sec", step: 5)
+        if method != .open {
+            VStack(alignment: .leading, spacing: 11) {
+                sectionTitle(tr("Details", "Detaljer"))
+                switch method {
+                case .open:
+                    EmptyView()
+                case .intervals:
+                    stepperRow(tr("Rounds", "Drag"), value: $rounds, range: 1...30)
+                    stepperRow(tr("Work", "Arbeid"), value: $workSeconds,
+                               range: 10...300, suffix: " sek", step: 5)
+                    stepperRow(tr("Rest", "Pause"), value: $restSeconds,
+                               range: 5...180, suffix: " sek", step: 5)
+                case .emom, .amrap:
+                    stepperRow(tr("Duration", "Varighet"), value: $durationMinutes,
+                               range: 5...60, suffix: " min", step: 5)
+                case .tabata:
+                    stepperRow(tr("Rounds", "Drag"), value: $rounds, range: 4...20)
+                    Text(tr("20 seconds work / 10 seconds rest",
+                            "20 sekunder arbeid / 10 sekunder pause"))
+                        .font(.caption)
+                        .foregroundStyle(muted)
+                case .forTime:
+                    stepperRow(tr("Time cap", "Tidsgrense"), value: $durationMinutes,
+                               range: 5...120, suffix: " min", step: 5)
+                }
             }
+            .padding(15)
+            .background(.white, in: RoundedRectangle(cornerRadius: 20))
+        }
+    }
 
-        case .emom:
-            VStack(spacing: 10) {
-                sectionTitle("EMOM setup")
-                stepperRow("Duration", value: $durationMinutes, range: 5...60, suffix: " min", step: 5)
-            }
-
-        case .amrap:
-            VStack(spacing: 10) {
-                sectionTitle("AMRAP setup")
-                stepperRow("Duration", value: $durationMinutes, range: 5...60, suffix: " min", step: 5)
-            }
-
-        case .tabata:
-            VStack(spacing: 10) {
-                sectionTitle("Tabata setup")
-                stepperRow("Rounds", value: $rounds, range: 4...20)
-                Text("Classic Tabata uses 20 seconds work and 10 seconds rest.")
+    private var workoutPreview: some View {
+        HStack(spacing: 12) {
+            Image(systemName: activity.systemImage)
+                .font(.title3)
+                .foregroundStyle(accent)
+                .frame(width: 46, height: 46)
+                .background(ATHLTHTheme.accentSoft,
+                            in: RoundedRectangle(cornerRadius: 13))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(previewConfiguration.title)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(ink)
+                Text(method.localizedSubtitle)
                     .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundStyle(muted)
             }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .background(.white, in: RoundedRectangle(cornerRadius: 19))
+    }
 
-        case .forTime:
-            VStack(spacing: 10) {
-                sectionTitle("For Time setup")
-                stepperRow("Time cap", value: $durationMinutes, range: 5...120, suffix: " min", step: 5)
+    private var recentRecordings: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle(tr("RECENTLY LOGGED", "SIST REGISTRERT"))
+            ForEach(recordedWorkouts) { workout in
+                HStack(spacing: 10) {
+                    Image(systemName: workout.activity.systemImage)
+                        .foregroundStyle(accent)
+                        .frame(width: 33, height: 33)
+                        .background(ATHLTHTheme.accentSoft,
+                                    in: RoundedRectangle(cornerRadius: 10))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(workout.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ink)
+                        Text(workout.evidence.label)
+                            .font(.caption2)
+                            .foregroundStyle(muted)
+                    }
+                    Spacer()
+                    Text("\\(Int(workout.durationSeconds / 60)) min")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(muted)
+                }
+                .padding(11)
+                .background(.white, in: RoundedRectangle(cornerRadius: 16))
             }
         }
     }
 
-    @ViewBuilder
     private func sectionTitle(_ title: String) -> some View {
         Text(title.uppercased())
             .font(.caption2.weight(.bold))
-            .tracking(1.15)
-            .foregroundStyle(ATHLTHTheme.mutedText)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .tracking(1.1)
+            .foregroundStyle(muted)
     }
 
-    @ViewBuilder
-    private func selectionTile(
-        title: String,
-        subtitle: String,
-        icon: String,
-        selected: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 11) {
-                Image(systemName: icon)
-                    .font(.system(size: 19, weight: .semibold))
-                    .foregroundStyle(selected ? .white : ATHLTHTheme.accent)
-                    .frame(width: 38, height: 38)
-                    .background(
-                        selected
-                            ? ATHLTHTheme.accent
-                            : ATHLTHTheme.accentSoft,
-                        in: RoundedRectangle(cornerRadius: 12)
-                    )
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-
-                    Text(subtitle)
-                        .font(.caption2)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: 0)
-
-                if selected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(ATHLTHTheme.accent)
-                }
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, minHeight: 66, alignment: .leading)
-            .background(
-                selected
-                    ? ATHLTHTheme.accentSoft
-                    : Color.white.opacity(0.72),
-                in: RoundedRectangle(cornerRadius: 17)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 17)
-                    .stroke(
-                        selected
-                            ? ATHLTHTheme.accent.opacity(0.28)
-                            : ATHLTHTheme.border,
-                        lineWidth: 1
-                    )
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    @ViewBuilder
     private func stepperRow(
-        _ title: String,
-        value: Binding<Int>,
-        range: ClosedRange<Int>,
-        suffix: String = "",
-        step: Int = 1
+        _ title: String, value: Binding<Int>,
+        range: ClosedRange<Int>, suffix: String = "", step: Int = 1
     ) -> some View {
         HStack {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-
+            Text(title).font(.subheadline.weight(.medium))
             Spacer()
-
-            Text("\(value.wrappedValue)\(suffix)")
+            Text("\\(value.wrappedValue)\\(suffix)")
                 .font(.subheadline.monospacedDigit())
-                .foregroundStyle(ATHLTHTheme.mutedText)
-
+                .foregroundStyle(muted)
             Stepper("", value: value, in: range, step: step)
                 .labelsHidden()
+                .tint(accent)
         }
-        .padding(14)
-        .background(
-            Color.white.opacity(0.74),
-            in: RoundedRectangle(cornerRadius: 16)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(ATHLTHTheme.border, lineWidth: 1)
-        }
+    }
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
     }
 }
