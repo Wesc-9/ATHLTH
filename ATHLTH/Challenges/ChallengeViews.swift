@@ -755,7 +755,9 @@ struct ChallengeCreationView: View {
                 r.fixedWeightKilograms != nil)
             _requiredWeightKg = State(initialValue:
                 r.fixedWeightKilograms ?? 80)
-            _verificationPolicy = State(initialValue: r.verificationPolicy)
+            _verificationPolicy = State(initialValue:
+                challenge.sport == .strength ? .manualAllowed : r.verificationPolicy
+            )
             _startsAt = State(initialValue: r.startsAt)
             _hasEnd = State(initialValue: r.endsAt != nil)
             _endsAt = State(initialValue: r.endsAt ??
@@ -765,9 +767,10 @@ struct ChallengeCreationView: View {
             _invitees = State(initialValue: challenge.participants.filter {
                 $0.state != .creator
             })
-            _meetupEnabled = State(initialValue: r.trainTogetherMode != nil)
-            _sameWorkoutMode = State(initialValue:
-                r.trainTogetherMode == .sameWorkout)
+            // Older same-workout agreements remain readable, but editing
+            // offers only an explicit physical meetup.
+            _meetupEnabled = State(initialValue:
+                r.trainTogetherMode == .physical || r.meetup != nil)
             _meetupPlaceName = State(initialValue: r.meetup?.placeName ?? "")
             _meetupAt = State(initialValue: r.meetup?.scheduledAt ?? r.startsAt)
             if let meetup = r.meetup {
@@ -791,7 +794,7 @@ struct ChallengeCreationView: View {
             _sport = State(initialValue: .strength)
             _scoring = State(initialValue: .heaviestWeight)
             _selectedCoverArtworkName = State(initialValue: "GoalStrength")
-            _verificationPolicy = State(initialValue: .verifiedPreferredManualAllowed)
+            _verificationPolicy = State(initialValue: .manualAllowed)
         }
 
         if changeProposalFor == nil, preselectedRouteID != nil {
@@ -842,7 +845,7 @@ struct ChallengeCreationView: View {
     @State private var exerciseName = "Bench Press"
     @State private var requiredWeightEnabled = false
     @State private var requiredWeightKg = 80.0
-    @State private var verificationPolicy: ChallengeVerificationPolicy = .verifiedPreferredManualAllowed
+    @State private var verificationPolicy: ChallengeVerificationPolicy = .manualAllowed
 
     // Give the recipient a real window to review or negotiate the rules.
     // The backend locks rule changes at the scheduled start time.
@@ -856,7 +859,6 @@ struct ChallengeCreationView: View {
     @State private var invitees: [ChallengeParticipant] = []
 
     @State private var meetupEnabled = false
-    @State private var sameWorkoutMode = false
     @State private var meetupPlaceName = ""
     @State private var meetupPlaceAddress = ""
     @State private var meetupAt = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
@@ -1101,7 +1103,7 @@ struct ChallengeCreationView: View {
                         false
                     selectedRouteID = nil
                     verificationPolicy =
-                        .verifiedPreferredManualAllowed
+                        .manualAllowed
 
                 case .heartRate:
                     scoring =
@@ -1321,9 +1323,9 @@ struct ChallengeCreationView: View {
                         showingExercisePicker = false
                     } label: {
                         HStack(spacing: 12) {
-                            Image(systemName: "dumbbell")
-                                .foregroundStyle(ATHLTHPlanDesign.accent)
-                                .frame(width: 28)
+                            // Reuse the real exercise-library artwork,
+                            // including bundled images and offline fallback.
+                            ExerciseArtwork(entry: entry, size: 56)
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(exerciseLibrary.localizedExerciseName(entry))
                                     .font(.subheadline.weight(.semibold))
@@ -2375,182 +2377,148 @@ struct ChallengeCreationView: View {
 
             creationDivider
 
-            DisclosureGroup(
-                isExpanded:
-                    $meetupEnabled
-            ) {
-                VStack(
-                    alignment: .leading,
-                    spacing: 12
-                ) {
-                    Picker(
+            // Every challenge already defines the common exercise or goal.
+            // Only an optional in-person meeting needs separate setup.
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle(isOn: $meetupEnabled) {
+                    Label(
                         ATHLTHLocalization.choose(
-                            english: "Train Together mode",
-                            norwegian: "Hvordan vil dere trene?"
+                            english: "Meet and train in person",
+                            norwegian: "Møtes og trene fysisk sammen"
                         ),
-                        selection: $sameWorkoutMode
-                    ) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Train in person",
-                            norwegian: "Trene fysisk sammen"
-                        )).tag(false)
-                        Text(ATHLTHLocalization.choose(
-                            english: "Do the same workout",
-                            norwegian: "Trene samme økt"
-                        )).tag(true)
-                    }
-                    .pickerStyle(.segmented)
-
-                    if !sameWorkoutMode {
-                    meetupPlaceSearch
-
-                    DatePicker(
-                        ATHLTHLocalization.choose(
-                            english: "Meet at",
-                            norwegian: "Møtetid"
-                        ),
-                        selection:
-                            $meetupAt,
-                        in: Date()...,
-                        displayedComponents: [
-                            .date,
-                            .hourAndMinute
-                        ]
+                        systemImage: "person.2.wave.2"
                     )
-                    .datePickerStyle(.compact)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(clubForest)
+                }
+                .tint(clubForest)
 
-                    MeetupLocationPicker(
-                        coordinate:
-                            $meetupCoordinate,
-                        position:
-                            $mapPosition
-                    ) { coordinate in
-                        meetupPlaceAddress =
-                            ""
-                        if meetupPlaceName
-                            .trimmingCharacters(
-                                in:
-                                    .whitespacesAndNewlines
-                            )
-                            .isEmpty {
-                            meetupPlaceName =
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "Selected map point",
-                                    norwegian:
-                                        "Valgt kartpunkt"
-                                )
-                        }
-                    }
+                if meetupEnabled {
+                meetupPlaceSearch
 
-                    if selectedRouteID !=
-                        nil {
-                        Button {
-                            guard
-                                let routeID =
-                                    selectedRouteID,
-                                let route =
-                                    session
-                                        .savedRoutes
-                                        .first(
-                                            where: {
-                                                $0.id ==
-                                                    routeID
-                                            }
-                                        ),
-                                let first =
-                                    route
-                                        .coordinates
-                                        .first
-                            else {
-                                return
-                            }
+                DatePicker(
+                    ATHLTHLocalization.choose(
+                        english: "Meet at",
+                        norwegian: "Møtetid"
+                    ),
+                    selection:
+                        $meetupAt,
+                    in: Date()...,
+                    displayedComponents: [
+                        .date,
+                        .hourAndMinute
+                    ]
+                )
+                .datePickerStyle(.compact)
 
-                            let coordinate =
-                                CLLocationCoordinate2D(
-                                    latitude:
-                                        first.latitude,
-                                    longitude:
-                                        first.longitude
-                                )
-
-                            meetupCoordinate =
-                                coordinate
-                            meetupPlaceName =
-                                route.title
-                            meetupPlaceAddress =
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "Route start",
-                                    norwegian:
-                                        "Rutestart"
-                                )
-                            meetupSearch.clear()
-                            mapPosition =
-                                .region(
-                                    MKCoordinateRegion(
-                                        center:
-                                            coordinate,
-                                        span:
-                                            MKCoordinateSpan(
-                                                latitudeDelta:
-                                                    0.015,
-                                                longitudeDelta:
-                                                    0.015
-                                            )
-                                    )
-                                )
-                        } label: {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "Use route start",
-                                    norwegian:
-                                        "Bruk rutestart"
-                                ),
-                                systemImage:
-                                    "location.fill"
-                            )
-                        }
-                        .buttonStyle(.bordered)
-                    }
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Check-in is explicit. ATHLTH does not continuously share participants’ live location.",
-                            norwegian:
-                                "Innsjekking er aktiv. ATHLTH deler ikke deltakernes posisjon kontinuerlig."
+                MeetupLocationPicker(
+                    coordinate:
+                        $meetupCoordinate,
+                    position:
+                        $mapPosition
+                ) { coordinate in
+                    meetupPlaceAddress =
+                        ""
+                    if meetupPlaceName
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
                         )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    } else {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Complete the same workout independently. Only invited participants can see this agreement.",
-                            norwegian: "Gjennomfør samme økt hver for dere. Bare inviterte deltakere ser avtalen."
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .isEmpty {
+                        meetupPlaceName =
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Selected map point",
+                                norwegian:
+                                    "Valgt kartpunkt"
+                            )
                     }
                 }
-                .padding(.top, 12)
-            } label: {
-                Label(
+
+                if selectedRouteID !=
+                    nil {
+                    Button {
+                        guard
+                            let routeID =
+                                selectedRouteID,
+                            let route =
+                                session
+                                    .savedRoutes
+                                    .first(
+                                        where: {
+                                            $0.id ==
+                                                routeID
+                                        }
+                                    ),
+                            let first =
+                                route
+                                    .coordinates
+                                    .first
+                        else {
+                            return
+                        }
+
+                        let coordinate =
+                            CLLocationCoordinate2D(
+                                latitude:
+                                    first.latitude,
+                                longitude:
+                                    first.longitude
+                            )
+
+                        meetupCoordinate =
+                            coordinate
+                        meetupPlaceName =
+                            route.title
+                        meetupPlaceAddress =
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Route start",
+                                norwegian:
+                                    "Rutestart"
+                            )
+                        meetupSearch.clear()
+                        mapPosition =
+                            .region(
+                                MKCoordinateRegion(
+                                    center:
+                                        coordinate,
+                                    span:
+                                        MKCoordinateSpan(
+                                            latitudeDelta:
+                                                0.015,
+                                            longitudeDelta:
+                                                0.015
+                                        )
+                                )
+                            )
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Use route start",
+                                norwegian:
+                                    "Bruk rutestart"
+                            ),
+                            systemImage:
+                                "location.fill"
+                        )
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                Text(
                     ATHLTHLocalization.choose(
-                        english: "Meet and train together",
-                        norwegian: "Møtes og trene sammen"
-                    ),
-                    systemImage:
-                        "person.2.wave.2"
+                        english:
+                            "Check-in is explicit. ATHLTH does not continuously share participants’ live location.",
+                        norwegian:
+                            "Innsjekking er aktiv. ATHLTH deler ikke deltakernes posisjon kontinuerlig."
+                    )
                 )
-                .font(
-                    .subheadline
-                        .weight(.semibold)
-                )
-                .foregroundStyle(
-                    clubForest
-                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                }
             }
         }
     }
@@ -3235,25 +3203,7 @@ struct ChallengeCreationView: View {
             creationDivider
         }
 
-        Button {
-            activeSelectionSheet = .verification
-        } label: {
-            creationSelectionRow(
-                title:
-                    ATHLTHLocalization.choose(
-                        english: "Verification",
-                        norwegian: "Verifisering"
-                    ),
-                value:
-                    verificationPolicy.title,
-                icon:
-                    "checkmark.shield.fill",
-                subtitle:
-                    verificationPolicy
-                        .subtitle
-            )
-        }
-        .buttonStyle(.plain)
+
     }
 
     private var creationHeartRateRules:
@@ -4196,7 +4146,7 @@ struct ChallengeCreationView: View {
             return false
         }
 
-        if meetupEnabled && !sameWorkoutMode &&
+        if meetupEnabled  &&
             meetupCoordinate == nil {
             return false
         }
@@ -6080,40 +6030,10 @@ struct ChallengeCreationView: View {
                 }
             }
 
-            if advancedRules {
-                Picker(
-                    "Result verification",
-                    selection: $verificationPolicy
-                ) {
-                    ForEach(
-                        ChallengeVerificationPolicy.allCases
-                    ) { policy in
-                        Text(policy.title).tag(policy)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 5) {
-                    Label(
-                        verificationPolicy.title,
-                        systemImage:
-                            verificationPolicy ==
-                                .verifiedRequired
-                                ? "checkmark.seal.fill"
-                                : "hand.tap.fill"
-                    )
-                    .font(.subheadline.weight(.semibold))
-
-                    Text(verificationPolicy.subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding()
-                .challengeCard()
-            }
-
-            Text(
-                "Manual strength submissions stay clearly labelled Manual. ATHLTH-tracked sets are labelled ATHLTH Verified."
-            )
+            Text(ATHLTHLocalization.choose(
+                english: "Manual strength results are allowed and labelled by how they were recorded.",
+                norwegian: "Manuelle styrkeresultater er tillatt og merkes etter registreringsmåte."
+            ))
             .challengeHint()
         }
     }
@@ -6300,7 +6220,13 @@ struct ChallengeCreationView: View {
                 )
             }
 
-            Toggle("Meet and train together", isOn: $meetupEnabled)
+            Toggle(
+                ATHLTHLocalization.choose(
+                    english: "Meet and train in person",
+                    norwegian: "Møtes og trene fysisk sammen"
+                ),
+                isOn: $meetupEnabled
+            )
 
             if meetupEnabled {
                 TextField("Meetup name", text: $meetupPlaceName)
@@ -6482,8 +6408,6 @@ struct ChallengeCreationView: View {
                     "Verification",
                     "Verified only · no manual results"
                 )
-            } else if sport == .strength {
-                reviewRow("Verification", verificationPolicy.title)
             }
 
             if meetupEnabled {
@@ -6697,7 +6621,7 @@ struct ChallengeCreationView: View {
 
         case 3:
             if hasEnd && endsAt <= startsAt { return false }
-            if meetupEnabled && !sameWorkoutMode &&
+            if meetupEnabled  &&
                 meetupCoordinate == nil { return false }
             return true
 
@@ -6929,7 +6853,7 @@ struct ChallengeCreationView: View {
             : nil
 
         let meetup: ChallengeMeetup?
-        if meetupEnabled && !sameWorkoutMode,
+        if meetupEnabled ,
            let meetupCoordinate {
             meetup = ChallengeMeetup(
                 placeName: meetupPlaceName.isEmpty
@@ -6946,9 +6870,11 @@ struct ChallengeCreationView: View {
 
         let rules = ATHLTHChallengeRules(
             scoring: effectiveScoring,
+            // Strength sets/reps/loads cannot be independently verified by
+            // a watch. Keep their origin labels without a policy selector.
             verificationPolicy:
                 sport == .strength
-                    ? verificationPolicy
+                    ? .manualAllowed
                     : .verifiedRequired,
             targetDistanceMeters:
                 scoring == .fastestDistance &&
@@ -7043,9 +6969,7 @@ struct ChallengeCreationView: View {
             lockRulesAtStart: true,
             meetup: meetup,
             trainTogetherModeRaw: meetupEnabled
-                ? (sameWorkoutMode
-                    ? ChallengeTrainTogetherMode.sameWorkout.rawValue
-                    : ChallengeTrainTogetherMode.physical.rawValue)
+                ? ChallengeTrainTogetherMode.physical.rawValue
                 : nil
         )
 
@@ -10142,7 +10066,9 @@ struct ChallengeDetailView: View {
                 .padding(.bottom, 8)
 
             ruleRow("Scoring", challenge.rules.scoring.title)
-            ruleRow("Verification", challenge.rules.verificationPolicy.title)
+            if challenge.sport != .strength {
+                ruleRow("Verification", challenge.rules.verificationPolicy.title)
+            }
 
             if let target = challenge.rules.targetDistanceMeters {
                 ruleRow("Distance", String(format: "%.2f km", target / 1_000))
