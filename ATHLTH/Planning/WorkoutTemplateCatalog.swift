@@ -1587,9 +1587,7 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private var canSave: Bool {
-        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && (hasRunning || hasStrength)
-            && !hasIncompleteSuperset
+        (hasRunning || hasStrength) && !hasIncompleteSuperset
     }
 
     private var hasIncompleteSuperset: Bool {
@@ -1739,7 +1737,7 @@ struct WorkoutTemplateBuilderView: View {
                         .foregroundStyle(studioInk.opacity(0.73))
 
                     TextField(
-                        tr("Workout name", "Navngi treningsøkten"),
+                        tr("Workout name (optional)", "Navn på økten (valgfritt)"),
                         text: $title
                     )
                     .font(.system(size: 27, weight: .bold, design: .rounded))
@@ -2680,8 +2678,9 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private func saveWorkout() {
-        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard canSave else { return }
+        let requestedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanTitle = requestedTitle.isEmpty ? resolvedWorkoutKind.title : requestedTitle
 
         var workout = PlannedSession(
             id: UUID(),
