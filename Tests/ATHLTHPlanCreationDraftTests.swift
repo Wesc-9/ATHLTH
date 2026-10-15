@@ -114,6 +114,28 @@ final class ATHLTHPlanCreationDraftTests: XCTestCase {
         XCTAssertFalse(persistedText.contains("healthData"))
     }
 
+    func testWeekPresetsResumeWithoutStoringCustomWorkoutNotes() throws {
+        let draft = ATHLTHPlanCreationDraft(
+            title: "Løpeplan",
+            weekCount: 6,
+            startDate: Date().addingTimeInterval(86_400),
+            advanced: true,
+            source: "scratch",
+            stage: "week",
+            preferredDayIndexes: [1, 4],
+            workoutKindsByDay: [1: "strength", 4: "running", 9: "walking"],
+            workoutPresetsByDay: [1: "Overkropp", 4: "Bakkeintervaller"],
+            workoutMinutesByDay: [1: 45, 4: 35, 9: 100]
+        )
+        let restored = try JSONDecoder().decode(
+            ATHLTHPlanCreationDraft.self, from: JSONEncoder().encode(draft)
+        )
+        XCTAssertEqual(restored.workoutKindsByDay?[1], "strength")
+        XCTAssertNil(restored.workoutKindsByDay?[9])
+        XCTAssertEqual(restored.workoutPresetsByDay?[4], "Bakkeintervaller")
+        XCTAssertEqual(restored.workoutMinutesByDay?[4], 35)
+    }
+
     func testLegacyDraftWithoutAdvancedFieldsStillDecodes() throws {
         let oldDraft = ATHLTHPlanCreationDraft(
             title: "Previous checkpoint",
