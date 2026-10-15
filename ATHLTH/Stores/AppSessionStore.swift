@@ -2242,7 +2242,8 @@ final class AppSessionStore: ObservableObject {
         endDate: Date? = nil,
         visibility: ProfileVisibility = .privateOnly,
         builderProfile: TrainingPlanBuilderProfile,
-        seedSuggestedWeek: Bool
+        seedSuggestedWeek: Bool,
+        structuredWorkoutsByDay: [Int: ATHLTHPlanStructuredWorkoutBlueprint] = [:]
     ) -> TrainingPlan? {
         let resolvedWeekCount =
             min(max(weekCount, 1), 52)
@@ -2486,6 +2487,13 @@ final class AppSessionStore: ObservableObject {
                         ]
                 }
             }
+        }
+
+        if builderProfile.mode == .advanced {
+            ATHLTHPlanStructuredWorkoutBlueprint.apply(
+                structuredWorkoutsByDay,
+                to: &weeks
+            )
         }
 
         let trimmedSummary =
