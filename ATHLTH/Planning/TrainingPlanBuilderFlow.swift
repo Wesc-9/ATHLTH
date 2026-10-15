@@ -4991,26 +4991,26 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     weeklyTimeBudgetMinutes,
                 simpleWorkoutKinds: mode == .basic ? orderedSimpleActivities : nil,
                 preferredWorkoutKindsByDay:
-                    Dictionary(
+                    mode == .advanced ? Dictionary(
                         uniqueKeysWithValues:
                             selectedDays.sorted().map {
                                 ($0, resolvedWorkoutKind(for: $0))
                             }
-                    ),
+                    ) : nil,
                 preferredWorkoutTitlesByDay:
-                    Dictionary(
+                    mode == .advanced ? Dictionary(
                         uniqueKeysWithValues:
                             selectedDays.sorted().map {
                                 ($0, resolvedWorkoutTitle(for: $0))
                             }
-                    ),
+                    ) : nil,
                 preferredWorkoutMinutesByDay:
-                    Dictionary(
+                    mode == .advanced ? Dictionary(
                         uniqueKeysWithValues:
                             selectedDays.sorted().map {
                                 ($0, resolvedWorkoutMinutes(for: $0))
                             }
-                    )
+                    ) : nil
             )
 
         let created =
