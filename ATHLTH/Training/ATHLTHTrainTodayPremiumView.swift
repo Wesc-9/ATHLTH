@@ -3,7 +3,7 @@ import SwiftUI
 /// The light "I dag" surface is deliberately separate from workout recording.
 /// Plans feed this view, while launching still goes through ATHLTHTrainView.
 struct ATHLTHTrainTodayPremiumView: View {
-    @StateObject private var workoutCatalog = WorkoutTemplateCatalogStore()
+    @ObservedObject var workoutCatalog: WorkoutTemplateCatalogStore
 
     let plan: TrainingPlan?
     let sessions: [PlannedSession]
@@ -317,15 +317,12 @@ struct ATHLTHTrainTodayPremiumView: View {
     // Real, published workouts only. This is editorial discovery, not an AI
     // prescription. The selection opens the original workout detail screen.
     private var suggestedWorkouts: [WorkoutTemplateCatalogEntry] {
-        let entries = workoutCatalog.entries.filter { !$0.blocks.isEmpty }
-        guard !entries.isEmpty else { return [] }
-        if let kind = primaryWorkout?.kind, kind == .running || kind == .strength {
-            let category = kind == .running ? "running" : "strength"
-            let preferred = entries.filter { $0.category == category }
-            let others = entries.filter { $0.category != category }
-            return Array((preferred + others).prefix(2))
-        }
-        return Array(entries.prefix(2))
+        // The bundled fallback contains only HYROX sessions and must not be
+        // marketed as general recommendations before the live catalog loads.
+        guard workoutCatalog.hasPublishedCatalog else { return [] }
+        return TrainWorkoutSuggestionPolicy.pick(
+            workoutCatalog.entries, preferredKind: primaryWorkout?.kind
+        )
     }
 
     @ViewBuilder
@@ -786,5 +783,62 @@ private extension View {
                     .stroke(line.opacity(0.68), lineWidth: 0.7)
             }
             .shadow(color: .black.opacity(0.035), radius: 10, y: 5)
+    }
+}
+
+
+/// Pure, deterministic selection for Train discovery. No user profiling,
+/// hidden AI prescriptions or dependence on the HYROX-only offline fallback.
+enum TrainWorkoutSuggestionPolicy {
+    static func pick(
+        _ entries: [WorkoutTemplateCatalogEntry],
+        preferredKind: WorkoutKind?
+    ) -> [WorkoutTemplateCatalogEntry] {
+        let safe = entries.filter { entry in
+            !entry.blocks.isEmpty &&
+            entry.difficulty.localizedCaseInsensitiveCompare("Advanced") != .orderedSame &&
+            !entry.tags.contains(where: { $0.localizedCaseInsensitiveContains("hyrox") })
+        }.sorted { lhs, rhs in
+            if lhs.sortOrder == rhs.sortOrder {
+                return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+            }
+            return lhs.sortOrder < rhs.sortOrder
+        }
+        guard !safe.isEmpty else { return [] }
+
+        let category: String?
+        switch preferredKind {
+        case .running: category = "running"
+        case .walking: category = "walking"
+        case .strength: category = "strength"
+        default: category = nil
+        }
+
+        var ordered = safe
+        if let category {
+            let matched = safe.filter { $0.category == category }
+            let remaining = safe.filter { $0.category != category }
+            ordered = matched + remaining
+        } else {
+            let entryLevel = safe.filter {
+                $0.difficulty.localizedCaseInsensitiveCompare("Beginner") == .orderedSame ||
+                $0.difficulty.localizedCaseInsensitiveCompare("All levels") == .orderedSame
+            }
+            if !entryLevel.isEmpty {
+                let other = safe.filter { entry in !entryLevel.contains(where: { $0.id == entry.id }) }
+                ordered = entryLevel + other
+            }
+        }
+
+        guard let first = ordered.first else { return [] }
+        var picked = [first]
+        if let different = ordered.dropFirst().first(where: {
+            $0.category != first.category
+        }) {
+            picked.append(different)
+        } else if let second = ordered.dropFirst().first {
+            picked.append(second)
+        }
+        return picked
     }
 }
