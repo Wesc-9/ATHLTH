@@ -845,7 +845,7 @@ struct ChallengeCreationView: View {
     @State private var exerciseName = "Bench Press"
     @State private var requiredWeightEnabled = false
     @State private var requiredWeightKg = 80.0
-    @State private var verificationPolicy: ChallengeVerificationPolicy = .manualAllowed
+    @State private var verificationPolicy: ChallengeVerificationPolicy = .verifiedPreferredManualAllowed
 
     // Give the recipient a real window to review or negotiate the rules.
     // The backend locks rule changes at the scheduled start time.
@@ -2394,129 +2394,129 @@ struct ChallengeCreationView: View {
                 .tint(clubForest)
 
                 if meetupEnabled {
-                meetupPlaceSearch
+                    meetupPlaceSearch
 
-                DatePicker(
-                    ATHLTHLocalization.choose(
-                        english: "Meet at",
-                        norwegian: "Møtetid"
-                    ),
-                    selection:
-                        $meetupAt,
-                    in: Date()...,
-                    displayedComponents: [
-                        .date,
-                        .hourAndMinute
-                    ]
-                )
-                .datePickerStyle(.compact)
-
-                MeetupLocationPicker(
-                    coordinate:
-                        $meetupCoordinate,
-                    position:
-                        $mapPosition
-                ) { coordinate in
-                    meetupPlaceAddress =
-                        ""
-                    if meetupPlaceName
-                        .trimmingCharacters(
-                            in:
-                                .whitespacesAndNewlines
-                        )
-                        .isEmpty {
-                        meetupPlaceName =
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Selected map point",
-                                norwegian:
-                                    "Valgt kartpunkt"
-                            )
-                    }
-                }
-
-                if selectedRouteID !=
-                    nil {
-                    Button {
-                        guard
-                            let routeID =
-                                selectedRouteID,
-                            let route =
-                                session
-                                    .savedRoutes
-                                    .first(
-                                        where: {
-                                            $0.id ==
-                                                routeID
-                                        }
-                                    ),
-                            let first =
-                                route
-                                    .coordinates
-                                    .first
-                        else {
-                            return
-                        }
-
-                        let coordinate =
-                            CLLocationCoordinate2D(
-                                latitude:
-                                    first.latitude,
-                                longitude:
-                                    first.longitude
-                            )
-
-                        meetupCoordinate =
-                            coordinate
-                        meetupPlaceName =
-                            route.title
-                        meetupPlaceAddress =
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Route start",
-                                norwegian:
-                                    "Rutestart"
-                            )
-                        meetupSearch.clear()
-                        mapPosition =
-                            .region(
-                                MKCoordinateRegion(
-                                    center:
-                                        coordinate,
-                                    span:
-                                        MKCoordinateSpan(
-                                            latitudeDelta:
-                                                0.015,
-                                            longitudeDelta:
-                                                0.015
-                                        )
-                                )
-                            )
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Use route start",
-                                norwegian:
-                                    "Bruk rutestart"
-                            ),
-                            systemImage:
-                                "location.fill"
-                        )
-                    }
-                    .buttonStyle(.bordered)
-                }
-
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Check-in is explicit. ATHLTH does not continuously share participants’ live location.",
-                        norwegian:
-                            "Innsjekking er aktiv. ATHLTH deler ikke deltakernes posisjon kontinuerlig."
+                    DatePicker(
+                        ATHLTHLocalization.choose(
+                            english: "Meet at",
+                            norwegian: "Møtetid"
+                        ),
+                        selection:
+                            $meetupAt,
+                        in: Date()...,
+                        displayedComponents: [
+                            .date,
+                            .hourAndMinute
+                        ]
                     )
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                    .datePickerStyle(.compact)
+
+                    MeetupLocationPicker(
+                        coordinate:
+                            $meetupCoordinate,
+                        position:
+                            $mapPosition
+                    ) { coordinate in
+                        meetupPlaceAddress =
+                            ""
+                        if meetupPlaceName
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+                            .isEmpty {
+                            meetupPlaceName =
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Selected map point",
+                                    norwegian:
+                                        "Valgt kartpunkt"
+                                )
+                        }
+                    }
+
+                    if selectedRouteID !=
+                        nil {
+                        Button {
+                            guard
+                                let routeID =
+                                    selectedRouteID,
+                                let route =
+                                    session
+                                        .savedRoutes
+                                        .first(
+                                            where: {
+                                                $0.id ==
+                                                    routeID
+                                            }
+                                        ),
+                                let first =
+                                    route
+                                        .coordinates
+                                        .first
+                            else {
+                                return
+                            }
+
+                            let coordinate =
+                                CLLocationCoordinate2D(
+                                    latitude:
+                                        first.latitude,
+                                    longitude:
+                                        first.longitude
+                                )
+
+                            meetupCoordinate =
+                                coordinate
+                            meetupPlaceName =
+                                route.title
+                            meetupPlaceAddress =
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Route start",
+                                    norwegian:
+                                        "Rutestart"
+                                )
+                            meetupSearch.clear()
+                            mapPosition =
+                                .region(
+                                    MKCoordinateRegion(
+                                        center:
+                                            coordinate,
+                                        span:
+                                            MKCoordinateSpan(
+                                                latitudeDelta:
+                                                    0.015,
+                                                longitudeDelta:
+                                                    0.015
+                                            )
+                                    )
+                                )
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Use route start",
+                                    norwegian:
+                                        "Bruk rutestart"
+                                ),
+                                systemImage:
+                                    "location.fill"
+                            )
+                        }
+                        .buttonStyle(.bordered)
+                    }
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Check-in is explicit. ATHLTH does not continuously share participants’ live location.",
+                            norwegian:
+                                "Innsjekking er aktiv. ATHLTH deler ikke deltakernes posisjon kontinuerlig."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                 }
             }
@@ -3202,8 +3202,6 @@ struct ChallengeCreationView: View {
 
             creationDivider
         }
-
-
     }
 
     private var creationHeartRateRules:
@@ -6853,7 +6851,7 @@ struct ChallengeCreationView: View {
             : nil
 
         let meetup: ChallengeMeetup?
-        if meetupEnabled ,
+        if meetupEnabled,
            let meetupCoordinate {
             meetup = ChallengeMeetup(
                 placeName: meetupPlaceName.isEmpty
@@ -10066,7 +10064,10 @@ struct ChallengeDetailView: View {
                 .padding(.bottom, 8)
 
             ruleRow("Scoring", challenge.rules.scoring.title)
-            if challenge.sport != .strength {
+            if challenge.sport != .strength ||
+                challenge.rules.verificationPolicy != .manualAllowed {
+                // Existing strength challenges with older verification policies
+                // still disclose their original restrictions.
                 ruleRow("Verification", challenge.rules.verificationPolicy.title)
             }
 
