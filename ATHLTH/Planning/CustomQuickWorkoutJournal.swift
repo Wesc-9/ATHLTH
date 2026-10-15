@@ -10,8 +10,8 @@ enum CustomQuickWorkoutEvidence: String, Codable, Hashable {
         switch self {
         case .phoneTimer:
             return ATHLTHLocalization.choose(
-                english: "Phone-timed · manual distance",
-                norwegian: "Tid målt på iPhone · manuell distanse"
+                english: "iPhone-timed · manual entry",
+                norwegian: "Tid målt på iPhone · øvrige data manuelt"
             )
         case .manual:
             return ATHLTHLocalization.choose(
@@ -36,8 +36,8 @@ struct CustomQuickWorkoutRecord: Identifiable, Codable, Hashable {
 
     var title: String {
         method == .open
-            ? activity.title
-            : "\(activity.title) · \(method.title)"
+            ? activity.localizedTitle
+            : "\(activity.localizedTitle) · \(method.localizedTitle)"
     }
 
     var manuallyEnteredMetricsAreUnverified: Bool { true }
