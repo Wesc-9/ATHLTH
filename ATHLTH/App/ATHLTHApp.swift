@@ -184,27 +184,27 @@ private struct ATHLTHSceneRootView: View {
         guard !didInstallBackgroundRefreshHandlers else { return }
         didInstallBackgroundRefreshHandlers = true
 
-        health
-            )
+        let homeAssistantStore = homeAssistant
+        let healthStore = health
 
-        health
+        healthStore
             .backgroundRefreshDidComplete = {
-                [weak homeAssistant,
-                 weak health] in
+                [weak homeAssistantStore,
+                 weak healthStore] in
 
                 guard ATHLTHDeviceRole.isIPhone,
-                      let homeAssistant,
-                      let health
+                      let homeAssistantStore,
+                      let healthStore
                 else {
                     return
                 }
 
                 let backgroundTrainingLoad:
                     Double?
-                if homeAssistant
+                if homeAssistantStore
                     .shareTrainingLoad {
                     backgroundTrainingLoad =
-                        await health
+                        await healthStore
                             .recoveryTrendSnapshot(
                                 days: 28
                             )
@@ -215,23 +215,23 @@ private struct ATHLTHSceneRootView: View {
                         nil
                 }
 
-                await homeAssistant
+                await homeAssistantStore
                     .syncBackgroundHealthSnapshot(
                         workouts:
-                            health.workouts,
+                            healthStore.workouts,
                         sleep:
-                            health.sleep,
+                            healthStore.sleep,
                         heart:
-                            health.heart,
+                            healthStore.heart,
                         training:
-                            health.training,
+                            healthStore.training,
                         recoveryScore:
-                            health
+                            healthStore
                                 .recovery
                                 .score,
                         recoveryState:
                             homeAssistantRecoveryStateValue(
-                                health
+                                healthStore
                                     .recovery
                                     .state
                             ),
@@ -242,27 +242,27 @@ private struct ATHLTHSceneRootView: View {
 
         ATHLTHHomeAssistantBackgroundRefresh
             .refreshHandler = {
-                [weak homeAssistant,
-                 weak health] in
+                [weak homeAssistantStore,
+                 weak healthStore] in
 
                 guard ATHLTHDeviceRole.isIPhone,
-                      let homeAssistant,
-                      let health,
-                      homeAssistant.isConnected
+                      let homeAssistantStore,
+                      let healthStore,
+                      homeAssistantStore.isConnected
                 else {
                     return false
                 }
 
-                await health.refreshIfStale(
+                await healthStore.refreshIfStale(
                     maxAge: 5 * 60
                 )
 
                 let backgroundTrainingLoad:
                     Double?
-                if homeAssistant
+                if homeAssistantStore
                     .shareTrainingLoad {
                     backgroundTrainingLoad =
-                        await health
+                        await healthStore
                             .recoveryTrendSnapshot(
                                 days: 28
                             )
@@ -273,17 +273,17 @@ private struct ATHLTHSceneRootView: View {
                         nil
                 }
 
-                await homeAssistant
+                await homeAssistantStore
                     .syncBackgroundHealthSnapshot(
-                        workouts: health.workouts,
-                        sleep: health.sleep,
-                        heart: health.heart,
-                        training: health.training,
+                        workouts: healthStore.workouts,
+                        sleep: healthStore.sleep,
+                        heart: healthStore.heart,
+                        training: healthStore.training,
                         recoveryScore:
-                            health.recovery.score,
+                            healthStore.recovery.score,
                         recoveryState:
                             homeAssistantRecoveryStateValue(
-                                health
+                                healthStore
                                     .recovery
                                     .state
                             ),
