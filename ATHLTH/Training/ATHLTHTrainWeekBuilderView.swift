@@ -550,6 +550,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     @State private var showIntervalComposer = false
     @State private var scheduled = false
     @State private var clockTime = Date()
+    @State private var durationWasEditedManually: Bool
     @State private var errorMessage: String?
     @State private var detailExerciseID: UUID?
 
@@ -578,6 +579,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
         ))
         _scheduled = State(initialValue: existingWorkout?.scheduledStart != nil)
         _clockTime = State(initialValue: existingWorkout?.scheduledStart ?? Date())
+        _durationWasEditedManually = State(initialValue: existingWorkout != nil)
     }
 
     var body: some View {
@@ -665,6 +667,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                     draft.workoutBlocks = template.resolvedWorkoutBlocks
                     draft.workoutCategory = template.workoutCategory
                     draft.durationMinutes = template.durationMinutes
+                    durationWasEditedManually = true
                     draft.runningWorkout = template.runningWorkout
                     draft.runningWorkouts = template.runningWorkouts
                     showSharedWorkoutTemplates = false
@@ -768,21 +771,82 @@ struct ATHLTHTrainWorkoutBuilderView: View {
         }
     }
 
+    // Estimates change with sets, reps and pauses until the athlete overrides
+    // the duration. Existing workouts keep their saved duration unchanged.
+    private var estimatedDurationMinutes: Int? {
+        guard draft.kind == .strength || draft.kind == .custom,
+              !draft.exercises.isEmpty else {
+            return nil
+        }
+        let seconds = draft.exercises.reduce(0.0) { total, exercise in
+            let targets = exercise.resolvedSetTargets
+            let work = targets.reduce(0.0) { subtotal, target in
+                let setSeconds: Int
+                if exercise.resolvedTargetKind == .time {
+                    setSeconds = target.durationSeconds
+                        ?? exercise.resolvedTargetDurationSeconds ?? 45
+                } else {
+                    setSeconds = min(
+                        max((target.reps ?? exercise.reps ?? 10) * 4, 20), 180
+                    )
+                }
+                return subtotal + Double(max(setSeconds, 0))
+            }
+            let rest = targets.dropLast().reduce(0.0) { subtotal, target in
+                subtotal + Double(max(
+                    target.restSeconds ?? exercise.restSeconds ?? 60, 0
+                ))
+            }
+            return total + work + rest + 30 // setup / transition
+        }
+        return min(max(Int(ceil(seconds / 300.0)) * 5, 5), 240)
+    }
+
+    private var displayedDurationMinutes: Int {
+        durationWasEditedManually
+            ? (draft.durationMinutes ?? 45)
+            : (estimatedDurationMinutes ?? draft.durationMinutes ?? 45)
+    }
+
     private var durationEditing: some View {
-        HStack {
-            Label(tr("Duration", "Varighet"), systemImage: "clock")
-                .font(.subheadline.weight(.medium))
-            Spacer()
-            Stepper(
-                "\(draft.durationMinutes ?? 45) min",
-                value: Binding(
-                    get: { draft.durationMinutes ?? 45 },
-                    set: { draft.durationMinutes = $0 }
-                ),
-                in: 5...240, step: 5
-            )
-            .font(.caption)
-            .fixedSize()
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Label(tr("Duration", "Varighet"), systemImage: "clock")
+                    .font(.subheadline.weight(.medium))
+                Spacer()
+                Stepper(
+                    "\(displayedDurationMinutes) min",
+                    value: Binding(
+                        get: { displayedDurationMinutes },
+                        set: {
+                            durationWasEditedManually = true
+                            draft.durationMinutes = $0
+                        }
+                    ),
+                    in: 5...240, step: 5
+                )
+                .font(.caption)
+                .fixedSize()
+            }
+            if let estimate = estimatedDurationMinutes {
+                HStack(spacing: 8) {
+                    Text(durationWasEditedManually
+                         ? tr("Manual duration", "Manuell varighet")
+                         : tr("Estimated from exercises and rest",
+                              "Beregnet fra øvelser og pauser"))
+                        .font(.caption2)
+                        .foregroundStyle(muted)
+                    Spacer()
+                    if durationWasEditedManually {
+                        Button(tr("Use estimate (\(estimate) min)",
+                                  "Bruk beregning (\(estimate) min)")) {
+                            durationWasEditedManually = false
+                        }
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(bronze)
+                    }
+                }
+            }
         }
         .foregroundStyle(ink)
         .padding(13)
@@ -1268,6 +1332,9 @@ struct ATHLTHTrainWorkoutBuilderView: View {
 
         let (weekIndex, dayIndex) = location
         var updated = draft
+        if !durationWasEditedManually, let estimatedDurationMinutes {
+            updated.durationMinutes = estimatedDurationMinutes
+        }
         // A name is optional; persist a useful localized title for other views.
         let requestedTitle = updated.title.trimmingCharacters(in: .whitespacesAndNewlines)
         updated.title = requestedTitle.isEmpty ? updated.kind.title : requestedTitle
