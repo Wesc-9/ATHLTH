@@ -11,6 +11,7 @@ struct ATHLTHTrainTodayPremiumView: View {
     let nextWorkoutDate: Date?
     let completionFraction: Double
     let planPosition: String
+    let hasActiveWorkout: Bool
     let onOpenPlan: () -> Void
     let onCreatePlan: () -> Void
     let onOpenLibrary: () -> Void
@@ -45,22 +46,27 @@ struct ATHLTHTrainTodayPremiumView: View {
             .padding(.bottom, 2)
 
             if let plan {
-                if let workout = primaryWorkout {
+                if !sessions.isEmpty && sessions.allSatisfy({ completedIDs.contains($0.id) }) {
+                    completedTodayCard(plan)
+                } else if let workout = primaryWorkout {
                     workoutCard(workout, plan: plan)
                 } else {
                     restDayCard(plan)
                 }
+
+                workoutLibraryShortcut
+                quickTrainSection
+                activePlanSection(plan)
             } else {
+                // Starting a workout must not require creating a training plan.
+                quickTrainSection
+                workoutLibraryShortcut
                 emptyPlanCard
             }
-
-            quickTrainSection
             ghostRaceSection
                 .padding(.top, 6)
 
-            if let plan {
-                activePlanSection(plan)
-            } else {
+            if plan == nil {
                 Button(action: onOpenLibrary) {
                     HStack(spacing: 12) {
                         Image(systemName: "square.stack.3d.up")
@@ -190,24 +196,32 @@ struct ATHLTHTrainTodayPremiumView: View {
                 }
 
                 Button {
-                    onStartWorkout(
-                        workout,
-                        healthCompletedIDs.contains(workout.id)
-                    )
+                    if hasActiveWorkout || finished {
+                        onWorkoutDetails(
+                            workout,
+                            healthCompletedIDs.contains(workout.id)
+                        )
+                    } else {
+                        onStartWorkout(
+                            workout,
+                            healthCompletedIDs.contains(workout.id)
+                        )
+                    }
                 } label: {
                     HStack {
                         Spacer()
                         Text(
                             finished
                                 ? tr("View workout", "Se økten")
+                                : hasActiveWorkout
+                                ? tr("View planned workout", "Se planlagt økt")
                                 : tr("Start workout", "Start økt")
                         )
                         .font(.subheadline.weight(.semibold))
                         Spacer()
                         Image(
-                            systemName: finished
-                                ? "checkmark"
-                                : "arrow.right"
+                            systemName: (finished || hasActiveWorkout)
+                                ? "arrow.up.right" : "play.fill"
                         )
                     }
                     .foregroundStyle(.white)
@@ -313,6 +327,87 @@ struct ATHLTHTrainTodayPremiumView: View {
             }
             .padding(16)
         }
+        .premiumTrainSurface(line: hairline)
+    }
+
+    // Shortcuts reuse the existing training library. No new recommendation
+    // engine or Quick Train changes are needed for this navigation improvement.
+    private var workoutLibraryShortcut: some View {
+        Button(action: onOpenLibrary) {
+            HStack(spacing: 12) {
+                Image(systemName: "rectangle.stack")
+                    .font(.system(size: 19, weight: .medium))
+                    .foregroundStyle(champagne)
+                    .frame(width: 38, height: 38)
+                    .background(
+                        Color(red: 0.96, green: 0.94, blue: 0.91),
+                        in: RoundedRectangle(cornerRadius: 11)
+                    )
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(tr("Choose a workout", "Velg en økt"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ink)
+                    Text(tr(
+                        "Saved workouts, intervals and your favorites",
+                        "Lagrede økter, intervaller og favoritter"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(muted)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(muted)
+            }
+            .padding(14)
+            .premiumTrainSurface(line: hairline)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func completedTodayCard(_ plan: TrainingPlan) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 29, weight: .light))
+                    .foregroundStyle(champagne)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tr("Today's training is done", "Dagens trening er fullført"))
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(ink)
+                    Text(tr(
+                        "Your planned sessions are complete.",
+                        "De planlagte øktene dine er gjennomført."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(muted)
+                }
+                Spacer(minLength: 0)
+            }
+            if let nextWorkoutTitle {
+                Button(action: onOpenPlan) {
+                    HStack(spacing: 6) {
+                        Text(tr("Next:", "Neste:") + " " + nextWorkoutTitle)
+                            .lineLimit(1)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ink)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Button(action: onOpenPlan) {
+                    Label(tr("View your plan", "Se treningsplanen"),
+                          systemImage: "calendar")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ink)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(17)
         .premiumTrainSurface(line: hairline)
     }
 
