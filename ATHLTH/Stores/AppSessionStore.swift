@@ -2243,7 +2243,8 @@ final class AppSessionStore: ObservableObject {
         visibility: ProfileVisibility = .privateOnly,
         builderProfile: TrainingPlanBuilderProfile,
         seedSuggestedWeek: Bool,
-        structuredWorkoutsByDay: [Int: ATHLTHPlanStructuredWorkoutBlueprint] = [:]
+        structuredWorkoutsByDay: [Int: ATHLTHPlanStructuredWorkoutBlueprint] = [:],
+        weekDayEdits: [Int: ATHLTHPlanWeekDayEdit] = [:]
     ) -> TrainingPlan? {
         let resolvedWeekCount =
             min(max(weekCount, 1), 52)
@@ -2509,6 +2510,9 @@ final class AppSessionStore: ObservableObject {
             ATHLTHPlanStructuredWorkoutBlueprint.apply(
                 scheduledBlueprints,
                 to: &weeks
+            )
+            ATHLTHPlanWeekDayEdit.apply(
+                weekDayEdits, to: &weeks, startDate: resolvedStart
             )
         }
 
