@@ -94,8 +94,12 @@ struct MessageInboxView: View {
                         )
                 }
 
-                if selectedFilter == .all && !recentPeople.isEmpty {
-                    recentPeopleStrip
+                // Recent conversations are shortcuts, not part of the
+                // selected inbox filter. Keep them above the tabs even
+                // when private Messages is the default.
+                if selectedFilter != .archive &&
+                    !recentConversations.isEmpty {
+                    recentConversationsStrip
                 }
 
                 inboxFilterBar
@@ -193,6 +197,7 @@ struct MessageInboxView: View {
             async let messageRefresh: Void = messaging.refresh(force: true)
             async let clubRefresh: Void = groups.refresh(force: true)
             _ = await (socialRefresh, messageRefresh, clubRefresh)
+            await groups.refreshRecentChatActivity(force: true)
         }
         .task {
             refreshCoachInboxState()
@@ -201,6 +206,7 @@ struct MessageInboxView: View {
             )
             await messaging.refresh()
             await groups.refresh()
+            await groups.refreshRecentChatActivity()
             messaging.loadPinnedConversations()
             await realtime.refreshOnlineUsers()
         }
@@ -530,78 +536,136 @@ struct MessageInboxView: View {
             }
     }
 
-    private var recentPeople:
-        [MessagePersonInboxItem] {
-        personInboxItems
-            .filter {
-                guard let conversation =
-                        $0.conversation
-                else {
-                    return true
-                }
+    private struct RecentInboxConversation: Identifiable {
+        enum Destination {
+            case person(MessagePersonInboxItem)
+            case club(CommunityGroupRecord)
+        }
 
-                return !messaging
-                    .isArchived(
-                        conversation.id
-                    )
-            }
-            .sorted {
-                if $0.isPinned !=
-                    $1.isPinned {
-                    return $0.isPinned
-                }
-
-                return $0.latestActivityAt >
-                    $1.latestActivityAt
-            }
-            .prefix(8)
-            .map { $0 }
+        let id: String
+        let lastActivityAt: Date
+        let destination: Destination
     }
 
-    private var recentPeopleStrip:
-        some View {
-        ScrollView(
-            .horizontal,
-            showsIndicators: false
-        ) {
+    /// One chronological row for people and joined clubs with real messages.
+    /// Invite-only entries and clubs with no chat history are not recents.
+    private var recentConversations: [RecentInboxConversation] {
+        let people: [RecentInboxConversation] =
+            personInboxItems.compactMap { item in
+                guard let conversation = item.conversation,
+                      !messaging.isArchived(conversation.id),
+                      let lastActivityAt =
+                        item.lastMessage?.createdAt ??
+                        conversation.lastMessageAt
+                else { return nil }
+
+                return RecentInboxConversation(
+                    id: "person:\(item.id.uuidString)",
+                    lastActivityAt: lastActivityAt,
+                    destination: .person(item)
+                )
+            }
+
+        let clubs: [RecentInboxConversation] =
+            groups.joinedGroups.compactMap { club in
+                let loadedLastMessageAt =
+                    groups.messages(in: club.id).last?.createdAt
+                let fetchedLastMessageAt =
+                    groups.recentChatActivityByGroup[club.id]
+                let lastActivityAt = [
+                    loadedLastMessageAt,
+                    fetchedLastMessageAt
+                ].compactMap { $0 }.max()
+
+                guard let lastActivityAt else { return nil }
+
+                return RecentInboxConversation(
+                    id: "club:\(club.id.uuidString)",
+                    lastActivityAt: lastActivityAt,
+                    destination: .club(club)
+                )
+            }
+
+        return Array(
+            (people + clubs)
+                .sorted {
+                    if $0.lastActivityAt == $1.lastActivityAt {
+                        return $0.id < $1.id
+                    }
+                    return $0.lastActivityAt > $1.lastActivityAt
+                }
+                .prefix(8)
+        )
+    }
+
+    private var recentConversationsStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 16) {
-                ForEach(recentPeople) { item in
-                    recentPersonLink(item)
+                ForEach(recentConversations) { recent in
+                    switch recent.destination {
+                    case .person(let person):
+                        recentPersonLink(person)
+                    case .club(let club):
+                        recentClubLink(club)
+                    }
                 }
             }
-            .padding(
-                .horizontal,
-                2
-            )
+            .padding(.horizontal, 2)
         }
     }
 
-    @ViewBuilder
     private func recentPersonLink(
         _ item: MessagePersonInboxItem
     ) -> some View {
-        if item.conversation != nil {
-            NavigationLink {
-                DirectMessageThreadView(
-                    friend: item.friend
-                )
-            } label: {
-                recentPersonBadge(item)
-            }
-            .buttonStyle(.plain)
-        } else if let challenge =
-                    item.pendingChallenges.first ??
-                    item.outgoingChallenges.first {
-            NavigationLink {
-                ChallengeDetailView(
-                    challengeID:
-                        challenge.id
-                )
-            } label: {
-                recentPersonBadge(item)
-            }
-            .buttonStyle(.plain)
+        NavigationLink {
+            DirectMessageThreadView(friend: item.friend)
+        } label: {
+            recentPersonBadge(item)
         }
+        .buttonStyle(.plain)
+    }
+
+    private func recentClubLink(
+        _ club: CommunityGroupRecord
+    ) -> some View {
+        NavigationLink {
+            CommunityGroupDetailView(group: club, initialTab: .chat)
+        } label: {
+            VStack(spacing: 6) {
+                ZStack(alignment: .bottomTrailing) {
+                    CommunityGroupIdentityAvatar(group: club, size: 60)
+                        .frame(width: 60, height: 60)
+                        .clipShape(Circle())
+                        .overlay {
+                            Circle()
+                                .stroke(Color.white.opacity(0.94), lineWidth: 2)
+                        }
+
+                    Image(systemName: "person.3.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 21, height: 21)
+                        .background(ATHLTHTheme.accentDeep, in: Circle())
+                        .overlay {
+                            Circle()
+                                .stroke(.white, lineWidth: 2)
+                        }
+                }
+
+                Text(club.name)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(1)
+                    .frame(width: 74)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            ATHLTHLocalization.choose(
+                english: "Club chat: \(club.name)",
+                norwegian: "Klubbchat: \(club.name)"
+            )
+        )
     }
 
     private func recentPersonBadge(
