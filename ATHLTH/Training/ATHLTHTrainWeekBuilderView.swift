@@ -513,15 +513,19 @@ struct ATHLTHTrainWeekBuilderView: View {
     private func dayName(_ index: Int) -> String {
         let no = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"]
         let en = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-        let position = min(max(index - 1, 0), 6)
+        let weekday = Calendar.current.component(.weekday, from: dayDate(index))
+        let position = (weekday + 5) % 7
         return tr(en[position], no[position])
     }
+
     private func fullDayName(_ index: Int) -> String {
         let no = ["Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag", "Søndag"]
         let en = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-        let position = min(max(index - 1, 0), 6)
+        let weekday = Calendar.current.component(.weekday, from: dayDate(index))
+        let position = (weekday + 5) % 7
         return tr(en[position], no[position])
     }
+
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
     }
