@@ -1363,7 +1363,14 @@ struct AIProgramBuilderView: View {
         do {
             let result = try await service.generate(request)
             guard session.signedIn, session.profile.userID == requestOwnerID else { return }
-            let validationIssues = draftValidationIssues(result)
+            // AI may propose something on a weekday the user already
+            // detailed manually. Overlay the authoritative Studio workout
+            // before validation, so we never reject a safe proposal merely
+            // because it would otherwise duplicate a protected session.
+            let effectiveProposal = result.displayingLockedWorkouts(
+                seed?.structuredWorkoutsByDay ?? [:]
+            )
+            let validationIssues = draftValidationIssues(effectiveProposal)
             guard validationIssues.isEmpty else {
                 preview = nil
                 errorMessage = ATHLTHLocalization.choose(
@@ -1373,11 +1380,7 @@ struct AIProgramBuilderView: View {
                 return
             }
             expandedPreviewWeeks.removeAll()
-            // Reflect locked ATHLTH Studio sessions in the review *before*
-            // the user approves anything, not only at final save.
-            preview = result.displayingLockedWorkouts(
-                seed?.structuredWorkoutsByDay ?? [:]
-            )
+            preview = effectiveProposal
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
