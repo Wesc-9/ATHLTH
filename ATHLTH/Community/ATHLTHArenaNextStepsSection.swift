@@ -33,6 +33,10 @@ struct ATHLTHArenaNextStepsSection: View {
     /// Landing pages can omit the repeated "nothing pending" card;
     /// the standalone section still shows it by default.
     var showEmptyState = true
+
+    init(showEmptyState: Bool = true) {
+        self.showEmptyState = showEmptyState
+    }
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var challenges: ChallengeStore
