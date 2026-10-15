@@ -3,6 +3,8 @@ import SwiftUI
 /// The light "I dag" surface is deliberately separate from workout recording.
 /// Plans feed this view, while launching still goes through ATHLTHTrainView.
 struct ATHLTHTrainTodayPremiumView: View {
+    @StateObject private var workoutCatalog = WorkoutTemplateCatalogStore()
+
     let plan: TrainingPlan?
     let sessions: [PlannedSession]
     let completedIDs: Set<UUID>
@@ -12,6 +14,7 @@ struct ATHLTHTrainTodayPremiumView: View {
     let completionFraction: Double
     let planPosition: String
     let hasActiveWorkout: Bool
+    let onChooseSuggestedWorkout: (WorkoutTemplateCatalogEntry) -> Void
     let onOpenPlan: () -> Void
     let onCreatePlan: () -> Void
     let onOpenLibrary: () -> Void
@@ -54,12 +57,14 @@ struct ATHLTHTrainTodayPremiumView: View {
                     restDayCard(plan)
                 }
 
-                workoutLibraryShortcut
+                suggestedWorkoutSection
                 quickTrainSection
+                workoutLibraryShortcut
                 activePlanSection(plan)
             } else {
                 // Starting a workout must not require creating a training plan.
                 quickTrainSection
+                suggestedWorkoutSection
                 workoutLibraryShortcut
                 emptyPlanCard
             }
@@ -68,6 +73,7 @@ struct ATHLTHTrainTodayPremiumView: View {
 
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .task { await workoutCatalog.refresh() }
     }
 
     private var primaryWorkout: PlannedSession? {
@@ -306,6 +312,96 @@ struct ATHLTHTrainTodayPremiumView: View {
             .padding(16)
         }
         .premiumTrainSurface(line: hairline)
+    }
+
+    // Real, published workouts only. This is editorial discovery, not an AI
+    // prescription. The selection opens the original workout detail screen.
+    private var suggestedWorkouts: [WorkoutTemplateCatalogEntry] {
+        let entries = workoutCatalog.entries.filter { !$0.blocks.isEmpty }
+        guard !entries.isEmpty else { return [] }
+        if let kind = primaryWorkout?.kind, kind == .running || kind == .strength {
+            let category = kind == .running ? "running" : "strength"
+            let preferred = entries.filter { $0.category == category }
+            let others = entries.filter { $0.category != category }
+            return Array((preferred + others).prefix(2))
+        }
+        return Array(entries.prefix(2))
+    }
+
+    @ViewBuilder
+    private var suggestedWorkoutSection: some View {
+        let suggestions = suggestedWorkouts
+        if !suggestions.isEmpty {
+            VStack(alignment: .leading, spacing: 11) {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(tr("WORKOUT LIBRARY", "FRA ØKTBIBLIOTEKET"))
+                            .font(.system(size: 9, weight: .semibold))
+                            .tracking(1.5)
+                            .foregroundStyle(champagne)
+                        Text(tr("Find a workout", "Finn en økt"))
+                            .font(.system(size: 24, weight: .regular, design: .serif))
+                            .foregroundStyle(ink)
+                    }
+                    Spacer()
+                    Button(action: onOpenLibrary) {
+                        HStack(spacing: 3) {
+                            Text(tr("See all", "Se alle"))
+                            Image(systemName: "arrow.up.right")
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ink)
+                    }
+                    .buttonStyle(.plain)
+                }
+                ForEach(suggestions) { entry in
+                    Button {
+                        onChooseSuggestedWorkout(entry)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: entry.systemImage)
+                                .font(.system(size: 20, weight: .regular))
+                                .foregroundStyle(champagne)
+                                .frame(width: 48, height: 48)
+                                .background(
+                                    Color(red: 0.96, green: 0.94, blue: 0.91),
+                                    in: RoundedRectangle(cornerRadius: 14)
+                                )
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(entry.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ink)
+                                    .lineLimit(1)
+                                Text(suggestionSubtitle(entry))
+                                    .font(.caption)
+                                    .foregroundStyle(muted)
+                                    .lineLimit(1)
+                            }
+                            Spacer(minLength: 4)
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(muted)
+                        }
+                        .padding(13)
+                        .premiumTrainSurface(line: hairline)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func suggestionSubtitle(_ entry: WorkoutTemplateCatalogEntry) -> String {
+        var parts = [entry.categoryTitle]
+        if let minutes = entry.estimatedDurationMinutes, minutes > 0 {
+            parts.append("\(minutes) min")
+        }
+        parts.append(tr(
+            "\(entry.blocks.count) steps",
+            "\(entry.blocks.count) steg"
+        ))
+        return parts.joined(separator: " · ")
     }
 
     // Shortcuts reuse the existing training library. No new recommendation
