@@ -14,7 +14,7 @@ enum ATHLTHPlanJourneyStep: Int, CaseIterable {
 enum ATHLTHPlanJourney {
     static func sequence(advanced: Bool) -> [ATHLTHPlanJourneyStep] {
         if advanced {
-            return [.mode, .source, .basics, .profile, .week, .review]
+            return [.mode, .basics, .profile, .week, .review]
         }
         return [.mode, .basics]
     }
