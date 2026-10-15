@@ -18,6 +18,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     private var advanced = false
     @State private var selectedWeekIndex: Int?
     @State private var showingCreation = false
+    @State private var pendingCreatedPlanID: UUID?
     @State private var showingMyPlans = false
     @State private var showingTemplates = false
     @State private var showingAllPlans = false
@@ -309,13 +310,18 @@ struct ATHLTHTrainPlanPremiumView: View {
 
     private var programSheets: some View {
         planContent
-        .sheet(isPresented: $showingCreation) {
-            ATHLTHTrainProgramComposerView { planID in
+        .sheet(isPresented: $showingCreation, onDismiss: {
+            if let planID = pendingCreatedPlanID {
                 focusedPlanID = planID
                 selectedWeekIndex = 0
                 if let created = session.trainingPlan(withID: planID) {
                     advanced = created.builderProfile?.mode == .advanced
                 }
+                pendingCreatedPlanID = nil
+            }
+        }) {
+            ATHLTHTrainProgramComposerView { planID in
+                pendingCreatedPlanID = planID
             }
         }
         .sheet(isPresented: $showingMyPlans) {
