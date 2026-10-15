@@ -311,6 +311,17 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         state.isReady
     }
 
+    /// Pairing + installation alone does not prove the Watch is nearby.
+    /// WCSession reachability only covers the active Watch app, so a fresh
+    /// acknowledgement is accepted for a short window as well.
+    var isVerifiedForLiveLaunch: Bool {
+        guard isReady else { return false }
+        if reachable { return true }
+        guard let lastVerifiedAt else { return false }
+        let age = Date().timeIntervalSince(lastVerifiedAt)
+        return age >= 0 && age <= 120
+    }
+
     var hasActiveWatchWorkout: Bool {
         watchWorkoutActivityState?
             .isActive == true
