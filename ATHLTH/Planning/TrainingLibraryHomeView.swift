@@ -34,6 +34,8 @@ struct TrainingLibraryHomeView: View {
 
             createSection
 
+            featuredIntervalsSection
+
             exploreSection
 
             personalLibrarySection
@@ -131,6 +133,116 @@ struct TrainingLibraryHomeView: View {
                 }
                 .accessibilityHint(tr("Open the complete workout builder",
                                       "Åpner øktbyggeren"))
+            }
+        }
+    }
+
+    /// A small, recognizable shortlist. Every card opens the same detail
+    /// and launch flow as the full running workout library.
+    private var featuredIntervalsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .bottom, spacing: 12) {
+                VStack(alignment: .leading, spacing: 5) {
+                    sectionHeading(
+                        tr("READY TO RUN", "KLARE ØKTER"),
+                        title: tr("Popular intervals", "Populære intervaller"),
+                        detail: tr(
+                            "Warm-up, efforts, recovery and cool-down included.",
+                            "Oppvarming, drag, pauser og nedjogging er klare."
+                        )
+                    )
+                }
+                Spacer(minLength: 0)
+                NavigationLink {
+                    RunningWorkoutLibraryView(
+                        source: .library,
+                        onStart: onStartRunning
+                    )
+                } label: {
+                    HStack(spacing: 5) {
+                        Text(tr("See all", "Se alle"))
+                        Image(systemName: "chevron.right")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(gold)
+                    .padding(.bottom, 7)
+                }
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 11) {
+                    ForEach(runningLibrary.featuredIntervals) { workout in
+                        NavigationLink {
+                            RunningWorkoutDetailView(
+                                workout: workout,
+                                selectionTitle: nil,
+                                onSelect: nil,
+                                onStart: onStartRunning
+                            )
+                        } label: {
+                            VStack(alignment: .leading, spacing: 9) {
+                                HStack {
+                                    Image(systemName: "figure.run")
+                                        .font(.system(size: 17, weight: .medium))
+                                        .foregroundStyle(green)
+                                        .frame(width: 39, height: 39)
+                                        .background(
+                                            green.opacity(0.10),
+                                            in: RoundedRectangle(cornerRadius: 12)
+                                        )
+                                    Spacer()
+                                    Image(systemName: "arrow.up.right")
+                                        .font(.caption.weight(.medium))
+                                        .foregroundStyle(muted)
+                                }
+                                Text(workout.title)
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .foregroundStyle(ink)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.85)
+                                Text(workout.summary)
+                                    .font(.caption)
+                                    .foregroundStyle(muted)
+                                    .lineLimit(3)
+                                    .frame(maxWidth: .infinity, minHeight: 47,
+                                           alignment: .topLeading)
+                                if let seconds = workout.estimatedDurationSeconds {
+                                    Label(
+                                        tr("Approx. \\(Int((seconds / 60).rounded(.up))) min",
+                                           "Ca. \\(Int((seconds / 60).rounded(.up))) min"),
+                                        systemImage: "clock"
+                                    )
+                                    .font(.caption2.weight(.medium))
+                                    .foregroundStyle(gold)
+                                } else {
+                                    Label(
+                                        tr("Distance-based", "Distansebasert"),
+                                        systemImage: "ruler"
+                                    )
+                                    .font(.caption2.weight(.medium))
+                                    .foregroundStyle(gold)
+                                }
+                            }
+                            .padding(14)
+                            .frame(width: 226, height: 182, alignment: .topLeading)
+                            .background(
+                                .white.opacity(0.94),
+                                in: RoundedRectangle(cornerRadius: 19)
+                            )
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 19)
+                                    .strokeBorder(.black.opacity(0.045),
+                                                  lineWidth: 1)
+                            }
+                        }
+                        .accessibilityHint(tr(
+                            "View all intervals and start this workout",
+                            "Se dragene og start denne økten"
+                        ))
+                    }
+                }
+                .padding(.vertical, 3)
+                .padding(.horizontal, 1)
             }
         }
     }
