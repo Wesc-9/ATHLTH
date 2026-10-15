@@ -4923,7 +4923,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 ),
             selectedGoalIDs: selectedGoalIDs,
             structuredWorkoutsByDay: mode == .advanced
-                ? structuredWorkoutsByDay : [:]
+                ? structuredWorkoutsByDay : [:],
+            preferredWorkoutsByDay: mode == .advanced
+                ? Dictionary(uniqueKeysWithValues: selectedDays.sorted().map { day in
+                    (day, ATHLTHPlanDayPreference(
+                        title: resolvedWorkoutTitle(for: day),
+                        kind: resolvedWorkoutKind(for: day),
+                        durationMinutes: resolvedWorkoutMinutes(for: day)
+                    ))
+                }) : [:]
         )
     }
 
