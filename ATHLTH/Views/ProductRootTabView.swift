@@ -5172,6 +5172,7 @@ struct ATHLTHTrainView: View {
     @State private var watchTransferError: String?
     @State private var selectedStrengthSession: PlannedSession?
     @State private var selectedPlanWorkout: PlannedWorkoutSelection?
+    @State private var selectedSuggestedWorkout: WorkoutTemplateCatalogEntry?
     @State private var pendingRunningTemplate: RunningWorkoutTemplate?
     @State private var pendingPlannedEnduranceWorkout: PlannedWorkoutSelection?
     @State private var showingRunQuickStart = false
@@ -5315,6 +5316,11 @@ struct ATHLTHTrainView: View {
             .sheet(isPresented: $showingTrainPlanProgress) {
                 if let plan = session.activePlan {
                     TrainingPlanProgressDetailView(planID: plan.id)
+                }
+            }
+            .sheet(item: $selectedSuggestedWorkout) { entry in
+                NavigationStack {
+                    WorkoutTemplateDetailView(entry: entry)
                 }
             }
             .sheet(item: $selectedPlanWorkout) { selection in
@@ -5986,6 +5992,7 @@ struct ATHLTHTrainView: View {
                 trainTodayPlanPositionText($0)
             } ?? "",
             hasActiveWorkout: hasOngoingTrainWorkout,
+            onChooseSuggestedWorkout: { selectedSuggestedWorkout = $0 },
             onOpenPlan: { selectedSection = 1 },
             onCreatePlan: { showingTrainProgramCreation = true },
             onOpenLibrary: { showingLibrary = true },
