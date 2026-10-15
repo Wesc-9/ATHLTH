@@ -64,8 +64,6 @@ struct ATHLTHTrainTodayPremiumView: View {
                 // Starting a workout must not require creating a training plan.
                 quickTrainSection
                 suggestedWorkoutSection
-                if suggestedWorkouts.isEmpty {
-                }
                 emptyPlanCard
             }
             ghostRaceSection
