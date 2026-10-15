@@ -707,131 +707,44 @@ struct ATHLTHArenaHomeView: View {
     @State private var pendingDelete: UUID?
     @State private var remoteRevision = UUID()
     @State private var showingCreateOptions = false
-    @AppStorage("athlth.arena.workspace.advancedMode")
-    private var advanced = false
+    @State private var showingMoreArena = false
 
     var body: some View {
-        ScrollViewReader { scrollProxy in
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 19) {
                 introduction
-                ATHLTHArenaNextStepsSection()
-                    .id("arena-next-steps")
 
                 if showingCreateOptions {
                     createOptions
                         .id("arena-create")
-                } else if advanced {
-                    arenaQuickNavigation(scrollProxy)
-                    quickStart
-                        .id("arena-create")
-                } else {
-                    simpleQuickStart
-                        .id("arena-create")
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
-                Group {
-                    ATHLTHArenaOnlineSection()
-                        .id(remoteRevision)
-                }
-                .id("arena-online")
+                // Actions that require a response come before browsing.
+                // Do not show a blank "all caught up" card on the landing page.
+                ATHLTHArenaNextStepsSection(showEmptyState: false)
 
+                // Keep one competition overview rather than multiple
+                // competing quick-start dashboards.
+                ATHLTHArenaOnlineSection()
                 ATHLTHArenaChallengeOverviewSection()
-                    .id("arena-challenges")
 
-                ATHLTHArenaLiveDuelsSection()
-                    .id("arena-duels")
+                // Live activity stays prominent; inactive marketing and
+                // deeper tools are available through the secondary area.
+                ATHLTHArenaLiveDuelsSection(hideWhenInactive: true)
+                moreArenaSection
 
-                if advanced {
-                    ATHLTHArenaSeasonsSection()
-                        .id("arena-seasons")
-
-                    Group {
-                        if dynamicTypeSize.isAccessibilitySize {
-                            VStack(spacing: 10) {
-                                arenaDestinations
-                            }
-                        } else {
-                            HStack(spacing: 10) {
-                                arenaDestinations
-                            }
-                        }
-                    }
+                if !drafts.isEmpty {
+                    draftsSection
                 }
-
-                HStack {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Your competition series",
-                        norwegian: "Dine konkurranseserier"
-                    ))
-                    .font(.headline)
-                    Spacer()
-                    Text("\(drafts.count)")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                }
-                .id("arena-drafts")
-
-                if drafts.isEmpty {
-                    ContentUnavailableView(
-                        ATHLTHLocalization.choose(
-                            english: "No series yet",
-                            norwegian: "Ingen konkurranseserier ennå"
-                        ),
-                        systemImage: "trophy",
-                        description: Text(ATHLTHLocalization.choose(
-                            english: "Create a draft and suggest the first rounds.",
-                            norwegian: "Opprett et utkast og foreslå de første rundene."
-                        ))
-                    )
-                    .frame(maxWidth: .infinity)
-                } else {
-                    ForEach(drafts) { draft in
-                        HStack(spacing: 10) {
-                            NavigationLink {
-                                ATHLTHArenaDraftDetailView(
-                                    draft: draft,
-                                    onSave: upsert,
-                                    onPublished: { id in
-                                        drafts.removeAll { $0.id == id }
-                                        ATHLTHArenaDraftStorage.save(
-                                            drafts,
-                                            for: session.profile.userID
-                                        )
-                                        remoteRevision = UUID()
-                                    }
-                                )
-                            } label: {
-                                draftRow(draft)
-                            }
-                            .buttonStyle(.plain)
-                            Button(role: .destructive) {
-                                pendingDelete = draft.id
-                            } label: {
-                                Image(systemName: "trash")
-                                    .font(.caption)
-                                    .foregroundStyle(ATHLTHTheme.mutedText)
-                                    .frame(width: 35, height: 44)
-                            }
-                            .accessibilityLabel(ATHLTHLocalization.choose(
-                                english: "Delete draft",
-                                norwegian: "Slett utkast"
-                            ))
-                        }
-                    }
-                }
-
-                Text(ATHLTHLocalization.choose(
-                    english: "Drafts stay on this device until you publish. Publishing sends invitations and opens a shared lobby. Results are approved by the participants.",
-                    norwegian: "Utkast lagres på denne enheten til du publiserer. Publisering sender invitasjoner og åpner en felles lobby. Resultatene godkjennes av deltakerne."
-                ))
-                .font(.footnote)
-                .foregroundStyle(ATHLTHTheme.mutedText)
             }
-            .padding(18)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 35)
             .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
         }
+        .scrollIndicators(.hidden)
         .background(ATHLTHArenaLightStyle.canvasBackground)
         .environment(\.colorScheme, .light)
         .navigationTitle("Arena")
@@ -880,14 +793,153 @@ struct ATHLTHArenaHomeView: View {
             ) {
                 if let id = pendingDelete {
                     drafts.removeAll { $0.id == id }
-                    ATHLTHArenaDraftStorage.save(drafts, for: session.profile.userID)
+                    ATHLTHArenaDraftStorage.save(
+                        drafts, for: session.profile.userID
+                    )
                 }
                 pendingDelete = nil
             }
-            Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt"), role: .cancel) {
+            Button(
+                ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt"),
+                role: .cancel
+            ) {
                 pendingDelete = nil
             }
         }
+    }
+
+    private var draftsSection: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(spacing: 9) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Your drafts", norwegian: "Dine utkast"
+                ))
+                .font(ATHLTHArenaLightStyle.editorialTitle(23))
+                .foregroundStyle(ATHLTHArenaLightStyle.ink)
+                Spacer()
+                Text("\(drafts.count)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHArenaLightStyle.secondary)
+            }
+            ForEach(drafts) { draft in
+                HStack(spacing: 10) {
+                    NavigationLink {
+                        ATHLTHArenaDraftDetailView(
+                            draft: draft,
+                            onSave: upsert,
+                            onPublished: { id in
+                                drafts.removeAll { $0.id == id }
+                                ATHLTHArenaDraftStorage.save(
+                                    drafts, for: session.profile.userID
+                                )
+                                remoteRevision = UUID()
+                            }
+                        )
+                    } label: {
+                        draftRow(draft)
+                    }
+                    .buttonStyle(.plain)
+                    Button(role: .destructive) {
+                        pendingDelete = draft.id
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHArenaLightStyle.secondary)
+                            .frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Delete draft", norwegian: "Slett utkast"
+                    ))
+                }
+            }
+            Text(ATHLTHLocalization.choose(
+                english: "Drafts stay on this device until published.",
+                norwegian: "Utkast lagres på denne enheten til de publiseres."
+            ))
+            .font(.caption)
+            .foregroundStyle(ATHLTHArenaLightStyle.secondary)
+        }
+    }
+
+    private var moreArenaSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 9) {
+                Text(ATHLTHLocalization.choose(
+                    english: "More in Arena", norwegian: "Mer i Arena"
+                ))
+                .font(ATHLTHArenaLightStyle.editorialTitle(23))
+                .foregroundStyle(ATHLTHArenaLightStyle.ink)
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 10) {
+                NavigationLink {
+                    GhostFriendRaceHubView()
+                } label: {
+                    arenaDestination(
+                        title: ATHLTHLocalization.choose(
+                            english: "Live Ghost", norwegian: "Live Ghost"
+                        ),
+                        detail: ATHLTHLocalization.choose(
+                            english: "Race a friend", norwegian: "Løp mot en venn"
+                        ),
+                        icon: "bolt.fill"
+                    )
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
+                    ATHLTHArenaSingleChallengesView()
+                } label: {
+                    arenaDestination(
+                        title: ATHLTHLocalization.choose(
+                            english: "Challenges", norwegian: "Utfordringer"
+                        ),
+                        detail: ATHLTHLocalization.choose(
+                            english: "All your challenges", norwegian: "Alle utfordringene"
+                        ),
+                        icon: "flag.checkered"
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
+            DisclosureGroup(
+                isExpanded: $showingMoreArena
+            ) {
+                VStack(alignment: .leading, spacing: 14) {
+                    ATHLTHArenaSeasonsSection()
+                    ATHLTHArenaLiveDuelsSection()
+                    NavigationLink {
+                        CommunityGroupsView()
+                    } label: {
+                        arenaDestination(
+                            title: ATHLTHLocalization.choose(
+                                english: "Clubs", norwegian: "Klubber"
+                            ),
+                            detail: ATHLTHLocalization.choose(
+                                english: "Club competitions",
+                                norwegian: "Klubbkonkurranser"
+                            ),
+                            icon: "person.3.fill"
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.top, 14)
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Seasons, clubs and additional tools",
+                        norwegian: "Sesonger, klubber og flere verktøy"
+                    ),
+                    systemImage: "square.grid.2x2"
+                )
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHArenaLightStyle.ink)
+            }
+            .padding(15)
+            .background(ATHLTHArenaLightStyle.card(19))
         }
     }
 
