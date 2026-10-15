@@ -89,3 +89,5 @@ ATHLTH 1.7.3 build 79 TestFlight upload — user-authorized 2026-10-12 after gre
 ATHLTH 1.7.4 build 80 TestFlight upload — user-authorized 2026-10-14; validated source 3b0ef8b270f988ba263ff86c5da89895f3d96c6d; simulator build/unit tests and backend regressions passed; iPhone/iPad smoke pending.
 
 ATHLTH 1.7.5 build 81 TestFlight upload — user-authorized 2026-10-14 20:33 Europe/Oslo; upload requires successful build/unit tests and backend regressions for this exact commit.
+
+ATHLTH 1.7.6 build 82 — user-authorized TestFlight upload on 2026-10-15, following Train, Library, and Messages improvements; upload only after workflow signing, archive, and validation succeed.
