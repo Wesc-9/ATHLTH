@@ -49,6 +49,21 @@ final class RunningWorkoutLibraryStore: ObservableObject {
         }
     }
 
+    /// Curated, recognizable sessions. Reuse the actual library templates
+    /// instead of duplicating workouts in a separate discovery catalog.
+    static let featuredIntervalNumbers: [Int] = [51, 52, 53, 26, 5, 54]
+
+    var featuredIntervals: [RunningWorkoutTemplate] {
+        let byID = Dictionary(
+            uniqueKeysWithValues: Self.builtInTemplates.map { ($0.id, $0) }
+        )
+        return Self.featuredIntervalNumbers.compactMap { number in
+            UUID(uuidString: String(
+                format: "A1000000-0000-0000-0000-%012d", number
+            )).flatMap { byID[$0] }
+        }
+    }
+
     func save(_ template: RunningWorkoutTemplate) {
         guard accountID != nil else { return }
         var copy = template
@@ -257,6 +272,42 @@ final class RunningWorkoutLibraryStore: ObservableObject {
                 timeBlock(.warmup, "Oppvarming", minutes: 10, intensity: .easy),
                 timeBlock(.work, "Intervall", minutes: 4, intensity: rpe(8),
                           repetitions: 4, recoverySeconds: 120),
+                timeBlock(.cooldown, "Nedjogging", minutes: 10, intensity: .easy)
+            ]
+        ),
+        template(
+            52,
+            title: "30/30 – 20 drag",
+            type: .intervals,
+            summary: "12 min oppvarming · 20 × 30 sek raskt / 30 sek rolig (kun mellom dragene) · 10 min nedjogging.",
+            blocks: [
+                timeBlock(.warmup, "Oppvarming", minutes: 12, intensity: .easy),
+                timeBlock(.work, "30 sek raskt", minutes: 0.5, intensity: rpe(8),
+                          repetitions: 20, recoverySeconds: 30),
+                timeBlock(.cooldown, "Nedjogging", minutes: 10, intensity: .easy)
+            ]
+        ),
+        template(
+            53,
+            title: "45/15 – 15 drag",
+            type: .intervals,
+            summary: "12 min oppvarming · 15 × 45 sek raskt / 15 sek rolig (kun mellom dragene) · 10 min nedjogging.",
+            blocks: [
+                timeBlock(.warmup, "Oppvarming", minutes: 12, intensity: .easy),
+                timeBlock(.work, "45 sek raskt", minutes: 0.75, intensity: rpe(8),
+                          repetitions: 15, recoverySeconds: 15),
+                timeBlock(.cooldown, "Nedjogging", minutes: 10, intensity: .easy)
+            ]
+        ),
+        template(
+            54,
+            title: "5 × 3 minutter",
+            type: .intervals,
+            summary: "12 min oppvarming · 5 × 3 min kontrollert hardt / 90 sek aktiv pause · 10 min nedjogging.",
+            blocks: [
+                timeBlock(.warmup, "Oppvarming", minutes: 12, intensity: .easy),
+                timeBlock(.work, "3 min intervall", minutes: 3, intensity: rpe(8),
+                          repetitions: 5, recoverySeconds: 90),
                 timeBlock(.cooldown, "Nedjogging", minutes: 10, intensity: .easy)
             ]
         ),
