@@ -1318,7 +1318,7 @@ struct ChallengeCreationView: View {
             List {
                 ForEach(exerciseLibrary.search(query: exerciseSearchQuery)) { entry in
                     Button {
-                        // Persist canonical names so historical verified results match.
+                        // Preserve the canonical exercise name for consistent scoring.
                         exerciseName = entry.name
                         showingExercisePicker = false
                     } label: {
@@ -3157,7 +3157,9 @@ struct ChallengeCreationView: View {
             }
             .buttonStyle(.plain)
 
-            creationDivider
+            if scoring == .mostReps {
+                creationDivider
+            }
         }
 
         if scoring == .mostReps {
@@ -3199,8 +3201,6 @@ struct ChallengeCreationView: View {
                         "scalemass.fill"
                 )
             }
-
-            creationDivider
         }
     }
 
