@@ -15,7 +15,9 @@ struct ATHLTHApp: App {
     }
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup { @Sendable in
+            // Explicitly non-actor-inheriting: SwiftUI can evaluate this
+            // capture-free factory on its asynchronous renderer executor.
             ATHLTHSceneRootView()
         }
     }
