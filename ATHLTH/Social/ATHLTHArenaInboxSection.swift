@@ -1,12 +1,13 @@
 import SwiftUI
 
-/// The same Arena invitation rows are surfaced inside the regular Messages
-/// inbox. Group series act as their own conversation and open the group room
-/// after acceptance; duel invites open the agreed series lobby.
+/// Arena invitations stay in the mixed and group inbox views. The private
+/// Messages tab is reserved for actual one-to-one conversations.
+/// Group series open their group room; duel invites open the series lobby.
 struct ATHLTHArenaInboxSection: View {
     @EnvironmentObject private var session: AppSessionStore
 
-    /// all, direct or groups; unread and archive omit Arena rows without read state.
+    /// Arena entries appear in All or Groups, not private Messages.
+    /// Unread and Archive omit entries without a per-message read state.
     let filterKey: String
     let onVisibleCountChanged: (Int) -> Void
 
@@ -32,7 +33,8 @@ struct ATHLTHArenaInboxSection: View {
                     entry.membership?.response == "invited" ||
                     entry.membership?.response == "accepted"
             case "direct":
-                return !entry.isGroup
+                // Duel invitations are not private chat messages.
+                return false
             case "groups":
                 return entry.isGroup
             default:
@@ -125,7 +127,7 @@ struct ATHLTHArenaInboxSection: View {
         .task(id: session.profile.userID) { await reload() }
         .task(id: filterKey) {
             onVisibleCountChanged(visible.count)
-            if filterKey == "all" || filterKey == "groups" || filterKey == "direct" {
+            if filterKey == "all" || filterKey == "groups" {
                 await reload()
             }
         }
