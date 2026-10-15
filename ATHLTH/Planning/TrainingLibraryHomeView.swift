@@ -135,8 +135,6 @@ struct TrainingLibraryHomeView: View {
         }
     }
 
-    /// A small, recognizable shortlist. Every card opens the same detail
-    /// and launch flow as the full running workout library.
     private var exploreSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeading(
@@ -194,8 +192,6 @@ struct TrainingLibraryHomeView: View {
                     )
                 }
             }
-
-
         }
     }
 
