@@ -1,0 +1,79 @@
+import Foundation
+
+/// A single advanced workout definition shared by the plan wizard and Coach.
+/// Basic never creates these blueprints. IDs, media and exercise snapshots
+/// remain part of the existing ATHLTH training model.
+struct ATHLTHPlanStructuredWorkoutBlueprint: Hashable {
+    var title: String
+    var kind: WorkoutKind
+    var durationMinutes: Int
+    var routeID: UUID?
+    var blocks: [WorkoutTemplateBlock]
+
+    var isValid: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !blocks.isEmpty && blocks.count <= 200
+            && blocks.contains { $0.kind == .run || $0.kind == .exercise }
+            && blocks.expandedForExecution().count <= 1_000
+            && !Set(blocks.compactMap {
+                $0.groupKind == .superset ? $0.groupID : nil
+            }).contains { groupID in
+                blocks.filter { $0.groupID == groupID && $0.kind == .exercise }.count < 2
+            }
+    }
+
+    var category: String {
+        let hasRun = blocks.contains { $0.kind == .run }
+        let hasStrength = blocks.contains { $0.kind == .exercise }
+        if hasRun && hasStrength { return "hybrid" }
+        if hasRun { return "running" }
+        if hasStrength { return "strength" }
+        return "custom"
+    }
+
+    /// Structured execution is authoritative. Do not also execute legacy
+    /// suggested exercises, or add an extra AI session on that day.
+    func applying(to existing: PlannedSession?) -> PlannedSession {
+        var workout = existing ?? PlannedSession(
+            id: UUID(),
+            title: title,
+            kind: kind,
+            scheduledStart: nil,
+            durationMinutes: durationMinutes,
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            routeID: routeID,
+            exercises: [],
+            notes: nil
+        )
+        workout.title = title
+        workout.kind = kind
+        workout.durationMinutes = min(max(durationMinutes, 5), 240)
+        workout.routeID = blocks.contains(where: { $0.kind == .run }) ? routeID : nil
+        workout.exercises = []
+        workout.workoutBlocks = blocks
+        workout.workoutCategory = category
+        workout.runningWorkout = nil
+        workout.runningWorkouts = nil
+        return workout
+    }
+
+    static func apply(
+        _ choices: [Int: ATHLTHPlanStructuredWorkoutBlueprint],
+        to weeks: inout [TrainingPlanWeek]
+    ) {
+        guard !choices.isEmpty else { return }
+        for weekIndex in weeks.indices {
+            for dayIndex in weeks[weekIndex].days.indices {
+                let day = weeks[weekIndex].days[dayIndex].dayIndex
+                guard let blueprint = choices[day], blueprint.isValid else {
+                    continue
+                }
+                let previous = weeks[weekIndex].days[dayIndex].sessions.first
+                weeks[weekIndex].days[dayIndex].sessions = [
+                    blueprint.applying(to: previous)
+                ]
+            }
+        }
+    }
+}
