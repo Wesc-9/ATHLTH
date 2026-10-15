@@ -44,6 +44,18 @@ final class NorwegianExerciseLocalizationTests: XCTestCase {
         XCTAssertTrue(terms.contains("Benkpress"))
     }
 
+    func testRowingMachineLocalizationLoadsWithoutDuplicateDictionaryKeys() {
+        XCTAssertEqual(
+            ATHLTHExerciseNameLocalization.norwegianName(for: "Rowing Machine"),
+            "Romaskin"
+        )
+        let searchTerms = ATHLTHExerciseNameLocalization.searchTerms(
+            for: "Rowing Machine"
+        )
+        XCTAssertTrue(searchTerms.contains("Rowing Machine"))
+        XCTAssertTrue(searchTerms.contains("Romaskin"))
+    }
+
     @MainActor
     func testCompactTranslationOverlayIsKeyedBySourceIdentifier() {
         let previous = UserDefaults.standard.string(forKey: "settings.language")
