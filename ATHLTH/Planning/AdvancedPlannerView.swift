@@ -6866,14 +6866,20 @@ struct SessionEditorView: View {
 
                             if planned.supersetGroupID != nil {
                                 Image(systemName: "link")
-                                    .font(.system(size: 8, weight: .bold))
-                                    .foregroundStyle(.orange)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.accent)
+                                    .padding(7)
+                                    .background(
+                                        ATHLTHPlanDesign.selectedSurface,
+                                        in: Circle()
+                                    )
                             }
 
                             Image(systemName: "chevron.right")
                                 .font(.caption)
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk.opacity(0.60))
                         }
+                        .padding(.vertical, 6)
                     }
                     .buttonStyle(.plain)
                     .swipeActions(
@@ -6915,18 +6921,38 @@ struct SessionEditorView: View {
                         .tint(ATHLTHTheme.accentDeep)
                     }
 
-                    if index > 0 {
+                    if index > 0 && editorMode == .advanced {
                         Button {
                             toggleSuperset(at: index)
                         } label: {
                             Label(
                                 planned.supersetGroupID == nil
-                                    ? ATHLTHLocalization.choose(english: "Superset with previous", norwegian: "Koble til supersett")
-                                    : ATHLTHLocalization.choose(english: "Remove superset", norwegian: "Fjern supersett"),
-                                systemImage: "arrow.triangle.2.circlepath"
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Connect to previous as superset",
+                                        norwegian: "Koble til forrige som supersett"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Remove superset",
+                                        norwegian: "Fjern supersett"
+                                    ),
+                                systemImage: planned.supersetGroupID == nil
+                                    ? "link" : "link.badge.plus"
                             )
-                            .font(.caption)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.accent)
+                            .padding(.horizontal, 12)
+                            .frame(height: 28)
+                            .background(
+                                ATHLTHPlanDesign.selectedSurface,
+                                in: Capsule()
+                            )
                         }
+                        .buttonStyle(.plain)
+                        .listRowInsets(
+                            EdgeInsets(top: 1, leading: 86, bottom: 4, trailing: 14)
+                        )
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                     }
                 }
                 .onMove { offsets, destination in
