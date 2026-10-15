@@ -1547,6 +1547,7 @@ struct MyWorkoutTemplatesView: View {
 
 struct WorkoutTemplateBuilderView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
 
@@ -1561,6 +1562,15 @@ struct WorkoutTemplateBuilderView: View {
     @State private var collapsedGroupIDs: Set<UUID> = []
     @State private var showingDiscardConfirmation = false
     @State private var manualDurationMinutes: Int?
+    @State private var allRoundsExpandedIDs: Set<UUID> = []
+    @State private var draftRestored = false
+    @State private var draftActive = false
+    @State private var draftFinished = false
+    @State private var draftNotice = false
+    @AppStorage("athlth.workoutBuilder.durationInput.v1")
+    private var durationInputMode = "clock"
+    private let draftContext: String
+    private let initialDraftSignature: String
     /// Present from advanced plan creation to edit a specific weekday
     /// without creating an unwanted shared workout template.
     private let onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool) -> Void)?
@@ -1570,13 +1580,61 @@ struct WorkoutTemplateBuilderView: View {
         initialBlocks: [WorkoutTemplateBlock] = [],
         initialRouteID: UUID? = nil,
         initialDurationOverrideMinutes: Int? = nil,
+        draftContext: String = "shared-template",
         onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool) -> Void)? = nil
     ) {
         _title = State(initialValue: initialTitle)
         _blocks = State(initialValue: initialBlocks)
         _selectedRouteID = State(initialValue: initialRouteID)
         _manualDurationMinutes = State(initialValue: initialDurationOverrideMinutes)
+        self.draftContext = draftContext
+        let originalBlocks = (try? JSONEncoder().encode(initialBlocks))?.base64EncodedString() ?? ""
+        self.initialDraftSignature = initialTitle + "|" + originalBlocks +
+            "|" + (initialRouteID?.uuidString ?? "") +
+            "|" + String(initialDurationOverrideMinutes ?? -1)
         self.onSaveToPlan = onSaveToPlan
+    }
+
+    private struct StoredWorkoutDraft: Codable {
+        let signature: String
+        let title: String
+        let blocks: [WorkoutTemplateBlock]
+        let routeID: UUID?
+        let manualMinutes: Int?
+        let updatedAt: Date
+    }
+
+    private var draftStorageKey: String {
+        let encodedContext = Data(draftContext.utf8).base64EncodedString()
+        return "athlth.workoutBuilder.draft.v1.\(session.profile.userID.uuidString).\(encodedContext)"
+    }
+
+    private func restoreWorkoutDraft() {
+        guard let data = UserDefaults.standard.data(forKey: draftStorageKey),
+              let stored = try? JSONDecoder().decode(StoredWorkoutDraft.self, from: data),
+              stored.signature == initialDraftSignature else { return }
+        title = stored.title
+        blocks = stored.blocks
+        selectedRouteID = stored.routeID
+        manualDurationMinutes = stored.manualMinutes
+        collapsedGroupIDs = Set(blocks.compactMap(\.groupID))
+        draftRestored = true
+        draftNotice = true
+    }
+
+    private func persistWorkoutDraft() {
+        guard draftActive, !draftFinished else { return }
+        // Save on edits and when locking the device, not only on explicit Save.
+        let snapshot = StoredWorkoutDraft(
+            signature: initialDraftSignature,
+            title: title,
+            blocks: blocks,
+            routeID: selectedRouteID,
+            manualMinutes: manualDurationMinutes,
+            updatedAt: Date()
+        )
+        guard let data = try? JSONEncoder().encode(snapshot) else { return }
+        UserDefaults.standard.set(data, forKey: draftStorageKey)
     }
 
     private let studioInk = Color(red: 0.17, green: 0.17, blue: 0.18)
@@ -1591,6 +1649,18 @@ struct WorkoutTemplateBuilderView: View {
         blocks.contains(where: { $0.kind == .run })
     }
 
+    private var hasOutdoorCardio: Bool {
+        blocks.contains { $0.kind == .run && $0.isIndoor != true }
+    }
+
+    private var hasWalking: Bool {
+        blocks.contains { $0.kind == .run && $0.cardioActivity == .walking }
+    }
+
+    private var hasActualRunning: Bool {
+        blocks.contains { $0.kind == .run && $0.cardioActivity != .walking }
+    }
+
     private var hasStrength: Bool {
         blocks.contains(where: { $0.kind == .exercise })
     }
@@ -1598,7 +1668,8 @@ struct WorkoutTemplateBuilderView: View {
     // Infer the workout type from its actual content, instead of forcing a type
     // before the user has added any blocks.
     private var category: String {
-        if hasRunning && hasStrength { return "hybrid" }
+        if (hasRunning && hasStrength) || (hasWalking && hasActualRunning) { return "hybrid" }
+        if hasWalking { return "walking" }
         if hasRunning { return "running" }
         if hasStrength { return "strength" }
         return "custom"
@@ -1608,6 +1679,7 @@ struct WorkoutTemplateBuilderView: View {
         switch category {
         case "hybrid": return tr("Hybrid", "Hybrid")
         case "running": return tr("Running", "Løping")
+        case "walking": return tr("Walking", "Gåing")
         case "strength": return tr("Strength", "Styrke")
         default: return tr("Custom", "Egendefinert")
         }
@@ -1710,8 +1782,12 @@ struct WorkoutTemplateBuilderView: View {
                     durationSettings
                     addBlockSection
                     timeline
-                    if hasRunning {
-                        routeSection
+                    if draftNotice {
+                        Label(tr("Recovered saved draft", "Gjenopprettet lagret utkast"),
+                              systemImage: "checkmark.circle.fill")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(studioAccent)
+                            .padding(.horizontal, 6)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -1745,12 +1821,14 @@ struct WorkoutTemplateBuilderView: View {
                 titleVisibility: .visible
             ) {
                 Button(tr("Discard", "Forkast"), role: .destructive) {
+                    draftFinished = true
+                    UserDefaults.standard.removeObject(forKey: draftStorageKey)
                     dismiss()
                 }
                 Button(tr("Keep editing", "Fortsett å redigere"), role: .cancel) {}
             } message: {
-                Text(tr("Changes that haven't been saved will be lost.",
-                        "Endringer som ikke er lagret, går tapt."))
+                Text(tr("A recoverable local draft is kept until you discard or save.",
+                        "Utkastet er lagret lokalt til du forkaster eller lagrer det."))
             }
             .sheet(isPresented: $showingExercisePicker) {
                 NavigationStack {
@@ -1763,6 +1841,22 @@ struct WorkoutTemplateBuilderView: View {
                     }
                 }
             }
+            .onAppear {
+                guard !draftActive else { return }
+                restoreWorkoutDraft()
+                if !draftRestored {
+                    collapsedGroupIDs = Set(blocks.compactMap(\.groupID))
+                }
+                draftActive = true
+            }
+            .onChange(of: blocks) { _, _ in persistWorkoutDraft() }
+            .onChange(of: title) { _, _ in persistWorkoutDraft() }
+            .onChange(of: selectedRouteID) { _, _ in persistWorkoutDraft() }
+            .onChange(of: manualDurationMinutes) { _, _ in persistWorkoutDraft() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { persistWorkoutDraft() }
+            }
+            .onDisappear { persistWorkoutDraft() }
             .onChange(of: showingExercisePicker) { _, showing in
                 if !showing {
                     exerciseTargetGroupID = nil
@@ -2792,6 +2886,8 @@ struct WorkoutTemplateBuilderView: View {
         } else {
             session.saveSharedWorkout(workout)
         }
+        draftFinished = true
+        UserDefaults.standard.removeObject(forKey: draftStorageKey)
         dismiss()
     }
 
