@@ -3169,6 +3169,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         (weekIndex ?? selectedPlanWeekIndex) * 7 + day
     }
 
+    private func calendarDate(for week: Int, offset: Int) -> Date {
+        Calendar.current.date(
+            byAdding: .day, value: week * 7 + offset,
+            to: Calendar.current.startOfDay(for: startDate)
+        ) ?? startDate
+    }
+
     private func dateForWeekDay(_ day: Int, weekIndex: Int) -> Date {
         let calendar = Calendar.current
         let start = calendar.startOfDay(for: startDate)
@@ -3227,9 +3234,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     ATHLTHLocalization.choose(english: "of", norwegian: "av") +
                     " \(weekCount)")
                         .font(.subheadline.weight(.semibold))
-                    Text(dateForWeekDay(1, weekIndex: selectedPlanWeekIndex)
+                    Text(calendarDate(for: selectedPlanWeekIndex, offset: 0)
                         .formatted(date: .abbreviated, time: .omitted) + " – " +
-                        dateForWeekDay(7, weekIndex: selectedPlanWeekIndex)
+                        calendarDate(for: selectedPlanWeekIndex, offset: 6)
                         .formatted(date: .abbreviated, time: .omitted))
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
@@ -3247,7 +3254,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 7) {
-                    ForEach(1...7, id: \.self) { day in
+                    ForEach(Array(1...7).sorted {
+                        dateForWeekDay($0, weekIndex: selectedPlanWeekIndex) <
+                        dateForWeekDay($1, weekIndex: selectedPlanWeekIndex)
+                    }, id: \.self) { day in
                         Button {
                             editingWeekDay = WeekDayEditorSelection(id: day)
                         } label: {
@@ -3305,13 +3315,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
             weekSelector
 
-            ForEach(1...7, id: \.self) { day in
+            ForEach(Array(1...7).sorted {
+                dateForWeekDay($0, weekIndex: selectedPlanWeekIndex) <
+                dateForWeekDay($1, weekIndex: selectedPlanWeekIndex)
+            }, id: \.self) { day in
                 if selectedDays.contains(day) || weekDayEdits[weekDayKey(day)] != nil {
                     Button {
                         editingWeekDay = WeekDayEditorSelection(id: day)
                     } label: {
                         HStack(spacing: 12) {
-                            Image(systemName: resolvedWorkoutKind(for: day).systemImage)
+                            Image(systemName: effectiveWorkoutKind(for: day).systemImage)
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(ATHLTHTheme.accentDeep)
                                 .frame(width: 44, height: 44)
@@ -3505,11 +3518,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                         .multilineTextAlignment(.center)
                                         .frame(maxWidth: .infinity, minHeight: 44)
                                         .foregroundStyle(
-                                            effectiveWorkoutTitle(for: day) == choice
+                                            (effectiveWorkoutTitle(for: day) == choice ||
+                                            (choice == "Egendefinert" &&
+                                             weekDayEdits[weekDayKey(day)]?.isCustomTitle == true))
                                                 ? .white : ATHLTHTheme.primaryText
                                         )
                                         .background(
-                                            effectiveWorkoutTitle(for: day) == choice
+                                            (effectiveWorkoutTitle(for: day) == choice ||
+                                            (choice == "Egendefinert" &&
+                                             weekDayEdits[weekDayKey(day)]?.isCustomTitle == true))
                                                 ? ATHLTHTheme.accentDeep : ATHLTHTheme.accentSoft,
                                             in: RoundedRectangle(cornerRadius: 12)
                                         )
@@ -3666,7 +3683,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     draftContext: "new-program-week-\(selectedPlanWeekIndex)-day-\(selection.id)",
                     plannedDate: dateForWeekDay(selection.id, weekIndex: selectedPlanWeekIndex),
                     onSaveToPlan: { name, blocks, routeID, knownMinutes, _ in
-                        guard mode == .advanced, selectedDays.contains(selection.id) else {
+                        guard mode == .advanced else {
                             return
                         }
                         // The detailed recipe belongs to this selected date.
