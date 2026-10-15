@@ -6734,6 +6734,41 @@ struct SessionEditorView: View {
         selectedGearIDs.insert(defaultShoe.id)
     }
 
+    private func plannedExerciseDisplayName(_ planned: PlannedExercise) -> String {
+        if let id = planned.exerciseID,
+           let entry = exerciseLibrary.allExercises.first(where: { $0.id == id }) {
+            return exerciseLibrary.localizedExerciseName(entry)
+        }
+        return planned.embeddedExercise.displayName
+    }
+
+    @ViewBuilder
+    private func plannedExerciseThumbnail(
+        _ planned: PlannedExercise, number: Int
+    ) -> some View {
+        ZStack(alignment: .topLeading) {
+            if let id = planned.exerciseID,
+               let entry = exerciseLibrary.allExercises.first(where: { $0.id == id }) {
+                ExerciseArtwork(entry: entry, size: 62)
+            } else {
+                Image(systemName: "dumbbell")
+                    .font(.system(size: 22, weight: .light))
+                    .foregroundStyle(ATHLTHPlanDesign.accent)
+                    .frame(width: 62, height: 62)
+                    .background(
+                        ATHLTHPlanDesign.selectedSurface,
+                        in: RoundedRectangle(cornerRadius: 13)
+                    )
+            }
+            Text(String(number))
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .frame(width: 21, height: 21)
+                .background(.white, in: Circle())
+                .offset(x: -6, y: -6)
+        }
+    }
+
     private var strengthBuilder: some View {
         Section(ATHLTHLocalization.choose(english: "Strength exercises", norwegian: "Styrkeøvelser")) {
             if plannedExercises.isEmpty {
@@ -6752,36 +6787,10 @@ struct SessionEditorView: View {
                         exerciseBeingEdited = planned
                     } label: {
                         HStack(spacing: 12) {
-                            ZStack(alignment: .topLeading) {
-                                if let entry = exerciseLibrary.allExercises.first(
-                                    where: { $0.id == planned.embeddedExercise.id }
-                                ) {
-                                    ExerciseArtwork(entry: entry, size: 62)
-                                } else {
-                                    Image(systemName: "dumbbell")
-                                        .font(.system(size: 22, weight: .light))
-                                        .foregroundStyle(ATHLTHPlanDesign.accent)
-                                        .frame(width: 62, height: 62)
-                                        .background(
-                                            ATHLTHPlanDesign.selectedSurface,
-                                            in: RoundedRectangle(cornerRadius: 13)
-                                        )
-                                }
-                                Text("\(index + 1)")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                                    .frame(width: 21, height: 21)
-                                    .background(.white, in: Circle())
-                                    .offset(x: -6, y: -6)
-                            }
+                            plannedExerciseThumbnail(planned, number: index + 1)
 
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(
-                                    exerciseLibrary.allExercises.first(
-                                        where: { $0.id == planned.embeddedExercise.id }
-                                    ).map { exerciseLibrary.localizedExerciseName($0) }
-                                    ?? planned.embeddedExercise.displayName
-                                )
+                                Text(plannedExerciseDisplayName(planned))
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(ATHLTHPlanDesign.ink)
                                     .lineLimit(2)
@@ -9899,7 +9908,7 @@ struct PlannedExerciseEditorView: View {
 
     private var catalogEntry: ExerciseLibraryEntry? {
         exerciseLibrary.allExercises.first {
-            $0.id == original.embeddedExercise.id
+            $0.id == original.exerciseID
         }
     }
 
@@ -9908,7 +9917,7 @@ struct PlannedExerciseEditorView: View {
             let localized = exerciseLibrary.localizedExerciseInstructions(entry)
             if !localized.isEmpty { return localized }
         }
-        return original.embeddedExercise.instructions
+        return original.embeddedExercise.instructions ?? []
     }
 
     private var exerciseVideoURL: URL? {
@@ -10119,13 +10128,13 @@ struct PlannedExerciseEditorView: View {
                 }
 
                 if !original.embeddedExercise.primaryMuscles.isEmpty ||
-                   !original.embeddedExercise.secondaryMuscles.isEmpty {
+                   !(original.embeddedExercise.secondaryMuscles ?? []).isEmpty {
                     Section(ATHLTHLocalization.choose(
                         english: "Muscles used", norwegian: "Muskler i bruk"
                     )) {
                         ExerciseMuscleOverview(
                             primaryMuscles: original.embeddedExercise.primaryMuscles,
-                            secondaryMuscles: original.embeddedExercise.secondaryMuscles
+                            secondaryMuscles: original.embeddedExercise.secondaryMuscles ?? []
                         )
                         .padding(.vertical, 6)
                     }
