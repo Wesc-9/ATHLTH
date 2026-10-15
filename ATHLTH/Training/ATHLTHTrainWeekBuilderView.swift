@@ -206,19 +206,10 @@ struct ATHLTHTrainWeekBuilderView: View {
             Text(plan.title)
                 .font(.system(size: 31, weight: .regular, design: .serif))
                 .foregroundStyle(ink)
-            HStack(spacing: 10) {
-                Text(tr("Workouts, rest days and individual targets",
-                        "Økter, hviledager og individuelle treningsmål"))
-                    .font(.caption)
-                    .foregroundStyle(muted)
-                Spacer(minLength: 0)
-                Picker("", selection: $advanced) {
-                    Text("Basic").tag(false)
-                    Text(tr("Advanced", "Avansert")).tag(true)
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 155)
-            }
+            Text(tr("Workouts, recovery and individual targets",
+                    "Økter, restitusjon og individuelle treningsmål"))
+                .font(.caption)
+                .foregroundStyle(muted)
         }
     }
 
@@ -778,20 +769,13 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                  : tr("Perfect the details.", "Finjuster økten."))
                 .font(.system(size: 30, weight: .regular, design: .serif))
                 .foregroundStyle(ink)
-            HStack {
-                Text(tr("Detail level", "Detaljnivå"))
-                    .font(.caption)
-                    .foregroundStyle(muted)
-                Spacer()
-                Picker("", selection: $advanced) {
-                    Text("Basic").tag(false)
-                    Text(tr("Advanced", "Avansert")).tag(true)
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 184)
-            }
-            .padding(12)
-            .editorSurface(line: line)
+            Text(advanced
+                 ? tr("Choose exercises, intervals and recovery in one timeline.",
+                      "Sett sammen øvelser, intervaller og pauser i én tidslinje.")
+                 : tr("Choose an exercise and save your workout.",
+                      "Velg øvelser og lagre økten din."))
+                .font(.caption)
+                .foregroundStyle(muted)
         }
     }
 
