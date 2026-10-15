@@ -2938,6 +2938,112 @@ struct WorkoutTemplateBuilderView: View {
         }
     }
 
+    // Presentation preference only; the workout model always stores seconds.
+    @ViewBuilder
+    private func durationEntryEditor(_ index: Int) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 8) {
+                Text(tr("Duration", "Varighet"))
+                    .font(.caption.weight(.semibold))
+                Spacer()
+                Menu {
+                    Button(tr("Minutes", "Minutter")) { durationInputMode = "minutes" }
+                    Button(tr("Minutes : seconds", "Minutter : sekunder")) {
+                        durationInputMode = "clock"
+                    }
+                    Button(tr("Seconds", "Sekunder")) { durationInputMode = "seconds" }
+                } label: {
+                    HStack(spacing: 5) {
+                        Text(durationInputMode == "minutes"
+                             ? tr("Minutes", "Minutter")
+                             : durationInputMode == "seconds"
+                             ? tr("Seconds", "Sekunder")
+                             : tr("Min : sec", "Min : sek"))
+                        Image(systemName: "chevron.down")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(studioAccent)
+                }
+            }
+            HStack(spacing: 7) {
+                if durationInputMode == "seconds" {
+                    TextField(tr("Seconds", "Sekunder"),
+                              value: totalSecondsBinding(index),
+                              format: .number)
+                        .keyboardType(.numberPad)
+                        .frame(width: 82)
+                    Text(tr("sec", "sek"))
+                        .foregroundStyle(studioInk.opacity(0.60))
+                } else {
+                    TextField(tr("Minutes", "Minutter"),
+                              value: minutesComponentBinding(index),
+                              format: .number)
+                        .keyboardType(.numberPad)
+                        .frame(width: 62)
+                    if durationInputMode == "clock" {
+                        Text(":")
+                        TextField(tr("Seconds", "Sekunder"),
+                                  value: secondsComponentBinding(index),
+                                  format: .number)
+                            .keyboardType(.numberPad)
+                            .frame(width: 56)
+                        Text(tr("min : sec", "min : sek"))
+                            .font(.caption)
+                            .foregroundStyle(studioInk.opacity(0.60))
+                    } else {
+                        Text(tr("min", "min"))
+                            .foregroundStyle(studioInk.opacity(0.60))
+                        let remainder = Int((blocks[index].durationSeconds ?? 0).rounded()) % 60
+                        if remainder > 0 {
+                            Text("+ \(remainder) " + tr("sec", "sek"))
+                                .font(.caption)
+                                .foregroundStyle(studioInk.opacity(0.60))
+                        }
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .font(.system(size: 20, weight: .medium, design: .rounded))
+            .textFieldStyle(.roundedBorder)
+            Text(tr("Stored precisely in seconds, regardless of display choice.",
+                    "Tiden lagres nøyaktig i sekunder uansett visning."))
+                .font(.caption2)
+                .foregroundStyle(studioInk.opacity(0.55))
+        }
+        .padding(.vertical, 3)
+    }
+
+    private func totalSecondsBinding(_ index: Int) -> Binding<Int> {
+        Binding(
+            get: { Int((blocks[index].durationSeconds ?? 60).rounded()) },
+            set: { blocks[index].durationSeconds = Double(min(max($0, 1), 21600)) }
+        )
+    }
+
+    private func minutesComponentBinding(_ index: Int) -> Binding<Int> {
+        Binding(
+            get: { Int((blocks[index].durationSeconds ?? 60).rounded()) / 60 },
+            set: { minutes in
+                let remaining = Int((blocks[index].durationSeconds ?? 60).rounded()) % 60
+                blocks[index].durationSeconds = Double(
+                    min(max(minutes, 0) * 60 + remaining, 21600)
+                )
+            }
+        )
+    }
+
+    private func secondsComponentBinding(_ index: Int) -> Binding<Int> {
+        Binding(
+            get: { Int((blocks[index].durationSeconds ?? 60).rounded()) % 60 },
+            set: { seconds in
+                let minutes = Int((blocks[index].durationSeconds ?? 60).rounded()) / 60
+                blocks[index].durationSeconds = Double(
+                    min(minutes * 60 + min(max(seconds, 0), 59), 21600)
+                )
+            }
+        )
+    }
+
     private func distanceBinding(_ index: Int) -> Binding<Double> {
         Binding(
             get: { blocks[index].distanceMeters ?? 1_000 },
