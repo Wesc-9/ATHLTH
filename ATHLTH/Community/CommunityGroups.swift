@@ -2052,6 +2052,9 @@ final class CommunityGroupStore: ObservableObject {
     @Published private(set) var communityActivity: [CommunityGroupActivityRecord] = []
     @Published private(set) var profileCardsByID: [UUID: SocialProfileCard] = [:]
     @Published private(set) var messagesByGroup: [UUID: [CommunityGroupMessageRecord]] = [:]
+    /// Last known chat activity for joined clubs. Lightweight metadata only,
+    /// used by the inbox recent-conversations shortcuts.
+    @Published private(set) var recentChatActivityByGroup: [UUID: Date] = [:]
     @Published private(set) var eventsByGroup: [UUID: [CommunityGroupEventRecord]] = [:]
     @Published private(set) var challengesByGroup: [UUID: [CommunityGroupChallengeRecord]] = [:]
     // Lightweight, cross-Club calendar snapshots do not overwrite any Club's
@@ -2070,7 +2073,20 @@ final class CommunityGroupStore: ObservableObject {
 
     private let client: SupabaseClient
     private var lastRefreshAt: Date?
+    private var lastRecentChatRefreshAt: Date?
+    private var recentChatActivityUserID: UUID?
+    private var isRefreshingRecentChatActivity = false
     private var groupFetchLimit = 40
+
+    private struct RecentChatActivityRecord: Decodable {
+        let groupID: UUID
+        let createdAt: Date
+
+        enum CodingKeys: String, CodingKey {
+            case groupID = "group_id"
+            case createdAt = "created_at"
+        }
+    }
     @Published private(set) var canLoadMoreGroups = true
     @Published private(set) var isLoadingMoreGroups = false
 
@@ -2240,6 +2256,69 @@ final class CommunityGroupStore: ObservableObject {
 
     func messages(in groupID: UUID) -> [CommunityGroupMessageRecord] {
         messagesByGroup[groupID] ?? []
+    }
+
+    /// Refresh one small cross-club message index instead of loading every
+    /// club's full chat history when the inbox opens.
+    func refreshRecentChatActivity(force: Bool = false) async {
+        guard let userID = currentUserID else {
+            recentChatActivityByGroup = [:]
+            recentChatActivityUserID = nil
+            lastRecentChatRefreshAt = nil
+            return
+        }
+
+        if recentChatActivityUserID != userID {
+            recentChatActivityByGroup = [:]
+            recentChatActivityUserID = userID
+            lastRecentChatRefreshAt = nil
+        }
+
+        let groupIDs = joinedGroupIDs
+        guard !groupIDs.isEmpty else {
+            recentChatActivityByGroup = [:]
+            lastRecentChatRefreshAt = nil
+            return
+        }
+
+        if !force,
+           let lastRecentChatRefreshAt,
+           Date().timeIntervalSince(lastRecentChatRefreshAt) < 90 {
+            return
+        }
+        guard !isRefreshingRecentChatActivity else { return }
+        isRefreshingRecentChatActivity = true
+        defer { isRefreshingRecentChatActivity = false }
+
+        do {
+            // Only read timestamps for groups that the current user joined.
+            // Never download message bodies just to build shortcut ordering.
+            let rows: [RecentChatActivityRecord] = try await client
+                .from("community_group_messages")
+                .select("group_id,created_at")
+                .in("group_id", values: groupIDs.map(\.uuidString))
+                .order("created_at", ascending: false)
+                .limit(400)
+                .execute()
+                .value
+
+            guard !Task.isCancelled,
+                  currentUserID == userID else { return }
+
+            var latest: [UUID: Date] = [:]
+            for row in rows where groupIDs.contains(row.groupID) {
+                if latest[row.groupID] == nil {
+                    latest[row.groupID] = row.createdAt
+                }
+            }
+            recentChatActivityByGroup = latest
+            lastRecentChatRefreshAt = Date()
+        } catch is CancellationError {
+            return
+        } catch {
+            // A shortcut refresh must not block inbox conversations.
+            // Keep previously known club activity if the network fails.
+        }
     }
 
     func events(in groupID: UUID) -> [CommunityGroupEventRecord] {
@@ -2958,6 +3037,12 @@ final class CommunityGroupStore: ObservableObject {
             membersByGroup[groupID] = loadedMembers
             messagesByGroup[groupID] = loadedMessages.sorted {
                 $0.createdAt < $1.createdAt
+            }
+            if let latest = loadedMessages.first?.createdAt {
+                recentChatActivityByGroup[groupID] = max(
+                    recentChatActivityByGroup[groupID] ?? .distantPast,
+                    latest
+                )
             }
             eventsByGroup[groupID] = loadedEvents
             challengesByGroup[groupID] = loadedChallenges
@@ -4266,6 +4351,12 @@ final class CommunityGroupStore: ObservableObject {
 
             messagesByGroup[groupID] = rows.sorted {
                 $0.createdAt < $1.createdAt
+            }
+            if let latest = rows.first?.createdAt {
+                recentChatActivityByGroup[groupID] = max(
+                    recentChatActivityByGroup[groupID] ?? .distantPast,
+                    latest
+                )
             }
         } catch {
             errorMessage = error.localizedDescription
