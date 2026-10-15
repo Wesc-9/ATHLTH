@@ -3503,10 +3503,19 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         if workoutMinutesByDay[selection.id] == nil, let knownMinutes {
                             workoutMinutesByDay[selection.id] = min(max(knownMinutes, 5), 180)
                         }
-                        let containsRunning = blocks.contains { $0.kind == .run }
+                        let containsRunning = blocks.contains {
+                            $0.kind == .run && $0.cardioActivity != .walking
+                        }
+                        let containsWalking = blocks.contains {
+                            $0.kind == .run && $0.cardioActivity == .walking
+                        }
                         let containsStrength = blocks.contains { $0.kind == .exercise }
-                        let workoutKind: WorkoutKind = containsRunning && containsStrength
-                            ? .custom : containsRunning ? .running : .strength
+                        let workoutKind: WorkoutKind =
+                            (containsStrength && (containsRunning || containsWalking)) ||
+                            (containsRunning && containsWalking)
+                                ? .custom
+                                : containsRunning ? .running
+                                : containsWalking ? .walking : .strength
                         let choice = ATHLTHPlanStructuredWorkoutBlueprint(
                             title: name,
                             kind: workoutKind,
