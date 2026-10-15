@@ -621,6 +621,32 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     }
 
     var body: some View {
+        draftPreservingEditor
+            .preferredColorScheme(.light)
+    }
+
+    private var draftPreservingEditor: some View {
+        editorNavigation
+            .onAppear {
+                guard !localDraftReady else { return }
+                restoreLocalDraft()
+                localDraftReady = true
+            }
+            .onChange(of: draft.title) { _, _ in persistLocalDraft() }
+            .onChange(of: draft.kind) { _, _ in persistLocalDraft() }
+            .onChange(of: draft.workoutBlocks) { _, _ in persistLocalDraft() }
+            .onChange(of: draft.notes) { _, _ in persistLocalDraft() }
+            .onChange(of: draft.durationMinutes) { _, _ in persistLocalDraft() }
+            .onChange(of: draft.exercises.count) { _, _ in persistLocalDraft() }
+            .onChange(of: scheduled) { _, _ in persistLocalDraft() }
+            .onChange(of: clockTime) { _, _ in persistLocalDraft() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { persistLocalDraft() }
+            }
+            .onDisappear { persistLocalDraft() }
+    }
+
+    private var editorNavigation: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 ScrollView {
@@ -793,23 +819,6 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                     }
                 }
             }
-            .onAppear {
-                guard !localDraftReady else { return }
-                restoreLocalDraft()
-                localDraftReady = true
-            }
-            .onChange(of: draft.title) { _, _ in persistLocalDraft() }
-            .onChange(of: draft.kind) { _, _ in persistLocalDraft() }
-            .onChange(of: draft.workoutBlocks) { _, _ in persistLocalDraft() }
-            .onChange(of: draft.notes) { _, _ in persistLocalDraft() }
-            .onChange(of: draft.durationMinutes) { _, _ in persistLocalDraft() }
-            .onChange(of: draft.exercises.count) { _, _ in persistLocalDraft() }
-            .onChange(of: scheduled) { _, _ in persistLocalDraft() }
-            .onChange(of: clockTime) { _, _ in persistLocalDraft() }
-            .onChange(of: scenePhase) { _, phase in
-                if phase != .active { persistLocalDraft() }
-            }
-            .onDisappear { persistLocalDraft() }
             .alert(tr("Could not save workout", "Kunne ikke lagre økten"),
                    isPresented: Binding(
                     get: { errorMessage != nil },
@@ -820,7 +829,6 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                 Text(errorMessage ?? "")
             }
         }
-        .preferredColorScheme(.light)
     }
 
     private var heading: some View {
