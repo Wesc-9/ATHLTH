@@ -468,6 +468,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .onChange(of: workoutKindOverridesByDay) { _, _ in saveResumableDraft() }
         .onChange(of: workoutTitleOverridesByDay) { _, _ in saveResumableDraft() }
         .onChange(of: workoutMinutesByDay) { _, _ in saveResumableDraft() }
+        .onChange(of: structuredWorkoutsByDay) { _, _ in saveResumableDraft() }
         .onChange(of: selectedDays) { _, _ in
             structuredWorkoutsByDay = structuredWorkoutsByDay
                 .filter { selectedDays.contains($0.key) }
@@ -520,6 +521,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             .compactMapValues(WorkoutKind.init(rawValue:))
                         workoutTitleOverridesByDay = draft.workoutPresetsByDay ?? [:]
                         workoutMinutesByDay = draft.workoutMinutesByDay ?? [:]
+                        structuredWorkoutsByDay = draft.structuredWorkoutsByDay ?? [:]
                     }
                     // We intentionally resume the basics step so any goals,
                     // limitations and AI permissions must be reconfirmed.
@@ -4461,7 +4463,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     subtypeTitles(for: resolvedWorkoutKind(for: day)).contains(title)
                 } : nil,
             workoutMinutesByDay: mode == .advanced
-                ? workoutMinutesByDay : nil
+                ? workoutMinutesByDay : nil,
+            structuredWorkoutsByDay: mode == .advanced
+                ? structuredWorkoutsByDay : nil
         )
         draftStore.save(draft, userID: session.profile.userID)
     }
