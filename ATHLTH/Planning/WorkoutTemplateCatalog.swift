@@ -1618,23 +1618,7 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private var knownDurationMinutes: Int? {
-        guard !blocks.isEmpty else { return nil }
-        var seconds = 0.0
-        for block in blocks.expandedForExecution() {
-            if let duration = block.durationSeconds, duration > 0 {
-                seconds += duration
-            } else if block.kind == .run,
-                      let distance = block.distanceMeters,
-                      let pace = block.targetPaceSecondsPerKilometer,
-                      distance > 0, pace > 0 {
-                seconds += distance / 1_000 * pace
-            } else {
-                // A repetition-based exercise or unpaced distance has no
-                // reliable duration. Avoid displaying or saving a false total.
-                return nil
-            }
-        }
-        return Int(ceil(seconds / 60))
+        ATHLTHWorkoutDurationEstimator.minutes(for: blocks)
     }
 
     var body: some View {
@@ -1753,7 +1737,7 @@ struct WorkoutTemplateBuilderView: View {
                             icon: "square.stack.3d.up"
                         )
                         if let knownDurationMinutes {
-                            metricPill("\(knownDurationMinutes) min", icon: "clock")
+                            metricPill("~\(knownDurationMinutes) min", icon: "clock")
                         }
                         metricPill(categoryTitle, icon: "chart.bar.fill")
                     }
