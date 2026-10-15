@@ -3959,218 +3959,547 @@ struct HomeWeeklyProgressStrip:
     }
 }
 
-private struct HomeWeeklyProgressDaySheet:
-    View {
+private struct HomeWeeklyProgressDaySheet: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var strength: StrengthWorkoutStore
+    @EnvironmentObject private var messaging: MessagingStore
 
-    let selection:
-        HomeWeeklyProgressDaySelection
+    let selection: HomeWeeklyProgressDaySelection
     let plan: TrainingPlan?
     let onOpenWorkout: () -> Void
 
+    @StateObject private var workoutCatalog = WorkoutTemplateCatalogStore()
     @State private var showingStandaloneSessionEditor = false
+    @State private var showingWorkoutPicker = false
+    @State private var pendingPickedWorkout: PlannedSession?
+    @State private var selectedSuggestion: PlannedSession?
+    @State private var suggestionStartTime = Date()
     @State private var selectedInvitationLobby: PlannedSession?
-    @EnvironmentObject private var messaging: MessagingStore
+    @State private var selectedMode = 0
+
+    private let dayInk = Color(red: 0.17, green: 0.21, blue: 0.29)
+    private let dayCanvas = Color(red: 0.968, green: 0.971, blue: 0.985)
 
     private var currentPlanned: [PlannedSession] {
-        // selection.planned is a snapshot from when the sheet opened.
-        // Observe AppSessionStore so a newly saved workout appears here
-        // immediately, without having to close and reopen the calendar.
+        // Selection is a snapshot. Observe the saved standalone sessions so
+        // the newly scheduled workout appears immediately in "Dagens økt".
         let standalone = session.standalonePlannedSessions(on: selection.date)
         let standaloneIDs = Set(standalone.map(\.id))
         return (selection.planned.filter {
             !standaloneIDs.contains($0.id)
-        } + standalone).sorted {
+        } + standalone)
+        .sorted {
             ($0.scheduledStart ?? .distantFuture) <
                 ($1.scheduledStart ?? .distantFuture)
         }
     }
 
     private var canPlanWorkout: Bool {
-        HomeWeeklyProgressCalendar.canScheduleStandalone(
-            on: selection.date
-        )
+        HomeWeeklyProgressCalendar.canScheduleStandalone(on: selection.date)
+    }
+
+    private var hasAnyWorkoutsToday: Bool {
+        !currentPlanned.isEmpty ||
+        !selection.communityEvents.isEmpty ||
+        !selection.actual.isEmpty
+    }
+
+    private var workoutSuggestions: [PlannedSession] {
+        // No invented workout shortcuts: these are existing Workouts templates.
+        // Show athlete-saved sessions first, then published catalog workouts.
+        let saved = session.savedWorkoutTemplates
+        let savedTemplateIDs = Set(saved.compactMap(\.workoutTemplateID))
+        let catalog = workoutCatalog.entries
+            .filter { !savedTemplateIDs.contains($0.id) }
+            .map { $0.plannedSession() }
+        var distinct: [PlannedSession] = []
+        var names: Set<String> = []
+        for workout in saved + catalog {
+            let key = workout.title
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            if !key.isEmpty && names.insert(key).inserted {
+                distinct.append(workout)
+            }
+            if distinct.count == 4 { break }
+        }
+        return distinct
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(
-                    alignment: .leading,
-                    spacing: 10
-                ) {
-                    if canPlanWorkout {
-                        HStack {
-                            Spacer(minLength: 0)
+                VStack(alignment: .leading, spacing: 17) {
+                    Text(selection.date.formatted(
+                        .dateTime.weekday(.wide).day().month(.wide)
+                    ))
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(dayInk)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 15)
 
-                            Button {
-                                guard canPlanWorkout else { return }
-                                showingStandaloneSessionEditor = true
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Plan workout",
-                                        norwegian: "Planlegg økt"
-                                    ),
-                                    systemImage: "plus"
-                                )
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(ATHLTHTheme.accentDeep)
-                                .padding(.horizontal, 14)
-                                .frame(height: 38)
-                                .background(
-                                    ATHLTHTheme.accentSoft.opacity(0.55),
-                                    in: Capsule()
-                                )
-                                .overlay {
-                                    Capsule()
-                                        .stroke(
-                                            ATHLTHTheme.accentDeep.opacity(0.14),
-                                            lineWidth: 0.8
-                                        )
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityHint(
-                                ATHLTHLocalization.choose(
-                                    english: "Schedule an extra workout for this date",
-                                    norwegian: "Planlegg en ekstra økt på denne datoen"
-                                )
-                            )
+                    dayModeSelector
+
+                    if selectedMode == 0 {
+                        if hasAnyWorkoutsToday {
+                            todaysWorkoutList
+                        } else {
+                            emptyTodayCard
                         }
-                        .padding(.bottom, 4)
+                    } else {
+                        planningCard
                     }
 
-                    if currentPlanned.isEmpty &&
-                        selection.communityEvents.isEmpty &&
-                        selection.actual.isEmpty {
-                        ContentUnavailableView(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "No workouts",
-                                norwegian:
-                                    "Ingen økter"
-                            ),
-                            systemImage:
-                                "calendar"
-                        )
-                        .padding(.top, 40)
-                    }
-
-                    if !currentPlanned.isEmpty {
-                        sectionTitle(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Planned",
-                                norwegian:
-                                    "Planlagt"
-                            )
-                        )
-
-                        ForEach(currentPlanned) { workout in
-                            if workout.trainTogetherMode != nil {
-                                Button {
-                                    selectedInvitationLobby = workout
-                                } label: {
-                                    plannedRowContent(workout)
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityHint(
-                                    ATHLTHLocalization.choose(
-                                        english: "Open training lobby and invitation status",
-                                        norwegian: "Åpne treningslobby og invitasjonsstatus"
-                                    )
-                                )
-                            } else {
-                                plannedRow(workout)
-                            }
-                        }
-                    }
-
-                    if !selection
-                        .communityEvents
-                        .isEmpty {
-                        sectionTitle(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Events",
-                                norwegian:
-                                    "Arrangementer"
-                            )
-                        )
-
-                        ForEach(
-                            selection
-                                .communityEvents
-                        ) { event in
-                            communityEventRow(
-                                event
-                            )
-                        }
-                    }
-
-                    if !selection
-                        .actual
-                        .isEmpty {
-                        sectionTitle(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Completed workouts",
-                                norwegian:
-                                    "Utførte økter"
-                            )
-                        )
-
-                        ForEach(
-                            selection.actual
-                        ) { workout in
-                            NavigationLink {
-                                completedWorkoutDestination(workout)
-                                    .onAppear(perform: onOpenWorkout)
-                            } label: {
-                                actualRow(workout)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityHint(
-                                ATHLTHLocalization.choose(
-                                    english: "Open all workout details",
-                                    norwegian: "Åpne alle detaljer fra treningsøkten"
-                                )
-                            )
-                        }
-                    }
+                    workoutSuggestionSection
                 }
-                .padding(16)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 30)
+                .frame(maxWidth: 720)
+                .frame(maxWidth: .infinity)
             }
-            .background(
-                Color(
-                    .systemGroupedBackground
-                )
-                .ignoresSafeArea()
-            )
-            .navigationTitle(
-                selection.date.formatted(
-                    .dateTime
-                        .weekday(.wide)
-                        .day()
-                        .month(.wide)
-                )
-            )
-            .navigationBarTitleDisplayMode(
-                .inline
-            )
+            .background(dayCanvas.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingStandaloneSessionEditor) {
                 SessionEditorView(standaloneDate: selection.date)
                     .presentationDetents([.large])
+            }
+            .sheet(isPresented: $showingWorkoutPicker, onDismiss: {
+                if let pending = pendingPickedWorkout {
+                    pendingPickedWorkout = nil
+                    presentSuggestion(pending)
+                }
+            }) {
+                PlanWorkoutPickerView { workout in
+                    pendingPickedWorkout = workout
+                }
+            }
+            .sheet(item: $selectedSuggestion) { workout in
+                suggestionDetail(workout)
+                    .presentationDetents([.medium, .large])
             }
             .sheet(item: $selectedInvitationLobby) { workout in
                 PlannedWorkoutInvitationLobby(workout: workout)
                     .presentationDetents([.medium, .large])
             }
             .task {
-                await messaging.refresh(force: true)
+                async let refreshWorkouts: Void = workoutCatalog.refresh()
+                async let refreshMessages: Void = messaging.refresh(force: true)
+                _ = await (refreshWorkouts, refreshMessages)
                 session.syncApprovedSharedWorkouts(from: messaging.recentMessages)
+            }
+        }
+    }
+
+    private var dayModeSelector: some View {
+        HStack(spacing: 3) {
+            dayModeButton(
+                ATHLTHLocalization.choose(english: "Today's workout", norwegian: "Dagens økt"),
+                icon: "calendar",
+                mode: 0
+            )
+            dayModeButton(
+                ATHLTHLocalization.choose(english: "Plan new", norwegian: "Planlegg ny"),
+                icon: "plus",
+                mode: 1
+            )
+        }
+        .padding(4)
+        .background(dayInk.opacity(0.045), in: Capsule())
+        .overlay {
+            Capsule().strokeBorder(dayInk.opacity(0.11), lineWidth: 0.8)
+        }
+        .padding(.horizontal, 38)
+    }
+
+    private func dayModeButton(_ label: String, icon: String, mode: Int) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                selectedMode = mode
+            }
+        } label: {
+            Label(label, systemImage: icon)
+                .font(.system(size: 12, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .foregroundStyle(selectedMode == mode ? .white : dayInk)
+                .frame(maxWidth: .infinity)
+                .frame(height: 39)
+                .background {
+                    if selectedMode == mode {
+                        Capsule().fill(dayInk)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selectedMode == mode ? .isSelected : [])
+    }
+
+    private var emptyTodayCard: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "calendar")
+                .font(.system(size: 28, weight: .medium))
+                .foregroundStyle(dayInk.opacity(0.52))
+                .frame(width: 65, height: 65)
+                .background(dayInk.opacity(0.045), in: Circle())
+                .padding(.top, 11)
+
+            Text(ATHLTHLocalization.choose(
+                english: "No workouts today", norwegian: "Ingen økter i dag"
+            ))
+            .font(.system(size: 22, weight: .bold))
+            .foregroundStyle(dayInk)
+
+            Text(ATHLTHLocalization.choose(
+                english: "You can plan a workout outside your training plan whenever you want.",
+                norwegian: "Du kan planlegge en økt utenfor treningsplanen når du vil."
+            ))
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+
+            if canPlanWorkout {
+                Button {
+                    showingStandaloneSessionEditor = true
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Plan a new workout", norwegian: "Planlegg ny økt"
+                    ), systemImage: "plus")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 22)
+                    .frame(height: 47)
+                    .background(dayInk, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 5)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 18)
+        .frame(minHeight: 248)
+        .background(Color.white.opacity(0.84),
+                    in: RoundedRectangle(cornerRadius: 23, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 23, style: .continuous)
+                .strokeBorder(dayInk.opacity(0.075), lineWidth: 0.8)
+        }
+    }
+
+    private var planningCard: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            Label(ATHLTHLocalization.choose(
+                english: "An extra workout, your way",
+                norwegian: "En ekstra økt, på din måte"
+            ), systemImage: "calendar.badge.plus")
+                .font(.headline)
+                .foregroundStyle(dayInk)
+
+            Text(ATHLTHLocalization.choose(
+                english: "Choose a workout from Workouts, or create a new one. Nothing changes in your training plan.",
+                norwegian: "Velg en økt fra Workouts eller lag en ny. Treningsplanen din endres ikke."
+            ))
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+
+            if canPlanWorkout {
+                Button {
+                    showingStandaloneSessionEditor = true
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Create workout", norwegian: "Planlegg egen økt"
+                    ), systemImage: "plus.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 47)
+                    .background(dayInk, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(19)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white, in: RoundedRectangle(cornerRadius: 22))
+    }
+
+    private var workoutSuggestionSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(ATHLTHLocalization.choose(
+                    english: "Suggestions from Workouts",
+                    norwegian: "Forslag fra Workouts"
+                ))
+                .font(.headline)
+                .foregroundStyle(dayInk)
+                Spacer()
+                Button {
+                    showingWorkoutPicker = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(ATHLTHLocalization.choose(english: "See all", norwegian: "Se alle"))
+                        Image(systemName: "chevron.right")
+                    }
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(dayInk.opacity(0.7))
+                }
+                .buttonStyle(.plain)
+            }
+
+            if workoutSuggestions.isEmpty {
+                Text(ATHLTHLocalization.choose(
+                    english: "Explore the Workouts library to find ready-made sessions.",
+                    norwegian: "Utforsk Workouts-biblioteket for ferdige treningsøkter."
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } else {
+                HStack(alignment: .top, spacing: 8) {
+                    ForEach(Array(workoutSuggestions.enumerated()), id: \.offset) { index, workout in
+                        Button {
+                            presentSuggestion(workout)
+                        } label: {
+                            suggestionTile(workout, index: index)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    private func suggestionTile(_ workout: PlannedSession, index: Int) -> some View {
+        let accents: [Color] = [
+            Color(red: 0.88, green: 0.49, blue: 0.34),
+            Color(red: 0.29, green: 0.58, blue: 0.88),
+            Color(red: 0.31, green: 0.68, blue: 0.50),
+            Color(red: 0.57, green: 0.46, blue: 0.82)
+        ]
+        let accent = accents[index % accents.count]
+
+        return VStack(alignment: .leading, spacing: 7) {
+            Image(systemName: workout.kind.systemImage)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(dayInk)
+                .frame(height: 30, alignment: .leading)
+
+            Text(workout.title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(dayInk)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Spacer(minLength: 0)
+
+            HStack(spacing: 3) {
+                Text(workout.durationMinutes.map { "\($0) min" }
+                     ?? ATHLTHLocalization.choose(english: "Workout", norwegian: "Økt"))
+                    .font(.system(size: 10))
+                    .foregroundStyle(dayInk.opacity(0.66))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(dayInk)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
+        .padding(10)
+        .background(accent.opacity(0.10),
+                    in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(accent.opacity(0.08), lineWidth: 0.8)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(ATHLTHLocalization.choose(
+            english: "Review and schedule this Workouts session",
+            norwegian: "Se detaljer og planlegg denne økten"
+        ))
+    }
+
+    private var todaysWorkoutList: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(ATHLTHLocalization.choose(english: "Today", norwegian: "I dag"))
+                    .font(.headline)
+                    .foregroundStyle(dayInk)
+                Spacer()
+                if canPlanWorkout {
+                    Button {
+                        selectedMode = 1
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Add workout", norwegian: "Legg til økt"
+                        ), systemImage: "plus")
+                        .font(.caption.weight(.semibold))
+                    }
+                    .tint(dayInk)
+                }
+            }
+
+            if !currentPlanned.isEmpty {
+                sectionTitle(ATHLTHLocalization.choose(
+                    english: "Planned", norwegian: "Planlagt"
+                ))
+                ForEach(currentPlanned) { workout in
+                    if workout.trainTogetherMode != nil {
+                        Button {
+                            selectedInvitationLobby = workout
+                        } label: {
+                            plannedRowContent(workout)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        plannedRow(workout)
+                    }
+                }
+            }
+
+            if !selection.communityEvents.isEmpty {
+                sectionTitle(ATHLTHLocalization.choose(
+                    english: "Events", norwegian: "Arrangementer"
+                ))
+                ForEach(selection.communityEvents) { event in
+                    communityEventRow(event)
+                }
+            }
+
+            if !selection.actual.isEmpty {
+                sectionTitle(ATHLTHLocalization.choose(
+                    english: "Completed workouts", norwegian: "Utførte økter"
+                ))
+                ForEach(selection.actual) { workout in
+                    NavigationLink {
+                        completedWorkoutDestination(workout)
+                            .onAppear(perform: onOpenWorkout)
+                    } label: {
+                        actualRow(workout)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.86),
+                    in: RoundedRectangle(cornerRadius: 23))
+    }
+
+    private func presentSuggestion(_ workout: PlannedSession) {
+        let preferredStart = Calendar.current.date(
+            bySettingHour: 18, minute: 0, second: 0,
+            of: selection.date
+        ) ?? selection.date
+        let now = Date()
+        suggestionStartTime = Calendar.current.isDateInToday(selection.date)
+            && preferredStart <= now
+            ? now.addingTimeInterval(15 * 60)
+            : preferredStart
+        selectedSuggestion = workout
+    }
+
+    private func suggestionDetail(_ workout: PlannedSession) -> some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 17) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "FROM WORKOUTS", norwegian: "FRA WORKOUTS"
+                        ),
+                        systemImage: "square.stack.3d.up"
+                    )
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                    Text(workout.title)
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(dayInk)
+
+                    if let description = workout.notes, !description.isEmpty {
+                        Text(description)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack(spacing: 13) {
+                        Label(workout.kind.title, systemImage: workout.kind.systemImage)
+                        if let minutes = workout.durationMinutes {
+                            Label("\(minutes) min", systemImage: "clock")
+                        }
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(dayInk)
+
+                    if canPlanWorkout {
+                        DatePicker(
+                            ATHLTHLocalization.choose(english: "Time", norwegian: "Tidspunkt"),
+                            selection: $suggestionStartTime,
+                            displayedComponents: .hourAndMinute
+                        )
+                        .datePickerStyle(.compact)
+                        .padding(.vertical, 10)
+
+                        Button {
+                            var copy = PlannedSession(
+                                id: UUID(),
+                                title: workout.title,
+                                kind: workout.kind,
+                                scheduledStart: suggestionStartTime,
+                                durationMinutes: workout.durationMinutes,
+                                targetDistanceKilometers: workout.targetDistanceKilometers,
+                                targetPaceSecondsPerKilometer: workout.targetPaceSecondsPerKilometer,
+                                routeID: workout.routeID,
+                                exercises: workout.exercises,
+                                notes: workout.notes
+                            )
+                            copy.runningWorkout = workout.runningWorkout
+                            copy.runningWorkouts = workout.runningWorkouts
+                            copy.workoutTemplateID = workout.workoutTemplateID
+                            copy.workoutBlocks = workout.workoutBlocks
+                            copy.workoutCategory = workout.workoutCategory
+                            copy.gearIDs = workout.gearIDs
+                            copy.audioCoachConfiguration = workout.audioCoachConfiguration
+                            copy.autoPauseEnabled = workout.autoPauseEnabled
+                            copy.spotifyPlaylist = workout.spotifyPlaylist
+                            copy.spotifyAutoplayOnStart = workout.spotifyAutoplayOnStart
+                            copy.targetAlertConfiguration = workout.targetAlertConfiguration
+                            copy.routeAlertConfiguration = workout.routeAlertConfiguration
+                            copy.ghostTargetDurationSeconds = workout.ghostTargetDurationSeconds
+                            copy.ghostUpdates = workout.ghostUpdates
+                            session.addStandalonePlannedSession(copy)
+                            selectedSuggestion = nil
+                            selectedMode = 0
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Plan this workout", norwegian: "Planlegg denne økten"
+                                ), systemImage: "calendar.badge.plus"
+                            )
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 49)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(dayInk)
+                    }
+                }
+                .padding(20)
+            }
+            .background(dayCanvas.ignoresSafeArea())
+            .navigationTitle(
+                ATHLTHLocalization.choose(english: "Workout", norwegian: "Treningsøkt")
+            )
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Close", norwegian: "Lukk"
+                    )) {
+                        selectedSuggestion = nil
+                    }
+                }
             }
         }
     }
