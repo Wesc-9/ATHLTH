@@ -1,4 +1,5 @@
 import XCTest
+import SwiftUI
 @testable import ATHLTH
 
 final class ATHLTHPlanJourneyTests: XCTestCase {
@@ -37,6 +38,62 @@ final class ATHLTHPlanJourneyTests: XCTestCase {
                 )
             }
         }
+    }
+
+    @MainActor
+    func testPlanEntryCardsFitCompactPhoneWidths() {
+        let features: [ATHLTHPlanEntryModeCard.Feature] = [
+            .init(symbol: "bolt.fill", title: "Rask oppstart"),
+            .init(symbol: "list.bullet", title: "Faste maler"),
+            .init(symbol: "pencil", title: "Enkel å redigere")
+        ]
+
+        for width in [320.0, 375.0, 430.0] {
+            let card = ATHLTHPlanEntryModeCard(
+                title: "Enkel",
+                subtitle: "Kom raskt i gang med kun det viktigste.",
+                symbol: "sparkles",
+                selected: true,
+                features: features,
+                onSelect: {}
+            )
+            let controller = UIHostingController(rootView: card)
+            controller.loadViewIfNeeded()
+            let allowedWidth = width - 36
+            let measured = controller.sizeThatFits(
+                in: CGSize(width: allowedWidth, height: 700)
+            )
+            XCTAssertLessThanOrEqual(
+                measured.width, allowedWidth + 1,
+                "Mode card overflows a \(Int(width))-pt display"
+            )
+        }
+    }
+
+    @MainActor
+    func testPlanExistingChoicesAndIllustrationAreBounded() {
+        let artwork = UIHostingController(
+            rootView: ATHLTHPlanModeIllustration()
+        )
+        artwork.loadViewIfNeeded()
+        let imageSize = artwork.sizeThatFits(
+            in: CGSize(width: 190, height: 177)
+        )
+        XCTAssertLessThanOrEqual(imageSize.width, 191)
+
+        let shortcut = UIHostingController(
+            rootView: ATHLTHPlanExistingChoice(
+                title: "Planbibliotek",
+                subtitle: "Utforsk ferdige planer",
+                symbol: "square.stack.3d.up",
+                action: {}
+            )
+        )
+        shortcut.loadViewIfNeeded()
+        let shortcutSize = shortcut.sizeThatFits(
+            in: CGSize(width: 165, height: 300)
+        )
+        XCTAssertLessThanOrEqual(shortcutSize.width, 166)
     }
 
     func testPlanDesignHasConsistentLayoutPriorities() {
