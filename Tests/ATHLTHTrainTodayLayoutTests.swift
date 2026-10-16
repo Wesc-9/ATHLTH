@@ -135,6 +135,31 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
     }
 
     @MainActor
+    func testQuickStartDeviceButtonsFitCompactPhones() {
+        for width in [320.0, 375.0, 430.0] {
+            for watchAvailable in [false, true] {
+                for canStart in [false, true] {
+                    let bar = ATHLTHQuickStartDeviceLaunchBar(
+                        watchAvailable: watchAvailable,
+                        onIPhone: {},
+                        onAppleWatch: {},
+                        canStart: canStart
+                    )
+                    let host = UIHostingController(rootView: bar)
+                    host.loadViewIfNeeded()
+                    let measured = host.sizeThatFits(
+                        in: CGSize(width: width, height: 600)
+                    )
+                    XCTAssertLessThanOrEqual(
+                        measured.width, width + 1,
+                        "Quick Start device actions overflow a \(Int(width))-pt phone"
+                    )
+                }
+            }
+        }
+    }
+
+    @MainActor
     func testTodaySurfaceFitsCompactPhoneWidths() {
         let plan = TrainingPlan(
             id: UUID(),
