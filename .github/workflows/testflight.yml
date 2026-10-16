@@ -8,6 +8,7 @@ on:
       - release/v1.7.4
       - release/v1.7.5
       - release/v1.7.6
+      - release/v1.7.7
     paths:
       - .github/testflight-trigger
 
@@ -589,21 +590,8 @@ jobs:
             fi
           fi
 
-      - name: Publish GitHub release
-        if: success()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if gh release view "v1.7.6" >/dev/null 2>&1; then
-            echo "GitHub release v1.7.6 already exists; TestFlight build uploaded without recreating the release."
-          else
-            gh release create "v1.7.6" \
-              --target "$GITHUB_SHA" \
-              --title "ATHLTH 1.7.6" \
-              --generate-notes
-          fi
+      # A TestFlight build does not freeze this active development version.
+      # Create a GitHub release only when the version is explicitly locked.
 
       - name: Upload diagnostics
         if: failure()
