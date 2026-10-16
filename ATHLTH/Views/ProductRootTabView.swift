@@ -5982,6 +5982,24 @@ struct ATHLTHTrainView: View {
             ).completionFraction
         } ?? 0
 
+        let today = Date()
+        let hasRecordedWorkoutToday =
+            health.workouts.contains {
+                Calendar.current.isDate($0.startDate, inSameDayAs: today)
+            } ||
+            strengthWorkout.workoutHistory.contains {
+                guard let end = $0.endedAt else { return false }
+                return Calendar.current.isDate(end, inSameDayAs: today)
+            }
+
+        let readiness = TrainTodayOverviewPolicy.reliableReadiness(
+            health.recovery,
+            sleepEnd: health.sleep.sleepEnd,
+            hrvDate: health.heart.hrvDate,
+            restingHeartRateDate: health.heart.restingHeartRateDate,
+            now: today
+        )
+
         ATHLTHTrainTodayPremiumView(
             workoutCatalog: trainWorkoutCatalog,
             plan: active,
@@ -5995,6 +6013,8 @@ struct ATHLTHTrainView: View {
                 trainTodayPlanPositionText($0)
             } ?? "",
             hasActiveWorkout: hasOngoingTrainWorkout,
+            hasRecordedWorkoutToday: hasRecordedWorkoutToday,
+            todaysReadiness: readiness,
             onChooseSuggestedWorkout: { selectedSuggestedWorkout = $0 },
             onOpenPlan: { selectedSection = 1 },
             onCreatePlan: { showingTrainProgramCreation = true },
