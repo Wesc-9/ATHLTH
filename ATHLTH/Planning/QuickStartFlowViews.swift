@@ -283,20 +283,38 @@ enum RunQuickStartMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .free: return "Free Run"
-        case .route: return "Route"
-        case .structured: return "Workout"
+        case .free:
+            return ATHLTHLocalization.choose(
+                english: "Free run", norwegian: "Fri løping"
+            )
+        case .route:
+            return ATHLTHLocalization.choose(
+                english: "Route", norwegian: "Rute"
+            )
+        case .structured:
+            return ATHLTHLocalization.choose(
+                english: "Workout", norwegian: "Treningsøkt"
+            )
         }
     }
 
     var subtitle: String {
         switch self {
         case .free:
-            return "Just start running. No route or target required."
+            return ATHLTHLocalization.choose(
+                english: "Run freely without a route or target.",
+                norwegian: "Løp fritt uten rute eller mål."
+            )
         case .route:
-            return "Follow one of your saved ATHLTH routes."
+            return ATHLTHLocalization.choose(
+                english: "Use one of your saved routes.",
+                norwegian: "Følg en av dine lagrede ruter."
+            )
         case .structured:
-            return "Choose a workout from the running library."
+            return ATHLTHLocalization.choose(
+                english: "Choose a workout from the library.",
+                norwegian: "Velg en økt fra treningsbiblioteket."
+            )
         }
     }
 
@@ -1603,8 +1621,12 @@ struct RunQuickStartSheet: View {
     private var modeCard: some View {
         ATHLTHPlanSurface(density: .compact) {
             ATHLTHSectionHeader(
-                title: "Run type",
-                actionTitle: "Choose one"
+                title: ATHLTHLocalization.choose(
+                    english: "Run type", norwegian: "Løpetype"
+                ),
+                actionTitle: ATHLTHLocalization.choose(
+                    english: "Choose one", norwegian: "Velg én"
+                )
             )
 
             VStack(spacing: 8) {
