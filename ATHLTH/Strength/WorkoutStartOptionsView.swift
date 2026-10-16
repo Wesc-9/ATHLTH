@@ -22,7 +22,6 @@ struct WorkoutStartOptionsView: View {
         StrengthAdvancedConfiguration
     ) -> Void
 
-    @State private var captureDevice: WorkoutCaptureDevice
     @State private var trackingMode: StrengthTrackingMode
     @State private var selectedFriendIDs: Set<UUID> = []
     @State private var socialMode:
@@ -77,17 +76,10 @@ struct WorkoutStartOptionsView: View {
         self.watchConnected = watchConnected
         self.onStart = onStart
 
-        // Workout capture is chosen for this workout only.
-        // A workout started from iPhone stays on iPhone unless the user
-        // explicitly chooses Apple Watch in this sheet.
-        let initialDevice: WorkoutCaptureDevice =
-            .iPhone
-
         let savedAdvanced =
             StrengthAdvancedConfiguration
                 .savedDefaults()
 
-        _captureDevice = State(initialValue: initialDevice)
         _trackingMode = State(
             initialValue: defaultTracking == .advanced ? .advanced : .simple
         )
@@ -136,52 +128,6 @@ struct WorkoutStartOptionsView: View {
             watchConnected
     }
 
-    private var workoutDeviceCaption: String {
-        if ATHLTHDeviceRole.isIPad {
-            return ATHLTHLocalization.choose(
-                english:
-                    "iPad sends the start request to your signed-in iPhone. Apple Watch starts through the paired iPhone.",
-                norwegian:
-                    "iPad sender startforespørselen til iPhonen du er logget inn på. Apple Watch startes via den parede iPhonen."
-            )
-        }
-
-        return ATHLTHLocalization.choose(
-            english:
-                "This choice applies only to this workout.",
-            norwegian:
-                "Valget gjelder bare denne økten."
-        )
-    }
-
-    private var startButtonTitle: String {
-        if ATHLTHDeviceRole.isIPad {
-            return captureDevice == .appleWatch
-                ? ATHLTHLocalization.choose(
-                    english:
-                        "Start Apple Watch via iPhone",
-                    norwegian:
-                        "Start Apple Watch via iPhone"
-                )
-                : ATHLTHLocalization.choose(
-                    english: "Start on iPhone",
-                    norwegian: "Start på iPhone"
-                )
-        }
-
-        return captureDevice == .appleWatch
-            ? ATHLTHLocalization.choose(
-                english:
-                    "Start with Apple Watch",
-                norwegian:
-                    "Start med Apple Watch"
-            )
-            : ATHLTHLocalization.choose(
-                english: "Start on iPhone",
-                norwegian: "Start på iPhone"
-            )
-    }
-
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -192,70 +138,6 @@ struct WorkoutStartOptionsView: View {
                     // Advanced should add optional workout controls, not hide the
                     // core ability to build the strength session before starting.
                     exerciseSelectionCard
-
-                    ATHLTHCard {
-                        HStack(spacing: 8) {
-                            RoundedRectangle(
-                                cornerRadius: 2,
-                                style: .continuous
-                            )
-                            .fill(
-                                ATHLTHTheme
-                                    .premiumGold
-                            )
-                            .frame(
-                                width: 4,
-                                height: 26
-                            )
-
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "Workout device",
-                                    norwegian:
-                                        "Treningsenhet"
-                                )
-                            )
-                            .font(
-                                .title3.weight(
-                                    .bold
-                                )
-                            )
-
-                            Spacer()
-                        }
-
-                        HStack(spacing: 10) {
-                            deviceTile(
-                                title: "iPhone",
-                                icon: "iphone",
-                                selected:
-                                    captureDevice == .iPhone,
-                                disabled: false
-                            ) {
-                                captureDevice = .iPhone
-                            }
-
-                            deviceTile(
-                                title: "Apple Watch",
-                                icon: "applewatch",
-                                selected:
-                                    captureDevice == .appleWatch,
-                                disabled: !appleWatchSelectable
-                            ) {
-                                captureDevice =
-                                    .appleWatch
-                            }
-                        }
-                        .padding(.top, 10)
-
-                        Text(
-                            workoutDeviceCaption
-                        )
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 8)
-                    }
 
                     advancedOptionButton(
                         title:
@@ -595,7 +477,7 @@ struct WorkoutStartOptionsView: View {
                     effortMetric:
                         $effortMetric,
                     watchAvailable:
-                        captureDevice == .appleWatch &&
+                        appleWatchSelectable &&
                         !ATHLTHDeviceRole.isIPad
                 )
             }
@@ -625,94 +507,78 @@ struct WorkoutStartOptionsView: View {
     }
 
     private var strengthStickyStartBar: some View {
-        strengthStartButton
-            .padding(.horizontal, 16)
-            .padding(.top, 10)
-            .padding(.bottom, 8)
-            .background(
-                .ultraThinMaterial
-            )
-            .overlay(
-                alignment: .top
-            ) {
-                Divider()
-                    .opacity(0.35)
-            }
+        ATHLTHQuickStartDeviceLaunchBar(
+            watchAvailable: appleWatchSelectable,
+            onIPhone: { startStrength(using: .iPhone) },
+            onAppleWatch: { startStrength(using: .appleWatch) },
+            supportingText: ATHLTHDeviceRole.isIPad
+                ? ATHLTHLocalization.choose(
+                    english: "Starts via your signed-in iPhone.",
+                    norwegian: "Startes via din innloggede iPhone."
+                )
+                : nil
+        )
     }
 
-    private var strengthStartButton: some View {
-        Button {
-            let selectedFriends =
-                social.trainingPartners
-                    .filter {
-                        selectedFriendIDs
-                            .contains(
-                                $0.userID
-                            )
-                    }
-
-            let advancedConfiguration =
-                StrengthAdvancedConfiguration(
-                    spotifyPlaylist:
-                        trackingMode == .advanced
-                            ? selectedSpotifyPlaylist
-                            : nil,
-                    spotifyAutoplay:
-                        trackingMode == .advanced &&
-                        spotifyAutoplay,
-                    audioCoach:
-                        strengthAudioCoach,
-                    restCues:
-                        restCues,
-                    keepScreenAwake:
-                        trackingMode == .advanced &&
-                        keepScreenAwake,
-                    inputMode:
-                        captureDevice == .appleWatch
-                            ? inputMode
-                            : .iPhone,
-                    effortMetric:
-                        effortMetric
-                )
-
-            if trackingMode == .advanced {
-                advancedConfiguration
-                    .saveAsDefaults()
+    private func startStrength(using device: WorkoutCaptureDevice) {
+        guard device == .iPhone || appleWatchSelectable else { return }
+    let selectedFriends =
+        social.trainingPartners
+            .filter {
+                selectedFriendIDs
+                    .contains(
+                        $0.userID
+                    )
             }
 
-            var watchAudioCoach =
-                strengthAudioCoach.enabled
-                    ? strengthAudioCoach.watchConfiguration
-                    : .disabled
-            watchAudioCoach
-                .strengthHapticsEnabled =
-                restCues.hapticsEnabled
+    let advancedConfiguration =
+        StrengthAdvancedConfiguration(
+            spotifyPlaylist:
+                trackingMode == .advanced
+                    ? selectedSpotifyPlaylist
+                    : nil,
+            spotifyAutoplay:
+                trackingMode == .advanced &&
+                spotifyAutoplay,
+            audioCoach:
+                strengthAudioCoach,
+            restCues:
+                restCues,
+            keepScreenAwake:
+                trackingMode == .advanced &&
+                keepScreenAwake,
+            inputMode:
+                device == .appleWatch
+                    ? inputMode
+                    : .iPhone,
+            effortMetric:
+                effortMetric
+        )
 
-            onStart(
-                configuredSession,
-                captureDevice,
-                trackingMode,
-                selectedFriends,
-                socialMode,
-                watchAudioCoach,
-                advancedConfiguration
-            )
-            dismiss()
-        } label: {
-            Label(
-                startButtonTitle,
-                systemImage:
-                    captureDevice ==
-                    .appleWatch
-                        ? "applewatch"
-                        : "play.fill"
-            )
-            .font(.headline)
-            .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-        .tint(ATHLTHTheme.vitality)
+    if trackingMode == .advanced {
+        advancedConfiguration
+            .saveAsDefaults()
+    }
+
+    var watchAudioCoach =
+        strengthAudioCoach.enabled
+            ? strengthAudioCoach.watchConfiguration
+            : .disabled
+    watchAudioCoach
+        .strengthHapticsEnabled =
+        restCues.hapticsEnabled
+
+    onStart(
+        configuredSession,
+        device,
+        trackingMode,
+        selectedFriends,
+        socialMode,
+        watchAudioCoach,
+        advancedConfiguration
+    )
+
+        dismiss()
     }
 
     private var spotifySummary: String {
