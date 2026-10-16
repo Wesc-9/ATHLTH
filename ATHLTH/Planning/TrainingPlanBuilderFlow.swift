@@ -335,9 +335,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
             .safeAreaInset(edge: .bottom) {
                 if !showingCreatedPlan {
-                    if step == .source {
+                    if step == .mode {
+                        modeContinueBar
+                    } else if step == .source {
                         sourceContinueBar
-                    } else if step != .mode {
+                    } else {
                         bottomActionBar
                     }
                 }
@@ -691,98 +693,231 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 sourceChoiceHeader
-                    .padding(.bottom, 14)
+                    .padding(.bottom, 4)
 
-                Text(ATHLTHLocalization.choose(
-                    english: "How would you like to plan?",
-                    norwegian: "Hvordan vil du planlegge?"
-                ))
-                .font(.system(size: 33, weight: .regular, design: .serif))
-                .foregroundStyle(sourceInk)
-                .fixedSize(horizontal: false, vertical: true)
+                // An illustration adds warmth without displacing the choices
+                // below the fold. It stays fully offline as SwiftUI artwork.
+                VStack(alignment: .leading, spacing: 9) {
+                    HStack(alignment: .top, spacing: 0) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "STEP 1 OF \(stepDisplayTotal)",
+                                norwegian: "STEG 1 AV \(stepDisplayTotal)"
+                            ))
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(1.6)
+                            .foregroundStyle(sourceGold)
 
-                Text(ATHLTHLocalization.choose(
-                    english: "Choose how much control you want. Both options lead to an editable training plan.",
-                    norwegian: "Velg hvor mye kontroll du ønsker. Begge alternativene gir deg en treningsplan du kan redigere."
-                ))
-                .font(.subheadline)
-                .foregroundStyle(sourceMuted)
-                .fixedSize(horizontal: false, vertical: true)
+                            Text(ATHLTHLocalization.choose(
+                                english: "How would you like to plan?",
+                                norwegian: "Hvordan vil du planlegge?"
+                            ))
+                            .font(.system(size: 31, weight: .regular, design: .serif))
+                            .foregroundStyle(sourceInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .minimumScaleFactor(0.9)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                ATHLTHPlanSelectionCard(
-                    title: ATHLTHLocalization.choose(english: "Simple", norwegian: "Enkel"),
+                        ATHLTHPlanModeIllustration()
+                            .frame(width: 145, height: 170)
+                            .accessibilityHidden(true)
+                            .padding(.trailing, -7)
+                    }
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose how much control you want. Both options lead to an editable training plan.",
+                        norwegian: "Velg hvor mye kontroll du ønsker. Begge alternativene gir deg en treningsplan du kan redigere."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(sourceMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+
+                ATHLTHPlanEntryModeCard(
+                    title: ATHLTHLocalization.choose(
+                        english: "Simple", norwegian: "Enkel"
+                    ),
                     subtitle: ATHLTHLocalization.choose(
                         english: "Get started quickly with just the essentials.",
                         norwegian: "Kom raskt i gang med kun det viktigste."
                     ),
                     symbol: "sparkles",
                     selected: mode == .basic,
-                    accent: ATHLTHTheme.vitality
+                    features: [
+                        .init(
+                            symbol: "bolt.fill",
+                            title: ATHLTHLocalization.choose(
+                                english: "Quick start", norwegian: "Rask oppstart"
+                            )
+                        ),
+                        .init(
+                            symbol: "list.bullet",
+                            title: ATHLTHLocalization.choose(
+                                english: "Ready templates", norwegian: "Faste maler"
+                            )
+                        ),
+                        .init(
+                            symbol: "pencil",
+                            title: ATHLTHLocalization.choose(
+                                english: "Easy edits", norwegian: "Enkel å redigere"
+                            )
+                        )
+                    ]
                 ) {
-                    mode = .basic
-                    chooseSimpleActivity(.walking)
-                    goForward()
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        mode = .basic
+                    }
                 }
 
-                ATHLTHPlanSelectionCard(
-                    title: ATHLTHLocalization.choose(english: "Advanced", norwegian: "Avansert"),
+                ATHLTHPlanEntryModeCard(
+                    title: ATHLTHLocalization.choose(
+                        english: "Advanced", norwegian: "Avansert"
+                    ),
                     subtitle: ATHLTHLocalization.choose(
                         english: "Choose goals, equipment, training days and detailed program structure.",
                         norwegian: "Velg mål, utstyr, treningsdager og detaljert programstruktur."
                     ),
                     symbol: "slider.horizontal.3",
-                    selected: mode == .advanced
+                    selected: mode == .advanced,
+                    features: [
+                        .init(
+                            symbol: "chart.bar",
+                            title: ATHLTHLocalization.choose(
+                                english: "Tailored plan", norwegian: "Skreddersydd"
+                            )
+                        ),
+                        .init(
+                            symbol: "gearshape",
+                            title: ATHLTHLocalization.choose(
+                                english: "More settings", norwegian: "Flere valg"
+                            )
+                        ),
+                        .init(
+                            symbol: "slider.horizontal.3",
+                            title: ATHLTHLocalization.choose(
+                                english: "Full control", norwegian: "Full kontroll"
+                            )
+                        )
+                    ]
                 ) {
-                    mode = .advanced
-                    goForward()
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        mode = .advanced
+                    }
                 }
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "ALREADY HAVE A PLAN?",
-                        norwegian: "HAR DU EN PLAN FRA FØR?"
-                    ))
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.4)
-                    .foregroundStyle(sourceMuted)
 
-                    HStack(spacing: 8) {
-                        Button {
-                            sourceRoute.append(.library)
-                        } label: {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Plan library", norwegian: "Planbibliotek"
-                                ), systemImage: "square.stack.3d.up"
-                            )
-                            .font(.caption.weight(.semibold))
-                            .frame(maxWidth: .infinity, minHeight: 44)
+                VStack(alignment: .leading, spacing: 13) {
+                    HStack(spacing: 10) {
+                        Rectangle()
+                            .fill(sourceGold.opacity(0.26))
+                            .frame(height: 0.7)
+                        Text(ATHLTHLocalization.choose(
+                            english: "ALREADY HAVE A PLAN?",
+                            norwegian: "HAR DU EN PLAN FRA FØR?"
+                        ))
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(1.2)
+                        .foregroundStyle(sourceMuted)
+                        .fixedSize()
+                        Rectangle()
+                            .fill(sourceGold.opacity(0.26))
+                            .frame(height: 0.7)
+                    }
+
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 10) {
+                            existingPlanLibraryButton
+                            existingMyPlansButton
                         }
-                        Button {
-                            sourceRoute.append(.mine)
-                        } label: {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "My plans", norwegian: "Mine planer"
-                                ), systemImage: "bookmark"
-                            )
-                            .font(.caption.weight(.semibold))
-                            .frame(maxWidth: .infinity, minHeight: 44)
+                        VStack(spacing: 10) {
+                            existingPlanLibraryButton
+                            existingMyPlansButton
                         }
                     }
-                    .buttonStyle(.bordered)
-                    .tint(sourceInk)
                 }
-                .padding(.top, 7)
-
+                .padding(.top, 5)
             }
             .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 18)
             .padding(.top, 15)
-            .padding(.bottom, 30)
+            .padding(.bottom, 25)
         }
         .scrollIndicators(.hidden)
         .background(sourceCanvas.ignoresSafeArea())
+    }
+
+    private var existingPlanLibraryButton: some View {
+        ATHLTHPlanExistingChoice(
+            title: ATHLTHLocalization.choose(
+                english: "Plan library", norwegian: "Planbibliotek"
+            ),
+            subtitle: ATHLTHLocalization.choose(
+                english: "Explore ready plans", norwegian: "Utforsk ferdige planer"
+            ),
+            symbol: "square.stack.3d.up"
+        ) {
+            sourceRoute.append(.library)
+        }
+    }
+
+    private var existingMyPlansButton: some View {
+        ATHLTHPlanExistingChoice(
+            title: ATHLTHLocalization.choose(
+                english: "My plans", norwegian: "Mine planer"
+            ),
+            subtitle: ATHLTHLocalization.choose(
+                english: "View and edit plans", norwegian: "Se og rediger dine planer"
+            ),
+            symbol: "bookmark"
+        ) {
+            sourceRoute.append(.mine)
+        }
+    }
+
+    private var modeContinueBar: some View {
+        Button {
+            if mode == .basic {
+                // Establish the simple defaults once at actual continuation.
+                // Merely selecting a card must not mutate a plan or navigate.
+                updateSimplePlanChoices()
+            }
+            goForward()
+        } label: {
+            HStack(spacing: 12) {
+                Spacer(minLength: 12)
+                Text(ATHLTHLocalization.choose(
+                    english: "Select and continue", norwegian: "Velg og fortsett"
+                ))
+                .font(.subheadline.weight(.semibold))
+                Spacer(minLength: 0)
+                Image(systemName: "arrow.right")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 20)
+            .frame(maxWidth: .infinity, minHeight: 55)
+            .background(
+                LinearGradient(
+                    colors: [
+                        sourceGold.opacity(0.89),
+                        Color(red: 0.65, green: 0.48, blue: 0.27)
+                    ],
+                    startPoint: .leading, endPoint: .trailing
+                ),
+                in: RoundedRectangle(cornerRadius: 21, style: .continuous)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 21))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 18)
+        .padding(.top, 12)
+        .padding(.bottom, 10)
+        .background(sourceCanvas.opacity(0.98))
+        .accessibilityHint(ATHLTHLocalization.choose(
+            english: "Continue with the selected planning mode.",
+            norwegian: "Fortsett med valgt planleggingsmåte."
+        ))
     }
 
     private var sourceChoice: some View {
