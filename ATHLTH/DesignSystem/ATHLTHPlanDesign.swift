@@ -231,6 +231,7 @@ struct ATHLTHQuickStartDeviceLaunchBar: View {
     let onIPhone: () -> Void
     let onAppleWatch: () -> Void
     var supportingText: String? = nil
+    var canStart: Bool = true
 
     private func label(_ english: String, _ norwegian: String) -> String {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
@@ -248,16 +249,28 @@ struct ATHLTHQuickStartDeviceLaunchBar: View {
                     title: "iPhone",
                     icon: "iphone",
                     primary: true,
-                    enabled: true,
+                    enabled: canStart,
                     action: onIPhone
                 )
                 launchButton(
                     title: "Apple Watch",
                     icon: "applewatch",
                     primary: false,
-                    enabled: watchAvailable,
+                    enabled: watchAvailable && canStart,
                     action: onAppleWatch
                 )
+            }
+
+            if !canStart {
+                Label(
+                    label(
+                        "Choose a route or workout above before starting.",
+                        "Velg rute eller treningsøkt ovenfor før du starter."
+                    ),
+                    systemImage: "info.circle"
+                )
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
 
             if !watchAvailable {
