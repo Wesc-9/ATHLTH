@@ -46,6 +46,95 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
     }
 
     @MainActor
+    func testOverviewDistinguishesUnscheduledFromCompletedActivity() {
+        XCTAssertEqual(
+            TrainTodayOverviewPolicy.status(
+                hasPlan: false, hasRecordedWorkoutToday: false
+            ),
+            .noActivePlan
+        )
+        XCTAssertEqual(
+            TrainTodayOverviewPolicy.status(
+                hasPlan: true, hasRecordedWorkoutToday: false
+            ),
+            .noWorkoutInPlan
+        )
+        XCTAssertEqual(
+            TrainTodayOverviewPolicy.status(
+                hasPlan: true, hasRecordedWorkoutToday: true
+            ),
+            .trainedToday
+        )
+        XCTAssertEqual(
+            TrainTodayOverviewPolicy.status(
+                hasPlan: false, hasRecordedWorkoutToday: true
+            ),
+            .trainedToday
+        )
+    }
+
+    @MainActor
+    func testDayReadinessRequiresFreshCompleteBaseline() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let recent = now.addingTimeInterval(-6 * 3600)
+        let stale = now.addingTimeInterval(-60 * 3600)
+        let valid = RecoveryReadinessSummary(
+            score: 62,
+            state: .takeItEasy,
+            detail: "",
+            baselineDays: 8,
+            averageSleepDuration: nil,
+            baselineHRVMilliseconds: nil,
+            baselineRestingHeartRate: nil
+        )
+        XCTAssertEqual(
+            TrainTodayOverviewPolicy.reliableReadiness(
+                valid,
+                sleepEnd: recent,
+                hrvDate: recent,
+                restingHeartRateDate: recent,
+                now: now
+            )?.score,
+            62
+        )
+        XCTAssertNil(
+            TrainTodayOverviewPolicy.reliableReadiness(
+                valid,
+                sleepEnd: recent,
+                hrvDate: stale,
+                restingHeartRateDate: recent,
+                now: now
+            )
+        )
+        XCTAssertNil(
+            TrainTodayOverviewPolicy.reliableReadiness(
+                valid,
+                sleepEnd: nil,
+                hrvDate: recent,
+                restingHeartRateDate: recent,
+                now: now
+            )
+        )
+        XCTAssertNil(
+            TrainTodayOverviewPolicy.reliableReadiness(
+                RecoveryReadinessSummary(
+                    score: 62,
+                    state: .ready,
+                    detail: "",
+                    baselineDays: 2,
+                    averageSleepDuration: nil,
+                    baselineHRVMilliseconds: nil,
+                    baselineRestingHeartRate: nil
+                ),
+                sleepEnd: recent,
+                hrvDate: recent,
+                restingHeartRateDate: recent,
+                now: now
+            )
+        )
+    }
+
+    @MainActor
     func testTodaySurfaceFitsCompactPhoneWidths() {
         let plan = TrainingPlan(
             id: UUID(),
@@ -60,8 +149,8 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
             updatedAt: Date()
         )
 
-        // No plan and rest days both use photo heroes. Verify that image
-        // aspect ratios cannot force a wider-than-screen SwiftUI layout.
+        // Plan-free and unscheduled days show a compact overview.
+        // Verify it and the remaining heroes fit narrow phone widths.
         let scenarios: [TrainingPlan?] = [nil, plan]
         for width in [320.0, 375.0, 430.0] {
             for currentPlan in scenarios {
@@ -77,6 +166,8 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
                     completionFraction: 0,
                     planPosition: "",
                     hasActiveWorkout: hasActiveWorkout,
+                    hasRecordedWorkoutToday: false,
+                    todaysReadiness: nil,
                     onChooseSuggestedWorkout: { _ in },
                     onOpenPlan: {},
                     onCreatePlan: {},
