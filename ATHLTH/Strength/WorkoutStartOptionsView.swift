@@ -721,7 +721,7 @@ struct WorkoutStartOptionsView: View {
 
     private var exerciseSelectionCard:
         some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface(density: .compact) {
             HStack(spacing: 8) {
                 RoundedRectangle(
                     cornerRadius: 2,
