@@ -227,7 +227,6 @@ struct CustomQuickStartSheet: View {
 
     @State private var activity: CustomQuickWorkoutActivity = .hiit
     @State private var method: CustomQuickWorkoutMethod = .open
-    @State private var captureDevice: WorkoutCaptureDevice = .iPhone
     @State private var durationMinutes = 20
     @State private var workSeconds = 40
     @State private var restSeconds = 20
@@ -258,7 +257,6 @@ struct CustomQuickStartSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 19) {
                     header
-                    devicePicker
 
                     sectionTitle(tr("Activity", "Aktivitet"))
                     LazyVGrid(columns: columns, spacing: 9) {
@@ -279,7 +277,7 @@ struct CustomQuickStartSheet: View {
 
                     configurationControls
 
-                    if captureDevice == .appleWatch {
+                    if canUseWatch {
                         DisclosureGroup(tr("Audio coach (optional)", "Lydcoach (valgfritt)")) {
                             AudioCoachSetupCard(
                                 draft: $audioCoachDraft,
@@ -310,55 +308,43 @@ struct CustomQuickStartSheet: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                VStack(spacing: 9) {
+                VStack(spacing: 5) {
+                    ATHLTHQuickStartDeviceLaunchBar(
+                        watchAvailable: canUseWatch,
+                        onIPhone: {
+                            onStart(previewConfiguration, .phoneTimer)
+                            dismiss()
+                        },
+                        onAppleWatch: {
+                            guard canUseWatch else { return }
+                            onStart(previewConfiguration, .watch)
+                            dismiss()
+                        },
+                        supportingText: canUseWatch && method != .open
+                            ? tr(
+                                "Custom intervals are not transferred to Watch yet.",
+                                "Egendefinerte drag og pauser overføres ennå ikke til klokken."
+                            )
+                            : nil
+                    )
+
                     Button {
-                        if captureDevice == .appleWatch && !canUseWatch { return }
-                        onStart(
-                            previewConfiguration,
-                            captureDevice == .appleWatch ? .watch : .phoneTimer
-                        )
+                        onStart(previewConfiguration, .retrospective)
                         dismiss()
                     } label: {
                         Label(
-                            captureDevice == .appleWatch
-                                ? tr("Start on Apple Watch", "Start på Apple Watch")
-                                : tr("Start iPhone timer", "Start tidtaking på iPhone"),
-                            systemImage: captureDevice == .appleWatch
-                                ? "applewatch" : "play.fill"
+                            tr("Log a completed workout", "Registrer økt i etterkant"),
+                            systemImage: "square.and.pencil"
                         )
-                        .font(.headline.weight(.semibold))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .frame(minHeight: 44)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 54)
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(.white)
-                    .background(
-                        captureDevice == .appleWatch && !canUseWatch
-                            ? Color.gray.opacity(0.45) : accent,
-                        in: RoundedRectangle(cornerRadius: 18)
-                    )
-                    .disabled(captureDevice == .appleWatch && !canUseWatch)
-
-                    if captureDevice == .iPhone {
-                        Button {
-                            onStart(previewConfiguration, .retrospective)
-                            dismiss()
-                        } label: {
-                            Label(
-                                tr("Log a completed workout", "Registrer økt i etterkant"),
-                                systemImage: "square.and.pencil"
-                            )
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(accent)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 32)
-                        }
-                        .buttonStyle(.plain)
-                    }
+                    .padding(.horizontal, 16)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .background(.ultraThinMaterial)
+                .background(.regularMaterial)
             }
         }
         .presentationDetents([.large])
@@ -368,15 +354,9 @@ struct CustomQuickStartSheet: View {
                 audioCoachDraft.load(from: settings)
                 audioCoachLoaded = true
             }
-            if !canUseWatch {
-                captureDevice = .iPhone
-            }
             // Probe availability whenever the chooser is opened. Paired
             // does not mean the athlete brought their Watch to the gym.
             watchConnection.connect()
-        }
-        .onChange(of: watchConnected) { _, connected in
-            if !connected { captureDevice = .iPhone }
         }
     }
 
@@ -392,102 +372,6 @@ struct CustomQuickStartSheet: View {
             .font(.subheadline)
             .foregroundStyle(muted)
         }
-    }
-
-    private var devicePicker: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            sectionTitle(tr("Record with", "Registrer med"))
-            HStack(spacing: 10) {
-                deviceTile(
-                    title: "iPhone",
-                    icon: "iphone",
-                    subtitle: tr("Timer + manual input", "Tidtaker + manuell føring"),
-                    selected: captureDevice == .iPhone,
-                    enabled: true
-                ) {
-                    captureDevice = .iPhone
-                }
-                deviceTile(
-                    title: "Apple Watch",
-                    icon: "applewatch",
-                    subtitle: canUseWatch
-                        ? tr("Watch capture", "Måling på klokken")
-                        : tr("Not available", "Ikke tilgjengelig"),
-                    selected: captureDevice == .appleWatch,
-                    enabled: canUseWatch
-                ) {
-                    captureDevice = .appleWatch
-                }
-            }
-            if !canUseWatch {
-                HStack(alignment: .top, spacing: 9) {
-                    Image(systemName: "info.circle")
-                        .foregroundStyle(accent)
-                    Text(tr(
-                        "Apple Watch isn't verified nearby. You can always time or log the workout on iPhone.",
-                        "Apple Watch er ikke bekreftet i nærheten. Du kan alltid ta tiden eller registrere økten på iPhone."
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(muted)
-                    Spacer(minLength: 0)
-                    Button(tr("Check", "Sjekk")) {
-                        watchConnection.connect()
-                    }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(accent)
-                }
-                .fixedSize(horizontal: false, vertical: true)
-            } else if captureDevice == .appleWatch && method != .open {
-                Text(tr(
-                    "Apple Watch records the activity. Custom work/rest instructions are not yet transferred to Watch.",
-                    "Apple Watch registrerer aktiviteten. Egendefinerte drag og pauser overføres ennå ikke til klokken."
-                ))
-                .font(.caption)
-                .foregroundStyle(muted)
-            }
-        }
-        .padding(15)
-        .background(.white, in: RoundedRectangle(cornerRadius: 21))
-    }
-
-    private func deviceTile(
-        title: String, icon: String, subtitle: String,
-        selected: Bool, enabled: Bool, action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: icon)
-                        .font(.system(size: 19, weight: .semibold))
-                    Spacer()
-                    if selected { Image(systemName: "checkmark.circle.fill") }
-                    else if !enabled { Image(systemName: "lock.fill") }
-                }
-                .foregroundStyle(selected ? accent : muted)
-                Text(title)
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(ink)
-                Text(subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(muted)
-                    .lineLimit(2)
-                    .frame(height: 28, alignment: .topLeading)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(13)
-            .background(
-                selected ? ATHLTHTheme.accentSoft : ATHLTHTheme.canvasTop,
-                in: RoundedRectangle(cornerRadius: 17)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 17)
-                    .strokeBorder(selected ? accent.opacity(0.40)
-                                           : ATHLTHTheme.border, lineWidth: 1)
-            }
-            .opacity(enabled ? 1 : 0.56)
-        }
-        .buttonStyle(.plain)
-        .disabled(!enabled)
     }
 
     private func activityTile(_ kind: CustomQuickWorkoutActivity) -> some View {
