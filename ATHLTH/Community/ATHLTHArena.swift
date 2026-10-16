@@ -780,6 +780,10 @@ struct ATHLTHArenaHomeView: View {
                 // Do not show a blank "all caught up" card on the landing page.
                 ATHLTHArenaNextStepsSection(showEmptyState: false)
 
+                if !drafts.isEmpty {
+                    draftsSection
+                }
+
                 // Keep one competition overview rather than multiple
                 // competing quick-start dashboards.
                 ATHLTHArenaOnlineSection(compact: true)
@@ -793,10 +797,6 @@ struct ATHLTHArenaHomeView: View {
                 // deeper tools are available through the secondary area.
                 ATHLTHArenaLiveDuelsSection(hideWhenInactive: true)
                 moreArenaSection
-
-                if !drafts.isEmpty {
-                    draftsSection
-                }
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
@@ -1190,24 +1190,13 @@ struct ATHLTHArenaHomeView: View {
                 ))
             }
             Text(ATHLTHLocalization.choose(
-                english: "Select a starting point. The underlying workout, route and scoring rules stay unchanged.",
-                norwegian: "Velg et utgangspunkt. Treningsmotor, ruter og poengregler forblir som før."
+                english: "Choose a specific format. Workouts, routes and scoring rules are preserved.",
+                norwegian: "Velg en konkurranseform. Treningsøkter, ruter og poengregler beholdes."
             ))
             .font(.subheadline)
             .foregroundStyle(ATHLTHArenaLightStyle.secondary)
             .fixedSize(horizontal: false, vertical: true)
 
-            creationChoice(
-                mode: .challenge,
-                symbol: "flag.checkered",
-                title: ATHLTHLocalization.choose(
-                    english: "Challenge someone", norwegian: "Utfordre noen"
-                ),
-                subtitle: ATHLTHLocalization.choose(
-                    english: "One challenge, easy to set up",
-                    norwegian: "Én utfordring – raskt å komme i gang"
-                )
-            )
             creationChoice(
                 mode: .route,
                 symbol: "map",
@@ -1239,17 +1228,6 @@ struct ATHLTHArenaHomeView: View {
                 subtitle: ATHLTHLocalization.choose(
                     english: "Repetitions, load and workout goals",
                     norwegian: "Repetisjoner, belastning og øktmål"
-                )
-            )
-            creationChoice(
-                mode: .series,
-                symbol: "trophy",
-                title: ATHLTHLocalization.choose(
-                    english: "Competition series", norwegian: "Konkurranseserie"
-                ),
-                subtitle: ATHLTHLocalization.choose(
-                    english: "Multiple rounds, participants and points",
-                    norwegian: "Flere runder, deltakere og poeng"
                 )
             )
             creationChoice(
