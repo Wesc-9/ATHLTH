@@ -2774,7 +2774,6 @@ struct WalkQuickStartSheet: View {
         SocialWorkoutParticipationMode =
             .physical
     @State private var selectedGearIDs: Set<UUID> = []
-    @State private var captureDevice: WorkoutCaptureDevice = .iPhone
     @State private var audioCoachDraft = AudioCoachDraft()
     @State private var didLoadAudioCoachDefaults = false
     @State private var isAdvancedSetup = false
@@ -2848,14 +2847,6 @@ struct WalkQuickStartSheet: View {
                     if let plannedSession {
                         PlannedQuickStartContextCard(workout: plannedSession)
                     }
-
-                    QuickStartWorkoutDeviceCard(
-                        selection: $captureDevice,
-                        watchConnected: watchConnected,
-                        iPhoneEnabled: true,
-                        iPhoneSubtitle:
-                            "Keep your iPhone with you to record GPS distance, pace and time."
-                    )
 
                     WorkoutGearSelectionCard(
                         selectedGearIDs: $selectedGearIDs,
@@ -2973,75 +2964,21 @@ struct WalkQuickStartSheet: View {
                         .buttonStyle(.plain)
                     }
 
-                    Button {
-                        let friends = social.trainingPartners.filter {
-                            selectedFriendIDs.contains($0.userID)
-                        }
-
-                        onStart(
-                            WalkQuickStartConfiguration(
-                                captureDevice: captureDevice,
-                                audioCoach:
-                                    isAdvancedSetup &&
-                                    session.canAccess(.audioCoach)
-                                        ? audioCoachDraft.configuration()
-                                        : .disabled,
-                                autoPauseEnabled:
-                                    (
-                                        isAdvancedSetup
-                                            ? autoPausePreference
-                                            : .appDefault
-                                    )
-                                    .resolved(
-                                        appDefault:
-                                            settings.autoPauseOutdoorWorkouts
-                                    ),
-                                spotifyPlaylist:
-                                    isAdvancedSetup &&
-                                    spotifyAutoplay
-                                        ? selectedSpotifyPlaylist
-                                        : nil,
-                                spotifyAutoplay:
-                                    isAdvancedSetup &&
-                                    spotifyAutoplay &&
-                                    selectedSpotifyPlaylist != nil,
-                                friends:
-                                    friends,
-                                socialMode:
-                                    socialMode,
-                                gearIDs: selectedGearIDs
-                            )
-                        )
-                        dismiss()
-                    } label: {
-                        Label(
-                            captureDevice == .appleWatch
-                                ? (
-                                    ATHLTHDeviceRole.isIPad
-                                        ? "Start Apple Watch via iPhone"
-                                        : watchConnected
-                                            ? "Start Walk on Watch"
-                                            : "Apple Watch Required"
-                                )
-                                : "Start on iPhone",
-                            systemImage:
-                                captureDevice == .appleWatch
-                                    ? "applewatch"
-                                    : "iphone"
-                        )
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .tint(ATHLTHTheme.accent)
-                    .disabled(
-                        captureDevice == .appleWatch &&
-                        !watchConnected &&
-                        !ATHLTHDeviceRole.isIPad
-                    )
                 }
                 .padding()
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                ATHLTHQuickStartDeviceLaunchBar(
+                    watchAvailable: watchConnected || ATHLTHDeviceRole.isIPad,
+                    onIPhone: { startWalk(using: .iPhone) },
+                    onAppleWatch: { startWalk(using: .appleWatch) },
+                    supportingText: ATHLTHDeviceRole.isIPad
+                        ? ATHLTHLocalization.choose(
+                            english: "Sent via your signed-in iPhone.",
+                            norwegian: "Sendes via innlogget iPhone."
+                        )
+                        : nil
+                )
             }
             .navigationTitle("Start Walk")
             .navigationBarTitleDisplayMode(.inline)
@@ -3098,6 +3035,49 @@ struct WalkQuickStartSheet: View {
         }
     }
 
+    private func startWalk(using device: WorkoutCaptureDevice) {
+        guard device == .iPhone ||
+            watchConnected || ATHLTHDeviceRole.isIPad else { return }
+        let friends = social.trainingPartners.filter {
+            selectedFriendIDs.contains($0.userID)
+        }
+
+        onStart(
+            WalkQuickStartConfiguration(
+                captureDevice: device,
+                audioCoach:
+                    isAdvancedSetup &&
+                    session.canAccess(.audioCoach)
+                        ? audioCoachDraft.configuration()
+                        : .disabled,
+                autoPauseEnabled:
+                    (
+                        isAdvancedSetup
+                            ? autoPausePreference
+                            : .appDefault
+                    )
+                    .resolved(
+                        appDefault:
+                            settings.autoPauseOutdoorWorkouts
+                    ),
+                spotifyPlaylist:
+                    isAdvancedSetup &&
+                    spotifyAutoplay
+                        ? selectedSpotifyPlaylist
+                        : nil,
+                spotifyAutoplay:
+                    isAdvancedSetup &&
+                    spotifyAutoplay &&
+                    selectedSpotifyPlaylist != nil,
+                friends:
+                    friends,
+                socialMode:
+                    socialMode,
+                gearIDs: selectedGearIDs
+            )
+        )
+        dismiss()
+    }
 }
 
 struct StrengthQuickStartSheet: View {
