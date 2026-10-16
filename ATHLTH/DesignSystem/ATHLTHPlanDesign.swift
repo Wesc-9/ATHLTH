@@ -221,3 +221,141 @@ struct ATHLTHPlanDesignLabView: View {
         .preferredColorScheme(.light)
     }
 }
+
+
+/// Shared plan-styled launch control for all Quick Train setup sheets.
+/// The recorder is chosen by the actual launch action, not by an earlier
+/// selection that could silently start a different device.
+struct ATHLTHQuickStartDeviceLaunchBar: View {
+    let watchAvailable: Bool
+    let onIPhone: () -> Void
+    let onAppleWatch: () -> Void
+    var supportingText: String? = nil
+
+    private func label(_ english: String, _ norwegian: String) -> String {
+        ATHLTHLocalization.choose(english: english, norwegian: norwegian)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text(label("START WORKOUT WITH", "START ØKT MED"))
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(1.25)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+            HStack(spacing: 10) {
+                launchButton(
+                    title: "iPhone",
+                    icon: "iphone",
+                    primary: true,
+                    enabled: true,
+                    action: onIPhone
+                )
+                launchButton(
+                    title: "Apple Watch",
+                    icon: "applewatch",
+                    primary: false,
+                    enabled: watchAvailable,
+                    action: onAppleWatch
+                )
+            }
+
+            if !watchAvailable {
+                Label(
+                    label(
+                        "Apple Watch isn't connected. Connect it to start on Watch.",
+                        "Apple Watch er ikke tilkoblet. Koble til klokken for å starte der."
+                    ),
+                    systemImage: "info.circle"
+                )
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let supportingText {
+                Text(supportingText)
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 10)
+        .background(.regularMaterial)
+        .overlay(alignment: .top) {
+            ATHLTHPlanDesign.outline.frame(height: 1)
+        }
+    }
+
+    private func launchButton(
+        title: String,
+        icon: String,
+        primary: Bool,
+        enabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 19, weight: .medium))
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                Spacer(minLength: 0)
+                if !enabled {
+                    Image(systemName: "lock.fill")
+                        .font(.caption2)
+                } else {
+                    Image(systemName: "arrow.right")
+                        .font(.caption.weight(.medium))
+                }
+            }
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, minHeight: 54)
+            .foregroundStyle(
+                !enabled
+                    ? ATHLTHPlanDesign.secondaryInk.opacity(0.65)
+                    : primary ? Color.white : ATHLTHPlanDesign.ink
+            )
+            .background(
+                !enabled
+                    ? ATHLTHPlanDesign.outline.opacity(0.45)
+                    : primary ? ATHLTHPlanDesign.ink : ATHLTHPlanDesign.surface,
+                in: RoundedRectangle(
+                    cornerRadius: ATHLTHPlanDesign.fieldRadius,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: ATHLTHPlanDesign.fieldRadius,
+                    style: .continuous
+                )
+                .stroke(
+                    primary ? Color.clear : ATHLTHPlanDesign.outline,
+                    lineWidth: 1
+                )
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .accessibilityLabel(
+            label("Start with", "Start med") + " " + title
+        )
+        .accessibilityHint(
+            enabled
+                ? label(
+                    "Starts the current workout with this recording device.",
+                    "Starter denne økten med valgt registreringsenhet."
+                )
+                : label(
+                    "Apple Watch not connected.",
+                    "Apple Watch er ikke tilkoblet."
+                )
+        )
+    }
+}
