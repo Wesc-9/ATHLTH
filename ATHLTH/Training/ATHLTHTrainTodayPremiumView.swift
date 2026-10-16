@@ -14,6 +14,9 @@ struct ATHLTHTrainTodayPremiumView: View {
     let completionFraction: Double
     let planPosition: String
     let hasActiveWorkout: Bool
+    let hasRecordedWorkoutToday: Bool
+    /// Already filtered for a reliable, recent HealthKit baseline by the parent.
+    let todaysReadiness: RecoveryReadinessSummary?
     let onChooseSuggestedWorkout: (WorkoutTemplateCatalogEntry) -> Void
     let onOpenPlan: () -> Void
     let onCreatePlan: () -> Void
@@ -54,13 +57,15 @@ struct ATHLTHTrainTodayPremiumView: View {
                 } else if let workout = primaryWorkout {
                     workoutCard(workout, plan: plan)
                 } else {
-                    restDayCard(plan)
+                    openDayOverview(hasPlan: true)
                 }
 
                 suggestedWorkoutSection
                 quickTrainSection
                 activePlanSection(plan)
             } else {
+                // An empty plan must not mean an empty day.
+                openDayOverview(hasPlan: false)
                 // Starting a workout must not require creating a training plan.
                 quickTrainSection
                 suggestedWorkoutSection
@@ -252,64 +257,200 @@ struct ATHLTHTrainTodayPremiumView: View {
         .shadow(color: ink.opacity(0.065), radius: 14, y: 7)
     }
 
-    private func restDayCard(_ plan: TrainingPlan) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            stateImage("GoalRecovery", label: tr("RECOVERY DAY", "HVILEDAG"))
-            VStack(alignment: .leading, spacing: 11) {
-                Text(tr("A day to recover", "Treningsfri i dag"))
-                    .font(.system(size: 23, weight: .regular, design: .serif))
-                    .foregroundStyle(ink)
-                Text(
-                    tr(
-                        "No workout is planned today. Recovery is part of your program.",
-                        "Ingen økt i planen i dag. Restitusjon er også en del av treningen."
-                    )
-                )
-                .font(.subheadline)
-                .foregroundStyle(muted)
-                .fixedSize(horizontal: false, vertical: true)
+    /// A plan-free day is not automatically a prescribed rest day. Keep
+    /// this overview informational and allow the original Quick Train actions.
+    private func openDayOverview(hasPlan: Bool) -> some View {
+        let status = TrainTodayOverviewPolicy.status(
+            hasPlan: hasPlan,
+            hasRecordedWorkoutToday: hasRecordedWorkoutToday
+        )
 
-                if let nextWorkoutTitle {
-                    Button(action: onOpenPlan) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "calendar")
-                                .foregroundStyle(champagne)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(tr("NEXT WORKOUT", "NESTE ØKT"))
-                                    .font(.system(size: 9, weight: .semibold))
-                                    .tracking(1.1)
-                                    .foregroundStyle(muted)
-                                Text(nextWorkoutTitle)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(ink)
-                                if let nextWorkoutDate {
-                                    Text(nextWorkoutDate.formatted(.dateTime.weekday(.wide).day().month()))
-                                        .font(.caption)
-                                        .foregroundStyle(muted)
-                                }
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(ink)
-                        }
-                        .padding(13)
-                        .background(Color(red: 0.97, green: 0.96, blue: 0.94),
-                                    in: RoundedRectangle(cornerRadius: 11))
-                    }
-                    .buttonStyle(.plain)
-                } else {
-                    Button(action: onOpenPlan) {
-                        Label(tr("View plan", "Se treningsplan"), systemImage: "calendar")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(ink)
-                    }
-                    .buttonStyle(.plain)
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Image(systemName: "sun.horizon")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(champagne)
+                Text(tr("YOUR DAY", "DIN DAG"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.5)
+                    .foregroundStyle(muted)
+                Spacer(minLength: 0)
+                if status == .trainedToday {
+                    Label(
+                        tr("Recorded", "Registrert"),
+                        systemImage: "checkmark.circle.fill"
+                    )
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Color(red: 0.19, green: 0.44, blue: 0.36))
                 }
             }
-            .padding(16)
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(dayHeadline(for: status))
+                    .font(.system(size: 24, weight: .regular, design: .serif))
+                    .foregroundStyle(ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(dayDescription(for: status))
+                    .font(.subheadline)
+                    .foregroundStyle(muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Rectangle()
+                .fill(hairline.opacity(0.75))
+                .frame(height: 0.7)
+
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(champagne)
+                    .frame(width: 22)
+                    .padding(.top, 2)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tr("TODAY'S PLAN", "DAGENS PLAN"))
+                        .font(.system(size: 9, weight: .semibold))
+                        .tracking(1.1)
+                        .foregroundStyle(muted)
+                    Text(hasPlan
+                         ? tr("No scheduled workout", "Ingen planlagt økt")
+                         : tr("No active training plan", "Ingen aktiv treningsplan"))
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ink)
+                }
+                Spacer(minLength: 0)
+            }
+
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: todaysReadiness?.state.systemImage ?? "heart.text.square")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(champagne)
+                    .frame(width: 22)
+                    .padding(.top, 2)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tr("RECOVERY", "RESTITUSJON"))
+                        .font(.system(size: 9, weight: .semibold))
+                        .tracking(1.1)
+                        .foregroundStyle(muted)
+
+                    if let todaysReadiness, let score = todaysReadiness.score {
+                        HStack(alignment: .firstTextBaseline, spacing: 7) {
+                            Text(readinessTitle(todaysReadiness.state))
+                                .font(.subheadline.weight(.medium))
+                            Spacer(minLength: 4)
+                            Text("\(score)/100")
+                                .font(.subheadline.weight(.semibold))
+                                .monospacedDigit()
+                        }
+                        .foregroundStyle(ink)
+                        Text(tr(
+                            "Based on recent authorized health data, not a prescribed rest day.",
+                            "Basert på oppdaterte helsedata – ikke en pålagt hviledag."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text(tr(
+                            "Not enough up-to-date health data for today's assessment.",
+                            "Ikke nok oppdaterte helsedata til å vurdere dagsformen."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+
+            if hasPlan {
+                Button(action: onOpenPlan) {
+                    HStack(alignment: .center, spacing: 12) {
+                        Image(systemName: "arrow.forward.calendar")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(champagne)
+                            .frame(width: 22)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(nextWorkoutTitle == nil
+                                ? tr("YOUR TRAINING PLAN", "DIN TRENINGSPLAN")
+                                : tr("NEXT WORKOUT", "NESTE ØKT"))
+                                .font(.system(size: 9, weight: .semibold))
+                                .tracking(1.1)
+                                .foregroundStyle(muted)
+                            Text(nextWorkoutTitle ?? tr("View your plan", "Se treningsplan"))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ink)
+                                .lineLimit(2)
+                            if nextWorkoutTitle != nil, let nextWorkoutDate {
+                                Text(nextWorkoutDate.formatted(
+                                    .dateTime.weekday(.wide).day().month()
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(muted)
+                            }
+                        }
+                        Spacer(minLength: 4)
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ink)
+                    }
+                    .padding(13)
+                    .background(
+                        Color(red: 0.974, green: 0.964, blue: 0.946),
+                        in: RoundedRectangle(cornerRadius: 13)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
         }
+        .padding(17)
         .premiumTrainSurface(line: hairline)
+    }
+
+    private func dayHeadline(
+        for status: TrainTodayOverviewPolicy.Status
+    ) -> String {
+        switch status {
+        case .trainedToday:
+            return tr("You've trained today", "Du har trent i dag")
+        case .noWorkoutInPlan:
+            return tr("A flexible training day", "En åpen treningsdag")
+        case .noActivePlan:
+            return tr("Your day, your choice", "Dagen er din")
+        }
+    }
+
+    private func dayDescription(
+        for status: TrainTodayOverviewPolicy.Status
+    ) -> String {
+        switch status {
+        case .trainedToday:
+            return tr(
+                "An activity has been recorded today, even though none was scheduled.",
+                "En aktivitet er registrert i dag, selv om ingen økt var planlagt."
+            )
+        case .noWorkoutInPlan:
+            return tr(
+                "There is no workout in your plan today. You can rest or choose an activity.",
+                "Det ligger ingen økt i planen i dag. Du kan hvile eller velge en aktivitet."
+            )
+        case .noActivePlan:
+            return tr(
+                "Nothing is scheduled. Rest, move freely, or build a training plan.",
+                "Ingenting er planlagt. Hvil, beveg deg fritt eller lag en treningsplan."
+            )
+        }
+    }
+
+    private func readinessTitle(_ state: RecoveryReadinessState) -> String {
+        switch state {
+        case .ready: return tr("Ready for activity", "Klar for aktivitet")
+        case .balanced: return tr("Balanced", "Balansert")
+        case .takeItEasy: return tr("Take it a little easier", "Ta det litt roligere")
+        case .recover: return tr("Consider recovery", "Vurder restitusjon")
+        case .buildingBaseline: return tr("Building baseline", "Bygger grunnlag")
+        }
     }
 
     // Real, published workouts only. This is editorial discovery, not an AI
@@ -804,5 +945,46 @@ enum TrainWorkoutSuggestionPolicy {
             picked.append(second)
         }
         return picked
+    }
+}
+
+/// Never infer a rest prescription from an empty calendar. HealthKit recovery
+/// is informational only when a complete recent baseline is available.
+enum TrainTodayOverviewPolicy {
+    enum Status: Equatable {
+        case noActivePlan
+        case noWorkoutInPlan
+        case trainedToday
+    }
+
+    static func status(
+        hasPlan: Bool,
+        hasRecordedWorkoutToday: Bool
+    ) -> Status {
+        if hasRecordedWorkoutToday { return .trainedToday }
+        return hasPlan ? .noWorkoutInPlan : .noActivePlan
+    }
+
+    static func reliableReadiness(
+        _ readiness: RecoveryReadinessSummary,
+        sleepEnd: Date?,
+        hrvDate: Date?,
+        restingHeartRateDate: Date?,
+        now: Date = Date()
+    ) -> RecoveryReadinessSummary? {
+        guard readiness.baselineDays >= 5,
+              readiness.score != nil,
+              readiness.state != .buildingBaseline,
+              let sleepEnd,
+              let hrvDate,
+              let restingHeartRateDate else {
+            return nil
+        }
+
+        let fresh = [sleepEnd, hrvDate, restingHeartRateDate].allSatisfy {
+            let age = now.timeIntervalSince($0)
+            return age >= 0 && age <= 48 * 3600
+        }
+        return fresh ? readiness : nil
     }
 }
