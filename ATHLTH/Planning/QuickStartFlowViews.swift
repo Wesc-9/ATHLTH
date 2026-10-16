@@ -1128,9 +1128,11 @@ struct RunQuickStartSheet: View {
                     modeCard
                     runEnvironmentCard
 
-                    // Pick the recorder explicitly on both iPhone and iPad.
-                    // The fixed action at the bottom follows this selection.
-                    runDeviceCard
+                    // Recording device is chosen by one of the two actual
+                    // start buttons. Keep optional Watch timing here.
+                    if watchConnected || ATHLTHDeviceRole.isIPad {
+                        runWatchTimingOptions
+                    }
 
                     selectionCard
 
@@ -1478,215 +1480,38 @@ struct RunQuickStartSheet: View {
         )
     }
 
-    private var runDeviceCard: some View {
-        ATHLTHCard {
-            HStack(spacing: 8) {
-                RoundedRectangle(
-                    cornerRadius: 2,
-                    style: .continuous
-                )
-                .fill(
-                    ATHLTHTheme.premiumGold
-                )
-                .frame(
-                    width: 4,
-                    height: 26
-                )
-
-                Text(
+    private var runWatchTimingOptions: some View {
+        ATHLTHPlanSurface(density: .compact) {
+            DisclosureGroup {
+                Picker(
                     ATHLTHLocalization.choose(
-                        english: "Where do you want to record?",
-                        norwegian: "Hvor vil du registrere økten?"
-                    )
-                )
-                .font(
-                    .title3.weight(.bold)
-                )
-
-                Spacer()
-            }
-
-            HStack(spacing: 10) {
-                runDeviceTile(
-                    title: "iPhone",
-                    icon: "iphone",
-                    selected:
-                        captureDevice == .iPhone,
-                    disabled: false
+                        english: "When should the watch begin?",
+                        norwegian: "Når skal klokken starte?"
+                    ),
+                    selection: $watchStartMode
                 ) {
-                    captureDevice = .iPhone
-                }
-
-                runDeviceTile(
-                    title: "Apple Watch",
-                    icon: "applewatch",
-                    selected:
-                        captureDevice ==
-                            .appleWatch,
-                    disabled:
-                        !watchConnected &&
-                        !ATHLTHDeviceRole.isIPad
-                ) {
-                    captureDevice =
-                        .appleWatch
-                }
-            }
-            .padding(.top, 10)
-
-            if captureDevice == .appleWatch &&
-                !ATHLTHDeviceRole.isIPad {
-                VStack(alignment: .leading, spacing: 9) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Start on Apple Watch",
-                            norwegian: "Start på Apple Watch"
-                        )
-                    )
-                    .font(.subheadline.weight(.semibold))
-
-                    Picker(
-                        ATHLTHLocalization.choose(
-                            english: "Start timing",
-                            norwegian: "Starttidspunkt"
-                        ),
-                        selection: $watchStartMode
-                    ) {
-                        ForEach(WatchWorkoutStartMode.allCases) { option in
-                            Text(option.title).tag(option)
-                        }
+                    ForEach(WatchWorkoutStartMode.allCases) { option in
+                        Text(option.title).tag(option)
                     }
-                    .pickerStyle(.segmented)
-
-                    Text(watchStartMode.detail)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
                 }
-                .padding(.top, 12)
-            }
+                .pickerStyle(.segmented)
 
-            Text(
-                ATHLTHDeviceRole.isIPad
-                    ? ATHLTHLocalization.choose(
-                        english:
-                            "iPad sends the workout through your iPhone. Apple Watch keeps it ready until you press START.",
-                        norwegian:
-                            "iPad sender økten via iPhone. Apple Watch holder den klar til du trykker START."
-                    )
-                    : (
-                        captureDevice == .appleWatch
-                            ? ATHLTHLocalization.choose(
-                                english: watchStartMode.detail,
-                                norwegian: watchStartMode.detail
-                            )
-                            : ATHLTHLocalization.choose(
-                                english:
-                                    "Start directly on iPhone. GPS, time and distance are recorded here.",
-                                norwegian:
-                                    "Start direkte på iPhone. Tid, distanse og GPS registreres på telefonen."
-                            )
-                    )
-            )
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-            .padding(.top, 8)
+                Text(watchStartMode.detail)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Apple Watch start timing",
+                        norwegian: "Starttid på Apple Watch"
+                    ),
+                    systemImage: "applewatch"
+                )
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+            }
+            .tint(ATHLTHPlanDesign.accent)
         }
-    }
-
-    private func runDeviceTile(
-        title: String,
-        icon: String,
-        selected: Bool,
-        disabled: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            VStack(spacing: 7) {
-                Image(systemName: icon)
-                    .font(
-                        .system(
-                            size: 22,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        selected
-                            ? Color.white
-                            : disabled
-                                ? Color.secondary
-                                : ATHLTHTheme
-                                    .primaryText
-                    )
-
-                Text(title)
-                    .font(
-                        .subheadline
-                            .weight(.semibold)
-                    )
-                    .foregroundStyle(
-                        selected
-                            ? Color.white
-                            : disabled
-                                ? ATHLTHTheme
-                                    .mutedText
-                                : ATHLTHTheme
-                                    .primaryText
-                    )
-                    .lineLimit(1)
-                    .minimumScaleFactor(
-                        0.82
-                    )
-
-                Image(
-                    systemName:
-                        selected
-                            ? "checkmark.circle.fill"
-                            : "circle"
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    selected
-                        ? Color.white
-                        : Color.secondary
-                )
-            }
-            .frame(
-                maxWidth: .infinity,
-                minHeight: 118
-            )
-            .background(
-                selected
-                    ? ATHLTHTheme
-                        .accentDeep
-                    : Color.primary
-                        .opacity(0.025),
-                in: RoundedRectangle(
-                    cornerRadius: 18,
-                    style: .continuous
-                )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: 18,
-                    style: .continuous
-                )
-                .stroke(
-                    selected
-                        ? ATHLTHTheme
-                            .accentDeep
-                            .opacity(0.20)
-                        : Color.black
-                            .opacity(0.045),
-                    lineWidth: 0.8
-                )
-            }
-        }
-        .buttonStyle(.plain)
-        .disabled(disabled)
-        .opacity(
-            disabled
-                ? 0.60
-                : 1
-        )
     }
 
     private var runEnvironmentCard: some View {
@@ -2273,57 +2098,23 @@ struct RunQuickStartSheet: View {
     }
 
     private var runStickyStartBar: some View {
-        startButton
-        .padding(.horizontal, 16)
-        .padding(.top, 10)
-        .padding(.bottom, 8)
-        .background(
-            .ultraThinMaterial
-        )
-        .overlay(
-            alignment: .top
-        ) {
-            Divider()
-                .opacity(0.35)
-        }
-    }
-
-    private var startButton: some View {
-        Button {
-            submitQuickRun(
-                captureDevice:
-                    captureDevice
-            )
-        } label: {
-            Label(
-                startButtonTitle,
-                systemImage:
-                    captureDevice == .appleWatch
-                        ? "applewatch"
-                        : "play.fill"
-            )
-            .font(.headline)
-            .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-        .tint(ATHLTHTheme.vitality)
-        .disabled(
-            !canSubmitQuickRun(
-                captureDevice:
-                    captureDevice
-            )
-        )
-        .accessibilityHint(
-            captureDevice == .appleWatch
+        ATHLTHQuickStartDeviceLaunchBar(
+            watchAvailable: watchConnected || ATHLTHDeviceRole.isIPad,
+            onIPhone: {
+                captureDevice = .iPhone
+                submitQuickRun(captureDevice: .iPhone)
+            },
+            onAppleWatch: {
+                captureDevice = .appleWatch
+                submitQuickRun(captureDevice: .appleWatch)
+            },
+            supportingText: ATHLTHDeviceRole.isIPad
                 ? ATHLTHLocalization.choose(
-                    english: watchStartMode.detail,
-                    norwegian: watchStartMode.detail
+                    english: "Sent through your signed-in iPhone.",
+                    norwegian: "Sendes via din innloggede iPhone."
                 )
-                : ATHLTHLocalization.choose(
-                    english: "Start recording the workout on iPhone.",
-                    norwegian: "Start registrering av økten på iPhone."
-                )
+                : nil,
+            canStart: canSubmitQuickRun(captureDevice: .iPhone)
         )
     }
 
@@ -2440,38 +2231,6 @@ struct RunQuickStartSheet: View {
             )
         )
         dismiss()
-    }
-
-    private var startButtonTitle: String {
-        if captureDevice == .iPhone {
-            return ATHLTHLocalization.choose(
-                english: "Start Workout",
-                norwegian: "Start økt"
-            )
-        }
-
-        guard watchConnected ||
-                ATHLTHDeviceRole.isIPad
-        else {
-            return ATHLTHLocalization.choose(
-                english: "Apple Watch Required",
-                norwegian: "Apple Watch kreves"
-            )
-        }
-
-        if ATHLTHDeviceRole.isIPad {
-            return ATHLTHLocalization.choose(
-                english:
-                    "Send to Apple Watch via iPhone",
-                norwegian:
-                    "Send til Apple Watch via iPhone"
-            )
-        }
-
-        return ATHLTHLocalization.choose(
-            english: watchStartMode == .onWatch ? "Send to Apple Watch" : "Start on Apple Watch",
-            norwegian: watchStartMode == .onWatch ? "Send til Apple Watch" : "Start på Apple Watch"
-        )
     }
 
     private var quickRunGuidanceCard:
