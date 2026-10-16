@@ -97,3 +97,5 @@ ATHLTH 1.7.6 build 82 TestFlight retry — 2026-10-15: fixed duplicate Norwegian
 ATHLTH 1.7.6 build 83 — user-authorized TestFlight upload for custom quick workout Watch presence, iPhone timer, manual/retrospective logging and provenance; upload only when archive, unit tests, backend and signing checks all pass (2026-10-15).
 
 ATHLTH 1.7.6 build 83 — final user-authorized TestFlight validation retry 2026-10-15; run on current release head after previous iOS checks were cancelled; upload only after successful build, tests, signing and archive validation.
+
+ATHLTH 1.7.7 build 83 — user-authorized TestFlight upload 2026-10-16 after Arena landing redesign and challenge improvements; require successful release build, backend tests, signed archive and upload validations.
