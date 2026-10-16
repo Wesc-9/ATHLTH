@@ -1515,7 +1515,7 @@ struct RunQuickStartSheet: View {
     }
 
     private var runEnvironmentCard: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface(density: .compact) {
             ATHLTHSectionHeader(
                 title:
                     ATHLTHLocalization.choose(
@@ -1601,7 +1601,7 @@ struct RunQuickStartSheet: View {
     }
 
     private var modeCard: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface(density: .compact) {
             ATHLTHSectionHeader(
                 title: "Run type",
                 actionTitle: "Choose one"
@@ -1681,7 +1681,7 @@ struct RunQuickStartSheet: View {
     private var selectionCard: some View {
         switch mode {
         case .free:
-            ATHLTHCard {
+            ATHLTHPlanSurface(density: .compact) {
                 HStack(spacing: 12) {
                     Image(systemName: "location.fill")
                         .foregroundStyle(ATHLTHTheme.accent)
@@ -1715,7 +1715,7 @@ struct RunQuickStartSheet: View {
             }
 
         case .route:
-            ATHLTHCard {
+            ATHLTHPlanSurface(density: .compact) {
                 VStack(
                     alignment: .leading,
                     spacing: 12
@@ -2020,7 +2020,7 @@ struct RunQuickStartSheet: View {
             .athlthLightweightCardChrome()
 
         case .structured:
-            ATHLTHCard {
+            ATHLTHPlanSurface(density: .compact) {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(
@@ -2235,7 +2235,7 @@ struct RunQuickStartSheet: View {
 
     private var quickRunGuidanceCard:
         some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface(density: .compact) {
             VStack(
                 alignment: .leading,
                 spacing: 14
@@ -2788,7 +2788,7 @@ struct WalkQuickStartSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    ATHLTHCard {
+                    ATHLTHPlanSurface(density: .compact) {
                         HStack(spacing: 14) {
                             Image(systemName: "figure.walk")
                                 .font(.system(size: 28, weight: .semibold))
@@ -2853,7 +2853,7 @@ struct WalkQuickStartSheet: View {
                         activity: .walking
                     )
 
-                    ATHLTHCard {
+                    ATHLTHPlanSurface(density: .compact) {
                         VStack(
                             alignment: .leading,
                             spacing: 14
@@ -2899,7 +2899,7 @@ struct WalkQuickStartSheet: View {
                                 showStructuredOptions: false
                             )
                         } label: {
-                            ATHLTHCard {
+                            ATHLTHPlanSurface(density: .compact) {
                                 HStack(spacing: 12) {
                                     Image(
                                         systemName:
