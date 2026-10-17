@@ -4434,6 +4434,40 @@ private struct HomeStrengthMuscleArtwork:
 
     var body: some View {
         GeometryReader { proxy in
+            Group {
+                if profile.activations.isEmpty {
+                    // No recorded muscle groups: show the selected premium
+                    // strength photo instead of two inactive body diagrams.
+                    // Workout time remains live in the existing activity card.
+                    Image("StrengthEmptyMusclesHero")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(
+                            width: proxy.size.width,
+                            height: height
+                        )
+                        .clipped()
+                        .accessibilityLabel(
+                            ATHLTHLocalization.choose(
+                                english: "Strength training equipment",
+                                norwegian: "Styrkeutstyr"
+                            )
+                        )
+                } else {
+                    muscleMapArtwork
+                }
+            }
+            .frame(
+                width: proxy.size.width,
+                height: height
+            )
+            .clipped()
+        }
+        .frame(height: height)
+    }
+
+    private var muscleMapArtwork: some View {
+        GeometryReader { proxy in
             ZStack {
                 LinearGradient(
                     colors: [
