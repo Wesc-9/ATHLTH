@@ -15629,6 +15629,9 @@ struct ATHLTHProfileView: View {
 
                         Spacer(minLength: 0)
                     }
+                    // Visually lower avatar, name, username, focus and bio,
+                    // keeping the follower/workout/stat cards fixed.
+                    .offset(y: ATHLTHProfileHeroIdentityView.heroRowDownshift)
 
                     heroStatRow
                 }

@@ -1788,6 +1788,7 @@ struct FriendProfileView: View {
 
                         Spacer(minLength: 0)
                     }
+                    .offset(y: ATHLTHProfileHeroIdentityView.heroRowDownshift)
 
                     remoteProfileStats(
                         profile

@@ -13,6 +13,10 @@ struct ATHLTHProfileHeroIdentityView: View {
     // sits lower, clear of Dynamic Island, without moving the stat row.
     static let reservedHeight: CGFloat = 108
 
+    // Lower the entire identity row towards the statistics, not the stats
+    // themselves. Shared by personal and visited profiles.
+    static let heroRowDownshift: CGFloat = 10
+
     private var visibleFocus: String? {
         let text = trainingFocus?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
