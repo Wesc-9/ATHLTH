@@ -74,6 +74,47 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
     }
 
     @MainActor
+    func testCompletedIPhoneWorkoutCountsWithoutAppleHealthSync() {
+        let day = Date(timeIntervalSince1970: 1_800_000_000)
+        let completedToday = day.addingTimeInterval(-1800)
+        let completedYesterday = day.addingTimeInterval(-86_400)
+
+        // A local phone workout is valid even when HealthKit has no results.
+        XCTAssertTrue(TrainTodayOverviewPolicy.hasRecordedWorkout(
+            on: day,
+            healthStartDates: [],
+            strengthEndDates: [],
+            phoneCompletedDates: [completedToday]
+        ))
+        XCTAssertFalse(TrainTodayOverviewPolicy.hasRecordedWorkout(
+            on: day,
+            healthStartDates: [],
+            strengthEndDates: [],
+            phoneCompletedDates: []
+        ))
+        XCTAssertFalse(TrainTodayOverviewPolicy.hasRecordedWorkout(
+            on: day,
+            healthStartDates: [],
+            strengthEndDates: [],
+            phoneCompletedDates: [completedYesterday]
+        ))
+
+        // Existing HealthKit and strength history continue to count.
+        XCTAssertTrue(TrainTodayOverviewPolicy.hasRecordedWorkout(
+            on: day,
+            healthStartDates: [completedToday],
+            strengthEndDates: [],
+            phoneCompletedDates: []
+        ))
+        XCTAssertTrue(TrainTodayOverviewPolicy.hasRecordedWorkout(
+            on: day,
+            healthStartDates: [],
+            strengthEndDates: [completedToday],
+            phoneCompletedDates: []
+        ))
+    }
+
+    @MainActor
     func testDayReadinessRequiresFreshCompleteBaseline() {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let recent = now.addingTimeInterval(-6 * 3600)
