@@ -107,7 +107,7 @@ struct ThreadWorkoutInvitationCard: View {
 
                         VStack(alignment: .leading, spacing: 3) {
                             Text(workout.title)
-                                .font(.system(size: 21, weight: .bold, design: .rounded))
+                                .font(.system(size: 22, weight: .semibold, design: .serif))
                                 .foregroundStyle(ATHLTHTheme.primaryText)
                                 .multilineTextAlignment(.leading)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -180,10 +180,7 @@ struct ThreadWorkoutInvitationCard: View {
                         }
                     }
                     .padding(11)
-                    .background(
-                        ATHLTHTheme.surfaceStone.opacity(0.7),
-                        in: RoundedRectangle(cornerRadius: 13)
-                    )
+                    .athlthTrainTogetherCard(radius: 13, subtle: true)
                 }
 
                 HStack(spacing: 7) {
@@ -294,16 +291,8 @@ struct ThreadWorkoutInvitationCard: View {
             .padding(15)
         }
         .frame(maxWidth: 340, alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(.ultraThinMaterial)
-        }
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(Color.white.opacity(0.86), lineWidth: 1)
-        }
-        .shadow(color: ATHLTHTheme.accentDeep.opacity(0.10), radius: 20, x: 0, y: 9)
+        .athlthTrainTogetherCard(radius: 24)
         .sheet(isPresented: $showingDetails) {
             NavigationStack {
                 ScrollView {

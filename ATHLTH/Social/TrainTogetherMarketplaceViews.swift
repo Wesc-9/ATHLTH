@@ -524,9 +524,14 @@ struct TrainTogetherMarketplaceView:
                     .padding(.horizontal, 12)
                     .frame(height: 34)
                     .background(
-                        Color.white.opacity(0.86),
+                        ATHLTHTrainTogetherDesign.surface,
                         in: Capsule()
                     )
+                    .overlay {
+                        Capsule().strokeBorder(
+                            ATHLTHTrainTogetherDesign.outline, lineWidth: 0.8
+                        )
+                    }
                 }
             }
         }
@@ -564,34 +569,16 @@ struct TrainTogetherMarketplaceView:
                 selected
                     ? ATHLTHTheme
                         .vitality
-                    : Color.white
-                        .opacity(0.82),
+                    : ATHLTHTrainTogetherDesign.surface,
                 in: Capsule()
             )
         }
         .buttonStyle(.plain)
     }
 
-    private func sectionHeader(
-        _ title: String,
-        subtitle: String
-    ) -> some View {
-        VStack(
-            alignment: .leading,
-            spacing: 2
-        ) {
-            Text(title)
-                .font(
-                    .title3
-                        .weight(.bold)
-                )
-
-            Text(subtitle)
-                .font(.caption)
-                .foregroundStyle(
-                    .secondary
-                )
-        }
+    private func sectionHeader(_ title: String, subtitle: String) -> some View {
+        ATHLTHTrainTogetherSectionTitle(title: title, subtitle: subtitle)
+            .padding(.horizontal, 3)
     }
 
     private func postCard(
@@ -874,8 +861,7 @@ struct TrainTogetherMarketplaceView:
         )
         .frame(height: 28)
         .background(
-            Color.primary
-                .opacity(0.035),
+            ATHLTHTrainTogetherDesign.accentSoft.opacity(0.50),
             in: Capsule()
         )
         .lineLimit(1)
@@ -2438,6 +2424,8 @@ private struct TrainTogetherReportSheet:
                     .lineLimit(3...6)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(ATHLTHTrainTogetherDesign.canvas.ignoresSafeArea())
             .navigationTitle(
                 ATHLTHLocalization.choose(
                     english:
@@ -2581,6 +2569,8 @@ private struct TrainTogetherJoinRequestSheet:
                     )
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(ATHLTHTrainTogetherDesign.canvas.ignoresSafeArea())
             .navigationTitle(
                 ATHLTHLocalization.choose(
                     english:
@@ -3893,40 +3883,10 @@ struct TrainTogetherPostCreateView:
     }
 
     private func createSectionHeader(
-        _ title: String,
-        subtitle: String? = nil
+        _ title: String, subtitle: String? = nil
     ) -> some View {
-        VStack(
-            alignment: .leading,
-            spacing: 3
-        ) {
-            Text(title)
-                .font(
-                    .title3
-                        .weight(.bold)
-                )
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .primaryText
-                )
-
-            if let subtitle {
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
-                    )
-                    .fixedSize(
-                        horizontal: false,
-                        vertical: true
-                    )
-            }
-        }
-        .padding(
-            .horizontal,
-            2
-        )
+        ATHLTHTrainTogetherSectionTitle(title: title, subtitle: subtitle ?? "")
+            .padding(.horizontal, 3)
     }
 
     private func createTextFieldRow(
@@ -4541,14 +4501,7 @@ struct TrainTogetherMapPlacePickerView:
                 pickerHint
             }
         }
-        .background(
-            ATHLTHPremiumCanvas(
-                accent:
-                    ATHLTHTheme
-                        .vitality
-                        .opacity(0.14)
-            )
-        )
+        .background(ATHLTHTrainTogetherDesign.canvas.ignoresSafeArea())
         .navigationTitle(
             ATHLTHLocalization.choose(
                 english:
@@ -4814,19 +4767,8 @@ struct TrainTogetherMapPlacePickerView:
                                     .tertiary
                                 )
                             }
-                            .padding(12)
-                            .background(
-                                Color.white.opacity(
-                                    0.72
-                                ),
-                                in:
-                                    RoundedRectangle(
-                                        cornerRadius:
-                                            16,
-                                        style:
-                                            .continuous
-                                    )
-                            )
+                            .padding(14)
+                            .athlthTrainTogetherCard(radius: 17, subtle: true)
                         }
                         .buttonStyle(.plain)
                     }
