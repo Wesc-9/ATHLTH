@@ -511,6 +511,7 @@ struct WorkoutStartOptionsView: View {
             watchAvailable: appleWatchSelectable,
             onIPhone: { startStrength(using: .iPhone) },
             onAppleWatch: { startStrength(using: .appleWatch) },
+            preferAppleWatch: watchConnected && !ATHLTHDeviceRole.isIPad,
             supportingText: ATHLTHDeviceRole.isIPad
                 ? ATHLTHLocalization.choose(
                     english: "Starts via your signed-in iPhone.",
