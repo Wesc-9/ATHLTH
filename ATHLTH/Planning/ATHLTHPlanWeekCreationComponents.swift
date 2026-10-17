@@ -23,7 +23,7 @@ struct ATHLTHPlanWeekApproachCard: View {
                                 in: RoundedRectangle(cornerRadius: 15))
                 VStack(alignment: .leading, spacing: 5) {
                     Text(title)
-                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .font(.system(size: 19, weight: .semibold, design: .serif))
                         .foregroundStyle(ATHLTHPlanDesign.ink)
                     Text(subtitle)
                         .font(.subheadline)
@@ -36,16 +36,12 @@ struct ATHLTHPlanWeekApproachCard: View {
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
             .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(ATHLTHPlanDesign.surface,
-                        in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .stroke(ATHLTHPlanDesign.outline, lineWidth: 0.8)
-            }
+            .frame(maxWidth: .infinity, minHeight: 90, alignment: .leading)
+            .athlthPlanCard(radius: 22)
         }
         .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title + ". " + subtitle)
     }
 }
 
@@ -170,9 +166,9 @@ struct ATHLTHPlanWorkoutLibraryPicker: View {
                 Image(systemName: "plus.circle")
             }
             .foregroundStyle(ATHLTHPlanDesign.ink)
-            .padding(13)
-            .background(ATHLTHPlanDesign.surface,
-                        in: RoundedRectangle(cornerRadius: 18))
+            .padding(14)
+            .frame(minHeight: ATHLTHPlanDesign.minTapHeight)
+            .athlthPlanCard(radius: 18)
         }
         .buttonStyle(.plain)
     }

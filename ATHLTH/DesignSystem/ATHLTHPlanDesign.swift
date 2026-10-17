@@ -76,6 +76,40 @@ struct ATHLTHPlanSurface<Content: View>: View {
     }
 }
 
+/// Unified warm chrome used by every nested plan surface, including Studio.
+struct ATHLTHPlanCardChrome: ViewModifier {
+    var radius: CGFloat = ATHLTHPlanDesign.cardRadius
+    var warm = true
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .fill(LinearGradient(
+                        colors: [
+                            ATHLTHPlanDesign.surface,
+                            warm ? ATHLTHTheme.cardWarm.opacity(0.38) : ATHLTHPlanDesign.surface
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .stroke(ATHLTHPlanDesign.outline, lineWidth: 0.8)
+            }
+            .shadow(color: ATHLTHTheme.accentDeep.opacity(warm ? 0.055 : 0.035),
+                    radius: warm ? 13 : 9, y: warm ? 6 : 3)
+    }
+}
+
+extension View {
+    func athlthPlanCard(radius: CGFloat = ATHLTHPlanDesign.cardRadius,
+                        warm: Bool = true) -> some View {
+        modifier(ATHLTHPlanCardChrome(radius: radius, warm: warm))
+    }
+}
+
 /// Reused by the first-step mode picker and the source chooser.
 struct ATHLTHPlanSelectionCard: View {
     let title: String

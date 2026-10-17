@@ -1818,7 +1818,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             Image(systemName: "minus")
                                 .font(.title2.weight(.semibold))
                                 .frame(width: 60, height: 60)
-                                .background(Color.white, in: RoundedRectangle(cornerRadius: 16))
+                                .background(ATHLTHPlanDesign.surface, in: RoundedRectangle(cornerRadius: 16))
                         }
                         .disabled(simpleMinutes <= 5)
                         .accessibilityLabel(ATHLTHLocalization.choose(english: "Five minutes less", norwegian: "Fem minutter mindre"))
@@ -1832,7 +1832,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             Image(systemName: "plus")
                                 .font(.title2.weight(.semibold))
                                 .frame(width: 60, height: 60)
-                                .background(Color.white, in: RoundedRectangle(cornerRadius: 16))
+                                .background(ATHLTHPlanDesign.surface, in: RoundedRectangle(cornerRadius: 16))
                         }
                         .disabled(simpleMinutes >= 180)
                         .accessibilityLabel(ATHLTHLocalization.choose(english: "Five minutes more", norwegian: "Fem minutter mer"))
@@ -1864,8 +1864,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
-            .background(Color.white.opacity(0.8),
-                        in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .athlthPlanCard(radius: 18)
 
             if let conflict = conflictingPlan {
                 conflictCard(conflict)
@@ -3991,8 +3990,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
             .buttonStyle(.plain)
             .padding(12)
-            .background(ATHLTHTheme.accentSoft.opacity(0.6),
-                        in: RoundedRectangle(cornerRadius: 14))
+            .athlthPlanCard(radius: 18)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 7) {
@@ -4044,9 +4042,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                           ? ATHLTHTheme.accentDeep : Color.clear)
                                     .frame(width: 5, height: 5)
                             }
-                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
                             .frame(width: 44, height: 56)
-                            .background(.white, in: RoundedRectangle(cornerRadius: 12))
+                            .athlthPlanCard(radius: 12)
                         }
                         .buttonStyle(.plain)
                     }
@@ -4141,10 +4139,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 .background(ATHLTHTheme.accentSoft,
                                             in: Circle())
                         }
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.white.opacity(0.85),
-                                    in: RoundedRectangle(cornerRadius: 18))
+                        .padding(14)
+                        .frame(maxWidth: .infinity, minHeight: 78, alignment: .leading)
+                        .athlthPlanCard(radius: 19)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(
@@ -4173,9 +4170,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         }
                         .font(.caption.weight(.semibold))
                     }
-                    .padding(12)
-                    .background(Color.white.opacity(0.46),
-                                in: RoundedRectangle(cornerRadius: 18))
+                    .padding(14)
+                    .frame(minHeight: 68)
+                    .athlthPlanCard(radius: 19)
                 }
             }
 
@@ -4819,31 +4816,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             Spacer(minLength: 0)
         }
         .padding(17)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(0.94),
-                    ATHLTHTheme.cardWarm
-                        .opacity(0.44)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-            .stroke(
-                Color.white.opacity(0.92),
-                lineWidth: 0.8
-            )
-        }
+        .athlthPlanCard(radius: 24)
     }
 
     private func builderPanel<Content: View>(
