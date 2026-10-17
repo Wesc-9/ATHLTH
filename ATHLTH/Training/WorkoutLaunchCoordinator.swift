@@ -448,11 +448,7 @@ enum WorkoutLaunchCoordinator {
             return
         }
 
-        guard await watchConnection
-            .confirmNoActiveWatchWorkout()
-        else {
-            throw watchConnection.blockedWatchWorkoutLaunchError
-        }
+        try await watchConnection.requireNoActiveWatchWorkout()
 
         let selectedRoute: TrainingRoute? = {
             if let route = configuration.route {
@@ -815,11 +811,7 @@ enum WorkoutLaunchCoordinator {
             return
         }
 
-        guard await watchConnection
-            .confirmNoActiveWatchWorkout()
-        else {
-            throw watchConnection.blockedWatchWorkoutLaunchError
-        }
+        try await watchConnection.requireNoActiveWatchWorkout()
 
         if configuration.captureDevice == .iPhone {
             workoutMirroring?
@@ -966,11 +958,7 @@ enum WorkoutLaunchCoordinator {
         watchConnection: AppleWatchConnectionStore,
         spotify: SpotifyPlaybackStore
     ) async throws -> Bool {
-        guard await watchConnection
-            .confirmNoActiveWatchWorkout()
-        else {
-            throw watchConnection.blockedWatchWorkoutLaunchError
-        }
+        try await watchConnection.requireNoActiveWatchWorkout()
 
         // Basic tracking can still opt into voice guidance. Keep the
         // selected coach in all workout and invitation payloads without
