@@ -63,6 +63,86 @@ struct ATHLTHTrainTogetherSurface<Content: View>: View {
     }
 }
 
+/// A Train Together-only source card; the existing planning workflows are
+/// passed straight through as actions. Does not duplicate session models.
+struct ATHLTHTrainTogetherWorkoutSourceCard: View {
+    let context: String
+    let onCreateNew: () -> Void
+    let onUsePlanned: () -> Void
+
+    var body: some View {
+        ATHLTHTrainTogetherSurface {
+            Text(context)
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHTrainTogetherDesign.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            sourceChoice(
+                title: ATHLTHLocalization.choose(
+                    english: "Build a new workout", norwegian: "Bygg en ny økt"
+                ),
+                subtitle: ATHLTHLocalization.choose(
+                    english: "Plan exercises, intervals and rest.",
+                    norwegian: "Sett opp øvelser, intervaller og pauser."
+                ),
+                icon: "plus.square.on.square",
+                action: onCreateNew
+            )
+
+            sourceChoice(
+                title: ATHLTHLocalization.choose(
+                    english: "Use a planned workout", norwegian: "Bruk en planlagt økt"
+                ),
+                subtitle: ATHLTHLocalization.choose(
+                    english: "Choose an existing complete session.",
+                    norwegian: "Velg en eksisterende komplett treningsøkt."
+                ),
+                icon: "calendar.badge.checkmark",
+                action: onUsePlanned
+            )
+        }
+    }
+
+    private func sourceChoice(
+        title: String,
+        subtitle: String,
+        icon: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 21, weight: .medium))
+                    .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+                    .frame(width: 47, height: 47)
+                    .background(
+                        ATHLTHTrainTogetherDesign.accentSoft,
+                        in: RoundedRectangle(cornerRadius: 15)
+                    )
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 17, weight: .semibold, design: .serif))
+                        .foregroundStyle(ATHLTHTrainTogetherDesign.ink)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTrainTogetherDesign.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTrainTogetherDesign.secondary)
+            }
+            .padding(13)
+            .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
+            .athlthTrainTogetherCard(radius: 17, subtle: true)
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title + ". " + subtitle)
+    }
+}
+
 struct ATHLTHTrainTogetherSectionTitle: View {
     let title: String
     let subtitle: String

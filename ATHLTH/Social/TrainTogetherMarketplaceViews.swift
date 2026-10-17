@@ -3000,7 +3000,7 @@ struct TrainTogetherPostCreateView:
         if let workout = preparedWorkout {
             preparedWorkoutCard(workout)
         } else {
-            WorkoutPlanningSourceCard(
+            ATHLTHTrainTogetherWorkoutSourceCard(
                 context: ATHLTHLocalization.choose(
                     english: "Build your workout in the shared planner. Then choose how and where to train together.",
                     norwegian: "Bygg økten i den felles planleggeren. Velg deretter hvordan og hvor dere trener sammen."
