@@ -1349,6 +1349,7 @@ final class AppSessionStore: ObservableObject {
         _ plan: TrainingPlan,
         healthWorkouts: [WorkoutSummary],
         strengthHistory: [StrengthWorkoutLog],
+        structuredHistory: [StructuredWorkoutCompletion]? = nil,
         referenceDate: Date = Date()
     ) -> TrainingPlanProgressSnapshot {
         let calendar = Calendar.current
@@ -1402,6 +1403,16 @@ final class AppSessionStore: ObservableObject {
         let finishedStrengthSessionIDs = Set(
             strengthHistory.filter(\.isFinished).compactMap(\.plannedSessionID)
         )
+        // Keep the overview in sync with isPlanSessionCompleted: the latter
+        // already credits completed structured sessions with an explicit origin.
+        let finishedStructuredSessionIDs = Set(
+            (structuredHistory ?? StructuredWorkoutCompletionStore.load(userID: profile.userID))
+                .filter {
+                    $0.completedBlockCount > 0 &&
+                    ($0.sourcePlanID == nil || $0.sourcePlanID == plan.id)
+                }
+                .map(\.sourceWorkoutID)
+        )
         var completedIDs = Set<UUID>()
         var skippedIDs = Set<UUID>()
 
@@ -1424,7 +1435,8 @@ final class AppSessionStore: ObservableObject {
                 continue
             }
 
-            if finishedStrengthSessionIDs.contains(planned.id) {
+            if finishedStrengthSessionIDs.contains(planned.id) ||
+               (planned.isStructuredWorkout && finishedStructuredSessionIDs.contains(planned.id)) {
                 completedIDs.insert(planned.id)
                 continue
             }
