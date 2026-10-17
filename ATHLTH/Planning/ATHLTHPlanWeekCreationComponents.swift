@@ -54,6 +54,12 @@ struct ATHLTHPlanWorkoutLibraryPicker: View {
     @State private var query = ""
     let onSelect: (PlannedSession) -> Void
 
+    private var hasMatchingWorkouts: Bool {
+        session.savedWorkoutTemplates.contains { matches($0.title) }
+            || runningLibrary.customTemplates.contains { matches($0.title) }
+            || catalog.entries.contains { matches($0.title) }
+    }
+
     private func matches(_ title: String) -> Bool {
         let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
         return clean.isEmpty || title.localizedCaseInsensitiveContains(clean)
@@ -114,6 +120,29 @@ struct ATHLTHPlanWorkoutLibraryPicker: View {
                         ForEach(catalogItems) { item in
                             workoutButton(item.plannedSession(), subtitle: item.summary)
                         }
+                    }
+
+                    if !hasMatchingWorkouts {
+                        VStack(spacing: 9) {
+                            Image(systemName: "rectangle.stack.badge.questionmark")
+                                .font(.system(size: 27, weight: .medium))
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Text(ATHLTHLocalization.choose(
+                                english: "No workouts found", norwegian: "Ingen treningsøkter funnet"
+                            ))
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Try a different search, or build a workout on the selected day.",
+                                norwegian: "Prøv et annet søk, eller bygg en økt på den valgte dagen."
+                            ))
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 170)
+                        .padding(18)
+                        .athlthPlanCard(radius: 22)
                     }
                 }
                 .padding(18)
