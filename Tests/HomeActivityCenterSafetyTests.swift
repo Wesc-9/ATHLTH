@@ -3,6 +3,23 @@ import XCTest
 @testable import ATHLTH
 
 final class HomeActivityCenterSafetyTests: XCTestCase {
+    func testStrengthWithoutMuscleGroupsShowsPhotographicFallback() {
+        XCTAssertTrue(
+            HomeStrengthArtworkPolicy.usesFallbackPhoto(.empty)
+        )
+    }
+
+    func testStrengthWithRecordedMuscleGroupsKeepsTheAnatomyMap() {
+        let profile = StrengthMuscleProfile(
+            activations: [
+                StrengthMuscleActivation(region: .quads, score: 1)
+            ]
+        )
+        XCTAssertFalse(
+            HomeStrengthArtworkPolicy.usesFallbackPhoto(profile)
+        )
+    }
+
     func testInvalidCoordinatesAreRemovedBeforeMapKit() {
         let locations = [
             CLLocation(
