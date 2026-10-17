@@ -230,6 +230,9 @@ struct ATHLTHQuickStartDeviceLaunchBar: View {
     let watchAvailable: Bool
     let onIPhone: () -> Void
     let onAppleWatch: () -> Void
+    /// Highlight Watch as the preferred option when it is genuinely paired.
+    /// The iPhone action remains fully available and explicit.
+    var preferAppleWatch: Bool = false
     var supportingText: String? = nil
     var canStart: Bool = true
 
@@ -248,14 +251,14 @@ struct ATHLTHQuickStartDeviceLaunchBar: View {
                 launchButton(
                     title: "iPhone",
                     icon: "iphone",
-                    primary: true,
+                    primary: !(preferAppleWatch && watchAvailable),
                     enabled: canStart,
                     action: onIPhone
                 )
                 launchButton(
                     title: "Apple Watch",
                     icon: "applewatch",
-                    primary: false,
+                    primary: preferAppleWatch && watchAvailable,
                     enabled: watchAvailable && canStart,
                     action: onAppleWatch
                 )
