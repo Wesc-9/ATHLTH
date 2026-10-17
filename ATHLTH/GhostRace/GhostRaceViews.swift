@@ -355,8 +355,8 @@ struct GhostRaceHubView: View {
                     .foregroundStyle(ATHLTHTheme.accentDeep)
 
                 Text(selectedMode.headline)
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
-                    .tracking(-0.6)
+                    .font(.system(size: 29, weight: .semibold, design: .serif))
+                    .tracking(-0.4)
                     .foregroundStyle(ATHLTHTheme.primaryText)
                     .fixedSize(horizontal: false, vertical: true)
                     .lineLimit(3)
@@ -555,7 +555,7 @@ struct GhostRaceHubView: View {
     }
 
     private var liveModeIntro: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 10) {
                     Image(systemName: "person.2.wave.2.fill")
@@ -660,7 +660,7 @@ struct GhostRaceHubView: View {
         _ liveSession:
             ATHLTHLiveWorkoutSession
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(
                 alignment: .leading,
                 spacing: 13
@@ -868,7 +868,7 @@ struct GhostRaceHubView: View {
         NavigationLink {
             GhostFriendRaceHubView()
         } label: {
-            ATHLTHCard {
+            ATHLTHUnifiedCard {
                 HStack(spacing: 12) {
                     Image(
                         systemName:
@@ -962,7 +962,7 @@ struct GhostRaceHubView: View {
     }
 
     private var liveNowSection: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(alignment: .leading, spacing: 13) {
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 3) {
@@ -1171,7 +1171,7 @@ struct GhostRaceHubView: View {
         NavigationLink {
             ATHLTHGhostUpdatesSettingsView()
         } label: {
-            ATHLTHCard {
+            ATHLTHUnifiedCard {
                 HStack(spacing: 12) {
                     Image(
                         systemName:
@@ -1235,7 +1235,7 @@ struct GhostRaceHubView: View {
     }
 
     private var targetGhostSection: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(alignment: .leading, spacing: 13) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -1466,7 +1466,7 @@ struct GhostRaceHubView: View {
             replayRecommendationCard
 
             if recentRuns.count > 1 {
-                ATHLTHCard {
+                ATHLTHUnifiedCard {
                     VStack(alignment: .leading, spacing: 10) {
                         Text(ATHLTHLocalization.choose(
                             english: "Other recent runs",
@@ -1484,7 +1484,7 @@ struct GhostRaceHubView: View {
     }
 
     private var replayRecommendationCard: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(alignment: .leading, spacing: 13) {
                 HStack(spacing: 9) {
                     Image(systemName: "sparkles")
@@ -1548,7 +1548,7 @@ struct GhostRaceHubView: View {
             replayRecommendationCard
 
             if !similarReplayRuns.isEmpty {
-                ATHLTHCard {
+                ATHLTHUnifiedCard {
                     VStack(alignment: .leading, spacing: 11) {
                         Text(ATHLTHLocalization.choose(
                             english: "Similar distance",
@@ -1571,7 +1571,7 @@ struct GhostRaceHubView: View {
 
             if bestReplay(in: .five) != nil ||
                 bestReplay(in: .ten) != nil {
-                ATHLTHCard {
+                ATHLTHUnifiedCard {
                     VStack(alignment: .leading, spacing: 11) {
                         HStack(spacing: 8) {
                             Image(systemName: "medal.fill")
@@ -1593,7 +1593,7 @@ struct GhostRaceHubView: View {
                 }
             }
 
-            ATHLTHCard {
+            ATHLTHUnifiedCard {
                 VStack(alignment: .leading, spacing: 13) {
                     HStack {
                         VStack(alignment: .leading, spacing: 3) {
@@ -1744,7 +1744,7 @@ struct GhostRaceHubView: View {
     }
 
     private var replayMoreCard: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(ATHLTHLocalization.choose(
@@ -1885,7 +1885,7 @@ struct GhostRaceHubView: View {
     }
 
     private var routeSection: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(alignment: .leading, spacing: 13) {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
@@ -1970,7 +1970,7 @@ struct GhostRaceHubView: View {
     }
 
     private var friendSection: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {
                     Image(systemName: "person.2.fill")
@@ -2340,7 +2340,7 @@ struct GhostRaceLivePanel: View {
                         comparison: comparison
                     )
                 } else if ghostRace.result == nil {
-                    ATHLTHCard {
+                    ATHLTHUnifiedCard {
                         HStack(spacing: 12) {
                             ProgressView()
                             VStack(alignment: .leading, spacing: 3) {
@@ -2370,7 +2370,7 @@ struct GhostRaceLivePanel: View {
     private func statusCard(
         reference: GhostRaceReference
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack(spacing: 13) {
                 Image(systemName: "figure.run")
                     .font(.title2)
@@ -2432,7 +2432,7 @@ struct GhostRaceLivePanel: View {
         reference: GhostRaceReference,
         comparison: GhostRaceComparison
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             Map(
                 initialPosition:
                     .region(
@@ -2586,7 +2586,7 @@ struct GhostRaceLivePanel: View {
     private func progressCard(
         comparison: GhostRaceComparison
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(spacing: 13) {
                 progressRow(
                     title: "You",
@@ -2624,7 +2624,7 @@ struct GhostRaceLivePanel: View {
     private func resultCard(
         _ result: GhostRaceResult
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(alignment: .leading, spacing: 13) {
                 Label(
                     resultTitle(result),
@@ -2816,7 +2816,7 @@ struct GhostRaceLivePanel: View {
         value: String,
         icon: String
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(alignment: .leading, spacing: 7) {
                 Image(systemName: icon)
                     .foregroundStyle(ATHLTHTheme.vitality)

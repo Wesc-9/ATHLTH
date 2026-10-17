@@ -182,7 +182,7 @@ struct GhostFriendRaceHubView: View {
                 invitationsOverview
 
                 if advancedMode {
-                    ATHLTHCard { privacyCard }
+                    ATHLTHUnifiedCard { privacyCard }
                 }
             }
             .padding(16)
@@ -247,7 +247,7 @@ struct GhostFriendRaceHubView: View {
     }
 
     private var friendIntroCard: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "figure.run.circle.fill")
                     .font(.system(size: 34, weight: .light))
@@ -278,7 +278,7 @@ struct GhostFriendRaceHubView: View {
 
     private var invitationsOverview: some View {
         VStack(spacing: 14) {
-            ATHLTHCard {
+            ATHLTHUnifiedCard {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Text(ATHLTHLocalization.choose(
@@ -310,7 +310,7 @@ struct GhostFriendRaceHubView: View {
                 }
             }
 
-            ATHLTHCard {
+            ATHLTHUnifiedCard {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(ATHLTHLocalization.choose(
                         english: "Sent", norwegian: "Sendte invitasjoner"
@@ -488,7 +488,7 @@ struct GhostFriendRaceHubView: View {
     }
 
     private var invitationFriendStep: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(alignment: .leading, spacing: 13) {
                 Text(ATHLTHLocalization.choose(
                     english: "Who would you like to race?",
@@ -579,7 +579,7 @@ struct GhostFriendRaceHubView: View {
     }
 
     private var invitationReferenceStep: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(alignment: .leading, spacing: 14) {
                 Text(ATHLTHLocalization.choose(
                     english: "Choose a race reference",
@@ -788,7 +788,7 @@ struct GhostFriendRaceHubView: View {
     }
 
     private var invitationConfirmationStep: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(alignment: .leading, spacing: 14) {
                 Text(ATHLTHLocalization.choose(
                     english: "Ready to invite?",

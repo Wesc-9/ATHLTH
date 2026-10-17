@@ -66,7 +66,7 @@ struct MirroredWorkoutLiveView: View {
                             ) {
                                 metricCard(
                                     title:
-                                        "Heart rate",
+                                        ATHLTHLocalization.choose(english: "Heart rate", norwegian: "Puls"),
                                     value:
                                         ATHLTHCoachSensorFreshness.validHeartRate(
                                             snapshot.heartRate,
@@ -81,7 +81,7 @@ struct MirroredWorkoutLiveView: View {
 
                                 metricCard(
                                     title:
-                                        "Calories",
+                                        ATHLTHLocalization.choose(english: "Calories", norwegian: "Kalorier"),
                                     value:
                                         "\(Int(snapshot.activeCalories.rounded()))",
                                     unit: "kcal",
@@ -119,7 +119,7 @@ struct MirroredWorkoutLiveView: View {
                             Button {
                                 showingAIConversation = true
                             } label: {
-                                ATHLTHCard {
+                                ATHLTHUnifiedCard {
                                     HStack(spacing: 10) {
                                         Image(systemName: "mic.circle.fill")
                                             .foregroundStyle(ATHLTHTheme.accentDeep)
@@ -153,7 +153,7 @@ struct MirroredWorkoutLiveView: View {
                                     session: liveSession
                                 )
                             } label: {
-                                ATHLTHCard {
+                                ATHLTHUnifiedCard {
                                     HStack {
                                         Label(
                                             liveSession.ghostChallengeID ==
@@ -187,7 +187,7 @@ struct MirroredWorkoutLiveView: View {
 
                         if snapshot.kind !=
                             .running {
-                            ATHLTHCard {
+                            ATHLTHUnifiedCard {
                                 HStack {
                                     VStack(
                                         alignment:
@@ -393,7 +393,7 @@ struct MirroredWorkoutLiveView: View {
     }
 
     private var mirroredAudioCoachCard: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 10) {
                     Image(systemName: "waveform.circle.fill")
@@ -506,7 +506,7 @@ struct MirroredWorkoutLiveView: View {
                                 .routeDeviationMeters
                     )
 
-            ATHLTHCard {
+            ATHLTHUnifiedCard {
                 VStack(
                     alignment: .leading,
                     spacing: 14
@@ -845,7 +845,7 @@ struct MirroredWorkoutLiveView: View {
     @ViewBuilder
     private var header: some View {
         if let snapshot = mirroring.snapshot {
-            ATHLTHCard {
+            ATHLTHUnifiedCard {
                 HStack(spacing: 14) {
                     Image(systemName: snapshot.kind.systemImage)
                         .font(.system(size: 28, weight: .semibold))
@@ -857,7 +857,7 @@ struct MirroredWorkoutLiveView: View {
                         Text(snapshot.kind.title)
                             .font(.title2.weight(.bold))
 
-                        Text("Live from Apple Watch")
+                        Text(ATHLTHLocalization.choose(english: "Live from Apple Watch", norwegian: "Direkte fra Apple Watch"))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -903,7 +903,7 @@ struct MirroredWorkoutLiveView: View {
             ? max(snapshot.distanceMeters, 0) : 0
 
         return VStack(spacing: 12) {
-            ATHLTHCard {
+            ATHLTHUnifiedCard {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
                         Label(
@@ -1008,7 +1008,7 @@ struct MirroredWorkoutLiveView: View {
                     unit: walkFirst ? "/km" : "km"
                 )
 
-                ATHLTHCard {
+                ATHLTHUnifiedCard {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(ATHLTHLocalization.choose(
                             english: "ELAPSED", norwegian: "TID"
@@ -1100,7 +1100,7 @@ struct MirroredWorkoutLiveView: View {
                     distanceMeters: snapshot.distanceMeters
                 ) == .measuredDistance
 
-            ATHLTHCard {
+            ATHLTHUnifiedCard {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 9) {
                         Label(
@@ -1213,7 +1213,7 @@ struct MirroredWorkoutLiveView: View {
     private func mirroredCyclingDistance(
         _ snapshot: WatchWorkoutLiveSnapshot
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(alignment: .leading, spacing: 8) {
                 Text(ATHLTHLocalization.choose(
                     english: "RECORDED DISTANCE",
@@ -1256,7 +1256,7 @@ struct MirroredWorkoutLiveView: View {
         _ snapshot: WatchWorkoutLiveSnapshot
     ) -> some View {
         if let exercise = snapshot.strengthExerciseName {
-            ATHLTHCard {
+            ATHLTHUnifiedCard {
                 VStack(alignment: .leading, spacing: 9) {
                     Label(
                         ATHLTHLocalization.choose(
@@ -1338,7 +1338,7 @@ struct MirroredWorkoutLiveView: View {
         value: String,
         unit: String
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(
                 alignment: .leading,
                 spacing: 6
@@ -1437,9 +1437,9 @@ struct MirroredWorkoutLiveView: View {
 
     @ViewBuilder
     private func timer(_ snapshot: WatchWorkoutLiveSnapshot) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(spacing: 6) {
-                Text("Duration")
+                Text(ATHLTHLocalization.choose(english: "Duration", norwegian: "Varighet"))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
 
@@ -1467,14 +1467,15 @@ struct MirroredWorkoutLiveView: View {
         unit: String,
         icon: String
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(alignment: .leading, spacing: 8) {
                 Image(systemName: icon)
                     .font(.title3)
                     .foregroundStyle(ATHLTHTheme.accent)
 
                 Text(value)
-                    .font(.title2.weight(.bold))
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
 

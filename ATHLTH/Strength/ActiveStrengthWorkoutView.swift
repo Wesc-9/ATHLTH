@@ -668,7 +668,7 @@ struct ActiveStrengthWorkoutView: View {
     ) -> some View {
         if let configuration = workout.advancedConfiguration?.audioCoach,
            configuration.enabled {
-            ATHLTHCard {
+            ATHLTHUnifiedCard {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 10) {
                         Image(systemName: "waveform.circle.fill")
@@ -4767,7 +4767,7 @@ struct ActiveStrengthWorkoutView: View {
     private func focusedSetEntry(
         exercise: StrengthExerciseLog
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(
                 alignment: .leading,
                 spacing: 16
@@ -5540,7 +5540,7 @@ struct ActiveStrengthWorkoutView: View {
     private func focusedSetRest(
         exercise: StrengthExerciseLog
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(spacing: 12) {
                 Text(
                     ATHLTHLocalization.choose(
@@ -6469,14 +6469,14 @@ struct ActiveStrengthWorkoutView: View {
 
     @ViewBuilder
     private func workoutHeader(_ workout: StrengthWorkoutLog) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(workout.title)
                         .font(.headline)
                     TimelineView(.periodic(from: .now, by: 1)) { context in
                         Text(context.date.timeIntervalSince(workout.startedAt).clockDuration)
-                            .font(.largeTitle.monospacedDigit().weight(.bold))
+                            .font(.system(size: 39, weight: .bold, design: .rounded).monospacedDigit())
                     }
                 }
 
@@ -6508,7 +6508,7 @@ struct ActiveStrengthWorkoutView: View {
 
     @ViewBuilder
     private func addExerciseCard(_ workout: StrengthWorkoutLog) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack(spacing: 12) {
                 Image(systemName: "plus.circle.fill")
                     .font(.title2)
@@ -6589,7 +6589,7 @@ struct ActiveStrengthWorkoutView: View {
 
     @ViewBuilder
     private func simpleTrackingContent(workout: StrengthWorkoutLog) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             Label("Simple tracking", systemImage: "play.circle.fill")
                 .font(.title3.weight(.bold))
                 .foregroundStyle(ATHLTHTheme.accent)
@@ -6645,7 +6645,7 @@ struct ActiveStrengthWorkoutView: View {
         workout: StrengthWorkoutLog,
         exercise: StrengthExerciseLog
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(ATHLTHLocalization.format(
@@ -6657,7 +6657,7 @@ struct ActiveStrengthWorkoutView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                     Text(exercise.exercise.displayName)
-                        .font(.title2.weight(.bold))
+                        .font(.system(size: 27, weight: .semibold, design: .rounded))
 
                     if exercise.isWarmUpExercise {
                         Label(
@@ -6821,7 +6821,7 @@ struct ActiveStrengthWorkoutView: View {
             )
         }
 
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             ATHLTHSectionHeader(title: "Sets")
 
             VStack(spacing: 10) {
@@ -6961,7 +6961,7 @@ struct ActiveStrengthWorkoutView: View {
 
     @ViewBuilder
     private func recordingStatusCard(_ workout: StrengthWorkoutLog) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack {
                 Label(
                     workout.captureDevice == .appleWatch ? "Apple Watch workout" : "iPhone workout",
@@ -7051,7 +7051,7 @@ struct ActiveStrengthWorkoutView: View {
     private func watchInputCompanionCard(
         workout: StrengthWorkoutLog
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(spacing: 10) {
                 Image(systemName: "applewatch")
                     .font(.title2)
@@ -7446,7 +7446,7 @@ struct ActiveStrengthWorkoutView: View {
     }
 
     private var setEntry: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             ATHLTHSectionHeader(
                 title: "Log Set \((strength.currentSet?.setNumber) ?? 1)",
                 actionTitle: "Optional details"
@@ -7669,7 +7669,7 @@ struct ActiveStrengthWorkoutView: View {
     }
 
     private var restControls: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             ATHLTHSectionHeader(
                 title:
                     ATHLTHLocalization.choose(
@@ -7803,7 +7803,7 @@ struct ActiveStrengthWorkoutView: View {
 
     @ViewBuilder
     private func exerciseCompleteControls(workout: StrengthWorkoutLog) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(spacing: 12) {
                 Label("Exercise complete", systemImage: "checkmark.seal.fill")
                     .font(.title3.weight(.bold))
