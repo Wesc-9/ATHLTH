@@ -5206,6 +5206,8 @@ struct ATHLTHTrainView: View {
     @State private var highlightedTrainPlanID: UUID?
     @State private var watchTransferMessage: String?
     @State private var watchTransferError: String?
+    @State private var isRecheckingWatchActivity = false
+    @State private var watchActivityCheckMessage: String?
     @State private var selectedStrengthSession: PlannedSession?
     @State private var selectedPlanWorkout: PlannedWorkoutSelection?
     @State private var selectedSuggestedWorkout: WorkoutTemplateCatalogEntry?
@@ -5911,27 +5913,83 @@ struct ATHLTHTrainView: View {
                    ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive),
                   phoneWorkout.active == nil,
                   strengthWorkout.activeWorkout == nil {
-            HStack(spacing: 12) {
-                Image(systemName: "applewatch")
-                    .font(.system(size: 22))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Workout active on Apple Watch",
-                        norwegian: "Aktiv økt på Apple Watch"
-                    ))
-                    .font(.subheadline.weight(.semibold))
-                    Text(ATHLTHLocalization.choose(
-                        english: "Continue on Watch. Do not start another session.",
-                        norwegian: "Fortsett på klokken. Ikke start en ny økt."
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 12) {
+                    Image(systemName: "applewatch")
+                        .font(.system(size: 22))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ATHLTHLocalization.choose(
+                            english: watchConnection.reachable || ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
+                                ? "Workout active on Apple Watch"
+                                : "Apple Watch workout status unconfirmed",
+                            norwegian: watchConnection.reachable || ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
+                                ? "Aktiv økt på Apple Watch"
+                                : "Øktstatus på Apple Watch er ikke bekreftet"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        Text(ATHLTHLocalization.choose(
+                            english: "Check the Watch before starting another workout.",
+                            norwegian: "Kontroller klokken før du starter en ny økt."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
+
+                if watchConnection.hasActiveWatchWorkout {
+                    Button {
+                        recheckActiveWatchWorkout()
+                    } label: {
+                        HStack(spacing: 8) {
+                            if isRecheckingWatchActivity {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                            }
+                            Text(ATHLTHLocalization.choose(
+                                english: "Check workout status again",
+                                norwegian: "Kontroller øktstatus på nytt"
+                            ))
+                            .font(.caption.weight(.semibold))
+                        }
+                        .frame(minHeight: 44)
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isRecheckingWatchActivity)
+                }
+                if let watchActivityCheckMessage {
+                    Text(watchActivityCheckMessage)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             .padding(16)
             .background(.white, in: RoundedRectangle(cornerRadius: 17))
+        }
+    }
+
+    private func recheckActiveWatchWorkout() {
+        guard !isRecheckingWatchActivity else { return }
+        isRecheckingWatchActivity = true
+        watchActivityCheckMessage = nil
+        watchConnection.connect()
+        Task { @MainActor in
+            let isClear = await watchConnection.confirmNoActiveWatchWorkout()
+            if isClear {
+                // The active-activity card disappears when the Watch reports
+                // completion. Never clear the cached lock without evidence.
+                watchActivityCheckMessage = nil
+            } else {
+                watchActivityCheckMessage = ATHLTHLocalization.choose(
+                    english: "ATHLTH cannot confirm that this workout ended. Open ATHLTH on Apple Watch and check there, then try again.",
+                    norwegian: "ATHLTH kan ikke bekrefte at økten er avsluttet. Åpne ATHLTH på Apple Watch og kontroller der før du prøver igjen."
+                )
+            }
+            isRecheckingWatchActivity = false
         }
     }
 
