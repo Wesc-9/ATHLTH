@@ -48,6 +48,79 @@ final class AppleWatchConnectionPolicyTests: XCTestCase {
         }
     }
 
+    func testLiveWatchRequiresPositiveReplyBeforeStarting() {
+        let liveButTimedOut = AppleWatchActivityStartPolicy.resolve(
+            watchReachable: true, cachedActive: false,
+            reply: nil, replyIsCurrent: false
+        )
+        XCTAssertEqual(liveButTimedOut, .unconfirmed)
+
+        let idle = WatchWorkoutActivityState(
+            isActive: false, title: nil, updatedAt: Date()
+        )
+        XCTAssertEqual(
+            AppleWatchActivityStartPolicy.resolve(
+                watchReachable: true, cachedActive: false,
+                reply: idle, replyIsCurrent: true
+            ),
+            .clear
+        )
+        XCTAssertEqual(
+            AppleWatchActivityStartPolicy.resolve(
+                watchReachable: true, cachedActive: false,
+                reply: idle, replyIsCurrent: false
+            ),
+            .unconfirmed
+        )
+    }
+
+    func testActiveWatchCannotBeOverriddenByOldOrMissingReply() {
+        let active = WatchWorkoutActivityState(
+            isActive: true, title: "Run", updatedAt: Date()
+        )
+        let idle = WatchWorkoutActivityState(
+            isActive: false, title: nil, updatedAt: Date()
+        )
+        XCTAssertEqual(
+            AppleWatchActivityStartPolicy.resolve(
+                watchReachable: true, cachedActive: true,
+                reply: active, replyIsCurrent: true
+            ),
+            .active
+        )
+        XCTAssertEqual(
+            AppleWatchActivityStartPolicy.resolve(
+                watchReachable: true, cachedActive: true,
+                reply: idle, replyIsCurrent: false
+            ),
+            .unconfirmed
+        )
+        XCTAssertEqual(
+            AppleWatchActivityStartPolicy.resolve(
+                watchReachable: true, cachedActive: true,
+                reply: nil, replyIsCurrent: false
+            ),
+            .unconfirmed
+        )
+    }
+
+    func testSleepingWatchKeepsPhoneFallbackUnlessActiveWasReported() {
+        XCTAssertEqual(
+            AppleWatchActivityStartPolicy.resolve(
+                watchReachable: false, cachedActive: false,
+                reply: nil, replyIsCurrent: false
+            ),
+            .clear
+        )
+        XCTAssertEqual(
+            AppleWatchActivityStartPolicy.resolve(
+                watchReachable: false, cachedActive: true,
+                reply: nil, replyIsCurrent: false
+            ),
+            .unconfirmed
+        )
+    }
+
     func testNoCachedWatchActivityUsesOriginalBlockReason() {
         let error = AppleWatchActivityStartPolicy.blockingError(
             hasActiveWatchWorkout: false,
