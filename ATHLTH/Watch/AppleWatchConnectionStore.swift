@@ -34,6 +34,7 @@ enum AppleWatchWorkoutLaunchError: LocalizedError {
     case watchUnavailable
     case launchAlreadyInProgress
     case workoutAlreadyActive
+    case watchWorkoutStatusUnconfirmed
     case watchLockedOrPasscodeRequired
 
     var errorDescription: String? {
@@ -60,6 +61,14 @@ enum AppleWatchWorkoutLaunchError: LocalizedError {
                     "Another ATHLTH workout is already active. Finish it before starting a new workout.",
                 norwegian:
                     "En annen ATHLTH-økt er allerede aktiv. Avslutt den før du starter en ny økt."
+            )
+
+        case .watchWorkoutStatusUnconfirmed:
+            return ATHLTHLocalization.choose(
+                english:
+                    "A workout was last reported active on Apple Watch, but ATHLTH cannot check it right now. Check the Watch, open ATHLTH there and try again. No new workout was started.",
+                norwegian:
+                    "Apple Watch meldte sist at en økt var aktiv, men ATHLTH får ikke kontrollert status nå. Sjekk klokken, åpne ATHLTH på Watch og prøv igjen. Ingen ny økt ble startet."
             )
 
         case .watchLockedOrPasscodeRequired:
@@ -159,6 +168,20 @@ private struct IncomingWatchPayload: Sendable {
         probeID = payload[WatchTransferMetadataKey.probeID] as? String
         data = payload[WatchTransferMetadataKey.payload] as? Data
         sentAt = payload[WatchTransferMetadataKey.sentAt] as? TimeInterval
+    }
+}
+
+/// A pairing/installation check is not the same as a recent live Watch handshake.
+/// Keep this calculation testable without requiring physical Watch hardware.
+enum AppleWatchLinkVerificationPolicy {
+    static func isFresh(
+        lastVerifiedAt: Date?,
+        now: Date,
+        validFor: TimeInterval = 120
+    ) -> Bool {
+        guard let lastVerifiedAt else { return false }
+        let age = now.timeIntervalSince(lastVerifiedAt)
+        return age >= 0 && age <= validFor
     }
 }
 
@@ -317,9 +340,19 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     var isVerifiedForLiveLaunch: Bool {
         guard isReady else { return false }
         if reachable { return true }
-        guard let lastVerifiedAt else { return false }
-        let age = Date().timeIntervalSince(lastVerifiedAt)
-        return age >= 0 && age <= 120
+        return AppleWatchLinkVerificationPolicy.isFresh(
+            lastVerifiedAt: lastVerifiedAt,
+            now: Date()
+        )
+    }
+
+    /// A cached active workout must not be cleared just because the Watch is
+    /// temporarily unreachable. Show a specific recovery message instead.
+    var blockedWatchWorkoutLaunchError: AppleWatchWorkoutLaunchError {
+        if hasActiveWatchWorkout && !reachable {
+            return .watchWorkoutStatusUnconfirmed
+        }
+        return .workoutAlreadyActive
     }
 
     var hasActiveWatchWorkout: Bool {
@@ -388,7 +421,7 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         case .appNotInstalled:
             return "ATHLTH Watch app not installed"
         case .ready:
-            if lastVerifiedAt != nil {
+            if isVerifiedForLiveLaunch {
                 return "ATHLTH Watch connection verified"
             }
             if reachable {
