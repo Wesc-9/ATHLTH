@@ -67,7 +67,7 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         self.stage = stage
         self.planningApproach = advanced && ["quick", "guided"].contains(planningApproach ?? "")
             ? planningApproach : nil
-        self.guidedDayCursor = advanced ? guidedDayCursor.map { min(max($0, 0), self.weekCount * 7) } : nil
+        self.guidedDayCursor = advanced ? guidedDayCursor.map { min(max($0, 0), min(max(weekCount, 1), 52) * 7) } : nil
         self.firstGuidedWeekDecisionMade = advanced ? firstGuidedWeekDecisionMade : nil
         if let preferredDayIndexes {
             let valid = Set(preferredDayIndexes.filter { (1...7).contains($0) })
