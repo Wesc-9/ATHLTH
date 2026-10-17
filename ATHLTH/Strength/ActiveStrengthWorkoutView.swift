@@ -359,8 +359,8 @@ struct ActiveStrengthWorkoutView: View {
             }
             .alert(
                 ATHLTHLocalization.choose(
-                    english: "Apple Watch",
-                    norwegian: "Apple Watch"
+                    english: "Workout",
+                    norwegian: "Treningsøkt"
                 ),
                 isPresented:
                     Binding(
@@ -1682,14 +1682,18 @@ struct ActiveStrengthWorkoutView: View {
                 return
             }
 
-            strength.finish(
+            guard strength.finish(
                 healthKitWorkoutUUID:
                     healthWorkoutUUID,
                 duration:
                     endDate.timeIntervalSince(
                         workout.startedAt
                     )
-            )
+            ) else {
+                finishInProgress = false
+                watchFinishError = strength.completionSaveError
+                return
+            }
             appSession.endTrainingStatus()
             finishInProgress = false
             dismiss()
@@ -1730,7 +1734,7 @@ struct ActiveStrengthWorkoutView: View {
         // session ended. Finish the local strength log immediately so the UI
         // never gets stuck waiting for WCSession delivery. The later
         // WatchWorkoutResult attaches the HealthKit UUID and final metrics.
-        strength.finish(
+        guard strength.finish(
             healthKitWorkoutUUID: nil,
             duration:
                 snapshot.confirmedActiveDuration,
@@ -1740,7 +1744,10 @@ struct ActiveStrengthWorkoutView: View {
                 snapshot.averageHeartRate,
             maxHeartRate:
                 snapshot.maxHeartRate
-        )
+        ) else {
+            watchFinishError = strength.completionSaveError
+            return
+        }
         appSession.endTrainingStatus()
     }
 
