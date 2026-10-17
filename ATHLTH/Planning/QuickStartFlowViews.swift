@@ -2130,6 +2130,7 @@ struct RunQuickStartSheet: View {
                 captureDevice = .appleWatch
                 submitQuickRun(captureDevice: .appleWatch)
             },
+            preferAppleWatch: watchConnected && !ATHLTHDeviceRole.isIPad,
             supportingText: ATHLTHDeviceRole.isIPad
                 ? ATHLTHLocalization.choose(
                     english: "Sent through your signed-in iPhone.",
@@ -2994,6 +2995,7 @@ struct WalkQuickStartSheet: View {
                     watchAvailable: watchConnected || ATHLTHDeviceRole.isIPad,
                     onIPhone: { startWalk(using: .iPhone) },
                     onAppleWatch: { startWalk(using: .appleWatch) },
+                    preferAppleWatch: watchConnected && !ATHLTHDeviceRole.isIPad,
                     supportingText: ATHLTHDeviceRole.isIPad
                         ? ATHLTHLocalization.choose(
                             english: "Sent via your signed-in iPhone.",
