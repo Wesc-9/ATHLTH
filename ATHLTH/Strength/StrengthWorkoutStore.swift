@@ -53,6 +53,7 @@ final class StrengthWorkoutStore: ObservableObject {
         didSet { scheduleCheckpointPersist() }
     }
     @Published private(set) var completedWorkout: StrengthWorkoutLog?
+    @Published private(set) var completionSaveError: String?
     @Published private(set) var workoutHistory: [StrengthWorkoutLog] = []
     @Published private(set) var lastPhoneDraftMutationAt:
         Date = .distantPast
@@ -117,6 +118,7 @@ final class StrengthWorkoutStore: ObservableObject {
         defer { loadingAccount = false }
         accountID = userID
         completedWorkout = nil
+        completionSaveError = nil
         workoutHistory =
             (
                 userID.flatMap {
@@ -130,6 +132,16 @@ final class StrengthWorkoutStore: ObservableObject {
             .sorted {
                 $0.startedAt > $1.startedAt
             }
+        // A durable finish receipt survives a crash between committing the
+        // completed history and clearing the active workout checkpoint.
+        if let userID,
+           !UserDefaults.standard.bool(forKey: AccountLocalStorage.key("deleted", userID: userID)),
+           let completed = StrengthWorkoutCompletionJournal.read(userID: userID),
+           !workoutHistory.contains(where: { $0.id == completed.id }) {
+            workoutHistory.insert(completed, at: 0)
+            workoutHistory.sort { $0.startedAt > $1.startedAt }
+            persistWorkoutHistory()
+        }
         let checkpoint = userID.flatMap { AccountLocalStorage.read(Checkpoint.self, name: "strengthActive", userID: $0) }
         activeWorkout = checkpoint?.workout
         if let workout = activeWorkout,
@@ -3415,18 +3427,20 @@ final class StrengthWorkoutStore: ObservableObject {
         persistCheckpointNow()
     }
 
+    @discardableResult
     func finish(
         healthKitWorkoutUUID: UUID? = nil,
         duration: TimeInterval? = nil,
         activeCalories: Double? = nil,
         averageHeartRate: Double? = nil,
         maxHeartRate: Double? = nil
-    ) {
+    ) -> Bool {
         finalizeActualRestIfNeeded()
         restStartedAt = nil
         restEndsAt = nil
 
-        guard var workout = activeWorkout else { return }
+        guard var workout = activeWorkout else { return false }
+        completionSaveError = nil
 
         workout.endedAt =
             max(
@@ -3449,8 +3463,36 @@ final class StrengthWorkoutStore: ObservableObject {
                 maxHeartRate ?? existingMetrics.maxHeartRate
         )
 
+        guard let accountID,
+              !UserDefaults.standard.bool(forKey: AccountLocalStorage.key("deleted", userID: accountID))
+        else {
+            completionSaveError = ATHLTHLocalization.choose(
+                english: "Could not save this strength workout to an account. Your workout remains open.",
+                norwegian: "Kunne ikke lagre styrkeøkten på en konto. Økten holdes åpen."
+            )
+            return false
+        }
+
+        var updatedHistory = workoutHistory.filter { $0.id != workout.id }
+        updatedHistory.append(workout)
+        updatedHistory.sort { $0.startedAt > $1.startedAt }
+        do {
+            try StrengthWorkoutCompletionJournal.save(workout, userID: accountID)
+            try AccountLocalStorage.writeChecked(
+                updatedHistory, name: "strengthHistory", userID: accountID
+            )
+        } catch {
+            // Never discard the in-progress sets until durable storage succeeds.
+            completionSaveError = ATHLTHLocalization.choose(
+                english: "Could not save the strength workout. It is still open; try finishing again.",
+                norwegian: "Styrkeøkten kunne ikke lagres. Den er fortsatt åpen; prøv å avslutte igjen."
+            )
+            return false
+        }
+
         completedWorkout = workout
-        upsertWorkoutHistory(workout)
+        workoutHistory = updatedHistory
+        ATHLTHTrainingDataChangeSignal.post(userID: accountID)
         activeWorkout = nil
         recoveredCheckpointSavedAt = nil
         restEndsAt = nil
@@ -3467,6 +3509,7 @@ final class StrengthWorkoutStore: ObservableObject {
         draftWarmUp = false
         timedSetCountdown = nil
         persistCheckpointNow()
+        return true
     }
 
     func acknowledgeRecoveredWorkout() {
@@ -3572,6 +3615,12 @@ final class StrengthWorkoutStore: ObservableObject {
             return
         }
 
+        if let accountID,
+           let receipt = StrengthWorkoutCompletionJournal.read(userID: accountID),
+           workoutIDs.contains(receipt.id) ||
+           receipt.healthMetrics.healthKitWorkoutUUID.map(workoutIDs.contains) == true {
+            StrengthWorkoutCompletionJournal.remove(userID: accountID)
+        }
         workoutHistory.removeAll { workout in
             workoutIDs.contains(workout.id) ||
             workout.healthMetrics
