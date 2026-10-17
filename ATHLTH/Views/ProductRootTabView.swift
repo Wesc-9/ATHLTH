@@ -6019,14 +6019,12 @@ struct ATHLTHTrainView: View {
         } ?? 0
 
         let today = Date()
-        let hasRecordedWorkoutToday =
-            health.workouts.contains {
-                Calendar.current.isDate($0.startDate, inSameDayAs: today)
-            } ||
-            strengthWorkout.workoutHistory.contains {
-                guard let end = $0.endedAt else { return false }
-                return Calendar.current.isDate(end, inSameDayAs: today)
-            }
+        let hasRecordedWorkoutToday = TrainTodayOverviewPolicy.hasRecordedWorkout(
+            on: today,
+            healthStartDates: health.workouts.map(\.startDate),
+            strengthEndDates: strengthWorkout.workoutHistory.compactMap(\.endedAt),
+            phoneCompletedDates: phoneWorkout.history.compactMap(\.end)
+        )
 
         let readiness = TrainTodayOverviewPolicy.reliableReadiness(
             health.recovery,
