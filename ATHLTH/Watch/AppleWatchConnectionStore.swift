@@ -185,6 +185,20 @@ enum AppleWatchLinkVerificationPolicy {
     }
 }
 
+/// A cached Watch activity is ambiguous when WatchConnectivity is offline.
+/// Preserve the recording lock, but explain why starting is blocked.
+enum AppleWatchActivityStartPolicy {
+    static func blockingError(
+        hasActiveWatchWorkout: Bool,
+        isWatchReachable: Bool
+    ) -> AppleWatchWorkoutLaunchError {
+        if hasActiveWatchWorkout && !isWatchReachable {
+            return .watchWorkoutStatusUnconfirmed
+        }
+        return .workoutAlreadyActive
+    }
+}
+
 @MainActor
 final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Sendable {
     @Published private(set) var state: AppleWatchConnectionState = .checking
@@ -349,10 +363,10 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     /// A cached active workout must not be cleared just because the Watch is
     /// temporarily unreachable. Show a specific recovery message instead.
     var blockedWatchWorkoutLaunchError: AppleWatchWorkoutLaunchError {
-        if hasActiveWatchWorkout && !reachable {
-            return .watchWorkoutStatusUnconfirmed
-        }
-        return .workoutAlreadyActive
+        AppleWatchActivityStartPolicy.blockingError(
+            hasActiveWatchWorkout: hasActiveWatchWorkout,
+            isWatchReachable: reachable
+        )
     }
 
     var hasActiveWatchWorkout: Bool {
