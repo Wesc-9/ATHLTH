@@ -401,7 +401,7 @@ struct ThreadWorkoutInvitationCard: View {
                     .padding(20)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .background(ATHLTHPremiumCanvas())
+                .background(ATHLTHTrainTogetherDesign.canvas.ignoresSafeArea())
                 .navigationTitle(ATHLTHLocalization.choose(
                     english: "Workout invitation",
                     norwegian: "Treningsinvitasjon"
@@ -438,8 +438,7 @@ struct ThreadWorkoutInvitationCard: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.66),
-                    in: RoundedRectangle(cornerRadius: 12))
+        .athlthTrainTogetherCard(radius: 12, subtle: true)
     }
 
 }
@@ -532,7 +531,7 @@ struct PlannedWorkoutLobbyView: View {
             .padding(16)
         }
         .scrollIndicators(.hidden)
-        .background(ATHLTHPremiumCanvas().ignoresSafeArea())
+        .background(ATHLTHTrainTogetherDesign.canvas.ignoresSafeArea())
         .navigationTitle(ATHLTHLocalization.choose(
             english: "Workout lobby", norwegian: "Øktlobby"
         ))
@@ -576,7 +575,7 @@ struct PlannedWorkoutLobbyView: View {
                     .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.8))
             }
             Text(workout.title)
-                .font(.system(size: 25, weight: .bold, design: .rounded))
+                .font(.system(size: 27, weight: .semibold, design: .serif))
                 .foregroundStyle(ATHLTHTheme.primaryText)
                 .lineLimit(3)
             Text(workout.trainTogetherMode == .sameWorkout
@@ -591,28 +590,11 @@ struct PlannedWorkoutLobbyView: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: 25, style: .continuous)
-                .fill(LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.94),
-                        ATHLTHTheme.surfaceStone.opacity(0.83),
-                        ATHLTHTheme.cardWarm.opacity(0.71)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ))
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 25, style: .continuous)
-                .stroke(.white.opacity(0.88), lineWidth: 1)
-        }
-        .shadow(color: ATHLTHTheme.accentDeep.opacity(0.08),
-                radius: 18, x: 0, y: 9)
+        .athlthTrainTogetherCard(radius: 25)
     }
 
     private var workoutCard: some View {
-        ATHLTHCard {
+        ATHLTHTrainTogetherSurface {
             VStack(alignment: .leading, spacing: 12) {
                 if let start = workout.scheduledStart {
                     Label(start.formatted(date: .complete, time: .shortened),
@@ -642,7 +624,7 @@ struct PlannedWorkoutLobbyView: View {
     }
 
     private var participantsCard: some View {
-        ATHLTHCard {
+        ATHLTHTrainTogetherSurface {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {

@@ -147,24 +147,15 @@ struct TrainTogetherStatusStrip: View {
                                 6
                             )
                             .background(
-                                Color(
-                                    .secondarySystemGroupedBackground
-                                ),
+                                ATHLTHTrainTogetherDesign.accentSoft.opacity(0.62),
                                 in: Capsule()
                             )
                         }
                     }
                 }
             }
-            .padding(12)
-            .background(
-                ATHLTHTheme.accent
-                    .opacity(0.06),
-                in: RoundedRectangle(
-                    cornerRadius: 16,
-                    style: .continuous
-                )
-            )
+            .padding(14)
+            .athlthTrainTogetherCard(radius: 19, subtle: true)
             .task(id: sessionID) {
                 _ = await social
                     .confirmCurrentJoinedWorkoutStarted()
@@ -877,15 +868,7 @@ private struct SocialWorkoutCompanionSheet:
                 .padding(16)
                 .padding(.bottom, 24)
             }
-            .background(
-                ATHLTHPremiumCanvas(
-                    accent:
-                        ATHLTHTheme
-                            .vitality
-                            .opacity(0.10)
-                )
-                .ignoresSafeArea()
-            )
+            .background(ATHLTHTrainTogetherDesign.canvas.ignoresSafeArea())
             .navigationTitle(
                 ATHLTHLocalization.choose(
                     english:
@@ -928,7 +911,7 @@ private struct SocialWorkoutCompanionSheet:
 
     private var liveProgressSection:
         some View {
-        ATHLTHCard {
+        ATHLTHTrainTogetherSurface {
             VStack(
                 alignment: .leading,
                 spacing: 12
@@ -1268,7 +1251,7 @@ private struct SocialWorkoutCompanionSheet:
 
     private var chatSection:
         some View {
-        ATHLTHCard {
+        ATHLTHTrainTogetherSurface {
             VStack(
                 alignment: .leading,
                 spacing: 12

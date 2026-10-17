@@ -124,11 +124,8 @@ struct TrainTogetherAreaMapView: View {
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(14)
-        .background(
-            Color.white.opacity(0.94),
-            in: RoundedRectangle(cornerRadius: 23, style: .continuous)
-        )
+        .padding(16)
+        .athlthTrainTogetherCard(radius: 23)
         .task(id: lookupKey) {
             await resolvePublicAreas()
         }

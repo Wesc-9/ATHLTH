@@ -95,15 +95,7 @@ struct TrainTogetherCreatorLobbyView: View {
                 .frame(maxWidth: .infinity)
             }
             .scrollIndicators(.hidden)
-            .background(
-                ATHLTHPremiumCanvas(
-                    accent:
-                        ATHLTHTheme
-                            .vitality
-                            .opacity(0.10)
-                )
-                .ignoresSafeArea()
-            )
+            .background(ATHLTHTrainTogetherDesign.canvas.ignoresSafeArea())
             .navigationTitle(
                 ATHLTHLocalization.choose(
                     english: "Train Together",
@@ -228,9 +220,7 @@ struct TrainTogetherCreatorLobbyView: View {
                             "Fellesøkt"
                     )
                 )
-                .font(
-                    .title2.weight(.bold)
-                )
+                .font(.system(size: 26, weight: .semibold, design: .serif))
                 .foregroundStyle(.white)
                 .lineLimit(1)
 
@@ -282,7 +272,7 @@ struct TrainTogetherCreatorLobbyView: View {
     }
 
     private var participantCard: some View {
-        ATHLTHCard {
+        ATHLTHTrainTogetherSurface {
             VStack(
                 alignment: .leading,
                 spacing: 12
@@ -484,7 +474,7 @@ struct TrainTogetherCreatorLobbyView: View {
     }
 
     private var liveParticipantsCard: some View {
-        ATHLTHCard {
+        ATHLTHTrainTogetherSurface {
             VStack(alignment: .leading, spacing: 12) {
                 Label(
                     ATHLTHLocalization.choose(
@@ -538,7 +528,7 @@ struct TrainTogetherCreatorLobbyView: View {
     }
 
     private var actionCard: some View {
-        ATHLTHCard {
+        ATHLTHTrainTogetherSurface {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 10) {
                     Image(systemName: everyoneReady
@@ -759,7 +749,7 @@ struct TrainTogetherCreatorLobbyView: View {
     private func countdownCard(
         startAt: Date
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHTrainTogetherSurface {
             TimelineView(
                 .periodic(
                     from: .now,

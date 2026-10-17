@@ -372,7 +372,7 @@ struct TrainTogetherCircleView: View {
     }
 
     private var chatCard: some View {
-        ATHLTHCard {
+        ATHLTHTrainTogetherSurface {
             VStack(alignment: .leading, spacing: 12) {
                 Label(
                     ATHLTHLocalization.choose(
@@ -422,10 +422,14 @@ struct TrainTogetherCircleView: View {
                         .padding(10)
                         .background(
                             message.senderID == session.profile.userID
-                                ? ATHLTHTheme.vitalitySoft
-                                : Color.primary.opacity(0.035),
-                            in: RoundedRectangle(cornerRadius: 12)
+                                ? ATHLTHTrainTogetherDesign.accentSoft.opacity(0.72)
+                                : ATHLTHTrainTogetherDesign.surface,
+                            in: RoundedRectangle(cornerRadius: 14)
                         )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 14)
+                                .strokeBorder(ATHLTHTrainTogetherDesign.outline, lineWidth: 0.7)
+                        }
                     }
                 }
 
@@ -470,7 +474,7 @@ struct TrainTogetherCircleView: View {
     }
 
     private var recapCard: some View {
-        ATHLTHCard {
+        ATHLTHTrainTogetherSurface {
             VStack(alignment: .leading, spacing: 12) {
                 Label(
                     ATHLTHLocalization.choose(
