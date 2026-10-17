@@ -127,6 +127,19 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
                     }
                     safe.detailedWorkout = clean.isValid ? clean : nil
                 }
+                if let extras = safe.additionalDetailedWorkouts {
+                    safe.additionalDetailedWorkouts = extras.compactMap { extra in
+                        var clean = extra
+                        clean.routeID = nil
+                        clean.blocks = extra.blocks.filter { $0.kind != .note }.map {
+                            var block = $0
+                            block.notes = nil
+                            block.loadNote = nil
+                            return block
+                        }
+                        return clean.isValid ? clean : nil
+                    }
+                }
                 sanitized[day] = safe
             }
             self.weekDayEdits = sanitized.isEmpty ? nil : sanitized

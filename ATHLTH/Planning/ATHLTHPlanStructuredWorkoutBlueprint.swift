@@ -95,7 +95,18 @@ struct ATHLTHPlanWeekDayEdit: Codable, Hashable {
     var detailedWorkout: ATHLTHPlanStructuredWorkoutBlueprint?
     var isCustomTitle = false
     var removeTemplateDetail = false
-    var isRestDay = false
+    // Optional: existing persisted plans must continue decoding.
+    var isRestDay: Bool? = nil
+    var additionalDetailedWorkouts: [ATHLTHPlanStructuredWorkoutBlueprint]? = nil
+
+    func scheduledSessions(from originals: [PlannedSession]) -> [PlannedSession] {
+        if isRestDay == true { return [] }
+        let first = applying(to: originals.first)
+        let extras = (additionalDetailedWorkouts ?? [])
+            .filter(\.isValid)
+            .map { $0.applying(to: nil) }
+        return [first] + Array(originals.dropFirst()) + extras
+    }
 
     func applying(to original: PlannedSession?) -> PlannedSession {
         var result = original ?? PlannedSession(
@@ -153,12 +164,8 @@ struct ATHLTHPlanWeekDayEdit: Codable, Hashable {
             guard let dayIndex = weeks[weekIndex].days.firstIndex(
                 where: { $0.dayIndex == relativeDay }
             ) else { continue }
-            if edit.isRestDay {
-                weeks[weekIndex].days[dayIndex].sessions = []
-                continue
-            }
-            let previous = weeks[weekIndex].days[dayIndex].sessions.first
-            weeks[weekIndex].days[dayIndex].sessions = [edit.applying(to: previous)]
+            let previous = weeks[weekIndex].days[dayIndex].sessions
+            weeks[weekIndex].days[dayIndex].sessions = edit.scheduledSessions(from: previous)
         }
     }
 }

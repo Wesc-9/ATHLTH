@@ -56,6 +56,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var firstGuidedWeekDecisionMade = false
     @State private var repeatWeekCount = 1
     @State private var selectingLibraryDay: WeekDayEditorSelection?
+    @State private var addingExtraWorkout = false
+    @State private var selectingExtraFromLibrary = false
 
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
 
@@ -635,7 +637,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
         .sheet(item: $selectingLibraryDay) { selection in
             ATHLTHPlanWorkoutLibraryPicker { workout in
-                assignLibraryWorkout(workout, to: selection.id)
+                assignLibraryWorkout(workout, to: selection.id, asExtra: selectingExtraFromLibrary)
+                selectingExtraFromLibrary = false
                 selectingLibraryDay = nil
             }
         }
@@ -657,12 +660,17 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     guard proposed.isValid else { return }
                     updateWeekDay(selection.id) { edit in
                         edit.isRestDay = false
-                        edit.detailedWorkout = proposed
+                        if addingExtraWorkout {
+                            edit.additionalDetailedWorkouts = (edit.additionalDetailedWorkouts ?? []) + [proposed]
+                        } else {
+                            edit.detailedWorkout = proposed
+                            edit.kind = proposed.kind
+                            edit.title = name
+                            edit.durationMinutes = proposed.durationMinutes
+                        }
                         edit.removeTemplateDetail = false
-                        edit.kind = proposed.kind
-                        edit.title = name
-                        edit.durationMinutes = proposed.durationMinutes
                     }
+                    addingExtraWorkout = false
                 }
             )
         }
@@ -3049,7 +3057,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     private var guidedChosenDays: Set<Int> {
         Set(weekDayEdits.compactMap { key, edit in
-            edit.isRestDay || edit.detailedWorkout?.isValid != true
+            edit.isRestDay == true || edit.detailedWorkout?.isValid != true
                 ? nil : ((key - 1) % 7 + 1)
         })
     }
@@ -3124,7 +3132,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         edit.isRestDay
                             ? ATHLTHLocalization.choose(english: "Rest day chosen", norwegian: "Hviledag valgt")
                             : (edit.detailedWorkout?.title ?? ATHLTHLocalization.choose(english: "Workout chosen", norwegian: "Økt valgt")),
-                        systemImage: edit.isRestDay ? "moon.stars" : "checkmark.circle.fill"
+                        systemImage: edit.isRestDay == true ? "moon.stars" : "checkmark.circle.fill"
                     )
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHPlanDesign.ink)
@@ -3133,6 +3141,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                              " · \(workout.durationMinutes) min")
                             .font(.caption)
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        if let count = edit.additionalDetailedWorkouts?.count, count > 0 {
+                            Text("+ \(count) " + ATHLTHLocalization.choose(english: "additional workouts", norwegian: "ekstra økter"))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
                     }
                 }
             }
@@ -3145,6 +3158,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 )
             ) {
                 selectedPlanWeekIndex = guidedCurrentWeek
+                addingExtraWorkout = false
                 composingAdvancedDay = WeekDayEditorSelection(id: guidedCurrentWeekday)
             }
             ATHLTHPlanWeekApproachCard(
@@ -3156,7 +3170,30 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 )
             ) {
                 selectedPlanWeekIndex = guidedCurrentWeek
+                selectingExtraFromLibrary = false
                 selectingLibraryDay = WeekDayEditorSelection(id: guidedCurrentWeekday)
+            }
+            if weekDayEdits[weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)]?.detailedWorkout != nil {
+                ATHLTHPlanWeekApproachCard(
+                    icon: "plus.square.on.square",
+                    title: ATHLTHLocalization.choose(english: "Add another workout", norwegian: "Legg til en økt til"),
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Plan a second session on the same date.",
+                        norwegian: "Planlegg en ekstra økt samme dag."
+                    )
+                ) {
+                    selectedPlanWeekIndex = guidedCurrentWeek
+                    addingExtraWorkout = true
+                    composingAdvancedDay = WeekDayEditorSelection(id: guidedCurrentWeekday)
+                }
+                Button(ATHLTHLocalization.choose(
+                    english: "Add another from library", norwegian: "Legg til en ekstra fra bibliotek"
+                )) {
+                    selectedPlanWeekIndex = guidedCurrentWeek
+                    selectingExtraFromLibrary = true
+                    selectingLibraryDay = WeekDayEditorSelection(id: guidedCurrentWeekday)
+                }
+                .font(.subheadline.weight(.medium))
             }
             ATHLTHPlanWeekApproachCard(
                 icon: "moon.stars",
@@ -3253,7 +3290,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private var firstWeekWorkoutCount: Int {
         (1...7).filter {
             let workout = weekDayEdits[weekDayKey($0, weekIndex: 0)]
-            return workout?.isRestDay == false && workout?.detailedWorkout?.isValid == true
+            return workout?.isRestDay != true && workout?.detailedWorkout?.isValid == true
         }.count
     }
 
@@ -3265,7 +3302,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             // A manually built plan only uses the days actually chosen in week one.
             let days = Set((1...7).filter {
                 let edit = weekDayEdits[weekDayKey($0, weekIndex: 0)]
-                return edit?.isRestDay == false && edit?.detailedWorkout?.isValid == true
+                return edit?.isRestDay != true && edit?.detailedWorkout?.isValid == true
             })
             if !days.isEmpty {
                 selectedDays = days
@@ -3298,6 +3335,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             edit.kind = nil
             edit.durationMinutes = nil
             edit.removeTemplateDetail = true
+            edit.additionalDetailedWorkouts = nil
         }
     }
 
@@ -3312,7 +3350,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         return .strength
     }
 
-    private func assignLibraryWorkout(_ workout: PlannedSession, to day: Int) {
+    private func assignLibraryWorkout(_ workout: PlannedSession, to day: Int, asExtra: Bool) {
         let blocks = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
         let blueprint = ATHLTHPlanStructuredWorkoutBlueprint(
             title: workout.title,
@@ -3330,10 +3368,14 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
         updateWeekDay(day) { edit in
             edit.isRestDay = false
-            edit.detailedWorkout = blueprint
-            edit.kind = blueprint.kind
-            edit.title = blueprint.title
-            edit.durationMinutes = blueprint.durationMinutes
+            if asExtra {
+                edit.additionalDetailedWorkouts = (edit.additionalDetailedWorkouts ?? []) + [blueprint]
+            } else {
+                edit.detailedWorkout = blueprint
+                edit.kind = blueprint.kind
+                edit.title = blueprint.title
+                edit.durationMinutes = blueprint.durationMinutes
+            }
             edit.removeTemplateDetail = false
         }
     }
@@ -3365,6 +3407,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         )
                     ) {
                         editingWeekDay = nil
+                        addingExtraWorkout = false
                         composingAdvancedDay = WeekDayEditorSelection(id: day)
                     }
                     ATHLTHPlanWeekApproachCard(
@@ -3376,7 +3419,34 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         )
                     ) {
                         editingWeekDay = nil
+                        selectingExtraFromLibrary = false
                         selectingLibraryDay = WeekDayEditorSelection(id: day)
+                    }
+                    if weekDayEdits[weekDayKey(day)]?.detailedWorkout != nil {
+                        ATHLTHPlanWeekApproachCard(
+                            icon: "plus.square.on.square",
+                            title: ATHLTHLocalization.choose(english: "Add another workout", norwegian: "Legg til en ekstra økt"),
+                            subtitle: ATHLTHLocalization.choose(
+                                english: "Create a second workout on this day.",
+                                norwegian: "Bygg en ny økt samme dag."
+                            )
+                        ) {
+                            editingWeekDay = nil
+                            addingExtraWorkout = true
+                            composingAdvancedDay = WeekDayEditorSelection(id: day)
+                        }
+                        ATHLTHPlanWeekApproachCard(
+                            icon: "books.vertical",
+                            title: ATHLTHLocalization.choose(english: "Add another from library", norwegian: "Legg til en ekstra økt fra bibliotek"),
+                            subtitle: ATHLTHLocalization.choose(
+                                english: "Choose an existing full workout.",
+                                norwegian: "Velg en eksisterende komplett økt."
+                            )
+                        ) {
+                            editingWeekDay = nil
+                            selectingExtraFromLibrary = true
+                            selectingLibraryDay = WeekDayEditorSelection(id: day)
+                        }
                     }
                     ATHLTHPlanWeekApproachCard(
                         icon: "moon.stars",
