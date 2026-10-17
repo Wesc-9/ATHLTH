@@ -140,9 +140,13 @@ struct OnboardingFlowView: View {
                 await loadUsernameSuggestions()
             case .connections:
                 usernameFieldFocused = false
-                // The connection screen is also a device check. Refresh Watch
-                // status even when the user has not selected Apple Watch yet.
-                watchConnection.refreshStatus()
+                // Check the paired Watch immediately when selected, but never
+                // make Watch connectivity a prerequisite for onboarding.
+                if settings.trainingDeviceProvider == .appleWatch {
+                    watchConnection.connect()
+                } else {
+                    watchConnection.refreshStatus()
+                }
             case .goals, .ready:
                 usernameFieldFocused = false
             default:
@@ -1240,8 +1244,8 @@ struct OnboardingFlowView: View {
         VStack(alignment: .leading, spacing: 22) {
             VStack(alignment: .leading, spacing: 8) {
                 onboardingTitle(
-                    "Check your connections",
-                    subtitle: "Make sure the devices you want to use with ATHLTH are ready."
+                    "Your training devices",
+                    subtitle: "Apple Watch is recommended for the full ATHLTH experience. You can always record a workout with iPhone."
                 )
 
                 HStack(spacing: 7) {
@@ -1257,8 +1261,9 @@ struct OnboardingFlowView: View {
                 deviceChoiceCard(
                     provider: .appleWatch,
                     title: "Apple Watch",
-                    subtitle: "Track workouts, heart rate, recovery and more.",
+                    subtitle: "Recommended for live heart rate, workouts and recovery insights.",
                     icon: "applewatch",
+                    badge: "RECOMMENDED",
                     status: appleWatchConnectionLabel,
                     statusTint: appleWatchConnectionTint,
                     infoAction: {
@@ -1267,16 +1272,16 @@ struct OnboardingFlowView: View {
                 )
 
                 if settings.trainingDeviceProvider == .appleWatch,
-                   watchConnection.state == .appNotInstalled {
+                   !watchConnection.isReady {
                     Button {
-                        openAppleWatchApp()
+                        showingWatchInstallHelp = true
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: "applewatch")
-                            Text("Open Watch app to install ATHLTH")
+                            Text("Finish Apple Watch setup")
                                 .fontWeight(.semibold)
                             Spacer()
-                            Image(systemName: "arrow.up.right")
+                            Image(systemName: "chevron.right")
                                 .font(.caption.weight(.bold))
                         }
                         .frame(maxWidth: .infinity)
@@ -1301,7 +1306,7 @@ struct OnboardingFlowView: View {
                 deviceChoiceCard(
                     provider: .none,
                     title: "iPhone",
-                    subtitle: "Carry your iPhone throughout the workout to record outdoor runs and walks.",
+                    subtitle: "No Watch needed. Record runs and walks on iPhone, or log workouts manually.",
                     icon: "iphone",
                     status: settings.trainingDeviceProvider == .none
                         ? "iPhone recording"
@@ -1331,7 +1336,7 @@ struct OnboardingFlowView: View {
                 )
             }
 
-            Text("You can change your training device anytime in Settings.")
+            Text("You can choose iPhone recording when starting a workout, even if Apple Watch is selected here.")
                 .font(.caption)
                 .foregroundStyle(OnboardingTheme.faintText)
                 .frame(maxWidth: .infinity, alignment: .center)
@@ -1366,7 +1371,7 @@ struct OnboardingFlowView: View {
                 }
 
                 if provider == .appleWatch {
-                    watchConnection.refreshStatus()
+                    watchConnection.connect()
                 }
             } label: {
                 HStack(spacing: 17) {
@@ -1513,7 +1518,9 @@ struct OnboardingFlowView: View {
         case .appNotInstalled:
             return "Paired · ATHLTH app not installed"
         case .ready:
-            return "Connected"
+            return watchConnection.isVerifiedForLiveLaunch
+                ? "Watch connection verified"
+                : "Paired · ATHLTH installed"
         }
     }
 
@@ -1860,8 +1867,8 @@ struct OnboardingFlowView: View {
         switch settings.trainingDeviceProvider {
         case .appleWatch:
             return watchConnection.isReady
-                ? "Apple Watch connected"
-                : "Apple Watch selected · finish setup in Settings"
+                ? "Apple Watch paired · ATHLTH installed"
+                : "Apple Watch selected · finish setup when ready"
         case .garmin:
             return "Garmin selected · authorization pending"
         case .none:
@@ -1989,7 +1996,7 @@ struct OnboardingFlowView: View {
                 case .device:
                     footerButton(title: "Continue") {
                         if settings.trainingDeviceProvider == .appleWatch {
-                            watchConnection.refreshStatus()
+                            watchConnection.connect()
                         }
 
                         if health.hasRequestedAuthorization {
