@@ -320,6 +320,7 @@ struct CustomQuickStartSheet: View {
                             onStart(previewConfiguration, .watch)
                             dismiss()
                         },
+                        preferAppleWatch: canUseWatch && !ATHLTHDeviceRole.isIPad,
                         supportingText: canUseWatch && method != .open
                             ? tr(
                                 "Custom intervals are not transferred to Watch yet.",
