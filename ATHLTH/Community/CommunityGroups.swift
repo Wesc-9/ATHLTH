@@ -7165,7 +7165,7 @@ struct CommunityGroupDetailView: View {
     }
 
     private var membershipAccessCard: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             if groups.pendingInvite(
                 for: currentGroup.id
             ) != nil {
@@ -10120,7 +10120,7 @@ struct CommunityGroupDetailView: View {
             in: group.id
         )
 
-        return ATHLTHCard {
+        return ATHLTHUnifiedCard {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(
@@ -10329,7 +10329,7 @@ struct CommunityGroupDetailView: View {
     }
 
     private var groupUpdateComposer: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack(spacing: 9) {
                 Image(systemName: "megaphone.fill")
                     .font(.system(size: 15, weight: .semibold))
@@ -10506,7 +10506,7 @@ struct CommunityGroupDetailView: View {
     }
 
     private var comingUpCard: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Coming Up")
@@ -10651,7 +10651,7 @@ struct CommunityGroupDetailView: View {
                 .prefix(4)
         )
 
-        return ATHLTHCard {
+        return ATHLTHUnifiedCard {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Recent Activity")
@@ -10849,7 +10849,7 @@ struct CommunityGroupDetailView: View {
             in: group.id
         )
 
-        return ATHLTHCard {
+        return ATHLTHUnifiedCard {
             HStack {
                 Label(
                     isPinned
@@ -11410,7 +11410,7 @@ struct CommunityGroupDetailView: View {
     }
 
     private var events: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Club Events")
@@ -11728,7 +11728,7 @@ struct CommunityGroupDetailView: View {
 
     private var challenges: some View {
         VStack(spacing: 14) {
-            ATHLTHCard {
+            ATHLTHUnifiedCard {
                 HStack(spacing: 12) {
                     VStack(
                         alignment: .leading,
@@ -11868,7 +11868,7 @@ struct CommunityGroupDetailView: View {
             if activeGroupChallenges.isEmpty &&
                 plannedGroupChallenges.isEmpty &&
                 previousGroupChallenges.isEmpty {
-                ATHLTHCard {
+                ATHLTHUnifiedCard {
                     ContentUnavailableView(
                         ATHLTHLocalization.choose(
                             english:
@@ -11982,7 +11982,7 @@ struct CommunityGroupDetailView: View {
             [CommunityGroupChallengeRecord],
         planned: Bool
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack(spacing: 10) {
                 Image(systemName: icon)
                     .font(
@@ -16476,7 +16476,7 @@ struct CommunityGroupActivityPreviewCard: View {
     @EnvironmentObject private var groups: CommunityGroupStore
 
     var body: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Community Activity")
@@ -19180,7 +19180,7 @@ struct CommunityGroupEventCreateView: View {
         @ViewBuilder content:
             () -> Content
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(
                 alignment: .leading,
                 spacing: 14

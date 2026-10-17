@@ -656,7 +656,7 @@ struct ATHLTHNotificationCenterView: View {
     }
 
     private var emptyFilteredState: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack(spacing: 13) {
                 Image(systemName: selectedScope.icon)
                     .font(.system(size: 18, weight: .semibold))

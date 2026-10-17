@@ -186,7 +186,7 @@ struct RecoveryAIInsightCard: View {
     let isLoading: Bool
 
     var body: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack(spacing: 8) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 15, weight: .semibold))
@@ -647,7 +647,7 @@ struct RecoverySuggestedTodayCard: View {
     let onOpenTrain: () -> Void
 
     var body: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack(spacing: 8) {
                 Image(systemName: "scope")
                     .font(.system(size: 14, weight: .semibold))
@@ -1691,7 +1691,7 @@ struct RecoveryCoachView: View {
 
     private var coachInsightCard:
         some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack(spacing: 8) {
                 Image(
                     systemName:

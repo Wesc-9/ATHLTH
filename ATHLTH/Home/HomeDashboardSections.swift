@@ -1019,7 +1019,7 @@ struct HomeGettingStartedPopupView: View {
         NavigationLink {
             destination()
         } label: {
-            ATHLTHCard {
+            ATHLTHUnifiedCard {
                 HStack(spacing: 14) {
                     Image(
                         systemName: icon
@@ -1218,7 +1218,7 @@ struct HomeGettingStartedCard: View {
         destination: AnyView,
         onDismiss: @escaping () -> Void
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             ZStack(alignment: .topTrailing) {
                 NavigationLink {
                     destination
@@ -1374,7 +1374,7 @@ struct HomeHappeningCard: View {
 
     var body: some View {
         if hasContent {
-            ATHLTHCard {
+            ATHLTHUnifiedCard {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Happening")
@@ -2086,7 +2086,7 @@ struct HomeHealthMetricDetailView:
                     Spacer()
                 }
 
-                ATHLTHCard {
+                ATHLTHUnifiedCard {
                     HStack(
                         alignment: .top
                     ) {
@@ -2207,7 +2207,7 @@ struct HomeHealthMetricDetailView:
                         .padding(.top, 10)
                 }
 
-                ATHLTHCard {
+                ATHLTHUnifiedCard {
                     Text(
                         ATHLTHLocalization.choose(
                             english: "About the data",

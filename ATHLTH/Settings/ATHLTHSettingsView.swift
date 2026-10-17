@@ -218,10 +218,11 @@ struct ATHLTHSettingsView: View {
         }
         .padding(.horizontal, 16)
         .frame(height: 51)
-        .background(Color.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 18))
+        .background(ATHLTHUnifiedDesign.surface,
+                    in: RoundedRectangle(cornerRadius: 18))
         .overlay {
             RoundedRectangle(cornerRadius: 18)
-                .stroke(ATHLTHTheme.border.opacity(0.8), lineWidth: 0.8)
+                .strokeBorder(ATHLTHUnifiedDesign.outline, lineWidth: 0.8)
         }
     }
 
@@ -2210,7 +2211,7 @@ private struct AppleCalendarSettingsView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     sectionTitle("HOW IT WORKS")
 
-                    ATHLTHCard {
+                    ATHLTHUnifiedCard {
                         VStack(alignment: .leading, spacing: 14) {
                             calendarInfoRow(
                                 icon: "clock",
