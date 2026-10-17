@@ -348,7 +348,15 @@ struct SocialHubView: View {
                 }
 
                 if !social.workoutInvites.isEmpty {
-                    sectionTitle("Train Together")
+                    ATHLTHTrainTogetherSectionTitle(
+                        title: ATHLTHLocalization.choose(
+                            english: "Train Together", norwegian: "Tren sammen"
+                        ),
+                        subtitle: ATHLTHLocalization.choose(
+                            english: "Your invitations and shared workout requests.",
+                            norwegian: "Invitasjoner og forespørsler om felles trening."
+                        )
+                    )
 
                     ForEach(social.workoutInvites) { invite in
                         VStack(alignment: .leading, spacing: 11) {

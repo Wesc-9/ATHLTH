@@ -128,147 +128,72 @@ struct TrainTogetherCreatorLobbyView: View {
     }
 
     private var headerCard: some View {
-        ZStack(
-            alignment: .bottomLeading
-        ) {
-            Image("TrainHero")
-                .resizable()
-                .scaledToFill()
-                .frame(height: 190)
-                .clipped()
-
-            LinearGradient(
-                colors: [
-                    Color.black.opacity(0.04),
-                    Color.black.opacity(0.18),
-                    Color.black.opacity(0.70)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-
-            VStack(
-                alignment: .leading,
-                spacing: 7
-            ) {
-                HStack {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: hasStarted ? "TRAIN TOGETHER" : "PLANNED · NOT STARTED",
-                            norwegian: hasStarted ? "TREN SAMMEN" : "PLANLAGT · IKKE STARTET"
-                        ),
-                        systemImage:
-                            "person.2.fill"
-                    )
-                    .font(
-                        .caption.weight(
-                            .bold
-                        )
-                    )
-                    .tracking(0.8)
-                    .foregroundStyle(
-                        Color.white
-                            .opacity(0.92)
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "person.2.wave.2.fill")
+                    .font(.system(size: 23, weight: .semibold))
+                    .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+                    .frame(width: 54, height: 54)
+                    .background(
+                        ATHLTHTrainTogetherDesign.accentSoft,
+                        in: RoundedRectangle(cornerRadius: 17, style: .continuous)
                     )
 
-                    Spacer()
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(ATHLTHLocalization.choose(
+                        english: hasStarted ? "TRAINING TOGETHER" : "READY LOBBY",
+                        norwegian: hasStarted ? "TRENER SAMMEN" : "KLAR TIL ØKT"
+                    ))
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.5)
+                    .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
 
-                    Button {
-                        social
-                            .minimizeCoordinatedLobby()
-                    } label: {
-                        Image(
-                            systemName:
-                                "xmark"
-                        )
-                        .font(
-                            .system(
-                                size: 14,
-                                weight:
-                                    .bold
-                            )
-                        )
-                        .foregroundStyle(
-                            .white
-                        )
-                        .frame(
-                            width: 38,
-                            height: 38
-                        )
+                    Text(session?.title ?? ATHLTHLocalization.choose(
+                        english: "Shared workout", norwegian: "Fellesøkt"
+                    ))
+                    .font(.system(size: 27, weight: .semibold, design: .serif))
+                    .foregroundStyle(ATHLTHTrainTogetherDesign.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+
+                Button {
+                    social.minimizeCoordinatedLobby()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTrainTogetherDesign.ink)
+                        .frame(width: 44, height: 44)
                         .background(
-                            .ultraThinMaterial,
+                            ATHLTHTrainTogetherDesign.accentSoft.opacity(0.7),
                             in: Circle()
                         )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Close lobby (keep invitation)",
-                            norwegian:
-                                "Lukk lobby (behold invitasjonen)"
-                        )
-                    )
                 }
-
-                Text(
-                    session?.title ??
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Shared workout",
-                        norwegian:
-                            "Fellesøkt"
-                    )
-                )
-                .font(.system(size: 26, weight: .semibold, design: .serif))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "The invitation is planned, not started. Wait for your friend or choose how to begin.",
-                        norwegian:
-                            "Invitasjonen er planlagt, ikke startet. Vent på vennen din eller velg å starte."
-                    )
-                )
-                .font(.subheadline)
-                .foregroundStyle(
-                    Color.white
-                        .opacity(0.86)
-                )
-                .fixedSize(
-                    horizontal: false,
-                    vertical: true
-                )
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Close lobby (keep invitation)",
+                    norwegian: "Lukk lobby (behold invitasjonen)"
+                ))
             }
-            .padding(16)
+
+            Label(
+                ATHLTHLocalization.choose(
+                    english: hasStarted
+                        ? "Your shared session is underway."
+                        : "The workout has not started. Participants can mark themselves ready.",
+                    norwegian: hasStarted
+                        ? "Fellesøkten er i gang."
+                        : "Økten er ikke startet. Deltakerne kan markere seg klare."
+                ),
+                systemImage: hasStarted ? "figure.run" : "clock"
+            )
+            .font(.subheadline)
+            .foregroundStyle(ATHLTHTrainTogetherDesign.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(height: 190)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 26,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 26,
-                style: .continuous
-            )
-            .stroke(
-                Color.white
-                    .opacity(0.30),
-                lineWidth: 0.8
-            )
-        }
-        .shadow(
-            color:
-                Color.black
-                    .opacity(0.10),
-            radius: 18,
-            y: 8
-        )
+        .padding(19)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .athlthTrainTogetherCard(radius: 25)
     }
 
     private var participantCard: some View {

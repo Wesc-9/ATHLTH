@@ -535,6 +535,8 @@ struct TrainTogetherMarketplaceView:
                 }
             }
         }
+        .padding(14)
+        .athlthTrainTogetherCard(radius: 22, subtle: true)
     }
 
     private func filterChip(
@@ -2490,143 +2492,121 @@ private struct TrainTogetherReportSheet:
     }
 }
 
-private struct TrainTogetherJoinRequestSheet:
-    View
-{
-    @Environment(\.dismiss)
-    private var dismiss
-
-    @EnvironmentObject private var marketplace:
-        TrainTogetherMarketplaceStore
+private struct TrainTogetherJoinRequestSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var marketplace: TrainTogetherMarketplaceStore
 
     let post: TrainTogetherPost
-
     @State private var message = ""
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    VStack(
-                        alignment: .leading,
-                        spacing: 6
-                    ) {
-                        Text(post.title)
-                            .font(
-                                .headline
-                            )
-                        Text(
-                            "(post.broadArea) · " +
-                            post.scheduledStart
-                                .formatted(
-                                    date:
-                                        .abbreviated,
-                                    time:
-                                        .shortened
+            ScrollView {
+                VStack(alignment: .leading, spacing: 15) {
+                    ATHLTHTrainTogetherSurface {
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: "person.badge.plus")
+                                .font(.system(size: 22, weight: .semibold))
+                                .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+                                .frame(width: 49, height: 49)
+                                .background(
+                                    ATHLTHTrainTogetherDesign.accentSoft,
+                                    in: RoundedRectangle(cornerRadius: 15)
                                 )
-                        )
-                        .font(.caption)
-                        .foregroundStyle(
-                            .secondary
-                        )
-                    }
-                }
-
-                Section(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Optional message",
-                        norwegian:
-                            "Valgfri melding"
-                    )
-                ) {
-                    TextField(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Hi! Can I join?",
-                            norwegian:
-                                "Hei! Kan jeg bli med?"
-                        ),
-                        text: $message,
-                        axis: .vertical
-                    )
-                    .lineLimit(3...6)
-                }
-
-                Section {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "The creator must approve you before exact meetup information or the shared workout lobby becomes available.",
-                            norwegian:
-                                "Oppretteren må godkjenne deg før nøyaktig møtested og den delte øktlobbyen blir tilgjengelig."
-                        )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
-                        .secondary
-                    )
-                }
-            }
-            .scrollContentBackground(.hidden)
-            .background(ATHLTHTrainTogetherDesign.canvas.ignoresSafeArea())
-            .navigationTitle(
-                ATHLTHLocalization.choose(
-                    english:
-                        "Ask to join",
-                    norwegian:
-                        "Spør om å bli med"
-                )
-            )
-            .navigationBarTitleDisplayMode(
-                .inline
-            )
-            .toolbar {
-                ToolbarItem(
-                    placement:
-                        .cancellationAction
-                ) {
-                    Button(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Cancel",
-                            norwegian:
-                                "Avbryt"
-                        )
-                    ) {
-                        dismiss()
-                    }
-                }
-
-                ToolbarItem(
-                    placement:
-                        .confirmationAction
-                ) {
-                    Button(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Send",
-                            norwegian:
-                                "Send"
-                        )
-                    ) {
-                        Task {
-                            if await marketplace
-                                .requestToJoin(
-                                    postID:
-                                        post.id,
-                                    message:
-                                        message
-                                ) {
-                                dismiss()
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(post.title)
+                                    .font(.system(size: 25, weight: .semibold, design: .serif))
+                                    .foregroundStyle(ATHLTHTrainTogetherDesign.ink)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Text(post.broadArea + " · " + post.scheduledStart.formatted(
+                                    date: .abbreviated, time: .shortened
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTrainTogetherDesign.secondary)
                             }
+                            Spacer(minLength: 0)
                         }
                     }
-                    .disabled(
-                        marketplace
-                            .isWorking
+
+                    ATHLTHTrainTogetherSurface {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Message the organizer (optional)",
+                                norwegian: "Melding til arrangøren (valgfritt)"
+                            ),
+                            systemImage: "bubble.left"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTrainTogetherDesign.ink)
+
+                        TextField(
+                            ATHLTHLocalization.choose(
+                                english: "Hi! Can I join?",
+                                norwegian: "Hei! Kan jeg bli med?"
+                            ),
+                            text: $message,
+                            axis: .vertical
+                        )
+                        .lineLimit(3...6)
+                        .padding(13)
+                        .background(
+                            ATHLTHTrainTogetherDesign.accentSoft.opacity(0.35),
+                            in: RoundedRectangle(cornerRadius: 15)
+                        )
+                    }
+
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Exact meeting details and the shared lobby are available only after the organizer approves you.",
+                            norwegian: "Nøyaktig møtested og felles lobby blir først tilgjengelig når arrangøren har godkjent deg."
+                        ),
+                        systemImage: "lock.shield"
                     )
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTrainTogetherDesign.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 7)
                 }
+                .padding(16)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .background(ATHLTHTrainTogetherDesign.canvas.ignoresSafeArea())
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Ask to join", norwegian: "Spør om å bli med"
+            ))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Cancel", norwegian: "Avbryt"
+                    )) { dismiss() }
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    Task {
+                        if await marketplace.requestToJoin(
+                            postID: post.id, message: message
+                        ) {
+                            dismiss()
+                        }
+                    }
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Send request", norwegian: "Send forespørsel"
+                        ),
+                        systemImage: "paperplane.fill"
+                    )
+                    .font(.headline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTrainTogetherDesign.accent)
+                .disabled(marketplace.isWorking)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(.regularMaterial)
             }
         }
     }
