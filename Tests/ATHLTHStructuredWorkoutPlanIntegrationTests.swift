@@ -57,5 +57,59 @@ final class ATHLTHStructuredWorkoutPlanIntegrationTests: XCTestCase {
         XCTAssertEqual(scheduled.first?.resolvedWorkoutBlocks.expandedForExecution()
             .filter { $0.kind == .rest }.count, 3)
         // Two between-set recoveries plus one explicit pause.
+
+        // Train > Plan and Train > I dag must agree with the recorded
+        // structured workout, even when there is no HealthKit workout yet.
+        let before = store.trainingPlanProgress(
+            savedPlan,
+            healthWorkouts: [],
+            strengthHistory: [],
+            structuredHistory: [],
+            referenceDate: today
+        )
+        XCTAssertEqual(before.completedSessions, 0)
+
+        let completion = StructuredWorkoutCompletion(
+            id: UUID(), workoutTemplateID: nil,
+            sourceWorkoutID: prepared.id, title: prepared.title,
+            category: "strength", startedAt: today,
+            endedAt: today.addingTimeInterval(600),
+            completedBlockCount: 1, totalBlockCount: 2,
+            sourcePlanID: plan.id
+        )
+        XCTAssertTrue(prepared.isStructuredWorkout)
+        let after = store.trainingPlanProgress(
+            savedPlan,
+            healthWorkouts: [],
+            strengthHistory: [],
+            structuredHistory: [completion],
+            referenceDate: today
+        )
+        XCTAssertEqual(after.completedSessions, 1)
+        XCTAssertEqual(after.missed.count, 0)
+
+        let unrelated = StructuredWorkoutCompletion(
+            id: UUID(), workoutTemplateID: nil,
+            sourceWorkoutID: prepared.id, title: prepared.title,
+            category: "strength", startedAt: today,
+            endedAt: today.addingTimeInterval(600),
+            completedBlockCount: 1, totalBlockCount: 2,
+            sourcePlanID: UUID()
+        )
+        let unrelatedProgress = store.trainingPlanProgress(
+            savedPlan, healthWorkouts: [], strengthHistory: [],
+            structuredHistory: [unrelated], referenceDate: today
+        )
+        XCTAssertEqual(unrelatedProgress.completedSessions, 0)
+
+        store.setPlanSessionSkipped(
+            planID: plan.id, sessionID: prepared.id, skipped: true
+        )
+        let skipped = store.trainingPlanProgress(
+            savedPlan, healthWorkouts: [], strengthHistory: [],
+            structuredHistory: [completion], referenceDate: today
+        )
+        XCTAssertEqual(skipped.completedSessions, 0)
+        XCTAssertEqual(skipped.skippedSessions, 1)
     }
 }
