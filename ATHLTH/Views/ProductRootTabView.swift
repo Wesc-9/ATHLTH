@@ -93,6 +93,7 @@ struct ATHLTHMinimizedWorkoutReturnPill: View {
 }
 
 struct ProductRootTabView: View {
+    @ObservedObject private var pushManager = APNsPushManager.shared
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @EnvironmentObject private var notifications:
@@ -232,13 +233,48 @@ struct ProductRootTabView: View {
         .toolbarBackground(.ultraThinMaterial, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
         .toolbarColorScheme(.light, for: .tabBar)
+        // Render the actual challenge detail above the root tabs. The
+        // singleton retains the route if iOS delivers the tap before this
+        // view is created (cold launch).
+        .sheet(
+            item: Binding(
+                get: { pushManager.pendingChallengeNotification },
+                set: { route in
+                    if route == nil {
+                        pushManager.clearPendingChallengeNotification()
+                    }
+                }
+            )
+        ) { route in
+            NavigationStack {
+                ATHLTHChallengeNotificationDestination(route: route)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(ATHLTHLocalization.choose(
+                                english: "Close", norwegian: "Lukk"
+                            )) {
+                                pushManager.clearPendingChallengeNotification()
+                            }
+                        }
+                    }
+            }
+        }
         .onReceive(
             NotificationCenter.default.publisher(
                 for: .athlthRemoteNotificationTapped
             )
         ) { notification in
+            let info = notification.userInfo ?? [:]
+
+            // Personal and official weekly challenge reminders are local
+            // notifications with an entity ID, but no athlth_kind. Never
+            // fall back to Home or a generic Community tab for those taps.
+            if ATHLTHChallengeNotificationRoute.resolve(userInfo: info) != nil {
+                return
+            }
+
             let kind = (
-                notification.userInfo?["athlth_kind"] as? String
+                info["athlth_kind"] as? String
             )?.lowercased() ?? ""
 
             if kind.contains("message") ||
@@ -248,7 +284,7 @@ struct ProductRootTabView: View {
                 kind.contains("workout") ||
                 kind.contains("event") {
                 selectedTab = 4
-            } else {
+            } else if !kind.isEmpty {
                 selectedTab = 0
             }
         }
