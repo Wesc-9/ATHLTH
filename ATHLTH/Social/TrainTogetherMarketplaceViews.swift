@@ -400,7 +400,7 @@ struct TrainTogetherMarketplaceView:
                             .frame(height: 50)
                             .background(
                                 modeFilter == option
-                                    ? ATHLTHTheme.vitality
+                                    ? ATHLTHTrainTogetherDesign.accent
                                     : Color.clear,
                                 in: RoundedRectangle(
                                     cornerRadius: 15,
@@ -520,9 +520,9 @@ struct TrainTogetherMarketplaceView:
                         systemImage: "calendar"
                     )
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.vitality)
+                    .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
                     .padding(.horizontal, 12)
-                    .frame(height: 34)
+                    .frame(height: 36)
                     .background(
                         ATHLTHTrainTogetherDesign.surface,
                         in: Capsule()
@@ -567,8 +567,7 @@ struct TrainTogetherMarketplaceView:
             .frame(height: 36)
             .background(
                 selected
-                    ? ATHLTHTheme
-                        .vitality
+                    ? ATHLTHTrainTogetherDesign.accent
                     : ATHLTHTrainTogetherDesign.surface,
                 in: Capsule()
             )
