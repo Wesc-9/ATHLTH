@@ -547,6 +547,7 @@ final class AppSessionStore: ObservableObject {
             // Remove both separately from the regular training-data cleanup.
             RecoveryCoachConversationPersistence.delete(userID: deletedID)
             PhoneWorkoutCompletionJournal.remove(userID: deletedID)
+            StrengthWorkoutCompletionJournal.remove(userID: deletedID)
             RecoveryCoachConsentPreferences.revoke(userID: deletedID)
             RecoveryInsightAIConsentPreferences.removeForDeletedAccount(
                 userID: deletedID,
