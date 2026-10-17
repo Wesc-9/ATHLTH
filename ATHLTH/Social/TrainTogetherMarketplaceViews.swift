@@ -142,11 +142,8 @@ struct TrainTogetherMarketplaceView:
                                 Image(systemName: "chevron.right")
                                     .foregroundStyle(.secondary)
                             }
-                            .padding(14)
-                            .background(
-                                Color.white.opacity(0.91),
-                                in: RoundedRectangle(cornerRadius: 18)
-                            )
+                            .padding(15)
+                            .athlthTrainTogetherCard(radius: 18, subtle: true)
                         }
                         .buttonStyle(.plain)
                     }
@@ -209,14 +206,7 @@ struct TrainTogetherMarketplaceView:
             .padding(16)
             .padding(.bottom, 34)
         }
-        .background(
-            ATHLTHPremiumCanvas(
-                accent:
-                    ATHLTHTheme
-                        .vitality
-                        .opacity(0.16)
-            )
-        )
+        .background(ATHLTHTrainTogetherDesign.canvas.ignoresSafeArea())
         .navigationTitle(
             "Train Together"
         )
@@ -341,8 +331,8 @@ struct TrainTogetherMarketplaceView:
                         norwegian: "Finn noen å trene med"
                     )
                 )
-                .font(.title3.weight(.bold))
-                .foregroundStyle(ATHLTHTheme.primaryText)
+                .font(.system(size: 27, weight: .semibold, design: .serif))
+                .foregroundStyle(ATHLTHTrainTogetherDesign.ink)
 
                 Text(
                     ATHLTHLocalization.choose(
@@ -364,7 +354,7 @@ struct TrainTogetherMarketplaceView:
                     .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(width: 48, height: 48)
-                    .background(ATHLTHTheme.vitality, in: Circle())
+                    .background(ATHLTHTrainTogetherDesign.accent, in: Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(
@@ -376,10 +366,7 @@ struct TrainTogetherMarketplaceView:
         }
         .padding(17)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            Color.white.opacity(0.94),
-            in: RoundedRectangle(cornerRadius: 23, style: .continuous)
-        )
+        .athlthTrainTogetherCard(radius: 24)
     }
 
     private var filterBar: some View {
@@ -432,11 +419,8 @@ struct TrainTogetherMarketplaceView:
             }
             .padding(4)
             .background(
-                Color.primary.opacity(0.055),
-                in: RoundedRectangle(
-                    cornerRadius: 19,
-                    style: .continuous
-                )
+                ATHLTHTrainTogetherDesign.accentSoft.opacity(0.64),
+                in: RoundedRectangle(cornerRadius: 19, style: .continuous)
             )
 
             // Keep sport filters independently usable in all three tabs.
@@ -613,7 +597,7 @@ struct TrainTogetherMarketplaceView:
     private func postCard(
         _ post: TrainTogetherPost
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHTrainTogetherSurface {
             VStack(
                 alignment: .leading,
                 spacing: 12
@@ -1087,7 +1071,7 @@ struct TrainTogetherMarketplaceView:
 
     private var emptyState:
         some View {
-        ATHLTHCard {
+        ATHLTHTrainTogetherSurface {
             VStack(spacing: 12) {
                 Image(
                     systemName:
@@ -1362,7 +1346,7 @@ struct TrainTogetherPostDetailView:
                 )
             }
         }
-        .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+        .background(ATHLTHTrainTogetherDesign.canvas.ignoresSafeArea())
         .navigationTitle(
             ATHLTHLocalization.choose(
                 english: "Train Together", norwegian: "Tren sammen"
@@ -1541,7 +1525,7 @@ struct TrainTogetherPostDetailView:
     private func detailHero(
         _ post: TrainTogetherPost
     ) -> some View {
-        ATHLTHPlanSurface {
+        ATHLTHTrainTogetherSurface {
             VStack(
                 alignment: .leading,
                 spacing: 14
@@ -1667,7 +1651,7 @@ struct TrainTogetherPostDetailView:
     private func workoutCard(
         _ post: TrainTogetherPost
     ) -> some View {
-        ATHLTHPlanSurface {
+        ATHLTHTrainTogetherSurface {
             VStack(
                 alignment: .leading,
                 spacing: 12
@@ -1776,7 +1760,7 @@ struct TrainTogetherPostDetailView:
         _ post: TrainTogetherPost
     ) -> some View {
         VStack(spacing: 14) {
-            ATHLTHPlanSurface {
+            ATHLTHTrainTogetherSurface {
                 VStack(
                     alignment: .leading,
                     spacing: 12
@@ -1901,7 +1885,7 @@ struct TrainTogetherPostDetailView:
     private func guestControls(
         _ post: TrainTogetherPost
     ) -> some View {
-        ATHLTHPlanSurface {
+        ATHLTHTrainTogetherSurface {
             VStack(
                 alignment: .leading,
                 spacing: 12
@@ -2250,7 +2234,7 @@ struct TrainTogetherPostDetailView:
         _ meetup:
             TrainTogetherMeetup
     ) -> some View {
-        ATHLTHPlanSurface {
+        ATHLTHTrainTogetherSurface {
             VStack(
                 alignment: .leading,
                 spacing: 8
@@ -2805,14 +2789,7 @@ struct TrainTogetherPostCreateView:
         .scrollDismissesKeyboard(
             .interactively
         )
-        .background(
-            ATHLTHPremiumCanvas(
-                accent:
-                    ATHLTHTheme
-                        .vitality
-                        .opacity(0.18)
-            )
-        )
+        .background(ATHLTHTrainTogetherDesign.canvas.ignoresSafeArea())
         .navigationTitle(
             ATHLTHLocalization.choose(
                 english:
@@ -2937,7 +2914,7 @@ struct TrainTogetherPostCreateView:
 
     private var introCard:
         some View {
-        ATHLTHCard {
+        ATHLTHTrainTogetherSurface {
             HStack(
                 alignment: .top,
                 spacing: 14
@@ -3051,7 +3028,7 @@ struct TrainTogetherPostCreateView:
     }
 
     private func preparedWorkoutCard(_ workout: PlannedSession) -> some View {
-        ATHLTHCard {
+        ATHLTHTrainTogetherSurface {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 11) {
                     Image(systemName: workout.kind.systemImage)
@@ -3127,7 +3104,7 @@ struct TrainTogetherPostCreateView:
 
     private var workoutCard:
         some View {
-        ATHLTHCard {
+        ATHLTHTrainTogetherSurface {
             VStack(spacing: 0) {
                 createTextFieldRow(
                     icon: "text.cursor",
@@ -3501,7 +3478,7 @@ struct TrainTogetherPostCreateView:
 
     private var strengthExercisesCard:
         some View {
-        ATHLTHCard {
+        ATHLTHTrainTogetherSurface {
             VStack(
                 alignment: .leading,
                 spacing: 12
@@ -3696,7 +3673,7 @@ struct TrainTogetherPostCreateView:
 
     private var socialWorkoutCard:
         some View {
-        ATHLTHCard {
+        ATHLTHTrainTogetherSurface {
             VStack(
                 alignment: .leading,
                 spacing: 16
@@ -3768,7 +3745,7 @@ struct TrainTogetherPostCreateView:
 
     private var meetupCard:
         some View {
-        ATHLTHCard {
+        ATHLTHTrainTogetherSurface {
             VStack(
                 alignment: .leading,
                 spacing: 14
