@@ -279,8 +279,8 @@ struct ATHLTHQuickStartDeviceLaunchBar: View {
             if !watchAvailable {
                 Label(
                     label(
-                        "Apple Watch isn't connected. Connect it to start on Watch.",
-                        "Apple Watch er ikke tilkoblet. Koble til klokken for å starte der."
+                        "Apple Watch is not ready. Check it under Settings > Health & connections > Watch, or start with iPhone.",
+                        "Apple Watch er ikke klar. Kontroller den under Innstillinger > Helse og tilkoblinger > Watch, eller start med iPhone."
                     ),
                     systemImage: "info.circle"
                 )
@@ -368,10 +368,15 @@ struct ATHLTHQuickStartDeviceLaunchBar: View {
                     "Starts the current workout with this recording device.",
                     "Starter denne økten med valgt registreringsenhet."
                 )
-                : label(
-                    "Apple Watch not connected.",
-                    "Apple Watch er ikke tilkoblet."
-                )
+                : !canStart
+                    ? label(
+                        "Choose a workout or route before starting.",
+                        "Velg en økt eller rute før du starter."
+                    )
+                    : label(
+                        "Apple Watch is not ready. Check it in Settings.",
+                        "Apple Watch er ikke klar. Kontroller klokken i Innstillinger."
+                    )
         )
     }
 }
