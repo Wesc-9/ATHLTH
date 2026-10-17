@@ -1479,7 +1479,8 @@ struct MyWorkoutTemplatesView: View {
                                 Image(systemName: "chevron.right")
                             }
                             .padding(14)
-                            .background(.white, in: RoundedRectangle(cornerRadius: 15))
+                            .frame(minHeight: ATHLTHPlanDesign.minTapHeight)
+                            .athlthPlanCard(radius: 18)
                         }
                         .buttonStyle(.plain)
                     }
@@ -1529,13 +1530,7 @@ struct MyWorkoutTemplatesView: View {
                                 Spacer()
                             }
                             .padding(12)
-                            .background(
-                                Color.white.opacity(0.72),
-                                in: RoundedRectangle(
-                                    cornerRadius: 17,
-                                    style: .continuous
-                                )
-                            )
+                            .athlthPlanCard(radius: 17)
                         }
                     }
                 }
@@ -1562,12 +1557,8 @@ struct MyWorkoutTemplatesView: View {
             .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
         }
-        .background(
-            ATHLTHPremiumCanvas(
-                accent: ATHLTHTheme.accent.opacity(0.14)
-            )
-        )
-        .navigationTitle("My Workouts")
+        .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+        .navigationTitle(ATHLTHLocalization.choose(english: "My workouts", norwegian: "Mine treningsøkter"))
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingRunningBuilder) {
             ATHLTHTrainIntervalComposerView { workout in
@@ -1659,24 +1650,8 @@ struct MyWorkoutTemplatesView: View {
                 }
             }
         }
-        .padding(15)
-        .background(
-            Color.white.opacity(0.82),
-            in: RoundedRectangle(
-                cornerRadius: 21,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 21,
-                style: .continuous
-            )
-            .stroke(
-                Color.white.opacity(0.90),
-                lineWidth: 0.8
-            )
-        }
+        .padding(16)
+        .athlthPlanCard(radius: 21)
     }
 
     private func savedWorkoutSubtitle(
@@ -2076,7 +2051,8 @@ struct WorkoutTemplateBuilderView: View {
                         tr("Workout name (optional)", "Navn på økten (valgfritt)"),
                         text: $title
                     )
-                    .font(.system(size: 27, weight: .bold, design: .rounded))
+                    .font(.system(size: 27, weight: .semibold,
+                                  design: isPlannedWorkout ? .serif : .rounded))
                     .foregroundStyle(studioInk)
                     .tint(studioAccent)
                     .lineLimit(1)
@@ -2124,7 +2100,12 @@ struct WorkoutTemplateBuilderView: View {
             .lineLimit(1)
             .padding(.horizontal, 9)
             .frame(height: 28)
-            .background(.white.opacity(0.79), in: Capsule())
+            .background(isPlannedWorkout ? ATHLTHPlanDesign.selectedSurface
+                         : Color.white.opacity(0.79), in: Capsule())
+            .overlay {
+                Capsule().strokeBorder(isPlannedWorkout ? ATHLTHPlanDesign.outline
+                                       : Color.clear, lineWidth: 0.7)
+            }
     }
 
     private var timeline: some View {
@@ -2410,9 +2391,15 @@ struct WorkoutTemplateBuilderView: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(studioAccent)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 34)
-                        .background(studioAccent.opacity(0.065),
+                        .frame(minHeight: ATHLTHPlanDesign.minTapHeight)
+                        .background(isPlannedWorkout ? ATHLTHPlanDesign.selectedSurface
+                                     : studioAccent.opacity(0.065),
                                     in: RoundedRectangle(cornerRadius: 11))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 11)
+                                .strokeBorder(isPlannedWorkout ? ATHLTHPlanDesign.outline
+                                              : Color.clear, lineWidth: 0.8)
+                        }
                 }
             }
         }
@@ -2482,7 +2469,13 @@ struct WorkoutTemplateBuilderView: View {
                 }
                 .padding(11)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(studioBackground, in: RoundedRectangle(cornerRadius: 13))
+                .background(isPlannedWorkout ? ATHLTHPlanDesign.selectedSurface : studioBackground,
+                            in: RoundedRectangle(cornerRadius: 13))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 13)
+                        .strokeBorder(isPlannedWorkout ? ATHLTHPlanDesign.outline
+                                      : Color.clear, lineWidth: 0.8)
+                }
             }
         }
         .padding(.top, 4)
@@ -2678,7 +2671,7 @@ struct WorkoutTemplateBuilderView: View {
                 .font(.system(size: 21, weight: .medium))
                 .foregroundStyle(studioInk.opacity(0.82))
                 .frame(width: size, height: size)
-                .background(studioBackground,
+                .background(isPlannedWorkout ? ATHLTHPlanDesign.selectedSurface : studioBackground,
                             in: RoundedRectangle(cornerRadius: 11))
         }
     }
