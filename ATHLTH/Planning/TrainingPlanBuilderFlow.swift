@@ -4730,7 +4730,14 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     )
                 )
                 : AnyShapeStyle(
-                    Color.white.opacity(0.72)
+                    LinearGradient(
+                        colors: [
+                            ATHLTHPlanDesign.surface,
+                            ATHLTHTheme.cardWarm.opacity(0.38)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
                 ),
             in: RoundedRectangle(
                 cornerRadius: 19,
@@ -4743,12 +4750,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 style: .continuous
             )
             .stroke(
-                Color.white.opacity(
-                    prominent ? 0.12 : 0.90
-                ),
+                prominent ? Color.white.opacity(0.14)
+                    : ATHLTHPlanDesign.outline,
                 lineWidth: 0.8
             )
         }
+        .shadow(color: ATHLTHTheme.accentDeep.opacity(prominent ? 0.10 : 0.045),
+                radius: 12, y: 5)
     }
 
     private func stepIntro(
