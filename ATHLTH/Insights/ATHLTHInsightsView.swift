@@ -24,8 +24,8 @@ struct ATHLTHInsightsView: View {
             ) {
                 ATHLTHTabHero(
                     imageName: "ProgressHero",
-                    title: "Insights",
-                    subtitle: "Understand what is happening, what changed and what it means for your training.",
+                    title: ATHLTHLocalization.choose(english: "Insights", norwegian: "Innsikt"),
+                    subtitle: ATHLTHLocalization.choose(english: "Understand what is happening, what changed and what it means for your training.", norwegian: "Forstå dagsformen, endringene og hva de betyr for treningen din."),
                     height: 236,
                     alignment: .leading,
                     focalOffsetX: immersive ? 4 : 16,
@@ -65,7 +65,7 @@ struct ATHLTHInsightsView: View {
     }
 
     private var pulseCard: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack(alignment: .top, spacing: 14) {
                 ZStack {
                     Circle()
@@ -83,7 +83,7 @@ struct ATHLTHInsightsView: View {
                         .foregroundStyle(.secondary)
 
                     Text(pulseTitle)
-                        .font(.system(size: 27, weight: .bold, design: .rounded))
+                        .font(.system(size: 28, weight: .semibold, design: .serif))
                         .foregroundStyle(ATHLTHTheme.primaryText)
 
                     Text(pulseDetail)
@@ -97,7 +97,8 @@ struct ATHLTHInsightsView: View {
                 if let score = health.recovery.score {
                     VStack(spacing: 1) {
                         Text("\(score)")
-                            .font(.title2.weight(.bold))
+                            .font(.system(size: 29, weight: .bold, design: .rounded))
+                            .monospacedDigit()
                             .foregroundStyle(pulseTint)
                             .contentTransition(.numericText())
 
@@ -112,10 +113,10 @@ struct ATHLTHInsightsView: View {
     }
 
     private var nowCard: some View {
-        ATHLTHCard {
-            ATHLTHSectionHeader(title: "Now")
+        ATHLTHUnifiedCard {
+            ATHLTHSectionHeader(title: ATHLTHLocalization.choose(english: "Now", norwegian: "Akkurat nå"))
 
-            Text("Your current signals, without making you interpret a dashboard first.")
+            Text(ATHLTHLocalization.choose(english: "Your current signals, without making you interpret a dashboard first.", norwegian: "Dagens viktigste signaler, enkelt forklart."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .padding(.top, 2)
@@ -128,7 +129,7 @@ struct ATHLTHInsightsView: View {
                 spacing: 10
             ) {
                 insightMetric(
-                    title: "Sleep",
+                    title: ATHLTHLocalization.choose(english: "Sleep", norwegian: "Søvn"),
                     value: sleepValue,
                     detail: sleepDetail,
                     icon: "moon.fill",
@@ -144,7 +145,7 @@ struct ATHLTHInsightsView: View {
                 )
 
                 insightMetric(
-                    title: "Resting HR",
+                    title: ATHLTHLocalization.choose(english: "Resting HR", norwegian: "Hvilepuls"),
                     value: restingHRValue,
                     detail: restingHRDetail,
                     icon: "heart.fill",
@@ -152,7 +153,7 @@ struct ATHLTHInsightsView: View {
                 )
 
                 insightMetric(
-                    title: "Recovery",
+                    title: ATHLTHLocalization.choose(english: "Recovery", norwegian: "Restitusjon"),
                     value: recoveryValue,
                     detail: health.recovery.state.title,
                     icon: health.recovery.state.systemImage,
@@ -164,13 +165,13 @@ struct ATHLTHInsightsView: View {
     }
 
     private var whatChangedCard: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("What changed?")
+                    Text(ATHLTHLocalization.choose(english: "What changed?", norwegian: "Hva har endret seg?"))
                         .font(.title3.weight(.bold))
 
-                    Text("Meaningful differences versus your previous 28 days.")
+                    Text(ATHLTHLocalization.choose(english: "Meaningful differences versus your previous 28 days.", norwegian: "Utviklingen sammenlignet med de foregående 28 dagene."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -193,7 +194,7 @@ struct ATHLTHInsightsView: View {
                         .foregroundStyle(ATHLTHTheme.accent)
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("No major shift detected")
+                        Text(ATHLTHLocalization.choose(english: "No major shift detected", norwegian: "Ingen store endringer"))
                             .font(.subheadline.weight(.semibold))
 
                         Text(
@@ -253,13 +254,13 @@ struct ATHLTHInsightsView: View {
     }
 
     private var trendCard: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Trend")
+                    Text(ATHLTHLocalization.choose(english: "Trend", norwegian: "Utvikling"))
                         .font(.title3.weight(.bold))
 
-                    Text("Last 28 days")
+                    Text(ATHLTHLocalization.choose(english: "Last 28 days", norwegian: "Siste 28 dager"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -270,7 +271,7 @@ struct ATHLTHInsightsView: View {
                     ATHLTHProgressView()
                 } label: {
                     HStack(spacing: 4) {
-                        Text("All progress")
+                        Text(ATHLTHLocalization.choose(english: "All progress", norwegian: "All fremgang"))
                         Image(systemName: "chevron.right")
                     }
                     .font(.caption.weight(.semibold))
@@ -287,21 +288,21 @@ struct ATHLTHInsightsView: View {
                     spacing: 10
                 ) {
                     trendMetric(
-                        title: "Workouts",
+                        title: ATHLTHLocalization.choose(english: "Workouts", norwegian: "Treningsøkter"),
                         value: "\(snapshot.workoutCount)",
                         change: snapshot.workoutChangePercent,
                         icon: "dumbbell.fill"
                     )
 
                     trendMetric(
-                        title: "Training",
+                        title: ATHLTHLocalization.choose(english: "Training", norwegian: "Trening"),
                         value: formatDuration(snapshot.trainingDuration),
                         change: snapshot.trainingDurationChangePercent,
                         icon: "clock.fill"
                     )
 
                     trendMetric(
-                        title: "Distance",
+                        title: ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse"),
                         value: String(
                             format: "%.1f km",
                             snapshot.workoutDistanceMeters / 1_000
@@ -311,7 +312,7 @@ struct ATHLTHInsightsView: View {
                     )
 
                     trendMetric(
-                        title: "Daily steps",
+                        title: ATHLTHLocalization.choose(english: "Daily steps", norwegian: "Daglige steg"),
                         value: snapshot.averageDailySteps.map {
                             Int($0.rounded()).formatted()
                         } ?? "—",
@@ -329,7 +330,7 @@ struct ATHLTHInsightsView: View {
                 .foregroundStyle(.secondary)
                 .padding(.top, 12)
             } else {
-                Text("ATHLTH will show trends when comparable training data is available.")
+                Text(ATHLTHLocalization.choose(english: "ATHLTH will show trends when comparable training data is available.", norwegian: "Utviklingen vises når ATHLTH har nok sammenlignbare treningsdata."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.top, 12)
@@ -338,7 +339,7 @@ struct ATHLTHInsightsView: View {
     }
 
     private var whyItMattersCard: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack(alignment: .top, spacing: 13) {
                 Image(systemName: "lightbulb.max.fill")
                     .font(.system(size: 19, weight: .semibold))
@@ -353,7 +354,7 @@ struct ATHLTHInsightsView: View {
                     )
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Why it matters")
+                    Text(ATHLTHLocalization.choose(english: "Why it matters", norwegian: "Hva betyr dette?"))
                         .font(.title3.weight(.bold))
 
                     Text(whyItMattersText)
@@ -390,13 +391,13 @@ struct ATHLTHInsightsView: View {
     }
 
     private var whatIfCard: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("What if?")
+                    Text(ATHLTHLocalization.choose(english: "What if?", norwegian: "Hva om?"))
                         .font(.title3.weight(.bold))
 
-                    Text("Model a training week before you commit to it.")
+                    Text(ATHLTHLocalization.choose(english: "Model a training week before you commit to it.", norwegian: "Se hvordan en treningsuke kan påvirke belastningen før du bestemmer deg."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -420,7 +421,7 @@ struct ATHLTHInsightsView: View {
                 in: 2...7
             ) {
                 HStack {
-                    Text("Sessions per week")
+                    Text(ATHLTHLocalization.choose(english: "Sessions per week", norwegian: "Økter per uke"))
                         .font(.subheadline.weight(.semibold))
 
                     Spacer()
@@ -434,15 +435,15 @@ struct ATHLTHInsightsView: View {
 
             HStack(spacing: 10) {
                 simulatorMetric(
-                    title: "Baseline",
+                    title: ATHLTHLocalization.choose(english: "Baseline", norwegian: "Utgangspunkt"),
                     value: "\(Int(baselineSessionMinutes.rounded())) min",
-                    subtitle: "avg. session"
+                    subtitle: ATHLTHLocalization.choose(english: "avg. session", norwegian: "gj.sn. økt")
                 )
 
                 simulatorMetric(
-                    title: "Scenario",
+                    title: ATHLTHLocalization.choose(english: "Scenario", norwegian: "Forslag"),
                     value: "\(Int(projectedWeeklyMinutes.rounded())) min",
-                    subtitle: "per week"
+                    subtitle: ATHLTHLocalization.choose(english: "per week", norwegian: "per uke")
                 )
             }
             .padding(.top, 10)
@@ -483,7 +484,7 @@ struct ATHLTHInsightsView: View {
         NavigationLink {
             GhostReplaySimulatorView()
         } label: {
-            ATHLTHCard {
+            ATHLTHUnifiedCard {
                 HStack(alignment: .top, spacing: 13) {
                     Image(systemName: "figure.run.circle.fill")
                         .font(.system(size: 24, weight: .semibold))
@@ -498,7 +499,7 @@ struct ATHLTHInsightsView: View {
                         )
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Race yourself")
+                        Text(ATHLTHLocalization.choose(english: "Race yourself", norwegian: "Utfordre deg selv"))
                             .font(.headline)
                             .foregroundStyle(ATHLTHTheme.primaryText)
 
@@ -522,16 +523,16 @@ struct ATHLTHInsightsView: View {
     }
 
     private var detailDestinationsCard: some View {
-        ATHLTHCard {
-            ATHLTHSectionHeader(title: "Go deeper")
+        ATHLTHUnifiedCard {
+            ATHLTHSectionHeader(title: ATHLTHLocalization.choose(english: "Go deeper", norwegian: "Se flere detaljer"))
 
             VStack(spacing: 0) {
                 NavigationLink {
                     ATHLTHRecoveryView(onSelectTab: onSelectTab)
                 } label: {
                     insightDestinationRow(
-                        title: "Recovery details",
-                        subtitle: "Readiness, sleep, soreness and recovery tools",
+                        title: ATHLTHLocalization.choose(english: "Recovery details", norwegian: "Restitusjon"),
+                        subtitle: ATHLTHLocalization.choose(english: "Readiness, sleep, soreness and recovery tools", norwegian: "Dagsform, søvn, stølhet og restitusjon"),
                         icon: "leaf.fill"
                     )
                 }
@@ -543,8 +544,8 @@ struct ATHLTHInsightsView: View {
                     ATHLTHProgressView()
                 } label: {
                     insightDestinationRow(
-                        title: "Progress details",
-                        subtitle: "Charts, records, consistency and achievements",
+                        title: ATHLTHLocalization.choose(english: "Progress details", norwegian: "Fremgang"),
+                        subtitle: ATHLTHLocalization.choose(english: "Charts, records, consistency and achievements", norwegian: "Grafer, rekorder, kontinuitet og prestasjoner"),
                         icon: "chart.bar.fill"
                     )
                 }
@@ -624,7 +625,7 @@ struct ATHLTHInsightsView: View {
                 .font(.caption2.weight(.bold))
                 .foregroundStyle(change >= 0 ? ATHLTHTheme.accent : .orange)
             } else {
-                Text("No comparison")
+                Text(ATHLTHLocalization.choose(english: "No comparison", norwegian: "Ingen sammenligning"))
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
@@ -709,13 +710,13 @@ struct ATHLTHInsightsView: View {
     private var pulseTitle: String {
         switch health.recovery.state {
         case .ready:
-            return "STRONG"
+            return ATHLTHLocalization.choose(english: "STRONG", norwegian: "STERK")
         case .balanced:
-            return "BALANCED"
+            return ATHLTHLocalization.choose(english: "BALANCED", norwegian: "BALANSERT")
         case .takeItEasy, .recover:
-            return "RECOVER"
+            return ATHLTHLocalization.choose(english: "RECOVER", norwegian: "RESTITUSJON")
         case .buildingBaseline:
-            return "LEARNING"
+            return ATHLTHLocalization.choose(english: "LEARNING", norwegian: "KARTLEGGER")
         }
     }
 
@@ -869,7 +870,7 @@ struct ATHLTHInsightsView: View {
             to: &items,
             percent: snapshot.workoutDistanceChangePercent,
             threshold: 8,
-            noun: "Distance",
+            noun: ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse"),
             icon: "point.topleft.down.to.point.bottomright.curvepath",
             tint: .blue
         )
@@ -896,7 +897,7 @@ struct ATHLTHInsightsView: View {
             to: &items,
             percent: snapshot.stepsChangePercent,
             threshold: 10,
-            noun: "Daily steps",
+            noun: ATHLTHLocalization.choose(english: "Daily steps", norwegian: "Daglige steg"),
             icon: "figure.walk",
             tint: .orange
         )
