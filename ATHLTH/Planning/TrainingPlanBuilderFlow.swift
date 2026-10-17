@@ -56,6 +56,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var firstGuidedWeekDecisionMade = false
     @State private var repeatWeekCount = 1
     @State private var selectingLibraryDay: WeekDayEditorSelection?
+    @State private var pendingLibraryDay: WeekDayEditorSelection?
+    @State private var pendingStudioDay: WeekDayEditorSelection?
     @State private var addingExtraWorkout = false
     @State private var selectingExtraFromLibrary = false
 
@@ -635,7 +637,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
             )
         }
-        .sheet(item: $editingWeekDay) { selection in
+        .sheet(item: $editingWeekDay, onDismiss: {
+            if let pendingStudioDay {
+                self.pendingStudioDay = nil
+                composingAdvancedDay = pendingStudioDay
+            } else if let pendingLibraryDay {
+                self.pendingLibraryDay = nil
+                selectingLibraryDay = pendingLibraryDay
+            }
+        }) { selection in
             planDayActionsSheet(for: selection.id)
         }
         .sheet(item: $selectingLibraryDay) { selection in
@@ -3413,6 +3423,48 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     }
+                    if weekPlanningApproach == .quick,
+                       weekDayEdits[weekDayKey(day)]?.detailedWorkout == nil {
+                        ATHLTHPlanSurface {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Quick choice", norwegian: "Hurtigvalg"
+                                ))
+                                .font(.headline)
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Select the workout type now, or build it in detail below.",
+                                    norwegian: "Velg treningsform nå, eller bygg en detaljert økt nedenfor."
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                ForEach([WorkoutKind.strength, .running, .walking, .mobility], id: \.self) { kind in
+                                    Button {
+                                        updateWeekDay(day) { edit in
+                                            edit.kind = kind
+                                            edit.title = kind.title
+                                            edit.durationMinutes = resolvedWorkoutMinutes(for: day)
+                                            edit.detailedWorkout = nil
+                                            edit.additionalDetailedWorkouts = nil
+                                            edit.removeTemplateDetail = true
+                                            edit.isRestDay = false
+                                        }
+                                        editingWeekDay = nil
+                                    } label: {
+                                        HStack {
+                                            Image(systemName: kind.systemImage)
+                                            Text(kind.title)
+                                            Spacer()
+                                            Image(systemName: "chevron.right")
+                                        }
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                                        .frame(minHeight: 42)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
                     ATHLTHPlanWeekApproachCard(
                         icon: "plus.circle",
                         title: ATHLTHLocalization.choose(english: "Build planned workout", norwegian: "Bygg planlagt økt"),
@@ -3421,9 +3473,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             norwegian: "Lag en detaljert treningsøkt i ATHLTH Studio."
                         )
                     ) {
-                        editingWeekDay = nil
                         addingExtraWorkout = false
-                        composingAdvancedDay = WeekDayEditorSelection(id: day)
+                        pendingStudioDay = WeekDayEditorSelection(id: day)
+                        editingWeekDay = nil
                     }
                     ATHLTHPlanWeekApproachCard(
                         icon: "books.vertical",
@@ -3433,9 +3485,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             norwegian: "Hent lagrede økter med alle øvelser og intervaller."
                         )
                     ) {
-                        editingWeekDay = nil
                         selectingExtraFromLibrary = false
-                        selectingLibraryDay = WeekDayEditorSelection(id: day)
+                        pendingLibraryDay = WeekDayEditorSelection(id: day)
+                        editingWeekDay = nil
                     }
                     if weekDayEdits[weekDayKey(day)]?.detailedWorkout != nil {
                         ATHLTHPlanWeekApproachCard(
@@ -3446,9 +3498,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 norwegian: "Bygg en ny økt samme dag."
                             )
                         ) {
-                            editingWeekDay = nil
                             addingExtraWorkout = true
-                            composingAdvancedDay = WeekDayEditorSelection(id: day)
+                            pendingStudioDay = WeekDayEditorSelection(id: day)
+                            editingWeekDay = nil
                         }
                         ATHLTHPlanWeekApproachCard(
                             icon: "books.vertical",
@@ -3458,9 +3510,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 norwegian: "Velg en eksisterende komplett økt."
                             )
                         ) {
-                            editingWeekDay = nil
                             selectingExtraFromLibrary = true
-                            selectingLibraryDay = WeekDayEditorSelection(id: day)
+                            pendingLibraryDay = WeekDayEditorSelection(id: day)
+                            editingWeekDay = nil
                         }
                     }
                     ATHLTHPlanWeekApproachCard(
