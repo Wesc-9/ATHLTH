@@ -4420,6 +4420,16 @@ private struct HomeFollowingHistoryCard:
     }
 }
 
+/// Empty muscle data should never render an inactive two-body atlas.
+/// Shared by personal workouts and workouts in the activity feed.
+enum HomeStrengthArtworkPolicy {
+    static func usesFallbackPhoto(
+        _ profile: StrengthMuscleProfile
+    ) -> Bool {
+        profile.activations.isEmpty
+    }
+}
+
 private struct HomeStrengthMuscleArtwork:
     View {
     let profile: StrengthMuscleProfile
@@ -4435,7 +4445,7 @@ private struct HomeStrengthMuscleArtwork:
     var body: some View {
         GeometryReader { proxy in
             Group {
-                if profile.activations.isEmpty {
+                if HomeStrengthArtworkPolicy.usesFallbackPhoto(profile) {
                     // No recorded muscle groups: show the selected premium
                     // strength photo instead of two inactive body diagrams.
                     // Workout time remains live in the existing activity card.
