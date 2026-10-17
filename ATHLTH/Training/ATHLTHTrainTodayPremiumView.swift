@@ -965,6 +965,20 @@ enum TrainTodayOverviewPolicy {
         return hasPlan ? .noWorkoutInPlan : .noActivePlan
     }
 
+    /// A completed iPhone workout still counts when HealthKit access is denied
+    /// or its import has not finished. Never count an active, unfinished session.
+    static func hasRecordedWorkout(
+        on day: Date,
+        healthStartDates: [Date],
+        strengthEndDates: [Date],
+        phoneCompletedDates: [Date],
+        calendar: Calendar = .current
+    ) -> Bool {
+        healthStartDates.contains { calendar.isDate($0, inSameDayAs: day) } ||
+            strengthEndDates.contains { calendar.isDate($0, inSameDayAs: day) } ||
+            phoneCompletedDates.contains { calendar.isDate($0, inSameDayAs: day) }
+    }
+
     static func reliableReadiness(
         _ readiness: RecoveryReadinessSummary,
         sleepEnd: Date?,
