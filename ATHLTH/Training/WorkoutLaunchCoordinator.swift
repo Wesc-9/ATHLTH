@@ -451,8 +451,7 @@ enum WorkoutLaunchCoordinator {
         guard await watchConnection
             .confirmNoActiveWatchWorkout()
         else {
-            throw AppleWatchWorkoutLaunchError
-                .workoutAlreadyActive
+            throw watchConnection.blockedWatchWorkoutLaunchError
         }
 
         let selectedRoute: TrainingRoute? = {
@@ -819,8 +818,7 @@ enum WorkoutLaunchCoordinator {
         guard await watchConnection
             .confirmNoActiveWatchWorkout()
         else {
-            throw AppleWatchWorkoutLaunchError
-                .workoutAlreadyActive
+            throw watchConnection.blockedWatchWorkoutLaunchError
         }
 
         if configuration.captureDevice == .iPhone {
@@ -971,8 +969,7 @@ enum WorkoutLaunchCoordinator {
         guard await watchConnection
             .confirmNoActiveWatchWorkout()
         else {
-            throw AppleWatchWorkoutLaunchError
-                .workoutAlreadyActive
+            throw watchConnection.blockedWatchWorkoutLaunchError
         }
 
         // Basic tracking can still opt into voice guidance. Keep the
