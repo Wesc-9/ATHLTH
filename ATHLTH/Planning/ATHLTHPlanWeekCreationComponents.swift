@@ -124,7 +124,7 @@ struct ATHLTHPlanWorkoutLibraryPicker: View {
 
                     if !hasMatchingWorkouts {
                         VStack(spacing: 9) {
-                            Image(systemName: "rectangle.stack.badge.questionmark")
+                            Image(systemName: "rectangle.stack")
                                 .font(.system(size: 27, weight: .medium))
                                 .foregroundStyle(ATHLTHPlanDesign.ink)
                             Text(ATHLTHLocalization.choose(

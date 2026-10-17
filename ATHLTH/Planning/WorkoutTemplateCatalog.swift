@@ -1488,7 +1488,10 @@ struct MyWorkoutTemplatesView: View {
 
                 if !completionHistory.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("RECENT COMPLETED")
+                        Text(ATHLTHLocalization.choose(
+                            english: "RECENTLY COMPLETED",
+                            norwegian: "NYLIG GJENNOMFØRT"
+                        ))
                             .font(.caption2.weight(.bold))
                             .tracking(1.7)
                             .foregroundStyle(
@@ -1521,7 +1524,9 @@ struct MyWorkoutTemplatesView: View {
                                         )
 
                                     Text(
-                                        "\(completion.completedBlockCount)/\(completion.totalBlockCount) blocks · \(completion.endedAt.formatted(date: .abbreviated, time: .shortened))"
+                                        "\(completion.completedBlockCount)/\(completion.totalBlockCount) " +
+                                    ATHLTHLocalization.choose(english: "blocks", norwegian: "blokker") +
+                                    " · \(completion.endedAt.formatted(date: .abbreviated, time: .shortened))"
                                     )
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -1538,10 +1543,15 @@ struct MyWorkoutTemplatesView: View {
                 if session.savedWorkoutTemplates.isEmpty &&
                    runningLibrary.customTemplates.isEmpty {
                     ContentUnavailableView(
-                        "No saved workouts",
+                        ATHLTHLocalization.choose(
+                            english: "No saved workouts", norwegian: "Ingen lagrede treningsøkter"
+                        ),
                         systemImage: "rectangle.stack",
                         description: Text(
-                            "Save a workout from the Library or create one of your own."
+                            ATHLTHLocalization.choose(
+                            english: "Save a workout from the Library or create one of your own.",
+                            norwegian: "Lagre en økt fra biblioteket, eller lag din egen."
+                        )
                         )
                     )
                     .padding(.top, 60)
@@ -1611,7 +1621,9 @@ struct MyWorkoutTemplatesView: View {
 
                 Menu {
                     Button(
-                        "Delete",
+                        ATHLTHLocalization.choose(
+                            english: "Delete", norwegian: "Slett"
+                        ),
                         role: .destructive
                     ) {
                         session.deleteSavedWorkoutTemplate(
@@ -1658,12 +1670,10 @@ struct MyWorkoutTemplatesView: View {
         _ workout: PlannedSession
     ) -> String {
         if workout.isStructuredWorkout {
-            let category =
-                workout.workoutCategory?
-                    .capitalized ??
-                "Workout"
-            return
-                "\(category) · \(workout.resolvedWorkoutBlocks.count) blocks"
+            let category = workout.workoutCategory?.capitalized ??
+                ATHLTHLocalization.choose(english: "Workout", norwegian: "Treningsøkt")
+            return category + " · \(workout.resolvedWorkoutBlocks.count) " +
+                ATHLTHLocalization.choose(english: "blocks", norwegian: "blokker")
         }
 
         return workout.kind.title

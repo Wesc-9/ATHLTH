@@ -1916,25 +1916,17 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             .padding(.horizontal, 14)
             .frame(maxWidth: .infinity, minHeight: 58)
             .background(
-
                 selected ? ATHLTHTheme.accentDeep : ATHLTHPlanDesign.surface,
-
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-
             )
-
             .overlay {
-
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-
-                    .strokeBorder(selected ? Color.white.opacity(0.12)
-
-                                  : ATHLTHPlanDesign.outline, lineWidth: 0.8)
-
+                    .strokeBorder(
+                        selected ? Color.white.opacity(0.12) : ATHLTHPlanDesign.outline,
+                        lineWidth: 0.8
+                    )
             }
-
             .shadow(color: ATHLTHTheme.accentDeep.opacity(selected ? 0.06 : 0.035),
-
                     radius: 8, y: 3)
         }
         .buttonStyle(.plain)
@@ -1951,25 +1943,17 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 .foregroundStyle(selected ? Color.white : ATHLTHPlanDesign.ink)
                 .frame(maxWidth: .infinity, minHeight: 60)
                 .background(
-
                     selected ? ATHLTHTheme.accentDeep : ATHLTHPlanDesign.surface,
-
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-
                 )
-
                 .overlay {
-
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-
-                        .strokeBorder(selected ? Color.white.opacity(0.12)
-
-                                      : ATHLTHPlanDesign.outline, lineWidth: 0.8)
-
+                        .strokeBorder(
+                            selected ? Color.white.opacity(0.12) : ATHLTHPlanDesign.outline,
+                            lineWidth: 0.8
+                        )
                 }
-
                 .shadow(color: ATHLTHTheme.accentDeep.opacity(selected ? 0.06 : 0.035),
-
                         radius: 8, y: 3)
         }
         .buttonStyle(.plain)
