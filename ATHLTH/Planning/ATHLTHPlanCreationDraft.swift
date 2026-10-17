@@ -30,6 +30,9 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
     var structuredWorkoutsByDay:
         [Int: ATHLTHPlanStructuredWorkoutBlueprint]? = nil
     var weekDayEdits: [Int: ATHLTHPlanWeekDayEdit]? = nil
+    var planningApproach: String? = nil
+    var guidedDayCursor: Int? = nil
+    var firstGuidedWeekDecisionMade: Bool? = nil
     var savedAt: Date
 
     init(
@@ -49,6 +52,9 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         structuredWorkoutsByDay:
             [Int: ATHLTHPlanStructuredWorkoutBlueprint]? = nil,
         weekDayEdits: [Int: ATHLTHPlanWeekDayEdit]? = nil,
+        planningApproach: String? = nil,
+        guidedDayCursor: Int? = nil,
+        firstGuidedWeekDecisionMade: Bool? = nil,
         savedAt: Date = Date()
     ) {
         self.schemaVersion = Self.schemaVersion
@@ -59,6 +65,10 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         self.advanced = advanced
         self.source = source
         self.stage = stage
+        self.planningApproach = advanced && ["quick", "guided"].contains(planningApproach ?? "")
+            ? planningApproach : nil
+        self.guidedDayCursor = advanced ? guidedDayCursor.map { min(max($0, 0), self.weekCount * 7) } : nil
+        self.firstGuidedWeekDecisionMade = advanced ? firstGuidedWeekDecisionMade : nil
         if let preferredDayIndexes {
             let valid = Set(preferredDayIndexes.filter { (1...7).contains($0) })
             self.preferredDayIndexes = valid.isEmpty ? nil : valid.sorted()

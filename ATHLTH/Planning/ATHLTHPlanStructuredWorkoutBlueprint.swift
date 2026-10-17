@@ -95,6 +95,7 @@ struct ATHLTHPlanWeekDayEdit: Codable, Hashable {
     var detailedWorkout: ATHLTHPlanStructuredWorkoutBlueprint?
     var isCustomTitle = false
     var removeTemplateDetail = false
+    var isRestDay = false
 
     func applying(to original: PlannedSession?) -> PlannedSession {
         var result = original ?? PlannedSession(
@@ -152,6 +153,10 @@ struct ATHLTHPlanWeekDayEdit: Codable, Hashable {
             guard let dayIndex = weeks[weekIndex].days.firstIndex(
                 where: { $0.dayIndex == relativeDay }
             ) else { continue }
+            if edit.isRestDay {
+                weeks[weekIndex].days[dayIndex].sessions = []
+                continue
+            }
             let previous = weeks[weekIndex].days[dayIndex].sessions.first
             weeks[weekIndex].days[dayIndex].sessions = [edit.applying(to: previous)]
         }
