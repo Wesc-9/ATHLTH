@@ -1790,9 +1790,21 @@ struct WorkoutTemplateBuilderView: View {
         UserDefaults.standard.set(data, forKey: draftStorageKey)
     }
 
-    private let studioInk = Color(red: 0.17, green: 0.17, blue: 0.18)
-    private let studioAccent = Color(red: 0.65, green: 0.53, blue: 0.37)
-    private let studioBackground = Color(red: 0.986, green: 0.978, blue: 0.964)
+    // Standalone workout creation keeps its established palette. When opened
+    // from the plan, use the same tokens as the first plan-creation screen.
+    private var isPlannedWorkout: Bool { onSaveToPlan != nil }
+    private var studioInk: Color {
+        isPlannedWorkout ? ATHLTHPlanDesign.ink
+            : Color(red: 0.17, green: 0.17, blue: 0.18)
+    }
+    private var studioAccent: Color {
+        isPlannedWorkout ? ATHLTHTheme.accentDeep
+            : Color(red: 0.65, green: 0.53, blue: 0.37)
+    }
+    private var studioBackground: Color {
+        isPlannedWorkout ? ATHLTHPlanDesign.canvas
+            : Color(red: 0.986, green: 0.978, blue: 0.964)
+    }
 
     private func tr(_ english: String, _ norwegian: String) -> String {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
@@ -1923,8 +1935,8 @@ struct WorkoutTemplateBuilderView: View {
                 .foregroundStyle(studioInk.opacity(0.58))
             }
         }
-        .padding(15)
-        .background(.white, in: RoundedRectangle(cornerRadius: 18))
+        .padding(ATHLTHPlanDesign.Density.comfortable.cardPadding)
+        .athlthPlanCard(radius: 20, warm: isPlannedWorkout)
     }
 
     var body: some View {
@@ -1940,8 +1952,7 @@ struct WorkoutTemplateBuilderView: View {
                         .foregroundStyle(studioInk)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 9)
-                        .background(.white.opacity(0.95),
-                                    in: RoundedRectangle(cornerRadius: 12))
+                        .athlthPlanCard(radius: 12, warm: isPlannedWorkout)
                     }
                     workoutOverview
                     durationSettings
@@ -2042,7 +2053,8 @@ struct WorkoutTemplateBuilderView: View {
                 LinearGradient(
                     colors: [
                         .white,
-                        Color(red: 0.965, green: 0.952, blue: 0.932)
+                        isPlannedWorkout ? ATHLTHTheme.cardWarm.opacity(0.45)
+                            : Color(red: 0.965, green: 0.952, blue: 0.932)
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
@@ -2099,7 +2111,8 @@ struct WorkoutTemplateBuilderView: View {
         .clipShape(RoundedRectangle(cornerRadius: 23, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 23, style: .continuous)
-                .strokeBorder(.white.opacity(0.92), lineWidth: 1)
+                .strokeBorder(isPlannedWorkout ? ATHLTHPlanDesign.outline
+                                : Color.white.opacity(0.92), lineWidth: 1)
         }
         .shadow(color: studioInk.opacity(0.07), radius: 16, y: 8)
     }
@@ -2161,7 +2174,7 @@ struct WorkoutTemplateBuilderView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(22)
-                .background(.white, in: RoundedRectangle(cornerRadius: 22))
+                .athlthPlanCard(radius: 22, warm: isPlannedWorkout)
             } else {
                 VStack(spacing: 11) {
                     ForEach(Array(timelineStarts.enumerated()), id: \.element) { position, index in
@@ -2403,14 +2416,8 @@ struct WorkoutTemplateBuilderView: View {
                 }
             }
         }
-        .padding(11)
-        .background(.white,
-                    in: RoundedRectangle(cornerRadius: 21, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 21, style: .continuous)
-                .strokeBorder(studioInk.opacity(0.045), lineWidth: 0.8)
-        }
-        .shadow(color: studioInk.opacity(0.055), radius: 13, y: 5)
+        .padding(13)
+        .athlthPlanCard(radius: 21, warm: isPlannedWorkout)
     }
 
     private func intervalGroupSummary(members: [Int], rounds: Int) -> String {
@@ -2608,20 +2615,28 @@ struct WorkoutTemplateBuilderView: View {
                     .padding(.bottom, 4)
             }
         }
-        .padding(nested ? 5 : 11)
+        .padding(nested ? 5 : 13)
         .background {
             if !nested {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(.white)
+                    .fill(LinearGradient(
+                        colors: [
+                            ATHLTHPlanDesign.surface,
+                            isPlannedWorkout ? ATHLTHTheme.cardWarm.opacity(0.38)
+                                : ATHLTHPlanDesign.surface
+                        ],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ))
             }
         }
         .overlay {
             if !nested {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(studioInk.opacity(0.04), lineWidth: 0.8)
+                    .strokeBorder(isPlannedWorkout ? ATHLTHPlanDesign.outline
+                                  : studioInk.opacity(0.04), lineWidth: 0.8)
             }
         }
-        .shadow(color: studioInk.opacity(nested ? 0 : 0.05),
+        .shadow(color: ATHLTHTheme.accentDeep.opacity(nested ? 0 : 0.05),
                 radius: 12, y: 5)
     }
 
@@ -2878,14 +2893,8 @@ struct WorkoutTemplateBuilderView: View {
                 }
             }
         }
-        .padding(14)
-        .background(.white.opacity(0.96),
-                    in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(.white, lineWidth: 1)
-        }
-        .shadow(color: studioInk.opacity(0.045), radius: 14, y: 6)
+        .padding(ATHLTHPlanDesign.Density.comfortable.cardPadding)
+        .athlthPlanCard(radius: 24, warm: isPlannedWorkout)
     }
 
     private func studioLibraryTile(_ title: String, icon: String, color: Color) -> some View {
@@ -2897,16 +2906,22 @@ struct WorkoutTemplateBuilderView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
-        .foregroundStyle(color)
+        .foregroundStyle(isPlannedWorkout ? ATHLTHPlanDesign.ink : color)
         .frame(maxWidth: .infinity)
         .frame(height: 87)
-        .background(color.opacity(0.105),
+        .background(isPlannedWorkout ? ATHLTHPlanDesign.selectedSurface
+                     : color.opacity(0.105),
                     in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .strokeBorder(isPlannedWorkout ? ATHLTHPlanDesign.outline
+                              : Color.clear, lineWidth: 0.8)
+        }
         .contentShape(RoundedRectangle(cornerRadius: 17))
     }
 
     private var routeSection: some View {
-        ATHLTHCard {
+        ATHLTHPlanSurface {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Label(tr("Route", "Rute"), systemImage: "map")
@@ -2964,20 +2979,27 @@ struct WorkoutTemplateBuilderView: View {
                     .foregroundStyle(studioInk)
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)
-                    .background(.white, in: Capsule())
-                    .overlay { Capsule().strokeBorder(studioInk.opacity(0.12)) }
+                    .background(ATHLTHPlanDesign.surface,
+                                in: RoundedRectangle(cornerRadius: ATHLTHPlanDesign.fieldRadius))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: ATHLTHPlanDesign.fieldRadius)
+                            .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.8)
+                    }
             }
 
             Button {
                 saveWorkout()
             } label: {
-                Label(tr("Save workout", "Lagre treningsøkt"),
+                Label(isPlannedWorkout
+                    ? tr("Save planned workout", "Lagre planlagt økt")
+                    : tr("Save workout", "Lagre treningsøkt"),
                       systemImage: "checkmark.circle.fill")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)
-                    .background(studioAccent, in: Capsule())
+                    .background(studioAccent,
+                                in: RoundedRectangle(cornerRadius: ATHLTHPlanDesign.fieldRadius))
                     .opacity(canSave ? 1 : 0.48)
             }
             .disabled(!canSave)
@@ -2986,6 +3008,9 @@ struct WorkoutTemplateBuilderView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(.regularMaterial)
+        .overlay(alignment: .top) {
+            ATHLTHPlanDesign.outline.frame(height: 1)
+        }
     }
 
     private func blockAddButton(
