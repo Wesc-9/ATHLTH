@@ -508,11 +508,11 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 .launchAlreadyInProgress
         }
 
-        guard await confirmNoActiveWatchWorkout(),
-              !hasActiveIPhoneWorkout
-        else {
-            throw AppleWatchWorkoutLaunchError
-                .workoutAlreadyActive
+        guard await confirmNoActiveWatchWorkout() else {
+            throw blockedWatchWorkoutLaunchError
+        }
+        guard !hasActiveIPhoneWorkout else {
+            throw AppleWatchWorkoutLaunchError.workoutAlreadyActive
         }
 
         workoutLaunchInProgress = true
