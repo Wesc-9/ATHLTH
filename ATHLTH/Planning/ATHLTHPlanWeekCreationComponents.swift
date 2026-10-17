@@ -63,19 +63,20 @@ struct ATHLTHPlanWorkoutLibraryPicker: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 14) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Choose a complete workout",
-                        norwegian: "Velg en komplett treningsøkt"
-                    ))
-                    .font(.system(size: 28, weight: .semibold, design: .serif))
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-
-                    Text(ATHLTHLocalization.choose(
-                        english: "All exercises, sets, running intervals and rests are copied into your planned day.",
-                        norwegian: "Alle øvelser, sett, løpeintervaller og pauser kopieres inn i dagen."
-                    ))
-                    .font(.subheadline)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    ATHLTHPlanSectionIntro(
+                        eyebrow: ATHLTHLocalization.choose(
+                            english: "YOUR WORKOUT LIBRARY", norwegian: "DITT ØKTBIBLIOTEK"
+                        ),
+                        title: ATHLTHLocalization.choose(
+                            english: "Choose a complete workout",
+                            norwegian: "Velg en komplett treningsøkt"
+                        ),
+                        subtitle: ATHLTHLocalization.choose(
+                            english: "Copy all exercises, sets, intervals and recovery into the selected date.",
+                            norwegian: "Kopier alle øvelser, sett, intervaller og pauser til den valgte dagen."
+                        ),
+                        icon: "books.vertical"
+                    )
 
                     TextField(ATHLTHLocalization.choose(
                         english: "Search workouts", norwegian: "Søk etter treningsøkter"

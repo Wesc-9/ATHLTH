@@ -110,6 +110,44 @@ extension View {
     }
 }
 
+/// The same editorial hero header on the wizard, day picker and library.
+struct ATHLTHPlanSectionIntro: View {
+    let eyebrow: String
+    let title: String
+    let subtitle: String
+    let icon: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .frame(width: 50, height: 50)
+                .background(ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(eyebrow.uppercased())
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.45)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                Text(title)
+                    .font(.system(size: 25, weight: .semibold, design: .serif))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(ATHLTHPlanDesign.Density.comfortable.cardPadding)
+        .athlthPlanCard(radius: 24)
+    }
+}
+
 /// Reused by the first-step mode picker and the source chooser.
 struct ATHLTHPlanSelectionCard: View {
     let title: String

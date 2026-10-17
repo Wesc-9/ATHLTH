@@ -3408,13 +3408,18 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 13) {
-                    Text(dateForWeekDay(day, weekIndex: selectedPlanWeekIndex)
-                         .formatted(.dateTime.weekday(.wide).day().month(.wide)))
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    Text(ATHLTHLocalization.choose(english: "Plan this day", norwegian: "Planlegg denne dagen"))
-                        .font(.system(size: 30, weight: .semibold, design: .serif))
-                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                    ATHLTHPlanSectionIntro(
+                        eyebrow: dateForWeekDay(day, weekIndex: selectedPlanWeekIndex)
+                            .formatted(.dateTime.weekday(.wide).day().month(.wide)),
+                        title: ATHLTHLocalization.choose(
+                            english: "Plan this day", norwegian: "Planlegg denne dagen"
+                        ),
+                        subtitle: ATHLTHLocalization.choose(
+                            english: "Choose a full workout, build your own or set a rest day.",
+                            norwegian: "Velg en komplett økt, bygg en egen eller legg inn hviledag."
+                        ),
+                        icon: "calendar.day.timeline.left"
+                    )
                     if let edit = weekDayEdits[weekDayKey(day)] {
                         Text(edit.isRestDay == true
                              ? ATHLTHLocalization.choose(english: "Rest day", norwegian: "Hviledag")
@@ -4752,71 +4757,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         subtitle: String,
         icon: String
     ) -> some View {
-        HStack(
-            alignment: .top,
-            spacing: 14
-        ) {
-            Image(systemName: icon)
-                .font(
-                    .system(
-                        size: 20,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.accentDeep
-                )
-                .frame(width: 50, height: 50)
-                .background(
-                    LinearGradient(
-                        colors: [
-                            ATHLTHTheme.champagneSoft,
-                            ATHLTHTheme.accentSoft
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    in: RoundedRectangle(
-                        cornerRadius: 16,
-                        style: .continuous
-                    )
-                )
-
-            VStack(
-                alignment: .leading,
-                spacing: 5
-            ) {
-                Text(eyebrow)
-                    .font(.system(size: 8.5, weight: .bold))
-                    .tracking(1.45)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-
-                Text(title)
-                    .font(
-                        .system(
-                            size: 24,
-                            weight: .bold,
-                            design: .serif
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
-
-                Text(subtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-                    .lineSpacing(2)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(17)
-        .athlthPlanCard(radius: 24)
+        ATHLTHPlanSectionIntro(
+            eyebrow: eyebrow,
+            title: title,
+            subtitle: subtitle,
+            icon: icon
+        )
     }
 
     private func builderPanel<Content: View>(
