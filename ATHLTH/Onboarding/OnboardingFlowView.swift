@@ -1398,7 +1398,9 @@ struct OnboardingFlowView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 8) {
+                        // Stack the badge below the device title so Apple Watch
+                        // remains legible on compact phones and with larger text.
+                        VStack(alignment: .leading, spacing: 4) {
                             Text(title)
                                 .font(.system(size: 19, weight: .bold))
                                 .foregroundStyle(
