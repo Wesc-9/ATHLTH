@@ -393,7 +393,7 @@ struct WorkoutGearSelectionCard: View {
     }
 
     var body: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Gear")
@@ -791,7 +791,7 @@ struct ProfileGearDetailView: View {
     }
 
     private var hero: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack(spacing: 16) {
                 ZStack {
                     RoundedRectangle(
@@ -882,7 +882,7 @@ struct ProfileGearDetailView: View {
 
     @ViewBuilder
     private var usageCard: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(
@@ -1035,7 +1035,7 @@ struct ProfileGearDetailView: View {
             .compactMap(\.distanceMeters)
             .reduce(0, +)
 
-        return ATHLTHCard {
+        return ATHLTHUnifiedCard {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Shoe Insights")
@@ -1090,7 +1090,7 @@ struct ProfileGearDetailView: View {
     }
 
     private var detailsCard: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             Text("Details")
                 .font(.title3.weight(.bold))
 
@@ -1179,7 +1179,7 @@ struct ProfileGearDetailView: View {
     }
 
     private var historyCard: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Workout History")

@@ -42,12 +42,12 @@ struct WorkoutHistoryPreviewSection: View {
     @State private var loading = false
 
     var body: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Recent Activity")
+                    Text(ATHLTHLocalization.choose(english: "Recent Activity", norwegian: "Siste aktivitet"))
                         .font(.title3.bold())
-                    Text("Your latest completed workouts.")
+                    Text(ATHLTHLocalization.choose(english: "Your latest completed workouts.", norwegian: "Dine siste fullførte treningsøkter."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -57,7 +57,7 @@ struct WorkoutHistoryPreviewSection: View {
                 NavigationLink {
                     WorkoutHistoryView()
                 } label: {
-                    Text("See All")
+                    Text(ATHLTHLocalization.choose(english: "See All", norwegian: "Se alle"))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(ATHLTHTheme.accent)
                 }
@@ -74,9 +74,9 @@ struct WorkoutHistoryPreviewSection: View {
                         .foregroundStyle(ATHLTHTheme.accent)
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("No workouts yet")
+                        Text(ATHLTHLocalization.choose(english: "No workouts yet", norwegian: "Ingen treningsøkter ennå"))
                             .font(.subheadline.weight(.semibold))
-                        Text("Completed workouts will appear here automatically.")
+                        Text(ATHLTHLocalization.choose(english: "Completed workouts will appear here automatically.", norwegian: "Fullførte økter vises automatisk her."))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -168,7 +168,7 @@ struct WorkoutHistoryView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("Workout type", selection: $filter) {
+            Picker(ATHLTHLocalization.choose(english: "Workout type", norwegian: "Treningsform"), selection: $filter) {
                 ForEach(WorkoutHistoryFilter.allCases) { option in
                     Text(option.title).tag(option)
                 }
@@ -178,13 +178,13 @@ struct WorkoutHistoryView: View {
 
             if loading && workouts.isEmpty {
                 Spacer()
-                ProgressView("Loading workout history…")
+                ProgressView(ATHLTHLocalization.choose(english: "Loading workout history…", norwegian: "Laster treningshistorikk…"))
                 Spacer()
             } else if filtered.isEmpty {
                 ContentUnavailableView(
-                    "No workouts",
+                    ATHLTHLocalization.choose(english: "No workouts", norwegian: "Ingen treningsøkter"),
                     systemImage: "figure.run.circle",
-                    description: Text("Completed workouts from Apple Health and ATHLTH will appear here.")
+                    description: Text(ATHLTHLocalization.choose(english: "Completed workouts from Apple Health and ATHLTH will appear here.", norwegian: "Fullførte økter fra Apple Health og ATHLTH vises her."))
                 )
             } else {
                 ScrollView {
@@ -196,7 +196,7 @@ struct WorkoutHistoryView: View {
                                 WorkoutHistoryRow(workout: workout)
                                     .padding(12)
                                     .background(
-                                        Color(.secondarySystemGroupedBackground),
+                                        ATHLTHUnifiedDesign.surface,
                                         in: RoundedRectangle(cornerRadius: 18)
                                     )
                             }
@@ -207,8 +207,8 @@ struct WorkoutHistoryView: View {
                 }
             }
         }
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
-        .navigationTitle("Workout History")
+        .background(ATHLTHUnifiedDesign.canvas.ignoresSafeArea())
+        .navigationTitle(ATHLTHLocalization.choose(english: "Workout History", norwegian: "Treningshistorikk"))
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await load()
@@ -321,7 +321,7 @@ struct WorkoutHistoryDetailView: View {
                             activity: workout.activity
                         )
                     } else if workout.activity == .strength {
-                        ATHLTHCard {
+                        ATHLTHUnifiedCard {
                             HStack(spacing: 12) {
                                 Image(systemName: "location.slash.fill")
                                     .font(.title3)
@@ -355,7 +355,7 @@ struct WorkoutHistoryDetailView: View {
                 metricGrid
                 workoutGearCard
 
-                ATHLTHCard {
+                ATHLTHUnifiedCard {
                     HStack {
                         Text("Workout Review")
                             .font(.headline)
@@ -400,7 +400,7 @@ struct WorkoutHistoryDetailView: View {
                     .padding(.top, 10)
                 }
 
-                ATHLTHCard {
+                ATHLTHUnifiedCard {
                     ATHLTHSectionHeader(title: "Source")
                     HStack {
                         Label(workout.source, systemImage: sourceIcon)
@@ -415,7 +415,7 @@ struct WorkoutHistoryDetailView: View {
             }
             .padding()
         }
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .background(ATHLTHUnifiedDesign.canvas.ignoresSafeArea())
         .navigationTitle("Workout")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: workout.id) {
@@ -466,7 +466,7 @@ struct WorkoutHistoryDetailView: View {
     }
 
     private var ghostRaceCard: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack(spacing: 13) {
                 Image(systemName: "figure.run.circle.fill")
                     .font(.title2)
@@ -575,7 +575,7 @@ struct WorkoutHistoryDetailView: View {
     }
 
     private var workoutGearCard: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Gear")
@@ -745,7 +745,7 @@ struct WorkoutHistoryDetailView: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            Color(.secondarySystemGroupedBackground),
+            ATHLTHUnifiedDesign.surface,
             in: RoundedRectangle(cornerRadius: 17)
         )
     }
@@ -871,7 +871,7 @@ private struct WorkoutLocationMapCard: View {
     }
 
     var body: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(isRoute ? "Route" : "Workout Location")
@@ -1162,7 +1162,7 @@ struct PostWorkoutReviewView: View {
             ) {
                 NavigationStack {
                     ScrollView {
-                        ATHLTHCard {
+                        ATHLTHUnifiedCard {
                             WorkoutFriendPicker(
                                 selectedFriendIDs:
                                     $selectedFriendIDs
@@ -3781,7 +3781,7 @@ struct PostWorkoutReviewView: View {
     }
 
     private var visibilityCard: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(
                 alignment: .leading,
                 spacing: 12

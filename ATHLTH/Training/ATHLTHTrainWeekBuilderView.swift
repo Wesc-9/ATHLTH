@@ -75,7 +75,7 @@ struct ATHLTHTrainWeekBuilderView: View {
                                 .font(.caption)
                                 .foregroundStyle(ink)
                                 .padding(12)
-                                .background(.white, in: RoundedRectangle(cornerRadius: 10))
+                                .athlthPlanCard(radius: 10, warm: false)
                         }
                         Button {
                             showingPeriodization = true
@@ -97,7 +97,7 @@ struct ATHLTHTrainWeekBuilderView: View {
                             }
                             .foregroundStyle(ink)
                             .padding(14)
-                            .background(.white, in: RoundedRectangle(cornerRadius: 12))
+                            .athlthPlanCard(radius: 12, warm: false)
                             .overlay {
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(line, lineWidth: 0.7)
@@ -246,7 +246,7 @@ struct ATHLTHTrainWeekBuilderView: View {
         .font(.subheadline)
         .foregroundStyle(ink)
         .padding(9)
-        .background(.white, in: RoundedRectangle(cornerRadius: 15))
+        .athlthPlanCard(radius: 15, warm: false)
         .overlay {
             RoundedRectangle(cornerRadius: 15).stroke(line, lineWidth: 0.7)
         }
@@ -312,7 +312,7 @@ struct ATHLTHTrainWeekBuilderView: View {
                     }
                 }
                 .padding(18)
-                .background(.white, in: RoundedRectangle(cornerRadius: 15))
+                .athlthPlanCard(radius: 15, warm: false)
             }
 
             ForEach(day.sessions) { workout in
@@ -424,7 +424,7 @@ struct ATHLTHTrainWeekBuilderView: View {
                     .disabled(isCompleted(workout.id))
                 }
                 .padding(16)
-                .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                .athlthPlanCard(radius: 16, warm: false)
                 .overlay {
                     RoundedRectangle(cornerRadius: 16)
                         .stroke(line, lineWidth: 0.7)
@@ -464,7 +464,7 @@ struct ATHLTHTrainWeekBuilderView: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(ink)
                 .padding(15)
-                .background(.white, in: RoundedRectangle(cornerRadius: 13))
+                .athlthPlanCard(radius: 13, warm: false)
                 .overlay {
                     RoundedRectangle(cornerRadius: 13)
                         .stroke(line, lineWidth: 0.7)
@@ -1580,7 +1580,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
 private extension View {
     func editorSurface(line: Color) -> some View {
         self
-            .background(.white, in: RoundedRectangle(cornerRadius: 13))
+            .athlthPlanCard(radius: 13, warm: false)
             .overlay {
                 RoundedRectangle(cornerRadius: 13)
                     .stroke(line, lineWidth: 0.7)

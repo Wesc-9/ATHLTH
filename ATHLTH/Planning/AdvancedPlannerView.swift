@@ -341,7 +341,7 @@ struct AdvancedPlannerView: View {
 
     private var standaloneScheduleCard:
         some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(
                 alignment: .leading,
                 spacing: 12
@@ -1690,7 +1690,7 @@ struct AdvancedPlannerView: View {
     }
 
     private var emptyPlanState: some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             VStack(alignment: .leading, spacing: 15) {
                 HStack(spacing: 13) {
                     Image(systemName: "calendar.badge.plus")
@@ -2519,7 +2519,7 @@ struct AllTrainingPlansView: View {
         _ plan: TrainingPlan,
         status: TrainingPlanTimingStatus
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHUnifiedCard {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: statusIcon(status))
                     .font(.system(size: 18, weight: .semibold))
@@ -2813,7 +2813,7 @@ struct TrainingPlanManagerView: View {
             }
 
             if !session.planTemplates.isEmpty {
-                ATHLTHCard {
+                ATHLTHUnifiedCard {
                     ATHLTHSectionHeader(
                         title: "Saved Programs",
                         actionTitle: "\(session.planTemplates.count)"
@@ -2917,7 +2917,7 @@ struct TrainingPlanManagerView: View {
         Button {
             scheduledPlanToOpen = plan
         } label: {
-            ATHLTHCard {
+            ATHLTHUnifiedCard {
                 HStack(spacing: 13) {
                     Image(
                         systemName:
