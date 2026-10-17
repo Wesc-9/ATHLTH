@@ -188,6 +188,30 @@ enum AppleWatchLinkVerificationPolicy {
 /// A cached Watch activity is ambiguous when WatchConnectivity is offline.
 /// Preserve the recording lock, but explain why starting is blocked.
 enum AppleWatchActivityStartPolicy {
+    enum CheckResult: Equatable {
+        case clear
+        case active
+        case unconfirmed
+    }
+
+    /// Reachable Watch: require an actual, non-stale HealthKit activity reply.
+    /// Sleeping/offline Watch: preserve the existing iPhone fallback unless
+    /// the last reported activity was active (never clear that lock by age).
+    static func resolve(
+        watchReachable: Bool,
+        cachedActive: Bool,
+        reply: WatchWorkoutActivityState?,
+        replyIsCurrent: Bool
+    ) -> CheckResult {
+        guard watchReachable else {
+            return cachedActive ? .unconfirmed : .clear
+        }
+        guard let reply, replyIsCurrent else {
+            return .unconfirmed
+        }
+        return reply.isActive ? .active : .clear
+    }
+
     static func blockingError(
         hasActiveWatchWorkout: Bool,
         isWatchReachable: Bool
@@ -374,15 +398,20 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
             .isActive == true
     }
 
-    /// Recheck a cached Watch activity flag before blocking a new workout.
-    /// Never clear an active lock based on age or an unreachable Watch:
-    /// those cases might still represent an actual HealthKit recording.
-    func confirmNoActiveWatchWorkout() async -> Bool {
+    /// A failed or timed-out probe never proves that the Watch is idle.
+    /// An offline Watch retains the original iPhone fallback unless it last
+    /// reported an active workout. No stale active flag is cleared by age.
+    func checkWatchWorkoutActivity() async -> AppleWatchActivityStartPolicy.CheckResult {
         guard let session,
               session.activationState == .activated,
               session.isReachable
         else {
-            return !hasActiveWatchWorkout
+            return AppleWatchActivityStartPolicy.resolve(
+                watchReachable: false,
+                cachedActive: hasActiveWatchWorkout,
+                reply: nil,
+                replyIsCurrent: false
+            )
         }
 
         let activity: WatchWorkoutActivityState? =
@@ -399,21 +428,43 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                    errorHandler: gate.makeErrorHandler())
 
                 Task {
-                    try? await Task.sleep(for: .seconds(2))
+                    try? await Task.sleep(for: .seconds(3))
                     gate.complete(nil)
                 }
             }
 
-        if let activity {
-            let timestamp = activity.updatedAt.timeIntervalSince1970
-            if timestamp >= lastWatchWorkoutActivitySentAt {
-                lastWatchWorkoutActivitySentAt = timestamp
-                watchWorkoutActivityState = activity
-            }
+        let replyIsCurrent = activity.map {
+            $0.updatedAt.timeIntervalSince1970 >= lastWatchWorkoutActivitySentAt
+        } ?? false
+
+        if let activity, replyIsCurrent {
+            lastWatchWorkoutActivitySentAt =
+                activity.updatedAt.timeIntervalSince1970
+            watchWorkoutActivityState = activity
         }
 
-        // A timeout is not proof that the workout has finished.
-        return !hasActiveWatchWorkout
+        return AppleWatchActivityStartPolicy.resolve(
+            watchReachable: true,
+            cachedActive: hasActiveWatchWorkout,
+            reply: activity,
+            replyIsCurrent: replyIsCurrent
+        )
+    }
+
+    func confirmNoActiveWatchWorkout() async -> Bool {
+        await checkWatchWorkoutActivity() == .clear
+    }
+
+    /// All recording entry points share the same fail-safe rule.
+    func requireNoActiveWatchWorkout() async throws {
+        switch await checkWatchWorkoutActivity() {
+        case .clear:
+            return
+        case .active:
+            throw AppleWatchWorkoutLaunchError.workoutAlreadyActive
+        case .unconfirmed:
+            throw AppleWatchWorkoutLaunchError.watchWorkoutStatusUnconfirmed
+        }
     }
 
     // The iPhone is authoritative for locally recorded workouts. Both
@@ -522,16 +573,16 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 .launchAlreadyInProgress
         }
 
-        guard await confirmNoActiveWatchWorkout() else {
-            throw blockedWatchWorkoutLaunchError
-        }
-        guard !hasActiveIPhoneWorkout else {
-            throw AppleWatchWorkoutLaunchError.workoutAlreadyActive
-        }
-
+        // Claim this launch before awaiting a Watch reply; two taps must
+        // not pass the guard while the first request is still checking.
         workoutLaunchInProgress = true
         workoutLaunchError = nil
         defer { workoutLaunchInProgress = false }
+
+        try await requireNoActiveWatchWorkout()
+        guard !hasActiveIPhoneWorkout else {
+            throw AppleWatchWorkoutLaunchError.workoutAlreadyActive
+        }
 
         let configuration = HKWorkoutConfiguration()
 
