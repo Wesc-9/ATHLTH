@@ -423,9 +423,7 @@ struct SocialHubView: View {
                                     .buttonStyle(
                                         .borderedProminent
                                     )
-                                    .tint(
-                                        ATHLTHTheme.accent
-                                    )
+                                    .tint(ATHLTHTrainTogetherDesign.accent)
                                     .frame(
                                         maxWidth: .infinity
                                     )
@@ -465,20 +463,15 @@ struct SocialHubView: View {
                                     .buttonStyle(
                                         .borderedProminent
                                     )
-                                    .tint(
-                                        ATHLTHTheme.accent
-                                    )
+                                    .tint(ATHLTHTrainTogetherDesign.accent)
                                     .frame(
                                         maxWidth: .infinity
                                     )
                                 }
                             }
                         }
-                        .padding(12)
-                        .background(
-                            Color(.secondarySystemGroupedBackground),
-                            in: RoundedRectangle(cornerRadius: 17)
-                        )
+                        .padding(15)
+                        .athlthTrainTogetherCard(radius: 19, subtle: true)
                     }
                 }
 
@@ -4153,7 +4146,7 @@ struct WorkoutInviteLaunchSheet: View {
                             .borderedProminent
                         )
                         .controlSize(.large)
-                        .tint(ATHLTHTheme.accent)
+                        .tint(ATHLTHTrainTogetherDesign.accent)
                         .disabled(
                             isStarting ||
                             (
@@ -4225,13 +4218,7 @@ struct WorkoutInviteLaunchSheet: View {
                 }
                 .padding(16)
             }
-            .background(
-                ATHLTHPremiumCanvas(
-                    accent:
-                        ATHLTHTheme.accent
-                            .opacity(0.18)
-                )
-            )
+            .background(ATHLTHTrainTogetherDesign.canvas.ignoresSafeArea())
             .navigationTitle(
                 ATHLTHLocalization.choose(
                     english: "Train Together",
@@ -4301,7 +4288,7 @@ struct WorkoutInviteLaunchSheet: View {
     }
 
     private var introCard: some View {
-        ATHLTHCard {
+        ATHLTHTrainTogetherSurface {
             HStack(spacing: 12) {
                 if let creator =
                         invite.creator {
@@ -4367,7 +4354,7 @@ struct WorkoutInviteLaunchSheet: View {
     private func workoutSummary(
         _ workout: PlannedSession
     ) -> some View {
-        ATHLTHCard {
+        ATHLTHTrainTogetherSurface {
             VStack(
                 alignment: .leading,
                 spacing: 10
@@ -4445,7 +4432,7 @@ struct WorkoutInviteLaunchSheet: View {
     }
 
     private var devicePicker: some View {
-        ATHLTHCard {
+        ATHLTHTrainTogetherSurface {
             VStack(
                 alignment: .leading,
                 spacing: 10
@@ -4539,15 +4526,14 @@ struct WorkoutInviteLaunchSheet: View {
             )
             .background(
                 captureDevice == device
-                    ? ATHLTHTheme.accent
-                    : Color(
-                        .secondarySystemGroupedBackground
-                    ),
-                in: RoundedRectangle(
-                    cornerRadius: 16,
-                    style: .continuous
-                )
+                    ? ATHLTHTrainTogetherDesign.accent
+                    : ATHLTHTrainTogetherDesign.accentSoft.opacity(0.50),
+                in: RoundedRectangle(cornerRadius: 17, style: .continuous)
             )
+            .overlay {
+                RoundedRectangle(cornerRadius: 17, style: .continuous)
+                    .strokeBorder(ATHLTHTrainTogetherDesign.outline, lineWidth: 0.8)
+            }
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
@@ -4586,7 +4572,7 @@ struct WorkoutInviteLaunchSheet: View {
     }
 
     private var lobbyStatusCard: some View {
-        ATHLTHCard {
+        ATHLTHTrainTogetherSurface {
             VStack(alignment: .leading, spacing: 10) {
                 Text(
                     ATHLTHLocalization.choose(
