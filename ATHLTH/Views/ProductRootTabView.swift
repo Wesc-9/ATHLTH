@@ -826,6 +826,8 @@ struct ATHLTHHomeView: View {
 
                     homeGoalAndCalendarRow
 
+                    HomeActiveFriendsStrip()
+
                     HomePersonalRecentActivitySection()
                 }
                 .padding(.horizontal, 16)
