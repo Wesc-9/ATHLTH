@@ -2926,6 +2926,7 @@ struct HomeWeeklyProgressStrip:
             HomeWeeklyProgressDaySheet(
                 selection: selection,
                 plan: plan,
+                recentWorkouts: workouts,
                 onOpenWorkout: {
                     daySheetDetent = .large
                 }
@@ -3967,11 +3968,14 @@ private struct HomeWeeklyProgressDaySheet: View {
 
     let selection: HomeWeeklyProgressDaySelection
     let plan: TrainingPlan?
+    let recentWorkouts: [WorkoutSummary]
     let onOpenWorkout: () -> Void
 
     @StateObject private var workoutCatalog = WorkoutTemplateCatalogStore()
     @State private var showingStandaloneSessionEditor = false
     @State private var showingWorkoutPicker = false
+    @State private var showingInspiration = false
+    @State private var pendingInspiration: PlannedSession?
     @State private var pendingPickedWorkout: PlannedSession?
     @State private var selectedSuggestion: PlannedSession?
     @State private var suggestionStartTime = Date()
@@ -4038,6 +4042,29 @@ private struct HomeWeeklyProgressDaySheet: View {
         return distinct
     }
 
+    /// Training history is optional; an empty history yields a transparent,
+    /// general suggestion rather than invented recovery/readiness conclusions.
+    private var recentActivityHints: [ATHLTHInspirationRecentActivity] {
+        recentWorkouts.compactMap { workout in
+            let kind: WorkoutKind
+            switch workout.activity {
+            case .strength: kind = .strength
+            case .running: kind = .running
+            case .walking, .hiking: kind = .walking
+            default: return nil
+            }
+            return ATHLTHInspirationRecentActivity(
+                kind: kind, startedAt: workout.startDate
+            )
+        }
+    }
+
+    private var allInspirationWorkouts: [PlannedSession] {
+        let fullCatalog = workoutCatalog.entries.map { $0.plannedSession() }
+        let running = runningLibrary.allTemplates.map { $0.plannedSession() }
+        return session.savedWorkoutTemplates + fullCatalog + running
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -4048,7 +4075,7 @@ private struct HomeWeeklyProgressDaySheet: View {
                     .font(.system(size: 22, weight: .semibold, design: .rounded))
                     .foregroundStyle(dayInk)
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 6)
+                    .padding(.top, 12)
 
                     dayModeSelector
 
@@ -4089,6 +4116,25 @@ private struct HomeWeeklyProgressDaySheet: View {
             .sheet(isPresented: $showingStandaloneSessionEditor) {
                 SessionEditorView(standaloneDate: selection.date)
                     .presentationDetents([.large])
+            }
+            .sheet(isPresented: $showingInspiration, onDismiss: {
+                if let picked = pendingInspiration {
+                    pendingInspiration = nil
+                    presentSuggestion(picked)
+                }
+            }) {
+                ATHLTHHomeWorkoutInspirationView(
+                    workouts: allInspirationWorkouts,
+                    recentActivities: recentActivityHints,
+                    selectedDate: selection.date,
+                    onChoose: { workout in
+                        pendingInspiration = workout
+                        showingInspiration = false
+                    }
+                )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
             }
             .sheet(isPresented: $showingWorkoutPicker, onDismiss: {
                 if let pending = pendingPickedWorkout {
@@ -4163,64 +4209,96 @@ private struct HomeWeeklyProgressDaySheet: View {
         .accessibilityAddTraits(selectedMode == mode ? .isSelected : [])
     }
 
-    /// Compact empty state leaves the entire workout suggestion row visible.
+    /// The empty day is an invitation to discover, not a second planning menu.
+    /// "Planlegg ny" above already handles manual workout creation.
     private var emptyTodayCard: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            HStack(alignment: .top, spacing: 13) {
-                Image(systemName: "calendar.badge.clock")
-                    .font(.system(size: 21, weight: .medium))
-                    .foregroundStyle(dayInk)
-                    .frame(width: 48, height: 48)
-                    .background(dayInk.opacity(0.055),
-                                in: RoundedRectangle(cornerRadius: 15))
-
-                VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text(ATHLTHLocalization.choose(
-                        english: "No workout planned",
-                        norwegian: "Ingen planlagt økt"
+                        english: "NO PLANNED WORKOUT",
+                        norwegian: "INGEN PLANLAGT ØKT"
                     ))
-                    .font(.system(size: 19, weight: .semibold, design: .rounded))
-                    .foregroundStyle(dayInk)
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.5)
+                    .foregroundStyle(dayInk.opacity(0.57))
 
                     Text(ATHLTHLocalization.choose(
-                        english: "Choose a ready-made session below, or create your own.",
-                        norwegian: "Velg en ferdig økt nedenfor, eller lag din egen."
+                        english: "You have no workout planned today",
+                        norwegian: "Du har ingen planlagt økt i dag"
+                    ))
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .foregroundStyle(dayInk)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Browse a suggested session below, or find some inspiration.",
+                        norwegian: "Velg et forslag nedenfor, eller la deg inspirere."
                     ))
                     .font(.system(size: 13))
-                    .foregroundStyle(dayInk.opacity(0.68))
+                    .foregroundStyle(dayInk.opacity(0.64))
                     .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
+                Image(systemName: "calendar.badge.clock")
+                    .font(.system(size: 43, weight: .ultraLight))
+                    .foregroundStyle(dayInk.opacity(0.34))
+                    .frame(width: 91, height: 93)
+                    .background(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.94, green: 0.95, blue: 0.99),
+                                Color(red: 0.985, green: 0.98, blue: 0.97)
+                            ],
+                            startPoint: .topLeading, endPoint: .bottomTrailing
+                        ),
+                        in: RoundedRectangle(cornerRadius: 24)
+                    )
+                    .accessibilityHidden(true)
             }
 
             if canPlanWorkout {
                 Button {
-                    selectedMode = 1
+                    showingInspiration = true
                 } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "plus.circle.fill")
+                    HStack(spacing: 9) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Color(red: 0.67, green: 0.47, blue: 0.28))
                         Text(ATHLTHLocalization.choose(
-                            english: "Plan a workout", norwegian: "Planlegg en økt"
+                            english: "Get inspired", norwegian: "Bli inspirert"
                         ))
                         Spacer()
-                        Image(systemName: "arrow.right")
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 12, weight: .semibold))
                     }
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(dayInk)
-                    .padding(.horizontal, 13)
-                    .frame(height: 39)
-                    .background(dayInk.opacity(0.055),
-                                in: RoundedRectangle(cornerRadius: 13))
+                    .padding(.horizontal, 15)
+                    .frame(height: 46)
+                    .background(
+                        Color(red: 0.953, green: 0.956, blue: 0.973),
+                        in: RoundedRectangle(cornerRadius: 14)
+                    )
                 }
                 .buttonStyle(.plain)
+                .accessibilityHint(ATHLTHLocalization.choose(
+                    english: "Get workout suggestions based on your available time and recent sessions",
+                    norwegian: "Få treningsforslag ut fra tiden du har og nylige økter"
+                ))
             }
         }
         .padding(17)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.white, in: RoundedRectangle(cornerRadius: 22))
+        .background(
+            LinearGradient(
+                colors: [.white, Color(red: 0.985, green: 0.984, blue: 0.98)],
+                startPoint: .topLeading, endPoint: .bottomTrailing
+            ), in: RoundedRectangle(cornerRadius: 23)
+        )
         .overlay {
-            RoundedRectangle(cornerRadius: 22)
-                .strokeBorder(dayInk.opacity(0.07), lineWidth: 0.8)
+            RoundedRectangle(cornerRadius: 23)
+                .strokeBorder(dayInk.opacity(0.065), lineWidth: 0.8)
         }
     }
 
