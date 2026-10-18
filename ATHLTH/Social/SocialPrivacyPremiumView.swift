@@ -16,6 +16,9 @@ struct SocialPrivacySettingsView: View {
     @State private var achievementsExpanded = false
     @State private var profileExtrasExpanded = false
     @State private var liveExpanded = false
+    // Local viewer preference; never changes another athlete's sharing.
+    @AppStorage("athlth.home.showFriendPublicWorkouts")
+    private var showFriendWorkoutsOnHome = true
 
     private func loc(_ english: String, _ norwegian: String) -> String {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
@@ -167,6 +170,20 @@ struct SocialPrivacySettingsView: View {
                         )
                     )
                     .padding(.top, 6)
+
+                    thinDivider
+                    privacyToggle(
+                        "eye",
+                        loc(
+                            "Show friends' shared workouts on Home",
+                            "Vis venners delte økter på Hjem"
+                        ),
+                        detail: loc(
+                            "Only publicly shared workouts in the small friend popup. Does not change what you share.",
+                            "Kun offentlige økter i venn-popupen. Påvirker ikke hva du selv deler."
+                        ),
+                        binding: $showFriendWorkoutsOnHome
+                    )
                 }
             }
         }
