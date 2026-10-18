@@ -71,7 +71,15 @@ struct ExerciseLibraryView: View {
         self.selectionTitle = selectionTitle
         self.selectedExerciseCounts = selectedExerciseCounts
         self.onSelect = onSelect
-        _selectedBodyPart = State(initialValue: initialBodyPart)
+        // Callers may still pass legacy detailed muscle names. Keep the
+        // picker aligned with the nine visible familiar groups.
+        let normalizedBodyPart =
+            ExerciseLibraryStore.canonicalMuscleFilter(initialBodyPart)
+        _selectedBodyPart = State(
+            initialValue: ExerciseLibraryStore.commonMuscleFilters.contains(
+                normalizedBodyPart
+            ) ? normalizedBodyPart : "All"
+        )
     }
 
     private var results: [ExerciseLibraryEntry] {
