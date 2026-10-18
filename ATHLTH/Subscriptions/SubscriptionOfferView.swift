@@ -21,7 +21,10 @@ struct SubscriptionOfferView: View {
                     hero
 
                     if subscriptionStore.isLoading {
-                        ProgressView("Loading plans…")
+                        ProgressView(ATHLTHLocalization.choose(
+                            english: "Loading plans…",
+                            norwegian: "Laster abonnementer…"
+                        ))
                             .tint(OnboardingTheme.accent)
                             .foregroundStyle(OnboardingTheme.mutedText)
                             .frame(maxWidth: .infinity)
@@ -30,6 +33,7 @@ struct SubscriptionOfferView: View {
                         unavailableState
                     } else {
                         plans
+                        appStoreCurrencyNote
                         purchaseButton
                         continueTrialButton
                     }
@@ -100,6 +104,14 @@ struct SubscriptionOfferView: View {
         .task {
             await reloadPlans()
         }
+        .task {
+            // A Sandbox/App Store region may change while ATHLTH is open.
+            // Requery StoreKit; never calculate an approximate FX conversion.
+            for await _ in Storefront.updates {
+                guard !Task.isCancelled else { break }
+                await reloadPlans()
+            }
+        }
     }
 
     private func reloadPlans() async {
@@ -132,13 +144,19 @@ struct SubscriptionOfferView: View {
                 .font(.system(size: 36, weight: .bold))
                 .multilineTextAlignment(.center)
 
-            Text("Smarter training with ATHLTH AI and Audio Coach.")
+            Text(ATHLTHLocalization.choose(
+                english: "Smarter training with ATHLTH AI and Audio Coach.",
+                norwegian: "Smartere trening med ATHLTH AI og Audio Coach."
+            ))
                 .font(.subheadline)
                 .foregroundStyle(OnboardingTheme.mutedText)
                 .multilineTextAlignment(.center)
 
             if session.subscriptionAccess.trialIsActive {
-                Text("Your 7-day free access is already active.")
+                Text(ATHLTHLocalization.choose(
+                    english: "Your 7-day free access is already active.",
+                    norwegian: "Din gratis prøveperiode på 7 dager er aktiv."
+                ))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(OnboardingTheme.accent)
                     .padding(.horizontal, 12)
@@ -154,30 +172,48 @@ struct SubscriptionOfferView: View {
 
     private var benefits: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Included with ATHLTH+")
+            Text(ATHLTHLocalization.choose(
+                english: "Included with ATHLTH+",
+                norwegian: "Inkludert med ATHLTH+"
+            ))
                 .font(.caption.weight(.bold))
                 .tracking(1.2)
                 .foregroundStyle(OnboardingTheme.accent)
 
             VStack(spacing: 10) {
                 benefit(
-                    "AI-generated training programs from your goals",
+                    ATHLTHLocalization.choose(
+                        english: "AI-generated training programs from your goals",
+                        norwegian: "AI-genererte treningsprogrammer tilpasset målene dine"
+                    ),
                     icon: "sparkles"
                 )
                 benefit(
-                    "AI Complete fills gaps without replacing your workouts",
+                    ATHLTHLocalization.choose(
+                        english: "AI Complete fills gaps without replacing your workouts",
+                        norwegian: "AI Complete fyller hull i planen uten å erstatte øktene dine"
+                    ),
                     icon: "wand.and.stars"
                 )
                 benefit(
-                    "Goal, date and availability-aware AI planning",
+                    ATHLTHLocalization.choose(
+                        english: "Goal, date and availability-aware AI planning",
+                        norwegian: "AI-planlegging etter mål, dato og tilgjengelighet"
+                    ),
                     icon: "target"
                 )
                 benefit(
-                    "Audio Coach with pace, route progress and workout-step guidance",
+                    ATHLTHLocalization.choose(
+                        english: "Audio Coach with pace, route progress and workout-step guidance",
+                        norwegian: "Audio Coach med tempo, rutefremdrift og øktveiledning"
+                    ),
                     icon: "waveform.and.mic"
                 )
                 benefit(
-                    "AI equipment scanning with matched exercises from your library",
+                    ATHLTHLocalization.choose(
+                        english: "AI equipment scanning with matched exercises from your library",
+                        norwegian: "AI-skanning av treningsapparater med øvelser fra biblioteket"
+                    ),
                     icon: "camera.viewfinder"
                 )
             }
@@ -216,6 +252,28 @@ struct SubscriptionOfferView: View {
         }
     }
 
+
+    /// All amounts come from StoreKit's active App Store storefront. The iOS
+    /// language, GPS position and device region must never drive a separate
+    /// display-only currency conversion on a purchase screen.
+    private var appStoreCurrencyNote: some View {
+        VStack(spacing: 3) {
+            Text(ATHLTHLocalization.choose(
+                english: "Prices and currency are provided by your App Store.",
+                norwegian: "Priser og valuta hentes fra din App Store."
+            ))
+            if let currency = Storefront.current?.currency?.identifier {
+                Text(ATHLTHLocalization.choose(
+                    english: "App Store currency: \(currency)",
+                    norwegian: "App Store-valuta: \(currency)"
+                ))
+            }
+        }
+        .font(.caption2)
+        .foregroundStyle(OnboardingTheme.mutedText)
+        .multilineTextAlignment(.center)
+    }
+
     private var purchaseButton: some View {
         Button {
             guard
@@ -251,10 +309,16 @@ struct SubscriptionOfferView: View {
                 } else if
                     let selectedProductID,
                     let product = subscriptionStore.product(for: selectedProductID) {
-                    Text("Subscribe · \(product.displayPrice)")
+                    Text(ATHLTHLocalization.choose(
+                        english: "Subscribe · \(product.displayPrice)",
+                        norwegian: "Abonner · \(product.displayPrice)"
+                    ))
                         .font(.headline)
                 } else {
-                    Text("Choose a plan")
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose a plan",
+                        norwegian: "Velg abonnement"
+                    ))
                         .font(.headline)
                 }
 
@@ -274,8 +338,14 @@ struct SubscriptionOfferView: View {
         } label: {
             Text(
                 session.subscriptionAccess.trialIsActive
-                    ? "Continue with free trial"
-                    : "Not now"
+                    ? ATHLTHLocalization.choose(
+                        english: "Continue with free trial",
+                        norwegian: "Fortsett prøveperioden"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Not now",
+                        norwegian: "Ikke nå"
+                    )
             )
             .font(.subheadline.weight(.semibold))
             .frame(maxWidth: .infinity)
@@ -299,7 +369,10 @@ struct SubscriptionOfferView: View {
                         .multilineTextAlignment(.center)
                 }
 
-                Text("No subscription starts automatically. If you subscribe now, the App Store subscription starts now and auto-renews until canceled.")
+                Text(ATHLTHLocalization.choose(
+                    english: "No subscription starts automatically. If you subscribe now, the App Store subscription starts now and auto-renews until canceled.",
+                    norwegian: "Ingen abonnement starter automatisk. Hvis du abonnerer nå, starter betalingen via App Store og fornyes automatisk til du sier opp."
+                ))
                     .font(.caption2)
                     .foregroundStyle(OnboardingTheme.faintText)
                     .multilineTextAlignment(.center)
@@ -319,10 +392,15 @@ struct SubscriptionOfferView: View {
                 HStack(spacing: 7) {
                     ProgressView()
                         .controlSize(.small)
-                    Text("Restoring…")
+                    Text(ATHLTHLocalization.choose(
+                        english: "Restoring…", norwegian: "Gjenoppretter…"
+                    ))
                 }
             } else {
-                Text("Restore Purchases")
+                Text(ATHLTHLocalization.choose(
+                    english: "Restore Purchases",
+                    norwegian: "Gjenopprett kjøp"
+                ))
             }
         }
         .font(.subheadline.weight(.semibold))
@@ -332,11 +410,17 @@ struct SubscriptionOfferView: View {
 
     private var legalLinks: some View {
         HStack(spacing: 16) {
-            Button("Terms of Service") {
+            Button(ATHLTHLocalization.choose(
+                english: "Terms of Service",
+                norwegian: "Bruksvilkår"
+            )) {
                 legalDocument = .terms
             }
 
-            Button("Privacy Policy") {
+            Button(ATHLTHLocalization.choose(
+                english: "Privacy Policy",
+                norwegian: "Personvern"
+            )) {
                 legalDocument = .privacy
             }
         }
@@ -443,7 +527,10 @@ struct SubscriptionOfferView: View {
                             .foregroundStyle(OnboardingTheme.primaryText)
 
                         if yearly {
-                            Text("BEST VALUE")
+                            Text(ATHLTHLocalization.choose(
+                                english: "BEST VALUE",
+                                norwegian: "BEST VERDI"
+                            ))
                                 .font(.system(size: 9, weight: .bold))
                                 .tracking(0.8)
                                 .foregroundStyle(.black)
@@ -459,7 +546,10 @@ struct SubscriptionOfferView: View {
 
                     if yearly {
                         if let equivalent = yearlyMonthlyEquivalent(for: product) {
-                            Text("≈ \(equivalent) / month")
+                            Text(ATHLTHLocalization.choose(
+                                english: "≈ \(equivalent) / month",
+                                norwegian: "≈ \(equivalent) per måned"
+                            ))
                                 .font(.caption)
                                 .foregroundStyle(OnboardingTheme.mutedText)
                         }
@@ -474,7 +564,10 @@ struct SubscriptionOfferView: View {
                                 .foregroundStyle(OnboardingTheme.accent)
                         }
                     } else if product.id == SubscriptionStore.monthlyProductID {
-                        Text("Flexible monthly billing")
+                        Text(ATHLTHLocalization.choose(
+                            english: "Flexible monthly billing",
+                            norwegian: "Fleksibel månedlig betaling"
+                        ))
                             .font(.caption)
                             .foregroundStyle(OnboardingTheme.mutedText)
                     }
@@ -551,9 +644,15 @@ struct SubscriptionOfferView: View {
     private func planTitle(for product: Product) -> String {
         switch product.id {
         case SubscriptionStore.monthlyProductID:
-            return "Monthly"
+            return ATHLTHLocalization.choose(
+                english: "Monthly",
+                norwegian: "Månedlig"
+            )
         case SubscriptionStore.yearlyProductID:
-            return "Yearly"
+            return ATHLTHLocalization.choose(
+                english: "Yearly",
+                norwegian: "Årlig"
+            )
         default:
             return product.displayName
         }
@@ -562,9 +661,15 @@ struct SubscriptionOfferView: View {
     private func planSuffix(for product: Product) -> String {
         switch product.id {
         case SubscriptionStore.monthlyProductID:
-            return " / month"
+            return ATHLTHLocalization.choose(
+                english: " / month",
+                norwegian: " / måned"
+            )
         case SubscriptionStore.yearlyProductID:
-            return " / year"
+            return ATHLTHLocalization.choose(
+                english: " / year",
+                norwegian: " / år"
+            )
         default:
             return ""
         }
