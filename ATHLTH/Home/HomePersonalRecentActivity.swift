@@ -1204,7 +1204,7 @@ private struct HomePersonalHorizontalWorkoutCard:
                         )
                     } else {
                         HomeRecentCardMetric(
-                            icon: "point.topleft.down.curvedto.point.bottomright.up",
+                            icon: "location",
                             value: HomeRecentCardFormat.distance(workout.distanceMeters),
                             title: ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse")
                         )
@@ -1554,7 +1554,7 @@ private struct HomeFollowingHorizontalWorkoutCard: View {
                         )
                     } else {
                         HomeRecentCardMetric(
-                            icon: "point.topleft.down.curvedto.point.bottomright.up",
+                            icon: "location",
                             value: HomeRecentCardFormat.distance(meters),
                             title: ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse")
                         )
