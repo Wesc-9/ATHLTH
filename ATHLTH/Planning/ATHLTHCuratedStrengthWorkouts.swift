@@ -7,7 +7,8 @@ enum ATHLTHCuratedStrengthWorkouts {
     private struct Move {
         let title: String
         let sets: Int
-        let reps: Int
+        let reps: Int?
+        let durationSeconds: Int?
         let rest: Int
         let cue: String?
     }
@@ -16,7 +17,16 @@ enum ATHLTHCuratedStrengthWorkouts {
         _ title: String, _ sets: Int, _ reps: Int,
         _ rest: Int = 90, cue: String? = nil
     ) -> Move {
-        Move(title: title, sets: sets, reps: reps, rest: rest, cue: cue)
+        Move(title: title, sets: sets, reps: reps, durationSeconds: nil,
+             rest: rest, cue: cue)
+    }
+
+    private static func timedExercise(
+        _ title: String, _ sets: Int, _ seconds: Int,
+        _ rest: Int = 45, cue: String? = nil
+    ) -> Move {
+        Move(title: title, sets: sets, reps: nil, durationSeconds: seconds,
+             rest: rest, cue: cue)
     }
 
     private static func tr(_ en: String, _ no: String) -> String {
@@ -46,7 +56,8 @@ enum ATHLTHCuratedStrengthWorkouts {
             WorkoutTemplateBlock(
                 sequence: index + 2, kind: .exercise, title: move.title,
                 exerciseSlug: nil, distanceMeters: nil,
-                repetitions: move.reps, durationSeconds: nil,
+                repetitions: move.reps,
+                durationSeconds: move.durationSeconds.map(TimeInterval.init),
                 targetWeightKilograms: nil, loadNote: nil,
                 notes: move.cue ?? tr(
                     "Choose a manageable load and leave about 2 reps in reserve. Adjust sets and reps to your level.",
@@ -90,7 +101,7 @@ enum ATHLTHCuratedStrengthWorkouts {
                     exercise("Dumbbell Bench Press", 3, 10, 90),
                     exercise("Seated Cable Row", 3, 10, 90),
                     exercise("Romanian Deadlift", 2, 10, 90),
-                    exercise("Plank", 3, 30, 45, cue: tr(
+                    timedExercise("Plank", 3, 30, 45, cue: tr(
                         "Hold 30 seconds per set; stop before losing trunk control.",
                         "Hold 30 sekunder per sett; stopp før du mister kontrollen."
                     ))
@@ -141,7 +152,7 @@ enum ATHLTHCuratedStrengthWorkouts {
                     exercise("Lateral Raise", 3, 12, 60),
                     exercise("Face Pull", 3, 12, 60),
                     exercise("Dead Bug", 3, 10, 45),
-                    exercise("Side Plank", 3, 30, 45, cue: tr(
+                    timedExercise("Side Plank", 3, 60, 45, cue: tr(
                         "Hold for 30 seconds on each side.",
                         "Hold 30 sekunder på hver side."
                     ))
@@ -218,10 +229,10 @@ enum ATHLTHCuratedStrengthWorkouts {
                     exercise("Dead Bug", 3, 10, 45),
                     exercise("Bird Dog", 3, 10, 45),
                     exercise("Pallof Press", 3, 12, 60),
-                    exercise("Plank", 3, 30, 45, cue: tr(
+                    timedExercise("Plank", 3, 30, 45, cue: tr(
                         "30 seconds per set.", "30 sekunder per sett."
                     )),
-                    exercise("Side Plank", 2, 30, 45, cue: tr(
+                    timedExercise("Side Plank", 2, 60, 45, cue: tr(
                         "30 seconds on each side.", "30 sekunder på hver side."
                     ))
                   ]),
