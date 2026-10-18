@@ -30,6 +30,66 @@ final class NorwegianExerciseLocalizationTests: XCTestCase {
         XCTAssertEqual("Ab Wheel", "Ab Wheel")
     }
 
+    @MainActor
+    func testEquipmentUsesRealWorldNorwegianAndEnglishGymTerms() {
+        let previous = UserDefaults.standard.string(
+            forKey: "settings.language"
+        )
+        UserDefaults.standard.set("nb", forKey: "settings.language")
+        defer {
+            if let previous {
+                UserDefaults.standard.set(previous, forKey: "settings.language")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "settings.language")
+            }
+        }
+
+        let library = ExerciseLibraryStore()
+        let expectations: [(String, String)] = [
+            ("Treadmill", "Tredemølle"),
+            ("Rower", "Romaskin"),
+            ("Stationary Bike", "Treningssykkel"),
+            ("Elliptical", "Ellipsemaskin"),
+            ("Bicycle", "Sykkel"),
+            ("Dumbbell", "Manual"),
+            ("Barbell", "Vektstang"),
+            ("Cable", "Kabelapparat"),
+            ("Dip Station", "Dipsstativ"),
+            ("Climbing Rope", "Klatretau"),
+            ("EZ Bar", "EZ-stang"),
+            ("Kettlebell", "Kettlebell"),
+            ("Hack Squat", "Hack squat"),
+            ("Pec Deck", "Pec deck"),
+            ("Leg Curl", "Leg curl"),
+            ("Leg Extension", "Leg extension"),
+            ("Ski Erg", "SkiErg"),
+            ("TRX", "TRX"),
+            ("Battle Rope", "Battle rope"),
+            ("Chest Press Machine", "Chest press-maskin"),
+            ("Hip Thrust Machine", "Hip thrust-maskin"),
+            ("Wall Ball", "Wall ball")
+        ]
+        for (original, expected) in expectations {
+            XCTAssertEqual(
+                library.localizedEquipmentTitle(original),
+                expected,
+                "Wrong everyday gym term for \(original)"
+            )
+        }
+
+        // Keep filter values as the catalog IDs. Translated labels must
+        // never become exercise metadata or filter query arguments.
+        XCTAssertTrue(library.equipmentOptions.contains("Treadmill"))
+        XCTAssertFalse(library.equipmentOptions.contains("Tredemølle"))
+        XCTAssertFalse(
+            library.search(query: "", equipment: "Treadmill").isEmpty
+        )
+
+        UserDefaults.standard.set("en", forKey: "settings.language")
+        XCTAssertEqual(library.localizedEquipmentTitle("Treadmill"), "Treadmill")
+        XCTAssertEqual(library.localizedEquipmentTitle("Hip Thrust Machine"), "Hip Thrust Machine")
+    }
+
     func testNorwegianNameVocabularyRetainsSearchableEnglishSource() {
         XCTAssertEqual(ATHLTHExerciseNameLocalization.norwegianName(for: "Ab Crunch Machine"),
                        "Magemaskin")
