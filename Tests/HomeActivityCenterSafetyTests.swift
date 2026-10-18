@@ -20,6 +20,42 @@ final class HomeActivityCenterSafetyTests: XCTestCase {
         )
     }
 
+    func testPhotoCardHasNumbersOnlyWhenActuallyRecorded() {
+        XCTAssertNil(HomeStrengthRecentCardMetrics.durationText(0))
+        XCTAssertNil(HomeStrengthRecentCardMetrics.durationText(.nan))
+        XCTAssertEqual(HomeStrengthRecentCardMetrics.durationText(19 * 60), "19 min")
+        XCTAssertNil(HomeStrengthRecentCardMetrics.detailText(
+            exerciseCount: nil, completedSetCount: nil
+        ))
+        XCTAssertNil(HomeStrengthRecentCardMetrics.detailText(
+            exerciseCount: 0, completedSetCount: 0
+        ))
+        XCTAssertEqual(HomeStrengthRecentCardMetrics.detailText(
+            exerciseCount: 5, completedSetCount: nil
+        ), ATHLTHLocalization.choose(
+            english: "5 exercises", norwegian: "5 øvelser"
+        ))
+        XCTAssertEqual(HomeStrengthRecentCardMetrics.detailText(
+            exerciseCount: 5, completedSetCount: 14
+        ), ATHLTHLocalization.choose(
+            english: "5 exercises · 14 sets",
+            norwegian: "5 øvelser · 14 sett"
+        ))
+    }
+
+    func testNewPhotoCardRequiresNoMuscleActivations() {
+        XCTAssertTrue(HomeStrengthRecentCardMetrics.showsPhoto(for: .empty))
+        let workoutWithMuscles = StrengthMuscleProfile(
+            activations: [
+                StrengthMuscleActivation(region: .chest, score: 3),
+                StrengthMuscleActivation(region: .biceps, score: 2)
+            ]
+        )
+        XCTAssertFalse(HomeStrengthRecentCardMetrics.showsPhoto(
+            for: workoutWithMuscles
+        ))
+    }
+
     func testInvalidCoordinatesAreRemovedBeforeMapKit() {
         let locations = [
             CLLocation(
