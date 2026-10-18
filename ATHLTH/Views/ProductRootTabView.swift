@@ -4948,9 +4948,14 @@ private struct HomeCurrentStreakCard: View {
 struct TrainProgramCreationLaunch: Identifiable {
     let id = UUID()
     let resumesDraft: Bool
+    let draftID: UUID?
 
-    static var fresh: Self { Self(resumesDraft: false) }
-    static var continueDraft: Self { Self(resumesDraft: true) }
+    static var fresh: Self {
+        Self(resumesDraft: false, draftID: UUID())
+    }
+    static var continueDraft: Self {
+        Self(resumesDraft: true, draftID: nil)
+    }
 }
 
 private struct PlannedWorkoutSelection: Identifiable {
@@ -5242,9 +5247,6 @@ struct ATHLTHTrainView: View {
     @State private var showingTrainPlanWorkspace = false
     @State private var showingTrainAllPlans = false
     @State private var trainProgramCreationLaunch: TrainProgramCreationLaunch?
-    @State private var showingTrainDraftChoice = false
-    @State private var trainDraftLaunchError: String?
-    private let trainPlanDraftStore = ATHLTHPlanCreationDraftStore()
     @State private var newlyCreatedPlanToOpen: UUID?
     @State private var showingTrainPlanProgress = false
     @State private var showingTrainExerciseLibrary = false
@@ -5354,57 +5356,6 @@ struct ATHLTHTrainView: View {
             .sheet(isPresented: $showingTrainAllPlans) {
                 AllTrainingPlansView()
             }
-            .confirmationDialog(
-                ATHLTHLocalization.choose(
-                    english: "You have an unfinished training plan",
-                    norwegian: "Du har en påbegynt treningsplan"
-                ),
-                isPresented: $showingTrainDraftChoice,
-                titleVisibility: .visible
-            ) {
-                Button(ATHLTHLocalization.choose(
-                    english: "Continue draft", norwegian: "Fortsett utkast"
-                )) {
-                    trainProgramCreationLaunch = .continueDraft
-                }
-                Button(ATHLTHLocalization.choose(
-                    english: "Discard draft and start new",
-                    norwegian: "Forkast utkast og start ny"
-                ), role: .destructive) {
-                    if trainPlanDraftStore.deleteDraft(
-                        userID: session.profile.userID
-                    ) {
-                        trainProgramCreationLaunch = .fresh
-                    } else {
-                        trainDraftLaunchError = ATHLTHLocalization.choose(
-                            english: "The unfinished draft could not be removed. Please try again.",
-                            norwegian: "Kunne ikke fjerne utkastet. Prøv igjen."
-                        )
-                    }
-                }
-                Button(ATHLTHLocalization.choose(
-                    english: "Cancel", norwegian: "Avbryt"
-                ), role: .cancel) {}
-            } message: {
-                Text(ATHLTHLocalization.choose(
-                    english: "Start at step 1 with a new plan, or resume the saved draft. An existing completed plan is never affected.",
-                    norwegian: "Start på steg 1 med en ny plan, eller fortsett det lagrede utkastet. En ferdig treningsplan blir ikke berørt."
-                ))
-            }
-            .alert(
-                ATHLTHLocalization.choose(
-                    english: "Could not start new plan",
-                    norwegian: "Kunne ikke starte ny plan"
-                ),
-                isPresented: Binding(
-                    get: { trainDraftLaunchError != nil },
-                    set: { if !$0 { trainDraftLaunchError = nil } }
-                )
-            ) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(trainDraftLaunchError ?? "")
-            }
             .sheet(item: $trainProgramCreationLaunch, onDismiss: {
                 // Switch tabs only once the creation sheet has fully closed.
                 // Updating the underlying tab while the sheet is dismissing
@@ -5417,7 +5368,8 @@ struct ATHLTHTrainView: View {
                 }
             }) { launch in
                 ATHLTHTrainProgramComposerView(
-                    resumesDraftOnAppear: launch.resumesDraft
+                    resumesDraftOnAppear: launch.resumesDraft,
+                    draftID: launch.draftID
                 ) { planID in
                     newlyCreatedPlanToOpen = planID
                 }
@@ -6121,15 +6073,10 @@ struct ATHLTHTrainView: View {
         ))
     }
 
-    /// The + buttons always start at mode choice. A saved checkpoint is
-    /// never silently resumed or overwritten; the user makes that choice.
+    /// A new plan always opens step one. Saved drafts remain available
+    /// from the Plan workspace and have independent on-device checkpoints.
     private func beginFreshTrainingPlan() {
-        trainDraftLaunchError = nil
-        if trainPlanDraftStore.load(userID: session.profile.userID) != nil {
-            showingTrainDraftChoice = true
-        } else {
-            trainProgramCreationLaunch = .fresh
-        }
+        trainProgramCreationLaunch = .fresh
     }
 
     @ViewBuilder
