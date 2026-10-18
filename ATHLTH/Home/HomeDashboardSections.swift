@@ -4126,6 +4126,7 @@ private struct HomeWeeklyProgressDaySheet: View {
                 ATHLTHHomeWorkoutInspirationView(
                     workouts: allInspirationWorkouts,
                     recentActivities: recentActivityHints,
+                    goal: session.onboardingProfile?.currentGoal?.type,
                     selectedDate: selection.date,
                     onChoose: { workout in
                         pendingInspiration = workout
