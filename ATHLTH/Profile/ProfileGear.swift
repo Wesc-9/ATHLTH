@@ -1421,6 +1421,47 @@ struct ProfileGearManagerView: View {
                 )
             }
 
+            Section {
+                NavigationLink {
+                    AthleteGearMaintenanceView()
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "wrench.adjustable")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 38, height: 38)
+                            .background(
+                                ATHLTHTheme.accentSoft,
+                                in: RoundedRectangle(cornerRadius: 12)
+                            )
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Gear maintenance",
+                                norwegian: "Vedlikehold av utstyr"
+                            ))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+
+                            Text(ATHLTHLocalization.choose(
+                                english: "Service intervals and reminders",
+                                norwegian: "Serviceintervaller og påminnelser"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                .buttonStyle(.plain)
+            } header: {
+                Text(ATHLTHLocalization.choose(
+                    english: "Maintenance",
+                    norwegian: "Vedlikehold"
+                ))
+            }
+            .listRowBackground(Color.white.opacity(0.84))
+
             if let error = gear.errorMessage {
                 Section {
                     Label(
