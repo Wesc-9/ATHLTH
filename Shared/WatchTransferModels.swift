@@ -360,6 +360,13 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     var announcePauseResume: Bool? = nil
     var announceWorkoutComplete: Bool? = nil
 
+    // Voice-only Fuel & Hydration reminders. Nil disables them and keeps
+    // payloads from older iPhone/Watch builds backward compatible.
+    var fuelReminderIntervalMinutes: Int? = nil
+    var fuelReminderDurationMinutes: Int? = nil
+    var fuelCarbohydrateGramsPerHour: Int? = nil
+    var fuelFluidMLPerHour: Int? = nil
+
     // When a workout was launched from iPhone, iPhone owns spoken guidance
     // while WatchConnectivity remains reachable so Spotify/AirPods can stay on
     // the phone. Watch automatically becomes the voice fallback if the phone
@@ -391,6 +398,25 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     var strengthStatusIntervalSeconds: TimeInterval? = nil
     var strengthRestCountdownSeconds: Int? = nil
     var strengthHapticsEnabled: Bool? = nil
+
+    var resolvedFuelIntervalSeconds: TimeInterval? {
+        guard enabled,
+              let minutes = fuelReminderIntervalMinutes,
+              (10...60).contains(minutes),
+              let duration = fuelReminderDurationMinutes,
+              (30...480).contains(duration),
+              let carbohydrate = fuelCarbohydrateGramsPerHour,
+              (0...120).contains(carbohydrate),
+              let fluid = fuelFluidMLPerHour,
+              (0...1500).contains(fluid),
+              carbohydrate > 0 || fluid > 0
+        else { return nil }
+        return TimeInterval(minutes * 60)
+    }
+
+    var resolvedFuelDurationSeconds: TimeInterval {
+        TimeInterval(min(max(fuelReminderDurationMinutes ?? 120, 30), 480) * 60)
+    }
 
     var shouldDuckOtherAudio: Bool {
         duckOtherAudio ?? true
@@ -492,6 +518,53 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
         announceRemainingStepTime: false,
         announceRemainingStepDistance: false
     )
+}
+
+/// Both Watch and mirrored iPhone use the same elapsed-workout schedule.
+/// Never creates a notification or assumes nutrition amounts are medical advice.
+enum ATHLTHFuelVoicePrompt {
+    static func nextDue(after elapsed: TimeInterval,
+                        config: WatchAudioCoachConfiguration) -> TimeInterval? {
+        guard let interval = config.resolvedFuelIntervalSeconds,
+              elapsed.isFinite, elapsed >= 0
+        else { return nil }
+        let next = (floor(elapsed / interval) + 1) * interval
+        return next < config.resolvedFuelDurationSeconds ? next : nil
+    }
+
+    static func phrase(config: WatchAudioCoachConfiguration) -> String? {
+        guard let interval = config.resolvedFuelIntervalSeconds else {
+            return nil
+        }
+        let minutes = Int(interval / 60)
+        let fluid = Int((Double(config.fuelFluidMLPerHour ?? 0)
+                         * Double(minutes) / 60).rounded())
+        let carbs = Int((Double(config.fuelCarbohydrateGramsPerHour ?? 0)
+                         * Double(minutes) / 60).rounded())
+        let norwegian: Bool
+        switch config.language {
+        case .norwegian: norwegian = true
+        case .english: norwegian = false
+        case .system: norwegian = Locale.current.language.languageCode?.identifier == "nb"
+            || Locale.current.language.languageCode?.identifier == "nn"
+        }
+        if carbs > 0 && fluid > 0 {
+            return norwegian
+                ? "Påminnelse: drikk omtrent \(fluid) milliliter og få i deg omtrent \(carbs) gram karbohydrater, etter din egen plan."
+                : "Reminder: about \(fluid) milliliters of fluid and \(carbs) grams of carbohydrates, according to your plan."
+        }
+        if fluid > 0 {
+            return norwegian
+                ? "Påminnelse: drikk omtrent \(fluid) milliliter, etter din egen plan."
+                : "Reminder: about \(fluid) milliliters of fluid, according to your plan."
+        }
+        if carbs > 0 {
+            return norwegian
+                ? "Påminnelse: få i deg omtrent \(carbs) gram karbohydrater, etter din egen plan."
+                : "Reminder: about \(carbs) grams of carbohydrates, according to your plan."
+        }
+        return nil
+    }
 }
 
 enum ATHLTHGuidancePriority:
