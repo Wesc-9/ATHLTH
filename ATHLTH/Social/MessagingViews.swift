@@ -3207,6 +3207,7 @@ struct DirectMessageThreadView: View {
     @State private var text = ""
     @State private var selectedShare: MessageShareDraft?
     @State private var showingSharePicker = false
+    @State private var selectedPreviewAttachment: DirectMessageRecord?
     @State private var isSending = false
     @State private var loadError: String?
     @State private var savedFeedback: String?
@@ -3317,6 +3318,11 @@ struct DirectMessageThreadView: View {
             MessageSharePicker { draft in
                 selectedShare = draft
                 showingSharePicker = false
+            }
+        }
+        .sheet(item: $selectedPreviewAttachment) { message in
+            ATHLTHReceivedTrainingPreview(message: message) {
+                saveAttachment(message)
             }
         }
         .sheet(item: $workoutInvitationForProposal) { invitation in
@@ -3660,6 +3666,9 @@ struct DirectMessageThreadView: View {
                                     currentUserProfileCard,
                                 onSaveAttachment: {
                                     saveAttachment(message)
+                                },
+                                onPreviewAttachment: {
+                                    selectedPreviewAttachment = message
                                 },
                                 inviteResponse: plannedInviteResponse(
                                     for: message, in: messages
@@ -5667,6 +5676,11 @@ struct DirectMessageThreadView: View {
                 savedFeedback = "\(workout.title) was saved to your workout library."
             }
 
+        case .exercise:
+            // Recipients review/import an exercise in the library detail
+            // screen. Never auto-import as a consequence of opening the inbox.
+            break
+
         case .trainingPlan:
             if let plan = message.decodeSnapshot(TrainingPlan.self) {
                 session.saveSharedPlan(
@@ -6590,6 +6604,7 @@ private struct MessageBubble: View {
     let currentUserID: UUID?
     let currentUserProfile: SocialProfileCard
     let onSaveAttachment: () -> Void
+    let onPreviewAttachment: () -> Void
     let inviteResponse: PlannedWorkoutInviteResponse?
     let respondingToInvite: Bool
     let onRespondToInvite: (Bool) -> Void
@@ -7018,16 +7033,46 @@ private struct MessageBubble: View {
                             .foregroundStyle(.tertiary)
 
                         if !isMine && !isPlannedInvitation && !isPlannedInviteResponse {
-                            Button {
-                                onSaveAttachment()
-                            } label: {
-                                Label(
-                                    attachmentKind == .challenge ? "View details" : "Save a copy",
-                                    systemImage: attachmentKind == .challenge ? "bolt.fill" : "square.and.arrow.down"
-                                )
-                                .font(.caption.weight(.semibold))
+                            HStack(spacing: 8) {
+                                if attachmentKind == .challenge {
+                                    Button {
+                                        onSaveAttachment()
+                                    } label: {
+                                        Label("View details", systemImage: "bolt.fill")
+                                            .font(.caption.weight(.semibold))
+                                    }
+                                    .buttonStyle(.bordered)
+                                } else {
+                                    Button {
+                                        onPreviewAttachment()
+                                    } label: {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "View content",
+                                                norwegian: "Se innhold"
+                                            ),
+                                            systemImage: "eye"
+                                        )
+                                        .font(.caption.weight(.semibold))
+                                    }
+                                    .buttonStyle(.bordered)
+                                    if attachmentKind != .exercise {
+                                        Button {
+                                            onSaveAttachment()
+                                        } label: {
+                                            Label(
+                                                ATHLTHLocalization.choose(
+                                                    english: "Save copy",
+                                                    norwegian: "Lagre kopi"
+                                                ),
+                                                systemImage: "square.and.arrow.down"
+                                            )
+                                            .font(.caption.weight(.semibold))
+                                        }
+                                        .buttonStyle(.bordered)
+                                    }
+                                }
                             }
-                            .buttonStyle(.bordered)
                             .tint(ATHLTHTheme.vitality)
                         }
                     }
