@@ -28,6 +28,18 @@ enum ATHLTHPlanJourney {
             .map { $0 + 1 }
     }
 
+    /// Resume only known stages. Unrecognized legacy values fall back to
+    /// the mode choice instead of silently dropping the entire draft.
+    static func restoredStep(_ stored: String, advanced: Bool) -> ATHLTHPlanJourneyStep {
+        guard let candidate = ATHLTHPlanJourneyStep.allCases.first(where: {
+            String(describing: $0) == stored
+        }) else { return .mode }
+        // Source is retained as a valid legacy branch; it is not in today's
+        // standard simple/advanced progression.
+        if candidate == .source { return .source }
+        return sequence(advanced: advanced).contains(candidate) ? candidate : .basics
+    }
+
     static func next(
         after step: ATHLTHPlanJourneyStep,
         advanced: Bool
