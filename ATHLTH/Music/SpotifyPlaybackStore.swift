@@ -13,6 +13,47 @@ struct SpotifyPlaylistReference: Identifiable, Codable, Hashable {
     var ownerName: String?
 }
 
+/// Autoplay belongs to a specific workout request, not to a remembered
+/// playlist or to an App Remote reconnection. Kept independent of the SDK
+/// so pause, finish and delayed authorization can be regression-tested.
+struct SpotifyWorkoutAutoplayGate {
+    private(set) var isWorkoutActive = false
+    private(set) var wasManuallyPaused = false
+    private(set) var currentRequestID: UUID?
+
+    mutating func begin() -> UUID {
+        let id = UUID()
+        isWorkoutActive = true
+        wasManuallyPaused = false
+        currentRequestID = id
+        return id
+    }
+
+    func isCurrent(_ requestID: UUID) -> Bool {
+        isWorkoutActive && !wasManuallyPaused &&
+            currentRequestID == requestID
+    }
+
+    var shouldReconnectForControls: Bool {
+        isWorkoutActive && !wasManuallyPaused
+    }
+
+    mutating func pause() {
+        wasManuallyPaused = true
+        currentRequestID = nil
+    }
+
+    mutating func resumeControls() {
+        if isWorkoutActive { wasManuallyPaused = false }
+    }
+
+    mutating func end() {
+        isWorkoutActive = false
+        wasManuallyPaused = false
+        currentRequestID = nil
+    }
+}
+
 private struct SpotifyPKCESession: Codable {
     var accessToken: String
     var refreshToken: String?
@@ -124,6 +165,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
 
     private var pendingPlaybackURI: String?
     private var pendingPlaybackPlaylist: SpotifyPlaylistReference?
+    private var workoutAutoplayGate = SpotifyWorkoutAutoplayGate()
     private var pkceSession: SpotifyPKCESession?
     private var webAuthenticationSession: ASWebAuthenticationSession?
     private var pkceCodeVerifier: String?
@@ -282,24 +324,21 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     }
 
     func applicationDidBecomeActive() {
-        guard let appRemote,
+        // A remembered playlist does not authorize restarting music.
+        // Reconnect only to control a still-active linked workout.
+        guard workoutAutoplayGate.shouldReconnectForControls,
+              let appRemote,
               !appRemote.isConnected,
-              pendingPlaybackPlaylist != nil ||
-                activePlaylist != nil
-        else {
-            return
-        }
+              activePlaylist != nil
+        else { return }
 
         Task {
-            guard let token =
-                    await accessTokenForRequest()
-            else {
-                return
-            }
-
-            appRemote
-                .connectionParameters
-                .accessToken = token
+            guard let token = await accessTokenForRequest(),
+                  workoutAutoplayGate.shouldReconnectForControls,
+                  activePlaylist != nil,
+                  !appRemote.isConnected
+            else { return }
+            appRemote.connectionParameters.accessToken = token
             appRemote.connect()
         }
     }
@@ -315,6 +354,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     }
 
     func disconnect() {
+        workoutAutoplayGate.end()
         appRemote?.disconnect()
         sessionManager?.session = nil
         webAuthenticationSession?.cancel()
@@ -452,6 +492,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
             return
         }
 
+        let requestID = workoutAutoplayGate.begin()
         activePlaylist = nil
         lastStartedAt = nil
         lastErrorMessage = nil
@@ -459,6 +500,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         pendingPlaybackPlaylist = playlist
 
         guard let appRemote else {
+            workoutAutoplayGate.end()
             pendingPlaybackURI = nil
             pendingPlaybackPlaylist = nil
             lastErrorMessage =
@@ -466,16 +508,20 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
             return
         }
 
-        guard let token =
-                await accessTokenForRequest()
-        else {
-            connectionState = .disconnected
-            lastErrorMessage =
-                "Reconnect Spotify before starting linked playback."
-            pendingPlaybackURI = nil
-            pendingPlaybackPlaylist = nil
+        guard let token = await accessTokenForRequest() else {
+            // An old token request must never change the state of a newer
+            // workout or undo a manual pause.
+            if workoutAutoplayGate.isCurrent(requestID) {
+                workoutAutoplayGate.end()
+                connectionState = .disconnected
+                lastErrorMessage =
+                    "Reconnect Spotify before starting linked playback."
+                pendingPlaybackURI = nil
+                pendingPlaybackPlaylist = nil
+            }
             return
         }
+        guard workoutAutoplayGate.isCurrent(requestID) else { return }
 
         appRemote.connectionParameters
             .accessToken = token
@@ -483,31 +529,34 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         if appRemote.isConnected {
             await playThroughConnectedRemote(
                 playlist,
-                appRemote: appRemote
+                appRemote: appRemote,
+                requestID: requestID
             )
             return
         }
 
-        // Wake Spotify and return through the registered callback. The callback
-        // is NOT trusted for account authorization anymore; ATHLTH already owns
-        // a valid PKCE token and reuses it if Spotify returns unknown_error.
-        let installed =
-            await appRemote.authorizeAndPlayURI(
-                playlist.uri
-            )
+        // Spotify's authorizeAndPlayURI already requests playback.
+        // Never issue playerAPI.play again when the callback reconnects,
+        // or a manual pause can be undone by a delayed second play.
+        pendingPlaybackURI = nil
+        pendingPlaybackPlaylist = nil
+        let installed = await appRemote.authorizeAndPlayURI(playlist.uri)
+        guard workoutAutoplayGate.isCurrent(requestID) else { return }
 
-        if !installed {
+        if installed {
+            activePlaylist = playlist
+            lastStartedAt = Date()
+            // Remote playback state is learned from Spotify, not invented.
+        } else {
+            workoutAutoplayGate.end()
             lastErrorMessage =
                 "Spotify is not installed on this iPhone."
-            pendingPlaybackURI = nil
-            pendingPlaybackPlaylist = nil
         }
     }
 
     func pause() {
-        // A manual pause is authoritative. If Spotify was still completing an
-        // app-switch/reconnect from workout autoplay, do not let that deferred
-        // request restart playback after the user has paused it.
+        // Cancel every outstanding token or app-switch autoplay continuation.
+        workoutAutoplayGate.pause()
         pendingPlaybackURI = nil
         pendingPlaybackPlaylist = nil
 
@@ -523,14 +572,15 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     }
 
     func endLinkedWorkoutPlaybackSession() {
-        // Ending a workout should only disarm ATHLTH's automatic start intent.
-        // Do not pause Spotify here: the athlete may want the music to continue
-        // after finishing the workout.
+        // End the request and stop automatic reconnects. Leave the music
+        // untouched: the athlete may want it to continue after training.
+        workoutAutoplayGate.end()
         pendingPlaybackURI = nil
         pendingPlaybackPlaylist = nil
     }
 
     func resume() {
+        workoutAutoplayGate.resumeControls()
         appRemote?.playerAPI?.resume { [weak self] _, error in
             Task { @MainActor in
                 if let error {
@@ -725,8 +775,10 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
 
     private func playThroughConnectedRemote(
         _ playlist: SpotifyPlaylistReference,
-        appRemote: SPTAppRemote
+        appRemote: SPTAppRemote,
+        requestID: UUID
     ) async {
+        guard workoutAutoplayGate.isCurrent(requestID) else { return }
         await withCheckedContinuation {
             (continuation: CheckedContinuation<Void, Never>) in
             guard let playerAPI = appRemote.playerAPI else {
@@ -736,15 +788,21 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
 
             playerAPI.play(playlist.uri) { [weak self] _, error in
                 Task { @MainActor in
-                    if let error {
-                        self?.lastErrorMessage = error.localizedDescription
-                    } else {
-                        self?.activePlaylist = playlist
-                        self?.isPlaying = true
-                        self?.lastStartedAt = Date()
+                    guard let self,
+                          self.workoutAutoplayGate.isCurrent(requestID)
+                    else {
+                        continuation.resume()
+                        return
                     }
-                    self?.pendingPlaybackURI = nil
-                    self?.pendingPlaybackPlaylist = nil
+                    if let error {
+                        self.lastErrorMessage = error.localizedDescription
+                    } else {
+                        self.activePlaylist = playlist
+                        self.isPlaying = true
+                        self.lastStartedAt = Date()
+                    }
+                    self.pendingPlaybackURI = nil
+                    self.pendingPlaybackPlaylist = nil
                     continuation.resume()
                 }
             }
@@ -1519,21 +1577,9 @@ extension SpotifyPlaybackStore: SPTAppRemoteDelegate {
         Task { @MainActor in
             self.connectionState = .connected
             self.lastErrorMessage = nil
-
-            // Reconnecting App Remote is transport recovery, not playback
-            // intent. Only a playlist that is explicitly pending from a fresh
-            // autoplay request may start here. activePlaylist is display/state
-            // metadata and must never cause playback to restart by itself.
-            guard let playlist =
-                    self.pendingPlaybackPlaylist
-            else {
-                return
-            }
-
-            await self.playThroughConnectedRemote(
-                playlist,
-                appRemote: appRemote
-            )
+            // Transport reconnection is NEVER permission to start music.
+            // Explicit workout starts issue one request in
+            // startLinkedPlaylist, not a second request from this callback.
         }
     }
 
