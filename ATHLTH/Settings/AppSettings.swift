@@ -483,6 +483,7 @@ final class AppSettingsStore: ObservableObject {
     @Published private(set) var lastStrengthAdvancedSetup:
         Bool { didSet { persist() } }
     @Published var autoPauseOutdoorWorkouts: Bool { didSet { persist() } }
+    @Published var appleHealthIntegrationEnabled: Bool { didSet { persist() } }
     @Published var backgroundHealthSyncEnabled: Bool { didSet { persist() } }
     @Published var externalWorkoutImportMode: ExternalWorkoutImportMode { didSet { persist() } }
     @Published var autoPublishCompletedWorkouts: Bool { didSet { persist() } }
@@ -757,6 +758,7 @@ final class AppSettingsStore: ObservableObject {
         }
 
         autoPauseOutdoorWorkouts = defaults.object(forKey: "settings.autoPauseOutdoor") as? Bool ?? false
+        appleHealthIntegrationEnabled = defaults.object(forKey: "settings.appleHealthIntegrationEnabled") as? Bool ?? true
         backgroundHealthSyncEnabled = defaults.object(forKey: "settings.backgroundHealthSyncEnabled") as? Bool ?? true
         externalWorkoutImportMode = ExternalWorkoutImportMode(
             rawValue: defaults.string(forKey: "settings.externalWorkoutImportMode") ?? ""
@@ -1071,6 +1073,7 @@ final class AppSettingsStore: ObservableObject {
             forKey: "settings.lastStrengthAdvancedSetup"
         )
         defaults.set(autoPauseOutdoorWorkouts, forKey: "settings.autoPauseOutdoor")
+        defaults.set(appleHealthIntegrationEnabled, forKey: "settings.appleHealthIntegrationEnabled")
         defaults.set(backgroundHealthSyncEnabled, forKey: "settings.backgroundHealthSyncEnabled")
         defaults.set(externalWorkoutImportMode.rawValue, forKey: "settings.externalWorkoutImportMode")
         defaults.set(autoPublishCompletedWorkouts, forKey: "settings.autoPublishCompletedWorkouts")
