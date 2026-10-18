@@ -453,12 +453,9 @@ struct ATHLTHTrainTodayPremiumView: View {
         }
     }
 
-    // Real, published workouts only. This is editorial discovery, not an AI
-    // prescription. The selection opens the original workout detail screen.
+    // Curated and published recipes share a single source, so useful strength
+    // suggestions remain available offline as well as online.
     private var suggestedWorkouts: [WorkoutTemplateCatalogEntry] {
-        // The bundled fallback contains only HYROX sessions and must not be
-        // marketed as general recommendations before the live catalog loads.
-        guard workoutCatalog.hasPublishedCatalog else { return [] }
         return TrainWorkoutSuggestionPolicy.pick(
             workoutCatalog.entries, preferredKind: primaryWorkout?.kind
         )
@@ -893,7 +890,7 @@ private extension View {
 
 
 /// Pure, deterministic selection for Train discovery. No user profiling,
-/// hidden AI prescriptions or dependence on the HYROX-only offline fallback.
+/// hidden AI prescriptions or dependence on network availability.
 enum TrainWorkoutSuggestionPolicy {
     static func pick(
         _ entries: [WorkoutTemplateCatalogEntry],
@@ -901,7 +898,9 @@ enum TrainWorkoutSuggestionPolicy {
     ) -> [WorkoutTemplateCatalogEntry] {
         let safe = entries.filter { entry in
             !entry.blocks.isEmpty &&
-            entry.difficulty.localizedCaseInsensitiveCompare("Advanced") != .orderedSame &&
+            !["Advanced", "Avansert"].contains(where: {
+                entry.difficulty.localizedCaseInsensitiveCompare($0) == .orderedSame
+            }) &&
             !entry.tags.contains(where: { $0.localizedCaseInsensitiveContains("hyrox") })
         }.sorted { lhs, rhs in
             if lhs.sortOrder == rhs.sortOrder {
@@ -926,8 +925,9 @@ enum TrainWorkoutSuggestionPolicy {
             ordered = matched + remaining
         } else {
             let entryLevel = safe.filter {
-                $0.difficulty.localizedCaseInsensitiveCompare("Beginner") == .orderedSame ||
-                $0.difficulty.localizedCaseInsensitiveCompare("All levels") == .orderedSame
+                ["Beginner", "Nybegynner", "All levels", "Alle nivåer"].contains { level in
+                    $0.difficulty.localizedCaseInsensitiveCompare(level) == .orderedSame
+                }
             }
             if !entryLevel.isEmpty {
                 let other = safe.filter { entry in !entryLevel.contains(where: { $0.id == entry.id }) }
