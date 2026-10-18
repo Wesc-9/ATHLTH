@@ -298,7 +298,7 @@ extension RunningWorkoutTemplate {
             case .work, .steady: phase = .main
             }
 
-            for repetition in 1...max(block.repetitions, 1) {
+            for repetition in 1...min(max(block.repetitions, 1), 60) {
                 let work = block.resolvedWork(at: repetition)
                 let label = block.repetitions > 1
                     ? "\(block.title) · \(repetition)/\(block.repetitions)"
