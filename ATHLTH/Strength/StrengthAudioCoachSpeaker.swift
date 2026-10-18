@@ -10,6 +10,7 @@ final class StrengthAudioCoachSpeaker:
 {
     private let synthesizer =
         AVSpeechSynthesizer()
+    private let azureSpeech = ATHLTHAzureWorkoutSpeech()
     private var cueQueue = ATHLTHCoachCueQueue()
     private var eventLedger = ATHLTHCoachEventLedger()
     private var latestConfiguration: StrengthAudioCoachConfiguration?
@@ -35,6 +36,7 @@ final class StrengthAudioCoachSpeaker:
         speechPaused = paused
         cueQueue.reset()
         if paused {
+            azureSpeech.stop()
             synthesizer.stopSpeaking(at: .immediate)
             deactivateAudioSession()
         }
@@ -109,7 +111,7 @@ final class StrengthAudioCoachSpeaker:
             return
         }
 
-        if synthesizer.isSpeaking {
+        if synthesizer.isSpeaking || azureSpeech.isBusy {
             cueQueue.enqueue(
                 ATHLTHCoachQueuedCue(
                     event: resolvedEvent,
@@ -119,24 +121,6 @@ final class StrengthAudioCoachSpeaker:
             return
         }
         eventLedger.didDeliver(resolvedEvent)
-
-        let audioSession =
-            AVAudioSession.sharedInstance()
-        let options:
-            AVAudioSession.CategoryOptions =
-                configuration.duckOtherAudio
-                    ? [
-                        .duckOthers,
-                        .interruptSpokenAudioAndMixWithOthers
-                    ]
-                    : [.mixWithOthers]
-
-        try? audioSession.setCategory(
-            .playback,
-            mode: .spokenAudio,
-            options: options
-        )
-        try? audioSession.setActive(true)
 
         let spokenText = rememberForReplay
             ? (configuration.speechStyle ?? .balanced).render(
@@ -181,7 +165,25 @@ final class StrengthAudioCoachSpeaker:
                 )
             )
 
-        synthesizer.speak(utterance)
+        let routedToAzure = azureSpeech.begin(
+            spokenText,
+            voiceIdentifier: configuration.voiceIdentifier,
+            duckMusic: configuration.duckOtherAudio,
+            onFallback: { [weak self] in
+                guard let self, !self.speechPaused,
+                      self.latestConfiguration?.enabled == true
+                else { return }
+                self.activateLocalAudio(duck: configuration.duckOtherAudio)
+                self.synthesizer.speak(utterance)
+            },
+            onFinished: { [weak self] in
+                self?.deliverNextQueuedCue()
+            }
+        )
+        if !routedToAzure {
+            activateLocalAudio(duck: configuration.duckOtherAudio)
+            synthesizer.speak(utterance)
+        }
         if rememberForReplay {
             replayMemory.remember(spokenText, priority: .structuredStep)
             lastCoachMessage = replayMemory.text
@@ -190,6 +192,7 @@ final class StrengthAudioCoachSpeaker:
 
     private func deliverNextQueuedCue() {
         guard !synthesizer.isSpeaking,
+              !azureSpeech.isBusy,
               let configuration = latestConfiguration,
               configuration.enabled,
               let next = cueQueue.popNext()
@@ -211,6 +214,7 @@ final class StrengthAudioCoachSpeaker:
         lastCoachMessage = nil
         speechPaused = false
         latestConfiguration = nil
+        azureSpeech.stop()
         synthesizer.stopSpeaking(
             at: .immediate
         )
@@ -241,6 +245,10 @@ final class StrengthAudioCoachSpeaker:
             self.deactivateAudioSession()
             self.deliverNextQueuedCue()
         }
+    }
+
+    private func activateLocalAudio(duck: Bool) {
+        try? ATHLTHSpokenAudioSession.activate(duckOtherAudio: duck)
     }
 
     private func deactivateAudioSession() {
