@@ -3982,7 +3982,6 @@ private struct HomeWeeklyProgressDaySheet: View {
     @State private var scheduleConfirmation: String?
     @State private var selectedInvitationLobby: PlannedSession?
     @State private var selectedPlannedWorkout: PlannedSession?
-    @State private var selectedMode = 0
 
     private let dayInk = Color(red: 0.17, green: 0.21, blue: 0.29)
     private let dayCanvas = Color(red: 0.968, green: 0.971, blue: 0.985)
@@ -4080,7 +4079,7 @@ private struct HomeWeeklyProgressDaySheet: View {
                     .padding(.top, 30)
                     .padding(.bottom, 5)
 
-                    dayModeSelector
+                    dayActionHeader
 
                     if let scheduleConfirmation {
                         Label(
@@ -4097,14 +4096,10 @@ private struct HomeWeeklyProgressDaySheet: View {
                                     in: RoundedRectangle(cornerRadius: 13))
                     }
 
-                    if selectedMode == 0 {
-                        if hasAnyWorkoutsToday {
-                            todaysWorkoutList
-                        } else {
-                            emptyTodayCard
-                        }
+                    if hasAnyWorkoutsToday {
+                        todaysWorkoutList
                     } else {
-                        planningCard
+                        emptyTodayCard
                     }
 
                     workoutSuggestionSection
@@ -4192,48 +4187,48 @@ private struct HomeWeeklyProgressDaySheet: View {
         }
     }
 
-    private var dayModeSelector: some View {
-        HStack(spacing: 3) {
-            dayModeButton(
-                ATHLTHLocalization.choose(english: "Today's workout", norwegian: "Dagens økt"),
-                icon: "calendar",
-                mode: 0
+    /// Today's plan is a fixed section, not a mode. A single explicit
+    /// action launches the existing full workout planner immediately.
+    private var dayActionHeader: some View {
+        HStack(spacing: 12) {
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Today's workout",
+                    norwegian: "Dagens økt"
+                ),
+                systemImage: "calendar"
             )
-            dayModeButton(
-                ATHLTHLocalization.choose(english: "Plan new", norwegian: "Planlegg ny"),
-                icon: "plus",
-                mode: 1
-            )
-        }
-        .padding(4)
-        .background(dayInk.opacity(0.045), in: Capsule())
-        .overlay {
-            Capsule().strokeBorder(dayInk.opacity(0.11), lineWidth: 0.8)
-        }
-        .padding(.horizontal, 4)
-    }
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(dayInk)
 
-    private func dayModeButton(_ label: String, icon: String, mode: Int) -> some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.18)) {
-                selectedMode = mode
-            }
-        } label: {
-            Label(label, systemImage: icon)
-                .font(.system(size: 12, weight: .semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .foregroundStyle(selectedMode == mode ? .white : dayInk)
-                .frame(maxWidth: .infinity)
-                .frame(height: 39)
-                .background {
-                    if selectedMode == mode {
-                        Capsule().fill(dayInk)
-                    }
+            Spacer(minLength: 6)
+
+            if canPlanWorkout {
+                Button {
+                    showingStandaloneSessionEditor = true
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Plan new",
+                            norwegian: "Planlegg ny"
+                        ),
+                        systemImage: "plus"
+                    )
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 43)
+                    .background(dayInk, in: Capsule())
                 }
+                .buttonStyle(.plain)
+                .accessibilityHint(ATHLTHLocalization.choose(
+                    english: "Opens the workout planner for this day",
+                    norwegian: "Åpner øktplanleggeren direkte for denne dagen"
+                ))
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selectedMode == mode ? .isSelected : [])
+        .padding(.horizontal, 5)
+        .padding(.vertical, 5)
     }
 
     /// The empty day is an invitation to discover, not a second planning menu.
@@ -4327,43 +4322,6 @@ private struct HomeWeeklyProgressDaySheet: View {
             RoundedRectangle(cornerRadius: 23)
                 .strokeBorder(dayInk.opacity(0.065), lineWidth: 0.8)
         }
-    }
-
-    private var planningCard: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            Label(ATHLTHLocalization.choose(
-                english: "An extra workout, your way",
-                norwegian: "En ekstra økt, på din måte"
-            ), systemImage: "calendar.badge.plus")
-                .font(.headline)
-                .foregroundStyle(dayInk)
-
-            Text(ATHLTHLocalization.choose(
-                english: "Choose a workout from Workouts, or create a new one. Nothing changes in your training plan.",
-                norwegian: "Velg en økt fra Workouts eller lag en ny. Treningsplanen din endres ikke."
-            ))
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-
-            if canPlanWorkout {
-                Button {
-                    showingStandaloneSessionEditor = true
-                } label: {
-                    Label(ATHLTHLocalization.choose(
-                        english: "Create workout", norwegian: "Planlegg egen økt"
-                    ), systemImage: "plus.circle.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 47)
-                    .background(dayInk, in: Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(19)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.white, in: RoundedRectangle(cornerRadius: 22))
     }
 
     private var workoutSuggestionSection: some View {
@@ -4513,17 +4471,6 @@ private struct HomeWeeklyProgressDaySheet: View {
                     .font(.headline)
                     .foregroundStyle(dayInk)
                 Spacer()
-                if canPlanWorkout {
-                    Button {
-                        selectedMode = 1
-                    } label: {
-                        Label(ATHLTHLocalization.choose(
-                            english: "Add workout", norwegian: "Legg til økt"
-                        ), systemImage: "plus")
-                        .font(.caption.weight(.semibold))
-                    }
-                    .tint(dayInk)
-                }
             }
 
             if !currentPlanned.isEmpty {
@@ -4610,7 +4557,6 @@ private struct HomeWeeklyProgressDaySheet: View {
         // Return to the selected day with the new session visibly listed.
         scheduleConfirmation = workout.title
         selectedSuggestion = nil
-        selectedMode = 0
     }
 
     private func suggestionDetail(_ workout: PlannedSession) -> some View {
