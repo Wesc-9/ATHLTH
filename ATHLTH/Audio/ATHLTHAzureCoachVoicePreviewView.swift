@@ -102,6 +102,8 @@ final class ATHLTHAzureVoicePreviewPlayer:
 struct ATHLTHAzureCoachVoicePreviewView: View {
     @StateObject private var preview = ATHLTHAzureVoicePreviewPlayer()
     @EnvironmentObject private var settings: AppSettingsStore
+    @AppStorage("settings.audioCoach.azureThirdPartyConsent")
+    private var allowsAzureWorkoutText = false
 
     private struct Voice: Identifiable {
         let id: String
@@ -130,8 +132,8 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
         VStack(alignment: .leading, spacing: 10) {
             Label(
                 ATHLTHLocalization.choose(
-                    english: "Try natural Norwegian AI voices",
-                    norwegian: "Prøv naturlige norske AI-stemmer"
+                    english: "ATHLTH+ · Natural Norwegian voices",
+                    norwegian: "ATHLTH+ · Naturlige norske stemmer"
                 ),
                 systemImage: "waveform.badge.mic"
             )
@@ -139,24 +141,62 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
             .foregroundStyle(ATHLTHTheme.primaryText)
 
             Text(ATHLTHLocalization.choose(
-                english: "Optional Azure Speech F0 pilot. Requires a configured free-tier server. Previews use sample text, not your workout data.",
-                norwegian: "Valgfri test med Azure Speech F0. Krever at gratistjenesten er koblet til. Forhåndslytting bruker eksempeltekst, ikke treningsdataene dine."
+                english: "Pick an Azure voice for spoken workout guidance, or listen before choosing. If Azure is slow, unavailable or the free budget runs out, ATHLTH uses the offline iPhone voice.",
+                norwegian: "Velg en Azure-stemme til talebeskjeder under trening, eller forhåndslytt. Hvis Azure er treg, utilgjengelig eller gratiskvoten er brukt opp, brukes iPhone-stemmen offline."
             ))
             .font(.caption)
             .foregroundStyle(ATHLTHTheme.mutedText)
             .fixedSize(horizontal: false, vertical: true)
 
+            Toggle(isOn: $allowsAzureWorkoutText) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Allow Azure voices during workouts",
+                        norwegian: "Tillat Azure-stemmer under trening"
+                    ))
+                    .font(.subheadline.weight(.medium))
+                    Text(ATHLTHLocalization.choose(
+                        english: "Workout speech (possibly including pace, distance, time or heart rate) is sent to Microsoft to create audio. No GPS track or health history is sent. Turn off anytime.",
+                        norwegian: "Talebeskjeder (som kan inneholde tempo, distanse, tid eller puls) sendes til Microsoft for å lage lyd. GPS-spor og helsehistorikk sendes ikke. Kan slås av når som helst."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+            }
+            .tint(ATHLTHTheme.accentDeep)
+
             ForEach(voices) { voice in
                 HStack(spacing: 9) {
-                    Image(systemName: "waveform.circle.fill")
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(voice.name).font(.subheadline.weight(.medium))
-                        Text(voice.detail)
-                            .font(.caption2)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    Button {
+                        guard allowsAzureWorkoutText else { return }
+                        settings.audioCoachLanguage = .norwegian
+                        settings.audioCoachVoiceIdentifier =
+                            ATHLTHAzureCoachVoice.prefix + voice.id
+                    } label: {
+                        HStack(spacing: 9) {
+                            Image(systemName:
+                                settings.audioCoachVoiceIdentifier ==
+                                  ATHLTHAzureCoachVoice.prefix + voice.id
+                                    ? "checkmark.circle.fill" : "circle"
+                            )
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(voice.name)
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                                Text(voice.detail)
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            Spacer(minLength: 4)
+                        }
                     }
-                    Spacer(minLength: 4)
+                    .buttonStyle(.plain)
+                    .disabled(!allowsAzureWorkoutText)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Use \(voice.name) for Audio Coach",
+                        norwegian: "Bruk \(voice.name) i Audio Coach"
+                    ))
 
                     Button {
                         preview.preview(
@@ -194,8 +234,8 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
             }
 
             Text(ATHLTHLocalization.choose(
-                english: "The pilot is for listening and comparing voices. Live workouts still use your selected local system voice.",
-                norwegian: "Dette er foreløpig stemmeprøver. Under selve treningen brukes fortsatt den valgte lokale systemstemmen."
+                english: "Azure voices require ATHLTH+. Apple Watch uses its own local voice whenever iPhone audio is unavailable. The existing system-voice menu is always available.",
+                norwegian: "Azure-stemmer krever ATHLTH+. Apple Watch bruker lokal stemme når iPhone-lyden ikke er tilgjengelig. De vanlige systemstemmene er fortsatt tilgjengelige."
             ))
             .font(.caption2)
             .foregroundStyle(ATHLTHTheme.mutedText)
