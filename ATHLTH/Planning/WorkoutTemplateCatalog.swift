@@ -238,7 +238,7 @@ extension Array where Element == WorkoutTemplateBlock {
 
         func append(_ source: WorkoutTemplateBlock, title: String? = nil) {
             guard output.count < 1000 else { return }
-            let item = WorkoutTemplateBlock(
+            var item = WorkoutTemplateBlock(
                 sequence: output.count + 1,
                 kind: source.kind,
                 title: title ?? source.title,
@@ -255,6 +255,8 @@ extension Array where Element == WorkoutTemplateBlock {
                 cardioActivity: source.cardioActivity,
                 isIndoor: source.isIndoor
             )
+            item.exerciseID = source.exerciseID
+            item.exerciseSnapshot = source.exerciseSnapshot
             output.append(item)
         }
 
