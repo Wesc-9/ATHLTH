@@ -3503,12 +3503,34 @@ struct SavedWorkoutPickerView: View {
 struct PlanWorkoutPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
 
     @StateObject private var catalog =
         WorkoutTemplateCatalogStore()
     @State private var query = ""
+    @State private var selectedCategory = "all"
 
     let onSelect: (PlannedSession) -> Void
+
+    private func categoryMatches(_ kind: WorkoutKind, category: String? = nil) -> Bool {
+        switch selectedCategory {
+        case "running": return kind == .running
+        case "strength": return kind == .strength
+        case "hybrid": return category == "hybrid"
+        case "other": return kind == .mobility || kind == .walking || kind == .custom
+        default: return true
+        }
+    }
+
+    private var runningWorkouts: [RunningWorkoutTemplate] {
+        guard selectedCategory == "all" || selectedCategory == "running" else { return [] }
+        let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return runningLibrary.allTemplates.filter {
+            clean.isEmpty || $0.title.localizedCaseInsensitiveContains(clean)
+                || $0.summary.localizedCaseInsensitiveContains(clean)
+                || $0.type.title.localizedCaseInsensitiveContains(clean)
+        }
+    }
 
     private var savedWorkouts: [PlannedSession] {
         let clean =
@@ -3516,18 +3538,10 @@ struct PlanWorkoutPickerView: View {
                 in: .whitespacesAndNewlines
             )
 
-        guard !clean.isEmpty else {
-            return session.savedWorkoutTemplates
-        }
-
-        return session.savedWorkoutTemplates.filter {
-            $0.title.localizedCaseInsensitiveContains(
-                clean
-            ) ||
-            ($0.notes ?? "")
-                .localizedCaseInsensitiveContains(
-                    clean
-                )
+        return session.savedWorkoutTemplates.filter { workout in
+            categoryMatches(workout.kind, category: workout.workoutCategory) &&
+                (clean.isEmpty || workout.title.localizedCaseInsensitiveContains(clean) ||
+                 (workout.notes ?? "").localizedCaseInsensitiveContains(clean))
         }
     }
 
@@ -3538,29 +3552,29 @@ struct PlanWorkoutPickerView: View {
                 in: .whitespacesAndNewlines
             )
 
-        guard !clean.isEmpty else {
-            return catalog.entries
-        }
-
-        return catalog.entries.filter {
-            $0.title.localizedCaseInsensitiveContains(
-                clean
-            ) ||
-            $0.summary
-                .localizedCaseInsensitiveContains(
-                    clean
-                ) ||
-            $0.tags
-                .joined(separator: " ")
-                .localizedCaseInsensitiveContains(
-                    clean
-                )
+        return catalog.entries.filter { entry in
+            categoryMatches(entry.workoutKind, category: entry.category) &&
+                (clean.isEmpty ||
+                 entry.title.localizedCaseInsensitiveContains(clean) ||
+                 entry.summary.localizedCaseInsensitiveContains(clean) ||
+                 entry.tags.joined(separator: " ").localizedCaseInsensitiveContains(clean))
         }
     }
 
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    Picker(ATHLTHLocalization.choose(english: "Workout type", norwegian: "Økttype"),
+                           selection: $selectedCategory) {
+                        Text(ATHLTHLocalization.choose(english: "All", norwegian: "Alle")).tag("all")
+                        Text(ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke")).tag("strength")
+                        Text(ATHLTHLocalization.choose(english: "Running", norwegian: "Løping")).tag("running")
+                        Text(ATHLTHLocalization.choose(english: "Hybrid", norwegian: "Hybrid")).tag("hybrid")
+                        Text(ATHLTHLocalization.choose(english: "Other", norwegian: "Annet")).tag("other")
+                    }
+                    .pickerStyle(.menu)
+                }
                 if !savedWorkouts.isEmpty {
                     Section("My Workouts") {
                         ForEach(savedWorkouts) {
@@ -3585,8 +3599,31 @@ struct PlanWorkoutPickerView: View {
                     }
                 }
 
+                if !runningWorkouts.isEmpty {
+                    Section(ATHLTHLocalization.choose(
+                        english: "Running workouts", norwegian: "Løpeøkter"
+                    )) {
+                        ForEach(runningWorkouts) { workout in
+                            Button {
+                                onSelect(workout.plannedSession())
+                                dismiss()
+                            } label: {
+                                workoutRow(
+                                    title: workout.title,
+                                    subtitle: workout.summary,
+                                    icon: workout.type.systemImage
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
                 if !catalogWorkouts.isEmpty {
-                    Section("Workout Library") {
+                    Section(ATHLTHLocalization.choose(
+                        english: "Complete workout library",
+                        norwegian: "Ferdige treningsøkter"
+                    )) {
                         ForEach(catalogWorkouts) {
                             entry in
                             Button {
@@ -3612,7 +3649,7 @@ struct PlanWorkoutPickerView: View {
                 }
 
                 if savedWorkouts.isEmpty &&
-                    catalogWorkouts.isEmpty {
+                    catalogWorkouts.isEmpty && runningWorkouts.isEmpty {
                     ContentUnavailableView(
                         "No workouts found",
                         systemImage:
