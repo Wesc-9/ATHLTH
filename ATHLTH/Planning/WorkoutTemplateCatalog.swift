@@ -917,6 +917,7 @@ struct WorkoutTemplateLibraryView: View {
 
 struct WorkoutTemplateDetailView: View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
@@ -926,6 +927,8 @@ struct WorkoutTemplateDetailView: View {
     @State private var saved = false
     @State private var showingWorkout = false
     @State private var showingEditor = false
+    @State private var preparedShare: MessageShareDraft?
+    @State private var shareError: String?
 
     private var hasActiveWorkout: Bool {
         phoneWorkout.active != nil ||
@@ -1001,6 +1004,23 @@ struct WorkoutTemplateDetailView: View {
         .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
         .navigationTitle(tr("Workout", "Treningsøkt"))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    do {
+                        preparedShare = try ATHLTHShareDraftFactory.workout(
+                            entry.plannedSession(),
+                            library: exerciseLibrary.allExercises,
+                            ownerID: session.profile.userID
+                        )
+                    } catch {
+                        shareError = error.localizedDescription
+                    }
+                } label: {
+                    Label(tr("Share", "Del"), systemImage: "square.and.arrow.up")
+                }
+            }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack(spacing: 12) {
                 Button {
@@ -1035,6 +1055,18 @@ struct WorkoutTemplateDetailView: View {
             .padding(.horizontal, 18)
             .padding(.vertical, 11)
             .background(.regularMaterial)
+        }
+        .sheet(item: $preparedShare) { draft in
+            ATHLTHDirectShareSheet(draft: draft)
+        }
+        .alert(tr("Could not share", "Kunne ikke dele"),
+               isPresented: Binding(
+                   get: { shareError != nil },
+                   set: { if !$0 { shareError = nil } }
+               )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(shareError ?? "")
         }
         .fullScreenCover(isPresented: $showingWorkout) {
             StructuredWorkoutSessionView(workout: entry.plannedSession())
