@@ -4430,6 +4430,65 @@ enum HomeStrengthArtworkPolicy {
     }
 }
 
+/// Reusable premium background for strength cards in the activity log.
+/// Uses the already bundled high-resolution strength artwork rather than
+/// the tiny legacy 2.8 KB empty-workout image (which pixelated on iPhone).
+/// No network request or per-card image loading is needed.
+private struct HomePremiumStrengthStudioBackground: View {
+    let height: CGFloat
+    let preservesMuscleContrast: Bool
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                Image("StrengthPostWorkoutHero")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(
+                        width: proxy.size.width,
+                        height: proxy.size.height
+                    )
+                    .clipped()
+                    .saturation(0.86)
+                    .contrast(0.97)
+
+                // Light, sun-drenched photographic grade that preserves
+                // details at the edges while the anatomy floats above it.
+                LinearGradient(
+                    stops: [
+                        .init(color: Color(red: 0.99, green: 0.96, blue: 0.90)
+                            .opacity(preservesMuscleContrast ? 0.55 : 0.20),
+                              location: 0),
+                        .init(color: Color.white
+                            .opacity(preservesMuscleContrast ? 0.43 : 0.10),
+                              location: 0.50),
+                        .init(color: Color(red: 0.96, green: 0.94, blue: 0.91)
+                            .opacity(preservesMuscleContrast ? 0.40 : 0.14),
+                              location: 1)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.27),
+                        Color.clear,
+                        Color.black.opacity(0.10)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .clipped()
+        }
+        .frame(height: height)
+        .accessibilityHidden(true)
+        .allowsHitTesting(false)
+    }
+}
+
 private struct HomeStrengthMuscleArtwork:
     View {
     let profile: StrengthMuscleProfile
@@ -4449,20 +4508,16 @@ private struct HomeStrengthMuscleArtwork:
                     // No recorded muscle groups: show the selected premium
                     // strength photo instead of two inactive body diagrams.
                     // Workout time remains live in the existing activity card.
-                    Image("StrengthEmptyMusclesHero")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(
-                            width: proxy.size.width,
-                            height: height
+                    HomePremiumStrengthStudioBackground(
+                        height: height,
+                        preservesMuscleContrast: false
+                    )
+                    .accessibilityLabel(
+                        ATHLTHLocalization.choose(
+                            english: "Premium strength studio",
+                            norwegian: "Styrkestudio"
                         )
-                        .clipped()
-                        .accessibilityLabel(
-                            ATHLTHLocalization.choose(
-                                english: "Strength training equipment",
-                                norwegian: "Styrkeutstyr"
-                            )
-                        )
+                    )
                 } else {
                     muscleMapArtwork
                 }
@@ -4479,22 +4534,24 @@ private struct HomeStrengthMuscleArtwork:
     private var muscleMapArtwork: some View {
         GeometryReader { proxy in
             ZStack {
-                LinearGradient(
-                    colors: [
-                        Color(
-                            red: 0.992,
-                            green: 0.988,
-                            blue: 0.978
-                        ),
-                        Color(
-                            red: 0.948,
-                            green: 0.955,
-                            blue: 0.958
-                        )
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
+                // Premium studio photography replaces the old flat atlas
+                // gradient. The anatomical map and its geometry stay intact.
+                HomePremiumStrengthStudioBackground(
+                    height: height,
+                    preservesMuscleContrast: true
                 )
+
+                // Soft center scrim makes fine anatomical lines legible
+                // without hiding the sunlit studio around the figures.
+                RoundedRectangle(cornerRadius: 34, style: .continuous)
+                    .fill(Color.white.opacity(0.56))
+                    .frame(
+                        width: min(max(height * 2.30, 260),
+                                   max(proxy.size.width - 28, 1)),
+                        height: max(height - 8, 1)
+                    )
+                    .blur(radius: 17)
+                    .allowsHitTesting(false)
 
                 HStack(spacing: 0) {
                     figureGlow
