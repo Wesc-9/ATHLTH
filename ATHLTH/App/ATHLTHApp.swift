@@ -439,6 +439,7 @@ struct AppRootView: View {
     @State private var lastQueuedWorkoutReview: SocialPublishableWorkout?
     @State private var lastFullLifecycleRefreshAt: Date?
     @State private var showingNotificationPermissionPrimer = false
+    @State private var postTrialOfferWindow: ATHLTHPostTrialOfferWindow?
     @State private var showingRelayedStrengthWorkout = false
     @State private var relayedWorkoutLaunchGuardUntil = Date.distantPast
     @State private var lastTrainingPresenceSyncAt = Date.distantPast
@@ -1774,6 +1775,35 @@ struct AppRootView: View {
 
     private var productionRootContent: some View {
         lifecycleContent
+        .task(id: "\(signedInUserID?.uuidString ?? "none")-\(startupAuthenticationResolved)-\(scenePhase == .active)") {
+            // First authenticated, foreground app opening after the free
+            // trial. Server atomically records the one-time presentation.
+            guard appSession.signedIn,
+                  appSession.onboardingCompleted,
+                  startupAuthenticationResolved,
+                  scenePhase == .active,
+                  !appSession.previewModeEnabled,
+                  !appSession.hasPaidAccess,
+                  signedInUserID != nil,
+                  postTrialOfferWindow == nil
+            else { return }
+
+            if let window = await ATHLTHPostTrialOfferClient.presentOnce(),
+               !Task.isCancelled,
+               scenePhase == .active,
+               appSession.signedIn,
+               !appSession.hasPaidAccess {
+                postTrialOfferWindow = window
+            }
+        }
+        .sheet(item: $postTrialOfferWindow) { window in
+            ATHLTHPostTrialOfferSheet(window: window)
+        }
+        .onChange(of: signedInUserID) { _, _ in
+            // Do not show a previously signed-in account's one-shot offer
+            // after logout or account switching.
+            postTrialOfferWindow = nil
+        }
         .onOpenURL { url in
             if spotifyPlayback.handleOpenURL(url) {
                 return
