@@ -117,6 +117,9 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     var isIndoor: Bool? = nil
     /// Author-approved metadata can travel with a shared workout/plan.
     var exerciseSnapshot: ExerciseSnapshot? = nil
+    /// Exact identifier for personal exercises; never infer two owners'
+    /// exercises are equivalent merely from their displayed names.
+    var exerciseID: UUID? = nil
 
     var resolvedPhase: WorkoutPhaseKind {
         phase ?? (kind == .rest ? .recovery : .main)
@@ -148,6 +151,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         case cardioActivity = "cardio_activity"
         case isIndoor = "is_indoor"
         case exerciseSnapshot = "exercise_snapshot"
+        case exerciseID = "exercise_id"
     }
 
     var targetText: String? {
@@ -3039,6 +3043,7 @@ struct WorkoutTemplateBuilderView: View {
             block.setCount = 3
             block.restBetweenSetsSeconds = 90
         }
+        block.exerciseID = entry.id
         block.exerciseSnapshot = entry.source == .custom &&
             entry.exercise.isVisibleOutsideOwnerLibrary
             ? ATHLTHExerciseReferenceResolver.shareableSnapshot(entry.exercise)
@@ -3099,6 +3104,7 @@ struct WorkoutTemplateBuilderView: View {
             copy.cardioActivity = block.cardioActivity
             copy.isIndoor = block.isIndoor
             copy.exerciseSnapshot = block.exerciseSnapshot
+            copy.exerciseID = block.exerciseID
             return copy
         }
     }
