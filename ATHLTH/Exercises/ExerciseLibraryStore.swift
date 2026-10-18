@@ -852,12 +852,20 @@ final class ExerciseLibraryStore: ObservableObject {
     @discardableResult
     func importSharedExercise(
         _ source: ExerciseSnapshot,
-        ownerID: UUID
+        ownerID: UUID,
+        sourceExerciseID: UUID? = nil
     ) -> ExerciseLibraryEntry? {
         guard accountID == ownerID,
               let safe = ATHLTHExerciseReferenceResolver.safeImportedSnapshot(
                 source, fallbackTitle: source.name
               ) else { return nil }
+
+        if let sourceExerciseID,
+           let existing = customExercises.first(where: {
+               $0.exercise.sharedSourceExerciseID == sourceExerciseID
+           }) {
+            return existing
+        }
 
         // Names do not prove two personal exercises are identical. Never
         // overwrite the receiver's exercise; give the imported copy a unique
@@ -878,7 +886,7 @@ final class ExerciseLibraryStore: ObservableObject {
             }
         }
 
-        return createCustomExercise(
+        let imported = createCustomExercise(
             ownerID: ownerID, name: localName,
             instructions: safe.instructions,
             primaryMuscles: safe.primaryMuscles,
@@ -886,6 +894,11 @@ final class ExerciseLibraryStore: ObservableObject {
             equipment: safe.equipment,
             isVisibleOutsideOwnerLibrary: false
         )
+        guard let sourceExerciseID else { return imported }
+        var owned = imported.exercise
+        owned.sharedSourceExerciseID = sourceExerciseID
+        updateCustomExercise(owned)
+        return customExercises.first(where: { $0.id == owned.id }) ?? imported
     }
 
     func updateCustomExercise(_ exercise: Exercise) {
