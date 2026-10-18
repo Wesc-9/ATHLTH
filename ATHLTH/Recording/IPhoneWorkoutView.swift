@@ -1599,12 +1599,27 @@ struct IPhoneWorkoutView: View {
                 )
             }
             .toolbar(.hidden, for: .navigationBar)
-            .safeAreaInset(edge: .bottom) {
-                if let workout =
-                    recorder.active {
-                    premiumWorkoutControls(
-                        workout
-                    )
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if let workout = recorder.active {
+                    VStack(spacing: 0) {
+                        ATHLTHWorkoutAudioDock(
+                            coachVisible: true,
+                            coachEnabled:
+                                workout.audioCoachConfiguration?.enabled == true,
+                            coachPaused: recorder.coachSpeechPaused,
+                            coachManagedOnWatch: false,
+                            canReplayCoach: recorder.canReplayLastCoachMessage,
+                            onCoachStatus: { recorder.announceCoachStatusNow() },
+                            onCoachTogglePause: {
+                                recorder.setCoachSpeechPaused(
+                                    !recorder.coachSpeechPaused
+                                )
+                            },
+                            onCoachReplay: { recorder.replayLastCoachMessage() },
+                            onCoachSettings: { showingLiveAudioCoach = true }
+                        )
+                        premiumWorkoutControls(workout)
+                    }
                 }
             }
             .sheet(isPresented: $showingLiveAudioCoach) {
@@ -2051,58 +2066,6 @@ struct IPhoneWorkoutView: View {
                 )
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
-
-            Button {
-                showingLiveAudioCoach = true
-            } label: {
-                HStack(spacing: 11) {
-                    Image(
-                        systemName:
-                            workout.audioCoachConfiguration?.enabled == true
-                                ? "waveform.circle.fill"
-                                : "waveform.circle"
-                    )
-                    .font(.system(size: 24))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Audio Coach")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(ATHLTHTheme.primaryText)
-                        Text(
-                            workout.audioCoachConfiguration?.enabled == true
-                                ? ATHLTHLocalization.choose(
-                                    english: recorder.coachSpeechPaused
-                                        ? "Voice paused · tap to resume"
-                                        : "On · adjust during workout",
-                                    norwegian: recorder.coachSpeechPaused
-                                        ? "Tale pauset · trykk for å fortsette"
-                                        : "På · juster under økten"
-                                )
-                                : ATHLTHLocalization.choose(
-                                    english: "Off · tap to enable",
-                                    norwegian: "Av · trykk for å aktivere"
-                                )
-                        )
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                    }
-                    Spacer(minLength: 5)
-                    Image(systemName: "slider.horizontal.3")
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 11)
-                .background(
-                    Color.white.opacity(0.93),
-                    in: RoundedRectangle(cornerRadius: 17, style: .continuous)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 17, style: .continuous)
-                        .stroke(ATHLTHTheme.accentDeep.opacity(0.10))
-                }
-            }
-            .buttonStyle(.plain)
 
             Button {
                 showingAIConversation = true
