@@ -932,7 +932,7 @@ settingsSection("Health & Sync") {
                                         ? .orange
                                         : ATHLTHTheme.accentDeep,
                                     title: "Sync status",
-                                    subtitle: healthSyncStatusText
+                                    subtitle: healthSyncSummaryText
                                 ) {
                                     connectionTrailing(
                                         healthRequestInProgress
@@ -2065,6 +2065,37 @@ if session.currentRole.canAccessControlCenter {
             )
     }
 
+    private var healthSyncSummaryText: String {
+        if !settings.appleHealthIntegrationEnabled {
+            return ATHLTHLocalization.choose(
+                english: "Synchronization is paused",
+                norwegian: "Synkronisering er deaktivert"
+            )
+        }
+        if healthSyncHasIssue { return healthSyncStatusText }
+        if healthRequestInProgress || health.isRefreshing {
+            return ATHLTHLocalization.choose(
+                english: "Synchronizing…", norwegian: "Synkroniserer…"
+            )
+        }
+        if let last = health.lastSuccessfulRefreshAt {
+            let time = healthSyncTimestamp(last)
+            return ATHLTHLocalization.choose(
+                english: "Last synced \(time)",
+                norwegian: "Sist synkronisert \(time)"
+            )
+        }
+        return health.hasRequestedAuthorization
+            ? ATHLTHLocalization.choose(
+                english: "Ready for first sync",
+                norwegian: "Klar for første synkronisering"
+            )
+            : ATHLTHLocalization.choose(
+                english: "Connect to begin syncing",
+                norwegian: "Koble til for å synkronisere"
+            )
+    }
+
     private var healthSyncStatusText: String {
         guard settings.appleHealthIntegrationEnabled else {
             return ATHLTHLocalization.choose(
@@ -2179,6 +2210,12 @@ if session.currentRole.canAccessControlCenter {
             },
             set: { enabled in
                 settings.backgroundHealthSyncEnabled = enabled
+                Task {
+                    await health.configureBackgroundSync(
+                        allowed: enabled &&
+                            settings.appleHealthIntegrationEnabled
+                    )
+                }
             }
         )
     }
