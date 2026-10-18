@@ -762,31 +762,12 @@ final class MirroredWorkoutAudioCoach:
                 string: spokenText
             )
 
-        if let identifier =
-                configuration
-                    .voiceIdentifier,
-           let voice =
-                AVSpeechSynthesisVoice(
-                    identifier:
-                        identifier
-                ) {
-            utterance.voice = voice
-        } else {
-            switch configuration.language {
-            case .norwegian:
-                utterance.voice =
-                    AVSpeechSynthesisVoice(
-                        language: "nb-NO"
-                    )
-            case .english:
-                utterance.voice =
-                    AVSpeechSynthesisVoice(
-                        language: "en-US"
-                    )
-            case .system:
-                break
-            }
-        }
+        // The mirrored iPhone coach uses the same selected/highest-quality
+        // local voice as live running and the settings preview.
+        utterance.voice = ATHLTHCoachPreferredSystemVoice.resolve(
+            selectedIdentifier: configuration.voiceIdentifier,
+            language: configuration.language
+        )
 
         utterance.rate =
             configuration
