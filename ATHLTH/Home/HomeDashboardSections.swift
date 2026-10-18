@@ -3975,6 +3975,7 @@ private struct HomeWeeklyProgressDaySheet: View {
     @State private var pendingPickedWorkout: PlannedSession?
     @State private var selectedSuggestion: PlannedSession?
     @State private var suggestionStartTime = Date()
+    @State private var scheduleConfirmation: String?
     @State private var selectedInvitationLobby: PlannedSession?
     @State private var selectedMode = 0
 
@@ -4051,6 +4052,21 @@ private struct HomeWeeklyProgressDaySheet: View {
 
                     dayModeSelector
 
+                    if let scheduleConfirmation {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Scheduled: ", norwegian: "Planlagt: "
+                            ) + scheduleConfirmation,
+                            systemImage: "checkmark.circle.fill"
+                        )
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Color(red: 0.23, green: 0.45, blue: 0.36))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(Color(red: 0.90, green: 0.96, blue: 0.93),
+                                    in: RoundedRectangle(cornerRadius: 13))
+                    }
+
                     if selectedMode == 0 {
                         if hasAnyWorkoutsToday {
                             todaysWorkoutList
@@ -4086,7 +4102,9 @@ private struct HomeWeeklyProgressDaySheet: View {
             }
             .sheet(item: $selectedSuggestion) { workout in
                 suggestionDetail(workout)
-                    .presentationDetents([.medium, .large])
+                    .presentationDetents([.fraction(0.74), .large])
+                    .presentationDragIndicator(.visible)
+                    .presentationCornerRadius(28)
             }
             .sheet(item: $selectedInvitationLobby) { workout in
                 PlannedWorkoutInvitationLobby(workout: workout)
@@ -4439,79 +4457,230 @@ private struct HomeWeeklyProgressDaySheet: View {
         selectedSuggestion = workout
     }
 
+    /// A DatePicker configured for time-only selection may return a clock time
+    /// attached to a different day. Rebuild it on the tapped calendar day.
+    private var resolvedSuggestionStart: Date? {
+        HomeWorkoutSuggestionPlanner.scheduledStart(
+            on: selection.date, clockTime: suggestionStartTime
+        )
+    }
+
+    private var canScheduleSuggestion: Bool {
+        guard canPlanWorkout, let start = resolvedSuggestionStart else { return false }
+        return HomeWorkoutSuggestionPlanner.canSchedule(
+            on: selection.date, at: start
+        )
+    }
+
+    private func scheduleSuggestedWorkout(_ workout: PlannedSession) {
+        guard canScheduleSuggestion, let start = resolvedSuggestionStart else { return }
+        let copy = HomeWorkoutSuggestionPlanner.independentSession(
+            from: workout, start: start
+        )
+        session.addStandalonePlannedSession(copy)
+        // Return to the selected day with the new session visibly listed.
+        scheduleConfirmation = workout.title
+        selectedSuggestion = nil
+        selectedMode = 0
+    }
+
     private func suggestionDetail(_ workout: PlannedSession) -> some View {
-        NavigationStack {
+        let blocks = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+        let category = workout.workoutCategory ??
+            (workout.kind == .strength ? "strength" :
+             workout.kind == .running ? "running" :
+             workout.kind == .walking ? "walking" : "hybrid")
+        let symbol = category == "hybrid"
+            ? "figure.run.square.stack.fill" : workout.kind.systemImage
+
+        return NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 17) {
-                    ATHLTHWorkoutRecipePreview(
-                        title: workout.title,
-                        summary: workout.notes ?? "",
-                        category: workout.workoutCategory ??
-                            (workout.kind == .strength ? "strength" :
-                             workout.kind == .running ? "running" :
-                             workout.kind == .walking ? "walking" : "hybrid"),
-                        symbol: workout.kind.systemImage,
-                        difficulty: nil,
-                        durationMinutes: workout.durationMinutes,
-                        blocks: ATHLTHUnifiedWorkout.editorBlocks(from: workout)
-                    )
+                VStack(alignment: .leading, spacing: 15) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "ADD TO CALENDAR", norwegian: "LEGG TIL I KALENDER"
+                        ))
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(1.4)
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                        Text(selection.date.formatted(
+                            .dateTime.weekday(.wide).day().month(.wide)
+                        ))
+                        .font(.system(size: 23, weight: .semibold, design: .rounded))
+                        .foregroundStyle(dayInk)
+                    }
+                    .padding(.bottom, 2)
+
+                    HStack(alignment: .top, spacing: 13) {
+                        Image(systemName: symbol)
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 52, height: 52)
+                            .background(ATHLTHPlanDesign.selectedSurface,
+                                        in: RoundedRectangle(cornerRadius: 16))
+
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "FROM WORKOUTS", norwegian: "FRA WORKOUTS"
+                            ))
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(1.1)
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                            Text(workout.title)
+                                .font(.system(size: 21, weight: .semibold, design: .rounded))
+                                .foregroundStyle(dayInk)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            if let notes = workout.notes, !notes.isEmpty {
+                                Text(notes)
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(dayInk.opacity(0.68))
+                                    .lineLimit(3)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 23))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 23)
+                            .strokeBorder(dayInk.opacity(0.065), lineWidth: 0.8)
+                    }
+
+                    HStack(spacing: 8) {
+                        Label(
+                            category == "hybrid" ? "Hybrid" : workout.kind.title,
+                            systemImage: symbol
+                        )
+                        if let duration = workout.durationMinutes {
+                            Label("~\(duration) min", systemImage: "clock")
+                        }
+                        if !blocks.isEmpty {
+                            Label(
+                                "\(blocks.count) " + ATHLTHLocalization.choose(
+                                    english: "steps", norwegian: "deler"
+                                ),
+                                systemImage: "square.stack"
+                            )
+                        }
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(dayInk.opacity(0.8))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.77)
 
                     if canPlanWorkout {
-                        DatePicker(
-                            ATHLTHLocalization.choose(english: "Time", norwegian: "Tidspunkt"),
-                            selection: $suggestionStartTime,
-                            displayedComponents: .hourAndMinute
-                        )
-                        .datePickerStyle(.compact)
-                        .padding(.vertical, 10)
+                        VStack(alignment: .leading, spacing: 11) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "calendar.badge.clock")
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                Text(ATHLTHLocalization.choose(
+                                    english: "When do you want to train?",
+                                    norwegian: "Når vil du trene?"
+                                ))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(dayInk)
+                            }
 
-                        if !HomeWorkoutSuggestionPlanner.canSchedule(
-                            on: selection.date, at: suggestionStartTime
-                        ) {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Choose a future time on this date.",
-                                    norwegian: "Velg et fremtidig tidspunkt på denne datoen."
-                                ),
-                                systemImage: "clock.badge.exclamationmark"
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "TIME", norwegian: "TIDSPUNKT"
+                                    ))
+                                    .font(.system(size: 10, weight: .bold))
+                                    .tracking(1.1)
+                                    .foregroundStyle(dayInk.opacity(0.55))
+                                    Text(selection.date.formatted(
+                                        .dateTime.day().month(.wide)
+                                    ))
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(dayInk)
+                                }
+                                Spacer()
+                                DatePicker(
+                                    ATHLTHLocalization.choose(
+                                        english: "Time", norwegian: "Klokkeslett"
+                                    ),
+                                    selection: $suggestionStartTime,
+                                    displayedComponents: .hourAndMinute
+                                )
+                                .datePickerStyle(.compact)
+                                .labelsHidden()
+                                .tint(dayInk)
+                            }
 
-                        Button {
-                            guard HomeWorkoutSuggestionPlanner.canSchedule(
-                                on: selection.date, at: suggestionStartTime
-                            ) else { return }
-                            let copy = HomeWorkoutSuggestionPlanner.independentSession(
-                                from: workout, start: suggestionStartTime
-                            )
-                            session.addStandalonePlannedSession(copy)
-                            selectedSuggestion = nil
-                            selectedMode = 0
-                        } label: {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Plan this workout", norwegian: "Planlegg denne økten"
-                                ), systemImage: "calendar.badge.plus"
-                            )
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 49)
+                            if !canScheduleSuggestion {
+                                Label(ATHLTHLocalization.choose(
+                                    english: "Choose a future time on the selected day.",
+                                    norwegian: "Velg et fremtidig klokkeslett på den valgte dagen."
+                                ), systemImage: "clock.badge.exclamationmark")
+                                .font(.caption)
+                                .foregroundStyle(Color(red: 0.59, green: 0.34, blue: 0.25))
+                            }
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(dayInk)
-                        .disabled(!HomeWorkoutSuggestionPlanner.canSchedule(
-                            on: selection.date, at: suggestionStartTime
-                        ))
+                        .padding(17)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 22))
                     }
+
+                    NavigationLink {
+                        ScrollView {
+                            ATHLTHWorkoutRecipePreview(
+                                title: workout.title,
+                                summary: workout.notes ?? "",
+                                category: category,
+                                symbol: symbol,
+                                difficulty: nil,
+                                durationMinutes: workout.durationMinutes,
+                                blocks: blocks
+                            )
+                            .padding(18)
+                        }
+                        .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+                        .navigationTitle(ATHLTHLocalization.choose(
+                            english: "Workout details", norwegian: "Øktdetaljer"
+                        ))
+                        .navigationBarTitleDisplayMode(.inline)
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "list.bullet.rectangle")
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                            Text(ATHLTHLocalization.choose(
+                                english: "See the full workout",
+                                norwegian: "Se hele treningsøkten"
+                            ))
+                            .font(.subheadline.weight(.semibold))
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption.weight(.medium))
+                        }
+                        .foregroundStyle(dayInk)
+                        .padding(15)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 18))
+                    }
+                    .buttonStyle(.plain)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "This creates a separate calendar session. Your active training plan is not changed.",
+                        norwegian: "Økten legges til som en egen kalenderøkt. Den aktive treningsplanen endres ikke."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(dayInk.opacity(0.62))
+                    .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(20)
+                .padding(.horizontal, 18)
+                .padding(.top, 14)
+                .padding(.bottom, 16)
+                .frame(maxWidth: 720)
+                .frame(maxWidth: .infinity)
             }
             .background(dayCanvas.ignoresSafeArea())
-            .navigationTitle(
-                ATHLTHLocalization.choose(english: "Workout", norwegian: "Treningsøkt")
-            )
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Plan workout", norwegian: "Planlegg økt"
+            ))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -4520,6 +4689,26 @@ private struct HomeWeeklyProgressDaySheet: View {
                     )) {
                         selectedSuggestion = nil
                     }
+                }
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if canPlanWorkout {
+                    Button {
+                        scheduleSuggestedWorkout(workout)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Add workout to this day",
+                            norwegian: "Legg økten til denne dagen"
+                        ), systemImage: "calendar.badge.plus")
+                        .font(.system(size: 15, weight: .semibold))
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(dayInk)
+                    .disabled(!canScheduleSuggestion)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
+                    .background(.regularMaterial)
                 }
             }
         }
