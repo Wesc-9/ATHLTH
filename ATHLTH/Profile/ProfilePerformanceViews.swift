@@ -112,6 +112,31 @@ enum ProfileFeaturedRecordKind:
     case mostActiveCalories
     case mostStepsInWorkout
 
+    var recordArtwork: String {
+        switch group {
+        case .running: return "GoalSprint"
+        case .strength: return "StrengthPostWorkoutHero"
+        case .appleHealth: return "GoalWalking"
+        }
+    }
+
+    func supportingDetail(
+        healthRecords: [HealthPersonalRecord]
+    ) -> String {
+        guard let healthKind,
+              let record = healthRecords.first(where: { $0.kind == healthKind })
+        else { return shortTitle }
+
+        if let distance = healthKind.targetDistanceMeters, distance > 0 {
+            let pace = Int((record.value / (distance / 1_000)).rounded())
+            if pace > 0 {
+                return String(format: "%d:%02d /km", pace / 60, pace % 60)
+            }
+        }
+
+        return record.date.formatted(date: .abbreviated, time: .omitted)
+    }
+
     static let showcaseLimit = 4
     static let storageKey =
         "athlth.profile.featuredPersonalRecords.v1"
@@ -1616,6 +1641,101 @@ enum ProfileFeaturedRecordKind:
 }
 
 
+
+// Shared design and supporting metadata for profile highlights and their picker.
+// Both surfaces must render the same performance with the same visual language.
+private struct ProfileRecordVisualTile: View {
+    let kind: ProfileFeaturedRecordKind
+    let value: String
+    let detail: String
+    var showsSelection: Bool = false
+    var isSelected: Bool = false
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            GeometryReader { proxy in
+                Image(kind.recordArtwork)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .clipped()
+                    .opacity(0.26)
+            }
+
+            LinearGradient(
+                colors: [
+                    kind.tint.opacity(isSelected ? 0.22 : 0.14),
+                    Color.white.opacity(0.84)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack {
+                    Image(systemName: kind.icon)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(kind.tint)
+                        .frame(width: 30, height: 30)
+                        .background(Color.white.opacity(0.85), in: Circle())
+
+                    Spacer(minLength: 4)
+
+                    if showsSelection {
+                        Image(
+                            systemName: isSelected
+                                ? "checkmark.circle.fill"
+                                : "circle"
+                        )
+                        .font(.system(size: 21, weight: .semibold))
+                        .foregroundStyle(
+                            isSelected
+                                ? ATHLTHTheme.accentDeep
+                                : ATHLTHTheme.mutedText.opacity(0.68)
+                        )
+                        .accessibilityHidden(true)
+                    }
+                }
+
+                Spacer(minLength: 1)
+
+                Text(kind.title)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
+
+                Text(value)
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.68)
+
+                Text(detail)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(1)
+            }
+            .padding(12)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 130)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(
+                    isSelected && showsSelection
+                        ? ATHLTHTheme.accentDeep.opacity(0.50)
+                        : kind.tint.opacity(0.15),
+                    lineWidth: isSelected && showsSelection ? 1.4 : 0.8
+                )
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+
 struct ProfilePerformanceSection: View {
     let stats: ProfilePerformanceStats?
     let isLoading: Bool
@@ -2319,189 +2439,20 @@ struct PerformanceStatsView: View {
         _ kind: ProfileFeaturedRecordKind,
         index: Int
     ) -> some View {
-        let record =
-            kind.healthKind.flatMap {
-                record($0)
-            }
-
-        return ZStack(
-            alignment: .topLeading
-        ) {
-            GeometryReader { proxy in
-                Image(
-                    editorialFeaturedAsset(
-                        index
-                    )
-                )
-                .resizable()
-                .scaledToFill()
-                // Lock every asset to the exact grid-cell bounds. Different
-                // source aspect ratios must never widen or shrink the card.
-                .frame(
-                    width: proxy.size.width,
-                    height: proxy.size.height
-                )
-                // A small crop prevents any light source-image edge from
-                // becoming visible around the rounded card.
-                .scaleEffect(1.08)
-                .clipped()
-                .opacity(0.38)
-            }
-
-            LinearGradient(
-                colors: [
-                    editorialFeaturedTint(
-                        index
-                    )
-                    .opacity(0.84),
-                    Color.white.opacity(0.76)
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-
-            VStack(
-                alignment: .leading,
-                spacing: 4
-            ) {
-                HStack(
-                    alignment: .top
-                ) {
-                    Image(
-                        systemName:
-                            kind.icon
-                    )
-                    .font(
-                        .system(
-                            size: 13,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        kind.tint
-                    )
-                    .frame(
-                        width: 26,
-                        height: 26
-                    )
-                    .background(
-                        Color.white
-                            .opacity(0.84),
-                        in: Circle()
-                    )
-
-                    Spacer()
-
-                    Image(
-                        systemName:
-                            "chevron.right"
-                    )
-                    .font(
-                        .caption
-                            .weight(.bold)
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .primaryText
-                            .opacity(0.75)
-                    )
-                }
-
-                Text(kind.title)
-                    .font(
-                        .system(
-                            size: 9.5,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .primaryText
-                    )
-                    .lineLimit(2)
-
-                HStack(
-                    alignment:
-                        .firstTextBaseline
-                ) {
-                    Text(
-                        kind.displayValue(
-                            healthRecords:
-                                resolvedHealthRecords,
-                            stats: stats,
-                            strengthRecords:
-                                strengthWorkout
-                                    .personalRecords,
-                            strengthRepRecords:
-                                strengthWorkout
-                                    .repPersonalRecords,
-                            performanceWorkouts:
-                                resolvedPerformanceWorkouts,
-                            strengthWorkouts:
-                                strengthWorkout
-                                    .workoutHistory
-                        )
-                    )
-                    .font(
-                        .system(
-                            size: 15.5,
-                            weight: .bold,
-                            design: .rounded
-                        )
-                    )
-                    .monospacedDigit()
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .primaryText
-                    )
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.66)
-
-                    Spacer()
-                }
-
-                Text(
-                    record.map {
-                        editorialRecordDetail(
-                            $0
-                        )
-                    } ??
-                    kind.shortTitle
-                )
-                .font(
-                    .system(
-                        size: 9,
-                        weight: .medium
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .mutedText
-                )
-                .lineLimit(1)
-            }
-            .padding(8)
-        }
-        .frame(
-            maxWidth: .infinity
-        )
-        .frame(height: 80)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 20,
-                style: .continuous
+        ProfileRecordVisualTile(
+            kind: kind,
+            value: kind.displayValue(
+                healthRecords: resolvedHealthRecords,
+                stats: stats,
+                strengthRecords: strengthWorkout.personalRecords,
+                strengthRepRecords: strengthWorkout.repPersonalRecords,
+                performanceWorkouts: resolvedPerformanceWorkouts,
+                strengthWorkouts: strengthWorkout.workoutHistory
+            ),
+            detail: kind.supportingDetail(
+                healthRecords: resolvedHealthRecords
             )
         )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 20,
-                style: .continuous
-            )
-            .stroke(
-                Color.primary.opacity(0.035),
-                lineWidth: 0.6
-            )
-        }
     }
 
     private func editorialEmptyFeaturedTile(
@@ -9647,199 +9598,53 @@ struct ProfileRecordShowcasePickerView:
         )
     }
 
-    private func showcaseSlot(
-        _ index: Int
-    ) -> some View {
+    private func showcaseSlot(_ index: Int) -> some View {
         Group {
-            if selection.indices
-                .contains(index) {
-                let kind =
-                    selection[index]
+            if selection.indices.contains(index) {
+                let kind = selection[index]
 
-                VStack(
-                    alignment: .leading,
-                    spacing: 7
-                ) {
-                    HStack {
-                        Image(
-                            systemName:
-                                kind.icon
-                        )
-                        .font(
-                            .system(
-                                size: 13,
-                                weight:
-                                    .semibold
-                            )
-                        )
-                        .foregroundStyle(
-                            kind.tint
-                        )
-
-                        Spacer()
-
-                        Image(
-                            systemName:
-                                "checkmark.seal.fill"
-                        )
-                        .font(
-                            .system(
-                                size: 11
-                            )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .accentDeep
-                        )
-                    }
-
-                    Text(
-                        recordValue(
-                            for: kind
-                        )
-                    )
-                    .font(
-                        .headline
-                            .weight(.bold)
-                    )
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(
-                        0.72
-                    )
-
-                    Text(kind.title)
-                        .font(
-                            .caption2
-                                .weight(
-                                    .semibold
-                                )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .mutedText
-                        )
-                        .lineLimit(1)
-                }
-                .padding(10)
-                .frame(
-                    maxWidth: .infinity,
-                    minHeight: 62,
-                    alignment: .leading
-                )
-                .background(
-                    LinearGradient(
-                        colors: [
-                            kind.tint
-                                .opacity(
-                                    0.12
-                                ),
-                            Color.white
-                                .opacity(
-                                    0.88
-                                )
-                        ],
-                        startPoint:
-                            .topLeading,
-                        endPoint:
-                            .bottomTrailing
+                ProfileRecordVisualTile(
+                    kind: kind,
+                    value: recordValue(for: kind),
+                    detail: kind.supportingDetail(
+                        healthRecords: resolvedHealthRecords
                     ),
-                    in:
-                        RoundedRectangle(
-                            cornerRadius: 18,
-                            style:
-                                .continuous
-                        )
+                    showsSelection: true,
+                    isSelected: true
                 )
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: 18,
-                        style:
-                            .continuous
-                    )
-                    .stroke(
-                        kind.tint
-                            .opacity(
-                                0.18
-                            ),
-                        lineWidth: 0.8
-                    )
-                }
+                .accessibilityLabel(
+                    "\(kind.title), \(recordValue(for: kind))"
+                )
             } else {
-                VStack(spacing: 6) {
-                    Image(
-                        systemName:
-                            "plus"
-                    )
-                    .font(
-                        .system(
-                            size: 15,
-                            weight:
-                                .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
-                    )
-
+                VStack(spacing: 7) {
+                    Image(systemName: "plus.circle")
+                        .font(.system(size: 22, weight: .medium))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
                     Text(
                         ATHLTHLocalization.choose(
-                            english:
-                                "Open slot",
-                            norwegian:
-                                "Ledig plass"
+                            english: "Choose a record",
+                            norwegian: "Velg en rekord"
                         )
                     )
-                    .font(
-                        .caption2
-                            .weight(
-                                .semibold
-                            )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
-                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
                 }
-                .frame(
-                    maxWidth: .infinity,
-                    minHeight: 62
-                )
+                .frame(maxWidth: .infinity)
+                .frame(height: 130)
                 .background(
-                    Color.black
-                        .opacity(0.025),
-                    in:
-                        RoundedRectangle(
-                            cornerRadius: 18,
-                            style:
-                                .continuous
-                        )
+                    Color.white.opacity(0.78),
+                    in: RoundedRectangle(cornerRadius: 20)
                 )
                 .overlay {
-                    RoundedRectangle(
-                        cornerRadius: 18,
-                        style:
-                            .continuous
-                    )
-                    .stroke(
-                        ATHLTHTheme
-                            .border
-                            .opacity(0.65),
-                        style:
-                            StrokeStyle(
-                                lineWidth: 0.8,
-                                dash: [
-                                    5,
-                                    5
-                                ]
-                            )
-                    )
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(
+                            ATHLTHTheme.border.opacity(0.68),
+                            style: StrokeStyle(lineWidth: 1, dash: [5, 5])
+                        )
                 }
             }
         }
     }
-
 
     private func recordGroupSection(
         _ group: ProfileRecordGroup
@@ -9889,15 +9694,11 @@ struct ProfileRecordShowcasePickerView:
             }
 
             LazyVGrid(
-                columns: Array(
-                    repeating:
-                        GridItem(
-                            .flexible(),
-                            spacing: 6
-                        ),
-                    count: 4
-                ),
-                spacing: 6
+                columns: [
+                    GridItem(.flexible(), spacing: 10),
+                    GridItem(.flexible(), spacing: 10)
+                ],
+                spacing: 10
             ) {
                 ForEach(
                     candidates(
@@ -9929,265 +9730,43 @@ struct ProfileRecordShowcasePickerView:
         }
     }
 
-    private func showcaseCard(
-        _ kind:
-            ProfileFeaturedRecordKind
-    ) -> some View {
-        let isSelected =
-            selection.contains(kind)
+    private func showcaseCard(_ kind: ProfileFeaturedRecordKind) -> some View {
+        let selected = selection.contains(kind)
+        let available = isAvailable(kind)
         let selectionIsFull =
-            selection.count >=
-                ProfileFeaturedRecordKind
-                    .showcaseLimit
-        let available =
-            isAvailable(kind)
+            selection.count >= ProfileFeaturedRecordKind.showcaseLimit
 
         return Button {
             toggle(kind)
         } label: {
-            VStack(
-                alignment: .leading,
-                spacing: 4
-            ) {
-                HStack {
-                    Image(
-                        systemName:
-                            kind.icon
-                    )
-                    .font(
-                        .system(
-                            size: 10,
-                            weight:
-                                .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        kind.tint
-                    )
-                    .frame(
-                        width: 24,
-                        height: 24
-                    )
-                    .background(
-                        kind.tint
-                            .opacity(0.10),
-                        in:
-                            RoundedRectangle(
-                                cornerRadius: 12,
-                                style:
-                                    .continuous
-                            )
-                    )
-
-                    Spacer()
-
-                    ZStack {
-                        Circle()
-                            .stroke(
-                                isSelected
-                                    ? kind.tint
-                                    : ATHLTHTheme
-                                        .border,
-                                lineWidth:
-                                    isSelected
-                                    ? 0
-                                    : 1.2
-                            )
-                            .frame(
-                                width: 16,
-                                height: 16
-                            )
-
-                        if isSelected {
-                            Circle()
-                                .fill(
-                                    ATHLTHTheme
-                                        .accentDeep
-                                )
-                                .frame(
-                                    width: 19,
-                                    height: 19
-                                )
-
-                            Image(
-                                systemName:
-                                    "checkmark"
-                            )
-                            .font(
-                                .system(
-                                    size: 8,
-                                    weight:
-                                        .bold
-                                )
-                            )
-                            .foregroundStyle(
-                                .white
-                            )
-                        }
-                    }
-                }
-
-                Text(kind.title)
-                    .font(
-                        .system(
-                            size: 8.2,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .primaryText
-                    )
-                    .lineLimit(2)
-                    .minimumScaleFactor(
-                        0.72
-                    )
-
-                Text(
-                    recordValue(
-                        for: kind
-                    )
-                )
-                .font(
-                    .system(
-                        size: 12,
-                        weight: .bold,
-                        design: .rounded
-                    )
-                )
-                .monospacedDigit()
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .primaryText
-                )
-                .lineLimit(1)
-                .minimumScaleFactor(
-                    0.68
-                )
-
-                Label(
-                    isSelected
-                        ? ATHLTHLocalization
-                            .choose(
-                                english:
-                                    "Shown on profile",
-                                norwegian:
-                                    "Vises på profil"
-                            )
-                        : ATHLTHLocalization
-                            .choose(
-                                english:
-                                    available ? "Available" : "Not recorded",
-                                norwegian:
-                                    available ? "Tilgjengelig" : "Ikke registrert"
-                            ),
-                    systemImage:
-                        isSelected
-                        ? "checkmark.seal.fill"
-                        : "plus.circle"
-                )
-                .font(
-                    .system(
-                        size: 6.1,
-                        weight: .medium
-                    )
-                )
-                .foregroundStyle(
-                    isSelected
-                        ? ATHLTHTheme
-                            .accentDeep
-                        : ATHLTHTheme
-                            .mutedText
-                )
-            }
-            .padding(6)
-            .frame(
-                maxWidth: .infinity,
-                minHeight: 64,
-                alignment: .topLeading
-            )
-            .background(
-                LinearGradient(
-                    colors: [
-                        isSelected
-                            ? kind.tint
-                                .opacity(
-                                    0.10
-                                )
-                            : Color.white
-                                .opacity(
-                                    0.92
-                                ),
-                        Color.white
-                            .opacity(0.86)
-                    ],
-                    startPoint:
-                        .topLeading,
-                    endPoint:
-                        .bottomTrailing
+            ProfileRecordVisualTile(
+                kind: kind,
+                value: recordValue(for: kind),
+                detail: kind.supportingDetail(
+                    healthRecords: resolvedHealthRecords
                 ),
-                in:
-                    RoundedRectangle(
-                        cornerRadius: 12,
-                        style:
-                            .continuous
-                    )
+                showsSelection: true,
+                isSelected: selected
             )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: 13,
-                    style:
-                        .continuous
-                )
-                .stroke(
-                    isSelected
-                        ? ATHLTHTheme
-                            .premiumGold
-                            .opacity(
-                                0.30
-                            )
-                        : ATHLTHTheme
-                            .border
-                            .opacity(
-                                0.55
-                            ),
-                    lineWidth:
-                        isSelected
-                        ? 1.2
-                        : 0.8
-                )
-            }
-            .shadow(
-                color:
-                    Color.black
-                        .opacity(
-                            isSelected
-                            ? 0.045
-                            : 0.02
-                        ),
-                radius: 9,
-                y: 4
+            .opacity(
+                !available && !selected
+                    ? 0.64
+                    : (!selected && selectionIsFull ? 0.78 : 1)
             )
         }
         .buttonStyle(.plain)
-        .disabled(
-            (
-                !available &&
-                !isSelected
-            ) ||
-            (
-                !isSelected &&
-                selectionIsFull
-            )
+        .disabled((!available && !selected) || (!selected && selectionIsFull))
+        .accessibilityLabel(
+            "\(kind.title), \(recordValue(for: kind))"
         )
-        .opacity(
-            !available
-                ? 0.42
-                : (
-                    !isSelected &&
-                    selectionIsFull
-                        ? 0.42
-                        : 1
+        .accessibilityValue(
+            selected
+                ? ATHLTHLocalization.choose(
+                    english: "Shown on profile", norwegian: "Vises på profil"
+                )
+                : ATHLTHLocalization.choose(
+                    english: available ? "Available" : "Not recorded",
+                    norwegian: available ? "Tilgjengelig" : "Ikke registrert"
                 )
         )
     }
