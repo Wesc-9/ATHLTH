@@ -11,6 +11,8 @@ struct SubscriptionOfferView: View {
 
     @State private var selectedProductID: String?
     @State private var legalDocument: LegalDocumentKind?
+    @State private var showProductDiagnostics = false
+    @State private var purchaseFeedback: String?
 
     var body: some View {
         NavigationStack {
@@ -32,8 +34,16 @@ struct SubscriptionOfferView: View {
                         continueTrialButton
                     }
 
-                    if let errorMessage = subscriptionStore.errorMessage {
+                    if let errorMessage = subscriptionStore.errorMessage,
+                       !subscriptionStore.products.isEmpty {
                         Text(errorMessage)
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                            .multilineTextAlignment(.center)
+                    }
+
+                    if let purchaseFeedback {
+                        Text(purchaseFeedback)
                             .font(.caption)
                             .foregroundStyle(.red)
                             .multilineTextAlignment(.center)
@@ -88,13 +98,18 @@ struct SubscriptionOfferView: View {
             }
         }
         .task {
-            await subscriptionStore.loadProducts()
+            await reloadPlans()
+        }
+    }
 
-            if selectedProductID == nil {
-                selectedProductID =
-                    subscriptionStore.product(for: SubscriptionStore.yearlyProductID)?.id ??
-                    subscriptionStore.products.first?.id
-            }
+    private func reloadPlans() async {
+        await subscriptionStore.loadProducts()
+        if subscriptionStore.product(
+            for: selectedProductID ?? ""
+        ) == nil {
+            selectedProductID =
+                subscriptionStore.product(for: SubscriptionStore.yearlyProductID)?.id ??
+                subscriptionStore.products.first?.id
         }
     }
 
@@ -208,8 +223,13 @@ struct SubscriptionOfferView: View {
 
             Task {
                 guard let userID = accountService.currentUserID else {
+                    purchaseFeedback = ATHLTHLocalization.choose(
+                        english: "Sign in to ATHLTH before subscribing.",
+                        norwegian: "Logg inn i ATHLTH før du kjøper abonnement."
+                    )
                     return
                 }
+                purchaseFeedback = nil
 
                 if await subscriptionStore.purchase(
                     product,
@@ -321,29 +341,69 @@ struct SubscriptionOfferView: View {
     }
 
     private var unavailableState: some View {
-        VStack(spacing: 9) {
-            Image(systemName: "creditcard")
+        VStack(spacing: 12) {
+            Image(systemName: "wifi.exclamationmark")
                 .font(.title2)
                 .foregroundStyle(OnboardingTheme.accent)
 
-            Text("Plans aren’t available yet")
-                .font(.headline)
+            Text(ATHLTHLocalization.choose(
+                english: "Plans aren't available right now",
+                norwegian: "Abonnementene er ikke tilgjengelige nå"
+            ))
+            .font(.headline)
 
-            Text("Monthly and Yearly App Store plans will appear here when they are available.")
+            Text(ATHLTHLocalization.choose(
+                english: "The App Store did not return a monthly or yearly ATHLTH+ subscription. Your existing ATHLTH access is unaffected.",
+                norwegian: "App Store returnerte verken måneds- eller årsabonnement for ATHLTH+. Tilgangen du allerede har påvirkes ikke."
+            ))
+            .font(.caption)
+            .foregroundStyle(OnboardingTheme.mutedText)
+            .multilineTextAlignment(.center)
+
+            if let error = subscriptionStore.errorMessage {
+                Text(error)
+                    .font(.caption2)
+                    .foregroundStyle(OnboardingTheme.mutedText)
+                    .multilineTextAlignment(.center)
+            }
+
+            Button {
+                Task { await reloadPlans() }
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Try again", norwegian: "Prøv igjen"
+                    ),
+                    systemImage: "arrow.clockwise"
+                )
+                .font(.subheadline.weight(.semibold))
+            }
+            .buttonStyle(OnboardingPrimaryButtonStyle())
+            .disabled(subscriptionStore.isLoading)
+
+            Button {
+                showProductDiagnostics.toggle()
+            } label: {
+                Text(ATHLTHLocalization.choose(
+                    english: "Technical details",
+                    norwegian: "Tekniske detaljer"
+                ))
                 .font(.caption)
                 .foregroundStyle(OnboardingTheme.mutedText)
-                .multilineTextAlignment(.center)
-
-            Button(
-                session.subscriptionAccess.trialIsActive
-                    ? "Continue free trial"
-                    : "Not now"
-            ) {
-                dismiss()
             }
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(OnboardingTheme.accent)
-            .padding(.top, 4)
+            .buttonStyle(.plain)
+
+            if showProductDiagnostics {
+                Text(
+                    subscriptionStore.missingProductIDs.sorted().joined(
+                        separator: "\n"
+                    )
+                )
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(OnboardingTheme.mutedText)
+                .multilineTextAlignment(.center)
+                .textSelection(.enabled)
+            }
         }
         .padding(20)
         .frame(maxWidth: .infinity)
