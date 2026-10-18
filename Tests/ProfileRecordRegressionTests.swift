@@ -248,4 +248,56 @@ final class ProfileRecordRegressionTests:
         )
     }
 
+
+    func testFeaturedRecordCanBeRemovedWithoutDeletingOtherSelections() {
+        let selection: [ProfileFeaturedRecordKind] = [
+            .fastest1K, .longestRun, .strengthHeaviestSet
+        ]
+        let result = ProfileFeaturedRecordKind.removing(
+            .longestRun,
+            from: selection
+        )
+        XCTAssertEqual(result, [.fastest1K, .strengthHeaviestSet])
+        XCTAssertEqual(
+            ProfileFeaturedRecordKind.decodedSelection(
+                from: ProfileFeaturedRecordKind.encodedSelection(result)
+            ),
+            result
+        )
+        XCTAssertEqual(
+            ProfileFeaturedRecordKind.encodedSelection(
+                ProfileFeaturedRecordKind.removing(.fastest1K, from: [.fastest1K])
+            ),
+            "-"
+        )
+    }
+
+    func testReplacingFeaturedRecordKeepsPositionAndOtherRecords() {
+        let before: [ProfileFeaturedRecordKind] = [
+            .fastest1K, .longestRun, .strengthHeaviestSet
+        ]
+        XCTAssertEqual(
+            ProfileFeaturedRecordKind.replacing(
+                in: before, at: 1, with: .fastestFiveMinutePace
+            ),
+            [.fastest1K, .fastestFiveMinutePace, .strengthHeaviestSet]
+        )
+        // Already featured records exchange positions instead of duplicating.
+        XCTAssertEqual(
+            ProfileFeaturedRecordKind.replacing(
+                in: before, at: 0, with: .strengthHeaviestSet
+            ),
+            [.strengthHeaviestSet, .longestRun, .fastest1K]
+        )
+    }
+
+    func testReplacingInvalidSlotPreservesPreviousSelection() {
+        let before: [ProfileFeaturedRecordKind] = [.fastest1K, .longestRun]
+        XCTAssertEqual(
+            ProfileFeaturedRecordKind.replacing(
+                in: before, at: 4, with: .fastest5K
+            ),
+            before
+        )
+    }
 }
