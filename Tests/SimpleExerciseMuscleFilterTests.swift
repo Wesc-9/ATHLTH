@@ -11,6 +11,7 @@ final class SimpleExerciseMuscleFilterTests: XCTestCase {
         ])
     }
 
+    @MainActor
     func testAnatomicalGroupsAreMapped() {
         let examples: [(String, String)] = [
             ("Pectoralis Major", "Chest"),
