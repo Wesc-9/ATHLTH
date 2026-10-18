@@ -8,6 +8,7 @@ struct ATHLTHHomeWorkoutInspirationView: View {
 
     let workouts: [PlannedSession]
     let recentActivities: [ATHLTHInspirationRecentActivity]
+    let goal: AchievementGoal?
     let selectedDate: Date
     let onChoose: (PlannedSession) -> Void
 
@@ -22,7 +23,7 @@ struct ATHLTHHomeWorkoutInspirationView: View {
 
     private var ranked: [PlannedSession] {
         ATHLTHHomeWorkoutInspirationPolicy.ranked(
-            from: workouts, recent: recentActivities, minutes: minutes
+            from: workouts, recent: recentActivities, minutes: minutes, goal: goal
         )
     }
 
@@ -231,7 +232,7 @@ struct ATHLTHHomeWorkoutInspirationView: View {
                     Image(systemName: "sparkles")
                         .foregroundStyle(ATHLTHTheme.accentDeep)
                     Text(ATHLTHHomeWorkoutInspirationPolicy.explanation(
-                        for: workout, recent: recentActivities
+                        for: workout, recent: recentActivities, goal: goal
                     ))
                     .font(.subheadline)
                     .foregroundStyle(ink.opacity(0.75))
