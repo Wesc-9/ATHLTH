@@ -38,10 +38,10 @@ with check (
               and octet_length(attachment_payload) > 0
             )
           )
-          and not exists (
-            select 1 from public.direct_messages prior
-            where prior.conversation_id = c.id
-          )
+          -- Never query direct_messages from its own INSERT RLS policy:
+          -- that causes infinite policy recursion. The security-definer
+          -- guard_direct_message_insert trigger atomically locks the
+          -- conversation and rejects a second unaccepted message.
         )
       )
   )
