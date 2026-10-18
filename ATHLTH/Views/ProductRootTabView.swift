@@ -4943,7 +4943,7 @@ private struct HomeCurrentStreakCard: View {
 /// A fresh launch and an explicit draft continuation are distinct sheet
 /// identities. Reusing a Boolean sheet allowed an old wizard position
 /// to be carried into a new-plan launch.
-private struct TrainProgramCreationLaunch: Identifiable {
+struct TrainProgramCreationLaunch: Identifiable {
     let id = UUID()
     let resumesDraft: Bool
 

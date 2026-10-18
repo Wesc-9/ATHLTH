@@ -3,6 +3,24 @@ import SwiftUI
 @testable import ATHLTH
 
 final class ATHLTHPlanJourneyTests: XCTestCase {
+    func testFreshAndResumeLaunchesAreDistinct() {
+        let firstNewPlan = TrainProgramCreationLaunch.fresh
+        let anotherNewPlan = TrainProgramCreationLaunch.fresh
+        let resumedPlan = TrainProgramCreationLaunch.continueDraft
+
+        // Fresh + must not inherit a prior draft's step 2 (or later).
+        XCTAssertFalse(firstNewPlan.resumesDraft)
+        XCTAssertFalse(anotherNewPlan.resumesDraft)
+        XCTAssertTrue(resumedPlan.resumesDraft)
+
+        // Separate sheet identities force SwiftUI to recreate the builder
+        // at the canonical first mode-selection step.
+        XCTAssertNotEqual(firstNewPlan.id, anotherNewPlan.id)
+        XCTAssertNotEqual(firstNewPlan.id, resumedPlan.id)
+        XCTAssertEqual(ATHLTHPlanJourney.sequence(advanced: true).first, .mode)
+        XCTAssertEqual(ATHLTHPlanJourney.sequence(advanced: false).first, .mode)
+    }
+
     func testSimpleStartsWithModeAndSkipsAdvancedQuestions() {
         let stages = ATHLTHPlanJourney.sequence(advanced: false)
         XCTAssertEqual(stages, [.mode, .basics])
