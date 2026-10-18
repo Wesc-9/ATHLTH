@@ -176,21 +176,21 @@ enum ATHLTHExerciseReferenceResolver {
     ) -> WorkoutTemplateBlock {
         guard block.kind == .exercise else { return block }
         var copy = block
+        // A received custom exercise is not automatically licensed for
+        // forwarding. Send instructions only for a locally owned exercise
+        // whose creator has explicitly enabled sharing.
+        copy.exerciseSnapshot = nil
         if let found = resolve(block, in: library) {
             copy.exerciseID = found.id
             if let sourceID = found.sourceIdentifier {
                 copy.exerciseSlug = sourceID
             }
-            if found.source == .custom {
-                copy.exerciseSnapshot = shareableSnapshot(found.exercise)
+            if found.source == .custom,
+               let approved = shareableSnapshot(found.exercise) {
+                copy.exerciseSnapshot = safeImportedSnapshot(
+                    approved, fallbackTitle: block.title
+                )
             }
-        }
-        // Existing custom snapshots can already have traveled from another
-        // sender. Keep their reviewed text but drop unsafe media references.
-        if let snapshot = copy.exerciseSnapshot {
-            copy.exerciseSnapshot = safeImportedSnapshot(
-                snapshot, fallbackTitle: block.title
-            )
         }
         return copy
     }
@@ -217,11 +217,15 @@ enum ATHLTHExerciseReferenceResolver {
                         secondaryMuscles: [], equipment: [], imageURL: nil
                     )
                 }
-            } else if let cleaned = safeImportedSnapshot(
-                planned.embeddedExercise,
-                fallbackTitle: planned.embeddedExercise.name
-            ) {
-                safe.embeddedExercise = cleaned
+            } else {
+                // An exercise received from someone else may be previewed
+                // locally, but the original author has not consented to
+                // its further distribution by this user.
+                safe.embeddedExercise = ExerciseSnapshot(
+                    name: planned.embeddedExercise.name,
+                    instructions: [], primaryMuscles: [],
+                    secondaryMuscles: [], equipment: [], imageURL: nil
+                )
             }
             return safe
         }
