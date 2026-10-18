@@ -451,9 +451,13 @@ struct ATHLTHEditProfileView: View {
             return ATHLTHLocalization.choose(
                 english: "Followers", norwegian: "Følgere"
             )
-        default:
+        case "public":
             return ATHLTHLocalization.choose(
                 english: "Public identity", norwegian: "Offentlig identitet"
+            )
+        default:
+            return ATHLTHLocalization.choose(
+                english: "Visibility not loaded", norwegian: "Synlighet ikke lastet"
             )
         }
     }
@@ -1150,12 +1154,10 @@ struct ATHLTHEditProfileView: View {
     }
 
     private func removePhoto() async {
-        if selectedAvatarData != nil {
-            selectedAvatarData = nil
-            selectedPhoto = nil
-            return
-        }
-
+        // A removal from the photo's X always removes the displayed avatar.
+        // Discard any pending replacement as well, so Save cannot restore it.
+        selectedAvatarData = nil
+        selectedPhoto = nil
         guard session.profile.avatarURL != nil else { return }
 
         saving = true
