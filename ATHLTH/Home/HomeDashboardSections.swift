@@ -2786,7 +2786,7 @@ struct HomeWeeklyProgressStrip:
     @State private var weekOffset = 0
     @State private var selectedDay:
         HomeWeeklyProgressDaySelection?
-    @State private var daySheetDetent: PresentationDetent = .medium
+    @State private var daySheetDetent: PresentationDetent = .fraction(0.82)
 
     private var calendar:
         Calendar {
@@ -2931,7 +2931,7 @@ struct HomeWeeklyProgressStrip:
                 }
             )
             .presentationDetents(
-                [.medium, .large],
+                [.fraction(0.82), .large],
                 selection: $daySheetDetent
             )
             .presentationDragIndicator(
@@ -2972,7 +2972,7 @@ struct HomeWeeklyProgressStrip:
             )
 
         Button {
-            daySheetDetent = .medium
+            daySheetDetent = .fraction(0.82)
             selectedDay =
                 HomeWeeklyProgressDaySelection(
                     date: date,
@@ -4040,14 +4040,14 @@ private struct HomeWeeklyProgressDaySheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 17) {
+                VStack(alignment: .leading, spacing: 13) {
                     Text(selection.date.formatted(
                         .dateTime.weekday(.wide).day().month(.wide)
                     ))
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.system(size: 22, weight: .semibold, design: .rounded))
                     .foregroundStyle(dayInk)
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 15)
+                    .padding(.top, 6)
 
                     dayModeSelector
 
@@ -4064,7 +4064,7 @@ private struct HomeWeeklyProgressDaySheet: View {
                     workoutSuggestionSection
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 30)
+                .padding(.bottom, 22)
                 .frame(maxWidth: 720)
                 .frame(maxWidth: .infinity)
             }
@@ -4119,7 +4119,7 @@ private struct HomeWeeklyProgressDaySheet: View {
         .overlay {
             Capsule().strokeBorder(dayInk.opacity(0.11), lineWidth: 0.8)
         }
-        .padding(.horizontal, 38)
+        .padding(.horizontal, 4)
     }
 
     private func dayModeButton(_ label: String, icon: String, mode: Int) -> some View {
@@ -4145,56 +4145,64 @@ private struct HomeWeeklyProgressDaySheet: View {
         .accessibilityAddTraits(selectedMode == mode ? .isSelected : [])
     }
 
+    /// Compact empty state leaves the entire workout suggestion row visible.
     private var emptyTodayCard: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "calendar")
-                .font(.system(size: 28, weight: .medium))
-                .foregroundStyle(dayInk.opacity(0.52))
-                .frame(width: 65, height: 65)
-                .background(dayInk.opacity(0.045), in: Circle())
-                .padding(.top, 11)
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(alignment: .top, spacing: 13) {
+                Image(systemName: "calendar.badge.clock")
+                    .font(.system(size: 21, weight: .medium))
+                    .foregroundStyle(dayInk)
+                    .frame(width: 48, height: 48)
+                    .background(dayInk.opacity(0.055),
+                                in: RoundedRectangle(cornerRadius: 15))
 
-            Text(ATHLTHLocalization.choose(
-                english: "No workouts today", norwegian: "Ingen økter i dag"
-            ))
-            .font(.system(size: 22, weight: .bold))
-            .foregroundStyle(dayInk)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "No workout planned",
+                        norwegian: "Ingen planlagt økt"
+                    ))
+                    .font(.system(size: 19, weight: .semibold, design: .rounded))
+                    .foregroundStyle(dayInk)
 
-            Text(ATHLTHLocalization.choose(
-                english: "You can plan a workout outside your training plan whenever you want.",
-                norwegian: "Du kan planlegge en økt utenfor treningsplanen når du vil."
-            ))
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose a ready-made session below, or create your own.",
+                        norwegian: "Velg en ferdig økt nedenfor, eller lag din egen."
+                    ))
+                    .font(.system(size: 13))
+                    .foregroundStyle(dayInk.opacity(0.68))
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
 
             if canPlanWorkout {
                 Button {
-                    showingStandaloneSessionEditor = true
+                    selectedMode = 1
                 } label: {
-                    Label(ATHLTHLocalization.choose(
-                        english: "Plan a new workout", norwegian: "Planlegg ny økt"
-                    ), systemImage: "plus")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 22)
-                    .frame(height: 47)
-                    .background(dayInk, in: Capsule())
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus.circle.fill")
+                        Text(ATHLTHLocalization.choose(
+                            english: "Plan a workout", norwegian: "Planlegg en økt"
+                        ))
+                        Spacer()
+                        Image(systemName: "arrow.right")
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(dayInk)
+                    .padding(.horizontal, 13)
+                    .frame(height: 39)
+                    .background(dayInk.opacity(0.055),
+                                in: RoundedRectangle(cornerRadius: 13))
                 }
                 .buttonStyle(.plain)
-                .padding(.top, 5)
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 24)
-        .padding(.vertical, 18)
-        .frame(minHeight: 248)
-        .background(Color.white.opacity(0.84),
-                    in: RoundedRectangle(cornerRadius: 23, style: .continuous))
+        .padding(17)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white, in: RoundedRectangle(cornerRadius: 22))
         .overlay {
-            RoundedRectangle(cornerRadius: 23, style: .continuous)
-                .strokeBorder(dayInk.opacity(0.075), lineWidth: 0.8)
+            RoundedRectangle(cornerRadius: 22)
+                .strokeBorder(dayInk.opacity(0.07), lineWidth: 0.8)
         }
     }
 
