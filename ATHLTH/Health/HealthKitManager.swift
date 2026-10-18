@@ -1317,7 +1317,8 @@ final class HealthKitManager: ObservableObject {
         endDate: Date,
         externalID: UUID
     ) async -> UUID? {
-        guard healthDataAvailable,
+        guard integrationEnabled,
+              healthDataAvailable,
               canWriteWorkouts,
               endDate > startDate
         else {
