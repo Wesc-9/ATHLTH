@@ -249,6 +249,19 @@ struct ATHLTHSettingsView: View {
             .contentShape(RoundedRectangle(cornerRadius: 23))
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            Button {
+                UIPasteboard.general.string = ATHLTHLegalIdentity.supportContactEmail
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Copy email address",
+                        norwegian: "Kopier e-postadresse"
+                    ),
+                    systemImage: "doc.on.doc"
+                )
+            }
+        }
         .accessibilityLabel(ATHLTHLocalization.choose(
             english: "Email ATHLTH at contact@athlth.com",
             norwegian: "Send e-post til ATHLTH på contact@athlth.com"
@@ -1547,7 +1560,12 @@ if session.currentRole.canAccessControlCenter {
             )
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("ATHLTH  /  SETTINGS")
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "ATHLTH / SETTINGS",
+                        norwegian: "ATHLTH / INNSTILLINGER"
+                    )
+                )
                     .font(.system(size: 10, weight: .semibold))
                     .tracking(2.1)
                     .foregroundStyle(ATHLTHTheme.premiumGold)
