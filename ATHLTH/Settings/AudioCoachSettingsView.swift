@@ -1470,6 +1470,12 @@ struct ATHLTHAudioCoachSettingsView: View {
     }
 
     private var selectedVoiceTitle: String {
+        if let key = ATHLTHAzureCoachVoice.key(
+            settings.audioCoachVoiceIdentifier
+        ) {
+            return key.capitalized + " · Azure ATHLTH+"
+        }
+
         guard let identifier =
             settings
                 .audioCoachVoiceIdentifier,
