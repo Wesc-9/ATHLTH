@@ -189,6 +189,11 @@ struct ATHLTHDirectShareSheet: View {
                 .padding(.vertical, 10)
                 .background(.regularMaterial)
             }
+            .onChange(of: cleanUsername) { _, _ in
+                // Changing the query invalidates the earlier selection.
+                // Never send to a stale username result.
+                recipient = nil
+            }
             .task(id: cleanUsername) {
                 guard cleanUsername.count >= 2, !sent else {
                     social.clearSearch()
@@ -203,6 +208,7 @@ struct ATHLTHDirectShareSheet: View {
 
     private func send() async {
         guard let recipient, !sent, !sending,
+              recipient.usernameLabel.localizedCaseInsensitiveContains(cleanUsername),
               social.relationshipState(with: recipient.userID) != .blocked else {
             return
         }
