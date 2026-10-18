@@ -82,20 +82,28 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
     @StateObject private var preview = ATHLTHAzureVoicePreviewPlayer()
     @EnvironmentObject private var settings: AppSettingsStore
 
-    private let voices: [(id: String, name: String, detail: String)] = [
-        ("finn", "Finn", ATHLTHLocalization.choose(
-            english: "Norwegian · male",
-            norwegian: "Norsk · mannlig"
-        )),
-        ("iselin", "Iselin", ATHLTHLocalization.choose(
-            english: "Norwegian · female",
-            norwegian: "Norsk · kvinnelig"
-        )),
-        ("pernille", "Pernille", ATHLTHLocalization.choose(
-            english: "Norwegian · female",
-            norwegian: "Norsk · kvinnelig"
-        ))
-    ]
+    private struct Voice: Identifiable {
+        let id: String
+        let name: String
+        let detail: String
+    }
+
+    private var voices: [Voice] {
+        [
+            Voice(id: "finn", name: "Finn", detail: ATHLTHLocalization.choose(
+                english: "Norwegian · male",
+                norwegian: "Norsk · mannlig"
+            )),
+            Voice(id: "iselin", name: "Iselin", detail: ATHLTHLocalization.choose(
+                english: "Norwegian · female",
+                norwegian: "Norsk · kvinnelig"
+            )),
+            Voice(id: "pernille", name: "Pernille", detail: ATHLTHLocalization.choose(
+                english: "Norwegian · female",
+                norwegian: "Norsk · kvinnelig"
+            ))
+        ]
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -117,7 +125,7 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
             .foregroundStyle(ATHLTHTheme.mutedText)
             .fixedSize(horizontal: false, vertical: true)
 
-            ForEach(voices, id: \.id) { voice in
+            ForEach(voices) { voice in
                 HStack(spacing: 9) {
                     Image(systemName: "waveform.circle.fill")
                         .foregroundStyle(ATHLTHTheme.accentDeep)
