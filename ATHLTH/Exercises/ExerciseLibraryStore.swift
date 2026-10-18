@@ -846,6 +846,38 @@ final class ExerciseLibraryStore: ObservableObject {
         return entry
     }
 
+    /// Import only when an athlete explicitly taps "Add to my exercises".
+    /// The receiving account owns its private copy; local media and remote
+    /// access tokens from the sender never cross the account boundary.
+    @discardableResult
+    func importSharedExercise(
+        _ source: ExerciseSnapshot,
+        ownerID: UUID
+    ) -> ExerciseLibraryEntry? {
+        guard accountID == ownerID,
+              let safe = ATHLTHExerciseReferenceResolver.safeImportedSnapshot(
+                source, fallbackTitle: source.name
+              ) else { return nil }
+
+        // Do not silently overwrite an existing custom exercise, even when
+        // the creator has updated their own instructions since sending.
+        if customExercises.contains(where: {
+            ATHLTHExerciseReferenceResolver.key($0.canonicalName) ==
+                ATHLTHExerciseReferenceResolver.key(safe.name)
+        }) {
+            return nil
+        }
+
+        return createCustomExercise(
+            ownerID: ownerID, name: safe.name,
+            instructions: safe.instructions,
+            primaryMuscles: safe.primaryMuscles,
+            secondaryMuscles: safe.secondaryMuscles ?? [],
+            equipment: safe.equipment,
+            isVisibleOutsideOwnerLibrary: false
+        )
+    }
+
     func updateCustomExercise(_ exercise: Exercise) {
         guard exercise.origin == .custom, exercise.ownerID == accountID else { return }
 
