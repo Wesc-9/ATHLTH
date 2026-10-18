@@ -689,9 +689,10 @@ struct ATHLTHTrainPlanPremiumView: View {
                     .background(ATHLTHPlanDesign.selectedSurface,
                                 in: RoundedRectangle(cornerRadius: 14))
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(tr("Continue planning", "Fortsett planleggingen"))
+                    Text(draft.title)
                         .font(.headline)
                         .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .lineLimit(1)
                     Text(draftLocation(draft) + " · " +
                          draft.savedAt.formatted(.dateTime.day().month(.abbreviated).hour().minute()))
                         .font(.caption)
