@@ -241,8 +241,8 @@ struct ExerciseLibraryView: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHPlanDesign.ink)
                         Text(ATHLTHLocalization.choose(
-                            english: "Take a photo · AI analyzes it to filter exercises",
-                            norwegian: "Ta bilde · AI analyserer det og filtrerer øvelsene"
+                            english: "Camera opens directly · photo is sent to AI for matching",
+                            norwegian: "Kamera åpnes direkte · bildet sendes til AI for treff"
                         ))
                         .font(.caption)
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -679,7 +679,6 @@ struct ExerciseLibraryView: View {
                     .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
             }
             .buttonStyle(.plain)
-            .disabled(scannerIsAnalyzing)
             .accessibilityLabel(ATHLTHLocalization.choose(
                 english: "Scan again",
                 norwegian: "Skann på nytt"
@@ -708,7 +707,7 @@ struct ExerciseLibraryView: View {
 
     private var scannerEmptyState: some View {
         VStack(spacing: 12) {
-            Image(systemName: "camera.metering.unknown")
+            Image(systemName: "camera.viewfinder")
                 .font(.system(size: 30))
                 .foregroundStyle(ATHLTHPlanDesign.accent)
 
@@ -764,17 +763,9 @@ struct ExerciseLibraryView: View {
         favoritesOnly = false
         selectedSection = .library
 
-        let candidates = library.search(query: "")
-            .filter { $0.source != .custom }
-            .sorted { lhs, rhs in
-                if lhs.source != rhs.source {
-                    return lhs.source == .athlthCatalog
-                }
-                return lhs.name.localizedStandardCompare(rhs.name)
-                    == .orderedAscending
-            }
-            .prefix(100)
-            .map { $0 }
+        let candidates = ATHLTHEquipmentScanCandidateSelector.select(
+            from: library.search(query: "")
+        )
         scannerCandidates = candidates
 
         scannerTask = Task {
