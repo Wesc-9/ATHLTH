@@ -140,7 +140,7 @@ enum ATHLTHCatalogPlanSessionFactory {
         switch blueprint {
         case .strength, .fullBodyA: number = 1
         case .fullBodyB: number = 13
-        case .fullBodyC: number = 2
+        case .fullBodyC: number = 14 // bodyweight variation suitable for beginners
         case .upperBody: number = 12
         case .lowerBody: number = 13
         case .push: number = 8
