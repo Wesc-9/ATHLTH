@@ -176,6 +176,10 @@ struct SubscriptionOfferView: View {
                     "Audio Coach with pace, route progress and workout-step guidance",
                     icon: "waveform.and.mic"
                 )
+                benefit(
+                    "AI equipment scanning with matched exercises from your library",
+                    icon: "camera.viewfinder"
+                )
             }
         }
         .padding(16)
