@@ -1556,8 +1556,14 @@ settingsSection("Membership") {
                             } label: {
                                 PremiumSettingsRow(
                                     icon: "arrow.counterclockwise",
-                                    title: "Restore Purchases",
-                                    subtitle: "Restore your ATHLTH+ purchase"
+                                    title: ATHLTHLocalization.choose(
+                                        english: "Restore purchases",
+                                        norwegian: "Gjenopprett kjøp"
+                                    ),
+                                    subtitle: ATHLTHLocalization.choose(
+                                        english: "Restore ATHLTH+ purchases made through Apple",
+                                        norwegian: "Gjenopprett ATHLTH+-kjøp fra Apple"
+                                    )
                                 ) {
                                     if subscriptionStore.restoreInProgress {
                                         ProgressView()
@@ -1578,8 +1584,14 @@ settingsSection("Membership") {
                                 Link(destination: URL(string: "https://apps.apple.com/account/subscriptions")!) {
                                     PremiumSettingsRow(
                                         icon: "creditcard",
-                                        title: "Manage Subscription",
-                                        subtitle: "Open Apple subscription settings"
+                                        title: ATHLTHLocalization.choose(
+                                            english: "Manage subscription",
+                                            norwegian: "Administrer abonnement"
+                                        ),
+                                        subtitle: ATHLTHLocalization.choose(
+                                            english: "Open Apple subscription settings",
+                                            norwegian: "Åpne abonnementer hos Apple"
+                                        )
                                     ) {
                                         Image(systemName: "arrow.up.right")
                                             .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
