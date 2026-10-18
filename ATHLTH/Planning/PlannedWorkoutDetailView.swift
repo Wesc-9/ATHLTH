@@ -18,6 +18,7 @@ struct PlannedWorkoutDetailView: View {
 
     @State private var showingEditor = false
     @State private var showingStructuredWorkout = false
+    @State private var selectedLegacyExercise: WorkoutTemplateBlock?
     @State private var showingHealthLinkPicker = false
 
     private var currentWorkout: PlannedSession {
@@ -228,6 +229,9 @@ struct PlannedWorkoutDetailView: View {
             }
             .sheet(isPresented: $showingHealthLinkPicker) {
                 healthLinkPicker
+            }
+            .sheet(item: $selectedLegacyExercise) { block in
+                ATHLTHLinkedExerciseDetailView(block: block)
             }
             .fullScreenCover(
                 isPresented:
@@ -786,8 +790,34 @@ struct PlannedWorkoutDetailView: View {
                             )
 
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(exercise.embeddedExercise.displayName)
-                                .font(.subheadline.weight(.semibold))
+                            HStack(spacing: 8) {
+                                Text(exercise.embeddedExercise.displayName)
+                                    .font(.subheadline.weight(.semibold))
+                                Spacer(minLength: 0)
+                                Button {
+                                    var step = WorkoutTemplateBlock(
+                                        sequence: index + 1, kind: .exercise,
+                                        title: exercise.embeddedExercise.name,
+                                        exerciseSlug: nil, distanceMeters: nil,
+                                        repetitions: exercise.reps,
+                                        durationSeconds: nil,
+                                        targetWeightKilograms: exercise.targetWeightKilograms,
+                                        loadNote: nil, notes: exercise.notes, phase: .main
+                                    )
+                                    step.exerciseID = exercise.exerciseID
+                                    step.exerciseSnapshot = exercise.embeddedExercise
+                                    selectedLegacyExercise = step
+                                } label: {
+                                    Image(systemName: "info.circle")
+                                        .font(.subheadline)
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(ATHLTHLocalization.choose(
+                                    english: "Exercise information",
+                                    norwegian: "Øvelsesinformasjon"
+                                ))
+                            }
 
                             Text(exerciseSummary(exercise))
                                 .font(.caption)
@@ -930,78 +960,19 @@ struct PlannedWorkoutDetailView: View {
 
 
     private var structuredWorkoutCard: some View {
-        ATHLTHCard {
-            VStack(alignment: .leading, spacing: 12) {
-                sectionTitle(ATHLTHLocalization.choose(english: "Workout blocks", norwegian: "Øktblokker"))
-
-                ForEach(
-                    currentWorkout.resolvedWorkoutBlocks
-                ) { block in
-                    HStack(alignment: .top, spacing: 11) {
-                        Text("\(block.sequence)")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(
-                                ATHLTHTheme.accent
-                            )
-                            .frame(width: 28, height: 28)
-                            .background(
-                                ATHLTHTheme.accentSoft,
-                                in: Circle()
-                            )
-
-                        Image(
-                            systemName:
-                                block.kind.systemImage
-                        )
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(
-                            block.kind == .run
-                                ? ATHLTHTheme.vitality
-                                : ATHLTHTheme.accentDeep
-                        )
-                        .frame(width: 28, height: 28)
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(block.title)
-                                .font(
-                                    .subheadline.weight(
-                                        .semibold
-                                    )
-                                )
-
-                            if let target = block.targetText {
-                                Text(target)
-                                    .font(.caption)
-                                    .foregroundStyle(
-                                        ATHLTHTheme.mutedText
-                                    )
-                            }
-
-                            if let notes = block.notes,
-                               !notes.isEmpty {
-                                Text(notes)
-                                    .font(.caption2)
-                                    .foregroundStyle(
-                                        ATHLTHTheme.mutedText
-                                    )
-                            }
-                        }
-
-                        Spacer()
-                    }
-
-                    if block.id !=
-                        currentWorkout
-                            .resolvedWorkoutBlocks
-                            .last?
-                            .id {
-                        Divider()
-                    }
-                }
-            }
-        }
+        ATHLTHWorkoutRecipePreview(
+            title: currentWorkout.title,
+            summary: currentWorkout.notes ?? "",
+            category: currentWorkout.workoutCategory ??
+                (currentWorkout.kind == .strength ? "strength" :
+                 currentWorkout.kind == .running ? "running" :
+                 currentWorkout.kind == .walking ? "walking" : "hybrid"),
+            symbol: currentWorkout.kind.systemImage,
+            difficulty: nil,
+            durationMinutes: currentWorkout.durationMinutes,
+            blocks: currentWorkout.resolvedWorkoutBlocks
+        )
     }
-
 
     private var structuredWorkoutStartButton:
         some View {
