@@ -1576,6 +1576,7 @@ struct WorkoutTemplateBuilderView: View {
     @State private var blocks: [WorkoutTemplateBlock] = []
     @State private var selectedRouteID: UUID?
     @State private var showingExercisePicker = false
+    @State private var selectedExerciseInfo: WorkoutTemplateBlock?
     @State private var selectedPhase: WorkoutPhaseKind = .main
     @State private var expandedBlockIndex: Int?
     @State private var exerciseTargetGroupID: UUID?
@@ -1876,6 +1877,9 @@ struct WorkoutTemplateBuilderView: View {
             } message: {
                 Text(tr("A recoverable local draft is kept until you discard or save.",
                         "Utkastet er lagret lokalt til du forkaster eller lagrer det."))
+            }
+            .sheet(item: $selectedExerciseInfo) { block in
+                ATHLTHLinkedExerciseDetailView(block: block)
             }
             .sheet(isPresented: $showingExercisePicker) {
                 NavigationStack {
@@ -2426,6 +2430,21 @@ struct WorkoutTemplateBuilderView: View {
                 }
                 .buttonStyle(.plain)
 
+                if block.kind == .exercise {
+                    Button {
+                        selectedExerciseInfo = block
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(studioAccent)
+                            .frame(width: 34, height: 40)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(tr(
+                        "Exercise details", "Øvelsesinformasjon"
+                    ))
+                }
+
                 Menu {
                     ForEach(WorkoutPhaseKind.allCases) { phase in
                         Button {
@@ -2531,11 +2550,10 @@ struct WorkoutTemplateBuilderView: View {
 
     private func localizedBlockTitle(_ block: WorkoutTemplateBlock) -> String {
         guard block.kind == .exercise else { return block.title }
-        if let entry = exerciseLibrary.allExercises.first(where: { entry in
-            (block.exerciseSlug != nil && entry.sourceIdentifier == block.exerciseSlug)
-                || entry.name.localizedCaseInsensitiveCompare(block.title) == .orderedSame
-        }) {
-            return exerciseLibrary.localizedExerciseName(entry)
+        if let match = ATHLTHExerciseReferenceResolver.resolve(
+            block, in: exerciseLibrary.allExercises
+        ) {
+            return exerciseLibrary.localizedExerciseName(match)
         }
         return ATHLTHLocalization.isNorwegian
             ? ATHLTHExerciseNameLocalization.norwegianName(for: block.title)
@@ -2544,11 +2562,9 @@ struct WorkoutTemplateBuilderView: View {
 
     @ViewBuilder
     private func blockArtwork(_ block: WorkoutTemplateBlock, size: CGFloat) -> some View {
-        if block.kind == .exercise,
-           let match = exerciseLibrary.allExercises.first(where: { entry in
-               (block.exerciseSlug != nil && entry.sourceIdentifier == block.exerciseSlug)
-                   || entry.name.localizedCaseInsensitiveCompare(block.title) == .orderedSame
-           }) {
+        if let match = ATHLTHExerciseReferenceResolver.resolve(
+            block, in: exerciseLibrary.allExercises
+        ) {
             ExerciseArtwork(entry: match, size: size)
         } else if block.kind == .run,
                   (block.title.localizedCaseInsensitiveContains("mølle") ||
