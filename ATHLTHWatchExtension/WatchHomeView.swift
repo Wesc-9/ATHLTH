@@ -12,119 +12,66 @@ struct WatchHomeView: View {
 
     var body: some View {
         NavigationStack(path: $shortcutPath) {
-            ScrollView {
-                VStack(spacing: 9) {
-                    header
+            GeometryReader { geometry in
+                let compact = geometry.size.height < 205
+                let hasAdditionalContent =
+                    routeStore.preparedWorkout != nil ||
+                    routeStore.todayWorkout != nil ||
+                    workoutManager.errorMessage != nil
 
-                    if let prepared =
-                            routeStore.preparedWorkout {
-                        preparedWorkoutCard(
-                            prepared
-                        )
-                    }
-
-                    if let today =
-                            routeStore.todayWorkout {
-                        todayWorkoutCard(today)
-                    }
-
-                    quickStartTiles
-
-                    if let errorMessage =
-                            workoutManager
-                                .errorMessage {
-                        HStack(
-                            alignment: .top,
-                            spacing: 7
-                        ) {
-                            Image(
-                                systemName:
-                                    "exclamationmark.triangle.fill"
-                            )
-                            .foregroundStyle(
-                                WatchTheme.warning
-                            )
-
-                            Text(errorMessage)
-                                .font(
-                                    .system(
-                                        size: 9,
-                                        weight: .semibold
+                Group {
+                    if hasAdditionalContent {
+                        // Keep important transferred workouts and errors
+                        // available; only this expanded state may scroll.
+                        ScrollView {
+                            VStack(spacing: 7) {
+                                header
+                                if let prepared = routeStore.preparedWorkout {
+                                    preparedWorkoutCard(prepared)
+                                }
+                                if let today = routeStore.todayWorkout {
+                                    todayWorkoutCard(today)
+                                }
+                                quickStartTiles(compact: compact)
+                                otherWorkoutsCard(compact: compact)
+                                if let message = workoutManager.errorMessage {
+                                    Label(
+                                        message,
+                                        systemImage: "exclamationmark.triangle.fill"
                                     )
-                                )
-                                .foregroundStyle(
-                                    WatchTheme
-                                        .textSecondary
-                                )
-                                .multilineTextAlignment(
-                                    .leading
-                                )
-
-                            Spacer(
-                                minLength: 0
-                            )
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(WatchTheme.warning)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(9)
+                                    .watchSurface(radius: 13)
+                                }
+                            }
+                            .padding(.horizontal, 7)
+                            .padding(.bottom, 6)
                         }
-                        .padding(9)
-                        .watchSurface(
-                            radius: 15
-                        )
+                    } else {
+                        // Default state fits on a single Watch screen,
+                        // including the smallest supported displays.
+                        VStack(spacing: compact ? 5 : 8) {
+                            header
+                            Spacer(minLength: 0)
+                            quickStartTiles(compact: compact)
+                            otherWorkoutsCard(compact: compact)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, compact ? 2 : 5)
                     }
-
-                    NavigationLink {
-                        WatchWorkoutStartView(route: nil)
-                    } label: {
-                        menuCard(
-                            title: "Other workouts",
-                            subtitle:
-                                Text(
-                                    "Walk · Strength"
-                                ),
-                            icon: "figure.mixed.cardio",
-                            accent: false
-                        )
-                    }
-                    .buttonStyle(.plain)
-
-                    NavigationLink {
-                        WatchRoutesListView()
-                    } label: {
-                        menuCard(
-                            title: "Routes",
-                            subtitle:
-                                routeStore.routes.isEmpty
-                                    ? Text(
-                                        "Send a route from iPhone"
-                                    )
-                                    : Text(
-                                        ATHLTHLocalization.format(
-                                            "%d saved",
-                                            routeStore
-                                                .routes
-                                                .count
-                                        )
-                                    ),
-                            icon: "map.fill",
-                            accent: false
-                        )
-                    }
-                    .buttonStyle(.plain)
-
-                    connectionRow
                 }
-                .padding(.horizontal, 8)
-                .padding(.bottom, 12)
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: .top
+                )
+                .background(WatchTheme.planCanvas.ignoresSafeArea())
+                .foregroundStyle(WatchTheme.planInk)
             }
-            .background(
-                WatchTheme.canvas
-                    .ignoresSafeArea()
-            )
-            .foregroundStyle(
-                WatchTheme.textPrimary
-            )
-            .toolbar(
-                .hidden,
-                for: .navigationBar
-            )
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: WatchShortcutDestination.self) { target in
                 switch target {
                 case .routes:
@@ -198,50 +145,112 @@ struct WatchHomeView: View {
     }
 
     private var header: some View {
-        HStack {
-            VStack(
-                alignment: .leading,
-                spacing: 1
-            ) {
-                Text("ATHLTH")
-                    .font(
-                        .system(
-                            size: 18,
-                            weight: .black,
-                            design: .rounded
-                        )
-                    )
-                    .tracking(1.2)
+        HStack(spacing: 7) {
+            ATHLTHWatchLogomark()
+                .frame(width: 29, height: 29)
 
-                Text("READY TO MOVE")
-                    .font(
-                        .system(
-                            size: 8,
-                            weight: .bold
-                        )
-                    )
+            VStack(alignment: .leading, spacing: 1) {
+                Text("ATHLTH")
+                    .font(.system(size: 14, weight: .heavy, design: .rounded))
                     .tracking(1.1)
-                    .foregroundStyle(
-                        WatchTheme.muted
-                    )
+                    .foregroundStyle(WatchTheme.planInk)
+                    .minimumScaleFactor(0.8)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "READY TO MOVE",
+                    norwegian: "KLAR FOR ØKT"
+                ))
+                .font(.system(size: 7, weight: .semibold))
+                .tracking(0.6)
+                .foregroundStyle(WatchTheme.planSecondary)
             }
 
-            Spacer()
+            Spacer(minLength: 2)
+
+            NavigationLink {
+                WatchRoutesListView()
+            } label: {
+                Image(systemName: "map")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(WatchTheme.planInk)
+                    .frame(width: 31, height: 31)
+                    .background(.white, in: Circle())
+                    .overlay {
+                        Circle().strokeBorder(
+                            WatchTheme.planBorder, lineWidth: 0.6
+                        )
+                    }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Routes", norwegian: "Ruter"
+            ))
 
             Circle()
                 .fill(
                     routeStore.companionLinked
-                        ? WatchTheme.accent
-                        : WatchTheme.muted
+                        ? WatchTheme.planConnected
+                        : WatchTheme.planSecondary
                 )
-                .frame(
-                    width: 8,
-                    height: 8
+                .frame(width: 7, height: 7)
+                .accessibilityLabel(
+                    routeStore.companionLinked
+                        ? ATHLTHLocalization.choose(
+                            english: "iPhone connected",
+                            norwegian: "iPhone tilkoblet"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Watch can record independently",
+                            norwegian: "Klokken kan registrere økter alene"
+                        )
                 )
         }
-        .padding(.horizontal, 3)
-        .padding(.top, 3)
-        .padding(.bottom, 2)
+        .padding(.horizontal, 1)
+        .frame(height: 36)
+    }
+
+    private var otherWorkoutsCard: some View {
+        NavigationLink {
+            WatchWorkoutStartView(route: nil)
+        } label: {
+            HStack(spacing: 9) {
+                Image(systemName: "figure.mixed.cardio")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(WatchTheme.planAccent)
+                    .frame(width: 34, height: 34)
+                    .background(
+                        WatchTheme.planSelected,
+                        in: RoundedRectangle(cornerRadius: 11)
+                    )
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Other workouts",
+                        norwegian: "Andre økter"
+                    ))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(WatchTheme.planInk)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Walk and more",
+                        norwegian: "Gåtur og mer"
+                    ))
+                    .font(.system(size: 9))
+                    .foregroundStyle(WatchTheme.planSecondary)
+                }
+                Spacer(minLength: 2)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(WatchTheme.planSecondary)
+            }
+            .padding(.horizontal, 9)
+            .frame(height: 51)
+            .background(.white, in: RoundedRectangle(cornerRadius: 15))
+            .overlay {
+                RoundedRectangle(cornerRadius: 15)
+                    .strokeBorder(WatchTheme.planBorder, lineWidth: 0.75)
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private func preparedWorkoutCard(
@@ -649,28 +658,27 @@ struct WatchHomeView: View {
         }
     }
 
-    private var quickStartTiles: some View {
-        HStack(spacing: 8) {
+    private func quickStartTiles(compact: Bool) -> some View {
+        HStack(spacing: 7) {
             quickStartTile(
                 kind: .running,
                 title: ATHLTHLocalization.choose(
-                    english: "Run",
-                    norwegian: "Løp"
+                    english: "Run", norwegian: "Løp"
                 ),
                 icon: "figure.run",
-                tint: WatchTheme.accent,
-                fill: WatchTheme.accentSoft
+                tint: WatchTheme.planAccent,
+                fill: .white,
+                compact: compact
             )
-
             quickStartTile(
                 kind: .strength,
                 title: ATHLTHLocalization.choose(
-                    english: "Strength",
-                    norwegian: "Styrke"
+                    english: "Strength", norwegian: "Styrke"
                 ),
                 icon: "dumbbell.fill",
-                tint: WatchTheme.slate,
-                fill: WatchTheme.slateSoft
+                tint: WatchTheme.planInk,
+                fill: WatchTheme.planSelected,
+                compact: compact
             )
         }
     }
@@ -680,80 +688,52 @@ struct WatchHomeView: View {
         title: String,
         icon: String,
         tint: Color,
-        fill: Color
+        fill: Color,
+        compact: Bool
     ) -> some View {
         Button {
-            Task {
-                await workoutManager.start(
-                    kind: kind
-                )
-            }
+            Task { await workoutManager.start(kind: kind) }
         } label: {
-            VStack(spacing: 5) {
+            VStack(spacing: compact ? 2 : 4) {
                 Image(systemName: icon)
-                    .font(
-                        .system(
-                            size: 22,
-                            weight: .bold
-                        )
-                    )
+                    .font(.system(
+                        size: compact ? 18 : 21,
+                        weight: .semibold
+                    ))
                     .foregroundStyle(tint)
 
                 Text(title)
-                    .font(
-                        .system(
-                            size: 13,
-                            weight: .bold
-                        )
-                    )
-                    .foregroundStyle(
-                        WatchTheme.textPrimary
-                    )
+                    .font(.system(
+                        size: compact ? 12 : 13,
+                        weight: .bold
+                    ))
+                    .foregroundStyle(WatchTheme.planInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
 
-                Text(
-                    ATHLTHLocalization.choose(
-                        english: "Start workout",
-                        norwegian: "Start økt"
-                    )
-                )
+                Text(ATHLTHLocalization.choose(
+                    english: "Start workout", norwegian: "Start økt"
+                ))
                 .font(.system(size: 8))
-                .foregroundStyle(
-                    WatchTheme.textSecondary
-                )
+                .foregroundStyle(WatchTheme.planSecondary)
+                .lineLimit(1)
             }
-            .frame(
-                maxWidth: .infinity,
-                minHeight: 76
-            )
+            .frame(maxWidth: .infinity)
+            .frame(height: compact ? 69 : 77)
             .background(
                 fill,
-                in: RoundedRectangle(
-                    cornerRadius: 18,
-                    style: .continuous
-                )
+                in: RoundedRectangle(cornerRadius: 17)
             )
             .overlay {
-                RoundedRectangle(
-                    cornerRadius: 18,
-                    style: .continuous
-                )
-                .stroke(
-                    tint.opacity(0.16),
-                    lineWidth: 0.75
-                )
+                RoundedRectangle(cornerRadius: 17)
+                    .strokeBorder(
+                        WatchTheme.planBorder, lineWidth: 0.8
+                    )
             }
         }
         .buttonStyle(.plain)
-        .disabled(
-            workoutManager.state ==
-                .preparing
-        )
-        .opacity(
-            workoutManager.state ==
-                .preparing
-                ? 0.55
-                : 1
-        )
+        .disabled(workoutManager.state == .preparing)
+        .opacity(workoutManager.state == .preparing ? 0.55 : 1)
     }
 
     private func menuCard(
@@ -880,6 +860,36 @@ struct WatchHomeView: View {
         )
         .padding(.horizontal, 4)
         .padding(.top, 2)
+    }
+}
+
+/// Lightweight vector ATHLTH A mark. Avoids loading full app-icon
+/// artwork into the memory-limited Watch home view.
+private struct ATHLTHWatchLogomark: View {
+    var body: some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width
+            let height = geometry.size.height
+            ZStack {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(WatchTheme.planSelected)
+
+                Path { path in
+                    path.move(to: CGPoint(x: width * 0.24, y: height * 0.78))
+                    path.addLine(to: CGPoint(x: width * 0.49, y: height * 0.19))
+                    path.addLine(to: CGPoint(x: width * 0.78, y: height * 0.78))
+                    path.move(to: CGPoint(x: width * 0.34, y: height * 0.58))
+                    path.addLine(to: CGPoint(x: width * 0.68, y: height * 0.58))
+                }
+                .stroke(
+                    WatchTheme.planAccent,
+                    style: StrokeStyle(
+                        lineWidth: 2.7, lineCap: .round, lineJoin: .round
+                    )
+                )
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 
