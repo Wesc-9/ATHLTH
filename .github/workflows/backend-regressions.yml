@@ -55,6 +55,7 @@ jobs:
           docker exec -i supabase_db_ATHLTH-1.6.0 psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/arena_lifecycle_guards.sql
           docker exec -i supabase_db_ATHLTH-1.6.0 psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/challenge_acceptance_scoring_gate.sql
           docker exec -i supabase_db_ATHLTH-1.6.0 psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/social_challenge_acceptance_gate.sql
+          docker exec -i supabase_db_ATHLTH-1.6.0 psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/direct_exercise_share_policy.sql
           python3 scripts/test_ai_budget_concurrency.py
       - name: Stop local Supabase
         if: always()
