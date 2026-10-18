@@ -34,23 +34,7 @@ struct ATHLTHTrainTodayPremiumView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(tr("Today", "I dag"))
-                    .font(.system(size: 35, weight: .regular, design: .serif))
-                    .foregroundStyle(ink)
-                Spacer()
-                Text(
-                    Date().formatted(
-                        .dateTime.weekday(.wide).day().month(.wide)
-                    )
-                )
-                .font(.caption.weight(.medium))
-                .foregroundStyle(muted)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            }
-            .padding(.bottom, 2)
-
+            // The Train tab already says "I dag"; avoid a redundant title.
             if let plan {
                 if !sessions.isEmpty && sessions.allSatisfy({ completedIDs.contains($0.id) }) {
                     completedTodayCard(plan)
@@ -82,6 +66,22 @@ struct ATHLTHTrainTodayPremiumView: View {
         sessions.first { !completedIDs.contains($0.id) } ?? sessions.first
     }
 
+    // A full date on regular widths, a shorter date where labels need room.
+    private func todayDateLabel(color: Color) -> some View {
+        ViewThatFits(in: .horizontal) {
+            Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide)))
+                .fixedSize(horizontal: true, vertical: false)
+            Text(Date.now.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)))
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .font(.caption.weight(.medium))
+        .foregroundStyle(color)
+        .lineLimit(1)
+        .accessibilityLabel(
+            Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide))
+        )
+    }
+
     private func workoutCard(
         _ workout: PlannedSession,
         plan: TrainingPlan
@@ -110,14 +110,18 @@ struct ATHLTHTrainTodayPremiumView: View {
                     endPoint: .bottom
                 )
 
-                Text(
-                    finished
-                        ? tr("COMPLETED TODAY", "GJENNOMFØRT I DAG")
-                        : tr("TODAY'S WORKOUT", "DAGENS ØKT")
-                )
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(1.5)
-                .foregroundStyle(.white)
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(
+                        finished
+                            ? tr("COMPLETED TODAY", "GJENNOMFØRT I DAG")
+                            : tr("TODAY'S WORKOUT", "DAGENS ØKT")
+                    )
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.5)
+                    .foregroundStyle(.white)
+                    Spacer(minLength: 4)
+                    todayDateLabel(color: .white.opacity(0.92))
+                }
                 .padding(15)
             }
             .frame(height: 147)
@@ -273,7 +277,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                     .font(.system(size: 10, weight: .semibold))
                     .tracking(1.5)
                     .foregroundStyle(muted)
-                Spacer(minLength: 0)
+                Spacer(minLength: 4)
                 if status == .trainedToday {
                     Label(
                         tr("Recorded", "Registrert"),
@@ -281,7 +285,9 @@ struct ATHLTHTrainTodayPremiumView: View {
                     )
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(Color(red: 0.19, green: 0.44, blue: 0.36))
+                    .lineLimit(1)
                 }
+                todayDateLabel(color: muted)
             }
 
             VStack(alignment: .leading, spacing: 5) {
@@ -579,6 +585,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                     ))
                     .font(.caption)
                     .foregroundStyle(muted)
+                    todayDateLabel(color: muted)
                 }
                 Spacer(minLength: 0)
             }
