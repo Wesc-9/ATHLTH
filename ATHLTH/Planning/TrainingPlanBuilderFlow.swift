@@ -309,6 +309,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     var body: some View {
+        planPresentations
+    }
+
+    private var planNavigation: some View {
         NavigationStack(path: $sourceRoute) {
             ZStack {
                 ATHLTHPremiumCanvas(
@@ -378,6 +382,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 createdPlanReviewDestination
             }
         }
+    }
+
+    private var planLifecycle: some View {
+        planNavigation
         .onAppear {
             draftStore.setEditing(true, userID: session.profile.userID)
             guard !didApplySuggestedStartDate
@@ -442,6 +450,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 draftStore.setEditing(false, userID: session.profile.userID)
             }
         }
+    }
+
+    private var planPrimaryObservers: some View {
+        planLifecycle
         .onChange(of: title) { _, _ in saveResumableDraft() }
         .onChange(of: weekCount) { _, _ in saveResumableDraft() }
         .onChange(of: startDate) { _, _ in saveResumableDraft() }
@@ -458,6 +470,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             saveResumableDraft()
         }
         .onChange(of: firstGuidedWeekDecisionMade) { _, _ in saveResumableDraft() }
+    }
+
+    private var planSecondaryObservers: some View {
+        planPrimaryObservers
         .onChange(of: weekCount) { _, value in
             selectedPlanWeekIndex = min(selectedPlanWeekIndex, max(0, value - 1))
             weekDayEdits = weekDayEdits.filter { $0.key <= value * 7 }
@@ -499,6 +515,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 selectedDays = suggested
             }
         }
+    }
+
+    private var planPresentations: some View {
+        planSecondaryObservers
         .alert(
             ATHLTHLocalization.choose(
                 english: "Could not create plan",
