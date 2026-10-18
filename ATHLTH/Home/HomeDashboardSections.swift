@@ -2786,7 +2786,7 @@ struct HomeWeeklyProgressStrip:
     @State private var weekOffset = 0
     @State private var selectedDay:
         HomeWeeklyProgressDaySelection?
-    @State private var daySheetDetent: PresentationDetent = .fraction(0.82)
+    @State private var daySheetDetent: PresentationDetent = .fraction(0.78)
 
     private var calendar:
         Calendar {
@@ -2932,7 +2932,7 @@ struct HomeWeeklyProgressStrip:
                 }
             )
             .presentationDetents(
-                [.fraction(0.82), .large],
+                [.fraction(0.78), .large],
                 selection: $daySheetDetent
             )
             .presentationDragIndicator(
@@ -2973,7 +2973,7 @@ struct HomeWeeklyProgressStrip:
             )
 
         Button {
-            daySheetDetent = .fraction(0.82)
+            daySheetDetent = .fraction(0.78)
             selectedDay =
                 HomeWeeklyProgressDaySelection(
                     date: date,
