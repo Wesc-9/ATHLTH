@@ -5657,11 +5657,16 @@ struct DirectMessageThreadView: View {
     }
 
     private func saveAttachment(_ message: DirectMessageRecord) {
-        guard message.shareVersion != 3 &&
-              message.shareVersion != 2 &&
-              message.shareVersion != 4 &&
-              message.shareVersion != 5
-            else { return }
+        // Special response versions apply only to their attachment kind.
+        // A legitimate version-2/3/4 training plan must still be saveable.
+        if message.attachmentKind == .workout &&
+           [2, 3, 4, 5].contains(message.shareVersion) {
+            return
+        }
+        if message.attachmentKind == .challenge &&
+           message.shareVersion == 2 {
+            return
+        }
 
         guard message.senderID != messaging.currentUserID else { return }
 
