@@ -542,6 +542,42 @@ struct HomeActiveFriendsStrip: View {
     @EnvironmentObject private var messaging: MessagingStore
     @Environment(\.scenePhase) private var scenePhase
 
+    @State private var selectedFriendID: UUID?
+    @State private var destination: FriendQuickDestination?
+    @State private var challengeFriend: SocialProfileCard?
+
+    private enum FriendQuickDestination: Hashable {
+        case message(SocialProfileCard)
+        case profile(UUID)
+    }
+
+    private enum FriendQuickAction {
+        case message(SocialProfileCard)
+        case challenge(SocialProfileCard)
+        case profile(UUID)
+    }
+
+    private func openAction(_ action: FriendQuickAction) {
+        // Dismiss the anchored popover before presenting another destination
+        // so iOS never attempts to present two layers at the same time.
+        selectedFriendID = nil
+        Task { @MainActor in
+            do {
+                try await Task.sleep(for: .milliseconds(180))
+            } catch {
+                return
+            }
+            switch action {
+            case .message(let friend):
+                destination = .message(friend)
+            case .challenge(let friend):
+                challengeFriend = friend
+            case .profile(let userID):
+                destination = .profile(userID)
+            }
+        }
+    }
+
     private struct RankedFriend {
         let profile: SocialProfileCard
         let training: Bool
@@ -632,8 +668,8 @@ struct HomeActiveFriendsStrip: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(alignment: .top, spacing: 10) {
                         ForEach(orderedFriends) { friend in
-                            NavigationLink {
-                                FriendProfileView(userID: friend.userID)
+                            Button {
+                                selectedFriendID = friend.userID
                             } label: {
                                 VStack(spacing: 3) {
                                     ATHLTHSocialStatusAvatar(
@@ -649,8 +685,44 @@ struct HomeActiveFriendsStrip: View {
                                         .lineLimit(1)
                                 }
                                 .frame(width: 58)
+                                .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            .accessibilityHint(ATHLTHLocalization.choose(
+                                english: "Show quick actions",
+                                norwegian: "Vis hurtighandlinger"
+                            ))
+                            .popover(
+                                isPresented: Binding(
+                                    get: {
+                                        selectedFriendID == friend.userID
+                                    },
+                                    set: { presented in
+                                        if !presented &&
+                                           selectedFriendID == friend.userID {
+                                            selectedFriendID = nil
+                                        }
+                                    }
+                                ),
+                                attachmentAnchor: .rect(.bounds),
+                                arrowEdge: .bottom
+                            ) {
+                                HomeFriendQuickActionsPopover(
+                                    friend: friend,
+                                    isTraining: realtime.isTrainingNow(friend.userID),
+                                    isOnline: realtime.isOnline(friend.userID),
+                                    onMessage: {
+                                        openAction(.message(friend))
+                                    },
+                                    onChallenge: {
+                                        openAction(.challenge(friend))
+                                    },
+                                    onProfile: {
+                                        openAction(.profile(friend.userID))
+                                    }
+                                )
+                                .presentationCompactAdaptation(.popover)
+                            }
                         }
                     }
                     .padding(.vertical, 1)
@@ -671,6 +743,130 @@ struct HomeActiveFriendsStrip: View {
                 }
             }
         }
+    }
+    .navigationDestination(item: $destination) { destination in
+        switch destination {
+        case .message(let friend):
+            DirectMessageThreadView(friend: friend)
+        case .profile(let userID):
+            FriendProfileView(userID: userID)
+        }
+    }
+    .sheet(item: $challengeFriend) { friend in
+        ChallengeCreationView(preselectedFriends: [friend])
+    }
+}
+
+private struct HomeFriendQuickActionsPopover: View {
+    let friend: SocialProfileCard
+    let isTraining: Bool
+    let isOnline: Bool
+    let onMessage: () -> Void
+    let onChallenge: () -> Void
+    let onProfile: () -> Void
+
+    private var status: String {
+        if isTraining {
+            return ATHLTHLocalization.choose(
+                english: "Training now", norwegian: "Trener nå"
+            )
+        }
+        if isOnline {
+            return ATHLTHLocalization.choose(
+                english: "Online", norwegian: "Pålogget"
+            )
+        }
+        return ATHLTHLocalization.choose(
+            english: "Friend", norwegian: "Venn"
+        )
+    }
+
+    private var statusColor: Color {
+        if isTraining { return Color.orange }
+        if isOnline { return Color.green }
+        return ATHLTHTheme.mutedText
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(spacing: 10) {
+                ATHLTHSocialStatusAvatar(profile: friend, size: 42)
+                    .frame(width: 50, height: 50)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(friend.resolvedName)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(1)
+
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(statusColor)
+                            .frame(width: 6, height: 6)
+                        Text(status)
+                            .font(.system(size: 11))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+
+            Rectangle()
+                .fill(Color.black.opacity(0.07))
+                .frame(height: 0.5)
+
+            HStack(spacing: 4) {
+                actionButton(
+                    ATHLTHLocalization.choose(
+                        english: "Message", norwegian: "Melding"
+                    ),
+                    icon: "bubble.left",
+                    action: onMessage
+                )
+                actionButton(
+                    ATHLTHLocalization.choose(
+                        english: "Challenge", norwegian: "Utfordre"
+                    ),
+                    icon: "trophy",
+                    action: onChallenge
+                )
+                actionButton(
+                    ATHLTHLocalization.choose(
+                        english: "Profile", norwegian: "Profil"
+                    ),
+                    icon: "person.crop.circle",
+                    action: onProfile
+                )
+            }
+        }
+        .padding(14)
+        .frame(width: 278)
+        .background(Color.white)
+        .presentationBackground(.white)
+    }
+
+    private func actionButton(
+        _ title: String,
+        icon: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 7) {
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(height: 21)
+                Text(title)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, minHeight: 54)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
     }
 }
 
