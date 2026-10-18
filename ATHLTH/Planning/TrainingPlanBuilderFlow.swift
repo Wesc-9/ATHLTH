@@ -468,6 +468,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
             didApplySuggestedStartDate = true
 
+            if !resumesDraftOnAppear {
+                // A tap on "Create training plan" must never inherit step 2
+                // (or a draft checkpoint) from an earlier presentation.
+                // Only the explicit "Continue draft" route may restore it.
+                step = .mode
+                sourceRoute = NavigationPath()
+                selectedSource = .scratch
+                isHydratingPlanDraft = false
+            }
+
             if resumesDraftOnAppear,
                let unfinished = draftStore.load(userID: session.profile.userID) {
                 isHydratingPlanDraft = true
