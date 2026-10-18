@@ -1793,6 +1793,7 @@ struct CustomExerciseEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var library: ExerciseLibraryStore
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var subscriptionStore: SubscriptionStore
 
     @State private var name = ""
     @State private var primaryMuscles:
@@ -1812,6 +1813,7 @@ struct CustomExerciseEditorView: View {
     @State private var didSaveExercise = false
     @State private var studioError: String?
     @State private var showingEquipmentScanner = false
+    @State private var showingScannerSubscription = false
     @State private var aiPrompt = ""
     @State private var aiVideoBrief = ""
     @State private var isGeneratingAIDraft = false
@@ -1892,24 +1894,36 @@ struct CustomExerciseEditorView: View {
 
                 Section {
                     Button {
-                        showingEquipmentScanner = true
+                        if session.hasPaidAccess {
+                            showingEquipmentScanner = true
+                        } else {
+                            showingScannerSubscription = true
+                        }
                     } label: {
                         Label(
                             ATHLTHLocalization.choose(
                                 english: "Scan a gym machine and suggest an exercise",
                                 norwegian: "Skann et apparat og få øvelsesforslag"
                             ),
-                            systemImage: "camera.viewfinder"
+                            systemImage: session.hasPaidAccess
+                                ? "camera.viewfinder" : "lock.fill"
                         )
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .frame(minHeight: 48)
                     }
                     .tint(ATHLTHPlanDesign.ink)
-                    Text(ATHLTHLocalization.choose(
-                        english: "Choose an existing ATHLTH exercise as a starting point, then edit before saving your own version.",
-                        norwegian: "Bruk en eksisterende ATHLTH-øvelse som utgangspunkt, og tilpass den før du lagrer din egen versjon."
-                    ))
+                    Text(
+                        session.hasPaidAccess
+                        ? ATHLTHLocalization.choose(
+                            english: "Choose an existing ATHLTH exercise as a starting point, then edit before saving your own version.",
+                            norwegian: "Bruk en eksisterende ATHLTH-øvelse som utgangspunkt, og tilpass den før du lagrer din egen versjon."
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Requires ATHLTH+. Creating your own exercises manually remains free.",
+                            norwegian: "Krever ATHLTH+. Du kan fortsatt lage egne øvelser manuelt."
+                        )
+                    )
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 } header: {
@@ -2222,6 +2236,14 @@ struct CustomExerciseEditorView: View {
                         primaryMuscles.isEmpty ||
                         isImportingVideo
                     )
+                }
+            }
+            .sheet(isPresented: $showingScannerSubscription) {
+                SubscriptionOfferView {
+                    session.applyStoreKitEntitlement(
+                        subscriptionStore.activeEntitlement
+                    )
+                    showingScannerSubscription = false
                 }
             }
             .sheet(isPresented: $showingEquipmentScanner) {
