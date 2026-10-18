@@ -120,7 +120,7 @@ final class ATHLTHAzureWorkoutSpeech:
                     self.fallback(generation)
                 }
             } catch {
-                self?.fallback(generation)
+                self.fallback(generation)
             }
         }
         return true
