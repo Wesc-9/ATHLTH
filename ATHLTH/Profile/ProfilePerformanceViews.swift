@@ -351,6 +351,16 @@ enum ProfileFeaturedRecordKind:
                 english: "Longest run",
                 norwegian: "Lengste løpetur"
             )
+        case .bestRunningAveragePace:
+            return ATHLTHLocalization.choose(english: "Best average pace", norwegian: "Beste snittempo løping")
+        case .fastestFiveMinutePace:
+            return ATHLTHLocalization.choose(english: "Fastest 5 minutes", norwegian: "Raskeste 5 minutter")
+        case .fastestTenMinutePace:
+            return ATHLTHLocalization.choose(english: "Fastest 10 minutes", norwegian: "Raskeste 10 minutter")
+        case .longestRunningDuration:
+            return ATHLTHLocalization.choose(english: "Longest running time", norwegian: "Lengste løpetid")
+        case .mostRunningElevationGain:
+            return ATHLTHLocalization.choose(english: "Most climbing in a run", norwegian: "Flest høydemeter")
         case .bestWeeklyRunningDistance:
             return ATHLTHLocalization.choose(
                 english: "Best weekly distance",
@@ -452,6 +462,16 @@ enum ProfileFeaturedRecordKind:
                 english: "Best weekly volume",
                 norwegian: "Høyeste ukesvolum"
             )
+        case .strengthBestSingleSetVolume:
+            return ATHLTHLocalization.choose(english: "Highest volume in one set", norwegian: "Høyeste volum i ett sett")
+        case .strengthBestExerciseVolume:
+            return ATHLTHLocalization.choose(english: "Highest exercise volume", norwegian: "Høyeste volum i én øvelse")
+        case .strengthMostRepsInSet:
+            return ATHLTHLocalization.choose(english: "Most reps in one set", norwegian: "Flest reps i ett sett")
+        case .strengthLongestTimedSet:
+            return ATHLTHLocalization.choose(english: "Longest timed set", norwegian: "Lengste tidsstyrte sett")
+        case .strengthMostWorkoutsInWeek:
+            return ATHLTHLocalization.choose(english: "Most strength workouts in a week", norwegian: "Flest styrkeøkter på én uke")
         case .strengthMostCalories:
             return ATHLTHLocalization.choose(
                 english: "Most active calories",
@@ -467,6 +487,8 @@ enum ProfileFeaturedRecordKind:
                 english: "Longest walk / hike",
                 norwegian: "Lengste gåtur / fjelltur"
             )
+        case .bestWalkingAveragePace:
+            return ATHLTHLocalization.choose(english: "Best walking pace", norwegian: "Raskeste gåtempo")
         case .longestSwim:
             return ATHLTHLocalization.choose(
                 english: "Longest swim",
@@ -555,6 +577,16 @@ enum ProfileFeaturedRecordKind:
                 english: "Run",
                 norwegian: "Løp"
             )
+        case .bestRunningAveragePace:
+            return "min/km"
+        case .fastestFiveMinutePace:
+            return "5 min"
+        case .fastestTenMinutePace:
+            return "10 min"
+        case .longestRunningDuration:
+            return ATHLTHLocalization.choose(english: "Time", norwegian: "Tid")
+        case .mostRunningElevationGain:
+            return "hm"
         case .bestWeeklyRunningDistance:
             return ATHLTHLocalization.choose(
                 english: "Best week",
@@ -647,6 +679,16 @@ enum ProfileFeaturedRecordKind:
                 english: "Weekly volume",
                 norwegian: "Ukesvolum"
             )
+        case .strengthBestSingleSetVolume:
+            return ATHLTHLocalization.choose(english: "Set volume", norwegian: "Settvolum")
+        case .strengthBestExerciseVolume:
+            return ATHLTHLocalization.choose(english: "Exercise volume", norwegian: "Øvelsesvolum")
+        case .strengthMostRepsInSet:
+            return "Reps/sett"
+        case .strengthLongestTimedSet:
+            return ATHLTHLocalization.choose(english: "Timed set", norwegian: "Tidssett")
+        case .strengthMostWorkoutsInWeek:
+            return ATHLTHLocalization.choose(english: "Sessions/week", norwegian: "Økter/uke")
         case .strengthMostCalories:
             return ATHLTHLocalization.choose(
                 english: "Calories",
@@ -662,6 +704,8 @@ enum ProfileFeaturedRecordKind:
                 english: "Walk / hike",
                 norwegian: "Tur"
             )
+        case .bestWalkingAveragePace:
+            return "min/km"
         case .longestSwim:
             return ATHLTHLocalization.choose(
                 english: "Swim",
@@ -735,6 +779,14 @@ enum ProfileFeaturedRecordKind:
             return "flag.checkered"
         case .longestRun:
             return "point.topleft.down.to.point.bottomright.curvepath"
+        case .bestRunningAveragePace:
+            return "speedometer"
+        case .fastestFiveMinutePace, .fastestTenMinutePace:
+            return "stopwatch.fill"
+        case .longestRunningDuration:
+            return "clock.fill"
+        case .mostRunningElevationGain:
+            return "mountain.2.fill"
         case .bestWeeklyRunningDistance:
             return "calendar.badge.checkmark"
         case .mostRunsInWeek:
@@ -773,12 +825,24 @@ enum ProfileFeaturedRecordKind:
             return "square.grid.2x2.fill"
         case .strengthBestWeeklyVolume:
             return "chart.bar.fill"
+        case .strengthBestSingleSetVolume:
+            return "scalemass.fill"
+        case .strengthBestExerciseVolume:
+            return "chart.bar.fill"
+        case .strengthMostRepsInSet:
+            return "repeat.circle.fill"
+        case .strengthLongestTimedSet:
+            return "timer"
+        case .strengthMostWorkoutsInWeek:
+            return "calendar.badge.checkmark"
         case .strengthMostCalories:
             return "flame.fill"
         case .longestRide:
             return "figure.outdoor.cycle"
         case .longestWalkOrHike:
             return "figure.hiking"
+        case .bestWalkingAveragePace:
+            return "figure.walk"
         case .longestSwim:
             return "figure.pool.swim"
         case .longestWorkout:
@@ -828,6 +892,16 @@ enum ProfileFeaturedRecordKind:
             return .indigo
         case .longestRun:
             return .purple
+        case .bestRunningAveragePace:
+            return .teal
+        case .fastestFiveMinutePace:
+            return .orange
+        case .fastestTenMinutePace:
+            return .cyan
+        case .longestRunningDuration:
+            return .blue
+        case .mostRunningElevationGain:
+            return .mint
         case .bestWeeklyRunningDistance:
             return .green
         case .mostRunsInWeek:
@@ -872,12 +946,24 @@ enum ProfileFeaturedRecordKind:
             return .teal
         case .strengthBestWeeklyVolume:
             return ATHLTHTheme.accentDeep
+        case .strengthBestSingleSetVolume:
+            return .indigo
+        case .strengthBestExerciseVolume:
+            return .teal
+        case .strengthMostRepsInSet:
+            return .pink
+        case .strengthLongestTimedSet:
+            return .purple
+        case .strengthMostWorkoutsInWeek:
+            return .green
         case .strengthMostCalories:
             return .orange
         case .longestRide:
             return .green
         case .longestWalkOrHike:
             return .brown
+        case .bestWalkingAveragePace:
+            return .mint
         case .longestSwim:
             return .cyan
         case .longestWorkout:
