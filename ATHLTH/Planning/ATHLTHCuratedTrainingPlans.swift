@@ -153,8 +153,8 @@ enum ATHLTHCuratedTrainingPlans {
                  pattern: ["home", "core", "home"],
                  tags: ["home", "hjemme", "bodyweight", "no equipment"]),
 
-            plan(13, "strength-five-by-five",
-                 "Foundational Strength · 5×5", "Grunnstyrke · 5×5",
+            plan(13, "strength-compound-cycle",
+                 "Compound Strength Cycle", "Grunnstyrke · baseøvelser",
                  "Three compound-focused days. Keep loads manageable and refine technique.",
                  "Tre økter med baseøvelser. Prioriter teknikk og håndterbar belastning.",
                  category: "strength", goal: "Build compound-lift strength",
@@ -180,7 +180,7 @@ enum ATHLTHCuratedTrainingPlans {
                  category: "competition", goal: "Prepare for a powerlifting meet",
                  norwegianGoal: "Forberede styrkeløftkonkurranse",
                  level: "Advanced", weeks: 12,
-                 pattern: ["power_squat", "power_bench", "power_deadlift", "upper_body"],
+                 pattern: ["power_squat", "power_bench", "power_deadlift", "power_bench"],
                  tags: ["powerlifting", "competition", "meet", "styrkeløft"]),
 
             plan(16, "race-5k-speed",
@@ -273,5 +273,45 @@ enum ATHLTHCuratedTrainingPlans {
                  pattern: ["walking", "home", "walking"],
                  tags: ["walking", "gåing", "beginner", "hverdagsaktivitet"])
         ]
+    }
+}
+
+extension TrainingPlanCatalogEntry {
+    /// Editorial prerequisites shown before someone copies an advanced plan.
+    /// All plans still require the athlete to adapt to their health, capacity
+    /// and current training history.
+    var readinessGuidance: String? {
+        switch slug {
+        case "race-marathon", "marathon-build":
+            return ATHLTHLocalization.choose(
+                english: "For regular runners with an established weekly running base and comfortable long runs. If you are new to running, build a shorter-distance foundation first. Adjust the last two weeks to your real race date.",
+                norwegian: "For løpere med etablert ukentlig løpsmengde og erfaring med rolige langturer. Er du ny som løper, bygg grunnlaget med kortere distanser først. Tilpass de to siste ukene til faktisk løpsdato."
+            )
+        case "race-half-marathon", "half-marathon-foundation":
+            return ATHLTHLocalization.choose(
+                english: "You should already be running consistently. Use the first weeks to verify that the planned long runs match your current level, then adjust duration as needed.",
+                norwegian: "Du bør allerede løpe regelmessig. Bruk de første ukene til å kontrollere at langturen passer nivået ditt, og juster varigheten ved behov."
+            )
+        case "powerlifting-meet-prep", "powerlifting-technique":
+            return ATHLTHLocalization.choose(
+                english: "Prior lifting technique and safe spotting matter. These are submaximal training templates, not 1RM testing instructions. Arrange competition attempts with a qualified coach.",
+                norwegian: "God løfteteknikk og trygg sikring er viktig. Malene inneholder submaksimale økter, ikke instruksjoner for maksløft. Planlegg konkurranseforsøk med kvalifisert trener."
+            )
+        case "hyrox-competitive-build", "hyrox-first-event":
+            return ATHLTHLocalization.choose(
+                english: "Requires access to relevant stations. Choose manageable loads, practice safe transitions and check your official event division rules separately.",
+                norwegian: "Krever tilgang til relevante stasjoner. Velg håndterbare belastninger, øv på trygge overganger og kontroller reglene for din konkurranseklasse separat."
+            )
+        case "strength-ppl-6":
+            return ATHLTHLocalization.choose(
+                english: "Six days each week is demanding. Intended for experienced lifters with sufficient sleep, food and recovery. Switch to the three-day or upper/lower plan if progress or recovery stalls.",
+                norwegian: "Seks økter i uken er krevende. Ment for erfarne utøvere med nok søvn, mat og restitusjon. Velg en kortere splitt hvis fremgang eller restitusjon stopper opp."
+            )
+        default:
+            return category == "competition" ? ATHLTHLocalization.choose(
+                english: "Race preparation should start from your current fitness, not a target time alone. Plan the final weeks around your actual event date.",
+                norwegian: "Konkurranseforberedelse må ta utgangspunkt i formen du har i dag, ikke bare ønsket sluttid. Tilpass sluttukene til faktisk konkurransedato."
+            ) : nil
+        }
     }
 }
