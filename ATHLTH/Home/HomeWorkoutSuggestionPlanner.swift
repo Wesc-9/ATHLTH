@@ -3,6 +3,25 @@ import Foundation
 /// Converts a Workouts template into an independent calendar workout.
 /// The source template is never modified and no training plan is changed.
 enum HomeWorkoutSuggestionPlanner {
+    /// Time-only DatePicker selections can carry an unrelated calendar date.
+    /// Resolve the chosen clock time on the *tapped* day before validation or
+    /// saving, including when local time has a daylight-saving transition.
+    static func scheduledStart(
+        on selectedDay: Date,
+        clockTime: Date,
+        calendar: Calendar = .current
+    ) -> Date? {
+        let time = calendar.dateComponents([.hour, .minute], from: clockTime)
+        guard let hour = time.hour, let minute = time.minute,
+              let resolved = calendar.date(
+                bySettingHour: hour, minute: minute, second: 0,
+                of: selectedDay, matchingPolicy: .strict
+              ),
+              calendar.isDate(resolved, inSameDayAs: selectedDay)
+        else { return nil }
+        return resolved
+    }
+
     static func canSchedule(
         on selectedDay: Date,
         at start: Date,
