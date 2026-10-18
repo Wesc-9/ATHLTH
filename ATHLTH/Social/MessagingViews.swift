@@ -7372,6 +7372,34 @@ struct MessageSharePicker: View {
                 }
             }
 
+        case .exercise:
+            let exercises = exerciseLibrary.allExercises
+            if exercises.isEmpty {
+                ContentUnavailableView(
+                    ATHLTHLocalization.choose(english: "No exercises", norwegian: "Ingen øvelser"),
+                    systemImage: "dumbbell"
+                )
+            } else {
+                ForEach(exercises) { exercise in
+                    shareRow(
+                        icon: "dumbbell.fill",
+                        title: exerciseLibrary.localizedExerciseName(exercise),
+                        subtitle: ATHLTHLocalization.choose(
+                            english: "Exercise from the library",
+                            norwegian: "Øvelse fra biblioteket"
+                        )
+                    ) {
+                        do {
+                            onSelect(try ATHLTHShareDraftFactory.exercise(
+                                exercise, ownerID: session.profile.userID
+                            ))
+                        } catch {
+                            shareError = error.localizedDescription
+                        }
+                    }
+                }
+            }
+
         case .trainingPlan:
             let plans = shareablePlans
             if plans.isEmpty {
