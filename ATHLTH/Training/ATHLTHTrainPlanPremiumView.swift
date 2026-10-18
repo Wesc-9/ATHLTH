@@ -18,6 +18,9 @@ struct ATHLTHTrainPlanPremiumView: View {
     private var advanced = false
     @State private var selectedWeekIndex: Int?
     @State private var showingCreation = false
+    @State private var unfinishedPlanDraft: ATHLTHPlanCreationDraft?
+    @State private var showingDiscardPlanDraftConfirmation = false
+    private let unfinishedDraftStore = ATHLTHPlanCreationDraftStore()
     @State private var pendingCreatedPlanID: UUID?
     @State private var showingMyPlans = false
     @State private var browsingMyPlans = false
@@ -277,6 +280,9 @@ struct ATHLTHTrainPlanPremiumView: View {
         VStack(alignment: .leading, spacing: 18) {
             header
             workspaceNavigation
+            if let unfinishedPlanDraft {
+                continuePlanDraftCard(unfinishedPlanDraft)
+            }
             if browsingMyPlans {
                 savedPlansOverview
                 actionButton(
@@ -316,6 +322,7 @@ struct ATHLTHTrainPlanPremiumView: View {
         .foregroundStyle(graphite)
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear {
+            refreshUnfinishedPlanDraft()
             session.refreshActivePlanForToday()
             if let plan {
                 advanced = plan.builderProfile?.mode == .advanced
@@ -331,6 +338,9 @@ struct ATHLTHTrainPlanPremiumView: View {
         .onChange(of: selectedWeekIndex) { _, _ in
             selectedDayID = nil
         }
+        .onChange(of: showingCreation) { _, showing in
+            if !showing { refreshUnfinishedPlanDraft() }
+        }
         .onChange(of: highlightedPlanID) { _, next in
             focusedPlanID = next
             if next != nil { browsingMyPlans = false }
@@ -339,6 +349,23 @@ struct ATHLTHTrainPlanPremiumView: View {
 
     private var programSheets: some View {
         planContent
+        .confirmationDialog(
+            tr("Discard this unfinished training plan?", "Forkaste denne påbegynte treningsplanen?"),
+            isPresented: $showingDiscardPlanDraftConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(tr("Discard and start new", "Forkast og start ny"), role: .destructive) {
+                unfinishedDraftStore.clear(userID: session.profile.userID)
+                unfinishedPlanDraft = nil
+                showingCreation = true
+            }
+            Button(tr("Keep draft", "Behold utkast"), role: .cancel) {}
+        } message: {
+            Text(tr(
+                "This removes only the unfinished local draft, never your saved training plans.",
+                "Dette sletter bare det lokale utkastet, ikke lagrede treningsplaner."
+            ))
+        }
         .sheet(isPresented: $showingCreation, onDismiss: {
             if let planID = pendingCreatedPlanID {
                 focusedPlanID = planID
@@ -551,6 +578,92 @@ struct ATHLTHTrainPlanPremiumView: View {
             }
         }
         return nil
+    }
+
+    private func refreshUnfinishedPlanDraft() {
+        let checkpoint = unfinishedDraftStore.load(userID: session.profile.userID)
+        unfinishedPlanDraft = checkpoint?.stage == "mode" ? nil : checkpoint
+    }
+
+    private func draftLocation(_ draft: ATHLTHPlanCreationDraft) -> String {
+        switch draft.stage {
+        case "week":
+            if draft.planningApproach == "guided", let cursor = draft.guidedDayCursor {
+                let week = min(cursor / 7 + 1, draft.weekCount)
+                let day = cursor % 7 + 1
+                return tr("Week \\(week) · day \\(day)", "Uke \\(week) · dag \\(day)")
+            }
+            return tr("Week \\((draft.selectedPlanWeekIndex ?? 0) + 1)",
+                      "Uke \\((draft.selectedPlanWeekIndex ?? 0) + 1)")
+        case "profile": return tr("Goals and needs", "Mål og behov")
+        case "review": return tr("Review plan", "Oppsummering")
+        case "basics": return tr("Plan basics", "Grunninfo")
+        default: return tr("Planning in progress", "Påbegynt planlegging")
+        }
+    }
+
+    private func continuePlanDraftCard(_ draft: ATHLTHPlanCreationDraft) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: "calendar.badge.clock")
+                    .font(.system(size: 19, weight: .medium))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .frame(width: 46, height: 46)
+                    .background(ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 14))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tr("Continue planning", "Fortsett planleggingen"))
+                        .font(.headline)
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Text(draftLocation(draft) + " · " +
+                         draft.savedAt.formatted(.dateTime.day().month(.abbreviated).hour().minute()))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                Spacer(minLength: 0)
+                Menu {
+                    Button(role: .destructive) {
+                        showingDiscardPlanDraftConfirmation = true
+                    } label: {
+                        Label(tr("Start a new plan", "Start ny plan"), systemImage: "plus")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel(tr("Draft options", "Valg for utkast"))
+            }
+
+            Button {
+                showingCreation = true
+            } label: {
+                HStack {
+                    Label(tr("Resume my plan", "Fortsett på planen"), systemImage: "arrow.uturn.forward")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .frame(minHeight: 49)
+                .background(ATHLTHPlanDesign.ink,
+                            in: RoundedRectangle(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(tr(
+                "Opens your unfinished plan at the last editing position.",
+                "Åpner utkastet der du avsluttet redigeringen."
+            ))
+
+            Label(tr("Saved on this iPhone", "Utkast lagret på iPhone"),
+                  systemImage: "checkmark.circle")
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+        }
+        .padding(ATHLTHPlanDesign.Density.comfortable.cardPadding)
+        .athlthPlanCard(radius: 22)
     }
 
     private var workspaceNavigation: some View {
