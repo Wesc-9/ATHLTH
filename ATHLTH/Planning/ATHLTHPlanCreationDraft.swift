@@ -35,6 +35,8 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
     var firstGuidedWeekDecisionMade: Bool? = nil
     // Restore the actual workspace position, not just the plan's fields.
     var selectedPlanWeekIndex: Int? = nil
+    var editorDay: Int? = nil
+    var editorKind: String? = nil
     var simpleMinutes: Int? = nil
     var simpleActivityKinds: [String]? = nil
     var savedAt: Date
@@ -60,6 +62,8 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         guidedDayCursor: Int? = nil,
         firstGuidedWeekDecisionMade: Bool? = nil,
         selectedPlanWeekIndex: Int? = nil,
+        editorDay: Int? = nil,
+        editorKind: String? = nil,
         simpleMinutes: Int? = nil,
         simpleActivityKinds: [String]? = nil,
         savedAt: Date = Date()
@@ -79,6 +83,11 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         self.selectedPlanWeekIndex = advanced ? selectedPlanWeekIndex.map {
             min(max($0, 0), min(max(weekCount, 1), 52) - 1)
         } : nil
+        self.editorDay = advanced && editorKind != nil ? editorDay.flatMap {
+            (1...7).contains($0) ? $0 : nil
+        } : nil
+        self.editorKind = advanced && ["day", "studio", "library"].contains(editorKind ?? "")
+            ? editorKind : nil
         self.simpleMinutes = !advanced ? simpleMinutes.map { min(max($0, 5), 180) } : nil
         self.simpleActivityKinds = !advanced
             ? simpleActivityKinds?.filter { ["running", "walking", "strength"].contains($0) }
