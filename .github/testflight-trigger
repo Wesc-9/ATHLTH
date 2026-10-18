@@ -103,3 +103,4 @@ ATHLTH 1.7.7 build 83 — user-authorized TestFlight upload 2026-10-16 after Are
 ATHLTH 1.7.8 build 84 TestFlight upload — user-authorized 2026-10-17; iOS build, backend regressions and iPad smoke successful at 1845ad40; iPhone smoke still running; physical Watch+iPhone testing required after processing. Keep release/v1.7.8 active and unlocked.
 
 ATHLTH 1.7.9 build 85 — TestFlight upload explicitly authorized by user 2026-10-18; source e5442db21116; require passing iOS/build/backend checks, signing and Watch companion validation before App Store Connect upload.
+v1.8.0-build-86-20261018-training-plans-scheduled-upload
