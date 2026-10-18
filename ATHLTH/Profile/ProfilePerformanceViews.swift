@@ -114,7 +114,15 @@ enum ProfileFeaturedRecordKind:
 
     var recordArtwork: String {
         switch group {
-        case .running: return "GoalSprint"
+        case .running:
+            switch self {
+            case .longestRun, .longestRunningDuration, .mostRunningElevationGain:
+                return "GoalMountain"
+            case .bestWeeklyRunningDistance, .mostRunsInWeek, .bestRunningMonth:
+                return "GoalRunning"
+            default:
+                return "GoalSprint"
+            }
         case .strength: return "StrengthPostWorkoutHero"
         case .appleHealth: return "GoalWalking"
         }
@@ -3293,10 +3301,10 @@ struct PerformanceStatsView: View {
     }
 
     private var strengthDisplayItems: [PerformanceMetricItem] {
-        ProfileFeaturedRecordKind.allCases
+        let standard = ProfileFeaturedRecordKind.allCases
             .filter { $0.group == .strength }
             .map(profileRecordMetric)
-        + strengthWorkout.personalRecords
+        let individual = strengthWorkout.personalRecords
             .filter {
                 $0.kind == .heaviestSet &&
                 $0.score > 0 && $0.score.isFinite
@@ -3310,6 +3318,7 @@ struct PerformanceStatsView: View {
                     tint: ATHLTHTheme.accentDeep
                 )
             }
+        return standard + individual
     }
 
     private func sourceBadge(
@@ -9395,10 +9404,7 @@ struct ProfileRecordShowcasePickerView:
                     16
                 )
                 .padding(.top, 12)
-                .padding(
-                    .bottom,
-                    40
-                )
+                .padding(.bottom, 125)
                 .frame(maxWidth: 720)
                 .frame(
                     maxWidth: .infinity
