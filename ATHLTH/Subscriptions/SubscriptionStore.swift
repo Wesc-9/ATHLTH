@@ -29,6 +29,7 @@ final class SubscriptionStore: ObservableObject {
     ]
 
     @Published private(set) var products: [Product] = []
+    @Published private(set) var missingProductIDs: Set<String> = []
     @Published private(set) var activeEntitlement: StoreSubscriptionEntitlement?
     @Published private(set) var latestTransactionProof: AppStoreTransactionProof?
     @Published private(set) var isLoading = false
@@ -62,12 +63,32 @@ final class SubscriptionStore: ObservableObject {
 
         do {
             let loaded = try await Product.products(for: Array(Self.productIDs))
-            products = loaded.sorted { lhs, rhs in
-                planOrder(lhs.id) < planOrder(rhs.id)
+            products = loaded
+                .filter { Self.productIDs.contains($0.id) }
+                .sorted { lhs, rhs in
+                    planOrder(lhs.id) < planOrder(rhs.id)
+                }
+            missingProductIDs = Self.productIDs.subtracting(
+                Set(products.map(\.id))
+            )
+            if products.isEmpty {
+                errorMessage = ATHLTHLocalization.choose(
+                    english: "The App Store returned no ATHLTH+ plans. Retry, or check the subscription products in App Store Connect.",
+                    norwegian: "App Store returnerte ingen ATHLTH+-abonnementer. Prøv på nytt, eller kontroller produktene i App Store Connect."
+                )
+            } else if !missingProductIDs.isEmpty {
+                errorMessage = ATHLTHLocalization.choose(
+                    english: "One ATHLTH+ plan is temporarily unavailable from the App Store.",
+                    norwegian: "Ett av ATHLTH+-abonnementene er foreløpig utilgjengelig fra App Store."
+                )
             }
         } catch {
             products = []
-            errorMessage = error.localizedDescription
+            missingProductIDs = Self.productIDs
+            errorMessage = ATHLTHLocalization.choose(
+                english: "Could not load plans from the App Store: \(error.localizedDescription)",
+                norwegian: "Kunne ikke laste abonnementer fra App Store: \(error.localizedDescription)"
+            )
         }
     }
 
