@@ -62,6 +62,9 @@ struct AthleteGearRule: Codable, Hashable {
 struct AthleteToolsData: Codable {
     var races: [AthleteRace] = []
     var fuel = AthleteFuelPlan()
+    // Optional so existing on-device Codable archives decode unchanged.
+    // Disabled by default; a user must opt into spoken fuel cues.
+    var fuelVoiceEnabled: Bool? = nil
     var gearRules: [UUID: AthleteGearRule] = [:]
     var services: [AthleteGearService] = []
     var loadNotifications = false
