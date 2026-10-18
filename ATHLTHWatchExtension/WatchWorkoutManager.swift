@@ -226,6 +226,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
     private var nextDistanceAnnouncementMeters: Double?
     private var nextTimeAnnouncementSeconds: TimeInterval?
+    private var nextFuelAnnouncementSeconds: TimeInterval?
     private var structuredStepStartElapsedTime: TimeInterval = 0
     private var structuredStepStartDistanceMeters: Double = 0
     private var structuredWorkoutComplete = false
@@ -3739,6 +3740,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
                 self.evaluateStructuredRunningWorkout()
                 self.evaluateWorkoutTargetAlerts()
+                self.evaluateFuelAudioCoach()
                 self.evaluateAudioCoach()
                 await self.sendLiveSnapshot()
             }
@@ -3748,6 +3750,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private func resetAudioCoachThresholds() {
         lastGoalEncouragementAt = nil
         let configuration = audioCoachConfiguration
+        nextFuelAnnouncementSeconds = ATHLTHFuelVoicePrompt.nextDue(
+            after: elapsedTime,
+            config: configuration
+        )
 
         if configuration.enabled,
            let interval = configuration.distanceIntervalMeters,
@@ -3803,6 +3809,37 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 key: "ready",
                 priority: .routineCoach,
                 validFor: 15
+            )
+        )
+    }
+
+    private func evaluateFuelAudioCoach() {
+        guard state == .running,
+              audioCoachConfiguration.enabled,
+              !coachSpeechPaused,
+              let next = nextFuelAnnouncementSeconds,
+              elapsedTime >= next
+        else { return }
+
+        let config = audioCoachConfiguration
+        // Advance based on elapsed workout time, never wall clock time.
+        // If a watch/phone reconnect misses a slot, skip stale prompts.
+        nextFuelAnnouncementSeconds = ATHLTHFuelVoicePrompt.nextDue(
+            after: elapsedTime,
+            config: config
+        )
+
+        guard let phrase = ATHLTHFuelVoicePrompt.phrase(config: config)
+        else { return }
+
+        speak(
+            phrase,
+            priority: .routineCoach,
+            event: ATHLTHCoachEvent(
+                kind: .routineMilestone,
+                key: "fuel:\(Int(next))",
+                priority: .routineCoach,
+                validFor: 12
             )
         )
     }
