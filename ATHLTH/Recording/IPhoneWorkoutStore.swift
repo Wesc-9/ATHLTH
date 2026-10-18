@@ -325,6 +325,7 @@ final class IPhoneWorkoutStore:
 
     private let speechSynthesizer =
         AVSpeechSynthesizer()
+    private let azureCoachSpeech = ATHLTHAzureWorkoutSpeech()
     private var guidancePriorityGate =
         ATHLTHGuidancePriorityGate()
     private var coachEventLedger = ATHLTHCoachEventLedger()
@@ -2450,6 +2451,7 @@ final class IPhoneWorkoutStore:
         coachSpeechPaused = false
         coachReplayMemory.reset()
         lastCoachMessage = nil
+        azureCoachSpeech.stop()
         speechSynthesizer.stopSpeaking(
             at: .immediate
         )
@@ -3873,8 +3875,8 @@ final class IPhoneWorkoutStore:
                 .voiceDecision(
                     for: priority,
                     isSpeaking:
-                        speechSynthesizer
-                            .isSpeaking,
+                        speechSynthesizer.isSpeaking ||
+                        azureCoachSpeech.isBusy,
                     quietPeriodSeconds:
                         configuration
                             .resolvedGuidanceQuietPeriodSeconds
@@ -3894,6 +3896,7 @@ final class IPhoneWorkoutStore:
             }
             return
         case .interruptAndDeliver:
+            azureCoachSpeech.stop()
             speechSynthesizer
                 .stopSpeaking(
                     at: .immediate
@@ -3904,17 +3907,6 @@ final class IPhoneWorkoutStore:
 
         if let event {
             coachEventLedger.didDeliver(event)
-        }
-
-        do {
-            try ATHLTHSpokenAudioSession
-                .activate(
-                    duckOtherAudio:
-                        configuration
-                            .shouldDuckOtherAudio
-                )
-        } catch {
-            // Speech remains best-effort and must never stop the workout.
         }
 
         let spokenPhrase = rememberForReplay
@@ -3942,7 +3934,32 @@ final class IPhoneWorkoutStore:
             configuration
                 .resolvedSpeechVolume
 
-        speechSynthesizer.speak(utterance)
+        let routedToAzure = azureCoachSpeech.begin(
+            spokenPhrase,
+            voiceIdentifier: configuration.voiceIdentifier,
+            duckMusic: configuration.shouldDuckOtherAudio,
+            onFallback: { [weak self] in
+                guard let self,
+                      self.active?.audioCoachConfiguration?.enabled == true,
+                      !self.coachSpeechPaused
+                else { return }
+                try? ATHLTHSpokenAudioSession.activate(
+                    duckOtherAudio: configuration.shouldDuckOtherAudio
+                )
+                self.speechSynthesizer.speak(utterance)
+            },
+            onFinished: { [weak self] in
+                guard let self else { return }
+                self.guidancePriorityGate.voiceDidFinish()
+                self.deliverNextQueuedCoachCue()
+            }
+        )
+        if !routedToAzure {
+            try? ATHLTHSpokenAudioSession.activate(
+                duckOtherAudio: configuration.shouldDuckOtherAudio
+            )
+            speechSynthesizer.speak(utterance)
+        }
         if rememberForReplay,
            ATHLTHCoachReplayMemory.mayRemember(priority: priority) {
             coachReplayMemory.remember(spokenPhrase, priority: priority)
@@ -3952,6 +3969,7 @@ final class IPhoneWorkoutStore:
 
     private func deliverNextQueuedCoachCue() {
         guard !speechSynthesizer.isSpeaking,
+              !azureCoachSpeech.isBusy,
               let next = coachCueQueue.popNext()
         else { return }
         speak(
@@ -3963,6 +3981,7 @@ final class IPhoneWorkoutStore:
     }
 
     private func deactivateCoachAudioSession() {
+        azureCoachSpeech.stop()
         speechSynthesizer.stopSpeaking(
             at: .immediate
         )
