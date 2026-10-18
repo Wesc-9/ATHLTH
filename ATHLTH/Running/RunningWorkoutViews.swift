@@ -350,53 +350,17 @@ struct RunningWorkoutDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                ZStack(alignment: .bottomLeading) {
-                    LinearGradient(
-                        colors: [
-                            ATHLTHTheme.accent.opacity(0.90),
-                            Color.black.opacity(0.92)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-
-                    ATHLTHMarkShape()
-                        .fill(.white.opacity(0.10))
-                        .frame(width: 180, height: 130)
-                        .offset(x: 170, y: -35)
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Label(
-                            workout.type.title.uppercased(),
-                            systemImage: workout.type.systemImage
-                        )
-                        .font(.caption2.bold())
-                        .tracking(1.2)
-
-                        Text(workout.title)
-                            .font(.largeTitle.bold())
-
-                        Text(workout.summary)
-                            .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.78))
-                    }
-                    .foregroundStyle(.white)
-                    .padding(20)
-                }
-                .frame(height: 210)
-                .clipShape(RoundedRectangle(cornerRadius: 26))
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Workout Structure")
-                        .font(.title3.bold())
-
-                    ForEach(Array(workout.blocks.enumerated()), id: \.element.id) { index, block in
-                        RunningWorkoutBlockRow(
-                            index: index + 1,
-                            block: block
-                        )
-                    }
-                }
+                ATHLTHWorkoutRecipePreview(
+                    title: workout.title,
+                    summary: workout.summary,
+                    category: "running",
+                    symbol: workout.type.systemImage,
+                    difficulty: nil,
+                    durationMinutes: workout.estimatedDurationSeconds.map {
+                        Int(($0 / 60).rounded(.up))
+                    },
+                    blocks: workout.recipePreviewBlocks
+                )
 
                 if let onStart {
                     Button {
@@ -442,8 +406,8 @@ struct RunningWorkoutDetailView: View {
             }
             .padding()
         }
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
-        .navigationTitle("Running Workout")
+        .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+        .navigationTitle(ATHLTHLocalization.choose(english: "Running workout", norwegian: "Løpeøkt"))
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if let onSelect {
