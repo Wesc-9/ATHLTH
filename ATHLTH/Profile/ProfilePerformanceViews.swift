@@ -61,6 +61,11 @@ enum ProfileFeaturedRecordKind:
     case fastestHalfMarathon
     case fastestMarathon
     case longestRun
+    case bestRunningAveragePace
+    case fastestFiveMinutePace
+    case fastestTenMinutePace
+    case longestRunningDuration
+    case mostRunningElevationGain
     case bestWeeklyRunningDistance
     case mostRunsInWeek
     case bestRunningMonth
@@ -87,9 +92,15 @@ enum ProfileFeaturedRecordKind:
     case strengthMostExercises
     case strengthBestWeeklyVolume
     case strengthMostCalories
+    case strengthBestSingleSetVolume
+    case strengthBestExerciseVolume
+    case strengthMostRepsInSet
+    case strengthLongestTimedSet
+    case strengthMostWorkoutsInWeek
 
     case longestRide
     case longestWalkOrHike
+    case bestWalkingAveragePace
     case longestSwim
     case longestWorkout
     case longestHIITWorkout
@@ -129,6 +140,11 @@ enum ProfileFeaturedRecordKind:
              .fastestHalfMarathon,
              .fastestMarathon,
              .longestRun,
+             .bestRunningAveragePace,
+             .fastestFiveMinutePace,
+             .fastestTenMinutePace,
+             .longestRunningDuration,
+             .mostRunningElevationGain,
              .bestWeeklyRunningDistance,
              .mostRunsInWeek,
              .bestRunningMonth:
@@ -153,11 +169,17 @@ enum ProfileFeaturedRecordKind:
              .strengthMostReps,
              .strengthMostExercises,
              .strengthBestWeeklyVolume,
-             .strengthMostCalories:
+             .strengthMostCalories,
+             .strengthBestSingleSetVolume,
+             .strengthBestExerciseVolume,
+             .strengthMostRepsInSet,
+             .strengthLongestTimedSet,
+             .strengthMostWorkoutsInWeek:
             return .strength
 
         case .longestRide,
              .longestWalkOrHike,
+             .bestWalkingAveragePace,
              .longestSwim,
              .longestWorkout,
              .longestHIITWorkout,
@@ -198,12 +220,24 @@ enum ProfileFeaturedRecordKind:
             return .fastestMarathon
         case .longestRun:
             return .longestRun
+        case .bestRunningAveragePace:
+            return .bestRunningAveragePace
+        case .fastestFiveMinutePace:
+            return .fastestFiveMinutePace
+        case .fastestTenMinutePace:
+            return .fastestTenMinutePace
+        case .longestRunningDuration:
+            return .longestRunningDuration
+        case .mostRunningElevationGain:
+            return .mostRunningElevationGain
         case .longestStrengthWorkout:
             return .longestStrengthWorkout
         case .longestRide:
             return .longestRide
         case .longestWalkOrHike:
             return .longestWalkOrHike
+        case .bestWalkingAveragePace:
+            return .bestWalkingAveragePace
         case .longestSwim:
             return .longestSwim
         case .longestWorkout:
@@ -245,7 +279,12 @@ enum ProfileFeaturedRecordKind:
              .strengthMostReps,
              .strengthMostExercises,
              .strengthBestWeeklyVolume,
-             .strengthMostCalories:
+             .strengthMostCalories,
+             .strengthBestSingleSetVolume,
+             .strengthBestExerciseVolume,
+             .strengthMostRepsInSet,
+             .strengthLongestTimedSet,
+             .strengthMostWorkoutsInWeek:
             return nil
         }
     }
