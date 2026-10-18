@@ -96,7 +96,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.wesc9.athlth
         PRODUCT_NAME: ATHLTH
         ATHLTH_LEGAL_OPERATOR_NAME: ""
-        ATHLTH_PRIVACY_CONTACT_EMAIL: ""
+        ATHLTH_PRIVACY_CONTACT_EMAIL: "contact@athlth.com"
         ATHLTH_SUPPORT_URL: ""
         ATHLTH_SPOTIFY_CLIENT_ID: "d041cc7596a84f80be94e884a98b26ac"
         ATHLTH_HOME_ASSISTANT_CLIENT_ID: "https://hnkybbzxffvyhzrstqdo.supabase.co/functions/v1/athlth-home-assistant-oauth"
@@ -315,4 +315,3 @@ targets:
         CODE_SIGN_STYLE: Automatic
         APPLICATION_EXTENSION_API_ONLY: YES
         SKIP_INSTALL: YES
-
