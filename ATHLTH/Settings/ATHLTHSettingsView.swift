@@ -848,17 +848,21 @@ settingsSection("Profile") {
     }
 
     private var healthSettingsSection: some View {
-settingsSection("Health & Sync") {
+settingsSection(ATHLTHLocalization.choose(
+    english: "Health & synchronization", norwegian: "Helse og synkronisering"
+)) {
                         PremiumSettingsCard {
                             PremiumSettingsRow(
                                 icon: "heart",
-                                title: "Background Health Sync",
+                                title: ATHLTHLocalization.choose(
+                                    english: "Automatic Health sync",
+                                    norwegian: "Automatisk Health-synkronisering"
+                                ),
                                 subtitle: backgroundHealthSubtitle
                             ) {
                                 Toggle("", isOn: backgroundHealthSyncBinding)
                                     .labelsHidden()
                                     .tint(ATHLTHTheme.accent)
-                                    .disabled(false)
                             }
                             .opacity(1)
 
@@ -891,9 +895,15 @@ settingsSection("Health & Sync") {
                             } label: {
                                 PremiumSettingsRow(
                                     icon: "square.and.arrow.down",
-                                    title: "External workouts",
+                                    title: ATHLTHLocalization.choose(
+                                        english: "External workouts",
+                                        norwegian: "Eksterne treningsøkter"
+                                    ),
                                     subtitle:
-                                        "Control workouts found in Apple Health"
+                                        ATHLTHLocalization.choose(
+                                            english: "Manage workouts imported from Apple Health",
+                                            norwegian: "Styr import av økter fra Apple Health"
+                                        )
                                 ) {
                                     HStack(spacing: 8) {
                                         Text(
@@ -931,7 +941,10 @@ settingsSection("Health & Sync") {
                                     iconTint: healthSyncHasIssue
                                         ? .orange
                                         : ATHLTHTheme.accentDeep,
-                                    title: "Sync status",
+                                    title: ATHLTHLocalization.choose(
+                                        english: "Synchronization",
+                                        norwegian: "Synkronisering"
+                                    ),
                                     subtitle: healthSyncSummaryText
                                 ) {
                                     connectionTrailing(
