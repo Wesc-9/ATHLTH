@@ -1261,6 +1261,7 @@ settingsSection("Preferences") {
                                 }
                             }
                             .buttonStyle(.plain)
+
                             SettingsDivider()
 
                             Link(destination: URL(string: "https://repdb.co")!) {
@@ -1442,35 +1443,47 @@ settingsSection("Account") {
     private var privacySettingsSection: some View {
         settingsSection("Privacy") {
             PremiumSettingsCard {
-                            NavigationLink {
-                                LegalDocumentView(kind: .terms)
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "doc.text",
-                                    title: "Terms of Service",
-                                    subtitle: "Read the ATHLTH terms"
-                                ) {
-                                    Image(systemName: "chevron.right")
-                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                                }
-                            }
-                            .buttonStyle(.plain)
+                NavigationLink {
+                    LegalDocumentView(kind: .terms)
+                } label: {
+                    PremiumSettingsRow(
+                        icon: "doc.text",
+                        title: ATHLTHLocalization.choose(
+                            english: "Terms of Service",
+                            norwegian: "Brukervilkår"
+                        ),
+                        subtitle: ATHLTHLocalization.choose(
+                            english: "Read the ATHLTH terms",
+                            norwegian: "Les vilkårene for ATHLTH"
+                        )
+                    ) {
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                    }
+                }
+                .buttonStyle(.plain)
 
-                            SettingsDivider()
+                SettingsDivider()
 
-                            NavigationLink {
-                                LegalDocumentView(kind: .privacy)
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "lock.shield",
-                                    title: "Privacy Policy",
-                                    subtitle: "How ATHLTH handles your data"
-                                ) {
-                                    Image(systemName: "chevron.right")
-                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                                }
-                            }
-                            .buttonStyle(.plain)
+                NavigationLink {
+                    LegalDocumentView(kind: .privacy)
+                } label: {
+                    PremiumSettingsRow(
+                        icon: "lock.shield",
+                        title: ATHLTHLocalization.choose(
+                            english: "Privacy Policy",
+                            norwegian: "Personvernerklæring"
+                        ),
+                        subtitle: ATHLTHLocalization.choose(
+                            english: "How ATHLTH handles your data",
+                            norwegian: "Hvordan ATHLTH behandler opplysningene dine"
+                        )
+                    ) {
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                    }
+                }
+                .buttonStyle(.plain)
             }
         }
     }
