@@ -742,9 +742,7 @@ struct HomeActiveFriendsStrip: View {
                     }
                 }
             }
-        }
-    }
-    .navigationDestination(item: $destination) { destination in
+            .navigationDestination(item: $destination) { destination in
         switch destination {
         case .message(let friend):
             DirectMessageThreadView(friend: friend)
@@ -752,8 +750,10 @@ struct HomeActiveFriendsStrip: View {
             FriendProfileView(userID: userID)
         }
     }
-    .sheet(item: $challengeFriend) { friend in
-        ChallengeCreationView(preselectedFriends: [friend])
+            .sheet(item: $challengeFriend) { friend in
+                ChallengeCreationView(preselectedFriends: [friend])
+            }
+        }
     }
 }
 
