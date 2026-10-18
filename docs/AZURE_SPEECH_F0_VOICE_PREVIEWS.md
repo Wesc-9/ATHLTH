@@ -1,24 +1,35 @@
-# Azure Speech F0 voice preview pilot — ATHLTH v1.8.3
+# Azure Speech F0 — ATHLTH+ live Norwegian coach (v1.8.3)
 
-This pilot is OFF until configured. Quick Train Audio Coach remains opt-in; live coaching uses the selected local Apple voice, even offline. Azure only reads a fixed Norwegian sample phrase, never health, GPS, or user-entered text.
+Azure neural voices **Finn, Iselin, Pernille** are optional and require an ACTIVE ATHLTH+ subscription, checked server-side on every synthesis request. They work for Quick Train on iPhone (strength, running, walking), and mirrored Apple Watch sessions when the iPhone owns speech. The Watch itself always speaks using its best available installed Apple voice. The user must explicitly turn on Audio Coach for each fresh Quick Train workout.
 
-## Setup (without automatic paid requests)
+## F0 cost protection and requirements
 
-1. Create Azure AI Speech as tier **F0**, not S0. Confirm the free tier in Azure Portal and set a billing alert.
-2. Store secrets in Supabase Edge Functions only (never GitHub or iPhone): AZURE_SPEECH_KEY and AZURE_SPEECH_REGION (Azure resource region code).
-3. Apply the GitHub migration supabase/migrations/20261019010000_azure_tts_preview_free_budget.sql. It reserves a global hard cap of **400,000 characters per UTC calendar month**, below the F0 published 500,000 character allowance, using an atomic RPC. It fails closed.
-4. Deploy Supabase Edge Function azure-coach-voice from supabase/functions/azure-coach-voice/index.ts with its dependency supabase/functions/_shared/ai-request-budget.ts. Keep verify_jwt enabled.
-5. Enable ATHLTH_AZURE_TTS_ENABLED=true in the Supabase secret settings **last**, after F0 tier and all services are verified. Keep unset/false otherwise.
-6. To disable immediately, set ATHLTH_AZURE_TTS_ENABLED=false. An F0 Azure resource cannot be guaranteed free if other Azure resources outside ATHLTH incur charges; confirm billing separately.
+- Azure Speech resource must remain on F0 (Free), never S0, and should have billing alerts. Creating a free resource alone is insufficient; deployment secrets must match that resource. Other Azure usage on the account is outside this app's controls.
+- Supabase function secrets: AZURE_SPEECH_KEY, AZURE_SPEECH_REGION, ATHLTH_AZURE_TTS_ENABLED=true. NEVER store the key in iOS or GitHub.
+- Supabase Edge Function azure-coach-voice verifies a signed-in user AND a valid ATHLTH+ trial or active subscription; otherwise 401/403 and no Azure call.
+- Monthly fail-closed server quota is 400,000 total characters per UTC calendar month (Azure F0 includes 500,000 Neural TTS characters). Speech cannot exceed the cap because monthly reservations are atomic. Preview mode also consumes existing per-user AI budget.
+- Apply both migrations: supabase/migrations/20261019010000_azure_tts_preview_free_budget.sql and supabase/migrations/20261019022000_azure_live_coach_athlth_plus_quota.sql.
+- Live mode has separate subscriber fair-use limits (4 requests per minute, 100 per UTC day), shares the same monthly 400k cap. The provider's own F0 standard voice limit is 20 requests/60s across the resource; Azure 429s fall back locally.
+- Kill switch: set ATHLTH_AZURE_TTS_ENABLED=false to block ALL new Azure speech requests. No outgoing call when secrets or quota RPC are unavailable.
 
-## iPhone
+## Usage and personal information
 
-Open Audio Coach settings and select one of the fixed Azure Norwegian voice previews: Finn, Iselin or Pernille. The sample is not generated from workout/health data. If provider, network, authentication, or free quota is unavailable, playback fails safely and live workouts continue with offline Apple voices.
+Audio Coach > Stemme > ATHLTH+ norske stemmer. Enable the explicit Microsoft Azure workout speech data toggle, choose Finn, Iselin or Pernille; preview each using a fixed, non-personal sample. It is possible to return to a local voice in the normal voice menu. Revoking consent removes the Azure selection.
 
-## Scope
+Live coaching messages can include **pace, distance, elapsed time, and heart rate**. This selected spoken message is sent to Azure Speech through the authenticated Supabase Edge Function, with SSML metacharacters escaped and length limited to 220 characters. This function does not log or persist those messages, and does not send GPS traces or medical history. Confirm Azure/Microsoft data-processing commitments separately before launching to end users.
 
-Preview-only pilot: NOT a replacement for live coach speech. Connecting Azure to live workouts requires separately designed and verified provider selection, consent/privacy handling, latency guarantees, Spotify ducking, Watch voice routing and offline fallback. No TestFlight upload has been performed.
+Live iPhone synthesis is best-effort: if service is unavailable, network delays longer than 3.5s, free-budget exhausted or subscriber entitlement not valid, workout capture continues and local Apple TTS takes over. Azure is disabled for the remainder of that workout after a provider failure to prevent repeated slow requests. Spotify is not intentionally paused; spoken-audio ducking follows the normal app setting. Watch fallback remains entirely local.
+
+## Test gate before TestFlight
+
+- Confirm F0 tier, correct Azure secret region and enabled flag. Verify function response and that usage counts grow only on an ATHLTH+ account.
+- Verify **non-subscriber cannot preview or synthesize** with forged Azure voice request, and quota exhaustion cannot reach Azure.
+- Confirm all three Norwegian voice samples, selecting voice in settings, live speech in strength, running/walking and mirrored Watch workouts, pause/stop/resume/replay, AirPods/Spotify ducking and Watch connectivity loss.
+- Confirm consent revocation switches to Apple voice, airplane mode falls back under 3.5s and workout continues, and that a previously active workout stays healthy after closing Audio Coach UI.
+- Confirm iPhone, iPad, watchOS builds and backend regression jobs are green. Do NOT upload TestFlight without explicit user instruction.
 
 References:
 - https://learn.microsoft.com/en-us/azure/ai-services/speech-service/rest-text-to-speech
 - https://learn.microsoft.com/en-us/azure/ai-services/speech-service/language-support
+- https://learn.microsoft.com/en-us/azure/ai-services/speech-service/speech-services-quotas-and-limits
+- https://azure.microsoft.com/en-gb/pricing/details/speech/
