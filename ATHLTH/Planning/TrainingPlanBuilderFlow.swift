@@ -5028,11 +5028,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         case "saved": selectedSource = .saved
         default: selectedSource = .scratch
         }
+        // Activity days are structural plan data and safe to restore for
+        // both modes; do not reset a simple plan back to three days.
+        if let days = draft.preferredDayIndexes, !days.isEmpty {
+            selectedDays = Set(days)
+            sessionsPerWeek = days.count
+        }
         if draft.advanced {
-            if let days = draft.preferredDayIndexes, !days.isEmpty {
-                selectedDays = Set(days)
-                sessionsPerWeek = days.count
-            }
             if let equipmentValue = draft.equipmentContext,
                let restored = EquipmentContext(rawValue: equipmentValue) {
                 equipment = restored
@@ -5077,7 +5079,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             advanced: mode == .advanced,
             source: selectedSource.rawValue,
             stage: String(describing: step),
-            preferredDayIndexes: mode == .advanced ? selectedDays.sorted() : nil,
+            preferredDayIndexes: selectedDays.sorted(),
             equipmentContext: mode == .advanced ? equipment.rawValue : nil,
             weeklyTimeBudgetMinutes: mode == .advanced
                 ? weeklyTimeBudgetMinutes : nil,
