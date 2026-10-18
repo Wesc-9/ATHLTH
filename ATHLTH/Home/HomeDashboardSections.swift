@@ -4415,33 +4415,18 @@ private struct HomeWeeklyProgressDaySheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 17) {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "FROM WORKOUTS", norwegian: "FRA WORKOUTS"
-                        ),
-                        systemImage: "square.stack.3d.up"
+                    ATHLTHWorkoutRecipePreview(
+                        title: workout.title,
+                        summary: workout.notes ?? "",
+                        category: workout.workoutCategory ??
+                            (workout.kind == .strength ? "strength" :
+                             workout.kind == .running ? "running" :
+                             workout.kind == .walking ? "walking" : "hybrid"),
+                        symbol: workout.kind.systemImage,
+                        difficulty: nil,
+                        durationMinutes: workout.durationMinutes,
+                        blocks: ATHLTHUnifiedWorkout.editorBlocks(from: workout)
                     )
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-
-                    Text(workout.title)
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(dayInk)
-
-                    if let description = workout.notes, !description.isEmpty {
-                        Text(description)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    HStack(spacing: 13) {
-                        Label(workout.kind.title, systemImage: workout.kind.systemImage)
-                        if let minutes = workout.durationMinutes {
-                            Label("\(minutes) min", systemImage: "clock")
-                        }
-                    }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(dayInk)
 
                     if canPlanWorkout {
                         DatePicker(
