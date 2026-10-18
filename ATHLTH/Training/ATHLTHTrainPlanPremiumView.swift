@@ -19,9 +19,11 @@ struct ATHLTHTrainPlanPremiumView: View {
     private var advanced = false
     @State private var selectedWeekIndex: Int?
     @State private var showingCreation = false
-    @State private var unfinishedPlanDraft: ATHLTHPlanCreationDraft?
-    @State private var showingDiscardPlanDraftConfirmation = false
+    @State private var creationDraftID: UUID?
+    @State private var creationResumesDraft = true
+    @State private var unfinishedPlanDrafts: [ATHLTHPlanDraftRecord] = []
     @State private var showingDeletePlanDraftConfirmation = false
+    @State private var draftPendingDeletionID: UUID?
     @State private var planDraftDeletionError: String?
     private let unfinishedDraftStore = ATHLTHPlanCreationDraftStore()
     @State private var pendingCreatedPlanID: UUID?
@@ -283,8 +285,8 @@ struct ATHLTHTrainPlanPremiumView: View {
         VStack(alignment: .leading, spacing: 18) {
             header
             workspaceNavigation
-            if let unfinishedPlanDraft {
-                continuePlanDraftCard(unfinishedPlanDraft)
+            ForEach(unfinishedPlanDrafts) { checkpoint in
+                continuePlanDraftCard(checkpoint)
             }
             if browsingMyPlans {
                 savedPlansOverview
@@ -326,14 +328,19 @@ struct ATHLTHTrainPlanPremiumView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear {
             refreshUnfinishedPlanDraft()
-            if let checkpoint = unfinishedPlanDraft,
-               unfinishedDraftStore.wasEditing(userID: session.profile.userID),
-               Date().timeIntervalSince(checkpoint.savedAt) < 24 * 60 * 60 {
-                // Only reopen after an interrupted active session. A normal
-                // deliberate exit clears the flag and keeps the resume card.
+            if let checkpoint = unfinishedPlanDrafts.first(where: {
+                unfinishedDraftStore.wasEditing(
+                    userID: session.profile.userID,
+                    draftID: $0.draftID
+                ) &&
+                Date().timeIntervalSince($0.draft.savedAt) < 24 * 60 * 60
+            }) {
+                // Reopen only a genuinely interrupted editor, not an
+                // unrelated saved draft or a new-plan request.
                 Task { @MainActor in
                     await Task.yield()
-                    if !showingCreation { showingCreation = true }
+                    guard !showingCreation else { return }
+                    openDraft(checkpoint)
                 }
             }
             session.refreshActivePlanForToday()
@@ -367,8 +374,11 @@ struct ATHLTHTrainPlanPremiumView: View {
             isPresented: $showingDeletePlanDraftConfirmation
         ) {
             Button(tr("Delete draft", "Slett utkast"), role: .destructive) {
-                if unfinishedDraftStore.deleteDraft(userID: session.profile.userID) {
-                    unfinishedPlanDraft = nil
+                if unfinishedDraftStore.deleteDraft(
+                    userID: session.profile.userID,
+                    draftID: draftPendingDeletionID
+                ) {
+                    refreshUnfinishedPlanDraft()
                     planDraftDeletionError = nil
                 } else {
                     planDraftDeletionError = tr(
@@ -385,23 +395,6 @@ struct ATHLTHTrainPlanPremiumView: View {
                 "Dette sletter kun det uferdige utkastet på denne iPhonen. Lagrede og aktive treningsplaner blir ikke endret."
             ))
         }
-        .confirmationDialog(
-            tr("Discard this unfinished training plan?", "Forkaste denne påbegynte treningsplanen?"),
-            isPresented: $showingDiscardPlanDraftConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button(tr("Discard and start new", "Forkast og start ny"), role: .destructive) {
-                unfinishedDraftStore.clear(userID: session.profile.userID)
-                unfinishedPlanDraft = nil
-                showingCreation = true
-            }
-            Button(tr("Keep draft", "Behold utkast"), role: .cancel) {}
-        } message: {
-            Text(tr(
-                "This removes only the unfinished local draft, never your saved training plans.",
-                "Dette sletter bare det lokale utkastet, ikke lagrede treningsplaner."
-            ))
-        }
         .sheet(isPresented: $showingCreation, onDismiss: {
             if let planID = pendingCreatedPlanID {
                 focusedPlanID = planID
@@ -413,7 +406,10 @@ struct ATHLTHTrainPlanPremiumView: View {
                 pendingCreatedPlanID = nil
             }
         }) {
-            ATHLTHTrainProgramComposerView { planID in
+            ATHLTHTrainProgramComposerView(
+                resumesDraftOnAppear: creationResumesDraft,
+                draftID: creationDraftID
+            ) { planID in
                 pendingCreatedPlanID = planID
             }
         }
@@ -648,16 +644,21 @@ struct ATHLTHTrainPlanPremiumView: View {
 
     private func beginNewPlanCreation() {
         planDraftDeletionError = nil
-        if unfinishedPlanDraft != nil {
-            showingDiscardPlanDraftConfirmation = true
-        } else {
-            showingCreation = true
-        }
+        creationDraftID = UUID()
+        creationResumesDraft = false
+        showingCreation = true
+    }
+
+    private func openDraft(_ checkpoint: ATHLTHPlanDraftRecord) {
+        creationDraftID = checkpoint.draftID
+        creationResumesDraft = true
+        showingCreation = true
     }
 
     private func refreshUnfinishedPlanDraft() {
-        let checkpoint = unfinishedDraftStore.load(userID: session.profile.userID)
-        unfinishedPlanDraft = checkpoint?.stage == "mode" ? nil : checkpoint
+        unfinishedPlanDrafts = unfinishedDraftStore.records(
+            userID: session.profile.userID
+        ).filter { $0.draft.stage != "mode" }
     }
 
     private func draftLocation(_ draft: ATHLTHPlanCreationDraft) -> String {
@@ -677,8 +678,9 @@ struct ATHLTHTrainPlanPremiumView: View {
         }
     }
 
-    private func continuePlanDraftCard(_ draft: ATHLTHPlanCreationDraft) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+    private func continuePlanDraftCard(_ checkpoint: ATHLTHPlanDraftRecord) -> some View {
+        let draft = checkpoint.draft
+        return VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
                 Image(systemName: "calendar.badge.clock")
                     .font(.system(size: 19, weight: .medium))
@@ -698,19 +700,20 @@ struct ATHLTHTrainPlanPremiumView: View {
                 Spacer(minLength: 0)
                 Menu {
                     Button {
-                        showingCreation = true
+                        openDraft(checkpoint)
                     } label: {
                         Label(tr("Continue planning", "Fortsett planleggingen"),
                               systemImage: "arrow.uturn.forward")
                     }
                     Button {
-                        showingDiscardPlanDraftConfirmation = true
+                        beginNewPlanCreation()
                     } label: {
                         Label(tr("Start a new plan", "Start ny plan"),
                               systemImage: "plus")
                     }
                     Divider()
                     Button(role: .destructive) {
+                        draftPendingDeletionID = checkpoint.draftID
                         showingDeletePlanDraftConfirmation = true
                     } label: {
                         Label(tr("Delete draft", "Slett utkast"),
@@ -737,7 +740,7 @@ struct ATHLTHTrainPlanPremiumView: View {
             }
 
             Button {
-                showingCreation = true
+                openDraft(checkpoint)
             } label: {
                 HStack {
                     Label(tr("Resume my plan", "Fortsett på planen"), systemImage: "arrow.uturn.forward")
