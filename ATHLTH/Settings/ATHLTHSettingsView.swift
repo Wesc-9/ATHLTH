@@ -81,6 +81,7 @@ struct ATHLTHSettingsView: View {
 
     @State private var showingMembership = false
     @State private var healthRequestInProgress = false
+    @State private var showingAppleHealthPauseConfirmation = false
     @State private var settingsSearchText = ""
 
     var body: some View {
@@ -172,7 +173,8 @@ struct ATHLTHSettingsView: View {
             await notifications.refreshAuthorizationStatus()
             _ = await health.restoreAuthorizationStateFromSystem()
 
-            if health.hasRequestedAuthorization,
+            if settings.appleHealthIntegrationEnabled,
+               health.hasRequestedAuthorization,
                health.lastSuccessfulRefreshAt == nil,
                !health.isRefreshing {
                 health.resumeUserInitiatedHealthSync()
@@ -581,7 +583,6 @@ struct ATHLTHSettingsView: View {
     private func settingsContents(for category: ATHLTHSettingsCategory) -> some View {
         switch category {
         case .health:
-            healthSettingsSection
             connectionsSettingsSection
         case .training:
             trainingSettingsSection
@@ -950,11 +951,175 @@ settingsSection("Health & Sync") {
                     }
     }
 
+    // Keep all Apple Health controls together; Home Assistant has its own
+    // independent connection, sharing and refresh settings.
+    private var appleHealthSettingsPage: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                settingsSection("Apple Health") {
+                    PremiumSettingsCard {
+                        PremiumSettingsRow(
+                            icon: "heart.fill",
+                            iconTint: .pink,
+                            iconBackground: Color.pink.opacity(0.10),
+                            title: "Apple Health",
+                            subtitle: appleHealthConnectionSubtitle
+                        ) {
+                            Text(settings.appleHealthIntegrationEnabled
+                                ? healthSyncStateTitle
+                                : ATHLTHLocalization.choose(
+                                    english: "Paused", norwegian: "Deaktivert"
+                                ))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+
+                        SettingsDivider()
+
+                        Button {
+                            if settings.appleHealthIntegrationEnabled {
+                                showingAppleHealthPauseConfirmation = true
+                            } else {
+                                settings.appleHealthIntegrationEnabled = true
+                                handleAppleHealthTap()
+                            }
+                        } label: {
+                            PremiumSettingsRow(
+                                icon: settings.appleHealthIntegrationEnabled
+                                    ? "pause.circle" : "play.circle",
+                                title: settings.appleHealthIntegrationEnabled
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Pause Apple Health in ATHLTH",
+                                        norwegian: "Deaktiver Apple Health i ATHLTH"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Enable Apple Health",
+                                        norwegian: "Aktiver Apple Health"
+                                    ),
+                                subtitle: ATHLTHLocalization.choose(
+                                    english: "Control Health data sync inside ATHLTH",
+                                    norwegian: "Styr synkronisering av helsedata i ATHLTH"
+                                )
+                            ) {
+                                Image(systemName: "chevron.right")
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(healthRequestInProgress)
+
+                        if !health.hasRequestedAuthorization &&
+                           settings.appleHealthIntegrationEnabled {
+                            SettingsDivider()
+                            Button {
+                                handleAppleHealthTap()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "heart.text.square",
+                                    title: ATHLTHLocalization.choose(
+                                        english: "Connect Apple Health",
+                                        norwegian: "Koble til Apple Health"
+                                    ),
+                                    subtitle: ATHLTHLocalization.choose(
+                                        english: "Choose the Health data ATHLTH may access",
+                                        norwegian: "Velg hvilke helsedata ATHLTH får tilgang til"
+                                    )
+                                ) {
+                                    Image(systemName: "chevron.right")
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(healthRequestInProgress)
+                        }
+                    }
+                }
+
+                if settings.appleHealthIntegrationEnabled {
+                    healthSettingsSection
+                }
+
+                settingsSection("iOS Permissions") {
+                    PremiumSettingsCard {
+                        Button {
+                            if let url = URL(
+                                string: UIApplication.openSettingsURLString
+                            ) {
+                                openURL(url)
+                            }
+                        } label: {
+                            PremiumSettingsRow(
+                                icon: "lock.shield",
+                                title: ATHLTHLocalization.choose(
+                                    english: "Manage Health permissions in iOS",
+                                    norwegian: "Administrer helsetilgang i iOS"
+                                ),
+                                subtitle: ATHLTHLocalization.choose(
+                                    english: "Revoke Apple Health permissions in the Health app",
+                                    norwegian: "Trekk tilbake tillatelser i Helse-appen"
+                                )
+                            ) {
+                                Image(systemName: "arrow.up.right")
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                        }
+                        .buttonStyle(.plain)
+
+                        Text(ATHLTHLocalization.choose(
+                            english: "Turning off sync in ATHLTH does not revoke iOS permissions or erase previously imported data. To revoke access, open Health → profile → Apps → ATHLTH and switch off access. The button opens ATHLTH's iOS settings.",
+                            norwegian: "Deaktivering i ATHLTH stopper synkroniseringen, men tilbakekaller ikke iOS-tillatelser eller sletter tidligere importerte data. For å trekke tilbake tilgang: Åpne Helse → profil → Apper → ATHLTH, og slå av tilgangen. Knappen åpner ATHLTHs iOS-innstillinger."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .padding(.horizontal, 15)
+                        .padding(.bottom, 15)
+                    }
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 22)
+            .padding(.bottom, 34)
+            .frame(maxWidth: 700)
+            .frame(maxWidth: .infinity)
+        }
+        .background(settingsBackground)
+        .navigationTitle("Apple Health")
+        .navigationBarTitleDisplayMode(.inline)
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Pause Apple Health integration?",
+                norwegian: "Deaktivere Apple Health i ATHLTH?"
+            ),
+            isPresented: $showingAppleHealthPauseConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(
+                ATHLTHLocalization.choose(
+                    english: "Pause integration",
+                    norwegian: "Deaktiver integrasjonen"
+                ),
+                role: .destructive
+            ) {
+                settings.appleHealthIntegrationEnabled = false
+                Task { await health.disableBackgroundSync() }
+            }
+            Button(
+                ATHLTHLocalization.choose(
+                    english: "Cancel", norwegian: "Avbryt"
+                ), role: .cancel
+            ) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Automatic and manual Apple Health imports will stop. Existing Health permissions remain in iOS until you revoke them there.",
+                norwegian: "Automatisk og manuell import fra Apple Health stoppes. iOS-tillatelsene beholdes til du trekker dem tilbake i Helse."
+            ))
+        }
+    }
+
     private var connectionsSettingsSection: some View {
 settingsSection("Connections") {
                         PremiumSettingsCard {
-                            Button {
-                                handleAppleHealthTap()
+                            NavigationLink {
+                                appleHealthSettingsPage
                             } label: {
                                 PremiumSettingsRow(
                                     icon: "heart.fill",
@@ -964,17 +1129,18 @@ settingsSection("Connections") {
                                     subtitle: appleHealthConnectionSubtitle
                                 ) {
                                     connectionTrailing(
-                                        !health.hasRequestedAuthorization
-                                            ? "Connect"
-                                            : health.hasReadableHealthData
-                                                ? "Connected"
-                                                : "Configured",
+                                        !settings.appleHealthIntegrationEnabled
+                                            ? "Off"
+                                            : !health.hasRequestedAuthorization
+                                                ? "Connect"
+                                                : health.hasReadableHealthData
+                                                    ? "Connected"
+                                                    : "Configured",
                                         showChevron: true
                                     )
                                 }
                             }
                             .buttonStyle(.plain)
-                            .disabled(healthRequestInProgress)
 
                             SettingsDivider()
 
@@ -1840,6 +2006,11 @@ if session.currentRole.canAccessControlCenter {
     }
 
     private var healthSyncStateTitle: String {
+        guard settings.appleHealthIntegrationEnabled else {
+            return ATHLTHLocalization.choose(
+                english: "Paused", norwegian: "Deaktivert"
+            )
+        }
         guard settings.backgroundHealthSyncEnabled else {
             return ATHLTHLocalization.choose(
                 english: "Off",
@@ -1895,6 +2066,12 @@ if session.currentRole.canAccessControlCenter {
     }
 
     private var healthSyncStatusText: String {
+        guard settings.appleHealthIntegrationEnabled else {
+            return ATHLTHLocalization.choose(
+                english: "Apple Health synchronization is paused in ATHLTH.",
+                norwegian: "Apple Health-synkronisering er deaktivert i ATHLTH."
+            )
+        }
         if healthRequestInProgress {
             return ATHLTHLocalization.choose(
                 english: "Reading workouts, activity, sleep, heart data and profile values from Apple Health.",
@@ -2014,6 +2191,12 @@ if session.currentRole.canAccessControlCenter {
     }
 
     private var appleHealthConnectionSubtitle: String {
+        guard settings.appleHealthIntegrationEnabled else {
+            return ATHLTHLocalization.choose(
+                english: "Paused in ATHLTH · system permissions unchanged",
+                norwegian: "Deaktivert i ATHLTH · iOS-tillatelser beholdt"
+            )
+        }
         guard health.hasRequestedAuthorization else {
             return ATHLTHLocalization.choose(
                 english: "Connect your Apple Health data",
@@ -2144,6 +2327,7 @@ if session.currentRole.canAccessControlCenter {
     }
 
     private func handleAppleHealthTap() {
+        guard settings.appleHealthIntegrationEnabled else { return }
         Task {
             healthRequestInProgress = true
 
@@ -2171,6 +2355,7 @@ if session.currentRole.canAccessControlCenter {
     }
 
     private func runHealthSync() {
+        guard settings.appleHealthIntegrationEnabled else { return }
         guard health.hasRequestedAuthorization else {
             handleAppleHealthTap()
             return
