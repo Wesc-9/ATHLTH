@@ -2050,6 +2050,27 @@ struct TrainingPlanCatalogDetailView: View {
                     }
                 }
 
+                if let guidance = entry.readinessGuidance {
+                    ATHLTHPlanGhostCard {
+                        VStack(alignment: .leading, spacing: 9) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Before starting",
+                                    norwegian: "Før du starter"
+                                ),
+                                systemImage: "info.circle"
+                            )
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+
+                            Text(guidance)
+                                .font(.subheadline)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+
                 planPreview
 
                 Button {
