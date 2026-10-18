@@ -130,6 +130,14 @@ final class HealthKitManager: ObservableObject {
     private var trophyCacheLatestWorkoutEnd: Date?
     private var trophyCacheLatestSleepDuration: TimeInterval?
     private let trophySnapshotDiskKey = "athlth.health.trophySnapshotCache.v2"
+    /// Pausing Apple Health inside ATHLTH does not revoke the iOS
+    /// permission. Background and user-facing imports honor this opt-out.
+    private var integrationEnabled: Bool {
+        UserDefaults.standard.object(
+            forKey: "settings.appleHealthIntegrationEnabled"
+        ) as? Bool ?? true
+    }
+
     private let legacyAuthorizationFlagKey = "athlth.healthAuthorizationRequested"
     private let authorizationVersionKey = "athlth.healthAuthorizationVersion"
     // Tracks the newest permission set ATHLTH has explicitly requested.
@@ -263,7 +271,8 @@ final class HealthKitManager: ObservableObject {
 
     @discardableResult
     func refreshWorkoutImportInbox() async -> Bool {
-        guard healthDataAvailable,
+        guard integrationEnabled,
+              healthDataAvailable,
               hasRequestedAuthorization,
               !shouldDeferAutomaticHealthWork
         else {
@@ -459,6 +468,7 @@ final class HealthKitManager: ObservableObject {
 
         guard healthDataAvailable,
               hasRequestedAuthorization,
+              integrationEnabled,
               backgroundSyncEnabled
         else {
             return
@@ -658,18 +668,16 @@ final class HealthKitManager: ObservableObject {
     }
 
     func configureBackgroundSync(allowed: Bool) async {
-        guard healthDataAvailable,
-              !shouldDeferAutomaticHealthWork
-        else {
-            return
-        }
-
-        backgroundSyncError = nil
-
-        guard allowed else {
+        // Opt-out must take effect even when normal refreshes are deferred.
+        guard allowed, integrationEnabled else {
             await disableBackgroundSync()
             return
         }
+        guard healthDataAvailable,
+              !shouldDeferAutomaticHealthWork
+        else { return }
+
+        backgroundSyncError = nil
 
         startBackgroundObservers()
 
@@ -886,7 +894,8 @@ final class HealthKitManager: ObservableObject {
     }
 
     private func refreshHealthSignals() async {
-        guard healthDataAvailable,
+        guard integrationEnabled,
+              healthDataAvailable,
               !shouldDeferAutomaticHealthWork,
               !isRefreshing
         else {
@@ -992,6 +1001,7 @@ final class HealthKitManager: ObservableObject {
     }
 
     func refreshAll() async {
+        guard integrationEnabled else { return }
         let performanceID =
             ATHLTHPerformance.begin("HealthRefresh")
         defer {
@@ -3427,6 +3437,7 @@ final class HealthKitManager: ObservableObject {
     }
 
     func refreshPersonalDetails() async {
+        guard integrationEnabled else { return }
         let fetched =
             await fetchPersonalDetailsSnapshot()
         if personalDetails != fetched {
