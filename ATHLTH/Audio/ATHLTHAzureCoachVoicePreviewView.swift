@@ -164,6 +164,14 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
                 }
             }
             .tint(ATHLTHTheme.accentDeep)
+            .onChange(of: allowsAzureWorkoutText) { _, enabled in
+                if !enabled,
+                   ATHLTHAzureCoachVoice.key(
+                       settings.audioCoachVoiceIdentifier
+                   ) != nil {
+                    settings.audioCoachVoiceIdentifier = nil
+                }
+            }
 
             ForEach(voices) { voice in
                 HStack(spacing: 9) {
