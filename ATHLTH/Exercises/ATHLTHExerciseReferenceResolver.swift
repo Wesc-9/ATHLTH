@@ -188,6 +188,31 @@ enum ATHLTHExerciseReferenceResolver {
         from library: [ExerciseLibraryEntry]
     ) -> PlannedSession {
         var result = workout
+        result.exercises = workout.exercises.map { planned in
+            var safe = planned
+            let linked = planned.exerciseID.flatMap { identifier in
+                library.first(where: { $0.id == identifier })
+            }
+            if let linked, linked.source == .custom {
+                // The owner's "Allow in shared plans" toggle applies to
+                // legacy planned exercises just as it does to new blocks.
+                if let shared = shareableSnapshot(linked.exercise) {
+                    safe.embeddedExercise = shared
+                } else {
+                    safe.embeddedExercise = ExerciseSnapshot(
+                        name: linked.canonicalName,
+                        instructions: [], primaryMuscles: [],
+                        secondaryMuscles: [], equipment: [], imageURL: nil
+                    )
+                }
+            } else if let cleaned = safeImportedSnapshot(
+                planned.embeddedExercise,
+                fallbackTitle: planned.embeddedExercise.name
+            ) {
+                safe.embeddedExercise = cleaned
+            }
+            return safe
+        }
         if let blocks = result.workoutBlocks {
             result.workoutBlocks = blocks.map {
                 portableBlock($0, from: library)
