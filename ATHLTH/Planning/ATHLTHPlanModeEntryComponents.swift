@@ -124,6 +124,7 @@ struct ATHLTHPlanEntryModeCard: View {
     let symbol: String
     let selected: Bool
     let features: [Feature]
+    var compact: Bool = false
     let onSelect: () -> Void
 
     private let ink = ATHLTHPlanDesign.ink
@@ -132,25 +133,25 @@ struct ATHLTHPlanEntryModeCard: View {
 
     var body: some View {
         Button(action: onSelect) {
-            VStack(alignment: .leading, spacing: 13) {
-                HStack(alignment: .center, spacing: 13) {
+            VStack(alignment: .leading, spacing: compact ? 8 : 13) {
+                HStack(alignment: .center, spacing: compact ? 10 : 13) {
                     Image(systemName: symbol)
-                        .font(.system(size: 24, weight: .medium))
+                        .font(.system(size: compact ? 20 : 24, weight: .medium))
                         .foregroundStyle(selected ? gold : ink)
-                        .frame(width: 58, height: 58)
+                        .frame(width: compact ? 43 : 58, height: compact ? 43 : 58)
                         .background(
                             selected ? gold.opacity(0.095) : ink.opacity(0.04),
-                            in: RoundedRectangle(cornerRadius: 18)
+                            in: RoundedRectangle(cornerRadius: compact ? 13 : 18)
                         )
                         .accessibilityHidden(true)
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text(title)
-                            .font(.system(size: 19, weight: .semibold))
+                            .font(.system(size: compact ? 17 : 19, weight: .semibold))
                             .foregroundStyle(ink)
 
                         Text(subtitle)
-                            .font(.subheadline)
+                            .font(.system(size: compact ? 12 : 14))
                             .foregroundStyle(muted)
                             .fixedSize(horizontal: false, vertical: true)
                             .multilineTextAlignment(.leading)
@@ -158,7 +159,7 @@ struct ATHLTHPlanEntryModeCard: View {
                     Spacer(minLength: 4)
 
                     Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 23, weight: .regular))
+                        .font(.system(size: compact ? 20 : 23, weight: .regular))
                         .foregroundStyle(selected ? gold : muted.opacity(0.33))
                         .accessibilityHidden(true)
                 }
@@ -168,16 +169,16 @@ struct ATHLTHPlanEntryModeCard: View {
                     .frame(height: 0.7)
 
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 12) {
+                    HStack(spacing: compact ? 7 : 12) {
                         ForEach(features) { item in feature(item) }
                     }
 
-                    VStack(alignment: .leading, spacing: 9) {
+                    VStack(alignment: .leading, spacing: compact ? 5 : 9) {
                         ForEach(features) { item in feature(item) }
                     }
                 }
             }
-            .padding(16)
+            .padding(compact ? 12 : 16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 RoundedRectangle(cornerRadius: 23, style: .continuous)
@@ -216,13 +217,13 @@ struct ATHLTHPlanEntryModeCard: View {
     }
 
     private func feature(_ item: Feature) -> some View {
-        HStack(spacing: 5) {
+        HStack(spacing: compact ? 3 : 5) {
             Image(systemName: item.symbol)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: compact ? 10 : 12, weight: .semibold))
                 .foregroundStyle(gold)
                 .accessibilityHidden(true)
             Text(item.title)
-                .font(.system(size: 10, weight: .medium))
+                .font(.system(size: compact ? 9 : 10, weight: .medium))
                 .foregroundStyle(muted)
                 .fixedSize(horizontal: true, vertical: false)
         }
@@ -233,44 +234,91 @@ struct ATHLTHPlanExistingChoice: View {
     let title: String
     let subtitle: String
     let symbol: String
+    var compact: Bool = false
     let action: () -> Void
+
+    private let ink = ATHLTHPlanDesign.ink
+    private let muted = ATHLTHPlanDesign.secondaryInk
+    private let gold = ATHLTHPlanDesign.accent
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: symbol)
-                    .font(.system(size: 19, weight: .regular))
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                    .frame(width: 28)
-                    .accessibilityHidden(true)
+            Group {
+                if compact {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            symbolBadge
+                            Spacer(minLength: 0)
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(muted)
+                                .accessibilityHidden(true)
+                        }
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHPlanDesign.ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                    Text(subtitle)
-                        .font(.system(size: 10))
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
+                        Text(title)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(ink)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.82)
+                        Text(subtitle)
+                            .font(.system(size: 10))
+                            .foregroundStyle(muted)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 86, alignment: .leading)
+                } else {
+                    HStack(spacing: 10) {
+                        symbolBadge
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ink)
+                            Text(subtitle)
+                                .font(.caption)
+                                .foregroundStyle(muted)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(muted)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 62)
                 }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    .accessibilityHidden(true)
             }
-            .padding(.horizontal, 13)
-            .frame(maxWidth: .infinity, minHeight: 62)
+            .padding(compact ? 12 : 14)
             .background(
-                Color(red: 0.965, green: 0.958, blue: 0.950),
-                in: RoundedRectangle(cornerRadius: 22)
+                LinearGradient(
+                    colors: [.white, Color(red: 0.99, green: 0.975, blue: 0.948)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
             )
-            .contentShape(RoundedRectangle(cornerRadius: 22))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(ATHLTHPlanDesign.outline, lineWidth: 0.85)
+            }
+            .shadow(color: ink.opacity(0.045), radius: 10, y: 5)
+            .contentShape(RoundedRectangle(cornerRadius: 20))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title + ". " + subtitle)
+        .accessibilityHint(ATHLTHLocalization.choose(
+            english: "Open your plans.",
+            norwegian: "Åpne planene."
+        ))
+    }
+
+    private var symbolBadge: some View {
+        Image(systemName: symbol)
+            .font(.system(size: compact ? 17 : 20, weight: .medium))
+            .foregroundStyle(gold)
+            .frame(width: compact ? 35 : 42, height: compact ? 35 : 42)
+            .background(
+                gold.opacity(0.095),
+                in: RoundedRectangle(cornerRadius: 13)
+            )
+            .accessibilityHidden(true)
     }
 }
