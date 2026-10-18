@@ -1470,20 +1470,38 @@ final class AppSettingsStore: ObservableObject {
                 audioCoachAnnounceWorkoutComplete
         )
 
-        // Use the existing per-account fuel plan. Its voice opt-in is separate
-        // from legacy notification reminders and never requests push permission.
-        let tools = AthleteToolsStore.shared
-        let fuel = tools.data.fuel
-        if enabled, tools.userID != nil,
-           tools.data.fuelVoiceEnabled == true,
-           fuel.valid,
-           fuel.carbohydrateGramsPerHour > 0 || fuel.fluidMLPerHour > 0 {
-            configuration.fuelReminderIntervalMinutes = fuel.intervalMinutes
-            configuration.fuelReminderDurationMinutes = fuel.durationMinutes
-            configuration.fuelCarbohydrateGramsPerHour = fuel.carbohydrateGramsPerHour
-            configuration.fuelFluidMLPerHour = fuel.fluidMLPerHour
-        }
+        return applyingFuelVoice(to: configuration)
+    }
 
+    /// Append the current signed-in athlete's voice plan to any approved
+    /// Audio Coach configuration, including saved workout templates that
+    /// predate the feature. Never enable Audio Coach just for fuel.
+    func applyingFuelVoice(
+        to incoming: WatchAudioCoachConfiguration,
+        userID: UUID? = nil
+    ) -> WatchAudioCoachConfiguration {
+        var configuration = incoming
+        configuration.fuelReminderIntervalMinutes = nil
+        configuration.fuelReminderDurationMinutes = nil
+        configuration.fuelCarbohydrateGramsPerHour = nil
+        configuration.fuelFluidMLPerHour = nil
+
+        let tools = AthleteToolsStore.shared
+        guard configuration.enabled,
+              let activeUserID = tools.userID,
+              userID == nil || userID == activeUserID,
+              tools.data.fuelVoiceEnabled == true
+        else { return configuration }
+
+        let fuel = tools.data.fuel
+        guard fuel.valid,
+              fuel.carbohydrateGramsPerHour > 0 || fuel.fluidMLPerHour > 0
+        else { return configuration }
+
+        configuration.fuelReminderIntervalMinutes = fuel.intervalMinutes
+        configuration.fuelReminderDurationMinutes = fuel.durationMinutes
+        configuration.fuelCarbohydrateGramsPerHour = fuel.carbohydrateGramsPerHour
+        configuration.fuelFluidMLPerHour = fuel.fluidMLPerHour
         return configuration
     }
 
