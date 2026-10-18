@@ -3607,7 +3607,12 @@ final class IPhoneWorkoutStore:
             config: configuration
         )
 
-        guard let phrase = ATHLTHFuelVoicePrompt.phrase(
+        // No stale voice prompts after pause, backgrounding or reconnect.
+        guard ATHLTHFuelVoicePrompt.isFreshDue(
+            elapsed: elapsed,
+            scheduled: next
+        ),
+        let phrase = ATHLTHFuelVoicePrompt.phrase(
             config: configuration
         ) else { return }
 
