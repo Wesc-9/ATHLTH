@@ -13,7 +13,9 @@ struct ATHLTHWorkoutRecipePreview: View {
     let durationMinutes: Int?
     let blocks: [WorkoutTemplateBlock]
 
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @State private var advanced = false
+    @State private var selectedExercise: WorkoutTemplateBlock?
 
     private func tr(_ english: String, _ norwegian: String) -> String {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
@@ -45,6 +47,9 @@ struct ATHLTHWorkoutRecipePreview: View {
             statistics
             modeControl
             timeline
+        }
+        .sheet(item: $selectedExercise) { step in
+            ATHLTHLinkedExerciseDetailView(block: step)
         }
     }
 
@@ -188,15 +193,28 @@ struct ATHLTHWorkoutRecipePreview: View {
         }
     }
 
+    @ViewBuilder
     private func recipeStep(_ block: WorkoutTemplateBlock) -> some View {
+        if block.kind == .exercise {
+            Button {
+                selectedExercise = block
+            } label: {
+                recipeStepCard(block)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(ATHLTHLocalization.choose(
+                english: "View exercise instructions, muscles and demonstration",
+                norwegian: "Vis utførelse, muskler og øvelsesinformasjon"
+            ))
+        } else {
+            recipeStepCard(block)
+        }
+    }
+
+    private func recipeStepCard(_ block: WorkoutTemplateBlock) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 11) {
-                Image(systemName: blockIcon(block))
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(recipeTint)
-                    .frame(width: 39, height: 39)
-                    .background(ATHLTHPlanDesign.selectedSurface,
-                                in: RoundedRectangle(cornerRadius: 12))
+                thumbnail(for: block)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(localizedTitle(block))
@@ -210,6 +228,11 @@ struct ATHLTHWorkoutRecipePreview: View {
                     }
                 }
                 Spacer(minLength: 0)
+                if block.kind == .exercise {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
             }
 
             if advanced {
@@ -238,11 +261,35 @@ struct ATHLTHWorkoutRecipePreview: View {
         .athlthPlanCard(radius: 19)
     }
 
-    private func localizedTitle(_ block: WorkoutTemplateBlock) -> String {
-        guard block.kind == .exercise, ATHLTHLocalization.isNorwegian else {
-            return block.title
+    @ViewBuilder
+    private func thumbnail(for block: WorkoutTemplateBlock) -> some View {
+        if let match = ATHLTHExerciseReferenceResolver.resolve(
+            block, in: exerciseLibrary.allExercises
+        ) {
+            ExerciseArtwork(entry: match, size: 39)
+        } else {
+            Image(systemName: blockIcon(block))
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(recipeTint)
+                .frame(width: 39, height: 39)
+                .background(ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 12))
         }
-        return ATHLTHExerciseNameLocalization.norwegianName(for: block.title)
+    }
+
+    private func localizedTitle(_ block: WorkoutTemplateBlock) -> String {
+        guard block.kind == .exercise else { return block.title }
+        if let match = ATHLTHExerciseReferenceResolver.resolve(
+            block, in: exerciseLibrary.allExercises
+        ) {
+            return exerciseLibrary.localizedExerciseName(match)
+        }
+        if ATHLTHLocalization.isNorwegian {
+            return ATHLTHExerciseNameLocalization.norwegianName(
+                for: block.exerciseSnapshot?.name ?? block.title
+            )
+        }
+        return block.exerciseSnapshot?.name ?? block.title
     }
 
     private func blockIcon(_ block: WorkoutTemplateBlock) -> String {
