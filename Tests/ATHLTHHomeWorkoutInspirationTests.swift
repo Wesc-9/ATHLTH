@@ -86,6 +86,30 @@ final class ATHLTHHomeWorkoutInspirationTests: XCTestCase {
         XCTAssertEqual(result1.first?.id, first.id)
     }
 
+    func testExplicitRunningGoalFavorsAppropriateRunningWorkouts() {
+        let run = workout("Easy aerobic run", kind: .running, minutes: 45)
+        let strength = workout("Full Body", kind: .strength, minutes: 45)
+        let ranked = ATHLTHHomeWorkoutInspirationPolicy.ranked(
+            from: [strength, run], recent: [], minutes: 45,
+            goal: .runBetter, now: now
+        )
+        XCTAssertEqual(ranked.first?.id, run.id)
+        XCTAssertEqual(ranked.count, 2)
+    }
+
+    func testGoalDoesNotOverrideRecentStrengthLoadCaution() {
+        let strength = workout("Full Body", kind: .strength, minutes: 45)
+        let run = workout("Easy aerobic run", kind: .running, minutes: 45)
+        let recent = ATHLTHInspirationRecentActivity(
+            kind: .strength, startedAt: now.addingTimeInterval(-9 * 3_600)
+        )
+        let ranked = ATHLTHHomeWorkoutInspirationPolicy.ranked(
+            from: [strength, run], recent: [recent], minutes: 45,
+            goal: .buildMuscle, now: now
+        )
+        XCTAssertEqual(ranked.first?.id, run.id)
+    }
+
     func testAvailableTimeChangesRankWithoutInventingNewWorkouts() {
         let short = workout("Quick strength", kind: .strength, minutes: 25)
         let long = workout("Full Body", kind: .strength, minutes: 60)
