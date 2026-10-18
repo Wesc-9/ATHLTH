@@ -1646,6 +1646,29 @@ enum ProfileFeaturedRecordKind:
             .map(\.rawValue)
             .joined(separator: ",")
     }
+
+    // Only change which achievements are featured, never the records themselves.
+    static func removing(
+        _ kind: ProfileFeaturedRecordKind,
+        from selection: [ProfileFeaturedRecordKind]
+    ) -> [ProfileFeaturedRecordKind] {
+        selection.filter { $0 != kind }
+    }
+
+    static func replacing(
+        in selection: [ProfileFeaturedRecordKind],
+        at index: Int,
+        with kind: ProfileFeaturedRecordKind
+    ) -> [ProfileFeaturedRecordKind] {
+        guard selection.indices.contains(index) else { return selection }
+        var updated = selection
+        if let existing = updated.firstIndex(of: kind), existing != index {
+            updated.swapAt(index, existing)
+        } else {
+            updated[index] = kind
+        }
+        return updated
+    }
 }
 
 
@@ -1658,6 +1681,7 @@ private struct ProfileRecordVisualTile: View {
     let detail: String
     var showsSelection: Bool = false
     var isSelected: Bool = false
+    var showsManagement: Bool = false
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -1702,6 +1726,11 @@ private struct ProfileRecordVisualTile: View {
                                 : ATHLTHTheme.mutedText.opacity(0.68)
                         )
                         .accessibilityHidden(true)
+                    } else if showsManagement {
+                        Image(systemName: "ellipsis.circle.fill")
+                            .font(.system(size: 21, weight: .medium))
+                            .foregroundStyle(ATHLTHTheme.primaryText.opacity(0.78))
+                            .accessibilityHidden(true)
                     }
                 }
 
@@ -2014,6 +2043,10 @@ private struct PerformanceVolumePoint:
     let value: Double
 }
 
+private struct FeaturedRecordReplacementSlot: Identifiable {
+    let id: Int
+}
+
 struct PerformanceStatsView: View {
     let stats: ProfilePerformanceStats?
     var healthRecords: [HealthPersonalRecord] = []
@@ -2027,6 +2060,7 @@ struct PerformanceStatsView: View {
         PerformanceVolumePeriod = .year
     @AppStorage(ProfileFeaturedRecordKind.storageKey)
     private var featuredRecordSelectionRaw = ""
+    @State private var replacementSlot: FeaturedRecordReplacementSlot?
 
     private let gridColumns = [
         GridItem(
@@ -2037,19 +2071,10 @@ struct PerformanceStatsView: View {
     ]
 
     var body: some View {
-        ScrollViewReader { reader in
+        ScrollViewReader { _ in
             ScrollView {
                 VStack(spacing: 16) {
-                    editorialHero {
-                        withAnimation(
-                            .easeInOut(duration: 0.35)
-                        ) {
-                            reader.scrollTo(
-                                "performance-volume",
-                                anchor: .center
-                            )
-                        }
-                    }
+                    editorialHero
 
                     editorialFeaturedRecords
                     editorialSummaryStrip
@@ -2081,6 +2106,15 @@ struct PerformanceStatsView: View {
             )
         )
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $replacementSlot) { slot in
+            NavigationStack {
+                ProfileRecordShowcasePickerView(
+                    stats: stats,
+                    healthRecords: resolvedHealthRecords,
+                    replacingIndex: slot.id
+                )
+            }
+        }
         .task {
             guard health.hasRequestedAuthorization
             else {
@@ -2117,9 +2151,7 @@ struct PerformanceStatsView: View {
             : performanceWorkoutHistory
     }
 
-    private func editorialHero(
-        onOpenTrend: @escaping () -> Void
-    ) -> some View {
+    private var editorialHero: some View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
                 Image("GoalRunning")
@@ -2257,41 +2289,6 @@ struct PerformanceStatsView: View {
                         alignment: .leading
                     )
 
-                    Button(action: onOpenTrend) {
-                        HStack(spacing: 8) {
-                            Text(
-                                text(
-                                    "View your progress",
-                                    "Se din utvikling"
-                                )
-                            )
-
-                            Image(
-                                systemName:
-                                    "chevron.right"
-                            )
-                        }
-                        .font(
-                            .subheadline
-                                .weight(.semibold)
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .primaryText
-                        )
-                        .padding(
-                            .horizontal,
-                            16
-                        )
-                        .frame(height: 42)
-                        .background(
-                            Color.white
-                                .opacity(0.92),
-                            in: Capsule()
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.top, 8)
                 }
                 .padding(20)
 
@@ -2331,7 +2328,7 @@ struct PerformanceStatsView: View {
                 .padding(18)
             }
         }
-        .frame(height: 245)
+        .frame(height: 220)
         .clipShape(
             RoundedRectangle(
                 cornerRadius: 28,
@@ -2447,20 +2444,49 @@ struct PerformanceStatsView: View {
         _ kind: ProfileFeaturedRecordKind,
         index: Int
     ) -> some View {
-        ProfileRecordVisualTile(
-            kind: kind,
-            value: kind.displayValue(
-                healthRecords: resolvedHealthRecords,
-                stats: stats,
-                strengthRecords: strengthWorkout.personalRecords,
-                strengthRepRecords: strengthWorkout.repPersonalRecords,
-                performanceWorkouts: resolvedPerformanceWorkouts,
-                strengthWorkouts: strengthWorkout.workoutHistory
-            ),
-            detail: kind.supportingDetail(
-                healthRecords: resolvedHealthRecords
+        Menu {
+            Button {
+                replacementSlot = FeaturedRecordReplacementSlot(id: index)
+            } label: {
+                Label(
+                    text("Replace record", "Bytt rekord"),
+                    systemImage: "arrow.left.arrow.right"
+                )
+            }
+
+            Button(role: .destructive) {
+                let selected = ProfileFeaturedRecordKind.decodedSelection(
+                    from: featuredRecordSelectionRaw
+                )
+                featuredRecordSelectionRaw = ProfileFeaturedRecordKind
+                    .encodedSelection(
+                        ProfileFeaturedRecordKind.removing(kind, from: selected)
+                    )
+            } label: {
+                Label(
+                    text("Remove from profile", "Fjern fra profilen"),
+                    systemImage: "trash"
+                )
+            }
+        } label: {
+            ProfileRecordVisualTile(
+                kind: kind,
+                value: kind.displayValue(
+                    healthRecords: resolvedHealthRecords,
+                    stats: stats,
+                    strengthRecords: strengthWorkout.personalRecords,
+                    strengthRepRecords: strengthWorkout.repPersonalRecords,
+                    performanceWorkouts: resolvedPerformanceWorkouts,
+                    strengthWorkouts: strengthWorkout.workoutHistory
+                ),
+                detail: kind.supportingDetail(
+                    healthRecords: resolvedHealthRecords
+                ),
+                showsManagement: true
             )
-        )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(kind.title), \(text("Manage record", "Administrer rekord"))")
     }
 
     private func editorialEmptyFeaturedTile(
@@ -9172,6 +9198,7 @@ struct ProfileRecordShowcasePickerView:
     let stats: ProfilePerformanceStats?
     var healthRecords:
         [HealthPersonalRecord] = []
+    var replacingIndex: Int? = nil
 
     @EnvironmentObject private var health:
         HealthKitManager
@@ -9263,7 +9290,34 @@ struct ProfileRecordShowcasePickerView:
                     alignment: .leading,
                     spacing: 16
                 ) {
-                    showcaseHero
+                    if let replacingIndex, selection.indices.contains(replacingIndex) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Choose a replacement",
+                                    norwegian: "Velg en ny rekord"
+                                ),
+                                systemImage: "arrow.left.arrow.right"
+                            )
+                            .font(.headline.weight(.bold))
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Tap a record below to replace the selected one. Your other profile records stay unchanged.",
+                                    norwegian: "Trykk på en rekord nedenfor for å bytte ut den valgte. De andre rekordene beholdes."
+                                )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            Color.white.opacity(0.9),
+                            in: RoundedRectangle(cornerRadius: 22)
+                        )
+                    } else {
+                        showcaseHero
+                    }
 
                     VStack(
                         alignment: .leading,
@@ -9413,12 +9467,15 @@ struct ProfileRecordShowcasePickerView:
             .scrollIndicators(.hidden)
         }
         .navigationTitle(
-            ATHLTHLocalization.choose(
-                english:
-                    "Profile records",
-                norwegian:
-                    "Rekorder på profil"
-            )
+            replacingIndex == nil
+                ? ATHLTHLocalization.choose(
+                    english: "Profile records",
+                    norwegian: "Rekorder på profil"
+                )
+                : ATHLTHLocalization.choose(
+                    english: "Replace record",
+                    norwegian: "Bytt rekord"
+                )
         )
         .navigationBarTitleDisplayMode(
             .inline
@@ -9753,7 +9810,11 @@ struct ProfileRecordShowcasePickerView:
             )
         }
         .buttonStyle(.plain)
-        .disabled((!available && !selected) || (!selected && selectionIsFull))
+        .disabled(
+            replacingIndex != nil
+                ? !available
+                : ((!available && !selected) || (!selected && selectionIsFull))
+        )
         .accessibilityLabel(
             "\(kind.title), \(recordValue(for: kind))"
         )
@@ -9770,32 +9831,34 @@ struct ProfileRecordShowcasePickerView:
     }
 
     private func toggle(
-        _ kind:
-            ProfileFeaturedRecordKind
+        _ kind: ProfileFeaturedRecordKind
     ) {
         var updated = selection
 
-        if let index =
-            updated.firstIndex(
-                of: kind
-            ) {
-            updated.remove(
-                at: index
+        if let replacingIndex {
+            guard updated.indices.contains(replacingIndex),
+                  isAvailable(kind) else { return }
+            updated = ProfileFeaturedRecordKind.replacing(
+                in: updated,
+                at: replacingIndex,
+                with: kind
             )
-        } else {
-            guard updated.count <
-                    ProfileFeaturedRecordKind
-                        .showcaseLimit
-            else {
-                return
-            }
+            featuredRecordSelectionRaw =
+                ProfileFeaturedRecordKind.encodedSelection(updated)
+            dismiss()
+            return
+        }
 
+        if let index = updated.firstIndex(of: kind) {
+            updated.remove(at: index)
+        } else {
+            guard updated.count < ProfileFeaturedRecordKind.showcaseLimit
+            else { return }
             updated.append(kind)
         }
 
         featuredRecordSelectionRaw =
-            ProfileFeaturedRecordKind
-                .encodedSelection(updated)
+            ProfileFeaturedRecordKind.encodedSelection(updated)
     }
 }
 
