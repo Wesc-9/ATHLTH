@@ -104,3 +104,5 @@ ATHLTH 1.7.8 build 84 TestFlight upload — user-authorized 2026-10-17; iOS buil
 
 ATHLTH 1.7.9 build 85 — TestFlight upload explicitly authorized by user 2026-10-18; source e5442db21116; require passing iOS/build/backend checks, signing and Watch companion validation before App Store Connect upload.
 v1.8.0-build-86-20261018-training-plans-scheduled-upload
+
+ATHLTH 1.8.1 build 87 TestFlight user-authorized 2026-10-18 — premium settings and integrated authenticated contact form; email sender configured and Resend-to-iCloud manual test delivered; require green iOS build, backend tests, signed archive and Watch companion validation before upload.
