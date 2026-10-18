@@ -55,7 +55,10 @@ enum ATHLTHCuratedStrengthWorkouts {
         ] + moves.enumerated().map { index, move in
             WorkoutTemplateBlock(
                 sequence: index + 2, kind: .exercise, title: move.title,
-                exerciseSlug: nil, distanceMeters: nil,
+                exerciseSlug: ATHLTHExerciseReferenceResolver.nativeSourceIdentifier(
+                    for: move.title
+                ),
+                distanceMeters: nil,
                 repetitions: move.reps,
                 durationSeconds: move.durationSeconds.map(TimeInterval.init),
                 targetWeightKilograms: nil, loadNote: nil,
