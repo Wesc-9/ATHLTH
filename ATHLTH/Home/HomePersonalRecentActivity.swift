@@ -4757,7 +4757,7 @@ private struct HomeStrengthRecentPhotoArtwork: View {
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .bottomLeading) {
-                Image("StrengthRecentCardStudio")
+                Image("StrengthPostWorkoutHero")
                     .resizable()
                     .scaledToFill()
                     .frame(width: proxy.size.width, height: proxy.size.height)
