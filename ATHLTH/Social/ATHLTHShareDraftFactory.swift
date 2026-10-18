@@ -20,15 +20,33 @@ struct ATHLTHSharedExerciseAttachment: Codable, Hashable {
 }
 
 enum ATHLTHShareDraftFactory {
-    static func workout(_ original: PlannedSession,
-                        library: [ExerciseLibraryEntry],
-                        ownerID: UUID) throws -> MessageShareDraft {
+    static func safeWorkout(
+        _ original: PlannedSession, library: [ExerciseLibraryEntry]
+    ) -> PlannedSession {
         var copy = ATHLTHExerciseReferenceResolver.portableSession(
             original, from: library
         )
         copy.scheduledStart = nil
         copy.meetingPoint = nil
         copy.routeID = nil
+        copy.invitedPartnerID = nil
+        copy.trainTogetherMode = nil
+        copy.reminderMinutesBefore = nil
+        copy.allowInviteeExercises = nil
+        copy.gearIDs = nil
+        copy.spotifyPlaylist = nil
+        copy.spotifyAutoplayOnStart = nil
+        copy.audioCoachConfiguration = nil
+        copy.recoveryOriginalExercises = nil
+        copy.recoveryAdjustedExercises = nil
+        copy.recoveryAdjustedAt = nil
+        return copy
+    }
+
+    static func workout(_ original: PlannedSession,
+                        library: [ExerciseLibraryEntry],
+                        ownerID: UUID) throws -> MessageShareDraft {
+        let copy = safeWorkout(original, library: library)
         return try MessageShareDraft(
             kind: .workout, title: copy.title,
             subtitle: copy.durationMinutes.map { "\($0) min" },
@@ -44,16 +62,18 @@ enum ATHLTHShareDraftFactory {
         var copy = ATHLTHExerciseReferenceResolver.portablePlan(
             original, from: library
         )
+        copy.startDate = nil
+        copy.endDate = nil
+        copy.builderProfile = nil
+        copy.spotifyPlaylist = nil
+        copy.spotifyAutoplayOnWorkoutStart = false
+        copy.visibility = .privateOnly
         copy.weeks = copy.weeks.map { week in
             var updated = week
             updated.days = week.days.map { day in
                 var result = day
-                result.sessions = day.sessions.map { workout in
-                    var clean = workout
-                    clean.scheduledStart = nil
-                    clean.meetingPoint = nil
-                    clean.routeID = nil
-                    return clean
+                result.sessions = day.sessions.map {
+                    safeWorkout($0, library: library)
                 }
                 return result
             }
