@@ -400,7 +400,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 // (or a draft checkpoint) from an earlier presentation.
                 // Only the explicit "Continue draft" route may restore it.
                 step = .mode
-                sourceRoute = NavigationPath()
+                sourceRoute.removeAll()
                 selectedSource = .scratch
                 isHydratingPlanDraft = false
             }
