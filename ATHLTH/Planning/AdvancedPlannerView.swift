@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AdvancedPlannerView: View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
 
@@ -17,6 +18,8 @@ struct AdvancedPlannerView: View {
     @State private var showingPlanEditor = false
     @State private var showingPlanProgress = false
     @State private var showingAllPlans = false
+    @State private var preparedShare: MessageShareDraft?
+    @State private var shareError: String?
     @State private var showingProgramCreation = false
     @State private var studioSection: PlanStudioSection = .program
 
@@ -132,6 +135,45 @@ struct AdvancedPlannerView: View {
                 if showsEmptyState { emptyPlanState }
                 standaloneScheduleCard
             }
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                if let plan = displayedPlan {
+                    Button {
+                        do {
+                            preparedShare = try ATHLTHShareDraftFactory.plan(
+                                plan, library: exerciseLibrary.allExercises,
+                                ownerID: session.profile.userID
+                            )
+                        } catch {
+                            shareError = error.localizedDescription
+                        }
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Share plan", norwegian: "Del plan"
+                            ),
+                            systemImage: "square.and.arrow.up"
+                        )
+                    }
+                }
+            }
+        }
+        .sheet(item: $preparedShare) { draft in
+            ATHLTHDirectShareSheet(draft: draft)
+        }
+        .alert(
+            ATHLTHLocalization.choose(
+                english: "Could not share plan", norwegian: "Kunne ikke dele planen"
+            ),
+            isPresented: Binding(
+                get: { shareError != nil },
+                set: { if !$0 { shareError = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(shareError ?? "")
         }
         .onAppear {
             session.refreshActivePlanForToday()
