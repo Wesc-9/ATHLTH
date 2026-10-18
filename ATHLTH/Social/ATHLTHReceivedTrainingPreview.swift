@@ -63,9 +63,8 @@ struct ATHLTHReceivedTrainingPreview: View {
                         }
                     }
                     .safeAreaInset(edge: .bottom) {
-                        if [.workout, .trainingPlan, .runningWorkout].contains(
-                            message.attachmentKind
-                        ) {
+                        if let kind = message.attachmentKind,
+                           [.workout, .trainingPlan, .runningWorkout].contains(kind) {
                             Button {
                                 onSave()
                                 dismiss()
