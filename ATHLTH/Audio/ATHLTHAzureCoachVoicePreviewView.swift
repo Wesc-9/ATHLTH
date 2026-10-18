@@ -13,6 +13,7 @@ final class ATHLTHAzureVoicePreviewPlayer:
     @Published private(set) var message: String?
 
     private var player: AVAudioPlayer?
+    private var ownsAudioSession = false
     private var requestTask: Task<Void, Never>?
     private var requestIdentity = UUID()
     private struct Request: Encodable { let voice: String }
@@ -48,6 +49,7 @@ final class ATHLTHAzureVoicePreviewPlayer:
                     throw PreviewError.invalidAudio
                 }
                 try ATHLTHSpokenAudioSession.activate(duckOtherAudio: duckMusic)
+                ownsAudioSession = true
                 let audio = try AVAudioPlayer(data: data)
                 audio.delegate = self
                 guard audio.prepareToPlay(), audio.play() else {
@@ -60,7 +62,7 @@ final class ATHLTHAzureVoicePreviewPlayer:
                     return
                 }
                 loadingVoice = nil
-                ATHLTHSpokenAudioSession.deactivate()
+                releaseAudioSessionIfOwned()
                 message = ATHLTHLocalization.choose(
                     english: "Azure voice preview is unavailable. Your iPhone's offline voice still works during workouts.",
                     norwegian: "Azure-stemmen kan ikke forhåndslyttes nå. iPhone-stemmen fungerer fortsatt under treningsøkter."
@@ -76,6 +78,12 @@ final class ATHLTHAzureVoicePreviewPlayer:
         loadingVoice = nil
         player?.stop()
         player = nil
+        releaseAudioSessionIfOwned()
+    }
+
+    private func releaseAudioSessionIfOwned() {
+        guard ownsAudioSession else { return }
+        ownsAudioSession = false
         ATHLTHSpokenAudioSession.deactivate()
     }
 
