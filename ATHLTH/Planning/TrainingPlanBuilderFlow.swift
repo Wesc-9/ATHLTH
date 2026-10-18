@@ -1990,31 +1990,40 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         weeklyTimeBudgetMinutes = simpleMinutes * selectedDays.count
     }
 
+    // Basics already appears in the step progress header. Use one quiet
+    // editorial heading instead of repeating the step number and details in
+    // a large introductory card.
+    private var compactBasicsIntro: some View {
+        ATHLTHPlanSurface(density: .compact) {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .frame(width: 42, height: 42)
+                    .background(
+                        ATHLTHPlanDesign.selectedSurface,
+                        in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    )
+                    .accessibilityHidden(true)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Give the plan a frame",
+                    norwegian: "Gi planen en ramme"
+                ))
+                .font(.system(size: 24, weight: .regular, design: .serif))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
     private var basicsStep: some View {
         VStack(
             alignment: .leading,
             spacing: 16
         ) {
-            stepIntro(
-                eyebrow:
-                    ATHLTHLocalization.choose(
-                        english: "01 · PLAN BASICS",
-                        norwegian: "01 · GRUNNINFO"
-                    ),
-                title:
-                    ATHLTHLocalization.choose(
-                        english: "Give the plan a frame",
-                        norwegian: "Gi planen en ramme"
-                    ),
-                subtitle:
-                    ATHLTHLocalization.choose(
-                        english:
-                            "A clear name, a start date and how long you want the plan to run.",
-                        norwegian:
-                            "Velg navn, startdato og varighet. Alt kan endres senere."
-                    ),
-                icon: "calendar"
-            )
+            compactBasicsIntro
 
             builderPanel {
                 VStack(spacing: 14) {
