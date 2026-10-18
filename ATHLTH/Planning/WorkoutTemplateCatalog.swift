@@ -391,11 +391,18 @@ struct WorkoutTemplateCatalogEntry: Identifiable, Codable, Hashable {
     }
 }
 
+extension WorkoutTemplateCatalogEntry {
+    /// A single offline baseline used everywhere, even without connectivity.
+    static var bundledCatalog: [WorkoutTemplateCatalogEntry] {
+        fallbackCatalog + ATHLTHCuratedStrengthWorkouts.entries
+    }
+}
+
 @MainActor
 final class WorkoutTemplateCatalogStore: ObservableObject {
     @Published private(set) var entries:
         [WorkoutTemplateCatalogEntry] =
-            WorkoutTemplateCatalogEntry.fallbackCatalog
+            WorkoutTemplateCatalogEntry.bundledCatalog
     @Published private(set) var isLoading = false
     /// Whether the catalogue contains live published data rather than the
     /// bundled HYROX-only fallback. Used by general Train suggestions.
@@ -428,13 +435,24 @@ final class WorkoutTemplateCatalogStore: ObservableObject {
                     .execute()
                     .value
 
-            if !remote.isEmpty {
-                entries = remote
-                loadedRemote = true
-                hasPublishedCatalog = true
+            // Remote and built-in exercises should complement one another.
+            // Replace identical slugs with their published version, but do
+            // not hide offline running/strength recommendations when online.
+            let publishedSlugs = Set(remote.map(\.slug))
+            let localOnly = WorkoutTemplateCatalogEntry.bundledCatalog
+                .filter { !publishedSlugs.contains($0.slug) }
+            entries = (remote + localOnly).sorted {
+                $0.sortOrder == $1.sortOrder
+                    ? $0.title < $1.title : $0.sortOrder < $1.sortOrder
             }
+            loadedRemote = true
+            hasPublishedCatalog = !remote.isEmpty
             errorMessage = nil
         } catch {
+            // The full offline collection remains available on network errors.
+            if !hasPublishedCatalog {
+                entries = WorkoutTemplateCatalogEntry.bundledCatalog
+            }
             errorMessage = error.localizedDescription
         }
     }
