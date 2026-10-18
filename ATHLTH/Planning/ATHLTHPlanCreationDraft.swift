@@ -193,6 +193,19 @@ struct ATHLTHPlanCreationDraftStore {
         "athlth.planWizardDraft.v1.\(userID.uuidString)"
     }
 
+    private func editingKey(userID: UUID) -> String {
+        "athlth.planWizardEditing.v1.\(userID.uuidString)"
+    }
+
+    // Only a non-sensitive boolean is saved outside the protected draft.
+    func wasEditing(userID: UUID) -> Bool {
+        defaults.bool(forKey: editingKey(userID: userID))
+    }
+
+    func setEditing(_ editing: Bool, userID: UUID) {
+        defaults.set(editing, forKey: editingKey(userID: userID))
+    }
+
     private var folder: URL? {
         directoryURL ?? FileManager.default.urls(
             for: .applicationSupportDirectory, in: .userDomainMask
@@ -249,5 +262,6 @@ struct ATHLTHPlanCreationDraftStore {
             try? FileManager.default.removeItem(at: url)
         }
         defaults.removeObject(forKey: legacyKey(userID: userID))
+        setEditing(false, userID: userID)
     }
 }

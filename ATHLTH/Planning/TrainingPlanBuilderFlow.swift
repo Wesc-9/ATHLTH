@@ -455,6 +455,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
         }
         .onAppear {
+            draftStore.setEditing(true, userID: session.profile.userID)
             guard !didApplySuggestedStartDate
             else {
                 return
@@ -498,6 +499,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             for: suggested
                         )
                 )
+        }
+        .onDisappear {
+            // A normal dismissal exits the editing session, while locking
+            // the phone leaves it recoverable after an OS process eviction.
+            if scenePhase == .active {
+                draftStore.setEditing(false, userID: session.profile.userID)
+            }
         }
         .onChange(of: title) { _, _ in saveResumableDraft() }
         .onChange(of: weekCount) { _, _ in saveResumableDraft() }

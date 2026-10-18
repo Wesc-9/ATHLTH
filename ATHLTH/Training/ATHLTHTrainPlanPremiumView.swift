@@ -323,6 +323,16 @@ struct ATHLTHTrainPlanPremiumView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear {
             refreshUnfinishedPlanDraft()
+            if let checkpoint = unfinishedPlanDraft,
+               unfinishedDraftStore.wasEditing(userID: session.profile.userID),
+               Date().timeIntervalSince(checkpoint.savedAt) < 24 * 60 * 60 {
+                // Only reopen after an interrupted active session. A normal
+                // deliberate exit clears the flag and keeps the resume card.
+                Task { @MainActor in
+                    await Task.yield()
+                    if !showingCreation { showingCreation = true }
+                }
+            }
             session.refreshActivePlanForToday()
             if let plan {
                 advanced = plan.builderProfile?.mode == .advanced
