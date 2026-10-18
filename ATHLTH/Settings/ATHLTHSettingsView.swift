@@ -22,7 +22,7 @@ private enum ATHLTHSettingsCategory: String, CaseIterable, Identifiable {
         case .account: return ATHLTHLocalization.choose(english: "Profile & account", norwegian: "Profil og konto")
         case .app: return ATHLTHLocalization.choose(english: "App & language", norwegian: "App og språk")
         case .membership: return ATHLTHLocalization.choose(english: "Membership", norwegian: "Medlemskap")
-        case .privacy: return ATHLTHLocalization.choose(english: "Privacy & help", norwegian: "Personvern og hjelp")
+        case .privacy: return ATHLTHLocalization.choose(english: "Privacy", norwegian: "Personvern")
         case .developer: return ATHLTHLocalization.choose(english: "Developer tools", norwegian: "Utviklerverktøy")
         }
     }
@@ -34,7 +34,7 @@ private enum ATHLTHSettingsCategory: String, CaseIterable, Identifiable {
         case .account: return ATHLTHLocalization.choose(english: "Health profile, sign-in and security", norwegian: "Helseprofil, innlogging og sikkerhet")
         case .app: return ATHLTHLocalization.choose(english: "Language, units, time and widgets", norwegian: "Språk, enheter, tid og widgeter")
         case .membership: return ATHLTHLocalization.choose(english: "ATHLTH+, purchases and billing", norwegian: "ATHLTH+, kjøp og betaling")
-        case .privacy: return ATHLTHLocalization.choose(english: "Contact, privacy and legal information", norwegian: "Kontakt, personvern og vilkår")
+        case .privacy: return ATHLTHLocalization.choose(english: "Privacy policy and terms", norwegian: "Personvernerklæring og vilkår")
         case .developer: return ATHLTHLocalization.choose(english: "Diagnostics, AI usage and testing", norwegian: "Diagnostikk, AI-bruk og testing")
         }
     }
@@ -54,11 +54,11 @@ private enum ATHLTHSettingsCategory: String, CaseIterable, Identifiable {
     var terms: String {
         switch self {
         case .health: return "health helse apple health watch klokke sync synkronisering import calendar kalender spotify garmin home assistant tilkobling connections"
-        case .training: return "training trening workout styrke løping løp guidance veiledning audio coach ghost notifications varsler alarm achievements trophies medalje"
+        case .training: return "training trening workout styrke løping løp guidance veiledning audio coach ghost notifications varsler alarm achievements trophies medalje exercise data repdb øvelsesdatabase"
         case .account: return "profile profil account konto health helseprofil sign-in login innlogging password passord security sikkerhet data privacy"
         case .app: return "app språk language engelsk norsk måleenheter measurements units tid time format widget widgets lock screen siri"
         case .membership: return "medlemskap premium athlth plus abonnement billing betal kjøp purchase restore subscription trial"
-        case .privacy: return "privacy personvern rettigheter vilkår terms policy exercise data repdb om app legal hjelpe kontakt contact oss support støtte epost e-post email mail contact@athlth.com"
+        case .privacy: return "privacy personvern rettigheter vilkår terms policy legal"
         case .developer: return "utvikler developer support diagnostics diagnostikk debug usage ai lab control center"
         }
     }
@@ -97,11 +97,9 @@ struct ATHLTHSettingsView: View {
                         quickAccessSection
                     }
 
-                    if settingsSearchText.isEmpty || matchesContactSearch {
-                        supportContactCard
-                    }
-
-                    if filteredSettingsCategories.isEmpty {
+                    if filteredSettingsCategories.isEmpty &&
+                        !matchesContactSearch &&
+                        !matchesWebsiteSearch {
                         ContentUnavailableView.search(text: settingsSearchText)
                             .frame(maxWidth: .infinity)
                     } else {
@@ -137,6 +135,14 @@ struct ATHLTHSettingsView: View {
                                 )
                             }
                         }
+                    }
+
+                    if settingsSearchText.isEmpty || matchesContactSearch {
+                        supportContactCard
+                    }
+
+                    if settingsSearchText.isEmpty || matchesWebsiteSearch {
+                        websiteFooterLink
                     }
 
                     HStack {
@@ -183,6 +189,62 @@ struct ATHLTHSettingsView: View {
         guard !query.isEmpty else { return true }
         return "contact@athlth.com kontakt contact oss hjelp support epost email"
             .localizedStandardContains(query)
+    }
+
+    private var matchesWebsiteSearch: Bool {
+        let query = settingsSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return true }
+        return "ATHLTH.com nettside website hjemmeside official offisiell web"
+            .localizedStandardContains(query)
+    }
+
+    private var websiteFooterLink: some View {
+        Link(destination: ATHLTHLegalIdentity.websiteURL) {
+            HStack(spacing: 12) {
+                Image(systemName: "globe")
+                    .font(.system(size: 19, weight: .medium))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 38, height: 38)
+                    .background(
+                        ATHLTHTheme.premiumGoldSoft,
+                        in: RoundedRectangle(cornerRadius: 12)
+                    )
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Official website",
+                        norwegian: "Offisiell nettside"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    Text("ATHLTH.com")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                }
+
+                Spacer(minLength: 4)
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .background(
+                Color.white.opacity(0.85),
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(ATHLTHTheme.border.opacity(0.60), lineWidth: 0.8)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 18))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(ATHLTHLocalization.choose(
+            english: "Open official ATHLTH website",
+            norwegian: "Åpne ATHLTHs offisielle nettside"
+        ))
     }
 
     private var supportContactCard: some View {
@@ -551,7 +613,7 @@ struct ATHLTHSettingsView: View {
         case .membership:
             membershipSettingsSection
         case .privacy:
-            aboutSettingsSection
+            privacySettingsSection
         case .developer:
             developerSettingsSections
         }
@@ -1199,6 +1261,25 @@ settingsSection("Preferences") {
                                 }
                             }
                             .buttonStyle(.plain)
+                            SettingsDivider()
+
+                            Link(destination: URL(string: "https://repdb.co")!) {
+                                PremiumSettingsRow(
+                                    icon: "figure.strengthtraining.traditional",
+                                    title: ATHLTHLocalization.choose(
+                                        english: "Exercise data",
+                                        norwegian: "Øvelsesdata"
+                                    ),
+                                    subtitle: ATHLTHLocalization.choose(
+                                        english: "Exercise catalog powered by RepDB",
+                                        norwegian: "Øvelsesbibliotek levert av RepDB"
+                                    )
+                                ) {
+                                    Image(systemName: "arrow.up.right")
+                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                }
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
     }
@@ -1358,44 +1439,9 @@ settingsSection("Account") {
                     }
     }
 
-    private var aboutSettingsSection: some View {
-settingsSection("About") {
-                        PremiumSettingsCard {
-                            NavigationLink {
-            ATHLTHContactSupportView()
-        } label: {
-                                PremiumSettingsRow(
-                                    icon: "envelope",
-                                    iconTint: ATHLTHTheme.accentDeep,
-                                    iconBackground: ATHLTHTheme.premiumGoldSoft,
-                                    title: ATHLTHLocalization.choose(
-                                        english: "Contact us",
-                                        norwegian: "Kontakt oss"
-                                    ),
-                                    subtitle: ATHLTHLegalIdentity.supportContactEmail
-                                ) {
-                                    Image(systemName: "arrow.up.right")
-                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            SettingsDivider()
-
-                            Link(destination: URL(string: "https://repdb.co")!) {
-                                PremiumSettingsRow(
-                                    icon: "figure.strengthtraining.traditional",
-                                    title: "Exercise data",
-                                    subtitle: "Exercise catalog powered by RepDB"
-                                ) {
-                                    Image(systemName: "arrow.up.right")
-                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            SettingsDivider()
-
+    private var privacySettingsSection: some View {
+        settingsSection("Privacy") {
+            PremiumSettingsCard {
                             NavigationLink {
                                 LegalDocumentView(kind: .terms)
                             } label: {
@@ -1425,8 +1471,8 @@ settingsSection("About") {
                                 }
                             }
                             .buttonStyle(.plain)
-                        }
-                    }
+            }
+        }
     }
 
     @ViewBuilder
@@ -1644,6 +1690,8 @@ if session.currentRole.canAccessControlCenter {
             return "Konto"
         case "About":
             return "Om ATHLTH"
+        case "Privacy":
+            return "Personvern"
         case "Support":
             return "Brukerstøtte"
         case "Developer":
