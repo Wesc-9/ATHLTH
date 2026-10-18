@@ -4457,13 +4457,13 @@ private struct HomePremiumStrengthStudioBackground: View {
                 LinearGradient(
                     stops: [
                         .init(color: Color(red: 0.99, green: 0.96, blue: 0.90)
-                            .opacity(preservesMuscleContrast ? 0.55 : 0.20),
+                            .opacity(preservesMuscleContrast ? 0.24 : 0.12),
                               location: 0),
                         .init(color: Color.white
-                            .opacity(preservesMuscleContrast ? 0.43 : 0.10),
+                            .opacity(preservesMuscleContrast ? 0.21 : 0.08),
                               location: 0.50),
                         .init(color: Color(red: 0.96, green: 0.94, blue: 0.91)
-                            .opacity(preservesMuscleContrast ? 0.40 : 0.14),
+                            .opacity(preservesMuscleContrast ? 0.20 : 0.10),
                               location: 1)
                     ],
                     startPoint: .leading,
@@ -4544,9 +4544,9 @@ private struct HomeStrengthMuscleArtwork:
                 // Soft center scrim makes fine anatomical lines legible
                 // without hiding the sunlit studio around the figures.
                 RoundedRectangle(cornerRadius: 34, style: .continuous)
-                    .fill(Color.white.opacity(0.56))
+                    .fill(Color.white.opacity(0.46))
                     .frame(
-                        width: min(max(height * 2.30, 260),
+                        width: min(max(height * 1.82, 204),
                                    max(proxy.size.width - 28, 1)),
                         height: max(height - 8, 1)
                     )
