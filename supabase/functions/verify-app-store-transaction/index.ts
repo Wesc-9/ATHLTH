@@ -135,7 +135,7 @@ export default {
       return Response.json({ error: "Method not allowed." }, { status: 405 });
     }
 
-    const userID = ctx.userClaims?.sub;
+    const userID = ctx.userClaims?.id;
     if (!userID) {
       return Response.json({ error: "Missing authenticated user." }, { status: 401 });
     }
