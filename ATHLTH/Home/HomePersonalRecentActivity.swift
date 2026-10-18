@@ -542,26 +542,37 @@ struct HomeActiveFriendsStrip: View {
     @EnvironmentObject private var messaging: MessagingStore
     @Environment(\.scenePhase) private var scenePhase
 
+    private struct RankedFriend {
+        let profile: SocialProfileCard
+        let training: Bool
+        let online: Bool
+        let affinity: Int
+    }
+
     private var orderedFriends: [SocialProfileCard] {
+        // Compute each person's interaction score once per refresh, instead
+        // of re-scanning messages during every sorting comparison.
         social.mutualFollows
             .filter { !social.isMuted($0.userID) }
+            .map { friend in
+                RankedFriend(
+                    profile: friend,
+                    training: realtime.isTrainingNow(friend.userID),
+                    online: realtime.isOnline(friend.userID),
+                    affinity: affinity(for: friend.userID)
+                )
+            }
             .sorted { lhs, rhs in
-                let lhsTraining = realtime.isTrainingNow(lhs.userID)
-                let rhsTraining = realtime.isTrainingNow(rhs.userID)
-                if lhsTraining != rhsTraining { return lhsTraining }
-
-                let lhsOnline = realtime.isOnline(lhs.userID)
-                let rhsOnline = realtime.isOnline(rhs.userID)
-                if lhsOnline != rhsOnline { return lhsOnline }
-
-                let lhsAffinity = affinity(for: lhs.userID)
-                let rhsAffinity = affinity(for: rhs.userID)
-                if lhsAffinity != rhsAffinity { return lhsAffinity > rhsAffinity }
-
-                return lhs.resolvedName.localizedStandardCompare(
-                    rhs.resolvedName
+                if lhs.training != rhs.training { return lhs.training }
+                if lhs.online != rhs.online { return lhs.online }
+                if lhs.affinity != rhs.affinity {
+                    return lhs.affinity > rhs.affinity
+                }
+                return lhs.profile.resolvedName.localizedStandardCompare(
+                    rhs.profile.resolvedName
                 ) == .orderedAscending
             }
+            .map(\.profile)
     }
 
     // Only use interactions already authorized for this signed-in user.
@@ -646,12 +657,18 @@ struct HomeActiveFriendsStrip: View {
                 }
             }
             .padding(.top, 2)
-            .task {
-                await realtime.refreshOnlineUsers()
-            }
-            .onChange(of: scenePhase) { _, phase in
-                guard phase == .active else { return }
-                Task { await realtime.refreshOnlineUsers() }
+            .task(id: scenePhase) {
+                guard scenePhase == .active else { return }
+                // Low-frequency refresh only while this strip is mounted.
+                // No synthetic online status if the server data is stale.
+                while !Task.isCancelled {
+                    await realtime.refreshOnlineUsers()
+                    do {
+                        try await Task.sleep(for: .seconds(90))
+                    } catch {
+                        break
+                    }
+                }
             }
         }
     }
@@ -1651,7 +1668,14 @@ private struct HomeCompactActivityEngagementRow:
         guard let pendingLiked, pendingLiked != isLiked else {
             return likeCount
         }
-        return max(0, likeCount + (pendingLiked ? 1 : -1))
+        // Switching from a different reaction to heart changes its type,
+        // not the number of people reacting.
+        let alreadyReacted = currentItem?.reactions.contains {
+            $0.userID == social.currentUserID
+        } ?? false
+        return max(0, likeCount + (pendingLiked
+            ? (alreadyReacted ? 0 : 1)
+            : -1))
     }
 
     private var commentCount: Int {
