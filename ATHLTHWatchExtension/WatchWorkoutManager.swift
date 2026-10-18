@@ -3829,7 +3829,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             config: config
         )
 
-        guard let phrase = ATHLTHFuelVoicePrompt.phrase(config: config)
+        // Never catch up an overdue cue after a long pause or reconnect.
+        guard ATHLTHFuelVoicePrompt.isFreshDue(
+            elapsed: elapsedTime,
+            scheduled: next
+        ),
+        let phrase = ATHLTHFuelVoicePrompt.phrase(config: config)
         else { return }
 
         speak(
