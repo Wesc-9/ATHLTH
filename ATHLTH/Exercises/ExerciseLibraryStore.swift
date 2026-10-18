@@ -816,10 +816,10 @@ final class ExerciseLibraryStore: ObservableObject {
             if let bodyPart, bodyPart != "All" {
                 let selected = Self.canonicalMuscleFilter(bodyPart)
                 matchesBodyPart =
-                    entry.bodyPart.map {
+                    (entry.bodyPart.map {
                         Self.canonicalMuscleFilter($0)
                             .localizedCaseInsensitiveCompare(selected) == .orderedSame
-                    } ?? false ||
+                    } ?? false) ||
                     entry.exercise.primaryMuscles.contains {
                         Self.canonicalMuscleFilter($0)
                             .localizedCaseInsensitiveCompare(selected) == .orderedSame
