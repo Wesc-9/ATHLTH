@@ -46,7 +46,7 @@ Deno.serve(async (request) => {
 
   const { data: entitlement, error: planError } = await admin
     .from("subscription_entitlements")
-    .select("status,trial_ends_at,current_period_ends_at")
+    .select("tier,status,trial_ends_at,current_period_ends_at")
     .eq("user_id", user.id).maybeSingle();
   if (planError) return json({ error: "ATHLTH+ access could not be verified." }, 503);
   const now = Date.now();
@@ -57,7 +57,7 @@ Deno.serve(async (request) => {
     (entitlement.current_period_ends_at == null ||
       (typeof entitlement.current_period_ends_at === "string" &&
         Date.parse(entitlement.current_period_ends_at) > now));
-  if (!trial && !paid) {
+  if (entitlement?.tier !== "athlth_plus" || (!trial && !paid)) {
     return json({
       error: "The equipment scanner requires ATHLTH+.",
       code: "PREMIUM_REQUIRED",
@@ -127,7 +127,9 @@ Deno.serve(async (request) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: Deno.env.get("GROQ_VISION_MODEL") ?? "qwen/qwen3.8-27b",
+        // Pin a currently supported image model. A stale/deprecated
+        // GROQ_VISION_MODEL secret must not break equipment scans.
+        model: "qwen/qwen3.8-27b",
         messages: [{
           role: "user",
           content: [
@@ -136,22 +138,58 @@ Deno.serve(async (request) => {
           ],
         }],
         response_format: { type: "json_object" },
-        temperature: 0,
-        max_completion_tokens: 900,
+        reasoning_effort: "none",
+        temperature: 0.3,
+        max_completion_tokens: 1300,
         stream: false,
       }),
       signal: AbortSignal.timeout(27000),
     });
-  } catch {
-    return json({ error: "The image could not be analyzed." }, 502);
+  } catch (error) {
+    // No image, token, authentication data or provider payload is logged.
+    const timeout = error instanceof Error &&
+      (error.name === "TimeoutError" || error.name === "AbortError");
+    console.warn("[equipment-vision] upstream network failure",
+      timeout ? "timeout" : "network");
+    return json({
+      error: "Image analysis could not connect. Please try again.",
+      code: timeout ? "VISION_TIMEOUT" : "VISION_NETWORK_ERROR",
+    }, timeout ? 504 : 502);
   }
-  if (!ai.ok) return json({ error: "ATHLTH AI could not analyze this image." }, 502);
+
+  if (!ai.ok) {
+    // Keep sensitive provider response bodies private. Diagnostic HTTP status
+    // is sufficient to distinguish expired API access from rate limiting.
+    console.warn("[equipment-vision] upstream HTTP status", ai.status);
+    if (ai.status === 429) {
+      return json({
+        error: "The AI service is busy. Please try again later.",
+        code: "VISION_RATE_LIMIT",
+      }, 429);
+    }
+    if ([400, 401, 403, 404].includes(ai.status)) {
+      return json({
+        error: "Image analysis is temporarily unavailable. Please try again later.",
+        code: "VISION_PROVIDER_CONFIGURATION",
+      }, 503);
+    }
+    return json({
+      error: "The image service could not analyze this photo right now.",
+      code: "VISION_UPSTREAM_ERROR",
+    }, 502);
+  }
 
   let parsed: any;
   try {
     parsed = JSON.parse(textOutput(await ai.json()) ?? "");
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+      throw new Error("Invalid analysis");
   } catch {
-    return json({ error: "ATHLTH AI returned an invalid equipment analysis." }, 502);
+    console.warn("[equipment-vision] provider response had no valid JSON");
+    return json({
+      error: "The image analysis could not be read. Please try another photo.",
+      code: "VISION_INVALID_RESPONSE",
+    }, 502);
   }
   const confidence = ["high", "medium", "low"].includes(parsed?.confidence)
     ? parsed.confidence as "high" | "medium" | "low" : "low";
