@@ -89,6 +89,23 @@ final class ATHLTHPlanCreationDraftTests: XCTestCase {
         XCTAssertEqual(store.load(userID: user)?.title.count, 40)
     }
 
+    func testActiveEditorMarkerIsPerAccountAndClearResetsIt() {
+        let (settings, suite) = defaults()
+        defer { settings.removePersistentDomain(forName: suite) }
+        let location = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ATHLTHEditingFlag.\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: location) }
+        let store = ATHLTHPlanCreationDraftStore(defaults: settings, directoryURL: location)
+        let user = UUID()
+        let another = UUID()
+        XCTAssertFalse(store.wasEditing(userID: user))
+        store.setEditing(true, userID: user)
+        XCTAssertTrue(store.wasEditing(userID: user))
+        XCTAssertFalse(store.wasEditing(userID: another))
+        store.clear(userID: user)
+        XCTAssertFalse(store.wasEditing(userID: user))
+    }
+
     func testAtomicDraftSurvivesFreshStoreInstance() throws {
         let (settings, suite) = defaults()
         let location = FileManager.default.temporaryDirectory

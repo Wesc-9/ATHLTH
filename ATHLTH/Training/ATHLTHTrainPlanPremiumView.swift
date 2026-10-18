@@ -289,7 +289,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                     title: tr("Create another plan", "Opprett ny treningsplan"),
                     icon: "plus"
                 ) {
-                    showingCreation = true
+                    beginNewPlanCreation()
                 }
             } else if let plan {
                 if session.activePlan?.id != plan.id {
@@ -590,6 +590,14 @@ struct ATHLTHTrainPlanPremiumView: View {
         return nil
     }
 
+    private func beginNewPlanCreation() {
+        if unfinishedPlanDraft != nil {
+            showingDiscardPlanDraftConfirmation = true
+        } else {
+            showingCreation = true
+        }
+    }
+
     private func refreshUnfinishedPlanDraft() {
         let checkpoint = unfinishedDraftStore.load(userID: session.profile.userID)
         unfinishedPlanDraft = checkpoint?.stage == "mode" ? nil : checkpoint
@@ -886,7 +894,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                 }
             }
             Button {
-                showingCreation = true
+                beginNewPlanCreation()
             } label: {
                 Label(tr("New program", "Nytt program"), systemImage: "plus")
             }
@@ -916,7 +924,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                 }
                 Spacer()
                 Button {
-                    showingCreation = true
+                    beginNewPlanCreation()
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 18, weight: .medium))
@@ -985,7 +993,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                     title: tr("Create a plan", "Opprett treningsplan"),
                     icon: "arrow.right"
                 ) {
-                    showingCreation = true
+                    beginNewPlanCreation()
                 }
             }
             .padding(.horizontal, 17)
