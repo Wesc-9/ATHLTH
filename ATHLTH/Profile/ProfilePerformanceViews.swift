@@ -9658,15 +9658,36 @@ struct ProfileRecordShowcasePickerView:
             if selection.indices.contains(index) {
                 let kind = selection[index]
 
-                ProfileRecordVisualTile(
-                    kind: kind,
-                    value: recordValue(for: kind),
-                    detail: kind.supportingDetail(
-                        healthRecords: resolvedHealthRecords
-                    ),
-                    showsSelection: true,
-                    isSelected: true
-                )
+                ZStack(alignment: .topTrailing) {
+                    ProfileRecordVisualTile(
+                        kind: kind,
+                        value: recordValue(for: kind),
+                        detail: kind.supportingDetail(
+                            healthRecords: resolvedHealthRecords
+                        ),
+                        showsSelection: replacingIndex != nil,
+                        isSelected: true
+                    )
+
+                    if replacingIndex == nil {
+                        Button {
+                            toggle(kind)
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(ATHLTHTheme.primaryText.opacity(0.75))
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            ATHLTHLocalization.choose(
+                                english: "Remove from featured records",
+                                norwegian: "Fjern fra utvalgte rekorder"
+                            )
+                        )
+                    }
+                }
                 .accessibilityLabel(
                     "\(kind.title), \(recordValue(for: kind))"
                 )
