@@ -534,6 +534,129 @@ private struct HomeRecentActivityRevision:
     let phoneFirstEnd: Date?
 }
 
+// Small, low-cost Home presence strip. Uses the same server-authorized
+// mutual-follow status and avatar indicators as the rest of ATHLTH.
+struct HomeActiveFriendsStrip: View {
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
+    @EnvironmentObject private var messaging: MessagingStore
+    @Environment(\.scenePhase) private var scenePhase
+
+    private var orderedFriends: [SocialProfileCard] {
+        social.mutualFollows
+            .filter { !social.isMuted($0.userID) }
+            .sorted { lhs, rhs in
+                let lhsTraining = realtime.isTrainingNow(lhs.userID)
+                let rhsTraining = realtime.isTrainingNow(rhs.userID)
+                if lhsTraining != rhsTraining { return lhsTraining }
+
+                let lhsOnline = realtime.isOnline(lhs.userID)
+                let rhsOnline = realtime.isOnline(rhs.userID)
+                if lhsOnline != rhsOnline { return lhsOnline }
+
+                let lhsAffinity = affinity(for: lhs.userID)
+                let rhsAffinity = affinity(for: rhs.userID)
+                if lhsAffinity != rhsAffinity { return lhsAffinity > rhsAffinity }
+
+                return lhs.resolvedName.localizedStandardCompare(
+                    rhs.resolvedName
+                ) == .orderedAscending
+            }
+    }
+
+    // Only use interactions already authorized for this signed-in user.
+    // Pinned conversations, recent messages and engagement are tie-breakers,
+    // never a replacement for actual live training/online presence.
+    private func affinity(for userID: UUID) -> Int {
+        let pinned = messaging.conversation(with: userID).map {
+            messaging.pinnedConversationIDs.contains($0.id)
+        } ?? false
+        let messages = messaging.recentMessages.filter {
+            $0.deletedAt == nil &&
+            ($0.senderID == userID || $0.recipientID == userID)
+        }
+        let fresh = messages.contains {
+            $0.createdAt >= Date().addingTimeInterval(-14 * 86_400)
+        }
+        let engaged = social.feed.prefix(80).filter {
+            $0.actor.userID == userID &&
+            ($0.reactions.contains { $0.userID == social.currentUserID } ||
+             $0.comments.contains { $0.userID == social.currentUserID })
+        }.count
+
+        return (pinned ? 50 : 0)
+            + min(messages.count, 30) * 2
+            + (fresh ? 8 : 0)
+            + min(engaged, 10) * 3
+    }
+
+    private var activeCount: Int {
+        orderedFriends.filter {
+            realtime.isTrainingNow($0.userID) ||
+            realtime.isOnline($0.userID)
+        }.count
+    }
+
+    var body: some View {
+        if !orderedFriends.isEmpty {
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(spacing: 8) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Friends", norwegian: "Venner"
+                    ))
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                    if activeCount > 0 {
+                        Text(ATHLTHLocalization.choose(
+                            english: "\(activeCount) active",
+                            norwegian: "\(activeCount) aktive"
+                        ))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    Spacer(minLength: 0)
+                }
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(alignment: .top, spacing: 10) {
+                        ForEach(orderedFriends) { friend in
+                            NavigationLink {
+                                FriendProfileView(userID: friend.userID)
+                            } label: {
+                                VStack(spacing: 3) {
+                                    ATHLTHSocialStatusAvatar(
+                                        profile: friend, size: 43
+                                    )
+                                    .frame(width: 52, height: 52)
+
+                                    Text(friend.resolvedName
+                                        .components(separatedBy: " ")
+                                        .first ?? friend.resolvedName)
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundStyle(ATHLTHTheme.primaryText)
+                                        .lineLimit(1)
+                                }
+                                .frame(width: 58)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 1)
+                }
+            }
+            .padding(.top, 2)
+            .task {
+                await realtime.refreshOnlineUsers()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+                Task { await realtime.refreshOnlineUsers() }
+            }
+        }
+    }
+}
+
 struct HomePersonalRecentActivitySection:
     View {
     @EnvironmentObject private var health:
@@ -650,7 +773,7 @@ struct HomePersonalRecentActivitySection:
                             horizontalItem(
                                 item
                             )
-                            .frame(width: 278)
+                            .frame(width: 252)
                         }
                     }
                     .padding(
@@ -1106,7 +1229,7 @@ private struct HomePersonalHorizontalWorkoutCard:
                     workout: workout,
                     strengthWorkout: strengthWorkout,
                     phoneWorkout: phoneWorkout,
-                    height: 142,
+                    height: 114,
                     precomputedStrengthProfile: isStrength ? muscleProfile : nil
                 )
             }
@@ -1177,54 +1300,6 @@ private struct HomePersonalHorizontalWorkoutCard:
             .padding(.top, 8)
             .padding(.bottom, 7)
 
-            Rectangle()
-                .fill(Color.black.opacity(0.06))
-                .frame(height: 0.7)
-                .padding(.horizontal, 12)
-
-            NavigationLink {
-                activityLink
-            } label: {
-                HStack(spacing: 7) {
-                    if isStrength {
-                        HomeRecentCardMetric(
-                            icon: "clock",
-                            value: HomeRecentCardFormat.duration(workout.duration),
-                            title: ATHLTHLocalization.choose(english: "Duration", norwegian: "Varighet")
-                        )
-                        HomeRecentCardMetric(
-                            icon: "list.bullet",
-                            value: HomeRecentCardFormat.count(workout.strengthExerciseCount),
-                            title: ATHLTHLocalization.choose(english: "Exercises", norwegian: "Øvelser")
-                        )
-                        HomeRecentCardMetric(
-                            icon: "scalemass",
-                            value: HomeRecentCardFormat.volume(workout.strengthTotalVolumeKilograms),
-                            title: ATHLTHLocalization.choose(english: "Volume", norwegian: "Volum")
-                        )
-                    } else {
-                        HomeRecentCardMetric(
-                            icon: "location",
-                            value: HomeRecentCardFormat.distance(workout.distanceMeters),
-                            title: ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse")
-                        )
-                        HomeRecentCardMetric(
-                            icon: "clock",
-                            value: HomeRecentCardFormat.duration(workout.duration),
-                            title: ATHLTHLocalization.choose(english: "Duration", norwegian: "Tid")
-                        )
-                        HomeRecentCardMetric(
-                            icon: "speedometer",
-                            value: HomeRecentCardFormat.pace(seconds: workout.duration, meters: workout.distanceMeters),
-                            title: ATHLTHLocalization.choose(english: "Avg. pace", norwegian: "Snittfart")
-                        )
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
         }
     }
 
@@ -1450,7 +1525,7 @@ private struct HomeFollowingHorizontalWorkoutCard: View {
                 HomeFollowingWorkoutArtwork(
                     item: item,
                     activity: activity,
-                    height: 142
+                    height: 114
                 )
             }
             .buttonStyle(.plain)
@@ -1460,7 +1535,7 @@ private struct HomeFollowingHorizontalWorkoutCard: View {
                     FriendProfileView(userID: item.actor.userID)
                 } label: {
                     HStack(spacing: 8) {
-                        SocialAvatar(profile: item.actor, size: 36)
+                        SocialAvatar(profile: item.actor, size: 32)
                             .overlay {
                                 Circle().stroke(
                                     ATHLTHTheme.accent.opacity(0.25),
@@ -1523,58 +1598,6 @@ private struct HomeFollowingHorizontalWorkoutCard: View {
             .padding(.top, 8)
             .padding(.bottom, 7)
 
-            Rectangle()
-                .fill(Color.black.opacity(0.06))
-                .frame(height: 0.7)
-                .padding(.horizontal, 12)
-
-            NavigationLink {
-                detail
-            } label: {
-                HStack(spacing: 7) {
-                    if isStrength {
-                        HomeRecentCardMetric(
-                            icon: "clock",
-                            value: HomeRecentCardFormat.duration(seconds),
-                            title: ATHLTHLocalization.choose(english: "Duration", norwegian: "Varighet")
-                        )
-                        HomeRecentCardMetric(
-                            icon: "list.bullet",
-                            value: HomeRecentCardFormat.count(
-                                HomeRecentCardFormat.integer(item, key: "exercise_count")
-                            ),
-                            title: ATHLTHLocalization.choose(english: "Exercises", norwegian: "Øvelser")
-                        )
-                        HomeRecentCardMetric(
-                            icon: "scalemass",
-                            value: HomeRecentCardFormat.volume(
-                                HomeRecentCardFormat.number(item, key: "volume_kg")
-                            ),
-                            title: ATHLTHLocalization.choose(english: "Volume", norwegian: "Volum")
-                        )
-                    } else {
-                        HomeRecentCardMetric(
-                            icon: "location",
-                            value: HomeRecentCardFormat.distance(meters),
-                            title: ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse")
-                        )
-                        HomeRecentCardMetric(
-                            icon: "clock",
-                            value: HomeRecentCardFormat.duration(seconds),
-                            title: ATHLTHLocalization.choose(english: "Duration", norwegian: "Tid")
-                        )
-                        HomeRecentCardMetric(
-                            icon: "speedometer",
-                            value: HomeRecentCardFormat.pace(seconds: seconds, meters: meters),
-                            title: ATHLTHLocalization.choose(english: "Avg. pace", norwegian: "Snittfart")
-                        )
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
         }
     }
 }
@@ -1587,6 +1610,8 @@ private struct HomeCompactActivityEngagementRow:
     let item: SocialFeedItem?
 
     @State private var showingComments = false
+    @State private var pendingLiked: Bool?
+    @State private var isSendingLike = false
 
     private var currentItem:
         SocialFeedItem? {
@@ -1618,6 +1643,17 @@ private struct HomeCompactActivityEngagementRow:
         currentItem?.reactions.count ?? 0
     }
 
+    private var displayedLiked: Bool {
+        pendingLiked ?? isLiked
+    }
+
+    private var displayedLikeCount: Int {
+        guard let pendingLiked, pendingLiked != isLiked else {
+            return likeCount
+        }
+        return max(0, likeCount + (pendingLiked ? 1 : -1))
+    }
+
     private var commentCount: Int {
         currentItem?.comments.count ?? 0
     }
@@ -1625,34 +1661,36 @@ private struct HomeCompactActivityEngagementRow:
     var body: some View {
         HStack(spacing: 14) {
             Button {
-                guard let currentItem else {
+                guard let currentItem, !isSendingLike else {
                     return
                 }
-
+                let shouldLike = !displayedLiked
+                pendingLiked = shouldLike
+                isSendingLike = true
                 Task {
                     await social.setReaction(
-                        activityID:
-                            currentItem.id,
-                        reaction:
-                            isLiked
-                                ? nil
-                                : .heart
+                        activityID: currentItem.id,
+                        reaction: shouldLike ? .heart : nil
                     )
+                    // The shared social feed is the source of truth. A failed
+                    // request restores the prior heart instead of inventing a like.
+                    pendingLiked = nil
+                    isSendingLike = false
                 }
             } label: {
                 HStack(spacing: 4) {
                     Image(
                         systemName:
-                            isLiked
+                            displayedLiked
                                 ? "heart.fill"
                                 : "heart"
                     )
 
-                    Text("\(likeCount)")
+                    Text("\(displayedLikeCount)")
                         .monospacedDigit()
                 }
                 .foregroundStyle(
-                    isLiked
+                    displayedLiked
                         ? Color.red
                         : ATHLTHTheme
                             .mutedText
@@ -1664,7 +1702,7 @@ private struct HomeCompactActivityEngagementRow:
                 minHeight: 38
             )
             .contentShape(Rectangle())
-            .disabled(currentItem == nil)
+            .disabled(currentItem == nil || isSendingLike)
 
             Button {
                 guard currentItem != nil else {
