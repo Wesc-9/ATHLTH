@@ -8,6 +8,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     let startsAtSourceChoice: Bool
     let initialAdvanced: Bool
+    /// Only explicit "Continue draft" actions may resume at a later step.
+    let resumesDraftOnAppear: Bool
     var onCreated: ((UUID) -> Void)? = nil
 
     @State private var step: BuilderStep
@@ -95,8 +97,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     init(
         startsAtSourceChoice: Bool,
         initialAdvanced: Bool,
+        resumesDraftOnAppear: Bool = true,
         onCreated: ((UUID) -> Void)? = nil
     ) {
+        self.resumesDraftOnAppear = resumesDraftOnAppear
         self.onCreated = onCreated
         self.startsAtSourceChoice =
             startsAtSourceChoice
@@ -464,7 +468,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
             didApplySuggestedStartDate = true
 
-            if let unfinished = draftStore.load(userID: session.profile.userID) {
+            if resumesDraftOnAppear,
+               let unfinished = draftStore.load(userID: session.profile.userID) {
                 isHydratingPlanDraft = true
                 restorePlanDraft(unfinished)
                 // SwiftUI sheets should be presented after the navigation and

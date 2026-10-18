@@ -6,6 +6,8 @@ struct ATHLTHTrainProgramComposerView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
 
+    /// Pass false when the user chose "New plan" rather than "Continue".
+    var resumesDraftOnAppear = true
     var onCreated: ((UUID) -> Void)? = nil
 
     @StateObject private var catalog = TrainingPlanLibraryStore()
@@ -103,6 +105,7 @@ struct ATHLTHTrainProgramComposerView: View {
         ATHLTHTrainingPlanBuilderFlow(
             startsAtSourceChoice: true,
             initialAdvanced: advancedMode,
+            resumesDraftOnAppear: resumesDraftOnAppear,
             onCreated: onCreated
         )
     }
