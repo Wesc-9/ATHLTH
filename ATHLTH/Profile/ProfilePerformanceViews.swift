@@ -1289,7 +1289,7 @@ enum ProfileFeaturedRecordKind:
              .longestRunningDuration,
              .mostRunningElevationGain,
              .bestWalkingAveragePace,
-case .fastest400M,
+             .fastest400M,
              .fastest800M,
              .fastestMile,
              .fastest3K,
