@@ -82,7 +82,15 @@ enum ATHLTHCatalogPlanSessionFactory {
         let baselineMinutes = original?.estimatedDurationMinutes ??
             blueprint.durationMinutes(week: weekNumber, totalWeeks: entry.durationWeeks)
         let factor = competitionTaper ? 0.60 : recoveryWeek ? 0.80 : 1.0
-        let minutes = max(15, Int((Double(baselineMinutes) * factor).rounded()))
+        // Time-based running steps have already been adjusted for the current
+        // week. Counting their actual duration avoids fake 45-minute labels on
+        // 2-hour long runs, and prevents scaling taper volume twice.
+        let explicitMinutes = Int(ceil(
+            blocks.compactMap { $0.durationSeconds }.reduce(0, +) / 60
+        ))
+        let minutes = category == "running" || category == "walking"
+            ? max(10, explicitMinutes)
+            : max(15, Int((Double(baselineMinutes) * factor).rounded()))
 
         let stage: String
         if competitionTaper {
@@ -241,7 +249,8 @@ enum ATHLTHCatalogPlanSessionFactory {
             )]
 
         case .walkRun:
-            let runs = min(3 + max(0, (week - 1) / 2), 7)
+            let plannedRuns = min(3 + max(0, (week - 1) / 2), 7)
+            let runs = recovery || taper ? max(2, plannedRuns - 1) : plannedRuns
             var steps = [block(.run, tr("Easy walking warm-up", "Rolig gangoppvarming"),
                                phase: .warmup, seconds: 5 * 60, walking: true)]
             for attempt in 0..<runs {
