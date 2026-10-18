@@ -80,6 +80,7 @@ struct ATHLTHSettingsView: View {
     @EnvironmentObject private var homeAssistant: HomeAssistantConnectionStore
 
     @State private var showingMembership = false
+    @State private var membershipRestoreMessage: String?
     @State private var healthRequestInProgress = false
     @State private var showingAppleHealthPauseConfirmation = false
     @State private var settingsSearchText = ""
@@ -1454,8 +1455,18 @@ settingsSection("Membership") {
                                     icon: "crown.fill",
                                     iconTint: ATHLTHTheme.premiumGold,
                                     iconBackground: ATHLTHTheme.premiumGoldSoft,
-                                    title: "Plan",
-                                    subtitle: "Your current plan"
+                                    title: ATHLTHLocalization.choose(
+                                        english: "Plan", norwegian: "Abonnement"
+                                    ),
+                                    subtitle: session.subscriptionAccess.source == .ownerOverride
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Permanent owner access",
+                                            norwegian: "Permanent eiertilgang"
+                                        )
+                                        : ATHLTHLocalization.choose(
+                                            english: "Your current access",
+                                            norwegian: "Din nåværende tilgang"
+                                        )
                                 ) {
                                     HStack(spacing: 8) {
                                         Text(session.subscriptionAccess.displayTitle)
@@ -1524,8 +1535,23 @@ settingsSection("Membership") {
                             SettingsDivider()
 
                             Button {
+                                membershipRestoreMessage = nil
                                 Task {
-                                    _ = await subscriptionStore.restorePurchases()
+                                    let restored = await subscriptionStore.restorePurchases()
+                                    if restored {
+                                        session.applyStoreKitEntitlement(
+                                            subscriptionStore.activeEntitlement
+                                        )
+                                        membershipRestoreMessage = ATHLTHLocalization.choose(
+                                            english: "App Store purchase restored.",
+                                            norwegian: "App Store-kjøpet er gjenopprettet."
+                                        )
+                                    } else if subscriptionStore.errorMessage == nil {
+                                        membershipRestoreMessage = ATHLTHLocalization.choose(
+                                            english: "No active App Store purchase was found for this Apple Account.",
+                                            norwegian: "Fant ingen aktive App Store-kjøp for denne Apple-kontoen."
+                                        )
+                                    }
                                 }
                             } label: {
                                 PremiumSettingsRow(
@@ -1545,7 +1571,8 @@ settingsSection("Membership") {
                             .buttonStyle(.plain)
                             .disabled(subscriptionStore.restoreInProgress)
 
-                            if session.subscriptionAccess.hasPaidAccess {
+                            if session.subscriptionAccess.hasPaidAccess &&
+                               session.subscriptionAccess.billingPeriodTitle != nil {
                                 SettingsDivider()
 
                                 Link(destination: URL(string: "https://apps.apple.com/account/subscriptions")!) {
@@ -1559,6 +1586,15 @@ settingsSection("Membership") {
                                     }
                                 }
                                 .buttonStyle(.plain)
+                            }
+
+                            if let membershipRestoreMessage {
+                                SettingsDivider()
+                                Text(membershipRestoreMessage)
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
                             }
 
                             if let errorMessage = subscriptionStore.errorMessage {
