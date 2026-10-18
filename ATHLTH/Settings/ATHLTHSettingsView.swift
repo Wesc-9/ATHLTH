@@ -143,17 +143,23 @@ struct ATHLTHSettingsView: View {
                         supportContactCard
                     }
 
-                    if settingsSearchText.isEmpty || matchesWebsiteSearch {
-                        websiteFooterLink
-                    }
+                    HStack(spacing: 8) {
+                        Link(destination: ATHLTHLegalIdentity.websiteURL) {
+                            Text("ATHLTH.com")
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Open ATHLTH website",
+                            norwegian: "Åpne ATHLTH-nettsiden"
+                        ))
 
-                    HStack {
-                        Spacer()
+                        Text("·")
+
                         Text("ATHLTH \(appVersion)")
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                        Spacer()
                     }
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                    .frame(maxWidth: .infinity)
                     .padding(.top, 4)
                     .padding(.bottom, 22)
                 }
@@ -199,55 +205,6 @@ struct ATHLTHSettingsView: View {
         guard !query.isEmpty else { return true }
         return "ATHLTH.com nettside website hjemmeside official offisiell web"
             .localizedStandardContains(query)
-    }
-
-    private var websiteFooterLink: some View {
-        Link(destination: ATHLTHLegalIdentity.websiteURL) {
-            HStack(spacing: 12) {
-                Image(systemName: "globe")
-                    .font(.system(size: 19, weight: .medium))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .frame(width: 38, height: 38)
-                    .background(
-                        ATHLTHTheme.premiumGoldSoft,
-                        in: RoundedRectangle(cornerRadius: 12)
-                    )
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Official website",
-                        norwegian: "Offisiell nettside"
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-
-                    Text("ATHLTH.com")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                }
-
-                Spacer(minLength: 4)
-                Image(systemName: "arrow.up.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 11)
-            .background(
-                Color.white.opacity(0.85),
-                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(ATHLTHTheme.border.opacity(0.60), lineWidth: 0.8)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 18))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(ATHLTHLocalization.choose(
-            english: "Open official ATHLTH website",
-            norwegian: "Åpne ATHLTHs offisielle nettside"
-        ))
     }
 
     private var supportContactCard: some View {
@@ -2492,10 +2449,7 @@ if session.currentRole.canAccessControlCenter {
         let version = Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
         ) as? String ?? "—"
-        let build = Bundle.main.object(
-            forInfoDictionaryKey: "CFBundleVersion"
-        ) as? String ?? "—"
-        return "\(version) (\(build))"
+        return version
     }
 }
 
