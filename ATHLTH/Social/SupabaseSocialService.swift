@@ -831,6 +831,13 @@ final class SupabaseSocialService: Sendable {
     }
 
     func loadRemoteChallenges() async throws -> [ATHLTHChallenge] {
+        // Newer servers expire never-accepted invitations atomically before
+        // returning rows. Older deployments may not have the RPC yet; local
+        // ChallengeStore still enforces the same read-only status policy.
+        _ = try? await client
+            .rpc("expire_unaccepted_social_challenges")
+            .execute()
+
         let backendChallenges: [BackendSocialChallenge] = try await client
             .from("social_challenges")
             .select()
