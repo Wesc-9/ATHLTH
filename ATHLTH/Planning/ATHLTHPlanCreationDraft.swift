@@ -231,7 +231,7 @@ struct ATHLTHPlanCreationDraftStore {
         draftID: UUID? = nil
     ) {
         guard draft.isRestorable() else {
-            clear(userID: userID)
+            clear(userID: userID, draftID: draftID)
             return
         }
         guard let data = try? JSONEncoder().encode(draft),
