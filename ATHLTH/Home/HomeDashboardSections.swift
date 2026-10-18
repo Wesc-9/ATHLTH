@@ -4399,54 +4399,78 @@ private struct HomeWeeklyProgressDaySheet: View {
         let category = isStrength
             ? ATHLTHLocalization.choose(english: "STRENGTH", norwegian: "STYRKE")
             : isRun ? ATHLTHLocalization.choose(english: "RUNNING", norwegian: "LØPING")
-            : ATHLTHLocalization.choose(english: "WORKOUT", norwegian: "ØKT")
+            : workout.kind == .walking
+                ? ATHLTHLocalization.choose(english: "WALKING", norwegian: "GÅING")
+                : "HYBRID"
+        let imageName = isStrength ? "StrengthQuickHero"
+            : isRun ? "GoalRunning"
+            : workout.kind == .walking ? "GoalWalking" : "TrainHero"
 
-        return VStack(alignment: .leading, spacing: 7) {
-            HStack(spacing: 7) {
-                Image(systemName: symbol)
-                    .font(.system(size: 16, weight: .semibold))
+        return VStack(alignment: .leading, spacing: 0) {
+            Image(imageName)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 164, height: 95)
+                .clipped()
+                .overlay(alignment: .bottomLeading) {
+                    Image(systemName: symbol)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(accent)
+                        .frame(width: 36, height: 36)
+                        .background(.regularMaterial,
+                                    in: RoundedRectangle(cornerRadius: 12))
+                        .offset(y: 10)
+                        .padding(.leading, 10)
+                }
+                .overlay(alignment: .topTrailing) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(dayInk)
+                        .frame(width: 30, height: 30)
+                        .background(.white, in: Circle())
+                        .padding(9)
+                }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(category)
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1.1)
                     .foregroundStyle(accent)
-                    .frame(width: 35, height: 35)
-                    .background(accent.opacity(0.10),
-                                in: RoundedRectangle(cornerRadius: 11))
-                Spacer(minLength: 0)
-                Image(systemName: "plus")
-                    .font(.system(size: 11, weight: .bold))
+                    .padding(.top, 7)
+
+                Text(workout.title)
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(dayInk)
-                    .frame(width: 23, height: 23)
-                    .background(.white.opacity(0.92), in: Circle())
-            }
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
 
-            Text(category)
-                .font(.system(size: 9, weight: .bold))
-                .tracking(1.1)
-                .foregroundStyle(accent)
+                Text(workout.notes?.components(separatedBy: "\n").first ?? "")
+                    .font(.system(size: 11))
+                    .foregroundStyle(dayInk.opacity(0.62))
+                    .lineLimit(2)
+                    .frame(minHeight: 26, alignment: .topLeading)
 
-            Text(workout.title)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(dayInk)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            Spacer(minLength: 0)
-
-            HStack(spacing: 5) {
-                Image(systemName: "clock")
-                Text(workout.durationMinutes.map { "~\($0) min" }
-                     ?? ATHLTHLocalization.choose(english: "Workout", norwegian: "Økt"))
                 Spacer(minLength: 0)
-                Image(systemName: "arrow.up.right")
+                HStack(spacing: 4) {
+                    Image(systemName: "clock")
+                    Text(workout.durationMinutes.map { "~\($0) min" } ??
+                         ATHLTHLocalization.choose(english: "Workout", norwegian: "Økt"))
+                    Spacer(minLength: 0)
+                    Image(systemName: "arrow.up.right")
+                }
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(dayInk.opacity(0.67))
             }
-            .font(.system(size: 10, weight: .medium))
-            .foregroundStyle(dayInk.opacity(0.67))
+            .padding(.horizontal, 11)
+            .padding(.bottom, 12)
+            .frame(width: 164, height: 138, alignment: .topLeading)
         }
-        .frame(width: 152, height: 138, alignment: .topLeading)
-        .padding(13)
+        .frame(width: 164, height: 233)
         .background(.white, in: RoundedRectangle(cornerRadius: 20))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
         .overlay {
             RoundedRectangle(cornerRadius: 20)
-                .strokeBorder(accent.opacity(0.18), lineWidth: 0.8)
+                .strokeBorder(accent.opacity(0.13), lineWidth: 0.8)
         }
         .accessibilityElement(children: .combine)
         .accessibilityHint(ATHLTHLocalization.choose(
