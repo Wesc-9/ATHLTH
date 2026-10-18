@@ -62,7 +62,7 @@ private enum ATHLTHEquipmentScannerError: LocalizedError {
 }
 
 @MainActor
-private final class ATHLTHEquipmentVisionService {
+final class ATHLTHEquipmentVisionService {
     private let client = SupabaseEnvironment.client
 
     func analyze(
@@ -109,7 +109,7 @@ private final class ATHLTHEquipmentVisionService {
 
 /// Camera stills only. Users actively capture one photo and explicitly choose
 /// whether to send it to ATHLTH AI. No continuous camera stream is uploaded.
-private struct ATHLTHEquipmentCameraPicker: UIViewControllerRepresentable {
+struct ATHLTHEquipmentCameraPicker: UIViewControllerRepresentable {
     let onCapture: (UIImage) -> Void
     let onCancel: () -> Void
 
