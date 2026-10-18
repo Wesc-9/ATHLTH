@@ -93,7 +93,9 @@ struct ATHLTHLinkedExerciseDetailView: View {
                     VStack(spacing: 7) {
                         Button {
                             let result = library.importSharedExercise(
-                                previewSnapshot, ownerID: session.profile.userID
+                                previewSnapshot,
+                                ownerID: session.profile.userID,
+                                sourceExerciseID: block.exerciseID
                             )
                             if result != nil {
                                 imported = true
