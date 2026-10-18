@@ -358,7 +358,10 @@ final class MirroredWorkoutAudioCoach:
             after: snapshot.elapsedTime,
             config: configuration
         )
-        guard let message = ATHLTHFuelVoicePrompt.phrase(
+        guard ATHLTHFuelVoicePrompt.isFreshDue(
+            elapsed: snapshot.elapsedTime,
+            scheduled: next
+        ), let message = ATHLTHFuelVoicePrompt.phrase(
             config: configuration
         ) else { return }
 
