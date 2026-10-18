@@ -42,4 +42,54 @@ final class EquipmentScannerTests: XCTestCase {
         )
         XCTAssertTrue(scan.matchedExercises(in: [candidate]).isEmpty)
     }
+    @MainActor
+    func testScanResultsStayRestrictedToRecognizedExerciseIDs() throws {
+        let library = ExerciseLibraryStore()
+        let candidates = Array(library.search(query: "").prefix(3))
+        XCTAssertEqual(candidates.count, 3)
+        let payload = """
+        {
+          "equipmentName":"Weight machine",
+          "confidence":"medium",
+          "explanation":"Possible matching station",
+          "exerciseIDs":["\(candidates[2].id.uuidString)","\(candidates[0].id.uuidString)"]
+        }
+        """
+        let analysis = try JSONDecoder().decode(
+            ATHLTHEquipmentScanResponse.self,
+            from: Data(payload.utf8)
+        )
+        XCTAssertEqual(
+            analysis.matchedExercises(in: candidates).map(\.id),
+            [candidates[2].id, candidates[0].id]
+        )
+        XCTAssertFalse(
+            analysis.matchedExercises(in: candidates)
+                .contains(where: { $0.id == candidates[1].id })
+        )
+    }
+
+    @MainActor
+    func testEquipmentCandidatesAreBoundedAndDeterministic() {
+        let library = ExerciseLibraryStore()
+        let candidates = library.search(query: "")
+        let first = ATHLTHEquipmentScanCandidateSelector.select(
+            from: candidates
+        )
+        let second = ATHLTHEquipmentScanCandidateSelector.select(
+            from: candidates
+        )
+
+        XCTAssertLessThanOrEqual(first.count, 100)
+        XCTAssertEqual(first.map(\.id), second.map(\.id))
+        XCTAssertEqual(Set(first.map(\.id)).count, first.count)
+        XCTAssertTrue(first.allSatisfy { $0.source != .custom })
+        XCTAssertTrue(
+            ATHLTHEquipmentScanCandidateSelector.select(
+                from: candidates,
+                limit: 0
+            ).isEmpty
+        )
+    }
+
 }
