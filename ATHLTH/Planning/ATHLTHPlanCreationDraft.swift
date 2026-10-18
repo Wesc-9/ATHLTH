@@ -33,6 +33,10 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
     var planningApproach: String? = nil
     var guidedDayCursor: Int? = nil
     var firstGuidedWeekDecisionMade: Bool? = nil
+    // Restore the actual workspace position, not just the plan's fields.
+    var selectedPlanWeekIndex: Int? = nil
+    var simpleMinutes: Int? = nil
+    var simpleActivityKinds: [String]? = nil
     var savedAt: Date
 
     init(
@@ -55,6 +59,9 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         planningApproach: String? = nil,
         guidedDayCursor: Int? = nil,
         firstGuidedWeekDecisionMade: Bool? = nil,
+        selectedPlanWeekIndex: Int? = nil,
+        simpleMinutes: Int? = nil,
+        simpleActivityKinds: [String]? = nil,
         savedAt: Date = Date()
     ) {
         self.schemaVersion = Self.schemaVersion
@@ -69,6 +76,13 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
             ? planningApproach : nil
         self.guidedDayCursor = advanced ? guidedDayCursor.map { min(max($0, 0), min(max(weekCount, 1), 52) * 7) } : nil
         self.firstGuidedWeekDecisionMade = advanced ? firstGuidedWeekDecisionMade : nil
+        self.selectedPlanWeekIndex = advanced ? selectedPlanWeekIndex.map {
+            min(max($0, 0), min(max(weekCount, 1), 52) - 1)
+        } : nil
+        self.simpleMinutes = !advanced ? simpleMinutes.map { min(max($0, 5), 180) } : nil
+        self.simpleActivityKinds = !advanced
+            ? simpleActivityKinds?.filter { ["running", "walking", "strength"].contains($0) }
+            : nil
         if let preferredDayIndexes {
             let valid = Set(preferredDayIndexes.filter { (1...7).contains($0) })
             self.preferredDayIndexes = valid.isEmpty ? nil : valid.sorted()
@@ -158,13 +172,26 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
     }
 }
 
-/// Isolate each signed-in user to a different key; do not persist any
-/// personal health/limitation text in this convenience checkpoint.
+/// Atomic, per-account checkpoint storage. Existing UserDefaults snapshots are
+/// migrated on first read to avoid losing drafts created by older TestFlight builds.
+/// The payload intentionally excludes injury notes, free-text notes and route IDs.
 struct ATHLTHPlanCreationDraftStore {
     var defaults: UserDefaults = .standard
+    // Injection point for isolated tests; production uses Application Support.
+    var directoryURL: URL? = nil
 
-    private func key(userID: UUID) -> String {
+    private func legacyKey(userID: UUID) -> String {
         "athlth.planWizardDraft.v1.\(userID.uuidString)"
+    }
+
+    private var folder: URL? {
+        directoryURL ?? FileManager.default.urls(
+            for: .applicationSupportDirectory, in: .userDomainMask
+        ).first?.appendingPathComponent("ATHLTHPlanDrafts", isDirectory: true)
+    }
+
+    private func url(for userID: UUID) -> URL? {
+        folder?.appendingPathComponent("plan-\(userID.uuidString.lowercased()).json")
     }
 
     func save(_ draft: ATHLTHPlanCreationDraft, userID: UUID) {
@@ -172,24 +199,46 @@ struct ATHLTHPlanCreationDraftStore {
             clear(userID: userID)
             return
         }
-        guard let encoded = try? JSONEncoder().encode(draft),
-              encoded.count <= 750_000 else {
-            // Never save an oversized plan snapshot to UserDefaults.
-            return
+        guard let data = try? JSONEncoder().encode(draft),
+              data.count <= 8_000_000,
+              let destination = url(for: userID),
+              let folder else { return }
+        do {
+            try FileManager.default.createDirectory(
+                at: folder, withIntermediateDirectories: true
+            )
+            var options: Data.WritingOptions = [.atomic]
+            #if os(iOS) || os(watchOS)
+            options.insert(.completeFileProtectionUntilFirstUserAuthentication)
+            #endif
+            try data.write(to: destination, options: options)
+            // Only clear the old checkpoint once the new durable copy exists.
+            defaults.removeObject(forKey: legacyKey(userID: userID))
+        } catch {
+            // Never destroy the existing valid checkpoint on a write error.
         }
-        defaults.set(encoded, forKey: key(userID: userID))
     }
 
     func load(userID: UUID, at date: Date = Date()) -> ATHLTHPlanCreationDraft? {
-        guard let data = defaults.data(forKey: key(userID: userID)),
-              let draft = try? JSONDecoder().decode(ATHLTHPlanCreationDraft.self, from: data),
-              draft.isRestorable(at: date) else {
-            return nil
+        if let url = url(for: userID),
+           let bytes = try? Data(contentsOf: url),
+           let draft = try? JSONDecoder().decode(ATHLTHPlanCreationDraft.self, from: bytes),
+           draft.isRestorable(at: date) {
+            return draft
         }
+
+        // One-way migration from the previous on-device storage format.
+        guard let old = defaults.data(forKey: legacyKey(userID: userID)),
+              let draft = try? JSONDecoder().decode(ATHLTHPlanCreationDraft.self, from: old),
+              draft.isRestorable(at: date) else { return nil }
+        save(draft, userID: userID)
         return draft
     }
 
     func clear(userID: UUID) {
-        defaults.removeObject(forKey: key(userID: userID))
+        if let url = url(for: userID) {
+            try? FileManager.default.removeItem(at: url)
+        }
+        defaults.removeObject(forKey: legacyKey(userID: userID))
     }
 }
