@@ -41,7 +41,7 @@ jobs:
       - name: Test Audio Coach AI opt-in policy
         run: deno test supabase/functions/create-audio-coach-session/policy.test.ts
       - name: Typecheck changed Edge Functions
-        run: deno check supabase/functions/generate-strength-session/index.ts supabase/functions/create-audio-coach-session/index.ts supabase/functions/delete-account/index.ts supabase/functions/verify-app-store-transaction/index.ts supabase/functions/app-store-notifications/index.ts supabase/functions/recovery-sense/index.ts supabase/functions/recovery-sense-v2/index.ts supabase/functions/workout-insight/index.ts supabase/functions/generate-training-program/index.ts supabase/functions/generate-plan-adaptation/index.ts scripts/harden_workout_media_cache.ts
+        run: deno check supabase/functions/generate-strength-session/index.ts supabase/functions/create-audio-coach-session/index.ts supabase/functions/delete-account/index.ts supabase/functions/verify-app-store-transaction/index.ts supabase/functions/app-store-notifications/index.ts supabase/functions/recovery-sense/index.ts supabase/functions/recovery-sense-v2/index.ts supabase/functions/workout-insight/index.ts supabase/functions/generate-training-program/index.ts supabase/functions/generate-plan-adaptation/index.ts supabase/functions/post-trial-offer/index.ts scripts/harden_workout_media_cache.ts
       - name: Start disposable Supabase database
         run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
       - name: Replay migrations and verify privacy rules
@@ -54,6 +54,7 @@ jobs:
           docker exec -i supabase_db_ATHLTH-1.6.0 psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/training_now_mutual_presence_rls.sql
           docker exec -i supabase_db_ATHLTH-1.6.0 psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/security_definer_rpc_access.sql
           docker exec -i supabase_db_ATHLTH-1.6.0 psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/audio_coach_budget.sql
+          docker exec -i supabase_db_ATHLTH-1.6.0 psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/post_trial_offer_15_minutes.sql
           docker exec -i supabase_db_ATHLTH-1.6.0 psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/arena_lifecycle_guards.sql
           docker exec -i supabase_db_ATHLTH-1.6.0 psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/challenge_acceptance_scoring_gate.sql
           docker exec -i supabase_db_ATHLTH-1.6.0 psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/social_challenge_acceptance_gate.sql
