@@ -184,6 +184,12 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
 /// Atomic, per-account checkpoint storage. Existing UserDefaults snapshots are
 /// migrated on first read to avoid losing drafts created by older TestFlight builds.
 /// The payload intentionally excludes injury notes, free-text notes and route IDs.
+struct ATHLTHPlanDraftRecord: Identifiable {
+    let draftID: UUID?
+    let draft: ATHLTHPlanCreationDraft
+    var id: String { draftID?.uuidString ?? "original" }
+}
+
 struct ATHLTHPlanCreationDraftStore {
     var defaults: UserDefaults = .standard
     // Injection point for isolated tests; production uses Application Support.
@@ -193,17 +199,18 @@ struct ATHLTHPlanCreationDraftStore {
         "athlth.planWizardDraft.v1.\(userID.uuidString)"
     }
 
-    private func editingKey(userID: UUID) -> String {
-        "athlth.planWizardEditing.v1.\(userID.uuidString)"
+    private func editingKey(userID: UUID, draftID: UUID?) -> String {
+        let prefix = "athlth.planWizardEditing.v1.\(userID.uuidString)"
+        return draftID.map { prefix + "." + $0.uuidString } ?? prefix
     }
 
     // Only a non-sensitive boolean is saved outside the protected draft.
-    func wasEditing(userID: UUID) -> Bool {
-        defaults.bool(forKey: editingKey(userID: userID))
+    func wasEditing(userID: UUID, draftID: UUID? = nil) -> Bool {
+        defaults.bool(forKey: editingKey(userID: userID, draftID: draftID))
     }
 
-    func setEditing(_ editing: Bool, userID: UUID) {
-        defaults.set(editing, forKey: editingKey(userID: userID))
+    func setEditing(_ editing: Bool, userID: UUID, draftID: UUID? = nil) {
+        defaults.set(editing, forKey: editingKey(userID: userID, draftID: draftID))
     }
 
     private var folder: URL? {
@@ -212,18 +219,24 @@ struct ATHLTHPlanCreationDraftStore {
         ).first?.appendingPathComponent("ATHLTHPlanDrafts", isDirectory: true)
     }
 
-    private func url(for userID: UUID) -> URL? {
-        folder?.appendingPathComponent("plan-\(userID.uuidString.lowercased()).json")
+    private func url(for userID: UUID, draftID: UUID? = nil) -> URL? {
+        let base = "plan-\(userID.uuidString.lowercased())"
+        let file = draftID.map { base + "-\($0.uuidString.lowercased())" } ?? base
+        return folder?.appendingPathComponent(file + ".json")
     }
 
-    func save(_ draft: ATHLTHPlanCreationDraft, userID: UUID) {
+    func save(
+        _ draft: ATHLTHPlanCreationDraft,
+        userID: UUID,
+        draftID: UUID? = nil
+    ) {
         guard draft.isRestorable() else {
             clear(userID: userID)
             return
         }
         guard let data = try? JSONEncoder().encode(draft),
               data.count <= 8_000_000,
-              let destination = url(for: userID),
+              let destination = url(for: userID, draftID: draftID),
               let folder else { return }
         do {
             try FileManager.default.createDirectory(
@@ -234,34 +247,67 @@ struct ATHLTHPlanCreationDraftStore {
             options.insert(.completeFileProtectionUntilFirstUserAuthentication)
             #endif
             try data.write(to: destination, options: options)
-            // Only clear the old checkpoint once the new durable copy exists.
-            defaults.removeObject(forKey: legacyKey(userID: userID))
+            // A new draft must never clear the old format's checkpoint.
+            if draftID == nil {
+                defaults.removeObject(forKey: legacyKey(userID: userID))
+            }
         } catch {
             // Never destroy the existing valid checkpoint on a write error.
         }
     }
 
-    func load(userID: UUID, at date: Date = Date()) -> ATHLTHPlanCreationDraft? {
-        if let url = url(for: userID),
+    func load(
+        userID: UUID,
+        draftID: UUID? = nil,
+        at date: Date = Date()
+    ) -> ATHLTHPlanCreationDraft? {
+        if let url = url(for: userID, draftID: draftID),
            let bytes = try? Data(contentsOf: url),
            let draft = try? JSONDecoder().decode(ATHLTHPlanCreationDraft.self, from: bytes),
            draft.isRestorable(at: date) {
             return draft
         }
 
-        // One-way migration from the previous on-device storage format.
-        guard let old = defaults.data(forKey: legacyKey(userID: userID)),
+        // The legacy original must never masquerade as a new draft.
+        guard draftID == nil,
+              let old = defaults.data(forKey: legacyKey(userID: userID)),
               let draft = try? JSONDecoder().decode(ATHLTHPlanCreationDraft.self, from: old),
               draft.isRestorable(at: date) else { return nil }
         save(draft, userID: userID)
         return draft
     }
 
+    /// Lists only this account's valid checkpoints, newest first.
+    func records(userID: UUID) -> [ATHLTHPlanDraftRecord] {
+        var result: [ATHLTHPlanDraftRecord] = []
+        if let original = load(userID: userID) {
+            result.append(.init(draftID: nil, draft: original))
+        }
+        guard let folder,
+              let files = try? FileManager.default.contentsOfDirectory(
+                  at: folder, includingPropertiesForKeys: nil
+              )
+        else { return result }
+
+        let prefix = "plan-\(userID.uuidString.lowercased())-"
+        for file in files {
+            let filename = file.lastPathComponent
+            guard filename.hasPrefix(prefix), filename.hasSuffix(".json")
+            else { continue }
+            let suffix = String(filename.dropFirst(prefix.count).dropLast(5))
+            guard let id = UUID(uuidString: suffix),
+                  let draft = load(userID: userID, draftID: id)
+            else { continue }
+            result.append(.init(draftID: id, draft: draft))
+        }
+        return result.sorted { $0.draft.savedAt > $1.draft.savedAt }
+    }
+
     /// Explicit user-triggered deletion. Reports failure instead of hiding a
     /// draft that could reappear after relaunch if file removal was denied.
     @discardableResult
-    func deleteDraft(userID: UUID) -> Bool {
-        if let url = url(for: userID),
+    func deleteDraft(userID: UUID, draftID: UUID? = nil) -> Bool {
+        if let url = url(for: userID, draftID: draftID),
            FileManager.default.fileExists(atPath: url.path) {
             do {
                 try FileManager.default.removeItem(at: url)
@@ -269,12 +315,14 @@ struct ATHLTHPlanCreationDraftStore {
                 return false
             }
         }
-        defaults.removeObject(forKey: legacyKey(userID: userID))
-        setEditing(false, userID: userID)
+        if draftID == nil {
+            defaults.removeObject(forKey: legacyKey(userID: userID))
+        }
+        setEditing(false, userID: userID, draftID: draftID)
         return true
     }
 
-    func clear(userID: UUID) {
-        _ = deleteDraft(userID: userID)
+    func clear(userID: UUID, draftID: UUID? = nil) {
+        _ = deleteDraft(userID: userID, draftID: draftID)
     }
 }
