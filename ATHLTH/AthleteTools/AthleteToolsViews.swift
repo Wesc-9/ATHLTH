@@ -140,25 +140,103 @@ struct AthleteLoadView: View {
 
 struct AthleteFuelView: View {
     @ObservedObject private var tools = AthleteToolsStore.shared
-    @State private var start = Date()
+
+    private var voiceEnabled: Binding<Bool> {
+        Binding(
+            get: { tools.data.fuelVoiceEnabled == true },
+            set: { tools.data.fuelVoiceEnabled = $0 }
+        )
+    }
+
     var body: some View {
         Form {
-            Section("Your plan") {
-                Stepper("Duration: \(tools.data.fuel.durationMinutes) min", value: $tools.data.fuel.durationMinutes, in: 30...480, step: 10)
-                Stepper("Remind every \(tools.data.fuel.intervalMinutes) min", value: $tools.data.fuel.intervalMinutes, in: 10...60, step: 5)
-                Stepper("Carbohydrate: \(tools.data.fuel.carbohydrateGramsPerHour) g/h", value: $tools.data.fuel.carbohydrateGramsPerHour, in: 0...120, step: 5)
-                Stepper("Fluid: \(tools.data.fuel.fluidMLPerHour) ml/h", value: $tools.data.fuel.fluidMLPerHour, in: 0...1500, step: 50)
-                Text("Per reminder: \(tools.data.fuel.gramsPerReminder, specifier: "%.0f") g · \(tools.data.fuel.fluidPerReminder, specifier: "%.0f") ml")
-                DatePicker("Start", selection: $start, in: Date()...)
-                Button("Start reminders") { Task { await tools.startFuelReminders(at: start) } }
-                Button("Stop reminders", role: .destructive) { Task { await tools.stopFuelReminders() } }
-                if let end = tools.fuelEndsAt, end > Date() { Text("Scheduled until \(end.formatted(date: .abbreviated, time: .shortened))") }
+            Section {
+                Toggle(isOn: voiceEnabled) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Spoken reminders",
+                            norwegian: "Talte påminnelser"
+                        ),
+                        systemImage: "waveform"
+                    )
+                }
+                .tint(ATHLTHTheme.accentDeep)
+            } footer: {
+                Text(ATHLTHLocalization.choose(
+                    english: "Audio Coach speaks during active workouts using your selected voice. No push notifications, calendar alarms or background reminders are created. Enable Audio Coach for the workout as well.",
+                    norwegian: "Audio Coach snakker under aktive treningsøkter med den stemmen du har valgt. Ingen pushvarsler, alarmer eller bakgrunnsvarsler opprettes. Audio Coach må også være aktivert for økten."
+                ))
             }
-            Section("Reminder schedule") {
-                ForEach(tools.data.fuel.reminderOffsets, id: \.self) { Text("\($0) minutes after start") }
+
+            Section(ATHLTHLocalization.choose(
+                english: "Your voice plan",
+                norwegian: "Din taleplan"
+            )) {
+                Stepper(
+                    ATHLTHLocalization.choose(
+                        english: "Plan length: \(tools.data.fuel.durationMinutes) min",
+                        norwegian: "Planvarighet: \(tools.data.fuel.durationMinutes) min"
+                    ),
+                    value: $tools.data.fuel.durationMinutes,
+                    in: 30...480,
+                    step: 10
+                )
+
+                Stepper(
+                    ATHLTHLocalization.choose(
+                        english: "Speak every \(tools.data.fuel.intervalMinutes) min",
+                        norwegian: "Snakk hvert \(tools.data.fuel.intervalMinutes). minutt"
+                    ),
+                    value: $tools.data.fuel.intervalMinutes,
+                    in: 10...60,
+                    step: 5
+                )
+
+                Stepper(
+                    ATHLTHLocalization.choose(
+                        english: "Carbohydrates: \(tools.data.fuel.carbohydrateGramsPerHour) g/hour",
+                        norwegian: "Karbohydrater: \(tools.data.fuel.carbohydrateGramsPerHour) g/time"
+                    ),
+                    value: $tools.data.fuel.carbohydrateGramsPerHour,
+                    in: 0...120,
+                    step: 5
+                )
+
+                Stepper(
+                    ATHLTHLocalization.choose(
+                        english: "Fluids: \(tools.data.fuel.fluidMLPerHour) ml/hour",
+                        norwegian: "Drikke: \(tools.data.fuel.fluidMLPerHour) ml/time"
+                    ),
+                    value: $tools.data.fuel.fluidMLPerHour,
+                    in: 0...1500,
+                    step: 50
+                )
+
+                LabeledContent(
+                    ATHLTHLocalization.choose(
+                        english: "Each spoken reminder",
+                        norwegian: "Hver talepåminnelse"
+                    ),
+                    value: String(format: "%.0f g · %.0f ml",
+                        tools.data.fuel.gramsPerReminder,
+                        tools.data.fuel.fluidPerReminder)
+                )
             }
-            Section { Text("Choose amounts appropriate to your own needs. These are editable planning defaults. Reminders are iPhone notifications and may mirror to Apple Watch according to your notification settings; no independent Watch timer is started. Stop reminders when your workout ends or pauses.") }
-        }.navigationTitle("Fuel & hydration")
+            .disabled(tools.data.fuelVoiceEnabled != true)
+
+            Section {
+                Text(ATHLTHLocalization.choose(
+                    english: "The plan follows elapsed workout time and never starts on its own. It stops when the workout ends and does not speak while paused. Amounts are your own configurable estimates, not personalized medical advice. Do not enable reminders with both amounts at zero.",
+                    norwegian: "Planen følger økttiden og starter aldri på egen hånd. Den stopper når økten avsluttes og snakker ikke i pause. Mengdene er dine egne justerbare anslag, ikke personlige medisinske råd. Ikke aktiver med begge mengder satt til null."
+                ))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Fuel & hydration",
+            norwegian: "Energi og væske"
+        ))
     }
 }
 
