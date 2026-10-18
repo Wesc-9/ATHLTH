@@ -1,8 +1,9 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { enforceAIRequestBudget } from "../_shared/ai-request-budget.ts";
 
-// Preview-only pilot. No user text, route, GPS, HealthKit data or workout
-// measurements are transferred to Azure Speech.
+// ATHLTH+ neural speech. No GPS or medical records are sent. Live coach
+// messages may include workout metrics; opt-in is enforced by the iOS UI.
+// The server never persists, caches or logs spoken text.
 const sample = "Du er godt i gang. Hold et jevnt tempo, og fokuser på neste drag.";
 const voiceIDs: Record<string, string> = {
   finn: "nb-NO-FinnNeural",
@@ -37,10 +38,18 @@ Deno.serve(async (req: Request) => {
   } catch { return json({ error: "Invalid request" }, 400); }
   if (!body || typeof body !== "object" || Array.isArray(body))
     return json({ error: "Invalid request" }, 400);
-  const requestedVoice = (body as Record<string, unknown>).voice;
+  const requestBody = body as Record<string, unknown>;
+  const requestedVoice = requestBody.voice;
   if (typeof requestedVoice !== "string" ||
       !Object.prototype.hasOwnProperty.call(voiceIDs, requestedVoice))
     return json({ error: "Unsupported voice" }, 400);
+  // No arbitrary URL or SSML can be provided by the client.
+  const liveText = requestBody.text;
+  if (liveText !== undefined &&
+      (typeof liveText !== "string" || liveText.trim().length < 1 ||
+       liveText.length > 220 || /[\u0000-\u0008\u000e-\u001f]/.test(liveText)))
+    return json({ error: "Invalid speech text" }, 400);
+  const speech = typeof liveText === "string" ? liveText.trim() : sample;
 
   const admin = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -69,13 +78,13 @@ Deno.serve(async (req: Request) => {
 
   // Server-side atomic allowance: Azure is never called if this fails.
   const { data: reserved, error: budgetError } = await admin.rpc(
-    "reserve_athlth_azure_tts_preview", { p_characters: sample.length },
+    "reserve_athlth_azure_tts_preview", { p_characters: speech.length },
   );
   if (budgetError || reserved !== true)
     return json({ error: "Free preview budget reached or unavailable", code: "FREE_BUDGET_EXHAUSTED" }, 429);
 
   const ssml = '<speak version="1.0" xml:lang="nb-NO"><voice name="' +
-    voiceIDs[requestedVoice] + '">' + escapeXML(sample) + '</voice></speak>';
+    voiceIDs[requestedVoice] + '">' + escapeXML(speech) + '</voice></speak>';
   let azure: Response;
   try {
     azure = await fetch("https://" + region + ".tts.speech.microsoft.com/cognitiveservices/v1", {
@@ -84,7 +93,7 @@ Deno.serve(async (req: Request) => {
         "Ocp-Apim-Subscription-Key": key,
         "Content-Type": "application/ssml+xml",
         "X-Microsoft-OutputFormat": "audio-16khz-32kbitrate-mono-mp3",
-        "User-Agent": "ATHLTH-AzureVoicePreview",
+        "User-Agent": "ATHLTH-AzureCoachVoice",
       },
       body: ssml,
       signal: AbortSignal.timeout(9000),
