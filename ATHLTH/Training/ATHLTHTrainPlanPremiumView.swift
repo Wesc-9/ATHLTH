@@ -20,6 +20,8 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var showingCreation = false
     @State private var unfinishedPlanDraft: ATHLTHPlanCreationDraft?
     @State private var showingDiscardPlanDraftConfirmation = false
+    @State private var showingDeletePlanDraftConfirmation = false
+    @State private var planDraftDeletionError: String?
     private let unfinishedDraftStore = ATHLTHPlanCreationDraftStore()
     @State private var pendingCreatedPlanID: UUID?
     @State private var showingMyPlans = false
@@ -359,6 +361,29 @@ struct ATHLTHTrainPlanPremiumView: View {
 
     private var programSheets: some View {
         planContent
+        .alert(
+            tr("Delete this draft?", "Slette dette utkastet?"),
+            isPresented: $showingDeletePlanDraftConfirmation
+        ) {
+            Button(tr("Delete draft", "Slett utkast"), role: .destructive) {
+                if unfinishedDraftStore.deleteDraft(userID: session.profile.userID) {
+                    unfinishedPlanDraft = nil
+                    planDraftDeletionError = nil
+                } else {
+                    planDraftDeletionError = tr(
+                        "The draft could not be deleted. Please try again.",
+                        "Utkastet kunne ikke slettes. Prøv på nytt."
+                    )
+                    refreshUnfinishedPlanDraft()
+                }
+            }
+            Button(tr("Cancel", "Avbryt"), role: .cancel) {}
+        } message: {
+            Text(tr(
+                "This permanently deletes only the unfinished plan on this iPhone. Saved and active training plans will not be changed.",
+                "Dette sletter kun det uferdige utkastet på denne iPhonen. Lagrede og aktive treningsplaner blir ikke endret."
+            ))
+        }
         .confirmationDialog(
             tr("Discard this unfinished training plan?", "Forkaste denne påbegynte treningsplanen?"),
             isPresented: $showingDiscardPlanDraftConfirmation,
@@ -591,6 +616,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     }
 
     private func beginNewPlanCreation() {
+        planDraftDeletionError = nil
         if unfinishedPlanDraft != nil {
             showingDiscardPlanDraftConfirmation = true
         } else {
@@ -640,10 +666,24 @@ struct ATHLTHTrainPlanPremiumView: View {
                 }
                 Spacer(minLength: 0)
                 Menu {
-                    Button(role: .destructive) {
+                    Button {
+                        showingCreation = true
+                    } label: {
+                        Label(tr("Continue planning", "Fortsett planleggingen"),
+                              systemImage: "arrow.uturn.forward")
+                    }
+                    Button {
                         showingDiscardPlanDraftConfirmation = true
                     } label: {
-                        Label(tr("Start a new plan", "Start ny plan"), systemImage: "plus")
+                        Label(tr("Start a new plan", "Start ny plan"),
+                              systemImage: "plus")
+                    }
+                    Divider()
+                    Button(role: .destructive) {
+                        showingDeletePlanDraftConfirmation = true
+                    } label: {
+                        Label(tr("Delete draft", "Slett utkast"),
+                              systemImage: "trash")
                     }
                 } label: {
                     Image(systemName: "ellipsis")
@@ -652,6 +692,17 @@ struct ATHLTHTrainPlanPremiumView: View {
                         .frame(width: 44, height: 44)
                 }
                 .accessibilityLabel(tr("Draft options", "Valg for utkast"))
+                .accessibilityHint(tr(
+                    "Continue, start a new plan or delete this draft",
+                    "Fortsett, start en ny plan eller slett utkastet"
+                ))
+            }
+
+            if let planDraftDeletionError {
+                Label(planDraftDeletionError, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .accessibilityAddTraits(.isStaticText)
             }
 
             Button {
