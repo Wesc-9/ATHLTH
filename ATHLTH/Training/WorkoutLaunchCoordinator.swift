@@ -36,6 +36,21 @@ struct PlannedWorkoutWatchBuilder {
             workout.audioCoachConfiguration ??
             defaultConfiguration
 
+        // A saved workout may override other Audio Coach preferences,
+        // but fuel voice reminders follow the current athlete's opt-in.
+        configuration.fuelReminderIntervalMinutes =
+            configuration.enabled
+                ? defaultConfiguration.fuelReminderIntervalMinutes : nil
+        configuration.fuelReminderDurationMinutes =
+            configuration.enabled
+                ? defaultConfiguration.fuelReminderDurationMinutes : nil
+        configuration.fuelCarbohydrateGramsPerHour =
+            configuration.enabled
+                ? defaultConfiguration.fuelCarbohydrateGramsPerHour : nil
+        configuration.fuelFluidMLPerHour =
+            configuration.enabled
+                ? defaultConfiguration.fuelFluidMLPerHour : nil
+
         configuration.routeDistanceMeters =
             selectedRoute.map {
                 $0.distanceKilometers * 1_000
@@ -418,7 +433,10 @@ enum WorkoutLaunchCoordinator {
                                     session.savedRoutes
                             ),
                     watchAudioCoach:
-                        configuration.audioCoach,
+                        settings.applyingFuelVoice(
+                            to: configuration.audioCoach,
+                            userID: session.profile.userID
+                        ),
                     ghostTargetDurationSeconds:
                         configuration
                             .ghostTargetDurationSeconds,
@@ -467,8 +485,10 @@ enum WorkoutLaunchCoordinator {
             }
         }()
 
-        let resolvedAudioCoach =
-            configuration.audioCoach
+        let resolvedAudioCoach = settings.applyingFuelVoice(
+            to: configuration.audioCoach,
+            userID: session.profile.userID
+        )
         let resolvedGhostUpdates =
             GhostRaceStartService
                 .coexistingGhostAudio(
@@ -789,7 +809,10 @@ enum WorkoutLaunchCoordinator {
                         configuration
                             .trainTogetherInvitePayload,
                     watchAudioCoach:
-                        configuration.audioCoach,
+                        settings.applyingFuelVoice(
+                            to: configuration.audioCoach,
+                            userID: session.profile.userID
+                        ),
                     ghostTargetDurationSeconds:
                         nil,
                     ghostUpdates: nil,
@@ -827,7 +850,10 @@ enum WorkoutLaunchCoordinator {
                         norwegian: "Gåtur"
                     ),
                 audioCoach:
-                    configuration.audioCoach,
+                    settings.applyingFuelVoice(
+                        to: configuration.audioCoach,
+                        userID: session.profile.userID
+                    ),
                 routeAlerts:
                     settings.routeAlertConfiguration,
                 autoPauseEnabled:
@@ -879,8 +905,10 @@ enum WorkoutLaunchCoordinator {
         watchConnection
             .sendWorkoutRouteSelection(nil)
 
-        var watchAudioCoach =
-            configuration.audioCoach
+        var watchAudioCoach = settings.applyingFuelVoice(
+            to: configuration.audioCoach,
+            userID: session.profile.userID
+        )
 
         if workoutMirroring != nil,
            configuration.audioCoach.enabled {
