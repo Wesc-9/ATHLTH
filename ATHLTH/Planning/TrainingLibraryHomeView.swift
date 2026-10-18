@@ -3047,12 +3047,15 @@ struct PersonalizeTrainingPlanView: View {
 
 struct MyTrainingPlansLibraryView: View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
 
     @State private var showingCreatePlan = false
     @State private var scheduleError: String?
     @State private var reviewingPlan: TrainingPlan?
+    @State private var preparedShare: MessageShareDraft?
+    @State private var shareError: String?
 
     var body: some View {
         ScrollView {
@@ -3135,6 +3138,20 @@ struct MyTrainingPlansLibraryView: View {
                                 )
                             }
                             .buttonStyle(.plain)
+
+                            Button {
+                                preparePlanShare(plan)
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Share plan", norwegian: "Del plan"
+                                    ),
+                                    systemImage: "square.and.arrow.up"
+                                )
+                                .font(.caption.weight(.semibold))
+                            }
+                            .buttonStyle(.bordered)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
 
                             if !progress.missed.isEmpty {
                                 Button {
@@ -3224,6 +3241,22 @@ struct MyTrainingPlansLibraryView: View {
         .sheet(isPresented: $showingCreatePlan) {
             TrainingPlanCreationView()
         }
+        .sheet(item: $preparedShare) { draft in
+            ATHLTHDirectShareSheet(draft: draft)
+        }
+        .alert(
+            ATHLTHLocalization.choose(
+                english: "Could not share plan", norwegian: "Kunne ikke dele planen"
+            ),
+            isPresented: Binding(
+                get: { shareError != nil },
+                set: { if !$0 { shareError = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(shareError ?? "")
+        }
         .sheet(item: $reviewingPlan) { plan in
             MissedWorkoutsReviewView(
                 planID: plan.id
@@ -3241,6 +3274,17 @@ struct MyTrainingPlansLibraryView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(scheduleError ?? "")
+        }
+    }
+
+    private func preparePlanShare(_ plan: TrainingPlan) {
+        do {
+            preparedShare = try ATHLTHShareDraftFactory.plan(
+                plan, library: exerciseLibrary.allExercises,
+                ownerID: session.profile.userID
+            )
+        } catch {
+            shareError = error.localizedDescription
         }
     }
 
@@ -3349,6 +3393,20 @@ struct MyTrainingPlansLibraryView: View {
                 )
             }
             .buttonStyle(.plain)
+
+            Button {
+                preparePlanShare(template)
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Share plan", norwegian: "Del plan"
+                    ),
+                    systemImage: "square.and.arrow.up"
+                )
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 39)
+            }
+            .buttonStyle(.bordered)
         }
         .padding(16)
         .background(
