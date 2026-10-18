@@ -1,6 +1,7 @@
 # ATHLTH development baseline
 
-- Active development version: **1.8.0** on `release/v1.8.0`, starting at **build 86** (2026-10-18). This is the only branch for new development.
+- Active development version: **1.8.1** on `release/v1.8.1`, starting at **build 87** (2026-10-18). This is the only branch for new development.
+- Version **1.8.0** is locked for new development. Frozen commit: `092e0bb59ada330cd7753b5033c4887e58a07b52` (build 86; Xcode build, backend regressions, and TestFlight upload succeeded 2026-10-18). Preservation branch: `backup/v1.8.0-locked-before-v1.8.1-20261018`. Keep `release/v1.8.0` unchanged.
 - Version **1.7.9** is locked for new development. Preservation branch: `backup/v1.7.9-locked-before-v1.8.0-20261018`.
 - Version **1.7.8** is locked for new development. Frozen commit: `e6161e55a5b6b91977b3cefddb41d123fa23e87a` (build 84; iOS build, backend regressions and TestFlight upload succeeded on 2026-10-17). Preservation branch: `backup/v1.7.8-locked-before-v1.7.9-20261017`.
 - Version **1.7.7** is locked for new development. Frozen commit: `914c1a4e34693a89455c997decf18339f7c7b2a4` (build 83; Xcode build, backend regressions, and TestFlight upload succeeded). Preservation branch: `backup/v1.7.7-locked-before-v1.7.8-20261016`.
