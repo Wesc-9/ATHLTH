@@ -8,6 +8,7 @@ struct ATHLTHTrainProgramComposerView: View {
 
     /// Pass false when the user chose "New plan" rather than "Continue".
     var resumesDraftOnAppear = true
+    var draftID: UUID? = nil
     var onCreated: ((UUID) -> Void)? = nil
 
     @StateObject private var catalog = TrainingPlanLibraryStore()
@@ -106,6 +107,7 @@ struct ATHLTHTrainProgramComposerView: View {
             startsAtSourceChoice: true,
             initialAdvanced: advancedMode,
             resumesDraftOnAppear: resumesDraftOnAppear,
+            draftID: draftID,
             onCreated: onCreated
         )
     }
