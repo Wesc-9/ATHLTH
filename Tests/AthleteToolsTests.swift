@@ -114,6 +114,73 @@ final class AthleteToolsTests: XCTestCase {
         var invalid = plan; invalid.intervalMinutes = 0
         XCTAssertTrue(invalid.reminderOffsets.isEmpty)
     }
+    func testVoiceFuelScheduleUsesElapsedWorkoutTimeAndStopsAtPlanEnd() {
+        var config = WatchAudioCoachConfiguration.disabled
+        config.enabled = true
+        config.language = .norwegian
+        config.fuelReminderIntervalMinutes = 20
+        config.fuelReminderDurationMinutes = 120
+        config.fuelCarbohydrateGramsPerHour = 45
+        config.fuelFluidMLPerHour = 500
+
+        XCTAssertEqual(
+            ATHLTHFuelVoicePrompt.nextDue(after: 0, config: config),
+            1_200
+        )
+        XCTAssertEqual(
+            ATHLTHFuelVoicePrompt.nextDue(after: 1_205, config: config),
+            2_400
+        )
+        XCTAssertNil(
+            ATHLTHFuelVoicePrompt.nextDue(after: 6_000, config: config)
+        )
+        XCTAssertNil(
+            ATHLTHFuelVoicePrompt.nextDue(after: 7_200, config: config)
+        )
+        XCTAssertTrue(
+            ATHLTHFuelVoicePrompt.phrase(config: config)?
+                .contains("15 gram") == true
+        )
+        XCTAssertTrue(
+            ATHLTHFuelVoicePrompt.phrase(config: config)?
+                .contains("167 milliliter") == true
+        )
+    }
+
+    func testVoiceFuelRemindersAreOptInAndRejectEmptyAmounts() {
+        var config = WatchAudioCoachConfiguration.disabled
+        XCTAssertNil(
+            ATHLTHFuelVoicePrompt.nextDue(after: 0, config: config)
+        )
+        config.enabled = true
+        config.fuelReminderIntervalMinutes = 20
+        config.fuelReminderDurationMinutes = 120
+        config.fuelCarbohydrateGramsPerHour = 0
+        config.fuelFluidMLPerHour = 0
+        XCTAssertNil(
+            ATHLTHFuelVoicePrompt.nextDue(after: 0, config: config)
+        )
+        config.fuelFluidMLPerHour = 500
+        XCTAssertNotNil(
+            ATHLTHFuelVoicePrompt.nextDue(after: 0, config: config)
+        )
+    }
+
+    func testLegacyAthleteToolsArchiveDecodesWithoutVoiceOptIn() throws {
+        let old = AthleteToolsData()
+        let encoder = JSONEncoder()
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: encoder.encode(old)
+        ) as? [String: Any])
+        object.removeValue(forKey: "fuelVoiceEnabled")
+        let json = try JSONSerialization.data(withJSONObject: object)
+        let restored = try JSONDecoder().decode(
+            AthleteToolsData.self, from: json
+        )
+        XCTAssertNotEqual(restored.fuelVoiceEnabled, true)
+        XCTAssertEqual(restored.fuel.durationMinutes, 120)
+    }
+
     func testMaintenanceRestartPreservesOdometer() {
         var rule = AthleteGearRule(intervalKM: 500)
         XCTAssertEqual(rule.remaining(at: 600), -100)
