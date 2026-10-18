@@ -25,8 +25,16 @@ enum ATHLTHLegalIdentity {
         infoString("ATHLTHLegalOperatorName")
     }
 
+    /// Shared address for in-app help, terms and privacy inquiries.
+    static let supportContactEmail = "contact@athlth.com"
+
+    static var supportContactMailURL: URL {
+        // A known, fixed RFC 6068 mailto destination.
+        URL(string: "mailto:contact@athlth.com?subject=ATHLTH%20Support")!
+    }
+
     static var privacyContactEmail: String? {
-        infoString("ATHLTHPrivacyContactEmail")
+        infoString("ATHLTHPrivacyContactEmail") ?? supportContactEmail
     }
 
     static var supportURL: URL? {
@@ -57,10 +65,12 @@ enum ATHLTHLegalIdentity {
     }
 
     static var termsContactStatement: String {
-        if let operatorName, let privacyContactEmail {
-            return "ATHLTH is operated by \(operatorName). Questions about these Terms can be sent to \(privacyContactEmail)."
+        let operatorStatement: String
+        if let operatorName {
+            operatorStatement = "ATHLTH is operated by \(operatorName)."
+        } else {
+            operatorStatement = "ATHLTH is operated by the developer or seller identified on the App Store product page."
         }
-
-        return "ATHLTH is operated by the developer or seller identified on the App Store product page. Questions about these Terms can be submitted through the official ATHLTH support contact shown there."
+        return "\(operatorStatement) Questions about these Terms can be sent to \(supportContactEmail)."
     }
 }
