@@ -4940,6 +4940,17 @@ private struct HomeCurrentStreakCard: View {
     }
 }
 
+/// A fresh launch and an explicit draft continuation are distinct sheet
+/// identities. Reusing a Boolean sheet allowed an old wizard position
+/// to be carried into a new-plan launch.
+private struct TrainProgramCreationLaunch: Identifiable {
+    let id = UUID()
+    let resumesDraft: Bool
+
+    static var fresh: Self { Self(resumesDraft: false) }
+    static var continueDraft: Self { Self(resumesDraft: true) }
+}
+
 private struct PlannedWorkoutSelection: Identifiable {
     let planID: UUID
     let workout: PlannedSession
@@ -5228,8 +5239,7 @@ struct ATHLTHTrainView: View {
     @State private var showingLibrary = false
     @State private var showingTrainPlanWorkspace = false
     @State private var showingTrainAllPlans = false
-    @State private var showingTrainProgramCreation = false
-    @State private var resumesTrainProgramDraft = false
+    @State private var trainProgramCreationLaunch: TrainProgramCreationLaunch?
     @State private var showingTrainDraftChoice = false
     @State private var trainDraftLaunchError: String?
     private let trainPlanDraftStore = ATHLTHPlanCreationDraftStore()
@@ -5353,8 +5363,7 @@ struct ATHLTHTrainView: View {
                 Button(ATHLTHLocalization.choose(
                     english: "Continue draft", norwegian: "Fortsett utkast"
                 )) {
-                    resumesTrainProgramDraft = true
-                    showingTrainProgramCreation = true
+                    trainProgramCreationLaunch = .continueDraft
                 }
                 Button(ATHLTHLocalization.choose(
                     english: "Discard draft and start new",
@@ -5363,8 +5372,7 @@ struct ATHLTHTrainView: View {
                     if trainPlanDraftStore.deleteDraft(
                         userID: session.profile.userID
                     ) {
-                        resumesTrainProgramDraft = false
-                        showingTrainProgramCreation = true
+                        trainProgramCreationLaunch = .fresh
                     } else {
                         trainDraftLaunchError = ATHLTHLocalization.choose(
                             english: "The unfinished draft could not be removed. Please try again.",
@@ -5395,7 +5403,7 @@ struct ATHLTHTrainView: View {
             } message: {
                 Text(trainDraftLaunchError ?? "")
             }
-            .sheet(isPresented: $showingTrainProgramCreation, onDismiss: {
+            .sheet(item: $trainProgramCreationLaunch, onDismiss: {
                 // Switch tabs only once the creation sheet has fully closed.
                 // Updating the underlying tab while the sheet is dismissing
                 // could otherwise expose "I dag" instead of the saved plan.
@@ -5405,12 +5413,15 @@ struct ATHLTHTrainView: View {
                     selectedSection = 1
                     newlyCreatedPlanToOpen = nil
                 }
-            }) {
+            }) { launch in
                 ATHLTHTrainProgramComposerView(
-                    resumesDraftOnAppear: resumesTrainProgramDraft
+                    resumesDraftOnAppear: launch.resumesDraft
                 ) { planID in
                     newlyCreatedPlanToOpen = planID
                 }
+                // A different identity gives the wizard a genuinely fresh
+                // @State(.mode) on each new-plan presentation.
+                .id(launch.id)
             }
             .sheet(isPresented: $showingTrainPlanProgress) {
                 if let plan = session.activePlan {
@@ -6115,8 +6126,7 @@ struct ATHLTHTrainView: View {
         if trainPlanDraftStore.load(userID: session.profile.userID) != nil {
             showingTrainDraftChoice = true
         } else {
-            resumesTrainProgramDraft = false
-            showingTrainProgramCreation = true
+            trainProgramCreationLaunch = .fresh
         }
     }
 
