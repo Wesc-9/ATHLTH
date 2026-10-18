@@ -7403,16 +7403,15 @@ struct MessageSharePicker: View {
                         title: workout.title,
                         subtitle: workoutSubtitle(workout)
                     ) {
-                        createDraft(
-                            kind: .workout,
-                            title: workout.title,
-                            subtitle: workoutSubtitle(workout),
-                            snapshot: ATHLTHExerciseReferenceResolver.portableSession(
-                                workout, from: exerciseLibrary.allExercises
-                            ),
-                            sourceObjectID: workout.sharedSourceSessionID ?? workout.id,
-                            sourceOwnerID: workout.sharedSourceOwnerID ?? session.profile.userID
-                        )
+                        do {
+                            onSelect(try ATHLTHShareDraftFactory.workout(
+                                workout,
+                                library: exerciseLibrary.allExercises,
+                                ownerID: session.profile.userID
+                            ))
+                        } catch {
+                            shareError = error.localizedDescription
+                        }
                     }
                 }
             }
@@ -7460,17 +7459,15 @@ struct MessageSharePicker: View {
                         title: plan.title,
                         subtitle: "\(plan.weeks.count) weeks · version \(plan.version)"
                     ) {
-                        createDraft(
-                            kind: .trainingPlan,
-                            title: plan.title,
-                            subtitle: "\(plan.weeks.count) weeks · snapshot v\(plan.version)",
-                            snapshot: ATHLTHExerciseReferenceResolver.portablePlan(
-                                plan, from: exerciseLibrary.allExercises
-                            ),
-                            sourceObjectID: plan.sharedSourcePlanID ?? plan.id,
-                            sourceOwnerID: plan.sharedSourceOwnerID ?? plan.ownerID,
-                            shareVersion: plan.sharedSourceVersion ?? plan.version
-                        )
+                        do {
+                            onSelect(try ATHLTHShareDraftFactory.plan(
+                                plan,
+                                library: exerciseLibrary.allExercises,
+                                ownerID: session.profile.userID
+                            ))
+                        } catch {
+                            shareError = error.localizedDescription
+                        }
                     }
                 }
             }
