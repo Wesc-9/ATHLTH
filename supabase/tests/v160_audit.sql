@@ -61,14 +61,16 @@ do $$ begin
 end $$;
 reset role;
 -- Covers share a bucket with photos but use event/challenge audiences.
+-- Unaccepted challenge invitations must remain invited. Do not bypass the
+-- activation guard merely to create these media-access fixtures.
 insert into public.community_events(id,creator_id,title,activity_type,visibility,starts_at,meeting_name)
 values
  ('00000000-0000-0000-0000-000000000010','00000000-0000-0000-0000-000000000001','Public event','running','public',now()+interval '1 day','Test meeting'),
  ('00000000-0000-0000-0000-000000000011','00000000-0000-0000-0000-000000000001','Private event','running','private',now()+interval '1 day','Test meeting');
 insert into public.social_challenges(id,creator_id,title,sport,status,rules,visibility,starts_at)
 values
- ('00000000-0000-0000-0000-000000000012','00000000-0000-0000-0000-000000000001','Public challenge','running','upcoming','{}','public',now()+interval '1 day'),
- ('00000000-0000-0000-0000-000000000013','00000000-0000-0000-0000-000000000001','Private challenge','running','upcoming','{}','private',now()+interval '1 day');
+ ('00000000-0000-0000-0000-000000000012','00000000-0000-0000-0000-000000000001','Public challenge','running','invited','{}','public',now()+interval '1 day'),
+ ('00000000-0000-0000-0000-000000000013','00000000-0000-0000-0000-000000000001','Private challenge','running','invited','{}','private',now()+interval '1 day');
 insert into storage.objects(bucket_id,name)
 values
  ('workout-media','00000000-0000-0000-0000-000000000001/event-covers/00000000-0000-0000-0000-000000000010.jpg'),
