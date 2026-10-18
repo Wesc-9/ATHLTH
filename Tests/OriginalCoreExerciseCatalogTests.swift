@@ -105,9 +105,14 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
         XCTAssertFalse(bicepsExercises.isEmpty)
         XCTAssertTrue(bicepsExercises.allSatisfy { entry in
             entry.source != .athlthCatalog &&
-                entry.exercise.primaryMuscles.contains {
-                    ExerciseLibraryStore.canonicalMuscleFilter($0) == "Biceps"
-                }
+                (
+                    (entry.bodyPart.map {
+                        ExerciseLibraryStore.canonicalMuscleFilter($0) == "Biceps"
+                    } ?? false) ||
+                    entry.exercise.primaryMuscles.contains {
+                        ExerciseLibraryStore.canonicalMuscleFilter($0) == "Biceps"
+                    }
+                )
         })
     }
 
