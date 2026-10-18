@@ -738,16 +738,33 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private var modeChoice: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+        // Avoid scrolling on standard iPhones while retaining a safe fallback
+        // for compact screens and accessibility text scaling.
+        GeometryReader { geometry in
+            ViewThatFits(in: .vertical) {
+                modeChoiceLayout(compact: false)
+                modeChoiceLayout(compact: true)
+                ScrollView {
+                    modeChoiceLayout(compact: true)
+                }
+                .scrollIndicators(.hidden)
+            }
+            .frame(width: geometry.size.width,
+                   height: geometry.size.height,
+                   alignment: .top)
+        }
+        .background(sourceCanvas.ignoresSafeArea())
+    }
+
+    private func modeChoiceLayout(compact: Bool) -> some View {
+        VStack(alignment: .leading, spacing: compact ? 8 : 12) {
                 sourceChoiceHeader
-                    .padding(.bottom, 4)
 
                 // An illustration adds warmth without displacing the choices
                 // below the fold. It stays fully offline as SwiftUI artwork.
-                VStack(alignment: .leading, spacing: 9) {
-                    HStack(alignment: .top, spacing: 0) {
-                        VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: compact ? 5 : 8) {
+                    HStack(alignment: .center, spacing: 6) {
+                        VStack(alignment: .leading, spacing: compact ? 5 : 9) {
                             Text(ATHLTHLocalization.choose(
                                 english: "STEP 1 OF \(stepDisplayTotal)",
                                 norwegian: "STEG 1 AV \(stepDisplayTotal)"
@@ -760,24 +777,26 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 english: "How would you like to plan?",
                                 norwegian: "Hvordan vil du planlegge?"
                             ))
-                            .font(.system(size: 31, weight: .regular, design: .serif))
+                            .font(.system(size: compact ? 26 : 30, weight: .regular, design: .serif))
                             .foregroundStyle(sourceInk)
                             .fixedSize(horizontal: false, vertical: true)
-                            .minimumScaleFactor(0.9)
+                            .minimumScaleFactor(0.85)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                         ATHLTHPlanModeIllustration()
-                            .frame(width: 145, height: 170)
+                            .scaleEffect(compact ? 0.42 : 0.54)
+                            .frame(width: compact ? 80 : 106,
+                                   height: compact ? 86 : 108)
                             .accessibilityHidden(true)
-                            .padding(.trailing, -7)
+                            .allowsHitTesting(false)
                     }
 
                     Text(ATHLTHLocalization.choose(
                         english: "Choose how much control you want. Both options lead to an editable training plan.",
                         norwegian: "Velg hvor mye kontroll du ønsker. Begge alternativene gir deg en treningsplan du kan redigere."
                     ))
-                    .font(.subheadline)
+                    .font(.system(size: compact ? 12 : 14))
                     .foregroundStyle(sourceMuted)
                     .fixedSize(horizontal: false, vertical: true)
                 }
@@ -811,7 +830,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 english: "Easy edits", norwegian: "Enkel å redigere"
                             )
                         )
-                    ]
+                    ],
+                    compact: compact
                 ) {
                     withAnimation(.easeInOut(duration: 0.18)) {
                         mode = .basic
@@ -847,14 +867,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 english: "Full control", norwegian: "Full kontroll"
                             )
                         )
-                    ]
+                    ],
+                    compact: compact
                 ) {
                     withAnimation(.easeInOut(duration: 0.18)) {
                         mode = .advanced
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 13) {
+                VStack(alignment: .leading, spacing: compact ? 7 : 10) {
                     HStack(spacing: 10) {
                         Rectangle()
                             .fill(sourceGold.opacity(0.26))
@@ -863,8 +884,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             english: "ALREADY HAVE A PLAN?",
                             norwegian: "HAR DU EN PLAN FRA FØR?"
                         ))
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(1.2)
+                        .font(.system(size: compact ? 9 : 10, weight: .bold))
+                        .tracking(compact ? 1 : 1.2)
                         .foregroundStyle(sourceMuted)
                         .fixedSize()
                         Rectangle()
@@ -872,27 +893,18 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             .frame(height: 0.7)
                     }
 
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 10) {
-                            existingPlanLibraryButton
-                            existingMyPlansButton
-                        }
-                        VStack(spacing: 10) {
-                            existingPlanLibraryButton
-                            existingMyPlansButton
-                        }
+                    HStack(alignment: .top, spacing: compact ? 8 : 10) {
+                        existingPlanLibraryButton
+                        existingMyPlansButton
                     }
                 }
-                .padding(.top, 5)
-            }
-            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth, alignment: .leading)
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 18)
-            .padding(.top, 15)
-            .padding(.bottom, 25)
+                .padding(.top, compact ? 2 : 4)
         }
-        .scrollIndicators(.hidden)
-        .background(sourceCanvas.ignoresSafeArea())
+        .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth, alignment: .leading)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 18)
+        .padding(.top, compact ? 7 : 12)
+        .padding(.bottom, compact ? 5 : 10)
     }
 
     private var existingPlanLibraryButton: some View {
@@ -903,7 +915,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             subtitle: ATHLTHLocalization.choose(
                 english: "Explore ready plans", norwegian: "Utforsk ferdige planer"
             ),
-            symbol: "square.stack.3d.up"
+            symbol: "square.stack.3d.up",
+            compact: true
         ) {
             sourceRoute.append(.library)
         }
@@ -917,7 +930,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             subtitle: ATHLTHLocalization.choose(
                 english: "View and edit plans", norwegian: "Se og rediger dine planer"
             ),
-            symbol: "bookmark"
+            symbol: "bookmark",
+            compact: true
         ) {
             sourceRoute.append(.mine)
         }
@@ -1027,7 +1041,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private var sourceChoiceHeader: some View {
-        VStack(spacing: 22) {
+        VStack(spacing: step == .mode ? 12 : 22) {
             HStack(spacing: 8) {
                 Button {
                     if step == .mode { dismiss() } else { goBack() }
