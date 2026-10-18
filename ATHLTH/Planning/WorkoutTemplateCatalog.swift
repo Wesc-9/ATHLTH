@@ -907,10 +907,15 @@ struct WorkoutTemplateLibraryView: View {
 
 struct WorkoutTemplateDetailView: View {
     @EnvironmentObject private var session: AppSessionStore
-    @EnvironmentObject private var favorites: LibraryFavoritesStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+
+    let entry: WorkoutTemplateCatalogEntry
+
+    @State private var saved = false
+    @State private var showingWorkout = false
+    @State private var showingEditor = false
 
     private var hasActiveWorkout: Bool {
         phoneWorkout.active != nil ||
@@ -919,264 +924,119 @@ struct WorkoutTemplateDetailView: View {
         ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
     }
 
-    let entry: WorkoutTemplateCatalogEntry
-
-    @State private var saved = false
-    @State private var showingWorkout = false
+    private func tr(_ english: String, _ norwegian: String) -> String {
+        ATHLTHLocalization.choose(english: english, norwegian: norwegian)
+    }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                ATHLTHCard {
-                    HStack(alignment: .top, spacing: 14) {
-                        Image(systemName: entry.systemImage)
-                            .font(
-                                .system(
-                                    size: 25,
-                                    weight: .semibold
-                                )
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme.accentDeep
-                            )
-                            .frame(width: 54, height: 54)
-                            .background(
-                                ATHLTHTheme.accentSoft,
-                                in: RoundedRectangle(
-                                    cornerRadius: 17,
-                                    style: .continuous
-                                )
-                            )
+            VStack(alignment: .leading, spacing: 18) {
+                ATHLTHWorkoutRecipePreview(
+                    title: entry.title,
+                    summary: entry.summary,
+                    category: entry.category,
+                    symbol: entry.systemImage,
+                    difficulty: entry.difficulty,
+                    durationMinutes: entry.estimatedDurationMinutes,
+                    blocks: entry.blocks
+                )
 
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(
-                                entry.categoryTitle.uppercased()
-                            )
-                            .font(
-                                .system(
-                                    size: 9,
-                                    weight: .bold
-                                )
-                            )
-                            .tracking(1.6)
-                            .foregroundStyle(
-                                ATHLTHTheme.mutedText
-                            )
-
-                            Text(entry.title)
-                                .font(.title2.weight(.bold))
-
-                            Text(entry.summary)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer(minLength: 0)
-                    }
+                Button {
+                    showingEditor = true
+                } label: {
+                    Label(tr("Customize a copy", "Tilpass en kopi"),
+                          systemImage: "slider.horizontal.3")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 48)
                 }
-
-                ATHLTHCard {
-                    HStack(spacing: 16) {
-                        detailMetric(
-                            title: "Blocks",
-                            value: "\(entry.blocks.count)"
-                        )
-
-                        Divider()
-                            .frame(height: 34)
-
-                        detailMetric(
-                            title: "Level",
-                            value: entry.difficulty
-                        )
-
-                        if let minutes =
-                            entry.estimatedDurationMinutes {
-                            Divider()
-                                .frame(height: 34)
-
-                            detailMetric(
-                                title: "Time",
-                                value: "~\(minutes)m"
-                            )
-                        }
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("WORKOUT")
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.8)
-                        .foregroundStyle(
-                            ATHLTHTheme.mutedText
-                        )
-
-                    ForEach(entry.blocks) { block in
-                        blockRow(block)
-                    }
-                }
+                .buttonStyle(.bordered)
+                .tint(ATHLTHPlanDesign.ink)
 
                 if let source = entry.sourceLabel {
-                    ATHLTHCard {
-                        Label(
-                            source,
-                            systemImage: "checkmark.seal.fill"
-                        )
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(
-                            ATHLTHTheme.accentDeep
-                        )
-
-                        if entry.tags.contains("hyrox") {
-                            Text(
-                                "HYROX race loads differ by division. Use the load specified for your division when a block says race load."
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 5)
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "checkmark.seal")
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(source)
+                                .font(.subheadline.weight(.semibold))
+                            if entry.tags.contains("hyrox") {
+                                Text(tr(
+                                    "HYROX loads differ by division. Confirm the correct race load before starting.",
+                                    "HYROX-belastning varierer med klasse. Kontroller konkurransevekten før start."
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
+                        Spacer(minLength: 0)
                     }
-                }
-
-                HStack(spacing: 10) {
-                    Button {
-                        session.saveSharedWorkout(
-                            entry.plannedSession(),
-                            sourceSessionID: entry.id
-                        )
-                        saved = true
-                    } label: {
-                        Label(
-                            saved
-                                ? "Saved"
-                                : "Save",
-                            systemImage:
-                                saved
-                                    ? "checkmark.circle.fill"
-                                    : "square.and.arrow.down"
-                        )
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 52)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(saved)
-
-                    Button {
-                        guard !hasActiveWorkout else { return }
-                        showingWorkout = true
-                    } label: {
-                        Label(
-                            "Start",
-                            systemImage: "play.fill"
-                        )
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 52)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.accentDeep)
-                    .disabled(hasActiveWorkout)
+                    .padding(15)
+                    .athlthPlanCard(radius: 19)
                 }
 
                 if hasActiveWorkout {
-                    Label(ATHLTHLocalization.choose(
-                        english: "Finish the active workout before starting another.",
-                        norwegian: "Fullfør økten som pågår før du starter en ny."
+                    Label(tr(
+                        "Finish the active workout before starting another.",
+                        "Fullfør økten som pågår før du starter en ny."
                     ), systemImage: "info.circle")
                     .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 }
             }
             .padding(18)
             .frame(maxWidth: 720)
             .frame(maxWidth: .infinity)
         }
-        .background(
-            ATHLTHPremiumCanvas(
-                accent: ATHLTHTheme.accent.opacity(0.15)
-            )
-        )
-        .navigationTitle("Workout")
+        .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+        .navigationTitle(tr("Workout", "Treningsøkt"))
         .navigationBarTitleDisplayMode(.inline)
-        .fullScreenCover(
-            isPresented: $showingWorkout
-        ) {
-            StructuredWorkoutSessionView(
-                workout: entry.plannedSession()
-            )
-            .environmentObject(session)
-        }
-    }
-
-    private func blockRow(
-        _ block: WorkoutTemplateBlock
-    ) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Text("\(block.sequence)")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(ATHLTHTheme.accentDeep)
-                .frame(width: 30, height: 30)
-                .background(
-                    ATHLTHTheme.accentSoft,
-                    in: Circle()
-                )
-
-            Image(systemName: block.kind.systemImage)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(
-                    block.kind == .run
-                        ? ATHLTHTheme.vitality
-                        : ATHLTHTheme.accentDeep
-                )
-                .frame(width: 30, height: 30)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(block.title)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            HStack(spacing: 12) {
+                Button {
+                    session.saveSharedWorkout(
+                        entry.plannedSession(), sourceSessionID: entry.id
+                    )
+                    saved = true
+                } label: {
+                    Label(
+                        saved ? tr("Saved", "Lagret") : tr("Save", "Lagre"),
+                        systemImage: saved ? "checkmark.circle.fill" : "square.and.arrow.down"
+                    )
                     .font(.subheadline.weight(.semibold))
-
-                if let target = block.targetText {
-                    Text(target)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 51)
                 }
+                .buttonStyle(.bordered)
+                .disabled(saved)
 
-                if let notes = block.notes,
-                   !notes.isEmpty {
-                    Text(notes)
-                        .font(.caption2)
-                        .foregroundStyle(
-                            ATHLTHTheme.mutedText
-                        )
+                Button {
+                    guard !hasActiveWorkout else { return }
+                    showingWorkout = true
+                } label: {
+                    Label(tr("Start workout", "Start økt"),
+                          systemImage: "play.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 51)
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accentDeep)
+                .disabled(hasActiveWorkout)
             }
-
-            Spacer(minLength: 0)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 11)
+            .background(.regularMaterial)
         }
-        .padding(13)
-        .background(
-            Color.white.opacity(0.78),
-            in: RoundedRectangle(
-                cornerRadius: 17,
-                style: .continuous
+        .fullScreenCover(isPresented: $showingWorkout) {
+            StructuredWorkoutSessionView(workout: entry.plannedSession())
+                .environmentObject(session)
+        }
+        .sheet(isPresented: $showingEditor) {
+            WorkoutTemplateBuilderView(
+                initialTitle: entry.title,
+                initialBlocks: entry.blocks,
+                draftContext: "catalog-copy-\(entry.slug)"
             )
-        )
-    }
-
-    private func detailMetric(
-        title: String,
-        value: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(value)
-                .font(.headline)
-                .foregroundStyle(ATHLTHTheme.primaryText)
-
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(ATHLTHTheme.mutedText)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
