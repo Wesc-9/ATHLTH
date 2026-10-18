@@ -859,17 +859,27 @@ final class ExerciseLibraryStore: ObservableObject {
                 source, fallbackTitle: source.name
               ) else { return nil }
 
-        // Do not silently overwrite an existing custom exercise, even when
-        // the creator has updated their own instructions since sending.
-        if customExercises.contains(where: {
-            ATHLTHExerciseReferenceResolver.key($0.canonicalName) ==
-                ATHLTHExerciseReferenceResolver.key(safe.name)
-        }) {
-            return nil
+        // Names do not prove two personal exercises are identical. Never
+        // overwrite the receiver's exercise; give the imported copy a unique
+        // name if a different local record already uses that title.
+        var localName = safe.name
+        let used = Set(customExercises.map {
+            ATHLTHExerciseReferenceResolver.key($0.canonicalName)
+        })
+        if used.contains(ATHLTHExerciseReferenceResolver.key(localName)) {
+            let suffix = ATHLTHLocalization.choose(
+                english: " (shared copy)", norwegian: " (delt kopi)"
+            )
+            localName = safe.name + suffix
+            var counter = 2
+            while used.contains(ATHLTHExerciseReferenceResolver.key(localName)) {
+                localName = safe.name + suffix + " \(counter)"
+                counter += 1
+            }
         }
 
         return createCustomExercise(
-            ownerID: ownerID, name: safe.name,
+            ownerID: ownerID, name: localName,
             instructions: safe.instructions,
             primaryMuscles: safe.primaryMuscles,
             secondaryMuscles: safe.secondaryMuscles ?? [],
