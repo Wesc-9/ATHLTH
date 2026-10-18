@@ -34,7 +34,7 @@ private enum ATHLTHSettingsCategory: String, CaseIterable, Identifiable {
         case .account: return ATHLTHLocalization.choose(english: "Health profile, sign-in and security", norwegian: "Helseprofil, innlogging og sikkerhet")
         case .app: return ATHLTHLocalization.choose(english: "Language, units, time and widgets", norwegian: "Språk, enheter, tid og widgeter")
         case .membership: return ATHLTHLocalization.choose(english: "ATHLTH+, purchases and billing", norwegian: "ATHLTH+, kjøp og betaling")
-        case .privacy: return ATHLTHLocalization.choose(english: "Terms, privacy policy and information", norwegian: "Vilkår, personvern og informasjon")
+        case .privacy: return ATHLTHLocalization.choose(english: "Contact, privacy and legal information", norwegian: "Kontakt, personvern og vilkår")
         case .developer: return ATHLTHLocalization.choose(english: "Diagnostics, AI usage and testing", norwegian: "Diagnostikk, AI-bruk og testing")
         }
     }
@@ -58,7 +58,7 @@ private enum ATHLTHSettingsCategory: String, CaseIterable, Identifiable {
         case .account: return "profile profil account konto health helseprofil sign-in login innlogging password passord security sikkerhet data privacy"
         case .app: return "app språk language engelsk norsk måleenheter measurements units tid time format widget widgets lock screen siri"
         case .membership: return "medlemskap premium athlth plus abonnement billing betal kjøp purchase restore subscription trial"
-        case .privacy: return "privacy personvern rettigheter vilkår terms policy exercise data repdb om app legal hjelpe"
+        case .privacy: return "privacy personvern rettigheter vilkår terms policy exercise data repdb om app legal hjelpe kontakt contact oss support støtte epost e-post email mail contact@athlth.com"
         case .developer: return "utvikler developer support diagnostics diagnostikk debug usage ai lab control center"
         }
     }
@@ -97,35 +97,44 @@ struct ATHLTHSettingsView: View {
                         quickAccessSection
                     }
 
-                    VStack(alignment: .leading, spacing: 11) {
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english: "ALL SETTINGS",
-                                norwegian: "ALLE INNSTILLINGER"
+                    if settingsSearchText.isEmpty || matchesContactSearch {
+                        supportContactCard
+                    }
+
+                    if filteredSettingsCategories.isEmpty {
+                        ContentUnavailableView.search(text: settingsSearchText)
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        VStack(alignment: .leading, spacing: 18) {
+                            settingsCategoryGroup(
+                                ATHLTHLocalization.choose(
+                                    english: "YOUR TRAINING",
+                                    norwegian: "DIN TRENING"
+                                ),
+                                categories: [.health, .training]
                             )
-                        )
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .tracking(1.5)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                        .padding(.leading, 5)
 
-                        if filteredSettingsCategories.isEmpty {
-                            ContentUnavailableView.search(text: settingsSearchText)
-                                .frame(maxWidth: .infinity)
-                        } else {
-                            PremiumSettingsCard {
-                                ForEach(filteredSettingsCategories) { category in
-                                    NavigationLink {
-                                        settingsDetailPage(for: category)
-                                    } label: {
-                                        settingsCategoryRow(category)
-                                    }
-                                    .buttonStyle(.plain)
+                            settingsCategoryGroup(
+                                ATHLTHLocalization.choose(
+                                    english: "PERSONAL",
+                                    norwegian: "PERSONLIG"
+                                ),
+                                categories: [.account, .app]
+                            )
 
-                                    if category != filteredSettingsCategories.last {
-                                        SettingsDivider()
-                                    }
-                                }
+                            settingsCategoryGroup(
+                                "ATHLTH",
+                                categories: [.membership, .privacy]
+                            )
+
+                            if canShowDeveloperSettings {
+                                settingsCategoryGroup(
+                                    ATHLTHLocalization.choose(
+                                        english: "DEVELOPER",
+                                        norwegian: "UTVIKLER"
+                                    ),
+                                    categories: [.developer]
+                                )
                             }
                         }
                     }
@@ -165,6 +174,116 @@ struct ATHLTHSettingsView: View {
                     allowed: settings.backgroundHealthSyncEnabled
                 )
                 await health.refreshAll()
+            }
+        }
+    }
+
+    private var matchesContactSearch: Bool {
+        let query = settingsSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return true }
+        return "contact@athlth.com kontakt contact oss hjelp support epost email"
+            .localizedStandardContains(query)
+    }
+
+    private var supportContactCard: some View {
+        Link(destination: ATHLTHLegalIdentity.supportContactMailURL) {
+            HStack(spacing: 14) {
+                Image(systemName: "envelope.badge")
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 52, height: 52)
+                    .background(
+                        ATHLTHTheme.premiumGoldSoft,
+                        in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    )
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Contact us",
+                        norwegian: "Kontakt oss"
+                    ))
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                    Text(ATHLTHLegalIdentity.supportContactEmail)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Questions, suggestions or need help? Send an email.",
+                        norwegian: "Spørsmål, forslag eller trenger du hjelp?"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 2)
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+            }
+            .padding(16)
+            .background(
+                LinearGradient(
+                    colors: [
+                        Color.white,
+                        ATHLTHTheme.champagneSoft.opacity(0.72)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: RoundedRectangle(cornerRadius: 23, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 23, style: .continuous)
+                    .stroke(ATHLTHTheme.premiumGold.opacity(0.23), lineWidth: 0.9)
+            }
+            .shadow(
+                color: ATHLTHTheme.accentDeep.opacity(0.05),
+                radius: 16, y: 6
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 23))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(ATHLTHLocalization.choose(
+            english: "Email ATHLTH at contact@athlth.com",
+            norwegian: "Send e-post til ATHLTH på contact@athlth.com"
+        ))
+    }
+
+    @ViewBuilder
+    private func settingsCategoryGroup(
+        _ title: String,
+        categories: [ATHLTHSettingsCategory]
+    ) -> some View {
+        let matches = filteredSettingsCategories.filter { categories.contains($0) }
+
+        if !matches.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(title)
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .tracking(2.1)
+                    .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.80))
+                    .padding(.leading, 5)
+
+                PremiumSettingsCard {
+                    ForEach(matches) { category in
+                        NavigationLink {
+                            settingsDetailPage(for: category)
+                        } label: {
+                            settingsCategoryRow(category)
+                        }
+                        .buttonStyle(.plain)
+
+                        if category != matches.last {
+                            SettingsDivider()
+                        }
+                    }
+                }
             }
         }
     }
@@ -218,11 +337,17 @@ struct ATHLTHSettingsView: View {
         }
         .padding(.horizontal, 16)
         .frame(height: 51)
-        .background(ATHLTHUnifiedDesign.surface,
-                    in: RoundedRectangle(cornerRadius: 18))
+        .background(
+            LinearGradient(
+                colors: [.white, ATHLTHTheme.cardWarm.opacity(0.30)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
         .overlay {
-            RoundedRectangle(cornerRadius: 18)
-                .strokeBorder(ATHLTHUnifiedDesign.outline, lineWidth: 0.8)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(ATHLTHTheme.border.opacity(0.80), lineWidth: 0.8)
         }
     }
 
@@ -274,9 +399,13 @@ struct ATHLTHSettingsView: View {
     private func quickAccessItem(icon: String, title: String) -> some View {
         VStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 20, weight: .medium))
+                .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(ATHLTHTheme.accentDeep)
-                .frame(height: 28)
+                .frame(width: 38, height: 38)
+                .background(
+                    ATHLTHTheme.accentSoft,
+                    in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+                )
 
             Text(title)
                 .font(.system(size: 12, weight: .semibold))
@@ -287,13 +416,18 @@ struct ATHLTHSettingsView: View {
         .frame(maxWidth: .infinity)
         .frame(height: 92)
         .background(
-            Color.white.opacity(0.92),
+            LinearGradient(
+                colors: [.white, ATHLTHTheme.cardWarm.opacity(0.25)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
             in: RoundedRectangle(cornerRadius: 20, style: .continuous)
         )
         .overlay {
             RoundedRectangle(cornerRadius: 20)
-                .stroke(ATHLTHTheme.border.opacity(0.82), lineWidth: 0.8)
+                .stroke(ATHLTHTheme.border.opacity(0.80), lineWidth: 0.8)
         }
+        .shadow(color: ATHLTHTheme.accentDeep.opacity(0.035), radius: 10, y: 4)
     }
 
     private func settingsCategoryRow(
@@ -343,7 +477,7 @@ struct ATHLTHSettingsView: View {
             VStack(alignment: .leading, spacing: 6) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(category.title)
-                        .font(.system(size: 29, weight: .bold, design: .rounded))
+                        .font(.system(size: 29, weight: .regular, design: .serif))
                         .foregroundStyle(ATHLTHTheme.primaryText)
                     Text(category.detail)
                         .font(.subheadline)
@@ -1212,6 +1346,25 @@ settingsSection("Account") {
     private var aboutSettingsSection: some View {
 settingsSection("About") {
                         PremiumSettingsCard {
+                            Link(destination: ATHLTHLegalIdentity.supportContactMailURL) {
+                                PremiumSettingsRow(
+                                    icon: "envelope",
+                                    iconTint: ATHLTHTheme.accentDeep,
+                                    iconBackground: ATHLTHTheme.premiumGoldSoft,
+                                    title: ATHLTHLocalization.choose(
+                                        english: "Contact us",
+                                        norwegian: "Kontakt oss"
+                                    ),
+                                    subtitle: ATHLTHLegalIdentity.supportContactEmail
+                                ) {
+                                    Image(systemName: "arrow.up.right")
+                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            SettingsDivider()
+
                             Link(destination: URL(string: "https://repdb.co")!) {
                                 PremiumSettingsRow(
                                     icon: "figure.strengthtraining.traditional",
@@ -1375,7 +1528,7 @@ if session.currentRole.canAccessControlCenter {
     }
 
     private var header: some View {
-        HStack(spacing: 14) {
+        HStack(alignment: .center, spacing: 13) {
             Button {
                 dismiss()
             } label: {
@@ -1383,10 +1536,7 @@ if session.currentRole.canAccessControlCenter {
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(ATHLTHTheme.primaryText)
                     .frame(width: 43, height: 43)
-                    .background(
-                        Color.white.opacity(0.92),
-                        in: Circle()
-                    )
+                    .background(Color.white.opacity(0.96), in: Circle())
                     .overlay {
                         Circle().stroke(ATHLTHTheme.border, lineWidth: 0.8)
                     }
@@ -1396,30 +1546,37 @@ if session.currentRole.canAccessControlCenter {
                 ATHLTHLocalization.choose(english: "Back", norwegian: "Tilbake")
             )
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english: "Settings",
-                        norwegian: "Innstillinger"
-                    )
-                )
-                .font(.system(size: 29, weight: .bold, design: .rounded))
+            VStack(alignment: .leading, spacing: 4) {
+                Text("ATHLTH  /  SETTINGS")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(2.1)
+                    .foregroundStyle(ATHLTHTheme.premiumGold)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Settings", norwegian: "Innstillinger"
+                ))
+                .font(.system(size: 32, weight: .regular, design: .serif))
                 .foregroundStyle(ATHLTHTheme.primaryText)
 
-                Text(
-                    ATHLTHLocalization.choose(
-                        english: "Make ATHLTH yours.",
-                        norwegian: "Tilpass ATHLTH til deg."
-                    )
-                )
+                Text(ATHLTHLocalization.choose(
+                    english: "Make ATHLTH yours.",
+                    norwegian: "Dine valg. Din trening."
+                ))
                 .font(.subheadline)
                 .foregroundStyle(ATHLTHTheme.mutedText)
             }
 
             Spacer(minLength: 0)
+
+            Image(systemName: "slider.horizontal.3")
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(width: 44, height: 44)
+                .background(ATHLTHTheme.premiumGoldSoft, in: Circle())
+                .accessibilityHidden(true)
         }
-        .padding(.top, 8)
-        .padding(.bottom, 4)
+        .padding(.top, 6)
+        .padding(.bottom, 9)
     }
 
     @ViewBuilder
@@ -2545,14 +2702,25 @@ private struct PremiumSettingsCard<Content: View>: View {
             content
         }
         .background(
-            ATHLTHTheme.card,
-            in: RoundedRectangle(cornerRadius: 26, style: .continuous)
+            LinearGradient(
+                colors: [
+                    Color.white,
+                    ATHLTHTheme.cardWarm.opacity(0.27)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 23, style: .continuous)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .stroke(ATHLTHTheme.border, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 23, style: .continuous)
+                .stroke(ATHLTHTheme.border.opacity(0.75), lineWidth: 0.8)
         }
-        .shadow(color: Color.black.opacity(0.035), radius: 20, x: 0, y: 10)
+        .shadow(
+            color: ATHLTHTheme.accentDeep.opacity(0.04),
+            radius: 15,
+            x: 0, y: 7
+        )
     }
 }
 
