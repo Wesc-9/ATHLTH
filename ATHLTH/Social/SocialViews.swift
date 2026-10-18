@@ -3640,13 +3640,17 @@ struct SocialPrivacySettingsView: View {
                     Toggle("Allow follow requests", isOn: binding.allowFriendRequests)
 
                     Toggle(
-                        "Show when I’m online",
+                        ATHLTHLocalization.choose(
+                            english: "Show when I'm online",
+                            norwegian: "Vis når jeg er pålogget"
+                        ),
                         isOn: binding.showOnlineStatus
                     )
 
-                    Text(
-                        "Online status is shown only to people who follow you. It turns off when ATHLTH is no longer active and expires automatically if the app cannot update it."
-                    )
+                    Text(ATHLTHLocalization.choose(
+                        english: "Only people you follow who also follow you can see when you are online. Status turns off when ATHLTH is inactive and expires automatically if it stops updating.",
+                        norwegian: "Kun personer dere følger gjensidig kan se når du er pålogget. Statusen slås av når ATHLTH ikke er aktiv og utløper automatisk hvis den ikke oppdateres."
+                    ))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
