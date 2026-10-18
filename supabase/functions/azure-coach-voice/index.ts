@@ -69,19 +69,33 @@ Deno.serve(async (req: Request) => {
      (entitlement.status === "trialing" && validUntil(entitlement.trial_ends_at)));
   if (!eligible) return json({ error: "ATHLTH+ required", code: "PREMIUM_REQUIRED" }, 403);
 
-  const userBudget = await enforceAIRequestBudget(() =>
-    admin.rpc("consume_ai_request_budget", {
-      p_user_id: user.id,
-      p_feature: "generate-training-program",
-    }));
-  if (userBudget) return userBudget;
+  // Both routes require the server-verified ATHLTH+ entitlement above.
+  // Live training uses its own fair-use cap. Previews keep the existing
+  // shared AI-request budget. Both reserve from the SAME F0 monthly cap.
+  if (typeof liveText === "string") {
+    const { data: reserved, error: budgetError } = await admin.rpc(
+      "reserve_athlth_azure_tts_live",
+      { p_user_id: user.id, p_characters: speech.length },
+    );
+    if (budgetError || reserved !== true)
+      return json({ error: "Free live voice quota reached or unavailable",
+                    code: "FREE_BUDGET_EXHAUSTED" }, 429);
+  } else {
+    const userBudget = await enforceAIRequestBudget(() =>
+      admin.rpc("consume_ai_request_budget", {
+        p_user_id: user.id,
+        p_feature: "generate-training-program",
+      }));
+    if (userBudget) return userBudget;
 
-  // Server-side atomic allowance: Azure is never called if this fails.
-  const { data: reserved, error: budgetError } = await admin.rpc(
-    "reserve_athlth_azure_tts_preview", { p_characters: speech.length },
-  );
-  if (budgetError || reserved !== true)
-    return json({ error: "Free preview budget reached or unavailable", code: "FREE_BUDGET_EXHAUSTED" }, 429);
+    const { data: reserved, error: budgetError } = await admin.rpc(
+      "reserve_athlth_azure_tts_preview",
+      { p_characters: speech.length },
+    );
+    if (budgetError || reserved !== true)
+      return json({ error: "Free preview budget reached or unavailable",
+                    code: "FREE_BUDGET_EXHAUSTED" }, 429);
+  }
 
   const ssml = '<speak version="1.0" xml:lang="nb-NO"><voice name="' +
     voiceIDs[requestedVoice] + '">' + escapeXML(speech) + '</voice></speak>';
