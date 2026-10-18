@@ -76,6 +76,40 @@ final class ATHLTHCuratedTrainingPlanTests: XCTestCase {
     }
 
     @MainActor
+    func testWeeklyStrengthRepTargetsProgressGentlyWithoutInventingLoad() throws {
+        let plan = try XCTUnwrap(ATHLTHCuratedTrainingPlans.entries.first {
+            $0.slug == "focus-chest-triceps"
+        })
+        let first = ATHLTHCatalogPlanSessionFactory.session(
+            entry: plan, blueprint: .chest, week: 1
+        )
+        let third = ATHLTHCatalogPlanSessionFactory.session(
+            entry: plan, blueprint: .chest, week: 3
+        )
+        let secondary = ATHLTHCatalogPlanSessionFactory.session(
+            entry: plan, blueprint: .push, week: 3
+        )
+        let standardPush = ATHLTHCatalogPlanSessionFactory.session(
+            entry: try XCTUnwrap(ATHLTHCuratedTrainingPlans.entries.first {
+                $0.slug == "strength-ppl-3"
+            }), blueprint: .push, week: 3
+        )
+        let initialRep = try XCTUnwrap(first.resolvedWorkoutBlocks.first {
+            $0.kind == .exercise
+        }?.repetitions)
+        let nextRep = try XCTUnwrap(third.resolvedWorkoutBlocks.first {
+            $0.kind == .exercise
+        }?.repetitions)
+        XCTAssertEqual(nextRep, initialRep + 2)
+        XCTAssertTrue(third.resolvedWorkoutBlocks.allSatisfy {
+            $0.targetWeightKilograms == nil
+        })
+        let secondarySets = secondary.resolvedWorkoutBlocks.compactMap(\.setCount).reduce(0, +)
+        let standardSets = standardPush.resolvedWorkoutBlocks.compactMap(\.setCount).reduce(0, +)
+        XCTAssertLessThan(secondarySets, standardSets)
+    }
+
+    @MainActor
     func testCompetitivePlanReducesFatigueAtEndWithoutHardCodingPaceOrWeight() throws {
         let race = try XCTUnwrap(ATHLTHCuratedTrainingPlans.entries.first {
             $0.slug == "race-marathon"
