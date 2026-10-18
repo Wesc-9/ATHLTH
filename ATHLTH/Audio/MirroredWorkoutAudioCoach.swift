@@ -39,6 +39,7 @@ final class MirroredWorkoutAudioCoach:
         Double?
     private var nextTimeSeconds:
         TimeInterval?
+    private var nextFuelSeconds: TimeInterval?
     private var lastState:
         WatchWorkoutMirrorState?
     private var lastStepIndex: Int?
@@ -70,6 +71,10 @@ final class MirroredWorkoutAudioCoach:
         announcedStart = false
         finished = false
         workoutStartedAt = nil
+        nextFuelSeconds = ATHLTHFuelVoicePrompt.nextDue(
+            after: 0,
+            config: configuration
+        )
 
         if let interval =
                 configuration
@@ -178,6 +183,7 @@ final class MirroredWorkoutAudioCoach:
                maximumAge: ATHLTHCoachSensorFreshness.maximumSnapshotAge
            ) {
             announceStepIfNeeded(snapshot)
+            announceFuelIfNeeded(snapshot)
             announceRoutineIfNeeded(snapshot)
         }
 
@@ -223,6 +229,10 @@ final class MirroredWorkoutAudioCoach:
             nextTimeSeconds =
                 (floor(snapshot.elapsedTime / interval) + 1) * interval
         }
+        nextFuelSeconds = ATHLTHFuelVoicePrompt.nextDue(
+            after: snapshot.elapsedTime,
+            config: configuration
+        )
     }
 
     /// A Watch-originated attempt is not re-announced after a subsequent
@@ -268,6 +278,7 @@ final class MirroredWorkoutAudioCoach:
         configuration = .disabled
         nextDistanceMeters = nil
         nextTimeSeconds = nil
+        nextFuelSeconds = nil
         lastState = nil
         lastStepIndex = nil
         announcedStart = false
@@ -330,6 +341,36 @@ final class MirroredWorkoutAudioCoach:
                 priority: .structuredStep,
                 createdAt: snapshot.capturedAt,
                 validFor: 15
+            )
+        )
+    }
+
+    private func announceFuelIfNeeded(
+        _ snapshot: WatchWorkoutLiveSnapshot
+    ) {
+        guard let next = nextFuelSeconds,
+              snapshot.elapsedTime >= next
+        else { return }
+
+        // Elapsed-time buckets are shared with Watch. A missed slot is not
+        // read late after reconnect, pause or a temporary speech handoff.
+        nextFuelSeconds = ATHLTHFuelVoicePrompt.nextDue(
+            after: snapshot.elapsedTime,
+            config: configuration
+        )
+        guard let message = ATHLTHFuelVoicePrompt.phrase(
+            config: configuration
+        ) else { return }
+
+        speak(
+            message,
+            priority: .routineCoach,
+            event: ATHLTHCoachEvent(
+                kind: .routineMilestone,
+                key: "fuel:\(Int(next))",
+                priority: .routineCoach,
+                createdAt: snapshot.capturedAt,
+                validFor: 12
             )
         )
     }
