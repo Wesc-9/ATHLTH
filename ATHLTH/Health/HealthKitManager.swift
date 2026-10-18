@@ -3178,10 +3178,23 @@ final class HealthKitManager: ObservableObject {
             )
         }
 
-        appendLongestDurationRecord(
-            .longestRunningDuration,
-            activities: [.running]
-        )
+        // A manually entered workout can carry a user-provided duration.
+        // Do not present that as an automatically verified running PR.
+        if let longestMeasuredRun = workouts
+            .filter({
+                $0.workoutActivityType == .running &&
+                $0.metadata?[HKMetadataKeyWasUserEntered] as? Bool != true &&
+                $0.duration > 0
+            })
+            .max(by: { $0.duration < $1.duration }) {
+            records.append(
+                HealthPersonalRecord(
+                    kind: .longestRunningDuration,
+                    value: longestMeasuredRun.duration,
+                    date: longestMeasuredRun.startDate
+                )
+            )
+        }
         appendLongestDurationRecord(
             .longestStrengthWorkout,
             activities: [
