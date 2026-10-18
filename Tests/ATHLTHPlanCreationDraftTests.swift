@@ -106,6 +106,62 @@ final class ATHLTHPlanCreationDraftTests: XCTestCase {
         XCTAssertFalse(store.wasEditing(userID: user))
     }
 
+    func testDeleteDraftRemovesCheckpointAndResumeFlagWithoutTouchingOtherAccount() throws {
+        let (settings, suite) = defaults()
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ATHLTHPlanDraftDelete.\(UUID().uuidString)",
+                                    isDirectory: true)
+        defer {
+            settings.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: folder)
+        }
+
+        let owner = UUID()
+        let another = UUID()
+        let store = ATHLTHPlanCreationDraftStore(
+            defaults: settings, directoryURL: folder
+        )
+        store.save(draft(name: "Delete this one"), userID: owner)
+        store.save(draft(name: "Keep this one"), userID: another)
+        store.setEditing(true, userID: owner)
+        XCTAssertNotNil(store.load(userID: owner))
+
+        XCTAssertTrue(store.deleteDraft(userID: owner))
+        XCTAssertNil(store.load(userID: owner))
+        XCTAssertFalse(store.wasEditing(userID: owner))
+        XCTAssertEqual(store.load(userID: another)?.title, "Keep this one")
+
+        let freshInstance = ATHLTHPlanCreationDraftStore(
+            defaults: settings, directoryURL: folder
+        )
+        XCTAssertNil(freshInstance.load(userID: owner),
+                     "Deleted draft must not reappear when Plan is opened again")
+        XCTAssertTrue(freshInstance.deleteDraft(userID: owner),
+                      "Deleting an already missing draft is safe")
+    }
+
+    func testDeleteDraftClearsLegacyCheckpointWithoutTouchingStoredPlans() throws {
+        let (settings, suite) = defaults()
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ATHLTHLegacyDraftDelete.\(UUID().uuidString)",
+                                    isDirectory: true)
+        defer {
+            settings.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: folder)
+        }
+        let user = UUID()
+        let legacyKey = "athlth.planWizardDraft.v1.\(user.uuidString)"
+        settings.set(try JSONEncoder().encode(draft(name: "Old checkpoint")),
+                     forKey: legacyKey)
+        let store = ATHLTHPlanCreationDraftStore(
+            defaults: settings, directoryURL: folder
+        )
+
+        XCTAssertTrue(store.deleteDraft(userID: user))
+        XCTAssertNil(settings.data(forKey: legacyKey))
+        XCTAssertNil(store.load(userID: user))
+    }
+
     func testAtomicDraftSurvivesFreshStoreInstance() throws {
         let (settings, suite) = defaults()
         let location = FileManager.default.temporaryDirectory
