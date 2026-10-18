@@ -59,6 +59,25 @@ struct ATHLTHContactSupportView: View {
                     .foregroundStyle(ATHLTHTheme.mutedText)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 4)
+
+                    Link(destination: ATHLTHLegalIdentity.websiteURL) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "globe")
+                            Text("ATHLTH.com")
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 9, weight: .semibold))
+                        }
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Visit the ATHLTH website",
+                        norwegian: "Besøk ATHLTHs nettside"
+                    ))
                 }
                 .padding(18)
                 .frame(maxWidth: 650)
