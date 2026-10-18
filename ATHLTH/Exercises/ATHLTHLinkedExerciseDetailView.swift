@@ -58,13 +58,6 @@ struct ATHLTHLinkedExerciseDetailView: View {
         )
     }
 
-    private var ownedCopyAlreadyExists: Bool {
-        library.customExercises.contains {
-            ATHLTHExerciseReferenceResolver.key($0.canonicalName) ==
-                ATHLTHExerciseReferenceResolver.key(previewSnapshot.name)
-        }
-    }
-
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -107,14 +100,14 @@ struct ATHLTHLinkedExerciseDetailView: View {
                             }
                         } label: {
                             Label(
-                                imported || ownedCopyAlreadyExists
+                                imported
                                     ? ATHLTHLocalization.choose(
                                         english: "In My Exercises",
                                         norwegian: "I Mine øvelser")
                                     : ATHLTHLocalization.choose(
                                         english: "Add to My Exercises",
                                         norwegian: "Legg til i Mine øvelser"),
-                                systemImage: imported || ownedCopyAlreadyExists
+                                systemImage: imported
                                     ? "checkmark.circle.fill"
                                     : "square.and.arrow.down"
                             )
@@ -123,7 +116,7 @@ struct ATHLTHLinkedExerciseDetailView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(ATHLTHTheme.accentDeep)
-                        .disabled(imported || ownedCopyAlreadyExists)
+                        .disabled(imported)
 
                         if block.exerciseSnapshot == nil {
                             Text(ATHLTHLocalization.choose(
