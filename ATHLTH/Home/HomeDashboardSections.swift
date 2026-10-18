@@ -3981,6 +3981,7 @@ private struct HomeWeeklyProgressDaySheet: View {
     @State private var suggestionStartTime = Date()
     @State private var scheduleConfirmation: String?
     @State private var selectedInvitationLobby: PlannedSession?
+    @State private var selectedPlannedWorkout: PlannedSession?
     @State private var selectedMode = 0
 
     private let dayInk = Color(red: 0.17, green: 0.21, blue: 0.29)
@@ -4075,7 +4076,9 @@ private struct HomeWeeklyProgressDaySheet: View {
                     .font(.system(size: 22, weight: .semibold, design: .rounded))
                     .foregroundStyle(dayInk)
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 12)
+                    // Give the date breathing room below the sheet handle.
+                    .padding(.top, 30)
+                    .padding(.bottom, 5)
 
                     dayModeSelector
 
@@ -4156,6 +4159,29 @@ private struct HomeWeeklyProgressDaySheet: View {
             .sheet(item: $selectedInvitationLobby) { workout in
                 PlannedWorkoutInvitationLobby(workout: workout)
                     .presentationDetents([.medium, .large])
+            }
+            // A planned workout opens as a card over the calendar rather
+            // than pushing another page inside the day sheet.
+            .sheet(item: $selectedPlannedWorkout) { workout in
+                if let planID = HomeWeeklyProgressCalendar.containingPlanID(
+                    for: workout, in: plan
+                ) {
+                    PlannedWorkoutDetailView(
+                        planID: planID,
+                        workout: workout,
+                        isHealthCompleted: false
+                    )
+                    .presentationDetents([.fraction(0.85), .large])
+                    .presentationDragIndicator(.visible)
+                    .presentationCornerRadius(28)
+                } else {
+                    NavigationStack {
+                        HomeWeeklyStandaloneWorkoutDetailView(workout: workout)
+                    }
+                    .presentationDetents([.fraction(0.85), .large])
+                    .presentationDragIndicator(.visible)
+                    .presentationCornerRadius(28)
+                }
             }
             .task {
                 async let refreshWorkouts: Void = workoutCatalog.refresh()
@@ -4834,46 +4860,19 @@ private struct HomeWeeklyProgressDaySheet: View {
             .padding(.top, 4)
     }
 
-    @ViewBuilder
     private func plannedRow(
         _ workout: PlannedSession
     ) -> some View {
-        if let planID = HomeWeeklyProgressCalendar.containingPlanID(
-            for: workout,
-            in: plan
-        ) {
-            NavigationLink {
-                PlannedWorkoutDetailView(
-                    planID: planID,
-                    workout: workout,
-                    isHealthCompleted: false
-                )
-                .onAppear(perform: onOpenWorkout)
-            } label: {
-                plannedRowContent(workout)
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint(
-                ATHLTHLocalization.choose(
-                    english: "Open details for this planned workout",
-                    norwegian: "Åpne detaljer for denne planlagte økten"
-                )
-            )
-        } else {
-            NavigationLink {
-                HomeWeeklyStandaloneWorkoutDetailView(workout: workout)
-                    .onAppear(perform: onOpenWorkout)
-            } label: {
-                plannedRowContent(workout)
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint(
-                ATHLTHLocalization.choose(
-                    english: "Open details for this calendar workout",
-                    norwegian: "Åpne detaljer for denne kalenderøkten"
-                )
-            )
+        Button {
+            selectedPlannedWorkout = workout
+        } label: {
+            plannedRowContent(workout)
         }
+        .buttonStyle(.plain)
+        .accessibilityHint(ATHLTHLocalization.choose(
+            english: "Open the planned workout card",
+            norwegian: "Åpne kortet for den planlagte økten"
+        ))
     }
 
     private func plannedRowContent(
