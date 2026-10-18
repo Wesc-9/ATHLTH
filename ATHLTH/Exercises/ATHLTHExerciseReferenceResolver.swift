@@ -81,6 +81,11 @@ enum ATHLTHExerciseReferenceResolver {
             if byIdentifier.count == 1 { return byIdentifier[0] }
         }
 
+        // A friend's embedded instructions are authoritative for that
+        // particular custom exercise. A local exercise with the same name
+        // must not hide the sender's original technique and equipment.
+        if block.exerciseSnapshot != nil { return nil }
+
         // User-created exercises are only matched by explicit IDs. Equal
         // titles alone are not proof that two personal exercises are the same.
         let clean = key(block.title)
