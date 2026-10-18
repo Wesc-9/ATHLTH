@@ -84,6 +84,35 @@ struct ATHLTHWorkoutGuidanceSettingsView: View {
                     "Audio Coach reports your workout. Route Guardian keeps you on course. Ghost Updates compares you with a reference run. ATHLTH prioritizes safety and workout instructions when several signals happen together."
                 )
             }
+
+            Section {
+                NavigationLink {
+                    AthleteFuelView()
+                } label: {
+                    guidanceRow(
+                        title: ATHLTHLocalization.choose(
+                            english: "Fuel & hydration",
+                            norwegian: "Energi og væske"
+                        ),
+                        subtitle: ATHLTHLocalization.choose(
+                            english: "Set nutrition and water reminder intervals",
+                            norwegian: "Planlegg påminnelser for næring og drikke"
+                        ),
+                        icon: "drop.fill",
+                        tint: ATHLTHTheme.recoveryBlue
+                    )
+                }
+            } header: {
+                Text(ATHLTHLocalization.choose(
+                    english: "Advanced",
+                    norwegian: "Avansert"
+                ))
+            } footer: {
+                Text(ATHLTHLocalization.choose(
+                    english: "These reminders use iPhone notifications, which may appear on Apple Watch. They are not yet spoken by Audio Coach.",
+                    norwegian: "Påminnelsene bruker iPhone-varsler, som kan vises på Apple Watch. Audio Coach leser dem foreløpig ikke opp."
+                ))
+            }
         }
         .navigationTitle("Workout Guidance")
         .navigationBarTitleDisplayMode(.inline)
