@@ -10,6 +10,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     let initialAdvanced: Bool
     /// Only explicit "Continue draft" actions may resume at a later step.
     let resumesDraftOnAppear: Bool
+    /// New plans use their own checkpoint; old and completed plans are safe.
+    let draftID: UUID?
     var onCreated: ((UUID) -> Void)? = nil
 
     @State private var step: BuilderStep
@@ -98,9 +100,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         startsAtSourceChoice: Bool,
         initialAdvanced: Bool,
         resumesDraftOnAppear: Bool = true,
+        draftID: UUID? = nil,
         onCreated: ((UUID) -> Void)? = nil
     ) {
         self.resumesDraftOnAppear = resumesDraftOnAppear
+        self.draftID = draftID
         self.onCreated = onCreated
         self.startsAtSourceChoice =
             startsAtSourceChoice
@@ -387,7 +391,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private var planLifecycle: some View {
         planNavigation
         .onAppear {
-            draftStore.setEditing(true, userID: session.profile.userID)
+            draftStore.setEditing(true, userID: session.profile.userID, draftID: draftID)
             guard !didApplySuggestedStartDate
             else {
                 return
@@ -406,7 +410,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
 
             if resumesDraftOnAppear,
-               let unfinished = draftStore.load(userID: session.profile.userID) {
+               let unfinished = draftStore.load(
+                   userID: session.profile.userID, draftID: draftID
+               ) {
                 isHydratingPlanDraft = true
                 restorePlanDraft(unfinished)
                 // SwiftUI sheets should be presented after the navigation and
@@ -447,7 +453,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             // A normal dismissal exits the editing session, while locking
             // the phone leaves it recoverable after an OS process eviction.
             if scenePhase == .active {
-                draftStore.setEditing(false, userID: session.profile.userID)
+                draftStore.setEditing(false, userID: session.profile.userID, draftID: draftID)
             }
         }
     }
@@ -556,7 +562,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 onProgramCreatedPlanID: { id in
                     createdPlanID = id
                     completedPlanCreation = true
-                    draftStore.clear(userID: session.profile.userID)
+                    draftStore.clear(userID: session.profile.userID, draftID: draftID)
                 }
             )
         }
@@ -5186,7 +5192,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             simpleActivityKinds: mode == .basic
                 ? simpleActivities.map(\.rawValue).sorted() : nil
         )
-        draftStore.save(draft, userID: session.profile.userID)
+        draftStore.save(draft, userID: session.profile.userID, draftID: draftID)
     }
 
     private func goForward() {
@@ -5806,7 +5812,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         // user can immediately add exercises, edit days and review the week.
         createdPlanID = created.id
         completedPlanCreation = true
-        draftStore.clear(userID: session.profile.userID)
+        draftStore.clear(userID: session.profile.userID, draftID: draftID)
         showingCreatedPlan = true
     }
 }
