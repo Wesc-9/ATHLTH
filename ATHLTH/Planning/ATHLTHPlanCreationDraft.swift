@@ -257,11 +257,24 @@ struct ATHLTHPlanCreationDraftStore {
         return draft
     }
 
-    func clear(userID: UUID) {
-        if let url = url(for: userID) {
-            try? FileManager.default.removeItem(at: url)
+    /// Explicit user-triggered deletion. Reports failure instead of hiding a
+    /// draft that could reappear after relaunch if file removal was denied.
+    @discardableResult
+    func deleteDraft(userID: UUID) -> Bool {
+        if let url = url(for: userID),
+           FileManager.default.fileExists(atPath: url.path) {
+            do {
+                try FileManager.default.removeItem(at: url)
+            } catch {
+                return false
+            }
         }
         defaults.removeObject(forKey: legacyKey(userID: userID))
         setEditing(false, userID: userID)
+        return true
+    }
+
+    func clear(userID: UUID) {
+        _ = deleteDraft(userID: userID)
     }
 }
