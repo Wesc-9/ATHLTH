@@ -2052,94 +2052,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         }
                     }
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                isPlanDescriptionExpanded.toggle()
-                            }
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: "text.alignleft")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(ATHLTHPlanDesign.accent)
-                                    .frame(width: 23)
-
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(planSummary.isEmpty
-                                        ? ATHLTHLocalization.choose(
-                                            english: "Add plan description",
-                                            norwegian: "Legg til planbeskrivelse"
-                                        )
-                                        : ATHLTHLocalization.choose(
-                                            english: "Plan description",
-                                            norwegian: "Planbeskrivelse"
-                                        )
-                                    )
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(ATHLTHPlanDesign.ink)
-
-                                    if !planSummary.isEmpty && !isPlanDescriptionExpanded {
-                                        Text(planSummary)
-                                            .font(.caption)
-                                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                            .lineLimit(1)
-                                    } else if planSummary.isEmpty {
-                                        Text(ATHLTHLocalization.choose(
-                                            english: "Optional · What is this plan for?",
-                                            norwegian: "Valgfritt · Hva ønsker du med planen?"
-                                        ))
-                                        .font(.caption)
-                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                    }
-                                }
-                                Spacer(minLength: 4)
-                                Image(systemName: isPlanDescriptionExpanded ? "chevron.up" : "chevron.down")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                            }
-                            .frame(minHeight: 44)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityHint(ATHLTHLocalization.choose(
-                            english: "Expand or collapse the optional description field.",
-                            norwegian: "Åpne eller lukk feltet for valgfri planbeskrivelse."
-                        ))
-
-                        if isPlanDescriptionExpanded {
-                            TextField(
-                                ATHLTHLocalization.choose(
-                                    english: "For example: Build strength and consistency over eight weeks",
-                                    norwegian: "F.eks. bygge styrke og gode treningsvaner"
-                                ),
-                                text: $planSummary,
-                                axis: .vertical
-                            )
-                            .lineLimit(2...4)
-                            .textFieldStyle(.plain)
-                            .font(.subheadline)
-                            .padding(12)
-                            .background(
-                                .white.opacity(0.80),
-                                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            )
-                            .onChange(of: planSummary) { _, value in
-                                if value.count > 240 {
-                                    planSummary = String(value.prefix(240))
-                                }
-                            }
-                            Text("\(planSummary.count)/240")
-                                .font(.caption2)
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                .frame(maxWidth: .infinity, alignment: .trailing)
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(
-                        ATHLTHPlanDesign.selectedSurface.opacity(0.52),
-                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    )
+                    planDescriptionSection
 
                     Divider()
 
@@ -2253,6 +2166,97 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
             }
         }
+    }
+
+    private var planDescriptionSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isPlanDescriptionExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "text.alignleft")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(ATHLTHPlanDesign.accent)
+                        .frame(width: 23)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(planSummary.isEmpty
+                            ? ATHLTHLocalization.choose(
+                                english: "Add plan description",
+                                norwegian: "Legg til planbeskrivelse"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Plan description",
+                                norwegian: "Planbeskrivelse"
+                            )
+                        )
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                        if !planSummary.isEmpty && !isPlanDescriptionExpanded {
+                            Text(planSummary)
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                .lineLimit(1)
+                        } else if planSummary.isEmpty {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Optional · What is this plan for?",
+                                norwegian: "Valgfritt · Hva ønsker du med planen?"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                    }
+                    Spacer(minLength: 4)
+                    Image(systemName: isPlanDescriptionExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(ATHLTHLocalization.choose(
+                english: "Expand or collapse the optional description field.",
+                norwegian: "Åpne eller lukk feltet for valgfri planbeskrivelse."
+            ))
+
+            if isPlanDescriptionExpanded {
+                TextField(
+                    ATHLTHLocalization.choose(
+                        english: "For example: Build strength and consistency over eight weeks",
+                        norwegian: "F.eks. bygge styrke og gode treningsvaner"
+                    ),
+                    text: $planSummary,
+                    axis: .vertical
+                )
+                .lineLimit(2...4)
+                .textFieldStyle(.plain)
+                .font(.subheadline)
+                .padding(12)
+                .background(
+                    .white.opacity(0.80),
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                )
+                .onChange(of: planSummary) { _, value in
+                    if value.count > 240 {
+                        planSummary = String(value.prefix(240))
+                    }
+                }
+                Text("\(planSummary.count)/240")
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(
+            ATHLTHPlanDesign.selectedSurface.opacity(0.52),
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+        )
     }
 
     private var durationOptions: some View {
