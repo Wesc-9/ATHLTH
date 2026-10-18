@@ -4466,13 +4466,8 @@ private struct HomeWeeklyProgressDaySheet: View {
 
     private var todaysWorkoutList: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(ATHLTHLocalization.choose(english: "Today", norwegian: "I dag"))
-                    .font(.headline)
-                    .foregroundStyle(dayInk)
-                Spacer()
-            }
-
+            // The fixed "Dagens økt" header already identifies this
+            // section; avoid repeating "I dag" below the action button.
             if !currentPlanned.isEmpty {
                 sectionTitle(ATHLTHLocalization.choose(
                     english: "Planned", norwegian: "Planlagt"
