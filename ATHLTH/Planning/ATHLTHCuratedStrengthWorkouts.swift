@@ -281,3 +281,21 @@ enum ATHLTHCuratedStrengthWorkouts {
         ]
     }
 }
+
+extension RunningWorkoutTemplate {
+    /// Keep the native running prescription intact, including repetitions,
+    /// recoveries, per-rep overrides and the route. All plan pickers use this.
+    func plannedSession() -> PlannedSession {
+        var result = PlannedSession(
+            id: UUID(), title: title, kind: .running, scheduledStart: nil,
+            durationMinutes: estimatedDurationSeconds.map {
+                Int(($0 / 60).rounded(.up))
+            },
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil, routeID: routeID,
+            exercises: [], notes: summary
+        )
+        result.runningWorkout = self
+        return result
+    }
+}
