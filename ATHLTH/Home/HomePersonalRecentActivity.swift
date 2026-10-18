@@ -650,7 +650,7 @@ struct HomePersonalRecentActivitySection:
                             horizontalItem(
                                 item
                             )
-                            .frame(width: 202)
+                            .frame(width: 278)
                         }
                     }
                     .padding(
@@ -763,70 +763,40 @@ struct HomePersonalRecentActivitySection:
 
     @ViewBuilder
     private func horizontalItem(
-        _ item:
-            HomeActivityStreamItem
+        _ item: HomeActivityStreamItem
     ) -> some View {
-        switch item.source {
-        case .mine(let workout):
-            ZStack(alignment: .bottom) {
-                NavigationLink {
-                    HomePersonalActivityDestination(
-                        workout: workout,
-                        strengthWorkout:
-                            strengthWorkout(
-                                for: workout
-                            ),
-                        phoneWorkout:
-                            localPhoneWorkout(
-                                for: workout
-                            )
-                    )
-                } label: {
-                    HomePersonalHorizontalWorkoutCard(
-                        workout: workout,
-                        strengthWorkout:
-                            strengthWorkout(
-                                for: workout
-                            ),
-                        phoneWorkout:
-                            localPhoneWorkout(
-                                for: workout
-                            )
-                    )
-                }
-                .buttonStyle(.plain)
-
-                HomeCompactActivityEngagementRow(
-                    item:
-                        socialFeedItem(
-                            for: workout
-                        )
+        // One shared outer card keeps the engagement actions separate from
+        // the profile and activity navigation targets.
+        VStack(spacing: 0) {
+            switch item.source {
+            case .mine(let workout):
+                HomePersonalHorizontalWorkoutCard(
+                    workout: workout,
+                    strengthWorkout: strengthWorkout(for: workout),
+                    phoneWorkout: localPhoneWorkout(for: workout)
                 )
-                .padding(.horizontal, 10)
-                .padding(.bottom, 7)
-                .zIndex(4)
-            }
-
-        case .following(let socialItem):
-            ZStack(alignment: .bottom) {
-                NavigationLink {
-                    HomeFollowingWorkoutDetailView(
-                        item: socialItem
-                    )
-                } label: {
-                    HomeFollowingHorizontalWorkoutCard(
-                        item: socialItem
-                    )
-                }
-                .buttonStyle(.plain)
-
                 HomeCompactActivityEngagementRow(
-                    item: socialItem
+                    item: socialFeedItem(for: workout)
                 )
-                .padding(.horizontal, 10)
-                .padding(.bottom, 7)
-                .zIndex(4)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
+            case .following(let socialItem):
+                HomeFollowingHorizontalWorkoutCard(item: socialItem)
+                HomeCompactActivityEngagementRow(item: socialItem)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 8)
             }
+        }
+        .frame(maxWidth: .infinity)
+        .background(
+            Color.white.opacity(0.98),
+            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color.black.opacity(0.05), lineWidth: 0.8)
+                .allowsHitTesting(false)
         }
     }
 
@@ -1079,161 +1049,182 @@ private struct HomePersonalHorizontalWorkoutCard:
         return workout.title
     }
 
-    var body: some View {
-        let muscleProfile =
-            workout.activity == .strength
-                ? homeMuscleProfile
-                : .empty
+    @EnvironmentObject private var session: AppSessionStore
 
-        return VStack(
-            alignment: .leading,
-            spacing: 0
-        ) {
-            HomePersonalWorkoutVisual(
-                workout: workout,
-                strengthWorkout:
-                    strengthWorkout,
-                phoneWorkout:
-                    phoneWorkout,
-                height: 124,
-                precomputedStrengthProfile:
-                    workout.activity == .strength
-                        ? muscleProfile
-                        : nil
-            )
+    private var isStrength: Bool { workout.activity == .strength }
 
-            VStack(
-                alignment: .leading,
-                spacing: 6
-            ) {
-                HStack(spacing: 4) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "You",
-                            norwegian: "Du"
-                        )
-                    )
-                    .font(
-                        .system(
-                            size: 9.5,
-                            weight: .bold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.accentDeep
-                    )
-
-                    Text("·")
-                        .font(.system(size: 9.5))
-                        .foregroundStyle(
-                            ATHLTHTheme.mutedText
-                        )
-
-                    Text(
-                        workout.endDate.formatted(
-                            date: .omitted,
-                            time: .shortened
-                        )
-                    )
-                    .font(.system(size: 9.5))
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-                    .lineLimit(1)
-                }
-
-                Text(cardTitle)
-                    .font(
-                        .system(
-                            size: 15,
-                            weight: .bold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
-                    .lineLimit(2)
-
-                Text(detailText)
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-                    .lineLimit(1)
-
-                if let muscleFocusText =
-                        muscleFocusText(
-                            from: muscleProfile
-                        ) {
-                    HStack(spacing: 6) {
-                        Image(
-                            systemName:
-                                "figure.strengthtraining.traditional"
-                        )
-                        .font(
-                            .system(
-                                size: 9.5,
-                                weight: .semibold
-                            )
-                        )
-
-                        Text(muscleFocusText)
-                            .font(
-                                .system(
-                                    size: 10,
-                                    weight: .semibold
-                                )
-                            )
-                            .lineLimit(1)
+    @ViewBuilder
+    private var ownAvatar: some View {
+        Group {
+            if let url = session.profile.avatarURL {
+                ATHLTHStorageImage(url: url, maxPixelSize: 144) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable().scaledToFill()
+                    default:
+                        avatarFallback
                     }
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-                    .frame(height: 22)
-                } else if let exerciseNames,
-                          !exerciseNames.isEmpty {
-                    Text(exerciseNames)
-                        .font(
-                            .system(
-                                size: 8.5,
-                                weight: .medium
-                            )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme.mutedText
-                        )
-                        .lineLimit(1)
                 }
+            } else {
+                avatarFallback
             }
-            .padding(12)
-            .frame(
-                maxWidth: .infinity,
-                alignment: .leading
-            )
         }
-        .frame(height: 252, alignment: .top)
-        .background(
-            Color.white.opacity(0.96),
-            in: RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-        )
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-        )
+        .frame(width: 36, height: 36)
+        .clipShape(Circle())
         .overlay {
-            RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-            .stroke(
-                Color.black.opacity(0.045),
-                lineWidth: 0.8
-            )
+            Circle()
+                .stroke(ATHLTHTheme.accent.opacity(0.30), lineWidth: 1)
+        }
+    }
+
+    private var avatarFallback: some View {
+        Circle()
+            .fill(ATHLTHTheme.accentSoft)
+            .overlay {
+                Text(session.profile.displayName.prefix(1).uppercased())
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+            }
+    }
+
+    @ViewBuilder
+    private var activityLink: some View {
+        HomePersonalActivityDestination(
+            workout: workout,
+            strengthWorkout: strengthWorkout,
+            phoneWorkout: phoneWorkout
+        )
+    }
+
+    var body: some View {
+        let muscleProfile = isStrength ? homeMuscleProfile : .empty
+        VStack(alignment: .leading, spacing: 0) {
+            NavigationLink {
+                activityLink
+            } label: {
+                HomePersonalWorkoutVisual(
+                    workout: workout,
+                    strengthWorkout: strengthWorkout,
+                    phoneWorkout: phoneWorkout,
+                    height: 142,
+                    precomputedStrengthProfile: isStrength ? muscleProfile : nil
+                )
+            }
+            .buttonStyle(.plain)
+
+            HStack(spacing: 7) {
+                NavigationLink {
+                    ATHLTHProfileView()
+                } label: {
+                    HStack(spacing: 8) {
+                        ownAvatar
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(session.profile.displayName)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                            Text(
+                                HomeRecentCardFormat.activity(workout.activity)
+                                + " · " + HomeRecentCardFormat.date(workout.endDate)
+                            )
+                            .font(.system(size: 9.5))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.77)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english: "Open your profile",
+                        norwegian: "Åpne profilen din"
+                    )
+                )
+
+                Menu {
+                    NavigationLink {
+                        activityLink
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(english: "View activity", norwegian: "Se aktivitet"),
+                            systemImage: "figure.run"
+                        )
+                    }
+                    NavigationLink {
+                        ATHLTHProfileView()
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(english: "View profile", norwegian: "Se profil"),
+                            systemImage: "person.crop.circle"
+                        )
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .frame(width: 36, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(english: "Activity options", norwegian: "Aktivitetsvalg")
+                )
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .padding(.bottom, 7)
+
+            Rectangle()
+                .fill(Color.black.opacity(0.06))
+                .frame(height: 0.7)
+                .padding(.horizontal, 12)
+
+            NavigationLink {
+                activityLink
+            } label: {
+                HStack(spacing: 7) {
+                    if isStrength {
+                        HomeRecentCardMetric(
+                            icon: "clock",
+                            value: HomeRecentCardFormat.duration(workout.duration),
+                            title: ATHLTHLocalization.choose(english: "Duration", norwegian: "Varighet")
+                        )
+                        HomeRecentCardMetric(
+                            icon: "list.bullet",
+                            value: HomeRecentCardFormat.count(workout.strengthExerciseCount),
+                            title: ATHLTHLocalization.choose(english: "Exercises", norwegian: "Øvelser")
+                        )
+                        HomeRecentCardMetric(
+                            icon: "scalemass",
+                            value: HomeRecentCardFormat.volume(workout.strengthTotalVolumeKilograms),
+                            title: ATHLTHLocalization.choose(english: "Volume", norwegian: "Volum")
+                        )
+                    } else {
+                        HomeRecentCardMetric(
+                            icon: "point.topleft.down.curvedto.point.bottomright.up",
+                            value: HomeRecentCardFormat.distance(workout.distanceMeters),
+                            title: ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse")
+                        )
+                        HomeRecentCardMetric(
+                            icon: "clock",
+                            value: HomeRecentCardFormat.duration(workout.duration),
+                            title: ATHLTHLocalization.choose(english: "Duration", norwegian: "Tid")
+                        )
+                        HomeRecentCardMetric(
+                            icon: "speedometer",
+                            value: HomeRecentCardFormat.pace(seconds: workout.duration, meters: workout.distanceMeters),
+                            title: ATHLTHLocalization.choose(english: "Avg. pace", norwegian: "Snittfart")
+                        )
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -1429,175 +1420,161 @@ private struct HomePersonalHorizontalWorkoutCard:
     }
 }
 
-private struct HomeFollowingHorizontalWorkoutCard:
-    View {
+private struct HomeFollowingHorizontalWorkoutCard: View {
     let item: SocialFeedItem
 
-    private var activity:
-        WorkoutActivity {
-        HomeFollowingWorkoutPresentation
-            .activity(for: item)
+    private var activity: WorkoutActivity {
+        HomeFollowingWorkoutPresentation.activity(for: item)
+    }
+
+    private var isStrength: Bool { activity == .strength }
+
+    private var seconds: Double? {
+        HomeRecentCardFormat.number(item, key: "duration_seconds")
+    }
+
+    private var meters: Double? {
+        HomeRecentCardFormat.number(item, key: "distance_meters")
+    }
+
+    @ViewBuilder
+    private var detail: some View {
+        HomeFollowingWorkoutDetailView(item: item)
     }
 
     var body: some View {
-        VStack(
-            alignment: .leading,
-            spacing: 0
-        ) {
-            HomeFollowingWorkoutArtwork(
-                item: item,
-                activity: activity,
-                height: 106
-            )
-            .overlay(
-                alignment: .bottomLeading
-            ) {
-                SocialAvatar(
-                    profile: item.actor,
-                    size: 28
+        VStack(alignment: .leading, spacing: 0) {
+            NavigationLink {
+                detail
+            } label: {
+                HomeFollowingWorkoutArtwork(
+                    item: item,
+                    activity: activity,
+                    height: 142
                 )
-                .padding(9)
             }
+            .buttonStyle(.plain)
 
-            VStack(
-                alignment: .leading,
-                spacing: 5
-            ) {
-                HStack(spacing: 4) {
-                    Text(
-                        item.actor
-                            .resolvedName
-                    )
-                    .font(
-                        .system(
-                            size: 9,
-                            weight: .bold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.accentDeep
-                    )
-                    .lineLimit(1)
-
-                    Text("·")
-                        .font(.system(size: 9))
-                        .foregroundStyle(
-                            ATHLTHTheme.mutedText
-                        )
-
-                    Text(
-                        item.activity.createdAt,
-                        style: .relative
-                    )
-                    .font(.system(size: 9))
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-                    .lineLimit(1)
-                }
-
-                Text(
-                    item.activity.title
-                )
-                .font(
-                    .system(
-                        size: 13,
-                        weight: .bold
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.primaryText
-                )
-                .lineLimit(2)
-
-                if activity == .strength,
-                   let detail =
-                    HomeFollowingWorkoutPresentation
-                        .strengthDetailText(
-                            for: item
-                        ) {
-                    HStack(spacing: 5) {
-                        Image(
-                            systemName:
-                                "figure.strengthtraining.traditional"
-                        )
-                        .font(
-                            .system(
-                                size: 8,
-                                weight: .semibold
-                            )
-                        )
-
-                        Text(detail)
-                            .font(
-                                .system(
-                                    size: 8.5,
-                                    weight: .semibold
+            HStack(spacing: 7) {
+                NavigationLink {
+                    FriendProfileView(userID: item.actor.userID)
+                } label: {
+                    HStack(spacing: 8) {
+                        SocialAvatar(profile: item.actor, size: 36)
+                            .overlay {
+                                Circle().stroke(
+                                    ATHLTHTheme.accent.opacity(0.25),
+                                    lineWidth: 1
                                 )
+                            }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.actor.resolvedName)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                            Text(
+                                HomeRecentCardFormat.activity(activity)
+                                + " · " + HomeRecentCardFormat.date(item.activity.createdAt)
                             )
+                            .font(.system(size: 9.5))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
                             .lineLimit(1)
+                            .minimumScaleFactor(0.77)
+                        }
+                        Spacer(minLength: 0)
                     }
-                    .foregroundStyle(
-                        Color(
-                            red: 0.91,
-                            green: 0.33,
-                            blue: 0.22
-                        )
-                    )
-                    .padding(
-                        .horizontal,
-                        7
-                    )
-                    .frame(height: 22)
-                    .background(
-                        Color(
-                            red: 0.91,
-                            green: 0.33,
-                            blue: 0.22
-                        )
-                        .opacity(0.09),
-                        in: Capsule()
-                    )
-                } else if let subtitle =
-                            item.activity.subtitle,
-                          !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(.system(size: 9.5))
-                        .foregroundStyle(
-                            ATHLTHTheme.mutedText
-                        )
-                        .lineLimit(2)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(english: "Open athlete profile", norwegian: "Åpne brukerprofil")
+                )
+
+                Menu {
+                    NavigationLink {
+                        detail
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(english: "View activity", norwegian: "Se aktivitet"),
+                            systemImage: "figure.run"
+                        )
+                    }
+                    NavigationLink {
+                        FriendProfileView(userID: item.actor.userID)
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(english: "View profile", norwegian: "Se profil"),
+                            systemImage: "person.crop.circle"
+                        )
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .frame(width: 36, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(english: "Activity options", norwegian: "Aktivitetsvalg")
+                )
             }
-            .padding(10)
-            .frame(
-                maxWidth: .infinity,
-                alignment: .leading
-            )
-        }
-        .frame(height: 220, alignment: .top)
-        .background(
-            Color.white.opacity(0.96),
-            in: RoundedRectangle(
-                cornerRadius: 20,
-                style: .continuous
-            )
-        )
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 20,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 20,
-                style: .continuous
-            )
-            .stroke(
-                Color.black.opacity(0.045),
-                lineWidth: 0.8
-            )
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .padding(.bottom, 7)
+
+            Rectangle()
+                .fill(Color.black.opacity(0.06))
+                .frame(height: 0.7)
+                .padding(.horizontal, 12)
+
+            NavigationLink {
+                detail
+            } label: {
+                HStack(spacing: 7) {
+                    if isStrength {
+                        HomeRecentCardMetric(
+                            icon: "clock",
+                            value: HomeRecentCardFormat.duration(seconds),
+                            title: ATHLTHLocalization.choose(english: "Duration", norwegian: "Varighet")
+                        )
+                        HomeRecentCardMetric(
+                            icon: "list.bullet",
+                            value: HomeRecentCardFormat.count(
+                                HomeRecentCardFormat.integer(item, key: "exercise_count")
+                            ),
+                            title: ATHLTHLocalization.choose(english: "Exercises", norwegian: "Øvelser")
+                        )
+                        HomeRecentCardMetric(
+                            icon: "scalemass",
+                            value: HomeRecentCardFormat.volume(
+                                HomeRecentCardFormat.number(item, key: "volume_kg")
+                            ),
+                            title: ATHLTHLocalization.choose(english: "Volume", norwegian: "Volum")
+                        )
+                    } else {
+                        HomeRecentCardMetric(
+                            icon: "point.topleft.down.curvedto.point.bottomright.up",
+                            value: HomeRecentCardFormat.distance(meters),
+                            title: ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse")
+                        )
+                        HomeRecentCardMetric(
+                            icon: "clock",
+                            value: HomeRecentCardFormat.duration(seconds),
+                            title: ATHLTHLocalization.choose(english: "Duration", norwegian: "Tid")
+                        )
+                        HomeRecentCardMetric(
+                            icon: "speedometer",
+                            value: HomeRecentCardFormat.pace(seconds: seconds, meters: meters),
+                            title: ATHLTHLocalization.choose(english: "Avg. pace", norwegian: "Snittfart")
+                        )
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
     }
 }
@@ -1751,6 +1728,117 @@ private struct HomeCompactActivityEngagementRow:
 }
 
 // MARK: - Own workout cards
+
+// Shared typography, truthfully sourced metrics and date treatment for the
+// compact activity cards. Values are intentionally omitted if not recorded.
+private enum HomeRecentCardFormat {
+    static func duration(_ seconds: TimeInterval?) -> String {
+        guard let seconds, seconds.isFinite, seconds > 0 else { return "—" }
+        let total = max(1, Int((seconds / 60).rounded()))
+        return total >= 60
+            ? "\(total / 60)t \(total % 60)m"
+            : "\(total) min"
+    }
+
+    static func distance(_ meters: Double?) -> String {
+        guard let meters, meters.isFinite, meters > 0 else { return "—" }
+        return String(format: "%.1f km", meters / 1_000)
+    }
+
+    static func pace(seconds: TimeInterval?, meters: Double?) -> String {
+        guard let seconds, seconds.isFinite, seconds > 0,
+              let meters, meters.isFinite, meters > 0 else { return "—" }
+        let secondsPerKilometer = seconds * 1_000 / meters
+        guard secondsPerKilometer.isFinite,
+              secondsPerKilometer > 0,
+              secondsPerKilometer < 3_600 else { return "—" }
+        let pace = Int(secondsPerKilometer.rounded())
+        return String(format: "%d:%02d", pace / 60, pace % 60)
+    }
+
+    static func volume(_ kilograms: Double?) -> String {
+        guard let kilograms, kilograms.isFinite, kilograms > 0 else { return "—" }
+        return kilograms >= 1_000
+            ? String(format: "%.1f t", kilograms / 1_000)
+            : String(format: "%.0f kg", kilograms)
+    }
+
+    static func count(_ value: Int?) -> String {
+        guard let value, value > 0 else { return "—" }
+        return "\(value)"
+    }
+
+    static func energy(_ kilocalories: Double?) -> String {
+        guard let kilocalories, kilocalories.isFinite, kilocalories > 0 else { return "—" }
+        return "\(Int(kilocalories.rounded())) kcal"
+    }
+
+    static func date(_ date: Date) -> String {
+        let prefix: String
+        if Calendar.current.isDateInToday(date) {
+            prefix = ATHLTHLocalization.choose(english: "Today", norwegian: "I dag")
+        } else if Calendar.current.isDateInYesterday(date) {
+            prefix = ATHLTHLocalization.choose(english: "Yesterday", norwegian: "I går")
+        } else {
+            prefix = date.formatted(.dateTime.day().month(.abbreviated))
+        }
+        return prefix + " · " + date.formatted(date: .omitted, time: .shortened)
+    }
+
+    static func activity(_ kind: WorkoutActivity) -> String {
+        switch kind {
+        case .running:
+            return ATHLTHLocalization.choose(english: "Running", norwegian: "Løping")
+        case .walking:
+            return ATHLTHLocalization.choose(english: "Walking", norwegian: "Gåtur")
+        case .strength:
+            return ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke")
+        default:
+            return kind.rawValue
+        }
+    }
+
+    static func number(_ item: SocialFeedItem, key: String) -> Double? {
+        guard let raw = item.activity.metadata?[key],
+              let value = Double(raw),
+              value.isFinite, value > 0 else { return nil }
+        return value
+    }
+
+    static func integer(_ item: SocialFeedItem, key: String) -> Int? {
+        guard let raw = item.activity.metadata?[key],
+              let value = Int(raw), value > 0 else { return nil }
+        return value
+    }
+}
+
+private struct HomeRecentCardMetric: View {
+    let icon: String
+    let value: String
+    let title: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .medium))
+                Text(value)
+                    .font(.system(size: 11, weight: .semibold))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.77)
+            }
+            .foregroundStyle(ATHLTHTheme.primaryText)
+            Text(title)
+                .font(.system(size: 9, weight: .regular))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+}
 
 private struct HomePersonalFeaturedWorkoutCard:
     View {
