@@ -1400,7 +1400,7 @@ final class AppSettingsStore: ObservableObject {
         enabled: Bool,
         routeDistanceMeters: Double? = nil
     ) -> WatchAudioCoachConfiguration {
-        WatchAudioCoachConfiguration(
+        var configuration = WatchAudioCoachConfiguration(
             enabled: enabled,
             language: audioCoachLanguage,
             distanceIntervalMeters:
@@ -1469,6 +1469,22 @@ final class AppSettingsStore: ObservableObject {
             announceWorkoutComplete:
                 audioCoachAnnounceWorkoutComplete
         )
+
+        // Use the existing per-account fuel plan. Its voice opt-in is separate
+        // from legacy notification reminders and never requests push permission.
+        let tools = AthleteToolsStore.shared
+        let fuel = tools.data.fuel
+        if enabled, tools.userID != nil,
+           tools.data.fuelVoiceEnabled == true,
+           fuel.valid,
+           fuel.carbohydrateGramsPerHour > 0 || fuel.fluidMLPerHour > 0 {
+            configuration.fuelReminderIntervalMinutes = fuel.intervalMinutes
+            configuration.fuelReminderDurationMinutes = fuel.durationMinutes
+            configuration.fuelCarbohydrateGramsPerHour = fuel.carbohydrateGramsPerHour
+            configuration.fuelFluidMLPerHour = fuel.fluidMLPerHour
+        }
+
+        return configuration
     }
 
     var ghostRaceAudioConfiguration:
