@@ -331,6 +331,7 @@ final class IPhoneWorkoutStore:
     private var coachCueQueue = ATHLTHCoachCueQueue()
     private var nextDistanceAnnouncementMeters: Double?
     private var nextTimeAnnouncementSeconds: TimeInterval?
+    private var nextFuelAnnouncementSeconds: TimeInterval?
     private var offRouteStartedAt: Date?
     private var lastOffRouteAlertAt: Date?
     private var routeWasOff = false
@@ -851,6 +852,10 @@ final class IPhoneWorkoutStore:
                     guard interval > 0 else { return nil }
                     return (floor(workout.elapsed(at: now) / interval) + 1) * interval
                 }
+            nextFuelAnnouncementSeconds = ATHLTHFuelVoicePrompt.nextDue(
+                after: workout.elapsed(at: now),
+                config: configuration
+            )
         } else {
             resetCoachThresholds(configuration: nil)
             deactivateCoachAudioSession()
@@ -2434,6 +2439,7 @@ final class IPhoneWorkoutStore:
         plannedRouteGeometryMeters = 0
         nextDistanceAnnouncementMeters = nil
         nextTimeAnnouncementSeconds = nil
+        nextFuelAnnouncementSeconds = nil
         resetRouteAlertRuntime()
         resetGhostRuntime(
             configuration: nil
@@ -2459,8 +2465,14 @@ final class IPhoneWorkoutStore:
         else {
             nextDistanceAnnouncementMeters = nil
             nextTimeAnnouncementSeconds = nil
+            nextFuelAnnouncementSeconds = nil
             return
         }
+
+        nextFuelAnnouncementSeconds = ATHLTHFuelVoicePrompt.nextDue(
+            after: 0,
+            config: configuration
+        )
 
         if let interval =
                 configuration.distanceIntervalMeters,
@@ -3579,6 +3591,39 @@ final class IPhoneWorkoutStore:
         )
     }
 
+    private func announceFuelIfDue(
+        _ workout: PhoneWorkout,
+        configuration: WatchAudioCoachConfiguration
+    ) {
+        guard !coachSpeechPaused,
+              workout.resumedAt != nil,
+              let next = nextFuelAnnouncementSeconds
+        else { return }
+
+        let elapsed = workout.elapsed(at: Date())
+        guard elapsed >= next else { return }
+        nextFuelAnnouncementSeconds = ATHLTHFuelVoicePrompt.nextDue(
+            after: elapsed,
+            config: configuration
+        )
+
+        guard let phrase = ATHLTHFuelVoicePrompt.phrase(
+            config: configuration
+        ) else { return }
+
+        speak(
+            phrase,
+            configuration: configuration,
+            priority: .routineCoach,
+            event: ATHLTHCoachEvent(
+                kind: .routineMilestone,
+                key: "fuel:\(Int(next))",
+                priority: .routineCoach,
+                validFor: 12
+            )
+        )
+    }
+
     private func evaluateCoachAnnouncements(
         _ workout: PhoneWorkout
     ) {
@@ -3588,6 +3633,8 @@ final class IPhoneWorkoutStore:
         else {
             return
         }
+
+        announceFuelIfDue(workout, configuration: configuration)
 
         var shouldAnnounce = false
         var milestoneKeys: [String] = []
