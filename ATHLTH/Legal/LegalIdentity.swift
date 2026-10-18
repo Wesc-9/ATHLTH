@@ -25,6 +25,9 @@ enum ATHLTHLegalIdentity {
         infoString("ATHLTHLegalOperatorName")
     }
 
+    /// Single canonical ATHLTH website destination for in-app links.
+    static let websiteURL = URL(string: "https://athlth.com")!
+
     /// Shared address for in-app help, terms and privacy inquiries.
     static let supportContactEmail = "contact@athlth.com"
 
