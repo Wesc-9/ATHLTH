@@ -84,6 +84,26 @@ struct ATHLTHWorkoutAudioDock: View {
 
                         Spacer(minLength: 0)
 
+                        if selectedMode == .coach, let onCoachSettings {
+                            Button(action: onCoachSettings) {
+                                Image(systemName: "slider.horizontal.3")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    .frame(width: 35, height: 35)
+                                    .background(
+                                        Color.white.opacity(0.85),
+                                        in: Circle()
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(
+                                ATHLTHLocalization.choose(
+                                    english: "Audio Coach settings",
+                                    norwegian: "Innstillinger for Audio Coach"
+                                )
+                            )
+                        }
+
                         if coachVisible && coachEnabled && !coachManagedOnWatch {
                             ATHLTHAudioRouteControl(compact: true)
                                 .frame(width: 37, height: 35)
