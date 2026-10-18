@@ -72,9 +72,16 @@ enum ATHLTHExerciseReferenceResolver {
         in library: [ExerciseLibraryEntry]
     ) -> ExerciseLibraryEntry? {
         guard block.kind == .exercise else { return nil }
-        if let id = block.exerciseID,
-           let byID = library.first(where: { $0.id == id }) {
-            return byID
+        if let id = block.exerciseID {
+            if let exact = library.first(where: { $0.id == id }) {
+                return exact
+            }
+            if let imported = library.first(where: {
+                $0.source == .custom &&
+                $0.exercise.sharedSourceExerciseID == id
+            }) {
+                return imported
+            }
         }
         if let slug = block.exerciseSlug, !slug.isEmpty {
             let byIdentifier = library.filter { $0.sourceIdentifier == slug }
