@@ -758,12 +758,51 @@ struct HomeActiveFriendsStrip: View {
 }
 
 private struct HomeFriendQuickActionsPopover: View {
+    @EnvironmentObject private var social: SocialStore
+    @AppStorage("athlth.home.showFriendPublicWorkouts")
+    private var showFriendWorkouts = true
+
     let friend: SocialProfileCard
     let isTraining: Bool
     let isOnline: Bool
     let onMessage: () -> Void
     let onChallenge: () -> Void
     let onProfile: () -> Void
+
+    @State private var loadedPublicWorkouts: [SocialFeedItem] = []
+
+    private var publicWorkouts: [SocialFeedItem] {
+        guard showFriendWorkouts else { return [] }
+        // Only server-authorized, explicitly public workouts. Never infer
+        // workout history from training presence, device logs or private data.
+        let recent = (loadedPublicWorkouts + social.feed).filter {
+            $0.activity.actorID == friend.userID &&
+            $0.activity.kind == "workout" &&
+            $0.activity.visibility == "public"
+        }
+        var seen = Set<UUID>()
+        return Array(recent.sorted {
+            $0.activity.createdAt > $1.activity.createdAt
+        }.filter {
+            seen.insert($0.id).inserted
+        }.prefix(2))
+    }
+
+    private func loadPublicWorkouts() async {
+        guard showFriendWorkouts else {
+            loadedPublicWorkouts = []
+            return
+        }
+        guard let profile = await social.loadFriendProfile(friend.userID),
+              !Task.isCancelled, showFriendWorkouts else {
+            return
+        }
+        loadedPublicWorkouts = profile.recentActivities.filter {
+            $0.activity.actorID == friend.userID &&
+            $0.activity.kind == "workout" &&
+            $0.activity.visibility == "public"
+        }
+    }
 
     private var status: String {
         if isTraining {
