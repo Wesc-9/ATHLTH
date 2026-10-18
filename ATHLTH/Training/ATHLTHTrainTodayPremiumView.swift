@@ -924,9 +924,9 @@ enum TrainWorkoutSuggestionPolicy {
             let remaining = safe.filter { $0.category != category }
             ordered = matched + remaining
         } else {
-            let entryLevel = safe.filter {
+            let entryLevel = safe.filter { entry in
                 ["Beginner", "Nybegynner", "All levels", "Alle nivåer"].contains { level in
-                    $0.difficulty.localizedCaseInsensitiveCompare(level) == .orderedSame
+                    entry.difficulty.localizedCaseInsensitiveCompare(level) == .orderedSame
                 }
             }
             if !entryLevel.isEmpty {
