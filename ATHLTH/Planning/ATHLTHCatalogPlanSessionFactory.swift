@@ -27,9 +27,23 @@ enum ATHLTHCatalogPlanSessionFactory {
             blocks = original.blocks
             category = "strength"
             for index in blocks.indices where blocks[index].kind == .exercise {
+                let secondaryFocus = entry.slug == "focus-chest-triceps" && blueprint == .push ||
+                    entry.slug == "focus-back-biceps" && blueprint == .pull
                 if let sets = blocks[index].setCount {
                     blocks[index].setCount = max(1, sets -
-                        (competitionTaper ? 2 : recoveryWeek ? 1 : 0))
+                        (competitionTaper ? 2 : recoveryWeek ? 1 : secondaryFocus ? 1 : 0))
+                }
+                // Basic double progression: a small rep range across each
+                // three-week build, never an arbitrary weight increase.
+                // Only move upward if previous sets were completed cleanly.
+                if !recoveryWeek && !competitionTaper,
+                   let reps = blocks[index].repetitions, reps > 0 {
+                    blocks[index].repetitions = reps + (weekNumber - 1) % 4
+                    let baseNote = blocks[index].notes ?? ""
+                    blocks[index].notes = baseNote + "\n" + tr(
+                        "Rep target is a progression option, not a requirement. Repeat last week's reps if form or recovery is poor.",
+                        "Repsmålet er et progresjonsforslag, ikke et krav. Gjenta forrige ukes reps hvis teknikk eller restitusjon er dårlig."
+                    )
                 }
                 if competitionTaper {
                     // Reduce fatigue, keep comfortable technical practice.
