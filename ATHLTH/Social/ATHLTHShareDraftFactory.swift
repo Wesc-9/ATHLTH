@@ -111,3 +111,9 @@ enum ATHLTHDirectShareError: LocalizedError {
         )
     }
 }
+
+extension MessageShareDraft: Identifiable {
+    var id: String {
+        kind.rawValue + ":" + (sourceObjectID?.uuidString ?? title)
+    }
+}
