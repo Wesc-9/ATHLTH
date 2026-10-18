@@ -8,6 +8,7 @@ final class MirroredWorkoutAudioCoach:
 {
     private let synthesizer =
         AVSpeechSynthesizer()
+    private let azureCoachSpeech = ATHLTHAzureWorkoutSpeech()
 
     private var configuration:
         WatchAudioCoachConfiguration =
@@ -258,6 +259,7 @@ final class MirroredWorkoutAudioCoach:
     /// Stop audio immediately on expired ownership without discarding
     /// workout progress or queued configuration.
     func suspendForWatchFallback() {
+        azureCoachSpeech.stop()
         synthesizer.stopSpeaking(at: .immediate)
         ATHLTHSpokenAudioSession.deactivate()
         guidanceGate.reset()
@@ -265,6 +267,7 @@ final class MirroredWorkoutAudioCoach:
     }
 
     func stop() {
+        azureCoachSpeech.stop()
         synthesizer.stopSpeaking(
             at: .immediate
         )
@@ -707,7 +710,7 @@ final class MirroredWorkoutAudioCoach:
                 .voiceDecision(
                     for: priority,
                     isSpeaking:
-                        synthesizer.isSpeaking,
+                        synthesizer.isSpeaking || azureCoachSpeech.isBusy,
                     quietPeriodSeconds:
                         configuration
                             .resolvedGuidanceQuietPeriodSeconds
@@ -727,6 +730,7 @@ final class MirroredWorkoutAudioCoach:
             }
             return
         case .interruptAndDeliver:
+            azureCoachSpeech.stop()
             synthesizer.stopSpeaking(
                 at: .immediate
             )
@@ -736,17 +740,6 @@ final class MirroredWorkoutAudioCoach:
 
         if let event {
             eventLedger.didDeliver(event)
-        }
-
-        do {
-            try ATHLTHSpokenAudioSession
-                .activate(
-                    duckOtherAudio:
-                        configuration
-                            .shouldDuckOtherAudio
-                )
-        } catch {
-            // Spoken coaching must never interfere with workout capture.
         }
 
         let spokenText = rememberForReplay
@@ -776,9 +769,30 @@ final class MirroredWorkoutAudioCoach:
             configuration
                 .resolvedSpeechVolume
 
-        synthesizer.speak(
-            utterance
+        let routedToAzure = azureCoachSpeech.begin(
+            spokenText,
+            voiceIdentifier: configuration.voiceIdentifier,
+            duckMusic: configuration.shouldDuckOtherAudio,
+            onFallback: { [weak self] in
+                guard let self, self.configuration.enabled, !self.finished
+                else { return }
+                try? ATHLTHSpokenAudioSession.activate(
+                    duckOtherAudio: self.configuration.shouldDuckOtherAudio
+                )
+                self.synthesizer.speak(utterance)
+            },
+            onFinished: { [weak self] in
+                guard let self else { return }
+                self.guidanceGate.voiceDidFinish()
+                self.deliverNextQueuedCue()
+            }
         )
+        if !routedToAzure {
+            try? ATHLTHSpokenAudioSession.activate(
+                duckOtherAudio: configuration.shouldDuckOtherAudio
+            )
+            synthesizer.speak(utterance)
+        }
         if rememberForReplay,
            ATHLTHCoachReplayMemory.mayRemember(priority: priority) {
             coachReplayMemory.remember(spokenText, priority: priority)
@@ -792,6 +806,7 @@ final class MirroredWorkoutAudioCoach:
 
     private func deliverNextQueuedCue() {
         guard !synthesizer.isSpeaking,
+              !azureCoachSpeech.isBusy,
               let next = cueQueue.popNext()
         else { return }
         speak(
