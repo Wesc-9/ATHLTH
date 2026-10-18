@@ -34,6 +34,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var goal: TrainingPlanGoalType = .improveFitness
     @State private var goalDetail = ""
     @State private var planSummary = ""
+    @State private var isPlanDescriptionExpanded = false
 
     @State private var injuryFree = true
     @State private var injuriesOrLimitations = ""
@@ -2010,19 +2011,25 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         english:
                             "A clear name, a start date and how long you want the plan to run.",
                         norwegian:
-                            "Et tydelig navn, startdato og hvor lenge du vil følge planen."
+                            "Velg navn, startdato og varighet. Alt kan endres senere."
                     ),
                 icon: "calendar"
             )
 
             builderPanel {
                 VStack(spacing: 14) {
-                    fieldLabel(
-                        ATHLTHLocalization.choose(
-                            english: "Plan name",
-                            norwegian: "Navn på planen"
+                    HStack {
+                        fieldLabel(
+                            ATHLTHLocalization.choose(
+                                english: "Plan name",
+                                norwegian: "Navn på planen"
+                            )
                         )
-                    )
+
+                        Text("\(title.count)/40")
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
 
                     TextField(
                         ATHLTHLocalization.choose(
@@ -2037,31 +2044,102 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     .frame(height: 48)
                     .background(
                         Color.black.opacity(0.026),
-                        in: RoundedRectangle(
-                            cornerRadius: 14,
-                            style: .continuous
-                        )
+                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
                     )
-                    .onChange(of: title) {
-                        _, newValue in
+                    .onChange(of: title) { _, newValue in
                         if newValue.count > 40 {
-                            title =
-                                String(
-                                    newValue
-                                        .prefix(40)
-                                )
+                            title = String(newValue.prefix(40))
                         }
                     }
 
-                    HStack {
-                        Spacer()
+                    VStack(alignment: .leading, spacing: 8) {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                isPlanDescriptionExpanded.toggle()
+                            }
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "text.alignleft")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(ATHLTHPlanDesign.accent)
+                                    .frame(width: 23)
 
-                        Text("\(title.count)/40")
-                            .font(.caption2)
-                            .foregroundStyle(
-                                ATHLTHTheme.mutedText
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(planSummary.isEmpty
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Add plan description",
+                                            norwegian: "Legg til planbeskrivelse"
+                                        )
+                                        : ATHLTHLocalization.choose(
+                                            english: "Plan description",
+                                            norwegian: "Planbeskrivelse"
+                                        )
+                                    )
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                                    if !planSummary.isEmpty && !isPlanDescriptionExpanded {
+                                        Text(planSummary)
+                                            .font(.caption)
+                                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                            .lineLimit(1)
+                                    } else if planSummary.isEmpty {
+                                        Text(ATHLTHLocalization.choose(
+                                            english: "Optional · What is this plan for?",
+                                            norwegian: "Valgfritt · Hva ønsker du med planen?"
+                                        ))
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                    }
+                                }
+                                Spacer(minLength: 4)
+                                Image(systemName: isPlanDescriptionExpanded ? "chevron.up" : "chevron.down")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint(ATHLTHLocalization.choose(
+                            english: "Expand or collapse the optional description field.",
+                            norwegian: "Åpne eller lukk feltet for valgfri planbeskrivelse."
+                        ))
+
+                        if isPlanDescriptionExpanded {
+                            TextField(
+                                ATHLTHLocalization.choose(
+                                    english: "For example: Build strength and consistency over eight weeks",
+                                    norwegian: "F.eks. bygge styrke og gode treningsvaner"
+                                ),
+                                text: $planSummary,
+                                axis: .vertical
                             )
+                            .lineLimit(2...4)
+                            .textFieldStyle(.plain)
+                            .font(.subheadline)
+                            .padding(12)
+                            .background(
+                                .white.opacity(0.80),
+                                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            )
+                            .onChange(of: planSummary) { _, value in
+                                if value.count > 240 {
+                                    planSummary = String(value.prefix(240))
+                                }
+                            }
+                            Text("\(planSummary.count)/240")
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                        }
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        ATHLTHPlanDesign.selectedSurface.opacity(0.52),
+                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    )
 
                     Divider()
 
@@ -2096,55 +2174,26 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         durationOptions
                     }
 
-                    HStack {
-                        VStack(
-                            alignment: .leading,
-                            spacing: 2
-                        ) {
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english: "PLAN WINDOW",
-                                    norwegian: "PLANPERIODE"
-                                )
-                            )
-                            .font(.system(size: 8.5, weight: .bold))
-                            .tracking(1.1)
-                            .foregroundStyle(
-                                ATHLTHTheme.mutedText
-                            )
-
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "\(weekCount) weeks",
-                                    norwegian:
-                                        "\(weekCount) uker"
-                                )
-                            )
-                            .font(.headline)
-                        }
-
-                        Spacer()
-
-                        Text(
-                            "\(startDate.formatted(date: .abbreviated, time: .omitted))\n– \(resolvedEndDate.formatted(date: .abbreviated, time: .omitted))"
-                        )
+                    HStack(spacing: 8) {
+                        Image(systemName: "calendar.badge.clock")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(ATHLTHPlanDesign.accent)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Plan window",
+                            norwegian: "Planperiode"
+                        ))
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(
-                            ATHLTHTheme.mutedText
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        Spacer(minLength: 4)
+                        Text(
+                            "\(startDate.formatted(date: .abbreviated, time: .omitted)) – \(resolvedEndDate.formatted(date: .abbreviated, time: .omitted))"
                         )
-                        .multilineTextAlignment(
-                            .trailing
-                        )
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
                     }
-                    .padding(12)
-                    .background(
-                        ATHLTHTheme.accentSoft,
-                        in: RoundedRectangle(
-                            cornerRadius: 14,
-                            style: .continuous
-                        )
-                    )
+                    .padding(.top, 4)
                 }
             }
 
@@ -2200,44 +2249,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             .pickerStyle(.menu)
                         }
 
-                        Divider()
-
-                        VStack(
-                            alignment: .leading,
-                            spacing: 7
-                        ) {
-                            fieldLabel(
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "Plan note",
-                                    norwegian:
-                                        "Kort planbeskrivelse"
-                                )
-                            )
-
-                            TextField(
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "Optional context for the season or block",
-                                    norwegian:
-                                        "Valgfri beskrivelse av perioden"
-                                ),
-                                text: $planSummary,
-                                axis: .vertical
-                            )
-                            .lineLimit(2...4)
-                            .textFieldStyle(.plain)
-                            .padding(12)
-                            .background(
-                                Color.black
-                                    .opacity(0.026),
-                                in:
-                                    RoundedRectangle(
-                                        cornerRadius: 13,
-                                        style: .continuous
-                                    )
-                            )
-                        }
                     }
                 }
             }
@@ -2245,105 +2256,102 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private var durationOptions: some View {
-        LazyVGrid(
-            columns: [
-                GridItem(.adaptive(minimum: 64), spacing: 8)
-            ],
-            spacing: 8
-        ) {
-            ForEach(
-                [1, 2, 4, 6, 8, 12],
-                id: \.self
-            ) { value in
+        HStack(spacing: 7) {
+            ForEach([1, 4, 6, 8], id: \.self) { value in
                 Button {
                     weekCount = value
                 } label: {
                     VStack(spacing: 2) {
                         Text("\(value)")
-                            .font(.headline)
-                        Text(
-                            value == 1
-                                ? ATHLTHLocalization.choose(
-                                    english: "week",
-                                    norwegian: "uke"
-                                )
-                                : ATHLTHLocalization.choose(
-                                    english: "weeks",
-                                    norwegian: "uker"
-                                )
+                            .font(.system(size: 16, weight: .semibold))
+                            .monospacedDigit()
+                        Text(value == 1
+                            ? ATHLTHLocalization.choose(english: "week", norwegian: "uke")
+                            : ATHLTHLocalization.choose(english: "weeks", norwegian: "uker")
                         )
-                        .font(.caption2)
+                        .font(.system(size: 10))
                     }
                     .foregroundStyle(
-                        weekCount == value
-                            ? Color.white
-                            : ATHLTHTheme.primaryText
+                        weekCount == value ? Color.white : ATHLTHPlanDesign.ink
                     )
-                    .frame(
-                        maxWidth: .infinity,
-                        minHeight: 52
-                    )
+                    .frame(maxWidth: .infinity, minHeight: 54)
                     .background(
                         weekCount == value
                             ? ATHLTHTheme.accentDeep
-                            : Color.white.opacity(0.72),
-                        in: RoundedRectangle(
-                            cornerRadius: 14,
-                            style: .continuous
-                        )
+                            : Color.white.opacity(0.84),
+                        in: RoundedRectangle(cornerRadius: 13, style: .continuous)
                     )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            .stroke(
+                                weekCount == value
+                                    ? Color.white.opacity(0.13)
+                                    : ATHLTHPlanDesign.outline,
+                                lineWidth: 0.75
+                            )
+                    }
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: value == 1 ? "1 week" : "\(value) weeks",
+                    norwegian: value == 1 ? "1 uke" : "\(value) uker"
+                ))
+                .accessibilityAddTraits(weekCount == value ? [.isSelected] : [])
             }
 
             Menu {
-                ForEach(1...52, id: \.self) {
-                    value in
-                    Button(
-                        ATHLTHLocalization.choose(
-                            english:
-                                value == 1 ? "1 week" : "\(value) weeks",
-                            norwegian:
-                                value == 1 ? "1 uke" : "\(value) uker"
-                        )
-                    ) {
+                // Keep all durations possible, including 2 and 12 weeks;
+                // only the quick shortcuts are reduced to one row.
+                ForEach(1...52, id: \.self) { value in
+                    Button(ATHLTHLocalization.choose(
+                        english: value == 1 ? "1 week" : "\(value) weeks",
+                        norwegian: value == 1 ? "1 uke" : "\(value) uker"
+                    )) {
                         weekCount = value
                     }
                 }
             } label: {
                 VStack(spacing: 2) {
-                    Image(
-                        systemName:
-                            "ellipsis"
+                    if [1, 4, 6, 8].contains(weekCount) {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 16, weight: .semibold))
+                    } else {
+                        Text("\(weekCount)")
+                            .font(.system(size: 16, weight: .semibold))
+                            .monospacedDigit()
+                    }
+                    Text([1, 4, 6, 8].contains(weekCount)
+                        ? ATHLTHLocalization.choose(english: "Custom", norwegian: "Egen")
+                        : ATHLTHLocalization.choose(english: "weeks", norwegian: "uker")
                     )
-                    .font(.headline)
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Custom",
-                            norwegian: "Egendefinert"
-                        )
-                    )
-                    .font(.caption2)
+                    .font(.system(size: 10))
                 }
                 .foregroundStyle(
-                    [1, 2, 4, 6, 8, 12]
-                        .contains(weekCount)
-                        ? ATHLTHTheme.mutedText
-                        : ATHLTHTheme.accentDeep
+                    [1, 4, 6, 8].contains(weekCount)
+                        ? ATHLTHPlanDesign.ink
+                        : Color.white
                 )
-                .frame(
-                    maxWidth: .infinity,
-                    minHeight: 52
-                )
+                .frame(maxWidth: .infinity, minHeight: 54)
                 .background(
-                    Color.white.opacity(0.72),
-                    in: RoundedRectangle(
-                        cornerRadius: 14,
-                        style: .continuous
-                    )
+                    [1, 4, 6, 8].contains(weekCount)
+                        ? Color.white.opacity(0.84)
+                        : ATHLTHTheme.accentDeep,
+                    in: RoundedRectangle(cornerRadius: 13, style: .continuous)
                 )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        .stroke(
+                            [1, 4, 6, 8].contains(weekCount)
+                                ? ATHLTHPlanDesign.outline
+                                : Color.white.opacity(0.13),
+                            lineWidth: 0.75
+                        )
+                }
             }
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Custom duration, \(weekCount) weeks",
+                norwegian: "Egendefinert varighet, \(weekCount) uker"
+            ))
         }
     }
 
