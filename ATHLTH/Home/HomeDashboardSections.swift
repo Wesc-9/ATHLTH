@@ -4274,67 +4274,87 @@ private struct HomeWeeklyProgressDaySheet: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             } else {
-                HStack(alignment: .top, spacing: 8) {
-                    ForEach(Array(workoutSuggestions.enumerated()), id: \.offset) { index, workout in
-                        Button {
-                            presentSuggestion(workout)
-                        } label: {
-                            suggestionTile(workout, index: index)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 10) {
+                        ForEach(Array(workoutSuggestions.enumerated()), id: \.offset) { index, workout in
+                            Button {
+                                presentSuggestion(workout)
+                            } label: {
+                                suggestionTile(workout, index: index)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
+                    .padding(.vertical, 2)
                 }
+                .contentMargins(.trailing, 4)
             }
         }
     }
 
     private func suggestionTile(_ workout: PlannedSession, index: Int) -> some View {
-        let accents: [Color] = [
-            Color(red: 0.88, green: 0.49, blue: 0.34),
-            Color(red: 0.29, green: 0.58, blue: 0.88),
-            Color(red: 0.31, green: 0.68, blue: 0.50),
-            Color(red: 0.57, green: 0.46, blue: 0.82)
-        ]
-        let accent = accents[index % accents.count]
+        let isStrength = workout.workoutCategory == "strength" || workout.kind == .strength
+        let isRun = workout.workoutCategory == "running" || workout.kind == .running
+        let accent = isStrength ? Color(red: 0.40, green: 0.45, blue: 0.61)
+            : isRun ? Color(red: 0.27, green: 0.54, blue: 0.46)
+            : Color(red: 0.63, green: 0.48, blue: 0.34)
+        let symbol = workout.workoutCategory == "hybrid"
+            ? "figure.run.square.stack.fill" : workout.kind.systemImage
+        let category = isStrength
+            ? ATHLTHLocalization.choose(english: "STRENGTH", norwegian: "STYRKE")
+            : isRun ? ATHLTHLocalization.choose(english: "RUNNING", norwegian: "LØPING")
+            : ATHLTHLocalization.choose(english: "WORKOUT", norwegian: "ØKT")
 
         return VStack(alignment: .leading, spacing: 7) {
-            Image(systemName: workout.kind.systemImage)
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(dayInk)
-                .frame(height: 30, alignment: .leading)
+            HStack(spacing: 7) {
+                Image(systemName: symbol)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(accent)
+                    .frame(width: 35, height: 35)
+                    .background(accent.opacity(0.10),
+                                in: RoundedRectangle(cornerRadius: 11))
+                Spacer(minLength: 0)
+                Image(systemName: "plus")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(dayInk)
+                    .frame(width: 23, height: 23)
+                    .background(.white.opacity(0.92), in: Circle())
+            }
+
+            Text(category)
+                .font(.system(size: 9, weight: .bold))
+                .tracking(1.1)
+                .foregroundStyle(accent)
 
             Text(workout.title)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(dayInk)
                 .lineLimit(2)
+                .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             Spacer(minLength: 0)
 
-            HStack(spacing: 3) {
-                Text(workout.durationMinutes.map { "\($0) min" }
+            HStack(spacing: 5) {
+                Image(systemName: "clock")
+                Text(workout.durationMinutes.map { "~\($0) min" }
                      ?? ATHLTHLocalization.choose(english: "Workout", norwegian: "Økt"))
-                    .font(.system(size: 10))
-                    .foregroundStyle(dayInk.opacity(0.66))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(dayInk)
+                Image(systemName: "arrow.up.right")
             }
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(dayInk.opacity(0.67))
         }
-        .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
-        .padding(10)
-        .background(accent.opacity(0.10),
-                    in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .frame(width: 152, height: 138, alignment: .topLeading)
+        .padding(13)
+        .background(.white, in: RoundedRectangle(cornerRadius: 20))
         .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(accent.opacity(0.08), lineWidth: 0.8)
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(accent.opacity(0.18), lineWidth: 0.8)
         }
         .accessibilityElement(children: .combine)
         .accessibilityHint(ATHLTHLocalization.choose(
-            english: "Review and schedule this Workouts session",
+            english: "Review and plan this workout",
             norwegian: "Se detaljer og planlegg denne økten"
         ))
     }
