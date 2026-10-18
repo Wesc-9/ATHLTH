@@ -4214,33 +4214,10 @@ final class AppSessionStore: ObservableObject {
             _ blueprint: TrainingPlanCatalogSessionBlueprint,
             weekNumber: Int
         ) -> PlannedSession {
-            let blueprintNote = blueprint.note(
-                week: weekNumber,
-                totalWeeks: weekCount
-            )
-            let noteParts = [
-                "From ATHLTH Plan Library · \(entry.title)",
-                blueprintNote
-            ]
-            .compactMap { $0 }
-            .filter { !$0.isEmpty }
-
-            return PlannedSession(
-                id: UUID(),
-                title: blueprint.title,
-                kind: blueprint.kind,
-                scheduledStart: nil,
-                durationMinutes:
-                    blueprint.durationMinutes(
-                        week: weekNumber,
-                        totalWeeks: weekCount
-                    ),
-                targetDistanceKilometers: nil,
-                targetPaceSecondsPerKilometer: nil,
-                routeID: nil,
-                exercises: [],
-                notes: noteParts.joined(separator: "\n"),
-                runningWorkout: nil
+            // All catalog sessions share the same source of truth as the
+            // library preview. Never create placeholder workouts.
+            ATHLTHCatalogPlanSessionFactory.session(
+                entry: entry, blueprint: blueprint, week: weekNumber
             )
         }
 
