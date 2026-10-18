@@ -646,6 +646,8 @@ struct ATHLTHAudioCoachSettingsView: View {
                         duckOtherAudio: settings.audioCoachDuckOtherAudio,
                         speechStyle: settings.audioCoachSpeechStyle
                     )
+                    premiumDivider
+                    ATHLTHAzureCoachVoicePreviewView()
                 }
 
                 premiumDivider
