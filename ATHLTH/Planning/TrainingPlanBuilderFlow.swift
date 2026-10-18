@@ -375,88 +375,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             .navigationDestination(
                 isPresented: $showingCreatedPlan
             ) {
-                if let createdPlanID,
-                   let savedPlan = session.trainingPlan(withID: createdPlanID) {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Your plan has been saved",
-                                    norwegian: "Treningsplanen er lagret"
-                                ),
-                                systemImage: "checkmark.seal.fill"
-                            )
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-
-                            Text(savedPlan.title)
-                                .font(.system(size: 28, weight: .bold, design: .rounded))
-                                .foregroundStyle(ATHLTHPlanDesign.ink)
-
-                            HStack(spacing: 12) {
-                                Label("\(savedPlan.weeks.count) " +
-                                      ATHLTHLocalization.choose(english: "weeks", norwegian: "uker"),
-                                      systemImage: "calendar")
-                                Label("\(savedPlan.weeks.first?.days.flatMap(\.sessions).count ?? 0) " +
-                                      ATHLTHLocalization.choose(english: "sessions/week", norwegian: "økter/uke"),
-                                      systemImage: "figure.run")
-                            }
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-
-                            Text(ATHLTHLocalization.choose(
-                                english: "You can review your workouts below. The entire plan is available under Train → Plan.",
-                                norwegian: "Se gjennom øktene nedenfor. Hele planen finner du under Tren → Plan."
-                            ))
-                            .font(.subheadline)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                        }
-                        .padding(18)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.white.opacity(0.9),
-                                    in: RoundedRectangle(cornerRadius: 22))
-                        .padding(.horizontal, 18)
-                        .padding(.top, 14)
-
-                        ATHLTHTrainPlanPremiumView(highlightedPlanID: createdPlanID)
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 14)
-                    }
-                    .background(
-                        ATHLTHPremiumCanvas(
-                            accent: ATHLTHTheme.accent.opacity(0.30)
-                        )
-                    )
-                    .navigationTitle(
-                        ATHLTHLocalization.choose(
-                            english: "Review your plan",
-                            norwegian: "Se over planen din"
-                        )
-                    )
-                    .navigationBarTitleDisplayMode(.inline)
-                    .safeAreaInset(edge: .bottom) {
-                        Button {
-                            onCreated?(createdPlanID)
-                            dismiss()
-                        } label: {
-                            HStack {
-                                Text(ATHLTHLocalization.choose(english: "Open in Plan", norwegian: "Åpne i Plan"))
-                                    .font(.headline)
-                                Spacer(minLength: 8)
-                                Image(systemName: "arrow.right")
-                            }
-                            .foregroundStyle(.white)
-                            .padding(18)
-                            .frame(maxWidth: .infinity, minHeight: 58)
-                            .background(ATHLTHPlanDesign.ink, in: RoundedRectangle(cornerRadius: 18))
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 12)
-                        .background(.ultraThinMaterial)
-                    }
-                }
+                createdPlanReviewDestination
             }
         }
         .onAppear {
@@ -671,6 +590,94 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
             )
         }
+    }
+
+    // Kept separate from the main navigation body to avoid excessive
+    // SwiftUI generic type-checking in the plan creation flow.
+    @ViewBuilder
+    private var createdPlanReviewDestination: some View {
+                if let createdPlanID,
+                   let savedPlan = session.trainingPlan(withID: createdPlanID) {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Your plan has been saved",
+                                    norwegian: "Treningsplanen er lagret"
+                                ),
+                                systemImage: "checkmark.seal.fill"
+                            )
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                            Text(savedPlan.title)
+                                .font(.system(size: 28, weight: .bold, design: .rounded))
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                            HStack(spacing: 12) {
+                                Label("\(savedPlan.weeks.count) " +
+                                      ATHLTHLocalization.choose(english: "weeks", norwegian: "uker"),
+                                      systemImage: "calendar")
+                                Label("\(savedPlan.weeks.first?.days.flatMap(\.sessions).count ?? 0) " +
+                                      ATHLTHLocalization.choose(english: "sessions/week", norwegian: "økter/uke"),
+                                      systemImage: "figure.run")
+                            }
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+
+                            Text(ATHLTHLocalization.choose(
+                                english: "You can review your workouts below. The entire plan is available under Train → Plan.",
+                                norwegian: "Se gjennom øktene nedenfor. Hele planen finner du under Tren → Plan."
+                            ))
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        .padding(18)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.white.opacity(0.9),
+                                    in: RoundedRectangle(cornerRadius: 22))
+                        .padding(.horizontal, 18)
+                        .padding(.top, 14)
+
+                        ATHLTHTrainPlanPremiumView(highlightedPlanID: createdPlanID)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 14)
+                    }
+                    .background(
+                        ATHLTHPremiumCanvas(
+                            accent: ATHLTHTheme.accent.opacity(0.30)
+                        )
+                    )
+                    .navigationTitle(
+                        ATHLTHLocalization.choose(
+                            english: "Review your plan",
+                            norwegian: "Se over planen din"
+                        )
+                    )
+                    .navigationBarTitleDisplayMode(.inline)
+                    .safeAreaInset(edge: .bottom) {
+                        Button {
+                            onCreated?(createdPlanID)
+                            dismiss()
+                        } label: {
+                            HStack {
+                                Text(ATHLTHLocalization.choose(english: "Open in Plan", norwegian: "Åpne i Plan"))
+                                    .font(.headline)
+                                Spacer(minLength: 8)
+                                Image(systemName: "arrow.right")
+                            }
+                            .foregroundStyle(.white)
+                            .padding(18)
+                            .frame(maxWidth: .infinity, minHeight: 58)
+                            .background(ATHLTHPlanDesign.ink, in: RoundedRectangle(cornerRadius: 18))
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 12)
+                        .background(.ultraThinMaterial)
+                    }
+                }
     }
 
     private enum ExistingPlanDestination: Hashable {
