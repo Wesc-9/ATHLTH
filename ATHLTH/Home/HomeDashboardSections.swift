@@ -3962,6 +3962,7 @@ struct HomeWeeklyProgressStrip:
 private struct HomeWeeklyProgressDaySheet: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var strength: StrengthWorkoutStore
+    @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var messaging: MessagingStore
 
     let selection: HomeWeeklyProgressDaySelection
@@ -4005,18 +4006,28 @@ private struct HomeWeeklyProgressDaySheet: View {
     }
 
     private var workoutSuggestions: [PlannedSession] {
-        // No invented workout shortcuts: these are existing Workouts templates.
-        // Show athlete-saved sessions first, then published catalog workouts.
+        // Reuse real recipes; prioritize diverse training types instead of
+        // showing three HYROX tiles simply because they sort first.
         let saved = session.savedWorkoutTemplates
         let savedTemplateIDs = Set(saved.compactMap(\.workoutTemplateID))
-        let catalog = workoutCatalog.entries
-            .filter { !savedTemplateIDs.contains($0.id) }
-            .map { $0.plannedSession() }
+        let catalog = workoutCatalog.entries.filter {
+            !savedTemplateIDs.contains($0.id)
+        }
+        let runs = runningLibrary.allTemplates
+        let highlights: [PlannedSession] = [
+            catalog.first(where: {
+                $0.category == "strength" &&
+                ($0.difficulty == "Beginner" || $0.difficulty == "Nybegynner")
+            })?.plannedSession(),
+            runs.first(where: { $0.isBuiltIn })?.plannedSession(),
+            catalog.first(where: { $0.category == "hybrid" })?.plannedSession()
+        ].compactMap { $0 }
+        let all = highlights + saved + catalog.map { $0.plannedSession() } +
+            runs.map { $0.plannedSession() }
         var distinct: [PlannedSession] = []
         var names: Set<String> = []
-        for workout in saved + catalog {
-            let key = workout.title
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+        for workout in all {
+            let key = workout.title.trimmingCharacters(in: .whitespacesAndNewlines)
                 .lowercased()
             if !key.isEmpty && names.insert(key).inserted {
                 distinct.append(workout)
