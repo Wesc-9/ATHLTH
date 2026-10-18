@@ -1664,7 +1664,7 @@ private struct ProfileRecordVisualTile: View {
 
             LinearGradient(
                 colors: [
-                    kind.tint.opacity(isSelected ? 0.22 : 0.14),
+                    kind.tint.opacity(0.16),
                     Color.white.opacity(0.84)
                 ],
                 startPoint: .topLeading,
@@ -2932,22 +2932,20 @@ struct PerformanceStatsView: View {
                     ],
                     spacing: 8
                 ) {
-                    ForEach(
-                        Array(
-                            runningSummaryItems
-                                .enumerated()
-                        ),
-                        id: \.offset
-                    ) {
-                        index,
-                        item in
-
-                        lightPRMetric(
-                            item,
-                            source:
-                                runningSummaryMetricSource(
-                                    index
-                                )
+                    ForEach(runningSummaryKinds) { kind in
+                        ProfileRecordVisualTile(
+                            kind: kind,
+                            value: kind.displayValue(
+                                healthRecords: resolvedHealthRecords,
+                                stats: stats,
+                                strengthRecords: strengthWorkout.personalRecords,
+                                strengthRepRecords: strengthWorkout.repPersonalRecords,
+                                performanceWorkouts: resolvedPerformanceWorkouts,
+                                strengthWorkouts: strengthWorkout.workoutHistory
+                            ),
+                            detail: kind.supportingDetail(
+                                healthRecords: resolvedHealthRecords
+                            )
                         )
                     }
                 }
@@ -2991,52 +2989,55 @@ struct PerformanceStatsView: View {
         )
     }
 
-    private var runningSummaryItems:
-        [PerformanceMetricItem] {
-        Array(
-            runningItems
-                .prefix(4)
-        ) + [
-            longestRunItem,
-            bestWeeklyRunningDistanceItem
+    // Running PRs and the profile picker share a single record catalog.
+    private var runningSummaryKinds: [ProfileFeaturedRecordKind] {
+        [
+            .fastest400M,
+            .fastest800M,
+            .fastest1K,
+            .fastestMile,
+            .longestRun,
+            .bestWeeklyRunningDistance
         ]
     }
 
-    private var runningDisplayItems:
-        [PerformanceMetricItem] {
-        Array(
-            runningItems
-                .prefix(6)
-        ) + [
-            longestRunItem,
-            bestWeeklyRunningDistanceItem,
-            mostRunsInWeekItem,
-            bestRunningMonthItem
-        ]
+    private var runningDisplayKinds: [ProfileFeaturedRecordKind] {
+        ProfileFeaturedRecordKind.allCases.filter { $0.group == .running }
     }
 
-    private func runningSummaryMetricSource(
-        _ index: Int
-    ) -> String {
-        index < 5
-            ? text(
-                "Verified",
-                "Verifisert"
-            )
+    private var runningDisplayItems: [PerformanceMetricItem] {
+        runningDisplayKinds.map(profileRecordMetric)
+    }
+
+    private func runningMetricSource(_ index: Int) -> String {
+        guard runningDisplayKinds.indices.contains(index) else {
+            return "ATHLTH"
+        }
+        return runningDisplayKinds[index].healthKind != nil
+            ? ATHLTHLocalization.choose(english: "Apple Health", norwegian: "Apple Health")
             : "ATHLTH"
     }
 
-    private func runningMetricSource(
-        _ index: Int
-    ) -> String {
-        index < 7
-            ? text(
-                "Verified",
-                "Verifisert"
-            )
-            : "ATHLTH"
+    private func profileRecordMetric(
+        _ kind: ProfileFeaturedRecordKind
+    ) -> PerformanceMetricItem {
+        PerformanceMetricItem(
+            icon: kind.icon,
+            title: kind.title,
+            value: kind.displayValue(
+                healthRecords: resolvedHealthRecords,
+                stats: stats,
+                strengthRecords: strengthWorkout.personalRecords,
+                strengthRepRecords: strengthWorkout.repPersonalRecords,
+                performanceWorkouts: resolvedPerformanceWorkouts,
+                strengthWorkouts: strengthWorkout.workoutHistory
+            ),
+            detail: kind.supportingDetail(
+                healthRecords: resolvedHealthRecords
+            ),
+            tint: kind.tint
+        )
     }
-
 
     private var editorialStrengthPRCard:
         some View {
@@ -3223,20 +3224,20 @@ struct PerformanceStatsView: View {
                     ],
                     spacing: 8
                 ) {
-                    ForEach(
-                        Array(
-                            strengthSummaryItems
-                                .enumerated()
-                        ),
-                        id: \.offset
-                    ) {
-                        _,
-                        item in
-
-                        lightPRMetric(
-                            item,
-                            source:
-                                "ATHLTH"
+                    ForEach(strengthSummaryKinds) { kind in
+                        ProfileRecordVisualTile(
+                            kind: kind,
+                            value: kind.displayValue(
+                                healthRecords: resolvedHealthRecords,
+                                stats: stats,
+                                strengthRecords: strengthWorkout.personalRecords,
+                                strengthRepRecords: strengthWorkout.repPersonalRecords,
+                                performanceWorkouts: resolvedPerformanceWorkouts,
+                                strengthWorkouts: strengthWorkout.workoutHistory
+                            ),
+                            detail: kind.supportingDetail(
+                                healthRecords: resolvedHealthRecords
+                            )
                         )
                     }
                 }
@@ -3280,34 +3281,25 @@ struct PerformanceStatsView: View {
         )
     }
 
-    private var strengthSummaryItems:
-        [PerformanceMetricItem] {
-        Array(
-            strengthItems
-                .prefix(4)
-        ) + [
-            longestStrengthWorkoutItem,
-            bestWeeklyStrengthVolumeItem
+    private var strengthSummaryKinds: [ProfileFeaturedRecordKind] {
+        [
+            .strengthHeaviestSet,
+            .strengthEstimatedOneRM,
+            .strengthWorkoutVolume,
+            .strengthBestRepPR,
+            .longestStrengthWorkout,
+            .strengthBestWeeklyVolume
         ]
     }
 
-    private var strengthDisplayItems:
-        [PerformanceMetricItem] {
-        Array(
-            strengthItems
-                .prefix(6)
-        ) + [
-            longestStrengthWorkoutItem,
-            mostStrengthSetsItem,
-            mostStrengthRepsItem,
-            mostStrengthExercisesItem,
-            bestWeeklyStrengthVolumeItem,
-            mostStrengthCaloriesItem
-        ] + strengthWorkout.personalRecords
+    private var strengthDisplayItems: [PerformanceMetricItem] {
+        ProfileFeaturedRecordKind.allCases
+            .filter { $0.group == .strength }
+            .map(profileRecordMetric)
+        + strengthWorkout.personalRecords
             .filter {
                 $0.kind == .heaviestSet &&
-                $0.score > 0 &&
-                $0.score.isFinite
+                $0.score > 0 && $0.score.isFinite
             }
             .map { record in
                 PerformanceMetricItem(
