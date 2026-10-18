@@ -1,8 +1,8 @@
 import XCTest
 @testable import ATHLTH
 
-@MainActor
 final class SpotifyWorkoutAutoplayGateTests: XCTestCase {
+    @MainActor
     func testEnteringAppDoesNotReconnectAfterWorkoutEnds() {
         var gate = SpotifyWorkoutAutoplayGate()
         XCTAssertFalse(gate.shouldReconnectForControls)
@@ -16,6 +16,7 @@ final class SpotifyWorkoutAutoplayGateTests: XCTestCase {
         XCTAssertFalse(gate.isCurrent(started))
     }
 
+    @MainActor
     func testManualPauseCancelsPendingAutoplayAfterAppSwitch() {
         var gate = SpotifyWorkoutAutoplayGate()
         let request = gate.begin()
@@ -32,6 +33,7 @@ final class SpotifyWorkoutAutoplayGateTests: XCTestCase {
         XCTAssertFalse(gate.isCurrent(request))
     }
 
+    @MainActor
     func testLateAuthFromOldWorkoutCannotPlayInNewWorkout() {
         var gate = SpotifyWorkoutAutoplayGate()
         let first = gate.begin()
@@ -43,6 +45,7 @@ final class SpotifyWorkoutAutoplayGateTests: XCTestCase {
         XCTAssertTrue(gate.isCurrent(second))
     }
 
+    @MainActor
     func testNewPlaylistRequestInvalidatesOlderPendingRequest() {
         var gate = SpotifyWorkoutAutoplayGate()
         let first = gate.begin()
@@ -51,6 +54,7 @@ final class SpotifyWorkoutAutoplayGateTests: XCTestCase {
         XCTAssertTrue(gate.isCurrent(second))
     }
 
+    @MainActor
     func testEndingWorkoutDoesNotRequirePausingSpotify() {
         var gate = SpotifyWorkoutAutoplayGate()
         _ = gate.begin()
