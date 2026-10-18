@@ -68,9 +68,10 @@ begin
     raise exception 'Second user must get an independent offer';
   end if;
 
+  -- Preserve the exact CHECK expression with a single shared timestamp.
   update private.athlth_post_trial_offer_windows
-  set presented_at = clock_timestamp() - interval '16 minutes',
-      claim_deadline = clock_timestamp() - interval '1 minute'
+  set presented_at = claim_deadline - interval '16 minutes',
+      claim_deadline = claim_deadline - interval '1 minute'
   where user_id = expired_two;
 
   result := public.claim_athlth_post_trial_offer(expired_two);
