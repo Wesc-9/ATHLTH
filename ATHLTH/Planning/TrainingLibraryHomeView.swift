@@ -1056,18 +1056,44 @@ enum TrainingPlanCatalogSessionBlueprint: String, Codable, Hashable {
     case fullBodyA = "full_body_a"
     case fullBodyB = "full_body_b"
     case fullBodyC = "full_body_c"
+    // The program-specific recipes remain typed; never silently discard a
+    // workout identifier and leave an empty calendar day.
+    case upperBody = "upper_body"
+    case lowerBody = "lower_body"
+    case push
+    case pull
+    case legs
+    case chest
+    case back
+    case shouldersCore = "shoulders_core"
+    case quads
+    case glutes
+    case arms
+    case core
+    case home
+    case powerSquat = "power_squat"
+    case powerBench = "power_bench"
+    case powerDeadlift = "power_deadlift"
+    case racePaceRun = "race_pace_run"
+    case hillRun = "hill_run"
+    case hyroxSkills = "hyrox_skills"
+    case hyroxCircuit = "hyrox_circuit"
 
     var kind: WorkoutKind {
         switch self {
         case .walking:
             return .walking
-        case .strength, .fullBodyA, .fullBodyB, .fullBodyC:
+        case .strength, .fullBodyA, .fullBodyB, .fullBodyC,
+             .upperBody, .lowerBody, .push, .pull, .legs,
+             .chest, .back, .shouldersCore, .quads, .glutes,
+             .arms, .core, .home, .powerSquat, .powerBench,
+             .powerDeadlift:
             return .strength
         case .mobility:
             return .mobility
         case .recovery:
             return .recovery
-        case .custom:
+        case .custom, .hyroxSkills, .hyroxCircuit:
             return .custom
         default:
             return .running
@@ -1090,6 +1116,26 @@ enum TrainingPlanCatalogSessionBlueprint: String, Codable, Hashable {
         case .fullBodyA: return "Full Body A"
         case .fullBodyB: return "Full Body B"
         case .fullBodyC: return "Full Body C"
+        case .upperBody: return ATHLTHLocalization.choose(english: "Upper Body", norwegian: "Overkropp")
+        case .lowerBody: return ATHLTHLocalization.choose(english: "Lower Body", norwegian: "Underkropp")
+        case .push: return "Push"
+        case .pull: return "Pull"
+        case .legs: return ATHLTHLocalization.choose(english: "Leg Day", norwegian: "Bein")
+        case .chest: return ATHLTHLocalization.choose(english: "Chest & Triceps", norwegian: "Bryst og triceps")
+        case .back: return ATHLTHLocalization.choose(english: "Back & Biceps", norwegian: "Rygg og biceps")
+        case .shouldersCore: return ATHLTHLocalization.choose(english: "Shoulders & Core", norwegian: "Skuldre og kjerne")
+        case .quads: return ATHLTHLocalization.choose(english: "Quads", norwegian: "Fremside lår")
+        case .glutes: return ATHLTHLocalization.choose(english: "Glutes & Hamstrings", norwegian: "Sete og bakside lår")
+        case .arms: return ATHLTHLocalization.choose(english: "Arms", norwegian: "Armer")
+        case .core: return ATHLTHLocalization.choose(english: "Core", norwegian: "Kjerne")
+        case .home: return ATHLTHLocalization.choose(english: "Home Strength", norwegian: "Hjemmestyrke")
+        case .powerSquat: return ATHLTHLocalization.choose(english: "Squat Focus", norwegian: "Knebøyfokus")
+        case .powerBench: return ATHLTHLocalization.choose(english: "Bench Focus", norwegian: "Benkpressfokus")
+        case .powerDeadlift: return ATHLTHLocalization.choose(english: "Deadlift Focus", norwegian: "Markløftfokus")
+        case .racePaceRun: return ATHLTHLocalization.choose(english: "Race-pace Practice", norwegian: "Konkurransetempo")
+        case .hillRun: return ATHLTHLocalization.choose(english: "Hill Repeats", norwegian: "Bakkeintervaller")
+        case .hyroxSkills: return ATHLTHLocalization.choose(english: "Hybrid Station Skills", norwegian: "Hybrid stasjonsteknikk")
+        case .hyroxCircuit: return ATHLTHLocalization.choose(english: "Hybrid Circuit", norwegian: "Hybrid sirkeløkt")
         }
     }
 
@@ -1118,8 +1164,21 @@ enum TrainingPlanCatalogSessionBlueprint: String, Codable, Hashable {
             value = 50 + min((week - 1) * 5, 80)
         case .walking:
             value = 45
-        case .strength, .fullBodyA, .fullBodyB, .fullBodyC:
+        case .strength, .fullBodyA, .fullBodyB, .fullBodyC, .upperBody,
+             .lowerBody, .push, .pull, .legs, .chest, .back, .quads, .glutes, .arms:
             value = 50
+        case .shouldersCore, .home:
+            value = 40
+        case .core:
+            value = 30
+        case .powerSquat, .powerBench, .powerDeadlift:
+            value = 55
+        case .racePaceRun, .hillRun:
+            value = 45 + min((week - 1), 12)
+        case .hyroxSkills:
+            value = 45
+        case .hyroxCircuit:
+            value = 60
         case .mobility:
             value = 25
         case .recovery:
@@ -1162,8 +1221,18 @@ enum TrainingPlanCatalogSessionBlueprint: String, Codable, Hashable {
             return "Quality intervals with easy recovery between efforts."
         case .longRun:
             return "Build endurance at an easy, sustainable effort."
-        case .fullBodyA, .fullBodyB, .fullBodyC:
-            return "Full-body strength. Edit exercises to match your equipment."
+        case .fullBodyA, .fullBodyB, .fullBodyC, .upperBody, .lowerBody,
+             .push, .pull, .legs, .chest, .back, .quads, .glutes,
+             .arms, .core, .home:
+            return "Strength recipe with complete sets, repetitions and recovery. Adjust to your level."
+        case .powerSquat, .powerBench, .powerDeadlift:
+            return "Focus on technique and controlled effort; do not test a maximum during normal training."
+        case .hyroxSkills, .hyroxCircuit:
+            return "Practice station transitions with manageable loads and technique before speed."
+        case .racePaceRun:
+            return "Controlled race-pace intervals. Calibrate effort to your current fitness."
+        case .hillRun:
+            return "Run uphill with good form and recover easily downhill."
         default:
             return nil
         }
@@ -1212,16 +1281,35 @@ struct TrainingPlanCatalogEntry: Identifiable, Codable, Hashable {
     }
 
     var categoryTitle: String {
-        category
-            .replacingOccurrences(of: "_", with: " ")
-            .capitalized
+        switch category {
+        case "muscle_focus":
+            return ATHLTHLocalization.choose(english: "Muscle focus", norwegian: "Muskelgrupper")
+        case "competition":
+            return ATHLTHLocalization.choose(english: "Competition", norwegian: "Konkurranse")
+        case "general_fitness":
+            return ATHLTHLocalization.choose(english: "General fitness", norwegian: "Hverdagsform")
+        case "strength": return ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke")
+        case "running": return ATHLTHLocalization.choose(english: "Running", norwegian: "Løping")
+        case "hybrid": return "Hybrid"
+        default: return category.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+    }
+
+    /// Local plans never disappear when the published server collection is
+    /// unavailable or smaller; exact-slug server items are kept once.
+    static var bundledCatalog: [TrainingPlanCatalogEntry] {
+        fallbackCatalog + ATHLTHCuratedTrainingPlans.entries
+    }
+
+    var usesCompetitionTaper: Bool {
+        category == "competition" || ["marathon-build", "half-marathon-foundation"].contains(slug)
     }
 }
 
 @MainActor
 final class TrainingPlanLibraryStore: ObservableObject {
     @Published private(set) var entries: [TrainingPlanCatalogEntry] =
-        TrainingPlanCatalogEntry.fallbackCatalog
+        TrainingPlanCatalogEntry.bundledCatalog
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
 
@@ -1251,14 +1339,20 @@ final class TrainingPlanLibraryStore: ObservableObject {
                     .execute()
                     .value
 
-            if !remote.isEmpty {
-                entries = remote
-                loadedRemote = true
+            let remoteSlugs = Set(remote.map(\.slug))
+            let bundled = TrainingPlanCatalogEntry.bundledCatalog
+                .filter { !remoteSlugs.contains($0.slug) }
+            entries = (remote + bundled).sorted {
+                $0.sortOrder == $1.sortOrder
+                    ? $0.title < $1.title : $0.sortOrder < $1.sortOrder
             }
+            loadedRemote = true
             errorMessage = nil
         } catch {
-            // The curated local catalog intentionally remains available
-            // offline and before a new backend migration is deployed.
+            // Keep all local plans available even without the database.
+            if !loadedRemote {
+                entries = TrainingPlanCatalogEntry.bundledCatalog
+            }
             errorMessage = error.localizedDescription
         }
     }
@@ -1417,7 +1511,8 @@ struct TrainingPlanLibraryView: View {
                 entry.title.localizedCaseInsensitiveContains(cleanQuery) ||
                 entry.summary.localizedCaseInsensitiveContains(cleanQuery) ||
                 entry.goal.localizedCaseInsensitiveContains(cleanQuery) ||
-                entry.level.localizedCaseInsensitiveContains(cleanQuery)
+                entry.level.localizedCaseInsensitiveContains(cleanQuery) ||
+                entry.tags.joined(separator: " ").localizedCaseInsensitiveContains(cleanQuery)
 
             return categoryMatches &&
                 favoriteMatches &&
