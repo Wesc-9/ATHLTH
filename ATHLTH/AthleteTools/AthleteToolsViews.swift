@@ -161,6 +161,19 @@ struct AthleteFuelView: View {
                     )
                 }
                 .tint(ATHLTHTheme.accentDeep)
+                .disabled(
+                    tools.data.fuel.carbohydrateGramsPerHour == 0 &&
+                    tools.data.fuel.fluidMLPerHour == 0
+                )
+                if tools.data.fuel.carbohydrateGramsPerHour == 0 &&
+                   tools.data.fuel.fluidMLPerHour == 0 {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose a fluid or carbohydrate amount to enable voice reminders.",
+                        norwegian: "Velg en mengde drikke eller karbohydrater før du aktiverer tale."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
             } footer: {
                 Text(ATHLTHLocalization.choose(
                     english: "Audio Coach speaks during active workouts using your selected voice. No push notifications, calendar alarms or background reminders are created. Enable Audio Coach for the workout as well.",
@@ -222,7 +235,6 @@ struct AthleteFuelView: View {
                         tools.data.fuel.fluidPerReminder)
                 )
             }
-            .disabled(tools.data.fuelVoiceEnabled != true)
 
             Section {
                 Text(ATHLTHLocalization.choose(
