@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ATHLTHTrainingPlanBuilderFlow: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var goalStore: GoalStore
 
@@ -63,7 +64,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
 
-    private struct WeekDayEditorSelection: Identifiable {
+    private struct WeekDayEditorSelection: Identifiable, Equatable {
         let id: Int
     }
 
@@ -85,8 +86,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var showingAIBuilder = false
     @State private var didApplySuggestedStartDate = false
     @State private var showingPlanDesignLab = false
-    @State private var resumablePlanDraft: ATHLTHPlanCreationDraft?
-    @State private var showingResumePlanDialog = false
+    @State private var isHydratingPlanDraft = false
     @State private var completedPlanCreation = false
 
     private let draftStore = ATHLTHPlanCreationDraftStore()
@@ -463,8 +463,24 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             didApplySuggestedStartDate = true
 
             if let unfinished = draftStore.load(userID: session.profile.userID) {
-                resumablePlanDraft = unfinished
-                showingResumePlanDialog = true
+                isHydratingPlanDraft = true
+                restorePlanDraft(unfinished)
+                // SwiftUI sheets should be presented after the navigation and
+                // all of its fields have been restored to the view hierarchy.
+                Task { @MainActor in
+                    await Task.yield()
+                    isHydratingPlanDraft = false
+                    if step == .week, let day = unfinished.editorDay {
+                        let selection = WeekDayEditorSelection(id: day)
+                        switch unfinished.editorKind {
+                        case "studio": composingAdvancedDay = selection
+                        case "library": selectingLibraryDay = selection
+                        case "day": editingWeekDay = selection
+                        default: break
+                        }
+                    }
+                    saveResumableDraft()
+                }
                 return
             }
 
@@ -519,70 +535,14 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .onChange(of: equipment) { _, _ in saveResumableDraft() }
         .onChange(of: weeklyTimeBudgetMinutes) { _, _ in saveResumableDraft() }
         .onChange(of: step) { _, _ in saveResumableDraft() }
-        .confirmationDialog(
-            ATHLTHLocalization.choose(
-                english: "Continue your unfinished plan?",
-                norwegian: "Fortsette på treningsplanen?"
-            ),
-            isPresented: $showingResumePlanDialog,
-            titleVisibility: .visible
-        ) {
-            Button(ATHLTHLocalization.choose(
-                english: "Continue plan", norwegian: "Fortsett på planen"
-            )) {
-                if let draft = resumablePlanDraft {
-                    mode = draft.advanced ? .advanced : .basic
-                    title = draft.usedDefaultTitle == true ? "" : draft.title
-                    weekCount = draft.weekCount
-                    // A stale date must never point back in time.
-                    startDate = max(Calendar.current.startOfDay(for: Date()), draft.startDate)
-                    switch draft.source {
-                    case "library": selectedSource = .library
-                    case "saved": selectedSource = .saved
-                    default: selectedSource = .scratch
-                    }
-                    if draft.advanced {
-                        if let days = draft.preferredDayIndexes, !days.isEmpty {
-                            selectedDays = Set(days)
-                            sessionsPerWeek = days.count
-                        }
-                        if let savedEquipment = draft.equipmentContext,
-                           let restoredEquipment = EquipmentContext(rawValue: savedEquipment) {
-                            equipment = restoredEquipment
-                        }
-                        if let minutes = draft.weeklyTimeBudgetMinutes {
-                            weeklyTimeBudgetMinutes = minutes
-                        }
-                        workoutKindOverridesByDay = (draft.workoutKindsByDay ?? [:])
-                            .compactMapValues(WorkoutKind.init(rawValue:))
-                        workoutTitleOverridesByDay = draft.workoutPresetsByDay ?? [:]
-                        workoutMinutesByDay = draft.workoutMinutesByDay ?? [:]
-                        structuredWorkoutsByDay = draft.structuredWorkoutsByDay ?? [:]
-                        weekDayEdits = draft.weekDayEdits ?? [:]
-                        weekPlanningApproach = draft.planningApproach.flatMap(ATHLTHPlanWeekPlanningApproach.init(rawValue:))
-                        guidedDayCursor = min(max(0, draft.guidedDayCursor ?? 0), weekCount * 7)
-                        firstGuidedWeekDecisionMade = draft.firstGuidedWeekDecisionMade ?? false
-                    }
-                    // We intentionally resume the basics step so any goals,
-                    // limitations and AI permissions must be reconfirmed.
-                    step = .basics
-                }
-                resumablePlanDraft = nil
-                showingResumePlanDialog = false
-                saveResumableDraft()
-            }
-            Button(ATHLTHLocalization.choose(
-                english: "Start a new plan", norwegian: "Start ny plan"
-            ), role: .destructive) {
-                draftStore.clear(userID: session.profile.userID)
-                resumablePlanDraft = nil
-                showingResumePlanDialog = false
-            }
-        } message: {
-            Text(ATHLTHLocalization.choose(
-                english: "This device saved your plan basics and non-sensitive schedule choices. Health notes and personal goals were not saved.",
-                norwegian: "Denne enheten lagret grunninfo og treningsdager. Helsedata og personlige mål ble ikke lagret."
-            ))
+        .onChange(of: selectedPlanWeekIndex) { _, _ in saveResumableDraft() }
+        .onChange(of: simpleMinutes) { _, _ in saveResumableDraft() }
+        .onChange(of: simpleActivities) { _, _ in saveResumableDraft() }
+        .onChange(of: editingWeekDay) { _, _ in saveResumableDraft() }
+        .onChange(of: composingAdvancedDay) { _, _ in saveResumableDraft() }
+        .onChange(of: selectingLibraryDay) { _, _ in saveResumableDraft() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { saveResumableDraft() }
         }
         .onChange(
             of: sessionsPerWeek
@@ -5047,10 +5007,58 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .joined(separator: ", ")
     }
 
+    /// Restore the last editing position without an alert. The checkpoint is
+    /// intentionally privacy-safe: health notes and personal goal text are not
+    /// silently written to disk and can be reentered when needed.
+    private func restorePlanDraft(_ draft: ATHLTHPlanCreationDraft) {
+        mode = draft.advanced ? .advanced : .basic
+        title = draft.usedDefaultTitle == true ? "" : draft.title
+        weekCount = draft.weekCount
+        startDate = max(Calendar.current.startOfDay(for: Date()), draft.startDate)
+        switch draft.source {
+        case "library": selectedSource = .library
+        case "saved": selectedSource = .saved
+        default: selectedSource = .scratch
+        }
+        if draft.advanced {
+            if let days = draft.preferredDayIndexes, !days.isEmpty {
+                selectedDays = Set(days)
+                sessionsPerWeek = days.count
+            }
+            if let equipmentValue = draft.equipmentContext,
+               let restored = EquipmentContext(rawValue: equipmentValue) {
+                equipment = restored
+            }
+            if let minutes = draft.weeklyTimeBudgetMinutes {
+                weeklyTimeBudgetMinutes = minutes
+            }
+            workoutKindOverridesByDay = (draft.workoutKindsByDay ?? [:])
+                .compactMapValues(WorkoutKind.init(rawValue:))
+            workoutTitleOverridesByDay = draft.workoutPresetsByDay ?? [:]
+            workoutMinutesByDay = draft.workoutMinutesByDay ?? [:]
+            structuredWorkoutsByDay = draft.structuredWorkoutsByDay ?? [:]
+            weekDayEdits = draft.weekDayEdits ?? [:]
+            weekPlanningApproach = draft.planningApproach.flatMap(
+                ATHLTHPlanWeekPlanningApproach.init(rawValue:)
+            )
+            guidedDayCursor = min(max(0, draft.guidedDayCursor ?? 0), weekCount * 7)
+            firstGuidedWeekDecisionMade = draft.firstGuidedWeekDecisionMade ?? false
+            selectedPlanWeekIndex = min(max(0, draft.selectedPlanWeekIndex ?? 0), weekCount - 1)
+        } else {
+            simpleMinutes = draft.simpleMinutes ?? simpleMinutes
+            if let kinds = draft.simpleActivityKinds {
+                let restored = Set(kinds.compactMap(WorkoutKind.init(rawValue:)))
+                if !restored.isEmpty { simpleActivities = restored }
+            }
+        }
+        step = ATHLTHPlanJourney.restoredStep(draft.stage, advanced: draft.advanced)
+    }
+
     private func saveResumableDraft() {
         guard didApplySuggestedStartDate,
               !completedPlanCreation,
-              resumablePlanDraft == nil else {
+              !isHydratingPlanDraft,
+              step != .mode else {
             return
         }
         let draft = ATHLTHPlanCreationDraft(
@@ -5078,7 +5086,18 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             weekDayEdits: mode == .advanced ? weekDayEdits : nil,
             planningApproach: mode == .advanced ? weekPlanningApproach?.rawValue : nil,
             guidedDayCursor: mode == .advanced ? guidedDayCursor : nil,
-            firstGuidedWeekDecisionMade: mode == .advanced ? firstGuidedWeekDecisionMade : nil
+            firstGuidedWeekDecisionMade: mode == .advanced ? firstGuidedWeekDecisionMade : nil,
+            selectedPlanWeekIndex: mode == .advanced ? selectedPlanWeekIndex : nil,
+            editorDay: mode == .advanced
+                ? (composingAdvancedDay?.id ?? selectingLibraryDay?.id ?? editingWeekDay?.id)
+                : nil,
+            editorKind: mode != .advanced ? nil
+                : composingAdvancedDay != nil ? "studio"
+                : selectingLibraryDay != nil ? "library"
+                : editingWeekDay != nil ? "day" : nil,
+            simpleMinutes: mode == .basic ? simpleMinutes : nil,
+            simpleActivityKinds: mode == .basic
+                ? simpleActivities.map(\.rawValue).sorted() : nil
         )
         draftStore.save(draft, userID: session.profile.userID)
     }
