@@ -78,7 +78,7 @@ enum ATHLTHHomeWorkoutInspirationPolicy {
         return candidates.sorted {
             if $0.0 == $1.0 { return $0.1 < $1.1 }
             return $0.0 > $1.0
-        }.map(\.2)
+        }.map { $0.2 }
     }
 
     static func explanation(
