@@ -29,6 +29,7 @@ enum ExerciseLibrarySection: String, CaseIterable, Identifiable {
 struct ExerciseLibraryView: View {
     @EnvironmentObject private var library: ExerciseLibraryStore
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var subscriptionStore: SubscriptionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
     @EnvironmentObject private var recents: LibraryRecentsStore
     @ObservedObject private var norwegianTranslations = NorwegianExerciseAutoTranslation.shared
@@ -47,6 +48,7 @@ struct ExerciseLibraryView: View {
     @State private var showingCreateExercise = false
     @State private var showingEquipmentCamera = false
     @State private var showingCameraUnavailable = false
+    @State private var showingEquipmentSubscription = false
     @State private var equipmentPhoto: UIImage?
     @State private var scannerIsAnalyzing = false
     @State private var scannerAnalysis: ATHLTHEquipmentScanResponse?
@@ -221,11 +223,7 @@ struct ExerciseLibraryView: View {
             translationAvailabilityBanner
 
             Button {
-                if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                    showingEquipmentCamera = true
-                } else {
-                    showingCameraUnavailable = true
-                }
+                beginEquipmentScan()
             } label: {
                 HStack(spacing: 11) {
                     Image(systemName: "camera.viewfinder")
@@ -240,15 +238,24 @@ struct ExerciseLibraryView: View {
                         ))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHPlanDesign.ink)
-                        Text(ATHLTHLocalization.choose(
-                            english: "Camera opens directly · photo is sent to AI for matching",
-                            norwegian: "Kamera åpnes direkte · bildet sendes til AI for treff"
-                        ))
+                        Text(
+                            session.hasPaidAccess
+                            ? ATHLTHLocalization.choose(
+                                english: "Camera opens directly · photo is sent to AI for matching",
+                                norwegian: "Kamera åpnes direkte · bildet sendes til AI for treff"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "ATHLTH+ · Unlock equipment recognition",
+                                norwegian: "ATHLTH+ · Lås opp apparatgjenkjenning"
+                            )
+                        )
                         .font(.caption)
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     }
                     Spacer()
-                    Image(systemName: "arrow.up.right")
+                    Image(systemName:
+                        session.hasPaidAccess ? "arrow.up.right" : "lock.fill"
+                    )
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(ATHLTHPlanDesign.accent)
                 }
@@ -567,6 +574,14 @@ struct ExerciseLibraryView: View {
                 .environmentObject(library)
                 .environmentObject(session)
         }
+        .sheet(isPresented: $showingEquipmentSubscription) {
+            SubscriptionOfferView {
+                session.applyStoreKitEntitlement(
+                    subscriptionStore.activeEntitlement
+                )
+                showingEquipmentSubscription = false
+            }
+        }
         .fullScreenCover(isPresented: $showingEquipmentCamera) {
             ATHLTHEquipmentCameraPicker(
                 onCapture: { captured in
@@ -671,7 +686,7 @@ struct ExerciseLibraryView: View {
             Spacer(minLength: 4)
 
             Button {
-                showingEquipmentCamera = true
+                beginEquipmentScan()
             } label: {
                 Image(systemName: "camera.fill")
                     .font(.subheadline)
@@ -744,9 +759,26 @@ struct ExerciseLibraryView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    private func beginEquipmentScan() {
+        guard session.hasPaidAccess else {
+            showingEquipmentSubscription = true
+            return
+        }
+        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+            showingCameraUnavailable = true
+            return
+        }
+        showingEquipmentCamera = true
+    }
+
     /// Capturing a photo is an explicit scan action. The entry point explains
     /// that AI analyzes the photo before the user opens the camera.
     private func processEquipmentPhoto(_ image: UIImage) {
+        guard session.hasPaidAccess else {
+            resetEquipmentScan()
+            showingEquipmentSubscription = true
+            return
+        }
         scannerTask?.cancel()
         let identity = UUID()
         scanIdentity = identity
