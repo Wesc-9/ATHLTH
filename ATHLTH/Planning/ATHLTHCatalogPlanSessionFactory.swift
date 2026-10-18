@@ -74,7 +74,7 @@ enum ATHLTHCatalogPlanSessionFactory {
         // All blocks are portable and ordered. Do not generate additional
         // parallel exercise or running data that could execute twice.
         blocks = blocks.enumerated().map { index, step in
-            WorkoutTemplateBlock(
+            var copy = WorkoutTemplateBlock(
                 sequence: index + 1, kind: step.kind, title: step.title,
                 exerciseSlug: step.exerciseSlug,
                 distanceMeters: step.distanceMeters,
@@ -91,6 +91,9 @@ enum ATHLTHCatalogPlanSessionFactory {
                 groupRounds: step.groupRounds,
                 cardioActivity: step.cardioActivity, isIndoor: step.isIndoor
             )
+            copy.exerciseID = step.exerciseID
+            copy.exerciseSnapshot = step.exerciseSnapshot
+            return copy
         }
 
         let baselineMinutes = original?.estimatedDurationMinutes ??
