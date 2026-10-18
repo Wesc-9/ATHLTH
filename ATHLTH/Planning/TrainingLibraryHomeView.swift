@@ -2312,10 +2312,13 @@ struct TrainingPlanCatalogDetailView: View {
                 ),
                 id: \.offset
             ) { _, blueprint in
+                let actualWorkout = ATHLTHCatalogPlanSessionFactory.session(
+                    entry: entry, blueprint: blueprint, week: week
+                )
                 HStack(spacing: 10) {
                     Image(
                         systemName:
-                            blueprint.kind.systemImage
+                            actualWorkout.kind.systemImage
                     )
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(detailAccent)
@@ -2327,13 +2330,13 @@ struct TrainingPlanCatalogDetailView: View {
                         )
                     )
 
-                    Text(blueprint.title)
+                    Text(actualWorkout.title)
                         .font(.caption.weight(.semibold))
 
                     Spacer()
 
                     Text(
-                        "\(blueprint.durationMinutes(week: week, totalWeeks: entry.durationWeeks)) min"
+                        "\(actualWorkout.durationMinutes ?? 0) min"
                     )
                     .font(.caption2)
                     .foregroundStyle(
