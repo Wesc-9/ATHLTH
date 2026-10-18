@@ -146,4 +146,72 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
             $0.exerciseSlug == "athlth-native-seated-cable-row"
         })
     }
+    @MainActor
+    func testSharedExerciseCopiesArePrivateAndLinkedToSourceAcrossWeeks() throws {
+        let recipient = UUID()
+        let sourceExerciseID = UUID()
+        let library = ExerciseLibraryStore()
+        library.switchAccount(recipient)
+        defer { library.switchAccount(nil) }
+
+        let snapshot = ExerciseSnapshot(
+            name: "Personal Row Variation",
+            instructions: ["Set up handles", "Row with a stable trunk"],
+            primaryMuscles: ["Back"], secondaryMuscles: ["Biceps"],
+            equipment: ["Cable"], imageURL: nil
+        )
+        let imported = try XCTUnwrap(library.importSharedExercise(
+            snapshot, ownerID: recipient, sourceExerciseID: sourceExerciseID
+        ))
+        XCTAssertEqual(imported.exercise.ownerID, recipient)
+        XCTAssertFalse(imported.exercise.isVisibleOutsideOwnerLibrary)
+        XCTAssertEqual(imported.exercise.sharedSourceExerciseID, sourceExerciseID)
+        XCTAssertEqual(imported.exercise.instructions.count, 2)
+
+        var firstWeek = block(snapshot.name)
+        firstWeek.exerciseID = sourceExerciseID
+        firstWeek.exerciseSnapshot = snapshot
+        XCTAssertEqual(
+            ATHLTHExerciseReferenceResolver.resolve(
+                firstWeek, in: library.allExercises
+            )?.id, imported.id
+        )
+
+        // Sharing the same original exercise again reuses the existing copy.
+        let again = try XCTUnwrap(library.importSharedExercise(
+            snapshot, ownerID: recipient, sourceExerciseID: sourceExerciseID
+        ))
+        XCTAssertEqual(again.id, imported.id)
+    }
+
+    @MainActor
+    func testDifferentCreatorsMayShareDifferentExercisesWithIdenticalNames() throws {
+        let recipient = UUID()
+        let library = ExerciseLibraryStore()
+        library.switchAccount(recipient)
+        defer { library.switchAccount(nil) }
+
+        let source = ExerciseSnapshot(
+            name: "Cable Row", instructions: ["Personal setup"],
+            primaryMuscles: ["Back"], equipment: ["Cable"], imageURL: nil
+        )
+        let first = try XCTUnwrap(library.importSharedExercise(
+            source, ownerID: recipient, sourceExerciseID: UUID()
+        ))
+        let secondSourceID = UUID()
+        let second = try XCTUnwrap(library.importSharedExercise(
+            source, ownerID: recipient, sourceExerciseID: secondSourceID
+        ))
+        XCTAssertNotEqual(first.id, second.id)
+        XCTAssertNotEqual(first.canonicalName, second.canonicalName)
+        var incoming = block("Cable Row")
+        incoming.exerciseID = secondSourceID
+        incoming.exerciseSnapshot = source
+        XCTAssertEqual(
+            ATHLTHExerciseReferenceResolver.resolve(
+                incoming, in: library.allExercises
+            )?.id, second.id
+        )
+    }
+
 }
