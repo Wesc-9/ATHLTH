@@ -726,10 +726,16 @@ struct ExerciseLibraryView: View {
                 .font(.system(size: 30))
                 .foregroundStyle(ATHLTHPlanDesign.accent)
 
-            Text(ATHLTHLocalization.choose(
-                english: "No matching exercises",
-                norwegian: "Ingen aktuelle øvelser funnet"
-            ))
+            Text(scannerMessage == nil
+                ? ATHLTHLocalization.choose(
+                    english: "No matching exercises",
+                    norwegian: "Ingen aktuelle øvelser funnet"
+                )
+                : ATHLTHLocalization.choose(
+                    english: "Could not analyze the photo",
+                    norwegian: "Kunne ikke analysere bildet"
+                )
+            )
             .font(.headline)
 
             Text(scannerMessage ?? (
@@ -746,6 +752,23 @@ struct ExerciseLibraryView: View {
             .font(.subheadline)
             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             .multilineTextAlignment(.center)
+
+            if scannerMessage != nil,
+               let equipmentPhoto {
+                Button {
+                    processEquipmentPhoto(equipmentPhoto)
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Try again with the same photo",
+                            norwegian: "Prøv igjen med samme bilde"
+                        ),
+                        systemImage: "arrow.clockwise"
+                    )
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHPlanDesign.ink)
+            }
 
             Button(ATHLTHLocalization.choose(
                 english: "Show all exercises",
