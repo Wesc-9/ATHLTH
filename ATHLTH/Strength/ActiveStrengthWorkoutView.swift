@@ -49,7 +49,6 @@ struct ActiveStrengthWorkoutView: View {
                         ScrollView {
                             VStack(spacing: 18) {
                                 workoutHeader(workout)
-                                strengthCoachPanel(workout)
                                 TrainTogetherStatusStrip()
                                 addExerciseCard(workout)
                                 simpleTrackingContent(
@@ -561,6 +560,25 @@ struct ActiveStrengthWorkoutView: View {
                 )
             }
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let workout = strength.activeWorkout {
+                ATHLTHWorkoutAudioDock(
+                    coachVisible:
+                        workout.advancedConfiguration?.audioCoach.enabled == true,
+                    coachEnabled:
+                        workout.advancedConfiguration?.audioCoach.enabled == true,
+                    coachPaused: strengthCoach.speechPaused,
+                    coachManagedOnWatch: workout.captureDevice == .appleWatch,
+                    canReplayCoach: strengthCoach.canReplayLastMessage,
+                    onCoachStatus: { announceStrengthCoachStatusNow() },
+                    onCoachTogglePause: {
+                        strengthCoach.setSpeechPaused(!strengthCoach.speechPaused)
+                    },
+                    onCoachReplay: { strengthCoach.replayLastMessage() },
+                    onCoachSettings: nil
+                )
+            }
+        }
         // A strength workout is a true full-screen surface. Spotify can
         // temporarily move ATHLTH to the background while App Remote wakes the
         // Spotify app. When iOS restores this fullScreenCover, an explicit
@@ -660,126 +678,6 @@ struct ActiveStrengthWorkoutView: View {
             configuration: configuration,
             cueKind: .manualStatus
         )
-    }
-
-    @ViewBuilder
-    private func strengthCoachPanel(
-        _ workout: StrengthWorkoutLog
-    ) -> some View {
-        if let configuration = workout.advancedConfiguration?.audioCoach,
-           configuration.enabled {
-            ATHLTHUnifiedCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 10) {
-                        Image(systemName: "waveform.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Audio Coach")
-                                .font(.subheadline.weight(.semibold))
-                            Text(
-                                workout.captureDevice == .appleWatch
-                                    ? ATHLTHLocalization.choose(
-                                        english: "Voice controlled on Apple Watch",
-                                        norwegian: "Talen styres på Apple Watch"
-                                    )
-                                    : strengthCoach.speechPaused
-                                        ? ATHLTHLocalization.choose(
-                                            english: "Voice paused · workout continues",
-                                            norwegian: "Tale pauset · økten fortsetter"
-                                        )
-                                        : ATHLTHLocalization.choose(
-                                            english: "Voice on · workout continues",
-                                            norwegian: "Tale aktiv · økten fortsetter"
-                                        )
-                            )
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                        }
-                        Spacer(minLength: 4)
-                        if workout.captureDevice == .iPhone {
-                            ATHLTHAudioRouteControl(compact: true)
-                        }
-                    }
-
-                    if workout.captureDevice == .iPhone {
-                        HStack(spacing: 9) {
-                            Button {
-                                strengthCoach.setSpeechPaused(
-                                    !strengthCoach.speechPaused
-                                )
-                            } label: {
-                                Label(
-                                    strengthCoach.speechPaused
-                                        ? ATHLTHLocalization.choose(
-                                            english: "Resume voice",
-                                            norwegian: "Fortsett tale"
-                                        )
-                                        : ATHLTHLocalization.choose(
-                                            english: "Pause voice",
-                                            norwegian: "Pause tale"
-                                        ),
-                                    systemImage: strengthCoach.speechPaused
-                                        ? "play.fill"
-                                        : "pause.fill"
-                                )
-                                .frame(maxWidth: .infinity, minHeight: 42)
-                            }
-                            .buttonStyle(.bordered)
-
-                            Button {
-                                announceStrengthCoachStatusNow()
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Status now",
-                                        norwegian: "Status nå"
-                                    ),
-                                    systemImage: "waveform"
-                                )
-                                .frame(maxWidth: .infinity, minHeight: 42)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(ATHLTHTheme.accentDeep)
-                            .disabled(strengthCoach.speechPaused)
-                        }
-                        .font(.subheadline.weight(.semibold))
-
-                        if let last = strengthCoach.lastCoachMessage {
-                            Text(last)
-                                .font(.caption)
-                                .foregroundStyle(ATHLTHTheme.mutedText)
-                                .lineLimit(2)
-                        }
-
-                        TimelineView(.periodic(from: .now, by: 5)) { _ in
-                            Button {
-                                strengthCoach.replayLastMessage()
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Listen again",
-                                        norwegian: "Hør igjen"
-                                    ),
-                                    systemImage: "arrow.counterclockwise"
-                                )
-                                .font(.subheadline.weight(.semibold))
-                                .frame(maxWidth: .infinity, minHeight: 40)
-                            }
-                            .buttonStyle(.bordered)
-                            .disabled(!strengthCoach.canReplayLastMessage)
-                        }
-
-                        Text(ATHLTHLocalization.choose(
-                            english: "Voice controls never pause sets or rest timers. Recent messages expire after 45 seconds.",
-                            norwegian: "Talekontroller pauser ikke sett eller hviletid. Siste beskjed utløper etter 45 sekunder."
-                        ))
-                        .font(.caption2)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                    }
-                }
-            }
-        }
     }
 
     @MainActor
@@ -1781,8 +1679,6 @@ struct ActiveStrengthWorkoutView: View {
             focusedWorkoutStatus(
                 workout
             )
-
-            strengthCoachPanel(workout)
 
             Button {
                 showingExerciseQueue = true
