@@ -59,7 +59,25 @@ enum ATHLTHCatalogPlanSessionFactory {
 
         // All blocks are portable and ordered. Do not generate additional
         // parallel exercise or running data that could execute twice.
-        for index in blocks.indices { blocks[index].sequence = index + 1 }
+        blocks = blocks.enumerated().map { index, step in
+            WorkoutTemplateBlock(
+                sequence: index + 1, kind: step.kind, title: step.title,
+                exerciseSlug: step.exerciseSlug,
+                distanceMeters: step.distanceMeters,
+                repetitions: step.repetitions,
+                durationSeconds: step.durationSeconds,
+                targetWeightKilograms: step.targetWeightKilograms,
+                loadNote: step.loadNote, notes: step.notes,
+                phase: step.phase,
+                targetPaceSecondsPerKilometer: step.targetPaceSecondsPerKilometer,
+                targetHeartRateZone: step.targetHeartRateZone,
+                setCount: step.setCount,
+                restBetweenSetsSeconds: step.restBetweenSetsSeconds,
+                groupID: step.groupID, groupKind: step.groupKind,
+                groupRounds: step.groupRounds,
+                cardioActivity: step.cardioActivity, isIndoor: step.isIndoor
+            )
+        }
 
         let baselineMinutes = original?.estimatedDurationMinutes ??
             blueprint.durationMinutes(week: weekNumber, totalWeeks: entry.durationWeeks)
