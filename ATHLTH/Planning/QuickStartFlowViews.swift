@@ -149,7 +149,9 @@ struct AudioCoachDraft {
 
     @MainActor
     mutating func load(from settings: AppSettingsStore) {
-        enabled = settings.audioCoachEnabledByDefault
+        // Each fresh Quick Train session is opt-in. Keep all saved voice and
+        // guidance preferences, but never inherit a previous 'on' toggle.
+        enabled = false
         distanceTriggerEnabled =
             settings.audioCoachDistanceTriggerEnabled
         timeTriggerEnabled =
