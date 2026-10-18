@@ -235,6 +235,8 @@ final class ExerciseLibraryStore: ObservableObject {
             norwegian = "Bryst"
         case "core":
             norwegian = "Mage og kjerne"
+        case "legs":
+            norwegian = "Lår"
         case "adductors", "inner thigh":
             norwegian = "Innsiden av lårene"
         case "hip flexors":
@@ -260,7 +262,7 @@ final class ExerciseLibraryStore: ObservableObject {
         case "triceps":
             norwegian = "Triceps"
         case "glutes":
-            norwegian = "Setemuskler"
+            norwegian = "Sete"
         case "hamstrings":
             norwegian = "Bakside lår"
         case "neck":
@@ -591,36 +593,78 @@ final class ExerciseLibraryStore: ObservableObject {
         return resolved
     }
 
-    /// Dataset anatomy can use scientific names such as "biceps brachii".
-    /// Filter labels stay readable while the exercise metadata stays intact.
+    /// The athlete sees only familiar major groups. Detailed RepDB names
+    /// remain unchanged in exercise records, muscle maps, saved plans, etc.
+    static let commonMuscleFilters: [String] = [
+        "Chest", "Back", "Shoulders", "Biceps", "Triceps",
+        "Core", "Glutes", "Legs", "Calves"
+    ]
+
+    /// Collapse technical muscle and body-part names into the simple library
+    /// filters. This is presentation/search mapping, not a metadata rewrite.
     static func canonicalMuscleFilter(_ raw: String) -> String {
-        let key = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if key.contains("biceps") { return "Biceps" }
-        if key.contains("triceps") { return "Triceps" }
-        if key.contains("pectoralis") { return "Chest" }
-        if key.contains("deltoid") { return "Shoulders" }
-        if key.contains("latissimus") { return "Back" }
-        if key.contains("quadriceps") { return "Quads" }
-        if key.contains("gastrocnemius") || key.contains("soleus") { return "Calves" }
+        let key = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+            .lowercased()
+
+        if key == "all" { return "All" }
+        if ["chest", "pecs", "pectoral"].contains(key) ||
+            key.contains("pectoralis") {
+            return "Chest"
+        }
+        if ["back", "lower back", "upper back", "lats",
+            "traps", "rhomboids", "erector spinae",
+            "spinal erectors"].contains(key) ||
+            key.contains("latissimus") || key.contains("rhomboid") ||
+            key.contains("trapezius") || key.contains("spinae") {
+            return "Back"
+        }
+        if ["shoulders", "shoulder", "rotator cuff"].contains(key) ||
+            key.contains("deltoid") || key.contains("supraspinatus") ||
+            key.contains("infraspinatus") {
+            return "Shoulders"
+        }
+        if key.contains("tricep") || key.contains("anconeus") {
+            return "Triceps"
+        }
+        if ["biceps", "brachialis", "brachioradialis",
+            "forearms", "forearm", "lower arms", "lower arm"].contains(key) ||
+            key.contains("bicep") || key.contains("brachialis") ||
+            key.contains("brachioradialis") {
+            return "Biceps"
+        }
+        if ["core", "waist", "abs", "abdominals",
+            "abdominal", "obliques", "oblique"].contains(key) ||
+            key.contains("abdomin") || key.contains("oblique") {
+            return "Core"
+        }
+        if ["glutes", "glute", "buttocks", "hips",
+            "hip abductors", "abductors", "outer thigh",
+            "piriformis"].contains(key) ||
+            key.contains("gluteus") || key.contains("abductor") {
+            return "Glutes"
+        }
+        if ["calves", "calf", "lower legs", "lower leg",
+            "gastrocnemius", "soleus", "tibialis anterior"].contains(key) ||
+            key.contains("gastrocnemius") || key.contains("soleus") ||
+            key.contains("tibialis") {
+            return "Calves"
+        }
+        if ["legs", "leg", "upper legs", "upper leg",
+            "thighs", "thigh", "quads", "quadriceps", "hamstrings",
+            "adductors", "adductor", "inner thigh", "hip flexors",
+            "hip flexor", "rectus femoris", "sartorius",
+            "iliopsoas", "gracilis"].contains(key) ||
+            key.contains("quadricep") || key.contains("hamstring") ||
+            key.contains("adductor") || key.contains("vastus") {
+            return "Legs"
+        }
         return raw
     }
 
     var bodyParts: [String] {
-        if let cachedBodyParts {
-            return cachedBodyParts
-        }
-
-        // Filter options must come from the same catalog users can select.
-        // Include actual primary muscles so "Biceps" finds curl exercises
-        // even when RepDB labels their body part as "Upper Arms".
-        let resolved = Array(Set(selectableExercises.flatMap { entry in
-            ([entry.bodyPart].compactMap { $0 } + entry.exercise.primaryMuscles)
-                .map(Self.canonicalMuscleFilter)
-                .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-        })).sorted()
-
-        cachedBodyParts = resolved
-        return resolved
+        Self.commonMuscleFilters
     }
 
     var equipmentOptions: [String] {
@@ -770,11 +814,15 @@ final class ExerciseLibraryStore: ObservableObject {
 
             let matchesBodyPart: Bool
             if let bodyPart, bodyPart != "All" {
+                let selected = Self.canonicalMuscleFilter(bodyPart)
                 matchesBodyPart =
-                    entry.bodyPart?.localizedCaseInsensitiveCompare(bodyPart) == .orderedSame ||
+                    entry.bodyPart.map {
+                        Self.canonicalMuscleFilter($0)
+                            .localizedCaseInsensitiveCompare(selected) == .orderedSame
+                    } ?? false ||
                     entry.exercise.primaryMuscles.contains {
                         Self.canonicalMuscleFilter($0)
-                            .localizedCaseInsensitiveCompare(bodyPart) == .orderedSame
+                            .localizedCaseInsensitiveCompare(selected) == .orderedSame
                     }
             } else {
                 matchesBodyPart = true
