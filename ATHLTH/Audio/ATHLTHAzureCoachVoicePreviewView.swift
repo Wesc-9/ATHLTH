@@ -13,6 +13,8 @@ final class ATHLTHAzureVoicePreviewPlayer:
     @Published private(set) var message: String?
 
     private var player: AVAudioPlayer?
+    private var requestTask: Task<Void, Never>?
+    private var requestIdentity = UUID()
     private struct Request: Encodable { let voice: String }
     private struct Reply: Decodable {
         let voice: String
@@ -21,12 +23,13 @@ final class ATHLTHAzureVoicePreviewPlayer:
 
     func preview(_ voice: String, duckMusic: Bool) {
         guard loadingVoice == nil else { return }
-        player?.stop()
-        player = nil
+        stop()
+        let requestID = UUID()
+        requestIdentity = requestID
         loadingVoice = voice
         message = nil
 
-        Task { [weak self] in
+        requestTask = Task { [weak self] in
             guard let self else { return }
             do {
                 let answer: Reply = try await
@@ -34,6 +37,9 @@ final class ATHLTHAzureVoicePreviewPlayer:
                         "azure-coach-voice",
                         options: FunctionInvokeOptions(body: Request(voice: voice))
                     )
+                guard requestIdentity == requestID, !Task.isCancelled else {
+                    return
+                }
                 guard answer.voice == voice,
                       let data = Data(base64Encoded: answer.audioBase64),
                       !data.isEmpty,
@@ -50,6 +56,9 @@ final class ATHLTHAzureVoicePreviewPlayer:
                 player = audio
                 loadingVoice = nil
             } catch {
+                guard requestIdentity == requestID, !Task.isCancelled else {
+                    return
+                }
                 loadingVoice = nil
                 ATHLTHSpokenAudioSession.deactivate()
                 message = ATHLTHLocalization.choose(
@@ -61,6 +70,10 @@ final class ATHLTHAzureVoicePreviewPlayer:
     }
 
     func stop() {
+        requestIdentity = UUID()
+        requestTask?.cancel()
+        requestTask = nil
+        loadingVoice = nil
         player?.stop()
         player = nil
         ATHLTHSpokenAudioSession.deactivate()
