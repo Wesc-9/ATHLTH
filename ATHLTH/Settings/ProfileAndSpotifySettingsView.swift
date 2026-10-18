@@ -24,6 +24,29 @@ struct ATHLTHEditProfileView: View {
     @State private var checkingUsername = false
     @State private var saving = false
     @State private var errorMessage: String?
+    @State private var showingRemoveAvatarConfirmation = false
+    @State private var showingRemoveHeaderConfirmation = false
+    @State private var removingHeader = false
+    @State private var editingPublicField: PublicProfileField?
+    @State private var loadedProfile = false
+
+    private enum PublicProfileField: String, Identifiable {
+        case name, username, bio
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .name:
+                return ATHLTHLocalization.choose(english: "Display name", norwegian: "Visningsnavn")
+            case .username:
+                return ATHLTHLocalization.choose(english: "Username", norwegian: "Brukernavn")
+            case .bio:
+                return "Bio"
+            }
+        }
+    }
+
     @AppStorage("hasEditedATHLTHProfile")
     private var hasEditedATHLTHProfile = false
 
@@ -37,12 +60,11 @@ struct ATHLTHEditProfileView: View {
                 LazyVStack(spacing: 18) {
                     profileIdentityCard
 
-                    if let onEditHeader {
-                        profileHeaderEditingCard(onEditHeader: onEditHeader)
-                    }
-
                     VStack(spacing: 12) {
-                        ATHLTHSectionHeader(title: "Public profile")
+                        ATHLTHSectionHeader(title: ATHLTHLocalization.choose(
+                            english: "Public profile",
+                            norwegian: "Offentlig profil"
+                        ))
                             .padding(.horizontal, 2)
 
                         publicProfileCard
@@ -119,7 +141,9 @@ struct ATHLTHEditProfileView: View {
                                 .tint(.white)
                                 .frame(width: 48)
                         } else {
-                            Text("Save")
+                            Text(ATHLTHLocalization.choose(
+                                english: "Save", norwegian: "Lagre"
+                            ))
                                 .font(.subheadline.weight(.semibold))
                                 .frame(width: 48)
                         }
@@ -142,6 +166,53 @@ struct ATHLTHEditProfileView: View {
             }
         }
         .onAppear(perform: loadCurrentProfile)
+        .sheet(item: $editingPublicField) { field in
+            publicFieldEditor(for: field)
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Remove profile picture?",
+                norwegian: "Fjerne profilbildet?"
+            ),
+            isPresented: $showingRemoveAvatarConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Remove picture", norwegian: "Fjern bilde"
+            ), role: .destructive) {
+                Task { await removePhoto() }
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Cancel", norwegian: "Avbryt"
+            ), role: .cancel) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "The profile will show a default avatar.",
+                norwegian: "Profilen viser standardikonet når bildet fjernes."
+            ))
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Remove profile header?",
+                norwegian: "Fjerne headerbildet?"
+            ),
+            isPresented: $showingRemoveHeaderConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Remove header picture", norwegian: "Fjern headerbilde"
+            ), role: .destructive) {
+                Task { await resetHeaderPicture() }
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Cancel", norwegian: "Avbryt"
+            ), role: .cancel) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Your profile header will return to ATHLTH's default image.",
+                norwegian: "Profilheaderen går tilbake til standardbildet fra ATHLTH."
+            ))
+        }
         .task {
             await gear.refresh()
         }
@@ -214,52 +285,79 @@ struct ATHLTHEditProfileView: View {
     }
 
     private var profileIdentityCard: some View {
-        let photoButtonTitle =
-            selectedAvatarData == nil
-                ? "Change photo"
-                : "Use another"
-
-        return ATHLTHCard {
-            VStack(spacing: 16) {
-                ZStack(alignment: .bottomTrailing) {
-                    avatarPreview
-
-                    PhotosPicker(
-                        selection: $selectedPhoto,
-                        matching: .images
-                    ) {
-                        Image(systemName: "camera.fill")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 34, height: 34)
-                            .background(
-                                ATHLTHTheme.accentDeep,
-                                in: Circle()
-                            )
-                            .overlay {
-                                Circle()
-                                    .stroke(
-                                        Color.white.opacity(0.90),
-                                        lineWidth: 2
-                                    )
+        ATHLTHCard {
+            VStack(spacing: 10) {
+                ZStack(alignment: .bottom) {
+                    headerPicturePreview
+                        .overlay(alignment: .topTrailing) {
+                            if hasCustomHeader {
+                                removePictureButton(
+                                    label: ATHLTHLocalization.choose(
+                                        english: "Remove header picture",
+                                        norwegian: "Fjern headerbilde"
+                                    ),
+                                    disabled: saving || removingHeader
+                                ) {
+                                    showingRemoveHeaderConfirmation = true
+                                }
+                                .padding(9)
                             }
-                    }
-                    .buttonStyle(.plain)
-                    .offset(x: 2, y: 2)
-                    .accessibilityLabel("Change profile photo")
-                }
+                        }
 
-                VStack(spacing: 4) {
-                    Text(
-                        displayName.trimmingCharacters(
-                            in: .whitespacesAndNewlines
-                        ).isEmpty
-                            ? "Your profile"
-                            : displayName
-                    )
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-                    .lineLimit(1)
+                    avatarPreview
+                        .overlay(alignment: .topTrailing) {
+                            if session.profile.avatarURL != nil ||
+                                selectedAvatarData != nil {
+                                removePictureButton(
+                                    label: ATHLTHLocalization.choose(
+                                        english: "Remove profile picture",
+                                        norwegian: "Fjern profilbilde"
+                                    ),
+                                    disabled: saving
+                                ) {
+                                    showingRemoveAvatarConfirmation = true
+                                }
+                                .offset(x: 5, y: -2)
+                            }
+                        }
+                        .overlay(alignment: .bottomTrailing) {
+                            PhotosPicker(
+                                selection: $selectedPhoto,
+                                matching: .images
+                            ) {
+                                Image(systemName: "camera.fill")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 34, height: 34)
+                                    .background(ATHLTHTheme.accentDeep, in: Circle())
+                                    .overlay {
+                                        Circle().stroke(.white, lineWidth: 2)
+                                    }
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(saving)
+                            .accessibilityLabel(ATHLTHLocalization.choose(
+                                english: "Change profile picture",
+                                norwegian: "Bytt profilbilde"
+                            ))
+                            .offset(x: 2, y: 2)
+                        }
+                        .offset(y: 58)
+                }
+                .padding(.bottom, 58)
+
+                VStack(spacing: 5) {
+                    Text(displayName.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    ).isEmpty
+                        ? ATHLTHLocalization.choose(
+                            english: "Your profile", norwegian: "Din profil"
+                        )
+                        : displayName)
+                        .font(.system(size: 28, weight: .regular, design: .serif))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
 
                     if !cleanedUsername.isEmpty {
                         Text("@\(cleanedUsername)")
@@ -268,17 +366,23 @@ struct ATHLTHEditProfileView: View {
                             .lineLimit(1)
                     }
 
-                    Text("Public identity")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 5)
-                        .background(
-                            ATHLTHTheme.champagneSoft,
-                            in: Capsule()
-                        )
-                        .padding(.top, 3)
+                    Label(
+                        visibilityLabel,
+                        systemImage: "globe"
+                    )
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(ATHLTHTheme.champagneSoft, in: Capsule())
+                    .padding(.top, 3)
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.bottom, 9)
+
+                Rectangle()
+                    .fill(ATHLTHTheme.divider)
+                    .frame(height: 0.7)
 
                 HStack(spacing: 10) {
                     PhotosPicker(
@@ -286,145 +390,188 @@ struct ATHLTHEditProfileView: View {
                         matching: .images
                     ) {
                         Label(
-                            photoButtonTitle,
+                            ATHLTHLocalization.choose(
+                                english: "Change picture",
+                                norwegian: "Bytt bilde"
+                            ),
                             systemImage: "photo.on.rectangle"
                         )
-                        .font(.caption.weight(.semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHTheme.accentDeep)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 40)
+                        .frame(maxWidth: .infinity, minHeight: 46)
                         .background(
                             ATHLTHTheme.accentSoft,
                             in: Capsule()
                         )
                     }
                     .buttonStyle(.plain)
+                    .disabled(saving)
 
-                    if session.profile.avatarURL != nil ||
-                        selectedAvatarData != nil {
-                        Button(role: .destructive) {
-                            Task { await removePhoto() }
-                        } label: {
-                            Label("Remove", systemImage: "trash")
-                                .font(.caption.weight(.semibold))
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 40)
-                                .background(
-                                    Color.red.opacity(0.07),
-                                    in: Capsule()
-                                )
+                    if let onEditHeader {
+                        Button(action: onEditHeader) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Change header picture",
+                                    norwegian: "Endre headerbilde"
+                                ),
+                                systemImage: "photo.on.rectangle.angled"
+                            )
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.80)
+                            .frame(maxWidth: .infinity, minHeight: 46)
+                            .background(
+                                ATHLTHTheme.champagneSoft,
+                                in: Capsule()
+                            )
                         }
                         .buttonStyle(.plain)
-                        .disabled(saving)
+                        .disabled(removingHeader || saving)
                     }
                 }
-
-                Text(
-                    "Your photo follows your profile visibility settings."
-                )
-                .font(.caption)
-                .foregroundStyle(ATHLTHTheme.mutedText)
-                .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)
         }
     }
 
+    private var hasCustomHeader: Bool {
+        session.profile.headerImageURL != nil ||
+            (session.profile.headerArtworkName != nil &&
+             session.profile.headerArtworkName != "ProfileHero")
+    }
 
-    private func profileHeaderEditingCard(
-        onEditHeader: @escaping () -> Void
-    ) -> some View {
-        ATHLTHCard {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 10) {
-                    Image(systemName: "photo.on.rectangle.angled")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                        .frame(width: 34, height: 34)
-                        .background(
-                            ATHLTHTheme.accentSoft,
-                            in: RoundedRectangle(cornerRadius: 11)
-                        )
+    private var visibilityLabel: String {
+        switch social.privacy?.profileVisibility {
+        case "private":
+            return ATHLTHLocalization.choose(
+                english: "Private profile", norwegian: "Privat profil"
+            )
+        case "friends":
+            return ATHLTHLocalization.choose(
+                english: "Followers", norwegian: "Følgere"
+            )
+        default:
+            return ATHLTHLocalization.choose(
+                english: "Public identity", norwegian: "Offentlig identitet"
+            )
+        }
+    }
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english: "Profile header",
-                                norwegian: "Profilheader"
-                            )
-                        )
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english: "Select a built-in image or upload your own.",
-                                norwegian: "Velg standardbilde eller last opp ditt eget."
-                            )
-                        )
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                    }
-
-                    Spacer(minLength: 0)
-                }
-
-                GeometryReader { viewport in
-                    ZStack {
-                        if let headerURL = session.profile.headerImageURL {
-                            ATHLTHStorageImage(
-                                url: headerURL,
-                                maxPixelSize: 900
-                            ) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image.resizable().scaledToFill()
-                                default:
-                                    Image(
-                                        session.profile.headerArtworkName
-                                            ?? "ProfileHero"
-                                    )
-                                    .resizable().scaledToFill()
-                                }
-                            }
-                        } else {
-                            Image(
-                                session.profile.headerArtworkName
-                                    ?? "ProfileHero"
-                            )
-                            .resizable().scaledToFill()
+    private var headerPicturePreview: some View {
+        GeometryReader { viewport in
+            Group {
+                if let url = session.profile.headerImageURL {
+                    ATHLTHStorageImage(url: url, maxPixelSize: 900) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image.resizable().scaledToFill()
+                        default:
+                            Image(session.profile.headerArtworkName ?? "ProfileHero")
+                                .resizable().scaledToFill()
                         }
                     }
-                    .frame(
-                        width: viewport.size.width,
-                        height: viewport.size.height
-                    )
-                    .clipped()
-                    .clipShape(
-                        RoundedRectangle(cornerRadius: 17, style: .continuous)
-                    )
+                } else {
+                    Image(session.profile.headerArtworkName ?? "ProfileHero")
+                        .resizable().scaledToFill()
                 }
-                .frame(height: 116)
+            }
+            .frame(width: viewport.size.width, height: viewport.size.height)
+            .clipped()
+        }
+        .frame(height: 158)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .accessibilityHidden(true)
+    }
 
-                Button(action: onEditHeader) {
-                    HStack {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Change profile header",
-                                norwegian: "Endre profilheader"
-                            ),
-                            systemImage: "photo.badge.arrow.down"
+    private func removePictureButton(
+        label: String,
+        disabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 28, height: 28)
+                .background(ATHLTHTheme.accentDeep.opacity(0.88), in: Circle())
+                .overlay {
+                    Circle().stroke(.white.opacity(0.96), lineWidth: 1.5)
+                }
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .accessibilityLabel(label)
+    }
+
+    private var publicProfileCard: some View {
+        ATHLTHCard {
+            VStack(spacing: 0) {
+                publicProfileRow(
+                    title: ATHLTHLocalization.choose(
+                        english: "Display name", norwegian: "Visningsnavn"
+                    ),
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Shown on your ATHLTH profile.",
+                        norwegian: "Vises på profilen din."
+                    ),
+                    value: displayName,
+                    icon: "person.fill"
+                ) {
+                    editingPublicField = .name
+                }
+
+                profileDivider
+
+                publicProfileRow(
+                    title: ATHLTHLocalization.choose(
+                        english: "Username", norwegian: "Brukernavn"
+                    ),
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Your unique ATHLTH identity.",
+                        norwegian: "Din unike identitet på ATHLTH."
+                    ),
+                    value: "@\(cleanedUsername)",
+                    icon: "at"
+                ) {
+                    editingPublicField = .username
+                }
+
+                profileDivider
+
+                publicProfileRow(
+                    title: "Bio",
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Tell people a little about yourself.",
+                        norwegian: "Fortell litt om deg selv."
+                    ),
+                    value: bio.isEmpty
+                        ? ATHLTHLocalization.choose(
+                            english: "Add bio", norwegian: "Legg til bio"
                         )
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .padding(.horizontal, 14)
-                    .frame(height: 44)
-                    .background(
-                        ATHLTHTheme.accentSoft,
-                        in: RoundedRectangle(cornerRadius: 14)
+                        : bio,
+                    icon: "text.alignleft"
+                ) {
+                    editingPublicField = .bio
+                }
+
+                profileDivider
+
+                NavigationLink {
+                    SocialPrivacySettingsView()
+                } label: {
+                    publicProfileRowContent(
+                        title: ATHLTHLocalization.choose(
+                            english: "Visibility", norwegian: "Synlighet"
+                        ),
+                        subtitle: ATHLTHLocalization.choose(
+                            english: "Choose who can see your profile.",
+                            norwegian: "Velg hvem som kan se profilen."
+                        ),
+                        value: visibilityLabel,
+                        icon: "eye"
                     )
                 }
                 .buttonStyle(.plain)
@@ -432,91 +579,123 @@ struct ATHLTHEditProfileView: View {
         }
     }
 
-    private var publicProfileCard: some View {
-        ATHLTHCard {
-            VStack(spacing: 0) {
-                profileField(
-                    title: "Display name",
-                    icon: "person.fill"
-                ) {
-                    TextField("Display name", text: $displayName)
-                        .textContentType(.name)
-                        .multilineTextAlignment(.trailing)
-                }
+    private func publicProfileRow(
+        title: String,
+        subtitle: String,
+        value: String,
+        icon: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            publicProfileRowContent(
+                title: title, subtitle: subtitle, value: value, icon: icon
+            )
+        }
+        .buttonStyle(.plain)
+    }
 
-                profileDivider
+    private func publicProfileRowContent(
+        title: String,
+        subtitle: String,
+        value: String,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 11) {
+            profileFieldIcon(icon)
 
-                VStack(alignment: .leading, spacing: 9) {
-                    HStack(spacing: 12) {
-                        profileFieldIcon("at")
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
 
-                        Text("Username")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(ATHLTHTheme.mutedText)
+                Text(subtitle)
+                    .font(.system(size: 11))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+            }
 
-                        Spacer(minLength: 12)
+            Spacer(minLength: 6)
 
-                        TextField("Username", text: $username)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .textContentType(.username)
-                            .multilineTextAlignment(.trailing)
-                            .foregroundStyle(ATHLTHTheme.primaryText)
-                    }
+            Text(value)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: 116, alignment: .trailing)
 
-                    usernameStatus
-                        .padding(.leading, 42)
-                }
-                .padding(.vertical, 15)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+        }
+        .frame(minHeight: 72)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
 
-                profileDivider
-
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 12) {
-                        profileFieldIcon("text.alignleft")
-
-                        Text("Bio")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-
-                        Spacer()
-
-                        Text("\(bio.count)/160")
-                            .font(.caption2.monospacedDigit())
-                            .foregroundStyle(
-                                bio.count > 160
-                                    ? Color.red
-                                    : ATHLTHTheme.mutedText
-                            )
-                    }
-
-                    TextEditor(text: $bio)
-                        .frame(minHeight: 104)
-                        .scrollContentBackground(.hidden)
-                        .font(.body)
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                        .padding(12)
-                        .background(
-                            ATHLTHTheme.surfaceStone.opacity(0.82),
-                            in: RoundedRectangle(
-                                cornerRadius: 16,
-                                style: .continuous
-                            )
+    private func publicFieldEditor(
+        for field: PublicProfileField
+    ) -> some View {
+        NavigationStack {
+            Form {
+                Section {
+                    switch field {
+                    case .name:
+                        TextField(
+                            ATHLTHLocalization.choose(
+                                english: "Display name", norwegian: "Visningsnavn"
+                            ),
+                            text: $displayName
                         )
-                        .overlay {
-                            RoundedRectangle(
-                                cornerRadius: 16,
-                                style: .continuous
+                        .textContentType(.name)
+                    case .username:
+                        TextField(
+                            ATHLTHLocalization.choose(
+                                english: "Username", norwegian: "Brukernavn"
+                            ),
+                            text: $username
+                        )
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .textContentType(.username)
+
+                        usernameStatus
+                    case .bio:
+                        TextField(
+                            ATHLTHLocalization.choose(
+                                english: "Tell people about yourself",
+                                norwegian: "Fortell litt om deg selv"
+                            ),
+                            text: $bio,
+                            axis: .vertical
+                        )
+                        .lineLimit(3...7)
+                        Text("\(bio.count)/160")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(
+                                bio.count > 160 ? Color.red : ATHLTHTheme.mutedText
                             )
-                            .stroke(
-                                ATHLTHTheme.border,
-                                lineWidth: 0.8
-                            )
-                        }
+                    }
+                } footer: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Your changes will be saved when you tap Save on the profile screen.",
+                        norwegian: "Endringene lagres når du trykker Lagre på profilsiden."
+                    ))
                 }
-                .padding(.top, 15)
+            }
+            .navigationTitle(field.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Done", norwegian: "Ferdig"
+                    )) {
+                        editingPublicField = nil
+                    }
+                }
             }
         }
+        .presentationDetents([.medium, .large])
     }
 
     private var trainingIdentityCard: some View {
@@ -927,6 +1106,8 @@ struct ATHLTHEditProfileView: View {
     }
 
     private func loadCurrentProfile() {
+        guard !loadedProfile else { return }
+        loadedProfile = true
         displayName = session.profile.displayName
         username = session.profile.username
         bio = session.profile.bio
@@ -984,6 +1165,27 @@ struct ATHLTHEditProfileView: View {
         do {
             let bootstrap = try await accountService.removeProfileAvatar()
             session.applyBackendBootstrap(bootstrap)
+            await social.refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func resetHeaderPicture() async {
+        guard !saving && !removingHeader && hasCustomHeader else { return }
+        removingHeader = true
+        errorMessage = nil
+        defer { removingHeader = false }
+
+        do {
+            // A missing image uses the built-in default header rather than
+            // leaving an invalid remote image reference behind.
+            let bootstrap = try await accountService.updateProfileHeader(
+                artworkName: "ProfileHero",
+                imageURL: nil
+            )
+            session.applyBackendBootstrap(bootstrap)
+            await social.refresh()
         } catch {
             errorMessage = error.localizedDescription
         }
