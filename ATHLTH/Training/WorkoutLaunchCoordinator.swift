@@ -810,8 +810,7 @@ enum WorkoutLaunchCoordinator {
                             .trainTogetherInvitePayload,
                     watchAudioCoach:
                         settings.applyingFuelVoice(
-                            to: configuration.audioCoach,
-                            userID: session.profile.userID
+                            to: configuration.audioCoach
                         ),
                     ghostTargetDurationSeconds:
                         nil,
@@ -851,8 +850,7 @@ enum WorkoutLaunchCoordinator {
                     ),
                 audioCoach:
                     settings.applyingFuelVoice(
-                        to: configuration.audioCoach,
-                        userID: session.profile.userID
+                        to: configuration.audioCoach
                     ),
                 routeAlerts:
                     settings.routeAlertConfiguration,
@@ -906,8 +904,7 @@ enum WorkoutLaunchCoordinator {
             .sendWorkoutRouteSelection(nil)
 
         var watchAudioCoach = settings.applyingFuelVoice(
-            to: configuration.audioCoach,
-            userID: session.profile.userID
+            to: configuration.audioCoach
         )
 
         if workoutMirroring != nil,
