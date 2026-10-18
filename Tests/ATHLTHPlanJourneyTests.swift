@@ -20,6 +20,14 @@ final class ATHLTHPlanJourneyTests: XCTestCase {
         XCTAssertEqual(ATHLTHPlanJourney.position(of: .review, advanced: true), 5)
     }
 
+    func testResumeReturnsToLastAllowedWizardStage() {
+        XCTAssertEqual(ATHLTHPlanJourney.restoredStep("week", advanced: true), .week)
+        XCTAssertEqual(ATHLTHPlanJourney.restoredStep("review", advanced: true), .review)
+        XCTAssertEqual(ATHLTHPlanJourney.restoredStep("basics", advanced: false), .basics)
+        XCTAssertEqual(ATHLTHPlanJourney.restoredStep("week", advanced: false), .basics)
+        XCTAssertEqual(ATHLTHPlanJourney.restoredStep("futureStage", advanced: true), .mode)
+    }
+
     func testEveryNextAndPreviousStepIsReversible() {
         for isAdvanced in [false, true] {
             let stages = ATHLTHPlanJourney.sequence(advanced: isAdvanced)

@@ -88,6 +88,71 @@ final class ATHLTHPlanCreationDraftTests: XCTestCase {
         XCTAssertEqual(store.load(userID: user)?.weekCount, 52)
         XCTAssertEqual(store.load(userID: user)?.title.count, 40)
     }
+
+    func testAtomicDraftSurvivesFreshStoreInstance() throws {
+        let (settings, suite) = defaults()
+        let location = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ATHLTHDraftStore.\(UUID().uuidString)", isDirectory: true)
+        defer {
+            settings.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: location)
+        }
+        let user = UUID()
+        let first = ATHLTHPlanCreationDraftStore(defaults: settings, directoryURL: location)
+        first.save(draft(), userID: user)
+
+        let fresh = ATHLTHPlanCreationDraftStore(defaults: settings, directoryURL: location)
+        let restored = try XCTUnwrap(fresh.load(userID: user))
+        XCTAssertEqual(restored.title, "Eight week running")
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: location.path).count, 1)
+
+        fresh.clear(userID: user)
+        XCTAssertNil(first.load(userID: user))
+    }
+
+    func testExistingUserDefaultsDraftMigratesToFile() throws {
+        let (settings, suite) = defaults()
+        let location = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ATHLTHLegacyDraft.\(UUID().uuidString)", isDirectory: true)
+        defer {
+            settings.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: location)
+        }
+        let user = UUID()
+        let original = draft(name: "Migrated plan")
+        let key = "athlth.planWizardDraft.v1.\(user.uuidString)"
+        settings.set(try JSONEncoder().encode(original), forKey: key)
+
+        let store = ATHLTHPlanCreationDraftStore(defaults: settings, directoryURL: location)
+        XCTAssertEqual(store.load(userID: user)?.title, "Migrated plan")
+        XCTAssertNil(settings.data(forKey: key), "Legacy UserDefaults entry is cleared after migration")
+        XCTAssertEqual(store.load(userID: user)?.stage, "profile")
+    }
+
+    func testDraftRemembersWeekEditorAndSimpleChoices() throws {
+        let advanced = ATHLTHPlanCreationDraft(
+            title: "4-week plan", weekCount: 4, startDate: Date(),
+            advanced: true, source: "scratch", stage: "week",
+            selectedPlanWeekIndex: 2, editorDay: 4, editorKind: "studio"
+        )
+        let resumed = try JSONDecoder().decode(
+            ATHLTHPlanCreationDraft.self, from: JSONEncoder().encode(advanced)
+        )
+        XCTAssertEqual(resumed.selectedPlanWeekIndex, 2)
+        XCTAssertEqual(resumed.editorDay, 4)
+        XCTAssertEqual(resumed.editorKind, "studio")
+
+        let basic = ATHLTHPlanCreationDraft(
+            title: "Walk and run", weekCount: 8, startDate: Date(),
+            advanced: false, source: "scratch", stage: "basics",
+            simpleMinutes: 25, simpleActivityKinds: ["running", "walking"]
+        )
+        XCTAssertEqual(basic.simpleMinutes, 25)
+        XCTAssertEqual(basic.simpleActivityKinds, ["running", "walking"])
+        XCTAssertNil(basic.editorDay)
+    }
+
+
     func testAdvancedScheduleCheckpointPreservesOnlyStructuralPreferences() throws {
         let prefs = ATHLTHPlanCreationDraft(
             title: "Hybrid plan",

@@ -591,10 +591,10 @@ struct ATHLTHTrainPlanPremiumView: View {
             if draft.planningApproach == "guided", let cursor = draft.guidedDayCursor {
                 let week = min(cursor / 7 + 1, draft.weekCount)
                 let day = cursor % 7 + 1
-                return tr("Week \\(week) · day \\(day)", "Uke \\(week) · dag \\(day)")
+                return tr("Week \(week) · day \(day)", "Uke \(week) · dag \(day)")
             }
-            return tr("Week \\((draft.selectedPlanWeekIndex ?? 0) + 1)",
-                      "Uke \\((draft.selectedPlanWeekIndex ?? 0) + 1)")
+            return tr("Week \((draft.selectedPlanWeekIndex ?? 0) + 1)",
+                      "Uke \((draft.selectedPlanWeekIndex ?? 0) + 1)")
         case "profile": return tr("Goals and needs", "Mål og behov")
         case "review": return tr("Review plan", "Oppsummering")
         case "basics": return tr("Plan basics", "Grunninfo")
