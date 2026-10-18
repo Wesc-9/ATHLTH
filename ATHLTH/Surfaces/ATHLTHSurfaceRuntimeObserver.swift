@@ -9,6 +9,8 @@ struct ATHLTHSurfaceRuntimeObserver: View {
     @EnvironmentObject private var goals: GoalStore
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
+    @EnvironmentObject private var spotify: SpotifyPlaybackStore
+    @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var realtime:
@@ -45,6 +47,23 @@ struct ATHLTHSurfaceRuntimeObserver: View {
                     )
                 )
                 ghostRace.update(with: snapshot)
+            }
+            // Disable ATHLTH autoplay as soon as the underlying recording
+            // finishes, even if the live UI has already been dismissed.
+            .onChange(of: phoneWorkout.active?.id) { previous, current in
+                if previous != nil && current == nil {
+                    spotify.endLinkedWorkoutPlaybackSession()
+                }
+            }
+            .onChange(of: workoutMirroring.hasActiveMirroredWorkout) { previous, current in
+                if previous && !current {
+                    spotify.endLinkedWorkoutPlaybackSession()
+                }
+            }
+            .onChange(of: strengthWorkout.activeWorkout?.id) { previous, current in
+                if previous != nil && current == nil {
+                    spotify.endLinkedWorkoutPlaybackSession()
+                }
             }
             .onChange(
                 of:
