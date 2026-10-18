@@ -532,6 +532,18 @@ enum ATHLTHFuelVoicePrompt {
         return next < config.resolvedFuelDurationSeconds ? next : nil
     }
 
+    /// Do not read a long-overdue reminder after resume, reconnection, mute
+    /// or voice-ownership handoff. Both devices share this exact policy.
+    static func isFreshDue(
+        elapsed: TimeInterval,
+        scheduled: TimeInterval
+    ) -> Bool {
+        elapsed.isFinite &&
+        scheduled.isFinite &&
+        elapsed >= scheduled &&
+        elapsed - scheduled <= 12
+    }
+
     static func phrase(config: WatchAudioCoachConfiguration) -> String? {
         guard let interval = config.resolvedFuelIntervalSeconds else {
             return nil
