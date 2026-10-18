@@ -638,23 +638,8 @@ struct ATHLTHTrainTodayPremiumView: View {
             }
         }
         .padding(14)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(0.86),
-                    Color(red: 0.94, green: 0.94, blue: 0.96).opacity(0.85)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: 21, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 21, style: .continuous)
-                .stroke(.white.opacity(0.94), lineWidth: 1)
-                .allowsHitTesting(false)
-        }
-        .shadow(color: ink.opacity(0.045), radius: 12, y: 5)
+        // Match the warm white surfaces used by the rest of "I dag".
+        .premiumTrainSurface(line: hairline)
     }
 
     private func quickChoice(
@@ -671,7 +656,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                     .foregroundStyle(ink)
                     .frame(width: 35, height: 35)
                     .background(
-                        Color(red: 0.94, green: 0.95, blue: 0.97),
+                        Color(red: 0.96, green: 0.94, blue: 0.91),
                         in: RoundedRectangle(cornerRadius: 11, style: .continuous)
                     )
 
@@ -685,7 +670,7 @@ struct ATHLTHTrainTodayPremiumView: View {
             .padding(.horizontal, 11)
             .frame(maxWidth: .infinity, minHeight: 68)
             .background(
-                Color.white.opacity(0.92),
+                Color(red: 0.986, green: 0.978, blue: 0.963),
                 in: RoundedRectangle(cornerRadius: 15, style: .continuous)
             )
             .overlay {
