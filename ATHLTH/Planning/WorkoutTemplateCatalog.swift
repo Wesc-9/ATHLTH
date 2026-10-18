@@ -480,7 +480,8 @@ struct WorkoutTemplateLibraryView: View {
     }
 
     private var builtInRunningTemplates: [RunningWorkoutTemplate] {
-        runningLibrary.allTemplates.filter(\.isBuiltIn)
+        // Workouts must also expose user-created running templates.
+        runningLibrary.allTemplates
     }
 
     /// Built-in running workouts share the same search, category and favorite
@@ -3377,7 +3378,8 @@ struct PlanWorkoutPickerView: View {
         case "running": return kind == .running
         case "strength": return kind == .strength
         case "hybrid": return category == "hybrid"
-        case "other": return kind == .mobility || kind == .walking || kind == .custom
+        case "other": return kind == .mobility || kind == .walking ||
+            (kind == .custom && category != "hybrid")
         default: return true
         }
     }
