@@ -251,11 +251,9 @@ struct SocialPrivacySettingsView: View {
                 privacyToggle(
                     "figure.run",
                     loc("Training now", "Trener nå"),
-                    detail: audience(
-                        enabled: value.shareTrainingPresence,
-                        visibility: value.trainingPresenceVisibility,
-                        profile: value.profileVisibility
-                    ),
+                    detail: value.shareTrainingPresence
+                        ? loc("Mutual follows only", "Kun gjensidige")
+                        : loc("Not shared", "Deles ikke"),
                     binding: data.shareTrainingPresence
                 )
                 thinDivider

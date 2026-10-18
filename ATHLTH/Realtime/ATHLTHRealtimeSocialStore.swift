@@ -462,6 +462,8 @@ private struct BeginGhostLiveSessionParams: Encodable {
 @MainActor
 final class ATHLTHRealtimeSocialStore: ObservableObject {
     @Published private(set) var onlineUserIDs: Set<UUID> = []
+    @Published private(set) var trainingNowUserIDs: Set<UUID> = []
+    private var lastTrainingNowRefreshAt: Date?
     @Published private(set) var visibleLiveSessions: [ATHLTHLiveWorkoutSession] = []
     @Published private(set) var currentSession: ATHLTHLiveWorkoutSession?
     private var liveGhostFinishGate = ATHLTHLiveGhostFinishGate()
@@ -515,6 +517,46 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         onlineUserIDs.contains(userID)
     }
 
+    func isTrainingNow(_ userID: UUID) -> Bool {
+        trainingNowUserIDs.contains(userID)
+    }
+
+    /// A fresh server-authorized training session, independent of the green
+    /// online indicator. Supabase RLS limits reads to mutual follows.
+    func refreshTrainingNowUsers(force: Bool = false) async {
+        guard currentUserID != nil else {
+            trainingNowUserIDs.removeAll()
+            return
+        }
+        if !force, let lastTrainingNowRefreshAt,
+           Date().timeIntervalSince(lastTrainingNowRefreshAt) < 35 {
+            return
+        }
+        do {
+            let rows: [SocialPresenceRecord] = try await client
+                .from("social_presence")
+                .select("user_id,state,updated_at")
+                .eq("state", value: "training")
+                .limit(500)
+                .execute()
+                .value
+            let cutoff = Date().addingTimeInterval(-180)
+            trainingNowUserIDs = Set(rows.compactMap { row in
+                guard row.state == "training",
+                      let updatedAt = row.updatedAt,
+                      updatedAt >= cutoff else { return nil }
+                return row.userID
+            })
+            lastTrainingNowRefreshAt = Date()
+        } catch is CancellationError {
+            return
+        } catch {
+            // Fail closed: never preserve potentially stale training signals.
+            trainingNowUserIDs.removeAll()
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func configureOnlinePresence(
         appIsActive: Bool,
         enabled: Bool
@@ -560,6 +602,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
     func refreshOnlineUsers(
         force: Bool = false
     ) async {
+        await refreshTrainingNowUsers(force: force)
         guard currentUserID != nil else {
             onlineUserIDs.removeAll()
             return

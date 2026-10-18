@@ -98,7 +98,7 @@ struct ProfileFriendsSection: View {
                                 FriendProfileView(userID: friend.userID)
                             } label: {
                                 VStack(spacing: 7) {
-                                    ATHLTHOnlineAvatar(
+                                    ATHLTHSocialStatusAvatar(
                                         profile: friend,
                                         size: 54
                                     )

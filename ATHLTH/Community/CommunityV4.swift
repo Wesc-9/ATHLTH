@@ -931,6 +931,11 @@ struct ATHLTHCommunityV4View: View {
     private var sortedPeopleNow:
         [SocialProfileCard] {
         social.following.sorted { left, right in
+            let leftTraining = social.isMutualFollow(left.userID) &&
+                realtime.isTrainingNow(left.userID)
+            let rightTraining = social.isMutualFollow(right.userID) &&
+                realtime.isTrainingNow(right.userID)
+            if leftTraining != rightTraining { return leftTraining }
             let leftLive =
                 visibleCircleLiveSessions
                     .contains {
@@ -5319,6 +5324,7 @@ private struct CommunityV4SocialSnapshot: View {
 private struct CommunityV4PeopleStrip: View {
     @EnvironmentObject private var realtime:
         ATHLTHRealtimeSocialStore
+    @EnvironmentObject private var social: SocialStore
 
     let people: [SocialProfileCard]
     let liveSessions:
@@ -5340,63 +5346,10 @@ private struct CommunityV4PeopleStrip: View {
                         )
                     } label: {
                         VStack(spacing: 7) {
-                            ZStack(
-                                alignment:
-                                    .bottomTrailing
-                            ) {
-                                CommunityV4Avatar(
-                                    profile:
-                                        person,
-                                    size: 58,
-                                    isOnline:
-                                        realtime
-                                            .isOnline(
-                                                person
-                                                    .userID
-                                            )
-                                )
-
-                                if liveSessions
-                                    .contains(
-                                        where: {
-                                            $0.ownerID ==
-                                                person
-                                                    .userID
-                                        }
-                                    ) {
-                                    Image(
-                                        systemName:
-                                            "figure.run"
-                                    )
-                                    .font(
-                                        .system(
-                                            size: 9,
-                                            weight:
-                                                .bold
-                                        )
-                                    )
-                                    .foregroundStyle(
-                                        .white
-                                    )
-                                    .frame(
-                                        width: 22,
-                                        height: 22
-                                    )
-                                    .background(
-                                        ATHLTHTheme
-                                            .vitality,
-                                        in: Circle()
-                                    )
-                                    .overlay {
-                                        Circle()
-                                            .stroke(
-                                                .white,
-                                                lineWidth:
-                                                    2
-                                            )
-                                    }
-                                }
-                            }
+                            ATHLTHSocialStatusAvatar(
+                                profile: person,
+                                size: 58
+                            )
 
                             Text(
                                 firstName(
@@ -5417,37 +5370,26 @@ private struct CommunityV4PeopleStrip: View {
                             .frame(width: 70)
 
                             Text(
-                                liveSessions
-                                    .contains(
-                                        where: {
-                                            $0.ownerID ==
-                                                person
-                                                    .userID
-                                        }
+                                social.isMutualFollow(person.userID) &&
+                                realtime.isTrainingNow(person.userID)
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Training", norwegian: "Trener"
                                     )
-                                    ? "Training"
-                                    : realtime
-                                        .isOnline(
-                                            person
-                                                .userID
+                                    : social.isMutualFollow(person.userID) &&
+                                      realtime.isOnline(person.userID)
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Online", norwegian: "Pålogget"
                                         )
-                                        ? "Online"
-                                        : "Following"
+                                        : ATHLTHLocalization.choose(
+                                            english: "Following", norwegian: "Følger"
+                                        )
                             )
                             .font(.caption2)
                             .foregroundStyle(
-                                liveSessions
-                                    .contains(
-                                        where: {
-                                            $0.ownerID ==
-                                                person
-                                                    .userID
-                                        }
-                                    )
-                                    ? ATHLTHTheme
-                                        .vitality
-                                    : ATHLTHTheme
-                                        .mutedText
+                                social.isMutualFollow(person.userID) &&
+                                realtime.isTrainingNow(person.userID)
+                                    ? Color.orange
+                                    : ATHLTHTheme.mutedText
                             )
                         }
                     }

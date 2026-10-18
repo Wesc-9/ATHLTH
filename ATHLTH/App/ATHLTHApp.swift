@@ -441,6 +441,8 @@ struct AppRootView: View {
     @State private var showingNotificationPermissionPrimer = false
     @State private var showingRelayedStrengthWorkout = false
     @State private var relayedWorkoutLaunchGuardUntil = Date.distantPast
+    @State private var lastTrainingPresenceSyncAt = Date.distantPast
+    @State private var lastTrainingPresenceState: Bool?
     @State private var lastHomeAssistantLiveWorkoutSyncAt = Date.distantPast
     @State private var lastHomeAssistantStrengthSyncAt = Date.distantPast
     @State private var lastHomeAssistantSnapshotSyncAt = Date.distantPast
@@ -1244,14 +1246,23 @@ struct AppRootView: View {
         AnyView(
             lifecycleSessionContent
         .onReceive(phoneWorkout.$active) { workout in
-            handlePhoneWorkoutLiveUpdate(
-                workout
-            )
+            handlePhoneWorkoutLiveUpdate(workout)
+            Task { await syncActualTrainingPresence() }
         }
         .onReceive(strengthWorkout.$activeWorkout) { workout in
-            handleStrengthWorkoutLiveUpdate(
-                workout
-            )
+            handleStrengthWorkoutLiveUpdate(workout)
+            Task { await syncActualTrainingPresence() }
+        }
+        .onReceive(workoutMirroring.$snapshot) { _ in
+            Task { await syncActualTrainingPresence() }
+        }
+        .task(id: appSession.signedIn && scenePhase == .active) {
+            guard ATHLTHDeviceRole.isIPhone, appSession.signedIn,
+                  scenePhase == .active else { return }
+            while !Task.isCancelled {
+                await syncActualTrainingPresence()
+                try? await Task.sleep(for: .seconds(70))
+            }
         }
         .onChange(
             of: strengthWorkout.currentExerciseIndex
@@ -1533,10 +1544,7 @@ struct AppRootView: View {
                     await homeAssistant.sendWorkoutStopped()
                 }
 
-                if social.privacy?
-                    .shareTrainingPresence == true {
-                    await social.syncPresence(presence)
-                }
+                await syncActualTrainingPresence(force: true)
             }
         }
         .onChange(of: settings.profileVisibility) { _, visibility in
@@ -2963,6 +2971,35 @@ struct AppRootView: View {
         }
     }
 
+    /// A session actually recording on the iPhone or mirrored from Watch
+    /// is the sole source of the amber status, never a manually set bio.
+    @MainActor
+    private func syncActualTrainingPresence(force: Bool = false) async {
+        guard ATHLTHDeviceRole.isIPhone, appSession.signedIn,
+              social.privacy?.shareTrainingPresence == true else { return }
+
+        let training =
+            phoneWorkout.active != nil ||
+            strengthWorkout.activeWorkout != nil ||
+            workoutMirroring.hasActiveMirroredWorkout ||
+            ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
+        let now = Date()
+        if !force, lastTrainingPresenceState == training,
+           now.timeIntervalSince(lastTrainingPresenceSyncAt) < 65 {
+            return
+        }
+
+        let presence = TrainingPresence(
+            state: training ? .training : .available,
+            workoutTitle: nil,
+            startedAt: training ? now : nil,
+            visibility: .friends
+        )
+        await social.syncPresence(presence)
+        lastTrainingPresenceState = training
+        lastTrainingPresenceSyncAt = now
+    }
+
     private func refreshSocialHomeCore(
         deliverSystemAlertsForImportedInbox: Bool = true,
         force: Bool = false
@@ -2984,11 +3021,7 @@ struct AppRootView: View {
                 privacy.shareTrainingPresence
         }
 
-        if social.privacy?.shareTrainingPresence == true {
-            await social.syncPresence(
-                appSession.profile.presence
-            )
-        }
+        await syncActualTrainingPresence(force: true)
     }
 
     private func refreshSocialCore(
@@ -3011,10 +3044,7 @@ struct AppRootView: View {
             settings.shareTrainingPresence = privacy.shareTrainingPresence
         }
 
-        if ATHLTHDeviceRole.isIPhone,
-           social.privacy?.shareTrainingPresence == true {
-            await social.syncPresence(appSession.profile.presence)
-        }
+        await syncActualTrainingPresence(force: true)
     }
 
     private func syncSocialOwnedData() async {
