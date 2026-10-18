@@ -3,6 +3,7 @@ import Foundation
 enum MessageShareKind: String, Codable, CaseIterable, Identifiable, Hashable {
     case workout
     case trainingPlan = "training_plan"
+    case exercise
     case runningWorkout = "running_workout"
     case route
     case challenge
@@ -13,6 +14,7 @@ enum MessageShareKind: String, Codable, CaseIterable, Identifiable, Hashable {
         switch self {
         case .workout: return "Workout"
         case .trainingPlan: return "Training Plan"
+        case .exercise: return "Exercise"
         case .runningWorkout: return "Running Workout"
         case .route: return "Route"
         case .challenge: return "Challenge"
@@ -23,6 +25,7 @@ enum MessageShareKind: String, Codable, CaseIterable, Identifiable, Hashable {
         switch self {
         case .workout: return "dumbbell.fill"
         case .trainingPlan: return "calendar"
+        case .exercise: return "figure.strengthtraining.traditional"
         case .runningWorkout: return "figure.run"
         case .route: return "map.fill"
         case .challenge: return "bolt.fill"
