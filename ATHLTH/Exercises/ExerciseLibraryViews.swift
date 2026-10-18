@@ -1001,6 +1001,7 @@ struct ExerciseLibraryView: View {
 struct ExerciseDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var library: ExerciseLibraryStore
+    @EnvironmentObject private var session: AppSessionStore
     @ObservedObject private var norwegianTranslations = NorwegianExerciseAutoTranslation.shared
     @State private var detailTranslationConfig: TranslationSession.Configuration?
     @State private var showOriginalEnglish = false
@@ -1012,6 +1013,8 @@ struct ExerciseDetailView: View {
 
     @State private var showingDelete = false
     @State private var showingEdit = false
+    @State private var preparedShare: MessageShareDraft?
+    @State private var shareError: String?
 
     private var currentEntry: ExerciseLibraryEntry {
         library.allExercises.first(where: { $0.id == entry.id }) ?? entry
@@ -1200,6 +1203,22 @@ struct ExerciseDetailView: View {
         ))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    do {
+                        preparedShare = try ATHLTHShareDraftFactory.exercise(
+                            currentEntry, ownerID: session.profile.userID
+                        )
+                    } catch {
+                        shareError = error.localizedDescription
+                    }
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Share exercise", norwegian: "Del øvelse"
+                ))
+            }
             if currentEntry.source == .custom {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -1215,6 +1234,22 @@ struct ExerciseDetailView: View {
         }
         .sheet(isPresented: $showingEdit) {
             CustomExerciseEditorView(editing: currentEntry)
+        }
+        .sheet(item: $preparedShare) { draft in
+            ATHLTHDirectShareSheet(draft: draft)
+        }
+        .alert(
+            ATHLTHLocalization.choose(
+                english: "Could not share exercise", norwegian: "Kunne ikke dele øvelsen"
+            ),
+            isPresented: Binding(
+                get: { shareError != nil },
+                set: { if !$0 { shareError = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(shareError ?? "")
         }
         .task(id: currentEntry.id) {
             guard ATHLTHLocalization.isNorwegian,
