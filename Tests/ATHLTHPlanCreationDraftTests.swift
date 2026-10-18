@@ -346,4 +346,73 @@ final class ATHLTHPlanCreationDraftTests: XCTestCase {
         XCTAssertNil(draft.structuredWorkoutsByDay)
     }
 
+    func testNewPlanDraftDoesNotOverwriteExistingDraft() throws {
+        let (settings, suite) = defaults()
+        let location = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ATHLTHParallelDrafts.\(UUID().uuidString)", isDirectory: true)
+        defer {
+            settings.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: location)
+        }
+        let store = ATHLTHPlanCreationDraftStore(
+            defaults: settings, directoryURL: location
+        )
+        let user = UUID()
+        let first = draft(name: "Existing running program")
+        let secondID = UUID()
+        let thirdID = UUID()
+        store.save(first, userID: user)
+        store.save(draft(name: "New strength program"), userID: user, draftID: secondID)
+        store.save(draft(name: "Another plan"), userID: user, draftID: thirdID)
+
+        let reopened = ATHLTHPlanCreationDraftStore(
+            defaults: settings, directoryURL: location
+        )
+        XCTAssertEqual(reopened.load(userID: user)?.title, first.title)
+        XCTAssertEqual(reopened.load(userID: user, draftID: secondID)?.title,
+                       "New strength program")
+        XCTAssertEqual(reopened.load(userID: user, draftID: thirdID)?.title,
+                       "Another plan")
+        XCTAssertEqual(reopened.records(userID: user).count, 3)
+
+        reopened.clear(userID: user, draftID: secondID)
+        XCTAssertEqual(reopened.load(userID: user)?.title, first.title)
+        XCTAssertNil(reopened.load(userID: user, draftID: secondID))
+        XCTAssertNotNil(reopened.load(userID: user, draftID: thirdID))
+    }
+
+    func testNewPlanInvalidCheckpointNeverDeletesOlderDraft() {
+        let (settings, suite) = defaults()
+        let location = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ATHLTHInvalidNewDraft.\(UUID().uuidString)", isDirectory: true)
+        defer {
+            settings.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: location)
+        }
+        let store = ATHLTHPlanCreationDraftStore(
+            defaults: settings, directoryURL: location
+        )
+        let user = UUID()
+        let newID = UUID()
+        store.save(draft(name: "Keep this"), userID: user)
+        store.save(draft(name: "New plan"), userID: user, draftID: newID)
+        store.save(draft(name: "   "), userID: user, draftID: newID)
+
+        XCTAssertNil(store.load(userID: user, draftID: newID))
+        XCTAssertEqual(store.load(userID: user)?.title, "Keep this")
+    }
+
+    func testScopedEditingFlagsDoNotTriggerOtherDrafts() {
+        let (settings, suite) = defaults()
+        defer { settings.removePersistentDomain(forName: suite) }
+        let store = ATHLTHPlanCreationDraftStore(defaults: settings)
+        let user = UUID()
+        let newID = UUID()
+        store.setEditing(true, userID: user, draftID: newID)
+        XCTAssertTrue(store.wasEditing(userID: user, draftID: newID))
+        XCTAssertFalse(store.wasEditing(userID: user))
+        store.setEditing(false, userID: user, draftID: newID)
+        XCTAssertFalse(store.wasEditing(userID: user, draftID: newID))
+    }
+
 }
