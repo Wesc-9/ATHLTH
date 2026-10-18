@@ -227,6 +227,7 @@ struct ATHLTHAudioCoachSettingsView: View {
                             updateSection
                             eventSection
                             routeAndStructureSection
+                            fuelHydrationSection
                             musicSection
                         }
                     }
@@ -1274,6 +1275,56 @@ struct ATHLTHAudioCoachSettingsView: View {
                         $settings
                             .audioCoachAnnounceRemainingStepDistance
                 )
+            }
+        }
+    }
+
+    private var fuelHydrationSection: some View {
+        premiumSection(
+            ATHLTHLocalization.choose(
+                english: "Nutrition during workouts",
+                norwegian: "Energi og væske under økten"
+            )
+        ) {
+            premiumCard {
+                NavigationLink {
+                    AthleteFuelView()
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "drop.fill")
+                            .font(.system(size: 19, weight: .medium))
+                            .foregroundStyle(ATHLTHTheme.recoveryBlue)
+                            .frame(width: 44, height: 44)
+                            .background(
+                                ATHLTHTheme.accentSoft,
+                                in: RoundedRectangle(cornerRadius: 14)
+                            )
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Fuel & Hydration",
+                                norwegian: "Energi og væske"
+                            ))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+
+                            Text(ATHLTHLocalization.choose(
+                                english: "Spoken reminders only · no notifications",
+                                norwegian: "Bare tale · ingen varsler"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    .padding(15)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
     }
