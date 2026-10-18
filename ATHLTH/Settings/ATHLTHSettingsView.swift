@@ -186,7 +186,9 @@ struct ATHLTHSettingsView: View {
     }
 
     private var supportContactCard: some View {
-        Link(destination: ATHLTHLegalIdentity.supportContactMailURL) {
+        NavigationLink {
+            ATHLTHContactSupportView()
+        } label: {
             HStack(spacing: 14) {
                 Image(systemName: "envelope.badge")
                     .font(.system(size: 22, weight: .medium))
@@ -212,8 +214,8 @@ struct ATHLTHSettingsView: View {
                         .minimumScaleFactor(0.82)
 
                     Text(ATHLTHLocalization.choose(
-                        english: "Questions, suggestions or need help? Send an email.",
-                        norwegian: "Spørsmål, forslag eller trenger du hjelp?"
+                        english: "Report an issue or share an idea without opening email.",
+                        norwegian: "Meld inn feil eller forslag direkte i appen."
                     ))
                     .font(.caption)
                     .foregroundStyle(ATHLTHTheme.mutedText)
@@ -222,7 +224,7 @@ struct ATHLTHSettingsView: View {
 
                 Spacer(minLength: 2)
 
-                Image(systemName: "arrow.up.right")
+                Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(ATHLTHTheme.accentDeep)
             }
@@ -263,8 +265,8 @@ struct ATHLTHSettingsView: View {
             }
         }
         .accessibilityLabel(ATHLTHLocalization.choose(
-            english: "Email ATHLTH at contact@athlth.com",
-            norwegian: "Send e-post til ATHLTH på contact@athlth.com"
+            english: "Open ATHLTH support form",
+            norwegian: "Åpne kontaktskjema til ATHLTH"
         ))
     }
 
@@ -1359,7 +1361,9 @@ settingsSection("Account") {
     private var aboutSettingsSection: some View {
 settingsSection("About") {
                         PremiumSettingsCard {
-                            Link(destination: ATHLTHLegalIdentity.supportContactMailURL) {
+                            NavigationLink {
+            ATHLTHContactSupportView()
+        } label: {
                                 PremiumSettingsRow(
                                     icon: "envelope",
                                     iconTint: ATHLTHTheme.accentDeep,
