@@ -35,9 +35,13 @@ final class AthleteToolsStore: ObservableObject {
                 cycleReady = true
             } catch { self.error = "Unable to open the private diary. Existing data has been preserved." }
         }
-        fuelEndsAt = data.fuelEndsAt
+        fuelEndsAt = nil
+        // Migration: legacy time-based Fuel notifications are no longer valid.
+        // Voice prompts are emitted only by the active Watch/phone coach.
+        data.fuelEndsAt = nil
         restoring = false
         if let oldID, oldID != id { await cancelNotifications(for: oldID) }
+        if let id { await cancelNotifications(for: id, category: "fuel.") }
         // Also remove stale reminders from accounts used before this app launch.
         let center = UNUserNotificationCenter.current()
         let pending = await center.pendingNotificationRequests()
@@ -98,37 +102,6 @@ final class AthleteToolsStore: ObservableObject {
         data.fuelEndsAt = nil
         await cancelNotifications(for: id, category: "fuel.")
     }
-    func startFuelReminders(at start: Date) async {
-        guard let id = userID, data.fuel.valid, await requestNotifications(), userID == id else { return }
-        await stopFuelReminders()
-        guard userID == id else { return }
-        let plan = data.fuel
-        let center = UNUserNotificationCenter.current()
-        let existing = await center.pendingNotificationRequests()
-        guard existing.count + plan.reminderOffsets.count <= 60 else {
-            error = "Too many reminders are already scheduled. Stop another reminder plan or increase this interval."
-            return
-        }
-        do {
-            for offset in plan.reminderOffsets {
-                guard userID == id else { await cancelNotifications(for: id, category: "fuel."); return }
-                let content = UNMutableNotificationContent()
-                content.title = "ATHLTH · Fuel reminder"
-                content.body = String(format: "Your plan: %.0f g carbohydrate and %.0f ml fluid. Adjust to your needs.", plan.gramsPerReminder, plan.fluidPerReminder)
-                content.sound = .default
-                let fire = start.addingTimeInterval(Double(offset) * 60)
-                let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, fire.timeIntervalSinceNow), repeats: false)
-                try await center.add(UNNotificationRequest(identifier: prefix(for: id) + "fuel.\(offset)", content: content, trigger: trigger))
-            }
-            guard userID == id else { await cancelNotifications(for: id, category: "fuel."); return }
-            fuelEndsAt = start.addingTimeInterval(Double(plan.durationMinutes) * 60)
-            data.fuelEndsAt = fuelEndsAt
-        } catch {
-            await cancelNotifications(for: id, category: "fuel.")
-            self.error = "Reminders could not be scheduled. No partial plan was kept."
-        }
-    }
-
     func checkLoad(_ assessment: AthleteLoadAssessment) async {
         guard !checkingLoad else { return }
         checkingLoad = true; defer { checkingLoad = false }
