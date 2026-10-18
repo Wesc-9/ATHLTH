@@ -81,4 +81,69 @@ final class HomeWorkoutSuggestionPlannerTests: XCTestCase {
             on: day, at: yesterday, now: now, calendar: cal
         ))
     }
+    func testTimeOnlyPickerUsesTappedSundayNotItsHiddenDate() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Oslo"))
+
+        // Sunday 18 October, 05:04; the athlete chooses 18:00.
+        let selectedSunday = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 18, hour: 0, minute: 0
+        )))
+        let now = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 18, hour: 5, minute: 4
+        )))
+        // Simulate a time-only DatePicker whose backing date is yesterday.
+        let pickerValue = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 17, hour: 18, minute: 0
+        )))
+        XCTAssertFalse(HomeWorkoutSuggestionPlanner.canSchedule(
+            on: selectedSunday, at: pickerValue, now: now, calendar: calendar
+        ))
+        let resolved = try XCTUnwrap(HomeWorkoutSuggestionPlanner.scheduledStart(
+            on: selectedSunday, clockTime: pickerValue, calendar: calendar
+        ))
+        XCTAssertEqual(calendar.component(.day, from: resolved), 18)
+        XCTAssertEqual(calendar.component(.hour, from: resolved), 18)
+        XCTAssertTrue(HomeWorkoutSuggestionPlanner.canSchedule(
+            on: selectedSunday, at: resolved, now: now, calendar: calendar
+        ))
+    }
+
+    func testTimeOnlyPickerRejectsPastTimeAfterNormalizingToToday() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Oslo"))
+        let today = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 18, hour: 0
+        )))
+        let now = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 18, hour: 18, minute: 15
+        )))
+        let clock = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 19, hour: 18
+        )))
+        let resolved = try XCTUnwrap(HomeWorkoutSuggestionPlanner.scheduledStart(
+            on: today, clockTime: clock, calendar: calendar
+        ))
+        XCTAssertFalse(HomeWorkoutSuggestionPlanner.canSchedule(
+            on: today, at: resolved, now: now, calendar: calendar
+        ))
+    }
+
+    func testTimeOnlyPickerKeepsCorrectDateAcrossDSTBoundary() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Oslo"))
+        let day = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 3, day: 29, hour: 0
+        )))
+        let sourceClock = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 3, day: 28, hour: 18, minute: 30
+        )))
+        let result = try XCTUnwrap(HomeWorkoutSuggestionPlanner.scheduledStart(
+            on: day, clockTime: sourceClock, calendar: calendar
+        ))
+        XCTAssertEqual(calendar.component(.day, from: result), 29)
+        XCTAssertEqual(calendar.component(.hour, from: result), 18)
+        XCTAssertEqual(calendar.component(.minute, from: result), 30)
+    }
+
 }
