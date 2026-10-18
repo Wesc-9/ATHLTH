@@ -23,6 +23,54 @@ private struct ATHLTHEquipmentScanRequest: Encodable {
     let candidates: [ATHLTHEquipmentScanCandidate]
 }
 
+/// Balanced, deterministic shortlist for the vision API's bounded context.
+/// Without this, the first 100 alphabetically sorted exercises can all be
+/// from a small set of movement names and miss the scanned equipment.
+enum ATHLTHEquipmentScanCandidateSelector {
+    static func select(
+        from exercises: [ExerciseLibraryEntry],
+        limit: Int = 100
+    ) -> [ExerciseLibraryEntry] {
+        guard limit > 0 else { return [] }
+        let ordered = exercises
+            .filter { $0.source != .custom }
+            .sorted {
+                $0.name.localizedStandardCompare($1.name)
+                    == .orderedAscending
+            }
+
+        var groups: [String: [ExerciseLibraryEntry]] = [:]
+        for exercise in ordered {
+            let equipment = exercise.exercise.equipment.first?
+                .lowercased() ?? "other"
+            let muscle = exercise.bodyPart?.lowercased()
+                ?? exercise.exercise.primaryMuscles.first?.lowercased()
+                ?? "other"
+            groups[equipment + ":" + muscle, default: []].append(exercise)
+        }
+
+        let keys = groups.keys.sorted()
+        var indices = Dictionary(uniqueKeysWithValues:
+            keys.map { ($0, 0) })
+        var result: [ExerciseLibraryEntry] = []
+        result.reserveCapacity(min(ordered.count, limit))
+        while result.count < limit {
+            var advanced = false
+            for key in keys {
+                let index = indices[key, default: 0]
+                guard let group = groups[key],
+                      group.indices.contains(index) else { continue }
+                result.append(group[index])
+                indices[key] = index + 1
+                advanced = true
+                if result.count == limit { break }
+            }
+            if !advanced { break }
+        }
+        return result
+    }
+}
+
 struct ATHLTHEquipmentScanResponse: Decodable {
     let equipmentName: String
     let confidence: String
@@ -177,15 +225,9 @@ struct ATHLTHEquipmentScannerView: View {
     }
 
     private var candidates: [ExerciseLibraryEntry] {
-        library.search(query: "")
-            .sorted { lhs, rhs in
-                if lhs.source != rhs.source {
-                    return lhs.source == .athlthCatalog
-                }
-                return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
-            }
-            .prefix(100)
-            .map { $0 }
+        ATHLTHEquipmentScanCandidateSelector.select(
+            from: library.search(query: "")
+        )
     }
 
     private var matches: [ExerciseLibraryEntry] {
