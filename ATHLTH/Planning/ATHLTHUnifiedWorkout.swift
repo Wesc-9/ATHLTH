@@ -31,7 +31,10 @@ enum ATHLTHUnifiedWorkout {
                     notes: target.notes ?? exercise.notes,
                     phase: (target.isWarmUp ?? false) ? .warmup : .main
                 )
-                blocks.append(work)
+                var linkedWork = work
+                linkedWork.exerciseID = exercise.exerciseID
+                linkedWork.exerciseSnapshot = exercise.embeddedExercise
+                blocks.append(linkedWork)
 
                 if index < targets.count - 1 {
                     let pauseSeconds = target.restSeconds ??
