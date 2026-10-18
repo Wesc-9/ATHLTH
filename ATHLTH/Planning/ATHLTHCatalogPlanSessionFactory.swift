@@ -181,7 +181,10 @@ enum ATHLTHCatalogPlanSessionFactory {
         walking: Bool = false
     ) -> WorkoutTemplateBlock {
         WorkoutTemplateBlock(
-            sequence: 1, kind: kind, title: title, exerciseSlug: nil,
+            sequence: 1, kind: kind, title: title,
+            exerciseSlug: kind == .exercise
+                ? ATHLTHExerciseReferenceResolver.nativeSourceIdentifier(for: title)
+                : nil,
             distanceMeters: meters, repetitions: reps,
             durationSeconds: seconds, targetWeightKilograms: nil,
             loadNote: nil, notes: notes, phase: phase,
