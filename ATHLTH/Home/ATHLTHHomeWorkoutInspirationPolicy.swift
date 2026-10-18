@@ -28,6 +28,7 @@ enum ATHLTHHomeWorkoutInspirationPolicy {
         from workouts: [PlannedSession],
         recent: [ATHLTHInspirationRecentActivity],
         minutes: Int,
+        goal: AchievementGoal? = nil,
         now: Date = Date()
     ) -> [PlannedSession] {
         let recentActivities = recent.filter {
@@ -68,6 +69,24 @@ enum ATHLTHHomeWorkoutInspirationPolicy {
             if kind == "walking" || workout.kind == .walking {
                 score += 8
             }
+            // A declared training goal is a preference, not permission to
+            // override recent training load or invent personal readiness.
+            switch goal {
+            case .buildMuscle, .getStronger:
+                if kind == "strength" { score += 28 }
+            case .runBetter, .improveEndurance:
+                if kind == "running" { score += 26 }
+            case .moveMore, .maintainHealth, .loseWeight:
+                if kind == "walking" || workout.kind == .walking { score += 20 }
+            case .recoverySleep, .mobility:
+                if workout.kind == .recovery || workout.kind == .mobility {
+                    score += 28
+                }
+            case .event:
+                if kind == "running" { score += 10 }
+            case nil:
+                break
+            }
             if workout.kind == .recovery || workout.kind == .mobility {
                 score += recentStrength || recentRun ? 22 : 2
             }
@@ -84,15 +103,21 @@ enum ATHLTHHomeWorkoutInspirationPolicy {
     static func explanation(
         for workout: PlannedSession,
         recent: [ATHLTHInspirationRecentActivity],
+        goal: AchievementGoal? = nil,
         now: Date = Date()
     ) -> String {
         let last = recent.filter { $0.startedAt <= now }
             .max(by: { $0.startedAt < $1.startedAt })
         guard let last, now.timeIntervalSince(last.startedAt) < 48 * 3_600 else {
-            return ATHLTHLocalization.choose(
-                english: "A ready-made session from Workouts. We don't have enough recent training history to personalize this suggestion yet.",
-                norwegian: "En ferdig økt fra Workouts. Vi har ikke nok nyere treningshistorikk til å tilpasse forslaget ennå."
-            )
+            return goal == nil
+                ? ATHLTHLocalization.choose(
+                    english: "A ready-made session from Workouts. We don't have enough recent training history to personalize this suggestion yet.",
+                    norwegian: "En ferdig økt fra Workouts. Vi har ikke nok nyere treningshistorikk til å tilpasse forslaget ennå."
+                )
+                : ATHLTHLocalization.choose(
+                    english: "Suggested with your chosen training goal and available time in mind. We don't have enough recent sessions to estimate recovery.",
+                    norwegian: "Foreslått ut fra treningsmålet ditt og tiden du har. Vi har ikke nok nyere økter til å vurdere restitusjonen."
+                )
         }
         switch last.kind {
         case .strength:
