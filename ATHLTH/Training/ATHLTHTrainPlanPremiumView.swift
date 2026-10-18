@@ -6,6 +6,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
+    @EnvironmentObject private var goalStore: GoalStore
 
     // Optional deep link from "I dag" or the rebuilt library.
     var highlightedPlanID: UUID? = nil
@@ -27,7 +28,6 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var showingMyPlans = false
     @State private var browsingMyPlans = false
     @State private var showingTemplates = false
-    @State private var showingAllPlans = false
     @State private var showingEditor = false
     @State private var showingProgress = false
     @State private var showingGoals = false
@@ -63,6 +63,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var moveWeekDate = Date()
     @State private var moveError: String?
     @State private var editingPlan: TrainingPlan?
+    @State private var trainingPlanPendingDeletion: TrainingPlan?
 
     private let graphite = Color(red: 0.18, green: 0.18, blue: 0.17)
     private let secondaryInk = Color(red: 0.48, green: 0.46, blue: 0.43)
@@ -422,9 +423,6 @@ struct ATHLTHTrainPlanPremiumView: View {
         .sheet(isPresented: $showingTemplates) {
             TrainingPlanLibrarySheet()
         }
-        .sheet(isPresented: $showingAllPlans) {
-            AllTrainingPlansView()
-        }
         .sheet(isPresented: $showingProgress) {
             if let plan {
                 TrainingPlanProgressDetailView(planID: plan.id)
@@ -587,6 +585,39 @@ struct ATHLTHTrainPlanPremiumView: View {
                 expectedPlanVersion: destination.version,
                 existingWorkout: destination.workout
             )
+        }
+        .confirmationDialog(
+            trainingPlanPendingDeletion.map {
+                tr("Delete \($0.title)?", "Slette \($0.title)?")
+            } ?? tr("Delete training plan?", "Slette treningsplan?"),
+            isPresented: Binding(
+                get: { trainingPlanPendingDeletion != nil },
+                set: { if !$0 { trainingPlanPendingDeletion = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(tr("Delete training plan", "Slett treningsplan"), role: .destructive) {
+                guard let selected = trainingPlanPendingDeletion else { return }
+                trainingPlanPendingDeletion = nil
+                // Resolve again to avoid deleting a plan removed elsewhere.
+                guard session.trainingPlan(withID: selected.id) != nil else { return }
+                goalStore.setLinkedPlan(selected.id, goalIDs: [])
+                session.deleteTrainingPlan(selected.id)
+                focusedPlanID = nil
+                selectedWeekIndex = nil
+                selectedDayID = nil
+                if let currentPlan = plan {
+                    advanced = currentPlan.builderProfile?.mode == .advanced
+                }
+            }
+            Button(tr("Cancel", "Avbryt"), role: .cancel) {
+                trainingPlanPendingDeletion = nil
+            }
+        } message: {
+            Text(tr(
+                "The training plan and its remaining schedule will be permanently deleted. Recorded workout history is kept.",
+                "Treningsplanen og de gjenstående planlagte øktene slettes permanent. Registrerte treningsøkter i historikken beholdes."
+            ))
         }
     }
 
@@ -1089,11 +1120,6 @@ struct ATHLTHTrainPlanPremiumView: View {
                     } label: {
                         Label(tr("Edit details", "Rediger program"), systemImage: "slider.horizontal.3")
                     }
-                    Button {
-                        showingAllPlans = true
-                    } label: {
-                        Label(tr("All plans", "Alle planer"), systemImage: "square.stack")
-                    }
                     if advanced {
                     Button {
                         showingGoals = true
@@ -1115,6 +1141,12 @@ struct ATHLTHTrainPlanPremiumView: View {
                     } label: {
                         Label(tr("Analyze", "Analyser"), systemImage: "chart.xyaxis.line")
                     }
+                    }
+                    Divider()
+                    Button(role: .destructive) {
+                        trainingPlanPendingDeletion = plan
+                    } label: {
+                        Label(tr("Delete training plan", "Slett treningsplan"), systemImage: "trash")
                     }
                 } label: {
                     Image(systemName: "ellipsis")
