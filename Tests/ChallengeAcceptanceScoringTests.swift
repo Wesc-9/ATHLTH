@@ -81,6 +81,30 @@ final class ChallengeAcceptanceScoringTests: XCTestCase {
         )
     }
 
+    func testExpiredInviteIsCancelledInsteadOfCompleted() {
+        for state: ChallengeParticipantState in [.invited, .declined, .withdrawn] {
+            let subject = challenge(inviteState: state, status: .completed)
+            XCTAssertFalse(subject.hasAcceptedOpponent)
+            XCTAssertTrue(
+                subject.expiredWithoutOpponent(at: originalStart.addingTimeInterval(7_201))
+            )
+            XCTAssertFalse(
+                subject.expiredWithoutOpponent(at: originalStart.addingTimeInterval(7_199))
+            )
+        }
+    }
+
+    func testAcceptedOpponentStillHasValidCompletion() {
+        let subject = challenge(
+            inviteState: .accepted,
+            response: acceptedAt,
+            status: .completed
+        )
+        XCTAssertTrue(subject.hasAcceptedOpponent)
+        XCTAssertFalse(subject.expiredWithoutOpponent(at: originalStart.addingTimeInterval(7_201)))
+        XCTAssertNotNil(subject.scoringStartDate)
+    }
+
     func testInvitedOrDeclinedOpponentNeverUnlocksWorkoutScoring() {
         for state: ChallengeParticipantState in [.invited, .declined, .withdrawn] {
             let subject = challenge(inviteState: state)

@@ -8128,7 +8128,13 @@ struct ChallengeDetailView: View {
                             heartRateProfileRequiredCard
                         }
 
-                        leaderboardCard(challenge)
+                        if challenge.scoringStartDate != nil &&
+                           challenge.status != .cancelled &&
+                           !challenge.expiredWithoutOpponent() {
+                            leaderboardCard(challenge)
+                        } else if challenge.status != .cancelled {
+                            awaitingOpponentCard
+                        }
                         rulesCard(challenge)
 
                         if challenge.creatorID != session.profile.userID,
@@ -9065,12 +9071,17 @@ struct ChallengeDetailView: View {
                             .invited
                     )
 
-                    challengeHeroChip(
-                        title: "Leaderboard",
-                        icon:
-                            "chart.bar.fill",
-                        emphasized: false
-                    )
+                    if challenge.scoringStartDate != nil &&
+                       challenge.status != .cancelled &&
+                       !challenge.expiredWithoutOpponent() {
+                        challengeHeroChip(
+                            title: ATHLTHLocalization.choose(
+                                english: "Leaderboard", norwegian: "Resultater"
+                            ),
+                            icon: "chart.bar.fill",
+                            emphasized: false
+                        )
+                    }
 
                     challengeHeroChip(
                         title:
@@ -9223,6 +9234,29 @@ struct ChallengeDetailView: View {
                     .opacity(0.72),
             in: Capsule()
         )
+    }
+
+    private var awaitingOpponentCard: some View {
+        ATHLTHPlanSurface {
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Waiting for the other athlete to accept",
+                    norwegian: "Venter på at motparten skal godta"
+                ),
+                systemImage: "person.crop.circle.badge.clock"
+            )
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(ATHLTHTheme.primaryText)
+
+            Text(ATHLTHLocalization.choose(
+                english: "The leaderboard stays hidden until a challenger accepts. "
+                    + "If nobody joins before the deadline, the challenge is cancelled without results.",
+                norwegian: "Resultatlisten vises først når noen har godtatt. "
+                    + "Hvis ingen blir med før fristen, avlyses utfordringen uten resultat."
+            ))
+            .font(.caption)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+        }
     }
 
     private func leaderboardCard(

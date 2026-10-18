@@ -482,6 +482,24 @@ struct ATHLTHChallenge: Identifiable, Codable, Hashable {
         self.rulesLockedAt = rulesLockedAt
     }
 
+    /// An invitation or a lone creator is never a valid contest.
+    /// Treat legacy "completed" rows with no accepted opponent as cancelled
+    /// once their deadline has passed.
+    var hasAcceptedOpponent: Bool {
+        participants.contains {
+            $0.userID != creatorID &&
+            $0.state == .accepted &&
+            $0.respondedAt != nil
+        }
+    }
+
+    func expiredWithoutOpponent(at date: Date = Date()) -> Bool {
+        guard status != .draft,
+              let end = rules.endsAt,
+              date >= end else { return false }
+        return !hasAcceptedOpponent
+    }
+
     // The first opponent must explicitly accept before any workout can score.
     // Start time is based on the actual accepted response, never invite time.
     var scoringStartDate: Date? {

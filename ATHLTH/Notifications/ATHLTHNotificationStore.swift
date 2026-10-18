@@ -378,6 +378,15 @@ final class ATHLTHNotificationStore: ObservableObject {
         currentUserID: UUID
     ) {
         for challenge in challenges {
+            // Cancelled/unaccepted invitations are never competitions.
+            // Do not synthesize old result/completion alerts for them.
+            guard challenge.scoringStartDate != nil,
+                  challenge.status != .cancelled,
+                  !challenge.expiredWithoutOpponent() else {
+                removeUncontestedChallengeAlerts(challenge.id)
+                continue
+            }
+
             let currentParticipantID = challenge.participants.first {
                 $0.userID == currentUserID
             }?.id
@@ -632,6 +641,30 @@ final class ATHLTHNotificationStore: ObservableObject {
         }
     }
 
+    private func removeUncontestedChallengeAlerts(_ challengeID: UUID) {
+        let prefix = "challenge-\(challengeID.uuidString)-"
+        let outdated = items.filter {
+            $0.challengeID == challengeID &&
+            $0.kind == .challenge
+        }
+        if !outdated.isEmpty {
+            items.removeAll {
+                $0.challengeID == challengeID &&
+                $0.kind == .challenge
+            }
+            persist()
+        }
+
+        let reminderIDs = [
+            prefix + "start-1h",
+            prefix + "meetup-1h",
+            prefix + "end-24h",
+            prefix + "completed"
+        ]
+        UNUserNotificationCenter.current()
+            .removePendingNotificationRequests(withIdentifiers: reminderIDs)
+    }
+
     private func scheduleChallengeReminders(
         _ challenge: ATHLTHChallenge,
         currentUserID: UUID
@@ -644,6 +677,8 @@ final class ATHLTHNotificationStore: ObservableObject {
                 authorizationStatus == .ephemeral,
               challenge.status != .completed,
               challenge.status != .cancelled,
+              challenge.scoringStartDate != nil,
+              !challenge.expiredWithoutOpponent(),
               challenge.participants.contains(where: {
                   $0.userID == currentUserID &&
                   ($0.state == .creator || $0.state == .accepted)

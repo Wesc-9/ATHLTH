@@ -640,7 +640,10 @@ final class ChallengeStore: ObservableObject {
     }
 
     func leaderboard(for challengeID: UUID) -> [ChallengeLeaderboardEntry] {
-        guard let challenge = challenges.first(where: { $0.id == challengeID }) else {
+        guard let challenge = challenges.first(where: { $0.id == challengeID }),
+              challenge.scoringStartDate != nil,
+              challenge.status != .cancelled,
+              !challenge.expiredWithoutOpponent() else {
             return []
         }
 
@@ -782,17 +785,26 @@ final class ChallengeStore: ObservableObject {
         var changed = false
 
         for index in challenges.indices {
+            // Check this before the completed guard: older clients may have
+            // persisted a false completed result before an invite was accepted.
+            if challenges[index].expiredWithoutOpponent(at: now) {
+                if challenges[index].status != .cancelled {
+                    challenges[index].status = .cancelled
+                    changed = true
+                }
+                continue
+            }
+
             if challenges[index].status == .cancelled ||
-                challenges[index].status == .completed {
+                challenges[index].status == .completed ||
+                challenges[index].status == .draft {
                 continue
             }
 
             if let endsAt = challenges[index].rules.endsAt,
-               now > endsAt {
-                if challenges[index].status != .completed {
-                    challenges[index].status = .completed
-                    changed = true
-                }
+               now >= endsAt {
+                challenges[index].status = .completed
+                changed = true
                 continue
             }
 
