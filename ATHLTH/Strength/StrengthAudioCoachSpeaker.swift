@@ -151,31 +151,12 @@ final class StrengthAudioCoachSpeaker:
                 string: spokenText
             )
 
-        if let voiceIdentifier =
-                configuration
-                    .voiceIdentifier,
-           let voice =
-                AVSpeechSynthesisVoice(
-                    identifier:
-                        voiceIdentifier
-                ) {
-            utterance.voice = voice
-        } else {
-            switch configuration.language {
-            case .norwegian:
-                utterance.voice =
-                    AVSpeechSynthesisVoice(
-                        language: "nb-NO"
-                    )
-            case .english:
-                utterance.voice =
-                    AVSpeechSynthesisVoice(
-                        language: "en-US"
-                    )
-            case .system:
-                break
-            }
-        }
+        // Use the highest-quality installed voice for this language unless
+        // the athlete selected a specific speaker.
+        utterance.voice = ATHLTHCoachPreferredSystemVoice.resolve(
+            selectedIdentifier: configuration.voiceIdentifier,
+            language: configuration.language
+        )
 
         utterance.rate =
             Float(
