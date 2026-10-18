@@ -877,11 +877,99 @@ private struct HomeFriendQuickActionsPopover: View {
                     action: onProfile
                 )
             }
+
+            if showFriendWorkouts && !publicWorkouts.isEmpty {
+                Rectangle()
+                    .fill(Color.black.opacity(0.07))
+                    .frame(height: 0.5)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Recent shared workouts",
+                        norwegian: "Siste delte økter"
+                    ))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    ForEach(publicWorkouts) { item in
+                        sharedWorkoutRow(item)
+                    }
+                }
+            }
+
+            Button {
+                showFriendWorkouts.toggle()
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: showFriendWorkouts
+                        ? "eye.slash" : "eye")
+                    Text(showFriendWorkouts
+                        ? ATHLTHLocalization.choose(
+                            english: "Hide workout previews",
+                            norwegian: "Skjul økter"
+                          )
+                        : ATHLTHLocalization.choose(
+                            english: "Show shared workouts",
+                            norwegian: "Vis delte økter"
+                          ))
+                }
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
         .padding(14)
         .frame(width: 278)
         .background(Color.white)
         .presentationBackground(.white)
+        .task(id: showFriendWorkouts) {
+            await loadPublicWorkouts()
+        }
+    }
+
+    private func sharedWorkoutRow(_ item: SocialFeedItem) -> some View {
+        let activity = HomeFollowingWorkoutPresentation.activity(for: item)
+        let duration = HomeRecentCardFormat.number(
+            item, key: "duration_seconds"
+        )
+        let distance = HomeRecentCardFormat.number(
+            item, key: "distance_meters"
+        )
+        let showDistance = distance != nil &&
+            (activity == .running || activity == .walking || activity == .hiking)
+        return HStack(spacing: 8) {
+            Image(systemName: activity.icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(width: 27, height: 27)
+                .background(ATHLTHTheme.accentSoft, in: Circle())
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(HomeRecentCardFormat.activity(activity))
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(1)
+
+                HStack(spacing: 5) {
+                    Text(HomeRecentCardFormat.date(item.activity.createdAt))
+                    if showDistance {
+                        Text("· " + HomeRecentCardFormat.distance(distance))
+                    }
+                    if let duration {
+                        Text("· " + HomeRecentCardFormat.duration(duration))
+                    }
+                }
+                .font(.system(size: 9.5))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(minHeight: 33)
+        .accessibilityElement(children: .combine)
     }
 
     private func actionButton(
