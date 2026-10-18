@@ -49,6 +49,12 @@ struct ATHLTHHomeWorkoutInspirationView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     VStack(alignment: .leading, spacing: 7) {
+                        Text(selectedDate.formatted(
+                            .dateTime.weekday(.wide).day().month(.wide)
+                        ))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ink.opacity(0.61))
+
                         Text(tr("YOUR WORKOUT IDEA", "DAGENS TRENINGSIDÉ"))
                             .font(.system(size: 10, weight: .bold))
                             .tracking(1.6)
