@@ -94,7 +94,7 @@ struct SocialPrivacySettingsView: View {
 
     private var introduction: some View {
         HStack(alignment: .top, spacing: 13) {
-            Image(systemName: "hand.raised.shield.lefthalf.filled")
+            Image(systemName: "lock.shield")
                 .font(.system(size: 22, weight: .medium))
                 .foregroundStyle(ATHLTHTheme.accentDeep)
                 .frame(width: 48, height: 48)
@@ -194,8 +194,8 @@ struct SocialPrivacySettingsView: View {
                         // 'requests' is the existing secure all-users request mode:
                         // one introductory message until the recipient approves.
                         Text(loc("Everyone", "Alle")).tag("requests")
-                        Text(loc("Mutual follows only", "Kun gjensidige")).tag("friends")
-                        Text(loc("No new requests", "Ingen nye forespørsler")).tag("nobody")
+                        Text(loc("Mutuals", "Gjensidige")).tag("friends")
+                        Text(loc("None", "Ingen")).tag("nobody")
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
