@@ -279,33 +279,19 @@ struct ATHLTHAudioCoachSettingsView: View {
             premiumCard {
                 premiumRow(
                     icon: "waveform.and.mic",
-                    iconTint:
-                        ATHLTHTheme.premiumGold,
-                    iconBackground:
-                        ATHLTHTheme.premiumGoldSoft,
-                    title:
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Use Audio Coach for my workouts",
-                            norwegian:
-                                "Bruk Audio Coach på øktene mine"
-                        ),
-                    subtitle:
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Preselected whenever you start a supported workout",
-                            norwegian:
-                                "Forhåndsvalgt når du starter en støttet økt"
-                        )
-                ) {
-                    Toggle(
-                        "",
-                        isOn:
-                            $settings
-                                .audioCoachEnabledByDefault
+                    iconTint: ATHLTHTheme.premiumGold,
+                    iconBackground: ATHLTHTheme.premiumGoldSoft,
+                    title: ATHLTHLocalization.choose(
+                        english: "Off when a workout starts",
+                        norwegian: "Av når en økt starter"
+                    ),
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Enable Audio Coach when you want it. Your chosen voice and guidance settings are saved.",
+                        norwegian: "Aktiver Audio Coach når du ønsker det. Valgt stemme og veiledning beholdes."
                     )
-                    .labelsHidden()
-                    .tint(ATHLTHTheme.accent)
+                ) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
                 }
             }
         }
@@ -328,7 +314,6 @@ struct ATHLTHAudioCoachSettingsView: View {
         settings.audioCoachTimeTriggerEnabled = false
         settings.audioCoachDistanceIntervalKilometers =
             preset.distanceIntervalKilometers
-        settings.audioCoachEnabledByDefault = true
     }
 
     private var experienceSection: some View {
@@ -653,7 +638,14 @@ struct ATHLTHAudioCoachSettingsView: View {
 
                 if settings.audioCoachLanguage == .norwegian {
                     premiumDivider
-                    norwegianVoiceChoicesSection
+                    ATHLTHCoachVoiceChoices(
+                        selectedIdentifier: $settings.audioCoachVoiceIdentifier,
+                        language: settings.audioCoachLanguage,
+                        speechRate: settings.audioCoachSpeechRate,
+                        speechVolume: settings.audioCoachSpeechVolume,
+                        duckOtherAudio: settings.audioCoachDuckOtherAudio,
+                        speechStyle: settings.audioCoachSpeechStyle
+                    )
                 }
 
                 premiumDivider
@@ -1394,100 +1386,6 @@ struct ATHLTHAudioCoachSettingsView: View {
     }
 
 
-    /// Quick selection for two different *installed* Norwegian speakers.
-    /// More installed voices remain available in the full Voice menu.
-    private var norwegianVoiceChoicesSection: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            Text(ATHLTHLocalization.choose(
-                english: "Norwegian voices",
-                norwegian: "Norske stemmer"
-            ))
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(ATHLTHTheme.primaryText)
-
-            ForEach(norwegianVoiceChoices) { voice in
-                let index = norwegianVoiceChoices.firstIndex(of: voice) ?? 0
-                HStack(spacing: 10) {
-                    Button {
-                        settings.audioCoachVoiceIdentifier = voice.id
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName:
-                                settings.audioCoachVoiceIdentifier == voice.id
-                                    ? "checkmark.circle.fill" : "circle"
-                            )
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(ATHLTHLocalization.choose(
-                                    english: "Norwegian voice \(index + 1)",
-                                    norwegian: "Norsk stemme \(index + 1)"
-                                ))
-                                .font(.subheadline.weight(.semibold))
-                                Text(voice.compactTitle)
-                                    .font(.caption2)
-                                    .foregroundStyle(ATHLTHTheme.mutedText)
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(
-                        settings.audioCoachVoiceIdentifier == voice.id
-                            ? .isSelected : []
-                    )
-
-                    Button {
-                        ATHLTHAudioCoachPreviewSpeaker.shared.speak(
-                            language: .norwegian,
-                            voiceIdentifier: voice.id,
-                            speechRate: settings.audioCoachSpeechRate,
-                            speechVolume: settings.audioCoachSpeechVolume,
-                            duckOtherAudio: settings.audioCoachDuckOtherAudio,
-                            speechStyle: settings.audioCoachSpeechStyle
-                        )
-                    } label: {
-                        Image(systemName: "play.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(
-                        ATHLTHLocalization.choose(
-                            english: "Preview \(voice.name)",
-                            norwegian: "Forhåndslytt på \(voice.name)"
-                        )
-                    )
-                }
-                .padding(12)
-                .background(
-                    ATHLTHTheme.accentSoft.opacity(0.7),
-                    in: RoundedRectangle(cornerRadius: 14)
-                )
-            }
-
-            if norwegianVoiceChoices.count < 2 {
-                Text(ATHLTHLocalization.choose(
-                    english: "Only \(norwegianVoiceChoices.count) distinct Norwegian voice(s) are installed. Add other Norwegian system voices under iPhone Settings → Accessibility → Spoken Content → Voices, then reopen ATHLTH.",
-                    norwegian: "Bare \(norwegianVoiceChoices.count) ulike norske stemmer er installert. Legg til flere under iPhone-innstillinger → Tilgjengelighet → Opplest innhold → Stemmer, og åpne ATHLTH igjen."
-                ))
-                .font(.caption)
-                .foregroundStyle(ATHLTHTheme.mutedText)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(16)
-    }
-
-    private var norwegianVoiceChoices: [ATHLTHAudioCoachVoiceOption] {
-        // The list is quality-sorted. Prefer a second voice with a different
-        // name rather than the same speaker at a different download quality.
-        var seenNames = Set<String>()
-        return Array(availableVoiceOptions.filter { option in
-            seenNames.insert(option.name.lowercased()).inserted
-        }.prefix(2))
-    }
-
     private var availableVoiceOptions:
         [ATHLTHAudioCoachVoiceOption] {
         let prefixes: [String]
@@ -1965,5 +1863,164 @@ struct ATHLTHAudioCoachSettingsView: View {
                     .accentDeep
             )
         }
+    }
+}
+
+
+/// Lists every compatible installed system voice, including improved-quality
+/// downloads of the same speaker. Never invents a voice that iOS cannot play.
+struct ATHLTHCoachVoiceChoices: View {
+    @Binding var selectedIdentifier: String?
+    let language: WatchAudioCoachLanguage
+    let speechRate: Double
+    let speechVolume: Double
+    let duckOtherAudio: Bool
+    let speechStyle: ATHLTHCoachSpeechStyle
+
+    private var voices: [ATHLTHAudioCoachVoiceOption] {
+        let prefix: String
+        switch language {
+        case .norwegian:
+            prefix = "nb"
+        case .english:
+            prefix = "en"
+        case .system:
+            prefix = Locale.autoupdatingCurrent.language.languageCode?
+                .identifier.lowercased() ?? "en"
+        }
+        let prefixes: [String] = ["nb", "nn", "no"].contains(prefix)
+            ? ["nb", "nn", "no"] : [prefix]
+
+        return AVSpeechSynthesisVoice.speechVoices()
+            .filter { voice in
+                let locale = voice.language.lowercased()
+                return prefixes.contains { locale.hasPrefix($0) }
+            }
+            .map {
+                ATHLTHAudioCoachVoiceOption(
+                    id: $0.identifier,
+                    name: $0.name,
+                    language: $0.language,
+                    qualityRank: $0.quality.rawValue
+                )
+            }
+            .sorted { lhs, rhs in
+                if lhs.qualityRank != rhs.qualityRank {
+                    return lhs.qualityRank > rhs.qualityRank
+                }
+                if lhs.name != rhs.name {
+                    return lhs.name < rhs.name
+                }
+                return lhs.id < rhs.id
+            }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(ATHLTHLocalization.choose(
+                    english: "Available voices",
+                    norwegian: "Tilgjengelige stemmer"
+                ))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                Spacer()
+                Text("\(voices.count)")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+
+            Button {
+                selectedIdentifier = nil
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: selectedIdentifier == nil
+                          ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Automatic · best available",
+                            norwegian: "Automatisk · beste tilgjengelige"
+                        ))
+                        .font(.subheadline.weight(.medium))
+                        Text(ATHLTHLocalization.choose(
+                            english: "Prefers a higher-quality installed voice",
+                            norwegian: "Foretrekker en installert stemme med høyere kvalitet"
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
+            .buttonStyle(.plain)
+
+            ForEach(voices) { voice in
+                HStack(spacing: 10) {
+                    Button {
+                        selectedIdentifier = voice.id
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: selectedIdentifier == voice.id
+                                  ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(voice.name)
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                                Text(voice.qualityTitle ?? ATHLTHLocalization.choose(
+                                    english: "Standard",
+                                    norwegian: "Standard"
+                                ))
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(
+                        selectedIdentifier == voice.id ? .isSelected : []
+                    )
+
+                    Button {
+                        ATHLTHAudioCoachPreviewSpeaker.shared.speak(
+                            language: language,
+                            voiceIdentifier: voice.id,
+                            speechRate: speechRate,
+                            speechVolume: speechVolume,
+                            duckOtherAudio: duckOtherAudio,
+                            speechStyle: speechStyle
+                        )
+                    } label: {
+                        Image(systemName: "play.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 40, height: 40)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        ATHLTHLocalization.choose(
+                            english: "Listen to \(voice.displayTitle)",
+                            norwegian: "Lytt til \(voice.displayTitle)"
+                        )
+                    )
+                }
+                .padding(10)
+                .background(
+                    ATHLTHTheme.accentSoft.opacity(0.65),
+                    in: RoundedRectangle(cornerRadius: 14)
+                )
+            }
+
+            Text(ATHLTHLocalization.choose(
+                english: "Only voices installed on this iPhone appear here. For more Norwegian voices and improved quality: Settings → Accessibility → Spoken Content → Voices → Norwegian. Download an available enhanced or premium voice, then return to ATHLTH. Apple Watch has a separate voice catalog.",
+                norwegian: "Her vises bare stemmer installert på denne iPhonen. Se etter flere norske stemmer og bedre kvalitet under Innstillinger → Tilgjengelighet → Opplest innhold → Stemmer → Norsk. Last ned en forbedret eller premium-stemme dersom den tilbys, og gå tilbake til ATHLTH. Apple Watch har egne stemmer."
+            ))
+            .font(.caption)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(14)
     }
 }
