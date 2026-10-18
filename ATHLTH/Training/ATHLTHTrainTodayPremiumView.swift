@@ -69,7 +69,6 @@ struct ATHLTHTrainTodayPremiumView: View {
                 // Starting a workout must not require creating a training plan.
                 quickTrainSection
                 suggestedWorkoutSection
-                emptyPlanCard
             }
             ghostRaceSection
                 .padding(.top, 6)
@@ -319,6 +318,31 @@ struct ATHLTHTrainTodayPremiumView: View {
                         .foregroundStyle(ink)
                 }
                 Spacer(minLength: 0)
+                if !hasPlan {
+                    Button(action: onCreatePlan) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(ink)
+                            .frame(width: 34, height: 34)
+                            .background(
+                                Color(red: 0.96, green: 0.94, blue: 0.91),
+                                in: Circle()
+                            )
+                            .overlay {
+                                Circle()
+                                    .stroke(hairline.opacity(0.8), lineWidth: 0.8)
+                            }
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        tr("Create training plan", "Opprett treningsplan")
+                    )
+                    .accessibilityHint(
+                        tr("Open training plan builder", "Åpne treningsplanbyggeren")
+                    )
+                }
             }
 
             HStack(alignment: .top, spacing: 12) {
@@ -582,73 +606,6 @@ struct ATHLTHTrainTodayPremiumView: View {
         }
         .padding(17)
         .premiumTrainSurface(line: hairline)
-    }
-
-    private var emptyPlanCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            stateImage("TrainHero", label: tr("START YOUR JOURNEY", "DIN TRENINGSREISE"))
-            VStack(alignment: .leading, spacing: 12) {
-                Text(tr("Build your training plan", "Bygg din treningsplan"))
-                    .font(.system(size: 24, weight: .regular, design: .serif))
-                    .foregroundStyle(ink)
-                Text(
-                    tr(
-                        "Choose your goals, duration and weekly sessions. Create your own plan or start from a template.",
-                        "Velg mål, varighet og økter per uke. Bygg selv, eller start med en lagret plan."
-                    )
-                )
-                .font(.subheadline)
-                .foregroundStyle(muted)
-                .fixedSize(horizontal: false, vertical: true)
-                Button(action: onCreatePlan) {
-                    HStack {
-                        Spacer()
-                        Text(tr("Create training plan", "Bygg treningsplan"))
-                        Spacer()
-                        Image(systemName: "arrow.right")
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 15)
-                    .frame(height: 47)
-                    .background(ink, in: RoundedRectangle(cornerRadius: 11))
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(16)
-        }
-        .premiumTrainSurface(line: hairline)
-    }
-
-    private func stateImage(_ assetName: String, label: String) -> some View {
-        ZStack(alignment: .topLeading) {
-            // Keep the hero's layout width equal to the available card
-            // width; only crop the image inside that measured region.
-            GeometryReader { imageGeometry in
-                Image(assetName)
-                    .resizable()
-                    .scaledToFill()
-                    .saturation(0.35)
-                    .frame(
-                        width: imageGeometry.size.width,
-                        height: 143
-                    )
-                    .clipped()
-            }
-            .frame(height: 143)
-            LinearGradient(
-                colors: [.black.opacity(0.35), .clear],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            Text(label)
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(1.25)
-                .foregroundStyle(.white)
-                .padding(15)
-        }
-        .frame(height: 143)
-        .clipped()
     }
 
     private var quickTrainSection: some View {
