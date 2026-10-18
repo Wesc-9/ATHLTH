@@ -197,6 +197,11 @@ struct HealthProgressSnapshot: Equatable {
 
 enum HealthPersonalRecordKind: String, CaseIterable, Hashable {
     case longestRun
+    case bestRunningAveragePace
+    case fastestFiveMinutePace
+    case fastestTenMinutePace
+    case longestRunningDuration
+    case mostRunningElevationGain
     case fastest400M
     case fastest800M
     case fastest1K
@@ -210,6 +215,7 @@ enum HealthPersonalRecordKind: String, CaseIterable, Hashable {
     case fastestMarathon
     case longestRide
     case longestWalkOrHike
+    case bestWalkingAveragePace
     case longestSwim
     case longestWorkout
     case longestStrengthWorkout
@@ -226,6 +232,16 @@ enum HealthPersonalRecordKind: String, CaseIterable, Hashable {
         switch self {
         case .longestRun:
             return ATHLTHLocalization.string("Longest Run")
+        case .bestRunningAveragePace:
+            return ATHLTHLocalization.choose(english: "Best average running pace", norwegian: "Beste snittempo løping")
+        case .fastestFiveMinutePace:
+            return ATHLTHLocalization.choose(english: "Fastest 5-minute pace", norwegian: "Raskeste 5 minutter")
+        case .fastestTenMinutePace:
+            return ATHLTHLocalization.choose(english: "Fastest 10-minute pace", norwegian: "Raskeste 10 minutter")
+        case .longestRunningDuration:
+            return ATHLTHLocalization.choose(english: "Longest running time", norwegian: "Lengste løpetid")
+        case .mostRunningElevationGain:
+            return ATHLTHLocalization.choose(english: "Most elevation gained running", norwegian: "Flest høydemeter løping")
         case .fastest400M:
             return ATHLTHLocalization.choose(
                 english: "Fastest 400 m",
@@ -265,6 +281,8 @@ enum HealthPersonalRecordKind: String, CaseIterable, Hashable {
             return ATHLTHLocalization.string("Fastest Marathon")
         case .longestRide: return ATHLTHLocalization.string( "Longest Ride")
         case .longestWalkOrHike: return ATHLTHLocalization.string( "Longest Walk / Hike")
+        case .bestWalkingAveragePace:
+            return ATHLTHLocalization.choose(english: "Best walking pace", norwegian: "Raskeste gåtempo")
         case .longestSwim:
             return ATHLTHLocalization.choose(
                 english: "Longest Swim",
@@ -319,7 +337,10 @@ enum HealthPersonalRecordKind: String, CaseIterable, Hashable {
         switch self {
         case .longestRun:
             return "figure.run"
-        case .fastest400M,
+        case .bestRunningAveragePace,
+             .fastestFiveMinutePace,
+             .fastestTenMinutePace,
+             .fastest400M,
              .fastest800M,
              .fastest1K,
              .fastestMile,
@@ -331,10 +352,16 @@ enum HealthPersonalRecordKind: String, CaseIterable, Hashable {
              .fastestHalfMarathon,
              .fastestMarathon:
             return "stopwatch.fill"
+        case .longestRunningDuration:
+            return "clock.fill"
+        case .mostRunningElevationGain:
+            return "mountain.2.fill"
         case .longestRide:
             return "figure.outdoor.cycle"
         case .longestWalkOrHike:
             return "figure.hiking"
+        case .bestWalkingAveragePace:
+            return "figure.walk"
         case .longestSwim:
             return "figure.pool.swim"
         case .longestWorkout:
@@ -363,6 +390,11 @@ enum HealthPersonalRecordKind: String, CaseIterable, Hashable {
     var isRunningRecord: Bool {
         switch self {
         case .longestRun,
+             .bestRunningAveragePace,
+             .fastestFiveMinutePace,
+             .fastestTenMinutePace,
+             .longestRunningDuration,
+             .mostRunningElevationGain,
              .fastest400M,
              .fastest800M,
              .fastest1K,
@@ -413,6 +445,17 @@ struct HealthPersonalRecord: Identifiable, Equatable {
              .longestSwim:
             return String(format: "%.1f km", value / 1_000)
 
+        case .bestRunningAveragePace,
+             .fastestFiveMinutePace,
+             .fastestTenMinutePace,
+             .bestWalkingAveragePace:
+            let seconds = Int(value.rounded())
+            guard seconds > 0 else { return "—" }
+            return String(format: "%d:%02d /km", seconds / 60, seconds % 60)
+
+        case .mostRunningElevationGain:
+            return "\(Int(value.rounded())) hm"
+
         case .fastest400M,
              .fastest800M,
              .fastest1K,
@@ -440,7 +483,8 @@ struct HealthPersonalRecord: Identifiable, Equatable {
 
             return String(format: "%d:%02d", minutes, seconds)
 
-        case .longestWorkout,
+        case .longestRunningDuration,
+             .longestWorkout,
              .longestStrengthWorkout,
              .longestHIITWorkout,
              .longestRowingWorkout,
