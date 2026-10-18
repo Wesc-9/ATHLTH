@@ -2973,6 +2973,57 @@ final class HealthKitManager: ObservableObject {
                 for: runningWorkouts
             )
 
+        func appendBestPace(
+            _ kind: HealthPersonalRecordKind,
+            candidates: [(pace: Double, date: Date)]
+        ) {
+            guard let best = candidates
+                .filter({ $0.pace.isFinite && $0.pace >= 150 && $0.pace <= 1_200 })
+                .min(by: { $0.pace < $1.pace })
+            else { return }
+            records.append(HealthPersonalRecord(
+                kind: kind, value: best.pace, date: best.date
+            ))
+        }
+
+        appendBestPace(
+            .bestRunningAveragePace,
+            candidates: runningWorkouts.compactMap { workout in
+                guard workout.metadata?[HKMetadataKeyWasUserEntered] as? Bool != true,
+                      let meters = workout.athlthDistanceMeters,
+                      meters >= 1_000,
+                      workout.duration >= 180
+                else { return nil }
+                return (workout.duration * 1_000 / meters, workout.startDate)
+            }
+        )
+        appendBestPace(
+            .fastestFiveMinutePace,
+            candidates: runningPerformance.compactMap { entry in
+                guard let pace = entry.fastestFiveMinutePace else { return nil }
+                return (pace, entry.startDate)
+            }
+        )
+        appendBestPace(
+            .fastestTenMinutePace,
+            candidates: runningPerformance.compactMap { entry in
+                guard let pace = entry.fastestTenMinutePace else { return nil }
+                return (pace, entry.startDate)
+            }
+        )
+        if let bestAscent = runningPerformance
+            .compactMap({ entry -> (meters: Double, date: Date)? in
+                guard let value = entry.ascentMeters, value > 0 else { return nil }
+                return (value, entry.startDate)
+            })
+            .max(by: { $0.meters < $1.meters }) {
+            records.append(HealthPersonalRecord(
+                kind: .mostRunningElevationGain,
+                value: bestAscent.meters,
+                date: bestAscent.date
+            ))
+        }
+
         for entry in runningPerformance {
             for (kind, _) in timedRunningTargets {
                 guard let duration =
@@ -3028,6 +3079,18 @@ final class HealthKitManager: ObservableObject {
                 )
             )
         }
+
+        let walkingPaces: [(pace: Double, date: Date)] =
+            workouts.compactMap { workout in
+                guard workout.workoutActivityType == .walking,
+                      workout.metadata?[HKMetadataKeyWasUserEntered] as? Bool != true,
+                      let meters = workout.athlthDistanceMeters,
+                      meters >= 1_000,
+                      workout.duration >= 300
+                else { return nil }
+                return (workout.duration * 1_000 / meters, workout.startDate)
+            }
+        appendBestPace(.bestWalkingAveragePace, candidates: walkingPaces)
 
         if let workout = workouts
             .filter({
@@ -3115,6 +3178,10 @@ final class HealthKitManager: ObservableObject {
             )
         }
 
+        appendLongestDurationRecord(
+            .longestRunningDuration,
+            activities: [.running]
+        )
         appendLongestDurationRecord(
             .longestStrengthWorkout,
             activities: [
@@ -4441,6 +4508,11 @@ final class HealthKitManager: ObservableObject {
         let fastestTenMile: TimeInterval?
         let fastestHalfMarathon: TimeInterval?
         let fastestMarathon: TimeInterval?
+        // Optional for decoding previously cached route performances.
+        let fastestFiveMinutePace: Double?
+        let fastestTenMinutePace: Double?
+        let ascentMeters: Double?
+        let hasTimedPaceAnalysis: Bool?
 
         func duration(
             for kind: HealthPersonalRecordKind
@@ -4574,7 +4646,9 @@ final class HealthKitManager: ObservableObject {
                         workout.endDate
                     ) < 86_400
 
-                if !shouldRetryUnavailableRoute {
+                if !shouldRetryUnavailableRoute &&
+                    (cached.hasTimedPaceAnalysis == true ||
+                     !cached.routeAvailable) {
                     continue
                 }
             }
@@ -4619,7 +4693,17 @@ final class HealthKitManager: ObservableObject {
                 fastestFifteenK: segment(15_000),
                 fastestTenMile: segment(16_093.44),
                 fastestHalfMarathon: segment(21_097.5),
-                fastestMarathon: segment(42_195)
+                fastestMarathon: segment(42_195),
+                fastestFiveMinutePace: hasRoute
+                    ? bestRoutePace(in: route, duration: 300)
+                    : nil,
+                fastestTenMinutePace: hasRoute
+                    ? bestRoutePace(in: route, duration: 600)
+                    : nil,
+                ascentMeters: hasRoute
+                    ? verifiedRouteAscent(in: route)
+                    : nil,
+                hasTimedPaceAnalysis: true
             )
             cacheChanged = true
         }
@@ -6513,6 +6597,82 @@ final class HealthKitManager: ObservableObject {
                 Double(values.count),
             values.max()
         )
+    }
+
+    // Sliding GPS windows; exclude implausible fixes and jumps. No route,
+    // no record: a whole-workout average is never used as an interval PR.
+    private func bestRoutePace(
+        in locations: [CLLocation],
+        duration: TimeInterval
+    ) -> Double? {
+        guard duration > 0 else { return nil }
+        let points = locations
+            .filter {
+                $0.horizontalAccuracy >= 0 &&
+                $0.horizontalAccuracy <= 35
+            }
+            .sorted { $0.timestamp < $1.timestamp }
+        guard points.count >= 2 else { return nil }
+
+        var distance = Array(repeating: 0.0, count: points.count)
+        for i in 1..<points.count {
+            let seconds = points[i].timestamp.timeIntervalSince(points[i - 1].timestamp)
+            let meters = points[i].distance(from: points[i - 1])
+            let accepted = seconds > 0 && meters.isFinite &&
+                meters >= 0 && meters / seconds <= 8.5
+            distance[i] = distance[i - 1] + (accepted ? meters : 0)
+        }
+
+        var end = 1
+        var best: Double?
+        for start in 0..<(points.count - 1) {
+            if end <= start { end = start + 1 }
+            let targetTime = points[start].timestamp.addingTimeInterval(duration)
+            while end < points.count && points[end].timestamp < targetTime {
+                end += 1
+            }
+            if end >= points.count { break }
+            let prev = end - 1
+            let dt = points[end].timestamp.timeIntervalSince(points[prev].timestamp)
+            guard dt > 0 else { continue }
+            let fraction = max(0, min(1,
+                targetTime.timeIntervalSince(points[prev].timestamp) / dt))
+            let lastDistance = distance[prev] +
+                (distance[end] - distance[prev]) * fraction
+            let meters = lastDistance - distance[start]
+            guard meters > 0 else { continue }
+            let pace = duration * 1_000 / meters
+            // GPS errors must never produce superhuman performances.
+            guard pace.isFinite && pace >= 150 && pace <= 1_200 else {
+                continue
+            }
+            best = min(best ?? pace, pace)
+        }
+        return best
+    }
+
+    private func verifiedRouteAscent(
+        in locations: [CLLocation]
+    ) -> Double? {
+        let points = locations
+            .filter {
+                $0.horizontalAccuracy >= 0 &&
+                $0.horizontalAccuracy <= 35 &&
+                $0.verticalAccuracy >= 0 &&
+                $0.verticalAccuracy <= 20
+            }
+            .sorted { $0.timestamp < $1.timestamp }
+        guard points.count >= 3 else { return nil }
+        var ascent = 0.0
+        for i in 1..<points.count {
+            let dt = points[i].timestamp.timeIntervalSince(points[i - 1].timestamp)
+            guard dt > 0 && dt <= 30,
+                  points[i].distance(from: points[i - 1]) / dt <= 8.5
+            else { continue }
+            let rise = points[i].altitude - points[i - 1].altitude
+            if rise >= 1.5 && rise < 30 { ascent += rise }
+        }
+        return ascent >= 1 ? ascent : nil
     }
 
     private func fastestSegmentDuration(
