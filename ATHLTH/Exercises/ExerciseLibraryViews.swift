@@ -45,7 +45,16 @@ struct ExerciseLibraryView: View {
     @State private var selectedEquipment = "All"
     @State private var favoritesOnly = false
     @State private var showingCreateExercise = false
-    @State private var showingEquipmentScanner = false
+    @State private var showingEquipmentCamera = false
+    @State private var showingCameraUnavailable = false
+    @State private var equipmentPhoto: UIImage?
+    @State private var scannerIsAnalyzing = false
+    @State private var scannerAnalysis: ATHLTHEquipmentScanResponse?
+    @State private var scannerMessage: String?
+    @State private var scannerResultsActive = false
+    @State private var scannerCandidates: [ExerciseLibraryEntry] = []
+    @State private var scannerTask: Task<Void, Never>?
+    @State private var scanIdentity = UUID()
     @State private var selectedSection: ExerciseLibrarySection = .library
 
     init(
@@ -100,6 +109,16 @@ struct ExerciseLibraryView: View {
 
     private var displayedResults:
         [ExerciseLibraryEntry] {
+        if scannerResultsActive {
+            guard let scannerAnalysis else { return [] }
+            // Same native cards and Add buttons; only real validated exercise
+            // IDs selected by the equipment scanner remain in the list.
+            let regularResults = Set(results.map(\.id))
+            return scannerAnalysis
+                .matchedExercises(in: scannerCandidates)
+                .filter { regularResults.contains($0.id) }
+        }
+
         let trimmedQuery =
             query.trimmingCharacters(
                 in: .whitespacesAndNewlines
@@ -202,7 +221,11 @@ struct ExerciseLibraryView: View {
             translationAvailabilityBanner
 
             Button {
-                showingEquipmentScanner = true
+                if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                    showingEquipmentCamera = true
+                } else {
+                    showingCameraUnavailable = true
+                }
             } label: {
                 HStack(spacing: 11) {
                     Image(systemName: "camera.viewfinder")
@@ -218,8 +241,8 @@ struct ExerciseLibraryView: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHPlanDesign.ink)
                         Text(ATHLTHLocalization.choose(
-                            english: "Find exercises using the camera",
-                            norwegian: "Finn øvelser med kameraet"
+                            english: "Take a photo · AI analyzes it to filter exercises",
+                            norwegian: "Ta bilde · AI analyserer det og filtrerer øvelsene"
                         ))
                         .font(.caption)
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -242,6 +265,12 @@ struct ExerciseLibraryView: View {
             .buttonStyle(.plain)
             .padding(.horizontal, 16)
             .padding(.bottom, 5)
+
+            if scannerResultsActive {
+                equipmentScanFilterSummary
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 6)
+            }
 
             if selectedSection == .mine {
                 ATHLTHPlanSurface {
@@ -299,7 +328,14 @@ struct ExerciseLibraryView: View {
                 .padding(.bottom, 6)
             }
 
-            if selectedSection == .library &&
+            if scannerIsAnalyzing {
+                ProgressView(ATHLTHLocalization.choose(
+                    english: "Analyzing equipment and finding exercises…",
+                    norwegian: "Analyserer apparatet og finner aktuelle øvelser…"
+                ))
+                .padding(30)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if selectedSection == .library &&
                 library.isLoading &&
                 library.athlthCatalogExercises.isEmpty {
                 ProgressView(ATHLTHLocalization.choose(
@@ -307,7 +343,9 @@ struct ExerciseLibraryView: View {
                 ))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if entries.isEmpty {
-                if selectedSection == .mine && query.isEmpty {
+                if scannerResultsActive {
+                    scannerEmptyState
+                } else if selectedSection == .mine && query.isEmpty {
                     ContentUnavailableView {
                         Label(ATHLTHLocalization.choose(
                             english: "No personal exercises yet",
@@ -487,7 +525,8 @@ struct ExerciseLibraryView: View {
                     .overlay(
                         alignment: .trailing
                     ) {
-                        if query
+                        if !scannerResultsActive &&
+                           query
                             .trimmingCharacters(
                                 in:
                                     .whitespacesAndNewlines
@@ -528,9 +567,36 @@ struct ExerciseLibraryView: View {
                 .environmentObject(library)
                 .environmentObject(session)
         }
-        .sheet(isPresented: $showingEquipmentScanner) {
-            ATHLTHEquipmentScannerView(onSelect: onSelect)
-                .environmentObject(library)
+        .fullScreenCover(isPresented: $showingEquipmentCamera) {
+            ATHLTHEquipmentCameraPicker(
+                onCapture: { captured in
+                    showingEquipmentCamera = false
+                    processEquipmentPhoto(captured)
+                },
+                onCancel: {
+                    showingEquipmentCamera = false
+                }
+            )
+            .ignoresSafeArea()
+        }
+        .alert(
+            ATHLTHLocalization.choose(
+                english: "Camera not available",
+                norwegian: "Kamera ikke tilgjengelig"
+            ),
+            isPresented: $showingCameraUnavailable
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "A camera is required to scan gym equipment.",
+                norwegian: "Du trenger et kamera for å skanne treningsapparater."
+            ))
+        }
+        .onChange(of: selectedSection) { _, section in
+            if section == .mine, scannerResultsActive {
+                resetEquipmentScan()
+            }
         }
         .task {
             recents.refresh()
@@ -559,6 +625,190 @@ struct ExerciseLibraryView: View {
                 .map(\.name)
             await norwegianTranslations.translate(texts: pendingNames, using: session)
         }
+    }
+
+    /// Keep the scan photo and feedback within the exercise picker, not
+    /// another NavigationStack or a second exercise list.
+    private var equipmentScanFilterSummary: some View {
+        HStack(spacing: 11) {
+            if let equipmentPhoto {
+                Image(uiImage: equipmentPhoto)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 54, height: 54)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Scanned equipment",
+                        norwegian: "Skannet treningsapparat"
+                    ))
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(scannerAnalysis?.equipmentName ??
+                    ATHLTHLocalization.choose(
+                        english: "Analyzing equipment",
+                        norwegian: "Analyserer apparatet"
+                    ))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .lineLimit(1)
+
+                Text(scannerIsAnalyzing
+                    ? ATHLTHLocalization.choose(
+                        english: "Filtering the ATHLTH exercise library…",
+                        norwegian: "Filtrerer ATHLTH-biblioteket…"
+                    )
+                    : (scannerMessage ??
+                        ATHLTHLocalization.choose(
+                            english: "\(displayedResults.count) relevant exercises · verify equipment",
+                            norwegian: "\(displayedResults.count) aktuelle øvelser · kontroller apparatet"
+                        )))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 4)
+
+            Button {
+                showingEquipmentCamera = true
+            } label: {
+                Image(systemName: "camera.fill")
+                    .font(.subheadline)
+                    .frame(width: 36, height: 36)
+                    .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .disabled(scannerIsAnalyzing)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Scan again",
+                norwegian: "Skann på nytt"
+            ))
+
+            Button {
+                resetEquipmentScan()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .frame(width: 32, height: 36)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Clear equipment filter",
+                norwegian: "Fjern apparatfilter"
+            ))
+        }
+        .padding(12)
+        .background(
+            ATHLTHPlanDesign.selectedSurface.opacity(0.70),
+            in: RoundedRectangle(cornerRadius: 17, style: .continuous)
+        )
+    }
+
+    private var scannerEmptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "camera.metering.unknown")
+                .font(.system(size: 30))
+                .foregroundStyle(ATHLTHPlanDesign.accent)
+
+            Text(ATHLTHLocalization.choose(
+                english: "No matching exercises",
+                norwegian: "Ingen aktuelle øvelser funnet"
+            ))
+            .font(.headline)
+
+            Text(scannerMessage ?? (
+                scannerAnalysis?.confidence == "low"
+                    ? ATHLTHLocalization.choose(
+                        english: "The photo was too uncertain. Try a clearer picture of the entire machine.",
+                        norwegian: "Apparatet ble ikke gjenkjent sikkert. Prøv et tydeligere bilde av hele apparatet."
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "No exercises matched this machine and the active filters.",
+                        norwegian: "Ingen øvelser passer til apparatet og filtrene som er valgt."
+                    )
+            ))
+            .font(.subheadline)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            .multilineTextAlignment(.center)
+
+            Button(ATHLTHLocalization.choose(
+                english: "Show all exercises",
+                norwegian: "Vis alle øvelser"
+            )) {
+                resetEquipmentScan()
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(26)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// Capturing a photo is an explicit scan action. The entry point explains
+    /// that AI analyzes the photo before the user opens the camera.
+    private func processEquipmentPhoto(_ image: UIImage) {
+        scannerTask?.cancel()
+        let identity = UUID()
+        scanIdentity = identity
+        equipmentPhoto = image
+        scannerAnalysis = nil
+        scannerMessage = nil
+        scannerIsAnalyzing = true
+        scannerResultsActive = true
+
+        // Prevent older search filters from silently hiding matched exercises.
+        query = ""
+        selectedBodyPart = "All"
+        selectedEquipment = "All"
+        favoritesOnly = false
+        selectedSection = .library
+
+        let candidates = library.search(query: "")
+            .filter { $0.source != .custom }
+            .sorted { lhs, rhs in
+                if lhs.source != rhs.source {
+                    return lhs.source == .athlthCatalog
+                }
+                return lhs.name.localizedStandardCompare(rhs.name)
+                    == .orderedAscending
+            }
+            .prefix(100)
+            .map { $0 }
+        scannerCandidates = candidates
+
+        scannerTask = Task {
+            do {
+                let analysis = try await ATHLTHEquipmentVisionService()
+                    .analyze(image: image, exercises: candidates)
+                guard !Task.isCancelled, scanIdentity == identity else {
+                    return
+                }
+                scannerAnalysis = analysis
+                scannerIsAnalyzing = false
+            } catch {
+                guard !Task.isCancelled, scanIdentity == identity else {
+                    return
+                }
+                scannerMessage = ATHLTHLocalization.choose(
+                    english: "Could not analyze this photo. Try scanning again.",
+                    norwegian: "Bildet kunne ikke analyseres. Prøv å skanne på nytt."
+                )
+                scannerIsAnalyzing = false
+            }
+        }
+    }
+
+    private func resetEquipmentScan() {
+        scannerTask?.cancel()
+        scannerTask = nil
+        scanIdentity = UUID()
+        scannerIsAnalyzing = false
+        scannerResultsActive = false
+        scannerAnalysis = nil
+        scannerMessage = nil
+        scannerCandidates = []
+        equipmentPhoto = nil
     }
 
     @ViewBuilder
