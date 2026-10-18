@@ -35,7 +35,6 @@ struct SubscriptionOfferView: View {
                         plans
                         appStoreCurrencyNote
                         purchaseButton
-                        continueTrialButton
                     }
 
                     if let errorMessage = subscriptionStore.errorMessage,
@@ -330,29 +329,6 @@ struct SubscriptionOfferView: View {
             selectedProductID == nil ||
             subscriptionStore.purchaseInProgress
         )
-    }
-
-    private var continueTrialButton: some View {
-        Button {
-            dismiss()
-        } label: {
-            Text(
-                session.subscriptionAccess.trialIsActive
-                    ? ATHLTHLocalization.choose(
-                        english: "Continue with free trial",
-                        norwegian: "Fortsett prøveperioden"
-                    )
-                    : ATHLTHLocalization.choose(
-                        english: "Not now",
-                        norwegian: "Ikke nå"
-                    )
-            )
-            .font(.subheadline.weight(.semibold))
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 4)
-        }
-        .buttonStyle(.bordered)
-        .tint(OnboardingTheme.primaryText)
     }
 
     private var trialDisclosure: some View {
