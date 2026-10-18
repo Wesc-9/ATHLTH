@@ -4,6 +4,7 @@ import SwiftUI
 struct PlannedWorkoutDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
     @EnvironmentObject private var health: HealthKitManager
@@ -20,6 +21,8 @@ struct PlannedWorkoutDetailView: View {
     @State private var showingStructuredWorkout = false
     @State private var selectedLegacyExercise: WorkoutTemplateBlock?
     @State private var showingHealthLinkPicker = false
+    @State private var preparedShare: MessageShareDraft?
+    @State private var shareError: String?
 
     private var currentWorkout: PlannedSession {
         guard let plan = session.trainingPlan(withID: planID) else {
@@ -215,6 +218,25 @@ struct PlannedWorkoutDetailView: View {
                     }
                 }
 
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        do {
+                            preparedShare = try ATHLTHShareDraftFactory.workout(
+                                currentWorkout,
+                                library: exerciseLibrary.allExercises,
+                                ownerID: session.profile.userID
+                            )
+                        } catch {
+                            shareError = error.localizedDescription
+                        }
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Share workout", norwegian: "Del treningsøkt"
+                    ))
+                }
+
                 ToolbarItem(placement: .confirmationAction) {
                     Button(ATHLTHLocalization.choose(english: "Edit", norwegian: "Rediger")) {
                         showingEditor = true
@@ -229,6 +251,23 @@ struct PlannedWorkoutDetailView: View {
             }
             .sheet(isPresented: $showingHealthLinkPicker) {
                 healthLinkPicker
+            }
+            .sheet(item: $preparedShare) { draft in
+                ATHLTHDirectShareSheet(draft: draft)
+            }
+            .alert(
+                ATHLTHLocalization.choose(
+                    english: "Could not share workout",
+                    norwegian: "Kunne ikke dele treningsøkt"
+                ),
+                isPresented: Binding(
+                    get: { shareError != nil },
+                    set: { if !$0 { shareError = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(shareError ?? "")
             }
             .sheet(item: $selectedLegacyExercise) { block in
                 ATHLTHLinkedExerciseDetailView(block: block)
