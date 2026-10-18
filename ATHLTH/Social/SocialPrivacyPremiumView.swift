@@ -33,7 +33,6 @@ struct SocialPrivacySettingsView: View {
                         messagingSection(binding)
                         sharingSection(binding)
                         challengesSection(binding)
-                        saveButton
                     }
                     .padding(.horizontal, 18)
                     .padding(.top, 14)
@@ -234,8 +233,8 @@ struct SocialPrivacySettingsView: View {
                          loc("What you share", "Hva du deler"))
 
             Text(loc(
-                "Open a category to choose what others can see. Off always means private. Audience is shown for each item.",
-                "Åpne en kategori og velg hva andre kan se. Av betyr alltid privat. Publikum vises for hvert valg."
+                "Open a category to choose what appears on your social profile. The audience is shown for each item.",
+                "Åpne en kategori og velg hva som vises på den sosiale profilen. Publikum vises for hvert valg."
             ))
             .font(.caption)
             .foregroundStyle(ATHLTHTheme.mutedText)
@@ -449,26 +448,8 @@ struct SocialPrivacySettingsView: View {
         }
     }
 
-    private var saveButton: some View {
-        Button {
-            Task { await save() }
-        } label: {
-            HStack(spacing: 10) {
-                Spacer()
-                if saving { ProgressView().tint(.white) }
-                Text(loc("Save preferences", "Lagre innstillinger"))
-                    .font(.subheadline.weight(.semibold))
-                Spacer()
-            }
-            .frame(height: 52)
-            .foregroundStyle(.white)
-            .background(ATHLTHTheme.accentDeep, in: Capsule())
-        }
-        .disabled(saving)
-        .padding(.top, 3)
-    }
-
     private func audience(enabled: Bool, visibility: String, profile: String) -> String {
+        guard enabled else { return loc("Not shared", "Deles ikke") }
         let scope = PrivacyVisibilityRules.scope(
             enabled: enabled, current: visibility, profile: profile
         )
