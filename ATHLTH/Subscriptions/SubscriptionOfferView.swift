@@ -19,6 +19,7 @@ struct SubscriptionOfferView: View {
             ScrollView {
                 VStack(spacing: 18) {
                     hero
+                    featuredBenefits
 
                     if subscriptionStore.isLoading {
                         ProgressView(ATHLTHLocalization.choose(
@@ -35,6 +36,7 @@ struct SubscriptionOfferView: View {
                         plans
                         appStoreCurrencyNote
                         purchaseButton
+                        purchaseReassurance
                     }
 
                     if let errorMessage = subscriptionStore.errorMessage,
@@ -167,6 +169,61 @@ struct SubscriptionOfferView: View {
             }
         }
         .padding(.top, 4)
+    }
+
+    /// Lead with tangible benefits rather than asking users to choose a
+    /// billing period before they know what ATHLTH+ includes.
+    private var featuredBenefits: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "AI training plans made for you",
+                    norwegian: "AI-treningsplaner tilpasset deg"
+                ),
+                systemImage: "sparkles"
+            )
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Audio Coach for every workout",
+                    norwegian: "Audio Coach under treningen"
+                ),
+                systemImage: "waveform"
+            )
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Scan equipment to find exercises",
+                    norwegian: "Skann apparater og finn øvelser"
+                ),
+                systemImage: "camera.viewfinder"
+            )
+        }
+        .font(.subheadline.weight(.medium))
+        .foregroundStyle(OnboardingTheme.primaryText)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(
+            OnboardingTheme.card,
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
+    }
+
+    private var purchaseReassurance: some View {
+        VStack(spacing: 5) {
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Secure checkout through the App Store",
+                    norwegian: "Sikker betaling gjennom App Store"
+                ),
+                systemImage: "lock.shield"
+            )
+            Text(ATHLTHLocalization.choose(
+                english: "Auto-renews unless canceled. You can cancel in your App Store subscriptions.",
+                norwegian: "Fornyes automatisk til du sier opp. Du kan avslutte under abonnementer i App Store."
+            ))
+        }
+        .font(.caption2)
+        .foregroundStyle(OnboardingTheme.mutedText)
+        .multilineTextAlignment(.center)
     }
 
     private var benefits: some View {
@@ -502,7 +559,7 @@ struct SubscriptionOfferView: View {
                             .font(.headline)
                             .foregroundStyle(OnboardingTheme.primaryText)
 
-                        if yearly {
+                        if yearly, yearlySavingsPercent != nil {
                             Text(ATHLTHLocalization.choose(
                                 english: "BEST VALUE",
                                 norwegian: "BEST VERDI"
