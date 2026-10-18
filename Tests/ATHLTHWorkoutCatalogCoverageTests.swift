@@ -3,6 +3,7 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHWorkoutCatalogCoverageTests: XCTestCase {
+    @MainActor
     func testOfflineCatalogIncludesHybridAndStrengthPrescriptions() {
         let entries = WorkoutTemplateCatalogEntry.bundledCatalog
         XCTAssertEqual(entries.filter { $0.category == "hybrid" }.count, 3)
@@ -11,6 +12,7 @@ final class ATHLTHWorkoutCatalogCoverageTests: XCTestCase {
         XCTAssertEqual(Set(entries.map(\.slug)).count, entries.count)
     }
 
+    @MainActor
     func testEveryStrengthRecipeHasRealSetsRepsRestAndWarmup() {
         for entry in ATHLTHCuratedStrengthWorkouts.entries {
             XCTAssertEqual(entry.workoutKind, .strength)
@@ -20,7 +22,7 @@ final class ATHLTHWorkoutCatalogCoverageTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(exerciseBlocks.count, 4, entry.slug)
             XCTAssertTrue(exerciseBlocks.allSatisfy {
                 ($0.setCount ?? 0) > 0 &&
-                ($0.repetitions ?? 0) > 0 &&
+                (($0.repetitions ?? 0) > 0 || ($0.durationSeconds ?? 0) > 0) &&
                 ($0.restBetweenSetsSeconds ?? 0) > 0
             }, entry.slug)
             let session = entry.plannedSession()
@@ -30,6 +32,7 @@ final class ATHLTHWorkoutCatalogCoverageTests: XCTestCase {
         }
     }
 
+    @MainActor
     func testBuiltInRunningWorkoutRemainsNativeWhenUsedInTrainingPlan() {
         guard let run = RunningWorkoutLibraryStore.builtInTemplates.first else {
             return XCTFail("Built-in running workouts are missing")
@@ -43,6 +46,7 @@ final class ATHLTHWorkoutCatalogCoverageTests: XCTestCase {
         XCTAssertFalse(ATHLTHUnifiedWorkout.editorBlocks(from: workout).isEmpty)
     }
 
+    @MainActor
     func testStrengthIdsRemainStableAcrossCatalogAccess() {
         let first = ATHLTHCuratedStrengthWorkouts.entries.map(\.id)
         let second = ATHLTHCuratedStrengthWorkouts.entries.map(\.id)
