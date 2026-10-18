@@ -72,6 +72,10 @@ enum ATHLTHExerciseReferenceResolver {
         in library: [ExerciseLibraryEntry]
     ) -> ExerciseLibraryEntry? {
         guard block.kind == .exercise else { return nil }
+        if let id = block.exerciseID,
+           let byID = library.first(where: { $0.id == id }) {
+            return byID
+        }
         if let slug = block.exerciseSlug, !slug.isEmpty {
             let byIdentifier = library.filter { $0.sourceIdentifier == slug }
             if byIdentifier.count == 1 { return byIdentifier[0] }
@@ -161,6 +165,7 @@ enum ATHLTHExerciseReferenceResolver {
         guard block.kind == .exercise else { return block }
         var copy = block
         if let found = resolve(block, in: library) {
+            copy.exerciseID = found.id
             if let sourceID = found.sourceIdentifier {
                 copy.exerciseSlug = sourceID
             }
