@@ -1213,6 +1213,61 @@ enum ProfileFeaturedRecordKind:
                 ? formatKilograms(best)
                 : "—"
 
+        case .strengthBestSingleSetVolume:
+            let best = strengthWorkouts
+                .filter(\.isFinished)
+                .flatMap(\.exercises)
+                .flatMap(\.sets)
+                .filter(\.countsTowardTrainingLoad)
+                .map(\.volumeKilograms)
+                .max() ?? 0
+            return best > 0 ? formatKilograms(best) : "—"
+
+        case .strengthBestExerciseVolume:
+            let best = strengthWorkouts
+                .filter(\.isFinished)
+                .flatMap(\.exercises)
+                .map { exercise in
+                    exercise.sets.reduce(0.0) { $0 + $1.volumeKilograms }
+                }
+                .max() ?? 0
+            return best > 0 ? formatKilograms(best) : "—"
+
+        case .strengthMostRepsInSet:
+            let best = strengthWorkouts
+                .filter(\.isFinished)
+                .flatMap(\.exercises)
+                .flatMap(\.sets)
+                .filter(\.countsTowardTrainingLoad)
+                .compactMap(\.resolvedCompletedReps)
+                .filter { $0 > 0 }
+                .max()
+            return best.map { "\($0) reps" } ?? "—"
+
+        case .strengthLongestTimedSet:
+            let best = strengthWorkouts
+                .filter(\.isFinished)
+                .flatMap(\.exercises)
+                .flatMap(\.sets)
+                .filter {
+                    $0.isCompleted && $0.resolvedTargetKind == .time
+                }
+                .compactMap(\.resolvedCompletedDurationSeconds)
+                .filter { $0 > 0 }
+                .max()
+            return best.map { formatDuration(Double($0)) } ?? "—"
+
+        case .strengthMostWorkoutsInWeek:
+            let grouped = Dictionary(
+                grouping: strengthWorkouts.filter(\.isFinished)
+            ) {
+                Calendar.current.dateInterval(
+                    of: .weekOfYear, for: $0.startedAt
+                )?.start ?? Calendar.current.startOfDay(for: $0.startedAt)
+            }
+            let best = grouped.values.map(\.count).max() ?? 0
+            return best > 0 ? best.formatted() : "—"
+
         case .strengthMostCalories:
             let best =
                 strengthWorkouts
@@ -1228,7 +1283,13 @@ enum ProfileFeaturedRecordKind:
             }
             return "\(Int(best.rounded())) kcal"
 
-        case .fastest400M,
+        case .bestRunningAveragePace,
+             .fastestFiveMinutePace,
+             .fastestTenMinutePace,
+             .longestRunningDuration,
+             .mostRunningElevationGain,
+             .bestWalkingAveragePace,
+case .fastest400M,
              .fastest800M,
              .fastestMile,
              .fastest3K,
