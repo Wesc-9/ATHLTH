@@ -175,4 +175,77 @@ final class ProfileRecordRegressionTests:
         )
     }
 
+    func testNewPaceAndDurationRecordsHaveHealthSources() {
+        let running: [ProfileFeaturedRecordKind] = [
+            .bestRunningAveragePace,
+            .fastestFiveMinutePace,
+            .fastestTenMinutePace,
+            .longestRunningDuration,
+            .mostRunningElevationGain
+        ]
+        XCTAssertTrue(running.allSatisfy { $0.group == .running })
+        XCTAssertTrue(running.allSatisfy { $0.healthKind != nil })
+        XCTAssertEqual(
+            ProfileFeaturedRecordKind.bestWalkingAveragePace.group,
+            .appleHealth
+        )
+        XCTAssertEqual(
+            ProfileFeaturedRecordKind.bestWalkingAveragePace.healthKind,
+            .bestWalkingAveragePace
+        )
+    }
+
+    func testNewRecordValuesAreFormattedInMeaningfulUnits() {
+        let date = Date(timeIntervalSince1970: 1_000)
+        XCTAssertEqual(
+            HealthPersonalRecord(
+                kind: .bestRunningAveragePace,
+                value: 246,
+                date: date
+            ).formattedValue,
+            "4:06 /km"
+        )
+        XCTAssertEqual(
+            HealthPersonalRecord(
+                kind: .fastestFiveMinutePace,
+                value: 255,
+                date: date
+            ).formattedValue,
+            "4:15 /km"
+        )
+        XCTAssertEqual(
+            HealthPersonalRecord(
+                kind: .longestRunningDuration,
+                value: 5_220,
+                date: date
+            ).formattedValue,
+            "1h 27m"
+        )
+        XCTAssertEqual(
+            HealthPersonalRecord(
+                kind: .mostRunningElevationGain,
+                value: 287.3,
+                date: date
+            ).formattedValue,
+            "287 hm"
+        )
+    }
+
+    func testNewStrengthRecordsUseLoggedWorkouts() {
+        let kinds: [ProfileFeaturedRecordKind] = [
+            .strengthBestSingleSetVolume,
+            .strengthBestExerciseVolume,
+            .strengthMostRepsInSet,
+            .strengthLongestTimedSet,
+            .strengthMostWorkoutsInWeek
+        ]
+        XCTAssertTrue(kinds.allSatisfy { $0.group == .strength })
+        XCTAssertTrue(kinds.allSatisfy { $0.healthKind == nil })
+        XCTAssertTrue(
+            kinds.allSatisfy {
+                $0.displayValue(healthRecords: [], stats: nil) == "—"
+            }
+        )
+    }
+
 }
