@@ -56,7 +56,7 @@ struct ATHLTHPlanWorkoutLibraryPicker: View {
 
     private var hasMatchingWorkouts: Bool {
         session.savedWorkoutTemplates.contains { matches($0.title) }
-            || runningLibrary.customTemplates.contains { matches($0.title) }
+            || runningLibrary.allTemplates.contains { matches($0.title) }
             || catalog.entries.contains { matches($0.title) }
     }
 
@@ -100,15 +100,26 @@ struct ATHLTHPlanWorkoutLibraryPicker: View {
                         }
                     }
 
-                    if !runningLibrary.customTemplates.isEmpty {
+                    let builtInRuns = runningLibrary.allTemplates.filter {
+                        $0.isBuiltIn && matches($0.title)
+                    }
+                    if !builtInRuns.isEmpty {
+                        sectionHeading(ATHLTHLocalization.choose(
+                            english: "Ready-made running workouts",
+                            norwegian: "Ferdige løpeøkter"
+                        ))
+                        ForEach(builtInRuns) { run in
+                            workoutButton(run.plannedSession(), subtitle: run.summary)
+                        }
+                    }
+
+                    let customRuns = runningLibrary.customTemplates.filter { matches($0.title) }
+                    if !customRuns.isEmpty {
                         sectionHeading(ATHLTHLocalization.choose(
                             english: "Saved runs", norwegian: "Lagrede løpeøkter"
                         ))
-                        ForEach(runningLibrary.customTemplates.filter { matches($0.title) }) { run in
-                            let workout = makeRunningWorkout(run)
-                            workoutButton(workout, subtitle:
-                                "\(run.blocks.count) " +
-                                ATHLTHLocalization.choose(english: "interval blocks", norwegian: "intervallblokker"))
+                        ForEach(customRuns) { run in
+                            workoutButton(run.plannedSession(), subtitle: run.summary)
                         }
                     }
 
@@ -203,14 +214,5 @@ struct ATHLTHPlanWorkoutLibraryPicker: View {
         .buttonStyle(.plain)
     }
 
-    private func makeRunningWorkout(_ run: RunningWorkoutTemplate) -> PlannedSession {
-        var workout = PlannedSession(
-            id: UUID(), title: run.title, kind: .running, scheduledStart: nil,
-            durationMinutes: run.estimatedDurationSeconds.map { Int(ceil($0 / 60)) },
-            targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
-            routeID: run.routeID, exercises: [], notes: nil
-        )
-        workout.runningWorkout = run
-        return workout
-    }
+
 }
