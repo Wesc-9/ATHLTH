@@ -319,6 +319,9 @@ struct Exercise: Identifiable, Codable, Hashable {
     var imageURL: URL?
     var isVisibleOutsideOwnerLibrary: Bool
     var videoURL: URL? = nil
+    /// A private import may retain the source UUID as provenance, not as a
+    /// shared ownership or edit permission. Missing for legacy exercises.
+    var sharedSourceExerciseID: UUID? = nil
 
     var displayName: String {
         guard origin != .custom else {
