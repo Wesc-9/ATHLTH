@@ -3,6 +3,7 @@ import XCTest
 
 final class SubscriptionProductIdentifierTests: XCTestCase {
     // Must match App Store Connect, including the "paid" segment.
+    @MainActor
     func testSubscriptionProductIdentifiersMatchAppStoreConnect() {
         XCTAssertEqual(
             SubscriptionStore.monthlyProductID,
@@ -21,6 +22,7 @@ final class SubscriptionProductIdentifierTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testBillingPeriodRecognizesBothRealProducts() {
         let monthly = SubscriptionAccess(
             state: .paid,
