@@ -585,26 +585,6 @@ struct ATHLTHSettingsView: View {
             connectionsSettingsSection
         case .training:
             trainingSettingsSection
-            settingsSection("Tools") {
-                PremiumSettingsCard {
-                    NavigationLink {
-                        AthleteToolsView()
-                    } label: {
-                        PremiumSettingsRow(
-                            icon: "figure.run.circle",
-                            title: "Athlete Tools",
-                            subtitle: ATHLTHLocalization.choose(
-                                english: "Additional tools for your training",
-                                norwegian: "Flere verktøy til treningen din"
-                            )
-                        ) {
-                            Image(systemName: "chevron.right")
-                                .foregroundStyle(ATHLTHTheme.mutedText)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
         case .account:
             profileSettingsSection
             accountSettingsSection
