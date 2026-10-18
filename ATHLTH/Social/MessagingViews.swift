@@ -7155,6 +7155,7 @@ private struct MessageBubble: View {
 struct MessageSharePicker: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var challengeStore: ChallengeStore
     @EnvironmentObject private var settings: AppSettingsStore
@@ -7361,7 +7362,9 @@ struct MessageSharePicker: View {
                             kind: .workout,
                             title: workout.title,
                             subtitle: workoutSubtitle(workout),
-                            snapshot: workout,
+                            snapshot: ATHLTHExerciseReferenceResolver.portableSession(
+                                workout, from: exerciseLibrary.allExercises
+                            ),
                             sourceObjectID: workout.sharedSourceSessionID ?? workout.id,
                             sourceOwnerID: workout.sharedSourceOwnerID ?? session.profile.userID
                         )
@@ -7388,7 +7391,9 @@ struct MessageSharePicker: View {
                             kind: .trainingPlan,
                             title: plan.title,
                             subtitle: "\(plan.weeks.count) weeks · snapshot v\(plan.version)",
-                            snapshot: plan,
+                            snapshot: ATHLTHExerciseReferenceResolver.portablePlan(
+                                plan, from: exerciseLibrary.allExercises
+                            ),
                             sourceObjectID: plan.sharedSourcePlanID ?? plan.id,
                             sourceOwnerID: plan.sharedSourceOwnerID ?? plan.ownerID,
                             shareVersion: plan.sharedSourceVersion ?? plan.version
