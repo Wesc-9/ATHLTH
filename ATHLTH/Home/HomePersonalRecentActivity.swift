@@ -4709,6 +4709,104 @@ private struct HomeStrengthMuscleArtwork:
     }
 }
 
+// MARK: - Strength visual without recorded muscle groups
+
+/// The photographic strength card is an empty-muscle-data state only.
+/// When there are resolved muscle activations we keep the original muscle
+/// atlas, including its colors, labels and workout-specific highlights.
+enum HomeStrengthRecentCardMetrics {
+    static func showsPhoto(for profile: StrengthMuscleProfile) -> Bool {
+        HomeStrengthArtworkPolicy.usesFallbackPhoto(profile)
+    }
+
+    static func durationText(_ seconds: TimeInterval) -> String? {
+        guard seconds.isFinite, seconds > 0 else { return nil }
+        let minutes = max(1, Int((seconds / 60).rounded()))
+        return "\(minutes) min"
+    }
+
+    static func detailText(
+        exerciseCount: Int?, completedSetCount: Int?
+    ) -> String? {
+        let exercises = exerciseCount.flatMap { $0 > 0 ? $0 : nil }
+        let sets = completedSetCount.flatMap { $0 > 0 ? $0 : nil }
+
+        let exerciseText = exercises.map {
+            ATHLTHLocalization.format(
+                english: "%d exercises",
+                norwegian: "%d øvelser",
+                $0
+            )
+        }
+        let setText = sets.map {
+            ATHLTHLocalization.format(
+                english: "%d sets", norwegian: "%d sett", $0
+            )
+        }
+        let values = [exerciseText, setText].compactMap { $0 }
+        return values.isEmpty ? nil : values.joined(separator: " · ")
+    }
+}
+
+private struct HomeStrengthRecentPhotoArtwork: View {
+    let duration: TimeInterval
+    let exerciseCount: Int?
+    let completedSetCount: Int?
+    let height: CGFloat
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .bottomLeading) {
+                Image("StrengthRecentCardStudio")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .clipped()
+
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: .black.opacity(0.14), location: 0.38),
+                        .init(color: .black.opacity(0.76), location: 1)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                VStack(alignment: .leading, spacing: 3) {
+                    if let main = HomeStrengthRecentCardMetrics.durationText(duration) {
+                        Text(main)
+                            .font(.system(size: min(height * 0.24, 30),
+                                          weight: .semibold, design: .rounded))
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+
+                    if let detail = HomeStrengthRecentCardMetrics.detailText(
+                        exerciseCount: exerciseCount,
+                        completedSetCount: completedSetCount
+                    ) {
+                        Text(detail)
+                            .font(.system(size: min(height * 0.105, 15),
+                                          weight: .medium))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+                    }
+                }
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.35), radius: 5, y: 2)
+                .padding(.horizontal, 13)
+                .padding(.bottom, 11)
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .clipped()
+        }
+        .frame(height: height)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 // MARK: - Rich own-workout visual
 
 private struct HomePersonalWorkoutVisual:
@@ -4819,12 +4917,26 @@ private struct HomePersonalWorkoutVisual:
         }
     }
 
+    @ViewBuilder
     private var strengthBackground:
         some View {
-        HomeStrengthMuscleArtwork(
-            profile: muscleProfile,
-            height: height
-        )
+        if HomeStrengthRecentCardMetrics.showsPhoto(for: muscleProfile) {
+            HomeStrengthRecentPhotoArtwork(
+                duration: workout.duration,
+                exerciseCount: workout.strengthExerciseCount,
+                completedSetCount: strengthWorkout?.exercises
+                    .flatMap(\.sets)
+                    .filter { $0.isCompleted }
+                    .count,
+                height: height
+            )
+        } else {
+            // Preserve the existing muscle-group card unchanged.
+            HomeStrengthMuscleArtwork(
+                profile: muscleProfile,
+                height: height
+            )
+        }
     }
 
     private var routeMap:
