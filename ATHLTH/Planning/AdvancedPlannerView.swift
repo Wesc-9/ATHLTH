@@ -7015,7 +7015,8 @@ struct SessionEditorView: View {
 
     private var partnerPlanningSection: some View {
         Section {
-            HStack(spacing: 11) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 11) {
                 Image(systemName: "person.2.crop.square.stack.fill")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(ATHLTHTheme.accentDeep)
@@ -7045,7 +7046,7 @@ struct SessionEditorView: View {
                 .disabled(directPartnerID != nil)
             }
 
-            if selectedPartnerID != nil {
+                if selectedPartnerID != nil {
                 Toggle(
                     ATHLTHLocalization.choose(
                         english: "Allow guest to add exercises",
@@ -7092,6 +7093,8 @@ struct SessionEditorView: View {
             .font(.caption)
             .foregroundStyle(ATHLTHTheme.mutedText)
             .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.vertical, 8)
         } header: {
             Text(
                 ATHLTHLocalization.choose(
