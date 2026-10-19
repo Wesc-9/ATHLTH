@@ -81,8 +81,6 @@ private struct ATHLTHSceneRootView: View {
                     .environmentObject(watchConnection)
                     .environmentObject(notifications)
                     .environmentObject(accountService)
-                    .environmentObject(social)
-                    .environmentObject(realtimeSocial)
                     .environment(
                         \.locale,
                         settings.interfaceLocale
@@ -862,7 +860,7 @@ struct AppRootView: View {
                         enabled:
                             social.privacy?
                                 .showOnlineStatus ??
-                            true
+                            false
                     )
             }
             await realtimeSocial
@@ -1161,7 +1159,7 @@ struct AppRootView: View {
                             enabled:
                                 social.privacy?
                                     .showOnlineStatus ??
-                                true
+                                false
                         )
                 }
             }
