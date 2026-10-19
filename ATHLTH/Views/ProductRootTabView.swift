@@ -1258,6 +1258,10 @@ struct ATHLTHHomeView: View {
             .onChange(of: session.activePlan?.id) {
                 syncHomeTodayWorkoutToWatch()
             }
+            .onChange(of: session.activePlan) {
+                // Editing sessions in the same plan must also refresh Watch.
+                syncHomeTodayWorkoutToWatch()
+            }
         }
     }
 
