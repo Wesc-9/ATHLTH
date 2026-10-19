@@ -76,56 +76,7 @@ struct WorkoutPlanningSourceCard: View {
             }
 
             if let onRecoveryRest {
-                Button(action: onRecoveryRest) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "leaf.fill")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                            .frame(width: 45, height: 45)
-                            .background(
-                                ATHLTHTheme.recoveryBlueSoft,
-                                in: RoundedRectangle(cornerRadius: 14)
-                            )
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Recovery / rest day",
-                                norwegian: "Restitusjon / hviledag"
-                            ))
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(ATHLTHTheme.primaryText)
-
-                            Text(ATHLTHLocalization.choose(
-                                english: "Plan gentle recovery or a full day off.",
-                                norwegian: "Planlegg lett restitusjon eller en hel hviledag."
-                            ))
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                            .fixedSize(horizontal: false, vertical: true)
-                        }
-
-                        Spacer(minLength: 3)
-
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                    }
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        Color.white.opacity(0.86),
-                        in: RoundedRectangle(cornerRadius: 20)
-                    )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(ATHLTHTheme.border.opacity(0.65), lineWidth: 0.8)
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "Plan recovery or a rest day",
-                    norwegian: "Planlegg restitusjon eller hviledag"
-                ))
+                ATHLTHRecoveryRestEntryCard(action: onRecoveryRest)
             }
 
             HStack(alignment: .top, spacing: 10) {
@@ -265,6 +216,65 @@ struct WorkoutPlanningSourceCard: View {
     }
 }
 
+
+/// One reusable compact card on the extra-workout start, Library and Plan Studio.
+struct ATHLTHRecoveryRestEntryCard: View {
+    let action: () -> Void
+    var body: some View {
+
+                Button(action: action) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "leaf.fill")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 45, height: 45)
+                            .background(
+                                ATHLTHTheme.recoveryBlueSoft,
+                                in: RoundedRectangle(cornerRadius: 14)
+                            )
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Recovery / rest day",
+                                norwegian: "Restitusjon / hviledag"
+                            ))
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+
+                            Text(ATHLTHLocalization.choose(
+                                english: "Plan gentle recovery or a full day off.",
+                                norwegian: "Planlegg lett restitusjon eller en hel hviledag."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Spacer(minLength: 3)
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        Color.white.opacity(0.86),
+                        in: RoundedRectangle(cornerRadius: 20)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(ATHLTHTheme.border.opacity(0.65), lineWidth: 0.8)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Plan recovery or a rest day",
+                    norwegian: "Planlegg restitusjon eller hviledag"
+                ))
+
+    }
+}
 
 /// Shared planner for an easy recovery session or a genuine rest day.
 /// Works without Apple Watch and does not create a completed workout.
