@@ -5807,8 +5807,7 @@ struct SessionEditorView: View {
 
 
 
-                @ViewBuilder
-    workoutSourcesSection
+                workoutSourcesSection
 
 
                 if onPreparedWorkout == nil && !prioritizePartnerPlanning {
