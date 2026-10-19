@@ -174,6 +174,14 @@ struct TrainTogetherMarketplaceView:
                     )
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 34)
+                } else if let message = marketplace.refreshErrorMessage,
+                          visiblePosts.isEmpty {
+                    refreshStatus(message: message, isFailure: true)
+                } else if !marketplace.hasLoaded && visiblePosts.isEmpty {
+                    // A view-scoped task may have been cancelled before
+                    // the first successful load. Do not claim there are
+                    // no workouts when nothing has been fetched yet.
+                    refreshStatus(message: nil, isFailure: false)
                 } else if visiblePosts.isEmpty {
                     emptyState
                 } else if showingMap && modeFilter != .sameWorkout {
@@ -346,27 +354,70 @@ struct TrainTogetherMarketplaceView:
             }
 
             Spacer(minLength: 0)
-
-            Button {
-                showingCreate = true
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 48, height: 48)
-                    .background(ATHLTHTrainTogetherDesign.accent, in: Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(
-                ATHLTHLocalization.choose(
-                    english: "Create workout",
-                    norwegian: "Opprett økt"
-                )
-            )
         }
         .padding(17)
         .frame(maxWidth: .infinity, alignment: .leading)
         .athlthTrainTogetherCard(radius: 24)
+    }
+
+    /// Refresh problems are not creation/action errors: show an inline
+    /// retry instead of a modal alert that blocks the entire marketplace.
+    private func refreshStatus(
+        message: String?,
+        isFailure: Bool
+    ) -> some View {
+        VStack(spacing: 10) {
+            Image(systemName: isFailure ? "wifi.exclamationmark" : "arrow.clockwise")
+                .font(.system(size: 25, weight: .medium))
+                .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+
+            Text(
+                isFailure
+                    ? ATHLTHLocalization.choose(
+                        english: "Could not update workouts",
+                        norwegian: "Kunne ikke oppdatere øktene"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Workouts have not loaded yet",
+                        norwegian: "Øktene er ikke lastet inn ennå"
+                    )
+            )
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(ATHLTHTrainTogetherDesign.ink)
+
+            Text(
+                ATHLTHLocalization.choose(
+                    english: "Check your connection and try again.",
+                    norwegian: "Sjekk tilkoblingen og prøv igjen."
+                )
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+            Button {
+                Task { await marketplace.refresh() }
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Try again",
+                        norwegian: "Prøv igjen"
+                    ),
+                    systemImage: "arrow.clockwise"
+                )
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 20)
+                .frame(height: 42)
+                .background(ATHLTHTrainTogetherDesign.accent,
+                            in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(marketplace.isLoading)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+        .athlthTrainTogetherCard(radius: 22)
+        .accessibilityElement(children: .contain)
     }
 
     private var filterBar: some View {
