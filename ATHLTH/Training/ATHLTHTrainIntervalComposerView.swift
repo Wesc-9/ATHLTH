@@ -401,6 +401,20 @@ struct ATHLTHTrainIntervalComposerView: View {
                         Text(tr("HR zone", "Pulssone")).tag(RunningIntensityKind.heartRateZone)
                         Text(tr("No target", "Uten mål")).tag(RunningIntensityKind.none)
                     }
+                    if targetEffort == .pace {
+                        Toggle(tr("Enter target as speed", "Bruk hastighet (km/t)"),
+                               isOn: $speedInputEnabled)
+                            .tint(bronze)
+                        if speedInputEnabled {
+                            Stepper(String(format: "%.1f km/t", speedKilometersPerHour),
+                                    value: $speedKilometersPerHour,
+                                    in: 3...25, step: 0.1)
+                        } else {
+                            Stepper(paceLabel(paceSeconds),
+                                    value: $paceSeconds,
+                                    in: 150...1200, step: 5)
+                        }
+                    }
                 }
             }
 
@@ -569,6 +583,7 @@ struct ATHLTHTrainIntervalComposerView: View {
         } else {
             pauseEnabled = false
         }
+        targetEffort = block.work.intensity.kind
         paceEnabled = block.work.intensity.paceMinSecondsPerKilometer != nil
         paceSeconds = Int(block.work.intensity.paceMinSecondsPerKilometer ?? 300)
         speedInputEnabled = false
@@ -581,11 +596,12 @@ struct ATHLTHTrainIntervalComposerView: View {
     private func addBlock() {
         let resolvedPace = speedInputEnabled
             ? 3_600 / max(speedKilometersPerHour, 0.5) : Double(paceSeconds)
+        let wantsPace = kind == .work ? paceEnabled : targetEffort == .pace
         let intensity = RunningIntensityTarget(
-            kind: paceEnabled ? .pace :
+            kind: wantsPace ? .pace :
                   heartRateTargetEnabled ? .heartRateZone : targetEffort,
-            paceMinSecondsPerKilometer: paceEnabled ? resolvedPace : nil,
-            paceMaxSecondsPerKilometer: paceEnabled ? resolvedPace : nil,
+            paceMinSecondsPerKilometer: wantsPace ? resolvedPace : nil,
+            paceMaxSecondsPerKilometer: wantsPace ? resolvedPace : nil,
             heartRateZone: heartRateTargetEnabled ? heartRateZone : nil,
             rpe: nil
         )
