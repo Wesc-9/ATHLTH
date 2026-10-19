@@ -697,6 +697,9 @@ struct ATHLTHHomeView: View {
 
     @State private var homeStreakDays: [Date]?
     @State private var showingGlobalSearch = false
+    @State private var showingHomeTodayCalendarAll = false
+    @State private var selectedHomeStandaloneWorkout: PlannedSession?
+    @State private var selectedHomeAllStandaloneWorkout: PlannedSession?
     @State private var selectedHomeStrengthSession: PlannedSession?
     @State private var pendingHomeQuickStartKind: WorkoutKind?
     @State private var showingHomeStrengthWorkout = false
@@ -1154,6 +1157,21 @@ struct ATHLTHHomeView: View {
                     // remains available for a downward swipe back to Home.
                     .presentationContentInteraction(.scrolls)
                     .presentationCornerRadius(30)
+            }
+            // Independent sessions share the calendar but not a plan ID.
+            .sheet(item: $selectedHomeStandaloneWorkout) { workout in
+                NavigationStack {
+                    HomeWeeklyStandaloneWorkoutDetailView(workout: workout)
+                }
+                .presentationDetents([.fraction(0.76), .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
+            }
+            .sheet(isPresented: $showingHomeTodayCalendarAll) {
+                homeTodayCalendarAllSheet
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                    .presentationCornerRadius(28)
             }
             .onAppear {
                 syncHomeTodayWorkoutToWatch()
@@ -2216,12 +2234,10 @@ struct ATHLTHHomeView: View {
         some View {
         let plan =
             session.activePlan
-        let planWorkouts =
-            plan.map {
-                homeTodaySessions(
-                    in: $0
-                )
-            } ?? []
+        let todayWorkouts = HomeTodayCalendarSchedule.workouts(
+            plan: plan,
+            standalone: session.standalonePlannedSessions
+        )
         let personalEvents =
             homeTodayCommunityEvents
         let clubEvents =
@@ -2229,7 +2245,7 @@ struct ATHLTHHomeView: View {
 
         let availableAfterPlan =
             max(
-                2 - planWorkouts.count,
+                2 - todayWorkouts.count,
                 0
             )
         let visiblePersonalCount =
@@ -2249,7 +2265,7 @@ struct ATHLTHHomeView: View {
             spacing: 8
         ) {
             Button {
-                onOpenTrain(.plan)
+                showingHomeTodayCalendarAll = true
             } label: {
                 HStack {
                     Text("Kalender i dag")
@@ -2297,33 +2313,29 @@ struct ATHLTHHomeView: View {
             }
             .buttonStyle(.plain)
 
-            if !planWorkouts.isEmpty ||
+            if !todayWorkouts.isEmpty ||
                 !personalEvents.isEmpty ||
                 !clubEvents.isEmpty {
                 VStack(spacing: 7) {
-                    if let plan {
-                        ForEach(
-                            Array(
-                                planWorkouts
-                                    .prefix(2)
-                            )
-                        ) { workout in
-                            Button {
+                    ForEach(Array(todayWorkouts.prefix(2))) { workout in
+                        Button {
+                            if let planID =
+                                HomeWeeklyProgressCalendar.containingPlanID(
+                                    for: workout, in: plan
+                                ) {
                                 onOpenTrain(
                                     .workout(
-                                        planID:
-                                            plan.id,
-                                        workoutID:
-                                            workout.id
+                                        planID: planID,
+                                        workoutID: workout.id
                                     )
                                 )
-                            } label: {
-                                homeCalendarPlanRow(
-                                    workout
-                                )
+                            } else {
+                                selectedHomeStandaloneWorkout = workout
                             }
-                            .buttonStyle(.plain)
+                        } label: {
+                            homeCalendarPlanRow(workout)
                         }
+                        .buttonStyle(.plain)
                     }
 
                     ForEach(
@@ -2473,6 +2485,141 @@ struct ATHLTHHomeView: View {
                 ),
                 lineWidth: 0.7
             )
+        }
+    }
+
+
+    // The compact Home card displays two slots, but "See all" must expose
+    // every saved workout, including sessions created from Weekly Progress.
+    private var homeTodayCalendarAllSheet: some View {
+        let activePlan = session.activePlan
+        let workouts = HomeTodayCalendarSchedule.workouts(
+            plan: activePlan,
+            standalone: session.standalonePlannedSessions
+        )
+        let personalEvents = homeTodayCommunityEvents
+        let clubEvents = homeTodayGroupEvents
+
+        return NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 11) {
+                    if workouts.isEmpty &&
+                       personalEvents.isEmpty && clubEvents.isEmpty {
+                        ContentUnavailableView(
+                            ATHLTHLocalization.choose(
+                                english: "Nothing scheduled today",
+                                norwegian: "Ingenting planlagt i dag"
+                            ),
+                            systemImage: "calendar",
+                            description: Text(ATHLTHLocalization.choose(
+                                english: "Your planned workouts and events will appear here.",
+                                norwegian: "Planlagte økter og arrangementer vises her."
+                            ))
+                        )
+                    }
+
+                    ForEach(workouts) { workout in
+                        Button {
+                            if let planID =
+                                HomeWeeklyProgressCalendar.containingPlanID(
+                                    for: workout, in: activePlan
+                                ) {
+                                showingHomeTodayCalendarAll = false
+                                onOpenTrain(.workout(
+                                    planID: planID,
+                                    workoutID: workout.id
+                                ))
+                            } else {
+                                selectedHomeAllStandaloneWorkout = workout
+                            }
+                        } label: {
+                            homeCalendarPlanRow(workout)
+                                .padding(13)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(
+                                    ATHLTHPlanDesign.surface,
+                                    in: RoundedRectangle(cornerRadius: 16)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    ForEach(personalEvents) { event in
+                        NavigationLink {
+                            CommunityEventDetailView(eventID: event.id)
+                        } label: {
+                            homeCalendarEventRow(
+                                time: event.event.startsAt,
+                                title: event.event.title,
+                                systemImage: event.event.activityType.systemImage,
+                                detail: event.event.meetingName.isEmpty
+                                    ? event.event.activityType.title
+                                    : event.event.meetingName
+                            )
+                            .padding(13)
+                            .background(
+                                ATHLTHPlanDesign.surface,
+                                in: RoundedRectangle(cornerRadius: 16)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    ForEach(clubEvents) { event in
+                        if let group = groups.group(for: event.groupID) {
+                            NavigationLink {
+                                CommunityGroupEventDetailView(
+                                    group: group, event: event
+                                )
+                            } label: {
+                                homeCalendarEventRow(
+                                    time: event.startsAt,
+                                    title: event.title,
+                                    systemImage: homeGroupEventSystemImage(
+                                        event.activityType
+                                    ),
+                                    detail: event.meetingName.isEmpty
+                                        ? homeGroupEventActivityTitle(
+                                            event.activityType
+                                        )
+                                        : event.meetingName
+                                )
+                                .padding(13)
+                                .background(
+                                    ATHLTHPlanDesign.surface,
+                                    in: RoundedRectangle(cornerRadius: 16)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(18)
+            }
+            .scrollIndicators(.hidden)
+            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Today's calendar",
+                norwegian: "Kalender i dag"
+            ))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Done", norwegian: "Ferdig"
+                    )) {
+                        showingHomeTodayCalendarAll = false
+                    }
+                }
+            }
+        }
+        .sheet(item: $selectedHomeAllStandaloneWorkout) { workout in
+            NavigationStack {
+                HomeWeeklyStandaloneWorkoutDetailView(workout: workout)
+            }
+            .presentationDetents([.fraction(0.76), .large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(28)
         }
     }
 
