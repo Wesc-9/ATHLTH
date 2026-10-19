@@ -3547,10 +3547,20 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                         HStack(spacing: 6) {
                                             Image(systemName: "line.3.horizontal")
                                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                            Text(ATHLTHLocalization.choose(
-                                                english: "Block", norwegian: "Blokk") + " \(blockIndex + 1)")
-                                                .font(.caption)
-                                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(block.title)
+                                                    .font(.caption.weight(.medium))
+                                                if let target = block.targetText {
+                                                    Text(target)
+                                                        .font(.caption2)
+                                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                                }
+                                            }
+                                            if block.groupID != nil {
+                                                Image(systemName: "link")
+                                                    .font(.caption2)
+                                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                            }
                                         }
                                         .contextMenu {
                                             ForEach(1...7, id: \.self) { targetDay in
