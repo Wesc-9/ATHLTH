@@ -981,6 +981,9 @@ enum ATHLTHRunningStepEngine {
 struct WatchRunningWorkoutTransfer: Codable, Hashable {
     var title: String
     var steps: [WatchRunningWorkoutStep]
+    // Stable source identity so completed interval evidence can be associated
+    // with the planned workout, even when it was started on Apple Watch.
+    var sourceWorkoutID: UUID? = nil
     var routeAlerts: WatchRouteAlertConfiguration? = nil
     var targetAlerts: WatchWorkoutTargetAlertConfiguration? = nil
     // Non-nil means this is an indoor treadmill run, including a valid 0%.
@@ -1271,6 +1274,26 @@ struct WatchStrengthCommand: Codable, Hashable {
     var bootstrapSnapshot: WatchStrengthSessionSnapshot? = nil
 }
 
+/// Recorded, not prescribed, performance for a complete structured run.
+struct ATHLTHRecordedRunningStep: Codable, Hashable {
+    var index: Int
+    var title: String
+    var phase: String?
+    var activeSeconds: TimeInterval
+    var distanceMeters: Double
+    // A treadmill with manually entered belt speed is user-reported evidence.
+    var isUserReported: Bool = false
+
+    var actualSpeedKilometersPerHour: Double? {
+        guard activeSeconds >= 10, distanceMeters > 0,
+              activeSeconds.isFinite, distanceMeters.isFinite else {
+            return nil
+        }
+        let speed = distanceMeters * 3.6 / activeSeconds
+        return speed.isFinite && (0.5...35).contains(speed) ? speed : nil
+    }
+}
+
 struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     let id: UUID
     var kind: WatchWorkoutKind
@@ -1296,6 +1319,13 @@ struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     var routeLeaderboardEligible: Bool? = nil
     var routeComparisonID: UUID? = nil
     var routeTitle: String? = nil
+
+    // These fields are optional for legacy results. They are populated only
+    // for structured sessions that actually reached their final step.
+    var structuredWorkoutFullyCompleted: Bool? = nil
+    var structuredWorkoutSourceID: UUID? = nil
+    var structuredWorkoutTitle: String? = nil
+    var recordedRunningSteps: [ATHLTHRecordedRunningStep]? = nil
 
     // Strength work performed while iPhone is unavailable is shipped together
     // with the final HealthKit result. This makes offline completion atomic
