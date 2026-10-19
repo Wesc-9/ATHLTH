@@ -3319,7 +3319,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
             }
             guidedWeekNavigator
-            guidedSmartPlanningCard
             stepIntro(
                 eyebrow: guidedCurrentDate.formatted(.dateTime.weekday(.wide).day().month(.wide)),
                 title: ATHLTHLocalization.choose(english: "Plan this day", norwegian: "Planlegg denne dagen"),
@@ -3329,6 +3328,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 ),
                 icon: "calendar.day.timeline.left"
             )
+            guidedSmartPlanningCard
             if let edit = weekDayEdits[weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)] {
                 builderPanel {
                     Label(
@@ -3348,6 +3348,47 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             Text("+ \(count) " + ATHLTHLocalization.choose(english: "additional workouts", norwegian: "ekstra økter"))
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                    }
+                }
+            }
+            if let day = weekDayEdits[weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)],
+               day.isRestDay != true,
+               let primary = day.detailedWorkout {
+                builderPanel {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Today's sessions", norwegian: "Dagens økter"),
+                                  systemImage: "list.bullet.rectangle")
+                                .font(.headline)
+                            Spacer()
+                            Text("\(1 + (day.additionalDetailedWorkouts?.count ?? 0)) " +
+                                 ATHLTHLocalization.choose(english: "sessions", norwegian: "økter"))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        ForEach(Array(([primary] + (day.additionalDetailedWorkouts ?? [])).enumerated()),
+                                id: \.offset) { index, workout in
+                            HStack(spacing: 12) {
+                                Text(String(format: "%02d", index + 1))
+                                    .font(.caption.monospacedDigit().weight(.bold))
+                                    .foregroundStyle(ATHLTHPlanDesign.accent)
+                                    .frame(width: 30)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(workout.title)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                                    Text("\(workout.durationMinutes) min · \(workout.blocks.count) " +
+                                         ATHLTHLocalization.choose(english: "blocks", norwegian: "blokker"))
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                }
+                                Spacer()
+                            }
+                            if index < (day.additionalDetailedWorkouts?.count ?? 0) {
+                                Divider()
+                            }
                         }
                     }
                 }
