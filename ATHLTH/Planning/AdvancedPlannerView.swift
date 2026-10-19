@@ -5136,7 +5136,7 @@ struct SessionEditorView: View {
     @State private var directPartnerID: UUID?
     @State private var physicalMeetup = true
     @State private var meetingPoint: PlannedWorkoutMeetingPoint?
-    @State private var reminderMinutesBefore = 30
+    @State private var reminderMinutesBefore = 0
     @State private var showingMeetingPointPicker = false
     @State private var draftRestored = false
     @State private var draftFinalized = false
@@ -5744,79 +5744,68 @@ struct SessionEditorView: View {
                 )
 
 
-                if onPreparedWorkout == nil && !prioritizePartnerPlanning {
-                    partnerPlanningSection
-                }
-                plannedWorkoutLogisticsSection
-
                 if (existingWorkout == nil || kind == .strength) &&
                     (onPreparedWorkout == nil ||
                         initialSourceWorkout?.allowInviteeExercises == true) {
                     Section {
-                        Menu {
-                            Button {
-                                showingSavedWorkoutPicker = true
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(english: "Saved workout", norwegian: "Lagret økt"),
-                                    systemImage: "rectangle.stack.fill"
-                                )
-                            }
+                        VStack(alignment: .leading, spacing: 12) {
+                            Label(
+                                ATHLTHLocalization.choose(english: "Add to workout", norwegian: "Legg til"),
+                                systemImage: "plus.circle.fill"
+                            )
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHTheme.primaryText)
 
-                            Button {
-                                kind = .strength
-                                showingExerciseLibrary = true
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(english: "Exercise", norwegian: "Øvelse"),
-                                    systemImage: "dumbbell.fill"
-                                )
-                            }
-                        } label: {
-                            HStack(spacing: 11) {
-                                Image(
-                                    systemName:
-                                        "plus.circle.fill"
-                                )
-                                .foregroundStyle(
-                                    ATHLTHTheme.accent
-                                )
-                                .frame(width: 28)
-
-                                VStack(
-                                    alignment: .leading,
-                                    spacing: 2
-                                ) {
-                                    Text(ATHLTHLocalization.choose(english: "Add to workout", norwegian: "Legg til i økten"))
-                                        .foregroundStyle(
-                                            ATHLTHTheme.primaryText
-                                        )
-
-                                    Text(
-                                        ATHLTHLocalization.choose(english: "Choose an exercise or insert a saved workout.", norwegian: "Velg en øvelse eller sett inn en lagret økt.")
-                                    )
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                            HStack(spacing: 10) {
+                                Button {
+                                    showingSavedWorkoutPicker = true
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 7) {
+                                        Image(systemName: "rectangle.stack.fill")
+                                            .font(.title3)
+                                        Text(ATHLTHLocalization.choose(english: "Workout", norwegian: "Treningsøkt"))
+                                            .font(.subheadline.weight(.semibold))
+                                        Text(ATHLTHLocalization.choose(english: "Use a saved workout", norwegian: "Bruk en lagret økt"))
+                                            .font(.caption2)
+                                            .foregroundStyle(ATHLTHTheme.mutedText)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(14)
+                                    .background(ATHLTHTheme.accentSoft, in: RoundedRectangle(cornerRadius: 17))
                                 }
+                                .buttonStyle(.plain)
 
-                                Spacer()
-
-                                Image(
-                                    systemName: "chevron.down"
-                                )
-                                .font(.caption.bold())
-                                .foregroundStyle(.tertiary)
+                                Button {
+                                    kind = .strength
+                                    showingExerciseLibrary = true
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 7) {
+                                        Image(systemName: "dumbbell.fill")
+                                            .font(.title3)
+                                        Text(ATHLTHLocalization.choose(english: "Exercise", norwegian: "Øvelse"))
+                                            .font(.subheadline.weight(.semibold))
+                                        Text(ATHLTHLocalization.choose(english: "Choose from library", norwegian: "Velg fra biblioteket"))
+                                            .font(.caption2)
+                                            .foregroundStyle(ATHLTHTheme.mutedText)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(14)
+                                    .background(ATHLTHTheme.accentSoft, in: RoundedRectangle(cornerRadius: 17))
+                                }
+                                .buttonStyle(.plain)
                             }
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
                         }
-                        .buttonStyle(.plain)
+                        .padding(.vertical, 6)
                     }
-                    .listRowBackground(
-                        ATHLTHTheme.card
-                    )
-                    .listRowSeparatorTint(
-                        ATHLTHTheme.border
-                    )
+                    .listRowBackground(ATHLTHTheme.card)
+                    .listRowSeparator(.hidden)
                 }
+
+                if onPreparedWorkout == nil && !prioritizePartnerPlanning {
+                    partnerPlanningSection
+                }
+                plannedWorkoutLogisticsSection
 
                 if editorMode == .advanced {
                     advancedOptions
@@ -7027,10 +7016,11 @@ struct SessionEditorView: View {
     private var partnerPlanningSection: some View {
         Section {
             HStack(spacing: 11) {
-                Image(systemName: "person.2.fill")
+                Image(systemName: "person.2.crop.square.stack.fill")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .frame(width: 32)
+                    .frame(width: 38, height: 38)
+                    .background(ATHLTHTheme.accentSoft, in: RoundedRectangle(cornerRadius: 12))
 
                 Picker(
                     ATHLTHLocalization.choose(
