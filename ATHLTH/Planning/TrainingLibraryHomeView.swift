@@ -14,9 +14,6 @@ struct TrainingLibraryHomeView: View {
 
     let onStartRunning: (RunningWorkoutTemplate) -> Void
 
-    @State private var showingCreatePlan = false
-    @State private var showingCreateWorkout = false
-
     private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
     private let muted = Color(red: 0.47, green: 0.46, blue: 0.45)
     private let gold = Color(red: 0.65, green: 0.53, blue: 0.37)
@@ -43,12 +40,6 @@ struct TrainingLibraryHomeView: View {
         .frame(maxWidth: 720, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .center)
         .buttonStyle(.plain)
-        .sheet(isPresented: $showingCreatePlan) {
-            AdvancedTrainingPlanCreationView()
-        }
-        .sheet(isPresented: $showingCreateWorkout) {
-            WorkoutTemplateBuilderView()
-        }
         .task {
             await favorites.refresh()
         }
@@ -375,7 +366,7 @@ private struct LibraryHubCategoryTile: View {
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 36, height: 36)
-                    .background(.ultraThinMaterial.opacity(0.7),
+                    .background(.ultraThinMaterial,
                                 in: RoundedRectangle(cornerRadius: 11))
                 Spacer(minLength: 0)
                 Text(title)
