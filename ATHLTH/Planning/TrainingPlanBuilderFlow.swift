@@ -3309,6 +3309,17 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                               systemImage: "moon.stars")
                     }
                     .buttonStyle(.bordered)
+                    .disabled(weekDayEdits[weekDayKey(guidedCurrentWeekday,
+                                                    weekIndex: guidedCurrentWeek)]?.detailedWorkout != nil)
+                }
+                if weekDayEdits[weekDayKey(guidedCurrentWeekday,
+                                          weekIndex: guidedCurrentWeek)]?.detailedWorkout != nil {
+                    Text(ATHLTHLocalization.choose(
+                        english: "To replace a planned training day with rest, remove its workouts in the day editor first.",
+                        norwegian: "For å endre en treningsdag til hviledag må du først fjerne øktene i dagsredigeringen."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 }
             }
         }
