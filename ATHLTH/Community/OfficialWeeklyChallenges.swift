@@ -3237,28 +3237,28 @@ struct OfficialWeeklyChallengeDetailView: View {
         let progress = resolvedProgress(for: challenge)
 
         if progress >= 1 {
-            return "Completed"
+            return ATHLTHLocalization.choose(english: "Completed", norwegian: "Fullført")
         }
 
         let elapsed = elapsedFraction(for: challenge)
 
         if progress + 0.08 >= elapsed {
-            return "On track"
+            return ATHLTHLocalization.choose(english: "On track", norwegian: "I rute")
         }
 
-        return "Keep going"
+        return ATHLTHLocalization.choose(english: "Keep going", norwegian: "Fortsett slik")
     }
 
     private func progressStatusDescription(
         for challenge: OfficialWeeklyChallenge
     ) -> String {
         switch progressStatus(for: challenge) {
-        case "Completed":
+        case ATHLTHLocalization.choose(english: "Completed", norwegian: "Fullført"):
             return "You reached this week's target."
-        case "On track":
-            return "Your progress is keeping pace with the challenge window."
+        case ATHLTHLocalization.choose(english: "On track", norwegian: "I rute"):
+            return ATHLTHLocalization.choose(english: "Your progress is keeping pace with the challenge window.", norwegian: "Du ligger i rute til å nå ukens mål.")
         default:
-            return "There is still time to move toward the weekly target."
+            return ATHLTHLocalization.choose(english: "There is still time to move toward the weekly target.", norwegian: "Du har fortsatt tid til å nå ukens mål.")
         }
     }
 
