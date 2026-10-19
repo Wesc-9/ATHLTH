@@ -4,6 +4,7 @@ import SwiftUI
 /// edit them without manufacturing a plan ID, changing their UUID, or
 /// creating a second copy of the workout.
 struct HomeWeeklyStandaloneWorkoutDetailView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
     @ScaledMetric(relativeTo: .title) private var titleSize: CGFloat = 30
 
@@ -104,7 +105,27 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
         .scrollIndicators(.hidden)
         .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if !currentWorkout.isExplicitRestDay {
+            if currentWorkout.isExplicitRestDay {
+                VStack(spacing: 0) {
+                    Button(role: .destructive) {
+                        session.removeStandalonePlannedSession(currentWorkout.id)
+                        dismiss()
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Remove rest day",
+                                norwegian: "Fjern hviledag"
+                            ),
+                            systemImage: "trash"
+                        )
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                    }
+                    .buttonStyle(.bordered)
+                    .padding(.horizontal, 19)
+                    .padding(.vertical, 12)
+                }
+                .background(ATHLTHPlanDesign.canvas)
+            } else {
                 editActionFooter
             }
         }

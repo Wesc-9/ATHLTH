@@ -4859,20 +4859,17 @@ private struct HomeWeeklyProgressDaySheet: View {
         _ workout: PlannedSession
     ) -> some View {
         let completed =
-            selection
-                .completedPlannedIDs
-                .contains(
-                    workout.id
-                )
+            !workout.isExplicitRestDay &&
+            selection.completedPlannedIDs.contains(workout.id)
 
         return HStack(spacing: 11) {
             Image(
                 systemName:
                     completed
                         ? "checkmark"
-                        : workout
-                            .kind
-                            .systemImage
+                        : workout.isExplicitRestDay
+                            ? "moon.stars.fill"
+                            : workout.kind.systemImage
             )
             .font(
                 .system(
@@ -4883,8 +4880,9 @@ private struct HomeWeeklyProgressDaySheet: View {
             .foregroundStyle(
                 completed
                     ? .white
-                    : ATHLTHTheme
-                        .accentDeep
+                    : workout.isExplicitRestDay
+                        ? ATHLTHTheme.recoveryBlue
+                        : ATHLTHTheme.accentDeep
             )
             .frame(
                 width: 36,
@@ -4894,8 +4892,9 @@ private struct HomeWeeklyProgressDaySheet: View {
                 completed
                     ? ATHLTHTheme
                         .vitality
-                    : ATHLTHTheme
-                        .accentSoft,
+                    : workout.isExplicitRestDay
+                        ? ATHLTHTheme.recoveryBlueSoft
+                        : ATHLTHTheme.accentSoft,
                 in: Circle()
             )
 
@@ -4948,12 +4947,13 @@ private struct HomeWeeklyProgressDaySheet: View {
                         norwegian:
                             "Fullført"
                     )
-                    : ATHLTHLocalization.choose(
-                        english:
-                            "Planned",
-                        norwegian:
-                            "Planlagt"
-                    )
+                    : workout.isExplicitRestDay
+                        ? ATHLTHLocalization.choose(
+                            english: "Rest", norwegian: "Hvile"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Planned", norwegian: "Planlagt"
+                        )
             )
             .font(
                 .caption2.weight(
@@ -5132,6 +5132,11 @@ private struct HomeWeeklyProgressDaySheet: View {
     private func plannedDetail(
         _ workout: PlannedSession
     ) -> String {
+        if workout.isExplicitRestDay {
+            return ATHLTHLocalization.choose(
+                english: "Training-free day", norwegian: "Treningsfri dag"
+            )
+        }
         var parts: [String] = []
 
         if let start = workout.scheduledStart {

@@ -97,7 +97,8 @@ struct PlannedWorkoutDetailView: View {
     }
 
     private var isCompleted: Bool {
-        session.isPlanSessionCompleted(
+        guard !currentWorkout.isExplicitRestDay else { return false }
+        return session.isPlanSessionCompleted(
             planID: planID,
             sessionID: currentWorkout.id,
             healthWorkouts: health.workouts,
@@ -191,7 +192,21 @@ struct PlannedWorkoutDetailView: View {
                         notesCard(notes)
                     }
 
-                    completionCard
+                    if currentWorkout.isExplicitRestDay {
+                        ATHLTHCard {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Rest day · no training or completion required",
+                                    norwegian: "Hviledag · ingen trening eller fullføring kreves"
+                                ),
+                                systemImage: "moon.stars.fill"
+                            )
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.recoveryBlue)
+                        }
+                    } else {
+                        completionCard
+                    }
                 }
                 .padding(20)
                 .padding(.bottom, 28)
@@ -209,7 +224,11 @@ struct PlannedWorkoutDetailView: View {
                 )
                 .ignoresSafeArea()
             )
-            .navigationTitle(ATHLTHLocalization.choose(english: "Workout", norwegian: "Treningsøkt"))
+            .navigationTitle(
+                currentWorkout.isExplicitRestDay
+                    ? ATHLTHLocalization.choose(english: "Rest day", norwegian: "Hviledag")
+                    : ATHLTHLocalization.choose(english: "Workout", norwegian: "Treningsøkt")
+            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -219,9 +238,10 @@ struct PlannedWorkoutDetailView: View {
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        do {
-                            preparedShare = try ATHLTHShareDraftFactory.workout(
+                    if !currentWorkout.isExplicitRestDay {
+                        Button {
+                            do {
+                                preparedShare = try ATHLTHShareDraftFactory.workout(
                                 currentWorkout,
                                 library: exerciseLibrary.allExercises,
                                 ownerID: session.profile.userID
@@ -235,11 +255,14 @@ struct PlannedWorkoutDetailView: View {
                     .accessibilityLabel(ATHLTHLocalization.choose(
                         english: "Share workout", norwegian: "Del treningsøkt"
                     ))
+                    }
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(ATHLTHLocalization.choose(english: "Edit", norwegian: "Rediger")) {
-                        showingEditor = true
+                    if !currentWorkout.isExplicitRestDay {
+                        Button(ATHLTHLocalization.choose(english: "Edit", norwegian: "Rediger")) {
+                            showingEditor = true
+                        }
                     }
                 }
             }

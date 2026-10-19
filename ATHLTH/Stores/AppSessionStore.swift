@@ -808,6 +808,7 @@ final class AppSessionStore: ObservableObject {
                 .flatMap(\.days).flatMap(\.sessions)
                 .first(where: { $0.id == sessionID })
         else { return false }
+        guard !planned.isExplicitRestDay else { return false }
         if isPlanSessionSkipped(planID: planID, sessionID: sessionID) {
             return false
         }

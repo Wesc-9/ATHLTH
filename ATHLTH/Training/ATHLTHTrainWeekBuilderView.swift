@@ -343,15 +343,17 @@ struct ATHLTHTrainWeekBuilderView: View {
                         }
                         Spacer()
                         Menu {
-                            Button {
-                                editorRequest = .init(
-                                    dayID: day.id, sessionID: workout.id,
+                            if !workout.isExplicitRestDay {
+                                Button {
+                                    editorRequest = .init(
+                                        dayID: day.id, sessionID: workout.id,
                                     expectedPlanVersion: plan.version
                                 )
                             } label: {
                                 Label(tr("Edit", "Rediger"), systemImage: "pencil")
                             }
-                            .disabled(isCompleted(workout.id))
+                                .disabled(isCompleted(workout.id))
+                            }
                             Button {
                                 transferRequest = .init(
                                     workoutID: workout.id,
@@ -416,6 +418,7 @@ struct ATHLTHTrainWeekBuilderView: View {
                         .foregroundStyle(muted)
                     }
 
+                    if !workout.isExplicitRestDay {
                     Button {
                         editorRequest = .init(
                         dayID: day.id,
@@ -434,6 +437,7 @@ struct ATHLTHTrainWeekBuilderView: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(isCompleted(workout.id))
+                    }
                 }
                 .padding(16)
                 .athlthPlanCard(radius: 16, warm: false)
