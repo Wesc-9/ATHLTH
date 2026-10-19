@@ -91,7 +91,8 @@ enum ATHLTHPlanActualProgress {
             for workout in week.days.flatMap(\.sessions) {
                 // Duplicate identities are flagged separately by the structure
                 // advisor. Do not count the same linked workout twice.
-                guard seenIDs.insert(workout.id).inserted else { continue }
+                guard !workout.isExplicitRestDay,
+                      seenIDs.insert(workout.id).inserted else { continue }
                 let kindIndex: Int
                 switch workout.kind {
                 case .running: kindIndex = 0

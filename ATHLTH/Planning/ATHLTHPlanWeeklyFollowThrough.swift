@@ -196,7 +196,9 @@ enum ATHLTHPlanWeeklyFollowThrough {
             return WeekLoadSummary(
                 id: week.id, weekNumber: index + 1,
                 plannedMinutes: durations.reduce(0, +),
-                activeDays: days.filter { !$0.sessions.isEmpty }.count,
+                activeDays: days.filter {
+                    $0.sessions.contains { !$0.isExplicitRestDay }
+                }.count,
                 longDays: longDays.filter { $0 }.count,
                 adjacentLongDayPairs: adjacent
             )
@@ -262,7 +264,7 @@ enum ATHLTHPlanWeeklyFollowThrough {
         for (weekIndex, week) in plan.weeks.enumerated() {
             for day in week.days.sorted(by: { $0.dayIndex < $1.dayIndex }) {
                 var dayIsHard = false
-                for session in day.sessions {
+                for session in day.sessions where !session.isExplicitRestDay {
                     let minutes = max(0, session.durationMinutes ?? 0)
                     switch effortBySessionID[session.id] {
                     case .easy?: easy += minutes
@@ -341,7 +343,7 @@ enum ATHLTHPlanWeeklyFollowThrough {
             var hardDays = 0
             for day in week.days {
                 var dayHasHard = false
-                for workout in day.sessions {
+                for workout in day.sessions where !workout.isExplicitRestDay {
                     let minutes = max(0, workout.durationMinutes ?? 0)
                     switch effortBySessionID[workout.id] {
                     case .easy?: easy += minutes
@@ -388,7 +390,7 @@ enum ATHLTHPlanWeeklyFollowThrough {
                           byAdding: .day, value: weekOffset * 7 + day.dayIndex - 1,
                           to: calendar.startOfDay(for: start)
                       ), date >= today else { continue }
-                for workout in day.sessions {
+                for workout in day.sessions where !workout.isExplicitRestDay {
                     guard !store.isPlanSessionSkipped(planID: plan.id, sessionID: workout.id),
                           !store.isPlanSessionCompleted(
                               planID: plan.id, sessionID: workout.id,
@@ -705,7 +707,8 @@ enum ATHLTHPlanWeeklyFollowThrough {
 
             for day in week.days.sorted(by: { $0.dayIndex < $1.dayIndex }) {
                 for workout in day.sessions {
-                    guard seen.insert(workout.id).inserted else { continue }
+                    guard !workout.isExplicitRestDay,
+                          seen.insert(workout.id).inserted else { continue }
 
                     let scheduled = effectiveDate(
                         scheduledStart: workout.scheduledStart,

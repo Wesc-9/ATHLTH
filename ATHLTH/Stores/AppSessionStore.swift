@@ -648,6 +648,12 @@ final class AppSessionStore: ObservableObject {
         sessionID: UUID,
         completed: Bool
     ) {
+        if completed {
+            guard let workout = trainingPlan(withID: planID)?
+                .weeks.flatMap(\.days).flatMap(\.sessions)
+                .first(where: { $0.id == sessionID }),
+                !workout.isExplicitRestDay else { return }
+        }
         let key = Self.manualCompletionKey(
             planID: planID,
             sessionID: sessionID

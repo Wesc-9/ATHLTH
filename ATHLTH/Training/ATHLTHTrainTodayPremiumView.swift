@@ -36,7 +36,12 @@ struct ATHLTHTrainTodayPremiumView: View {
         VStack(alignment: .leading, spacing: 12) {
             // The Train tab already says "I dag"; avoid a redundant title.
             if let plan {
-                if !sessions.isEmpty && sessions.allSatisfy({ completedIDs.contains($0.id) }) {
+                if sessions.contains(where: { $0.isExplicitRestDay }) &&
+                   !sessions.contains(where: { !$0.isExplicitRestDay }) {
+                    restDayCard
+                } else if sessions.contains(where: { !$0.isExplicitRestDay }) &&
+                          sessions.filter({ !$0.isExplicitRestDay })
+                            .allSatisfy({ completedIDs.contains($0.id) }) {
                     completedTodayCard(plan)
                 } else if let workout = primaryWorkout {
                     workoutCard(workout, plan: plan)
@@ -63,7 +68,41 @@ struct ATHLTHTrainTodayPremiumView: View {
     }
 
     private var primaryWorkout: PlannedSession? {
-        sessions.first { !completedIDs.contains($0.id) } ?? sessions.first
+        let workouts = sessions.filter { !$0.isExplicitRestDay }
+        return workouts.first { !completedIDs.contains($0.id) } ?? workouts.first
+    }
+
+    private var restDayCard: some View {
+        Button(action: onOpenPlan) {
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: "moon.stars.fill")
+                    .font(.title2)
+                    .foregroundStyle(ATHLTHTheme.recoveryBlue)
+                    .frame(width: 50, height: 50)
+                    .background(ATHLTHTheme.recoveryBlueSoft,
+                                in: RoundedRectangle(cornerRadius: 15))
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(tr("REST DAY", "HVILEDAG"))
+                        .font(.caption.weight(.bold))
+                        .tracking(1.5)
+                    Text(tr("Recovery is on the schedule", "Restitusjon er planlagt"))
+                        .font(.headline)
+                    Text(tr(
+                        "You have no workout to complete today. View the day in your plan.",
+                        "Du har ingen treningsøkt å fullføre i dag. Se dagen i treningsplanen."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(muted)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(muted)
+            }
+            .foregroundStyle(ink)
+            .padding(16)
+            .background(.white, in: RoundedRectangle(cornerRadius: 18))
+        }
+        .buttonStyle(.plain)
     }
 
     // A full date on regular widths, a shorter date where labels need room.

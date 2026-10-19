@@ -317,6 +317,7 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
 
     private let fixedPlanID: UUID?
     private let fixedDayID: UUID?
+    private let onSaved: (() -> Void)?
     @State private var selectedPlanID: UUID?
     @State private var selectedDayID: UUID?
     @State private var date: Date
@@ -325,9 +326,15 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
     @State private var notes = ""
     @State private var errorMessage: String?
 
-    init(date: Date = Date(), planID: UUID? = nil, dayID: UUID? = nil) {
+    init(
+        date: Date = Date(),
+        planID: UUID? = nil,
+        dayID: UUID? = nil,
+        onSaved: (() -> Void)? = nil
+    ) {
         fixedPlanID = planID
         fixedDayID = dayID
+        self.onSaved = onSaved
         _selectedPlanID = State(initialValue: planID)
         _selectedDayID = State(initialValue: dayID)
         _date = State(initialValue: date)
@@ -618,6 +625,7 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
         } else {
             session.addStandalonePlannedSession(planned)
         }
+        onSaved?()
         dismiss()
     }
 }

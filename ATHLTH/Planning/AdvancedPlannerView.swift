@@ -5931,8 +5931,11 @@ struct SessionEditorView: View {
                 }
             }
             .sheet(isPresented: $showingRecoveryRestPlanner) {
-                ATHLTHRecoveryRestPlanningSheet(date: scheduledTime)
-                    .presentationDetents([.large])
+                ATHLTHRecoveryRestPlanningSheet(date: scheduledTime) {
+                    finishDraft()
+                    dismiss()
+                }
+                .presentationDetents([.large])
             }
             .sheet(isPresented: $showingSavedWorkoutPicker) {
                 PlanWorkoutPickerView { workout in
