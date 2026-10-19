@@ -12,6 +12,9 @@ struct ATHLTHWorkoutRecipePreview: View {
     let difficulty: String?
     let durationMinutes: Int?
     let blocks: [WorkoutTemplateBlock]
+    // Hide the duplicate hero/statistics when this detailed timeline is
+    // embedded below an existing workout overview sheet.
+    var embeddedInDetails = false
 
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @State private var advanced = false
@@ -43,8 +46,10 @@ struct ATHLTHWorkoutRecipePreview: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 17) {
-            introduction
-            statistics
+            if !embeddedInDetails {
+                introduction
+                statistics
+            }
             modeControl
             timeline
         }
@@ -135,7 +140,9 @@ struct ATHLTHWorkoutRecipePreview: View {
     private var modeControl: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Text(tr("SESSION DETAILS", "ØKTDETALJER"))
+                Text(embeddedInDetails
+                     ? tr("WORKOUT PROGRAM", "ØKTPROGRAM")
+                     : tr("SESSION DETAILS", "ØKTDETALJER"))
                     .font(.system(size: 11, weight: .bold))
                     .tracking(1.5)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
