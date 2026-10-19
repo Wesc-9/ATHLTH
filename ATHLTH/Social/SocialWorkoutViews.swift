@@ -4325,13 +4325,26 @@ private struct HomeActivityStrengthCard: View {
                 )
                 }
                 .padding(12)
-                .background(
-                    Color.indigo.opacity(0.035),
-                in: RoundedRectangle(
-                    cornerRadius: 19,
-                    style: .continuous
-                )
-            )
+                .background {
+                    GeometryReader { proxy in
+                        Image("StrengthFeedGym")
+                            .resizable()
+                            .scaledToFill()
+                            .frame(
+                                width: proxy.size.width,
+                                height: proxy.size.height
+                            )
+                            .overlay(Color.white.opacity(0.87))
+                            .clipped()
+                            .clipShape(
+                                RoundedRectangle(
+                                    cornerRadius: 19,
+                                    style: .continuous
+                                )
+                            )
+                    }
+                    .accessibilityHidden(true)
+                }
             .overlay {
                 RoundedRectangle(
                     cornerRadius: 19,
