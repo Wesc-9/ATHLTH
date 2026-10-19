@@ -2680,6 +2680,43 @@ struct HomeHealthMetricDetailView:
     }
 }
 
+/// One source of truth for today's small Home calendar card.
+/// Standalone sessions created from Weekly Progress live outside the active
+/// training plan, so both sources must be merged before limiting visible rows.
+enum HomeTodayCalendarSchedule {
+    static func workouts(
+        plan: TrainingPlan?,
+        standalone: [PlannedSession],
+        on date: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [PlannedSession] {
+        let planned = plan.map {
+            ATHLTHTrainingPlanSchedule.sessions(
+                in: $0, on: date, calendar: calendar
+            )
+        } ?? []
+
+        let independent = standalone.filter { workout in
+            guard let start = workout.scheduledStart else { return false }
+            return calendar.isDate(start, inSameDayAs: date)
+        }
+
+        // A standalone revision takes priority over an older plan copy with
+        // the same stable ID. Never show duplicate calendar entries.
+        let independentIDs = Set(independent.map(\.id))
+        let combined = planned.filter { !independentIDs.contains($0.id) } +
+            independent
+
+        return combined.sorted { lhs, rhs in
+            let first = lhs.scheduledStart ?? .distantFuture
+            let second = rhs.scheduledStart ?? .distantFuture
+            return first == second
+                ? lhs.id.uuidString < rhs.id.uuidString
+                : first < second
+        }
+    }
+}
+
 /// Pure calendar calculations shared by Home's week pager and tests.
 /// Plan weeks start on the configured plan start, not necessarily Monday.
 enum HomeWeeklyProgressCalendar {
