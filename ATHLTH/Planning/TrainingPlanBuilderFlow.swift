@@ -3316,6 +3316,59 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         weekDayEdits[destinationKey] = destination
     }
 
+    // Move one independent block between existing sessions without dropping either
+    // workout. Reject moves that would invalidate the source or destination.
+    private func moveGuidedBlock(
+        from sourceIndex: Int,
+        blockIndex: Int,
+        to destinationDay: Int,
+        workoutIndex: Int
+    ) {
+        let sourceKey = weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)
+        let targetKey = weekDayKey(destinationDay, weekIndex: guidedCurrentWeek)
+        guard let sourceEdit = weekDayEdits[sourceKey],
+              let sourcePrimary = sourceEdit.detailedWorkout,
+              let targetEdit = weekDayEdits[targetKey],
+              let targetPrimary = targetEdit.detailedWorkout else { return }
+
+        var sourceWorkouts = [sourcePrimary] + (sourceEdit.additionalDetailedWorkouts ?? [])
+        var targetWorkouts = [targetPrimary] + (targetEdit.additionalDetailedWorkouts ?? [])
+        guard sourceWorkouts.indices.contains(sourceIndex),
+              targetWorkouts.indices.contains(workoutIndex),
+              sourceWorkouts[sourceIndex].blocks.indices.contains(blockIndex),
+              sourceKey != targetKey || sourceIndex != workoutIndex else { return }
+
+        let block = sourceWorkouts[sourceIndex].blocks[blockIndex]
+        // Grouped movements (supersets etc.) must be edited as a group,
+        // rather than silently separating linked exercises.
+        guard block.groupID == nil else { return }
+        var updatedSource = sourceWorkouts[sourceIndex]
+        updatedSource.blocks.remove(at: blockIndex)
+        var updatedTarget = targetWorkouts[workoutIndex]
+        updatedTarget.blocks.append(block)
+        guard updatedSource.isValid, updatedTarget.isValid else { return }
+
+        if sourceKey == targetKey {
+            sourceWorkouts[sourceIndex] = updatedSource
+            sourceWorkouts[workoutIndex] = updatedTarget
+            var edit = sourceEdit
+            edit.detailedWorkout = sourceWorkouts[0]
+            edit.additionalDetailedWorkouts = Array(sourceWorkouts.dropFirst())
+            weekDayEdits[sourceKey] = edit
+        } else {
+            sourceWorkouts[sourceIndex] = updatedSource
+            targetWorkouts[workoutIndex] = updatedTarget
+            var source = sourceEdit
+            source.detailedWorkout = sourceWorkouts[0]
+            source.additionalDetailedWorkouts = Array(sourceWorkouts.dropFirst())
+            var target = targetEdit
+            target.detailedWorkout = targetWorkouts[0]
+            target.additionalDetailedWorkouts = Array(targetWorkouts.dropFirst())
+            weekDayEdits[sourceKey] = source
+            weekDayEdits[targetKey] = target
+        }
+    }
+
     private var guidedSmartPlanningCard: some View {
         builderPanel {
             VStack(alignment: .leading, spacing: 10) {
@@ -3479,6 +3532,42 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                          ATHLTHLocalization.choose(english: "blocks", norwegian: "blokker"))
                                         .font(.caption)
                                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                    ForEach(Array(workout.blocks.enumerated()), id: \.offset) { blockIndex, block in
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "line.3.horizontal")
+                                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                            Text(ATHLTHLocalization.choose(
+                                                english: "Block", norwegian: "Blokk") + " \(blockIndex + 1)")
+                                                .font(.caption)
+                                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                        }
+                                        .contextMenu {
+                                            if block.groupID == nil {
+                                                ForEach(1...7, id: \.self) { targetDay in
+                                                    let key = weekDayKey(targetDay, weekIndex: guidedCurrentWeek)
+                                                    if let target = weekDayEdits[key],
+                                                       let first = target.detailedWorkout {
+                                                        ForEach(Array(([first] + (target.additionalDetailedWorkouts ?? [])).enumerated()),
+                                                                id: \.offset) { targetIndex, targetWorkout in
+                                                            if targetDay != guidedCurrentWeekday || targetIndex != index {
+                                                                Button {
+                                                                    moveGuidedBlock(
+                                                                        from: index, blockIndex: blockIndex,
+                                                                        to: targetDay, workoutIndex: targetIndex
+                                                                    )
+                                                                } label: {
+                                                                    Label(
+                                                                        "\(targetDay) · \(targetWorkout.title)",
+                                                                        systemImage: "arrow.right"
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                                 Spacer()
                                 HStack(spacing: 6) {
