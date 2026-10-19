@@ -7,7 +7,7 @@ enum ATHLTHUnifiedDesign {
     static let canvas = ATHLTHPlanDesign.canvas
     static let ink = ATHLTHTheme.primaryText
     static let secondary = ATHLTHPlanDesign.secondaryInk
-    static let accent = ATHLTHPlanDesign.accent
+    static let accent = ATHLTHPlanDesign.accentInk
     static let outline = ATHLTHPlanDesign.outline
     static let surface = ATHLTHPlanDesign.surface
     static let selected = ATHLTHPlanDesign.selectedSurface

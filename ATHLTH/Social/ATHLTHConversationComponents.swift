@@ -6,7 +6,7 @@ struct ATHLTHConversationHero<
 >: View {
     let title: String
     let subtitle: String
-    let backgroundAsset: String
+    let backgroundAsset: String?
     let onBack: () -> Void
     let onProfileTap: (() -> Void)?
 
@@ -18,7 +18,7 @@ struct ATHLTHConversationHero<
     init(
         title: String,
         subtitle: String,
-        backgroundAsset: String = "GoalMountain",
+        backgroundAsset: String? = nil,
         onBack: @escaping () -> Void,
         onProfileTap: (() -> Void)? = nil,
         @ViewBuilder avatar: () -> Avatar,
@@ -44,23 +44,36 @@ struct ATHLTHConversationHero<
             ZStack(
                 alignment: .top
             ) {
-                Image(backgroundAsset)
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFill()
-                    // Keep the hero bound to the actual screen width.
-                    // Without an explicit width, wide artwork can enlarge
-                    // the whole conversation layout before clipping.
-                    .frame(
-                        width: proxy.size.width,
-                        height: heroHeight
+                if let backgroundAsset {
+                    // Explicit custom artwork remains available for special threads.
+                    Image(backgroundAsset)
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFill()
+                        .frame(width: proxy.size.width, height: heroHeight)
+                        .clipped()
+                        .accessibilityHidden(true)
+                } else {
+                    // Conversation headers should not borrow the library's
+                    // mountain hero. Use restrained brand tones instead.
+                    LinearGradient(
+                        colors: [
+                            ATHLTHTheme.accentDeep,
+                            Color(red: 0.28, green: 0.29, blue: 0.31),
+                            ATHLTHPlanDesign.outgoingMessage
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
-                    .scaleEffect(
-                        1.08,
-                        anchor: .center
-                    )
-                    .clipped()
-                    .allowsHitTesting(false)
+                    .frame(width: proxy.size.width, height: heroHeight)
+                    .overlay(alignment: .bottomTrailing) {
+                        ATHLTHMarkShape()
+                            .fill(ATHLTHTheme.champagne.opacity(0.13))
+                            .frame(width: 180, height: 126)
+                            .offset(x: 24, y: 16)
+                            .accessibilityHidden(true)
+                    }
+                }
 
                 LinearGradient(
                     stops: [
@@ -195,7 +208,11 @@ struct ATHLTHConversationHero<
                     .buttonStyle(.plain)
                     .disabled(onProfileTap == nil)
                     .accessibilityLabel(
-                        onProfileTap == nil ? title : title + " · Vis profil"
+                        onProfileTap == nil ? title :
+                            ATHLTHLocalization.choose(
+                                english: "\(title) · View profile",
+                                norwegian: "\(title) · Vis profil"
+                            )
                     )
 
                     Spacer(
@@ -204,8 +221,8 @@ struct ATHLTHConversationHero<
 
                     trailing
                         .frame(
-                            width: 42,
-                            height: 42
+                            width: 48,
+                            height: 48
                         )
                 }
                 .padding(

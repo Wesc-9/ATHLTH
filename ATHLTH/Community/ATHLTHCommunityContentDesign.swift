@@ -52,15 +52,15 @@ struct ATHLTHCommunityContextRibbon: View {
         HStack(spacing: 10) {
             Image(systemName: kind.symbol)
                 .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(ATHLTHPlanDesign.accent)
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
                 .frame(width: 40, height: 40)
                 .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(kind.localizedTitle.uppercased())
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.caption2.weight(.semibold))
                     .tracking(1.4)
-                    .foregroundStyle(ATHLTHPlanDesign.accent)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
                 Text(groupName)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHPlanDesign.ink)
