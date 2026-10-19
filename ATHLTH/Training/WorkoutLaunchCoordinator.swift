@@ -75,6 +75,7 @@ struct PlannedWorkoutWatchBuilder {
                 steps: structured.flatMap {
                     runningSteps(from: $0)
                 },
+                sourceWorkoutID: workout.id,
                 routeAlerts:
                     workout.routeAlertConfiguration ??
                     routeAlerts,
@@ -136,6 +137,7 @@ struct PlannedWorkoutWatchBuilder {
         return WatchRunningWorkoutTransfer(
             title: workout.title,
             steps: [fallback],
+            sourceWorkoutID: workout.id,
             routeAlerts:
                 workout.routeAlertConfiguration ??
                 routeAlerts,
