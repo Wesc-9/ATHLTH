@@ -938,9 +938,10 @@ struct ATHLTHTrainPlanPremiumView: View {
                                 .font(.subheadline.weight(.semibold))
                             Text(date.formatted(.dateTime.day()))
                                 .font(.title3.weight(.semibold))
-                            Text(day.sessions.isEmpty
+                            Text(day.sessions.filter { !$0.isExplicitRestDay }.isEmpty
                                  ? tr("Rest", "Fri")
-                                 : tr("\(day.sessions.count) workouts", "\(day.sessions.count) økter"))
+                                 : tr("\(day.sessions.filter { !$0.isExplicitRestDay }.count) workouts",
+                                      "\(day.sessions.filter { !$0.isExplicitRestDay }.count) økter"))
                                 .font(.caption2)
                         }
                         .foregroundStyle(selected ? Color.white : graphite)
@@ -1355,7 +1356,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     ) -> some View {
         let index = min(max(selectedWeekIndex ?? currentWeekIndex(plan), 0),
                         max(plan.weeks.count - 1, 0))
-        let workouts = week.days.flatMap(\.sessions)
+        let workouts = week.days.flatMap(\.sessions).filter { !$0.isExplicitRestDay }
         let completedCount = workouts.filter {
             session.isPlanSessionCompleted(
                 planID: plan.id,
@@ -1373,6 +1374,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                 return total
             }
             return total + day.sessions.filter {
+                !$0.isExplicitRestDay &&
                 !session.isPlanSessionSkipped(planID: plan.id, sessionID: $0.id) &&
                 !session.isPlanSessionCompleted(
                     planID: plan.id, sessionID: $0.id,
@@ -1475,7 +1477,8 @@ struct ATHLTHTrainPlanPremiumView: View {
                             openingWorkout = WorkoutDestination(planID: plan.id, workout: workout)
                         } label: {
                             HStack(spacing: 12) {
-                                Image(systemName: workout.kind.systemImage)
+                                Image(systemName: workout.isExplicitRestDay
+                                    ? "moon.stars.fill" : workout.kind.systemImage)
                                     .font(.title3)
                                     .foregroundStyle(kindTint(workout.kind))
                                     .frame(width: 44, height: 44)
@@ -1692,7 +1695,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                                           systemImage: "trash")
                                 }
                             }
-                            if !completed && !skipped {
+                            if !completed && !skipped && !workout.isExplicitRestDay {
                                 Button {
                                     session.setPlanSessionManuallyCompleted(
                                         planID: plan.id,
