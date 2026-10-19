@@ -12,6 +12,14 @@ private func recoveryAIText(
 }
 
 
+// Shared champagne-gold styling for the Coach conversation.
+// Kept local to avoid changing colors elsewhere in the app.
+private enum RecoveryCoachGold {
+    static let deep = Color(red: 0.59, green: 0.39, blue: 0.20)
+    static let light = Color(red: 0.86, green: 0.70, blue: 0.48)
+    static let icon = Color(red: 0.69, green: 0.47, blue: 0.23)
+}
+
 // Compact Coach header: no hero photo and no fabricated online indicator.
 private struct RecoveryCoachCompactHeader<Avatar: View, Trailing: View>: View {
     let title: String
@@ -2507,8 +2515,7 @@ struct RecoveryCoachView: View {
                         height: 44
                     )
                     .background(
-                        ATHLTHTheme
-                            .vitality,
+                        RecoveryCoachGold.light,
                         in: Circle()
                     )
                 }
@@ -2616,11 +2623,8 @@ struct RecoveryCoachView: View {
                             ? AnyShapeStyle(
                                 LinearGradient(
                                     colors: [
-                                        ATHLTHTheme
-                                            .vitality,
-                                        ATHLTHTheme
-                                            .accent
-                                            .opacity(0.92)
+                                        RecoveryCoachGold.deep,
+                                        RecoveryCoachGold.light
                                     ],
                                     startPoint:
                                         .topLeading,
@@ -2655,9 +2659,8 @@ struct RecoveryCoachView: View {
                     .shadow(
                         color:
                             message.role == .user
-                                ? ATHLTHTheme
-                                    .vitality
-                                    .opacity(0.08)
+                                ? RecoveryCoachGold.deep
+                                    .opacity(0.10)
                                 : ATHLTHTheme
                                     .accentDeep
                                     .opacity(0.04),
