@@ -1682,9 +1682,11 @@ private struct ProfileRecordVisualTile: View {
     var showsSelection: Bool = false
     var isSelected: Bool = false
     var showsManagement: Bool = false
+    var compactPremium: Bool = false
 
     var body: some View {
         ZStack(alignment: .topLeading) {
+            if !compactPremium {
             GeometryReader { proxy in
                 Image(kind.recordArtwork)
                     .resizable()
@@ -1696,19 +1698,21 @@ private struct ProfileRecordVisualTile: View {
 
             LinearGradient(
                 colors: [
-                    kind.tint.opacity(0.16),
-                    Color.white.opacity(0.84)
+                    compactPremium ? Color.white : kind.tint.opacity(0.16),
+                    compactPremium ? Color(red: 0.965, green: 0.973, blue: 0.982) : Color.white.opacity(0.84)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
 
-            VStack(alignment: .leading, spacing: 5) {
+            }
+
+            VStack(alignment: .leading, spacing: compactPremium ? 3 : 5) {
                 HStack {
                     Image(systemName: kind.icon)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(kind.tint)
-                        .frame(width: 30, height: 30)
+                        .foregroundStyle(compactPremium ? ATHLTHTheme.accentDeep : kind.tint)
+                        .frame(width: compactPremium ? 26 : 30, height: compactPremium ? 26 : 30)
                         .background(Color.white.opacity(0.85), in: Circle())
 
                     Spacer(minLength: 4)
@@ -1737,13 +1741,13 @@ private struct ProfileRecordVisualTile: View {
                 Spacer(minLength: 1)
 
                 Text(kind.title)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: compactPremium ? 11 : 11, weight: .semibold))
                     .foregroundStyle(ATHLTHTheme.primaryText)
                     .lineLimit(2)
                     .minimumScaleFactor(0.85)
 
                 Text(value)
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(.system(size: compactPremium ? 18 : 17, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(ATHLTHTheme.primaryText)
                     .lineLimit(1)
@@ -1754,17 +1758,17 @@ private struct ProfileRecordVisualTile: View {
                     .foregroundStyle(ATHLTHTheme.mutedText)
                     .lineLimit(1)
             }
-            .padding(12)
+            .padding(compactPremium ? 10 : 12)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 130)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .frame(height: compactPremium ? 98 : 130)
+        .clipShape(RoundedRectangle(cornerRadius: compactPremium ? 17 : 20, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(
                     isSelected && showsSelection
                         ? ATHLTHTheme.accentDeep.opacity(0.50)
-                        : kind.tint.opacity(0.15),
+                        : ATHLTHTheme.primaryText.opacity(0.09),
                     lineWidth: isSelected && showsSelection ? 1.4 : 0.8
                 )
         }
@@ -9666,7 +9670,8 @@ struct ProfileRecordShowcasePickerView:
                             healthRecords: resolvedHealthRecords
                         ),
                         showsSelection: replacingIndex != nil,
-                        isSelected: true
+                        isSelected: true,
+                        compactPremium: true
                     )
 
                     if replacingIndex == nil {
@@ -9822,7 +9827,8 @@ struct ProfileRecordShowcasePickerView:
                     healthRecords: resolvedHealthRecords
                 ),
                 showsSelection: true,
-                isSelected: selected
+                isSelected: selected,
+                compactPremium: true
             )
             .opacity(
                 !available && !selected
