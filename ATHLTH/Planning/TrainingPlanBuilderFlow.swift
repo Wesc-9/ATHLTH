@@ -590,7 +590,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 initialTitle: addingExtraWorkout ? "" : (selectedWorkoutForEditor(day: selection.id)?.title ?? ""),
                 initialBlocks: addingExtraWorkout ? [] : (selectedWorkoutForEditor(day: selection.id)?.blocks ?? []),
                 initialRouteID: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.routeID,
-                draftContext: "new-program-week-\(selectedPlanWeekIndex)-day-\(selection.id)",
+                draftContext: "new-program-week-\(selectedPlanWeekIndex)-day-\(selection.id)-workout-\(addingExtraWorkout ? "new" : String(editingWorkoutIndex))",
                 plannedDate: dateForWeekDay(selection.id, weekIndex: selectedPlanWeekIndex),
                 onSaveToPlan: { name, blocks, routeID, minutes, _ in
                     let proposed = ATHLTHPlanStructuredWorkoutBlueprint(
@@ -604,7 +604,14 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     updateWeekDay(selection.id) { edit in
                         edit.isRestDay = false
                         if addingExtraWorkout {
-                            edit.additionalDetailedWorkouts = (edit.additionalDetailedWorkouts ?? []) + [proposed]
+                            if edit.detailedWorkout == nil {
+                                edit.detailedWorkout = proposed
+                                edit.kind = proposed.kind
+                                edit.title = proposed.title
+                                edit.durationMinutes = proposed.durationMinutes
+                            } else {
+                                edit.additionalDetailedWorkouts = (edit.additionalDetailedWorkouts ?? []) + [proposed]
+                            }
                         } else if editingWorkoutIndex > 0,
                                   var extras = edit.additionalDetailedWorkouts,
                                   extras.indices.contains(editingWorkoutIndex - 1) {
