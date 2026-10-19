@@ -174,14 +174,13 @@ struct TrainTogetherMarketplaceView:
                     )
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 34)
-                } else if let message = marketplace.refreshErrorMessage,
-                          visiblePosts.isEmpty {
-                    refreshStatus(message: message, isFailure: true)
+                } else if marketplace.refreshErrorMessage != nil && visiblePosts.isEmpty {
+                    refreshStatus(isFailure: true)
                 } else if !marketplace.hasLoaded && visiblePosts.isEmpty {
                     // A view-scoped task may have been cancelled before
                     // the first successful load. Do not claim there are
                     // no workouts when nothing has been fetched yet.
-                    refreshStatus(message: nil, isFailure: false)
+                    refreshStatus(isFailure: false)
                 } else if visiblePosts.isEmpty {
                     emptyState
                 } else if showingMap && modeFilter != .sameWorkout {
@@ -362,10 +361,7 @@ struct TrainTogetherMarketplaceView:
 
     /// Refresh problems are not creation/action errors: show an inline
     /// retry instead of a modal alert that blocks the entire marketplace.
-    private func refreshStatus(
-        message: String?,
-        isFailure: Bool
-    ) -> some View {
+    private func refreshStatus(isFailure: Bool) -> some View {
         VStack(spacing: 10) {
             Image(systemName: isFailure ? "wifi.exclamationmark" : "arrow.clockwise")
                 .font(.system(size: 25, weight: .medium))
