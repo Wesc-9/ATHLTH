@@ -5506,6 +5506,67 @@ struct SessionEditorView: View {
         )
     }
 
+
+    // Keep the potentially large dynamic list outside the parent Form's
+    // result builder. This also avoids Swift compiler type-check timeouts
+    // when the standalone editor grows new controls.
+    @ViewBuilder
+    private var workoutStructurePreviewSection: some View {
+        if !workoutBlocks.isEmpty {
+            Section(ATHLTHLocalization.choose(
+                english: "Workout Structure", norwegian: "Øktstruktur"
+            )) {
+                HStack {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "\(workoutBlocks.count) blocks",
+                            norwegian: "\(workoutBlocks.count) blokker"
+                        ),
+                        systemImage: "list.number"
+                    )
+                    Spacer()
+                    if let workoutCategory {
+                        Text(workoutCategory.capitalized)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                ForEach(Array(workoutBlocks.prefix(5))) { block in
+                    HStack(spacing: 10) {
+                        Image(systemName: block.kind.systemImage)
+                            .foregroundStyle(
+                                block.kind == .run
+                                    ? ATHLTHTheme.vitality
+                                    : ATHLTHTheme.accent
+                            )
+                            .frame(width: 24)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(block.title)
+                                .font(.subheadline)
+                            if let target = block.targetText {
+                                Text(target)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer()
+                    }
+                }
+
+                if workoutBlocks.count > 5 {
+                    Text(ATHLTHLocalization.choose(
+                        english: "+\(workoutBlocks.count - 5) more blocks",
+                        norwegian: "+\(workoutBlocks.count - 5) blokker til"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -5529,71 +5590,7 @@ struct SessionEditorView: View {
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
 
-                if !workoutBlocks.isEmpty {
-                    Section(ATHLTHLocalization.choose(english: "Workout Structure", norwegian: "Øktstruktur")) {
-                        HStack {
-                            Label(
-                                "\(workoutBlocks.count) blocks",
-                                systemImage:
-                                    "list.number"
-                            )
-
-                            Spacer()
-
-                            if let workoutCategory {
-                                Text(
-                                    workoutCategory.capitalized
-                                )
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        ForEach(
-                            workoutBlocks.prefix(5)
-                        ) { block in
-                            HStack(spacing: 10) {
-                                Image(
-                                    systemName:
-                                        block.kind.systemImage
-                                )
-                                .foregroundStyle(
-                                    block.kind == .run
-                                        ? ATHLTHTheme.vitality
-                                        : ATHLTHTheme.accent
-                                )
-                                .frame(width: 24)
-
-                                VStack(
-                                    alignment: .leading,
-                                    spacing: 2
-                                ) {
-                                    Text(block.title)
-                                        .font(.subheadline)
-
-                                    if let target =
-                                        block.targetText {
-                                        Text(target)
-                                            .font(.caption2)
-                                            .foregroundStyle(
-                                                .secondary
-                                            )
-                                    }
-                                }
-
-                                Spacer()
-                            }
-                        }
-
-                        if workoutBlocks.count > 5 {
-                            Text(
-                                "+\(workoutBlocks.count - 5) more blocks"
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
-                    }
-                }
+                workoutStructurePreviewSection
 
                 Section {
                     TextField(
