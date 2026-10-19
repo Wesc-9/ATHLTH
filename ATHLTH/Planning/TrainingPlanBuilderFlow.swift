@@ -3358,6 +3358,18 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         // An empty or otherwise invalid source requires explicit session
         // deletion instead; never silently lose a workout or break a superset.
         guard updatedSource.isValid, updatedTarget.isValid else { return }
+        // A move changes the recipe. Recalculate only when the estimator has
+        // enough information; never replace a known duration with a guess.
+        if let minutes = ATHLTHWorkoutDurationEstimator.minutes(for: updatedSource.blocks) {
+            updatedSource.durationMinutes = minutes
+        }
+        if let minutes = ATHLTHWorkoutDurationEstimator.minutes(for: updatedTarget.blocks) {
+            updatedTarget.durationMinutes = minutes
+        }
+        updatedSource.kind = workoutKind(for: updatedSource.blocks)
+        updatedTarget.kind = workoutKind(for: updatedTarget.blocks)
+        if updatedSource.kind != .running { updatedSource.routeID = nil }
+        if updatedTarget.kind != .running { updatedTarget.routeID = nil }
 
         if sourceKey == targetKey {
             sourceWorkouts[sourceIndex] = updatedSource
@@ -3365,6 +3377,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             var edit = sourceEdit
             edit.detailedWorkout = sourceWorkouts[0]
             edit.additionalDetailedWorkouts = Array(sourceWorkouts.dropFirst())
+            edit.kind = sourceWorkouts[0].kind
+            edit.title = sourceWorkouts[0].title
+            edit.durationMinutes = sourceWorkouts[0].durationMinutes
             weekDayEdits[sourceKey] = edit
         } else {
             sourceWorkouts[sourceIndex] = updatedSource
@@ -3372,9 +3387,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             var source = sourceEdit
             source.detailedWorkout = sourceWorkouts[0]
             source.additionalDetailedWorkouts = Array(sourceWorkouts.dropFirst())
+            source.kind = sourceWorkouts[0].kind
+            source.title = sourceWorkouts[0].title
+            source.durationMinutes = sourceWorkouts[0].durationMinutes
             var target = targetEdit
             target.detailedWorkout = targetWorkouts[0]
             target.additionalDetailedWorkouts = Array(targetWorkouts.dropFirst())
+            target.kind = targetWorkouts[0].kind
+            target.title = targetWorkouts[0].title
+            target.durationMinutes = targetWorkouts[0].durationMinutes
             weekDayEdits[sourceKey] = source
             weekDayEdits[targetKey] = target
         }
