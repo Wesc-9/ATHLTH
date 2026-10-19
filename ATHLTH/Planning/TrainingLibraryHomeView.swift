@@ -353,39 +353,52 @@ private struct LibraryHubCategoryTile: View {
     let title: String
     let detail: String
     let symbol: String
+    let artwork: String
     let tint: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: symbol)
-                    .font(.system(size: 19, weight: .semibold))
-                    .foregroundStyle(tint)
-                    .frame(width: 42, height: 42)
-                    .background(tint.opacity(0.11),
-                                in: RoundedRectangle(cornerRadius: 13))
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.gray.opacity(0.7))
+        ZStack(alignment: .bottomLeading) {
+            GeometryReader { geometry in
+                Image(artwork)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
             }
-            Text(title)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color(red: 0.17, green: 0.17, blue: 0.18))
-            Text(detail)
-                .font(.caption)
-                .foregroundStyle(Color(red: 0.47, green: 0.46, blue: 0.45))
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
+            LinearGradient(
+                colors: [.black.opacity(0.02), .black.opacity(0.24), .black.opacity(0.72)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            VStack(alignment: .leading, spacing: 5) {
+                Image(systemName: symbol)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 36, height: 36)
+                    .background(.ultraThinMaterial.opacity(0.7),
+                                in: RoundedRectangle(cornerRadius: 11))
+                Spacer(minLength: 0)
+                Text(title)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
+                HStack(alignment: .bottom, spacing: 5) {
+                    Text(detail)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.88))
+                        .lineLimit(2)
+                    Spacer(minLength: 0)
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+            }
+            .padding(13)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, minHeight: 139,
-               alignment: .topLeading)
-        .background(.white.opacity(0.94),
-                    in: RoundedRectangle(cornerRadius: 20))
+        .frame(height: 170)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 20)
-                .strokeBorder(Color.black.opacity(0.035), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(.white.opacity(0.6), lineWidth: 0.8)
         }
         .contentShape(RoundedRectangle(cornerRadius: 20))
         .accessibilityElement(children: .combine)
