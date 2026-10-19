@@ -3491,7 +3491,9 @@ final class IPhoneWorkoutStore:
                     phase: step.phase,
                     activeSeconds: activeSeconds,
                     distanceMeters: segmentMeters,
-                    isUserReported: workout.runEnvironment == .treadmill
+                    isUserReported: workout.runEnvironment == .treadmill,
+                    targetPaceSecondsPerKilometer:
+                        step.targetPaceMinSecondsPerKilometer
                 ))
                 workout.recordedRunningSteps = recorded
             }
