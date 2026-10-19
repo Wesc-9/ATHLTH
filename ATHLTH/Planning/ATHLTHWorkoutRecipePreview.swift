@@ -273,6 +273,17 @@ struct ATHLTHWorkoutRecipePreview: View {
                             .font(.caption)
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     }
+                    if let pace = block.targetPaceSecondsPerKilometer,
+                       pace.isFinite, pace > 0 {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Target speed ",
+                                norwegian: "Målhastighet "
+                            ) + String(format: "%.1f km/t", 3_600 / pace)
+                        )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    }
                 }
                 Spacer(minLength: 0)
                 if block.kind == .exercise {
