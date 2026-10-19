@@ -65,6 +65,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var pendingLibraryDay: WeekDayEditorSelection?
     @State private var pendingStudioDay: WeekDayEditorSelection?
     @State private var addingExtraWorkout = false
+    @State private var editingWorkoutIndex = 0
     @State private var selectingExtraFromLibrary = false
 
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
@@ -586,9 +587,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
         .sheet(item: $composingAdvancedDay) { selection in
             WorkoutTemplateBuilderView(
-                initialTitle: addingExtraWorkout ? "" : (effectiveDetailedWorkout(for: selection.id)?.title ?? ""),
-                initialBlocks: addingExtraWorkout ? [] : (effectiveDetailedWorkout(for: selection.id)?.blocks ?? []),
-                initialRouteID: addingExtraWorkout ? nil : effectiveDetailedWorkout(for: selection.id)?.routeID,
+                initialTitle: addingExtraWorkout ? "" : (selectedWorkoutForEditor(day: selection.id)?.title ?? ""),
+                initialBlocks: addingExtraWorkout ? [] : (selectedWorkoutForEditor(day: selection.id)?.blocks ?? []),
+                initialRouteID: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.routeID,
                 draftContext: "new-program-week-\(selectedPlanWeekIndex)-day-\(selection.id)",
                 plannedDate: dateForWeekDay(selection.id, weekIndex: selectedPlanWeekIndex),
                 onSaveToPlan: { name, blocks, routeID, minutes, _ in
@@ -604,6 +605,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         edit.isRestDay = false
                         if addingExtraWorkout {
                             edit.additionalDetailedWorkouts = (edit.additionalDetailedWorkouts ?? []) + [proposed]
+                        } else if editingWorkoutIndex > 0,
+                                  var extras = edit.additionalDetailedWorkouts,
+                                  extras.indices.contains(editingWorkoutIndex - 1) {
+                            extras[editingWorkoutIndex - 1] = proposed
+                            edit.additionalDetailedWorkouts = extras
                         } else {
                             edit.detailedWorkout = proposed
                             edit.kind = proposed.kind
@@ -3239,6 +3245,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
+    private func selectedWorkoutForEditor(day: Int) -> ATHLTHPlanStructuredWorkoutBlueprint? {
+        let key = weekDayKey(day, weekIndex: selectedPlanWeekIndex)
+        guard let edit = weekDayEdits[key], let primary = edit.detailedWorkout else {
+            return effectiveDetailedWorkout(for: day)
+        }
+        let workouts = [primary] + (edit.additionalDetailedWorkouts ?? [])
+        return workouts.indices.contains(editingWorkoutIndex)
+            ? workouts[editingWorkoutIndex] : primary
+    }
+
     private func moveGuidedWorkout(from index: Int, by offset: Int) {
         let key = weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)
         guard var edit = weekDayEdits[key], let primary = edit.detailedWorkout else { return }
@@ -3441,8 +3457,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                     .foregroundStyle(ATHLTHPlanDesign.accent)
                                     .frame(width: 30)
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(workout.title)
-                                        .font(.subheadline.weight(.semibold))
+                                    Button {
+                                        selectedPlanWeekIndex = guidedCurrentWeek
+                                        editingWorkoutIndex = index
+                                        addingExtraWorkout = false
+                                        composingAdvancedDay = WeekDayEditorSelection(id: guidedCurrentWeekday)
+                                    } label: {
+                                        Text(workout.title)
+                                            .font(.subheadline.weight(.semibold))
+                                    }
+                                    .buttonStyle(.plain)
                                         .foregroundStyle(ATHLTHPlanDesign.ink)
                                     Text("\(workout.durationMinutes) min · \(workout.blocks.count) " +
                                          ATHLTHLocalization.choose(english: "blocks", norwegian: "blokker"))
