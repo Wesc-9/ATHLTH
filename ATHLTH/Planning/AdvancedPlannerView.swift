@@ -5685,7 +5685,7 @@ struct SessionEditorView: View {
 
                     if kind == .walking || kind == .running {
                         Stepper(
-                            "Distance: \(distanceKilometers, specifier: "%.1f") km",
+                            ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse") + ": \(distanceKilometers, specifier: "%.1f") km",
                             value: $distanceKilometers,
                             in: 0.5...100,
                             step: 0.5
@@ -5744,9 +5744,8 @@ struct SessionEditorView: View {
                 )
 
 
-                if (existingWorkout == nil || kind == .strength) &&
-                    (onPreparedWorkout == nil ||
-                        initialSourceWorkout?.allowInviteeExercises == true) {
+                if onPreparedWorkout == nil ||
+                    initialSourceWorkout?.allowInviteeExercises == true {
                     Section {
                         VStack(alignment: .leading, spacing: 12) {
                             Label(
@@ -5771,7 +5770,7 @@ struct SessionEditorView: View {
                                     }
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(14)
-                                    .background(ATHLTHTheme.accentSoft, in: RoundedRectangle(cornerRadius: 17))
+                                    .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 17))
                                 }
                                 .buttonStyle(.plain)
 
@@ -5794,9 +5793,9 @@ struct SessionEditorView: View {
                                 }
                                 .buttonStyle(.plain)
                             }
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .foregroundStyle(ATHLTHPlanDesign.accent)
                         }
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 10)
                     }
                     .listRowBackground(ATHLTHTheme.card)
                     .listRowSeparator(.hidden)
