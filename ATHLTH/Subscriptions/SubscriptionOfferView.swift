@@ -318,12 +318,10 @@ struct SubscriptionOfferView: View {
                 english: "Prices and currency are provided by your App Store.",
                 norwegian: "Priser og valuta hentes fra din App Store."
             ))
-            if let currency = Storefront.current?.currency?.identifier {
-                Text(ATHLTHLocalization.choose(
-                    english: "App Store currency: \(currency)",
-                    norwegian: "App Store-valuta: \(currency)"
-                ))
-            }
+            // StoreKit displayPrice already contains the purchase currency.
+            // Storefront.current is async and cannot be read in View.body.
+            // Never convert it from the user's GPS or device region.
+
         }
         .font(.caption2)
         .foregroundStyle(OnboardingTheme.mutedText)
