@@ -27,6 +27,30 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
         return notes
     }
 
+    // Prefer the actual executable recipe, including interval repetitions,
+    // recoveries, pace/zones and exercise targets. Text notes are only a
+    // fallback for older calendar sessions without structured blocks.
+    private var detailedBlocks: [WorkoutTemplateBlock] {
+        let stored = currentWorkout.resolvedWorkoutBlocks
+        if !stored.isEmpty { return stored }
+        if !currentWorkout.resolvedRunningWorkouts.isEmpty {
+            return currentWorkout.resolvedRunningWorkouts.flatMap {
+                $0.recipePreviewBlocks
+            }
+        }
+        if !currentWorkout.exercises.isEmpty {
+            return ATHLTHUnifiedWorkout.editorBlocks(from: currentWorkout)
+        }
+        return []
+    }
+
+    private var detailCategory: String {
+        currentWorkout.workoutCategory ??
+            (currentWorkout.kind == .running ? "running" :
+             currentWorkout.kind == .walking ? "walking" :
+             currentWorkout.kind == .strength ? "strength" : "hybrid")
+    }
+
     private func workoutSteps(from notes: String) -> [String] {
         // Only render an outline when the user has actually separated the
         // notes into stages. Ordinary prose stays intact in a single block.
@@ -42,11 +66,28 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
                 sheetHeader
                 overviewCard
 
+                // Full read-only programming timeline for authored workouts.
+                // The outline also supports the Simple/Advanced detail toggle.
+                if !detailedBlocks.isEmpty {
+                    ATHLTHWorkoutRecipePreview(
+                        title: currentWorkout.title,
+                        summary: "",
+                        category: detailCategory,
+                        symbol: currentWorkout.kind.systemImage,
+                        difficulty: nil,
+                        durationMinutes: currentWorkout.durationMinutes,
+                        blocks: detailedBlocks,
+                        embeddedInDetails: true
+                    )
+                }
+
+                // Preserve free-form instructions for older workouts and
+                // additional trainer notes for structured prescriptions.
                 if let notes = workoutNotes {
                     notesCard(notes)
                 }
 
-                if !currentWorkout.exercises.isEmpty {
+                if detailedBlocks.isEmpty && !currentWorkout.exercises.isEmpty {
                     exercisesCard
                 }
 
