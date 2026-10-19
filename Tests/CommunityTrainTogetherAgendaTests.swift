@@ -160,3 +160,39 @@ final class CommunityTrainTogetherAgendaTests: XCTestCase {
     }
 
 }
+
+final class TrainTogetherMarketplaceErrorPolicyTests: XCTestCase {
+    func testSwiftTaskCancellationDoesNotCountAsFailure() {
+        XCTAssertTrue(
+            TrainTogetherMarketplaceErrorPolicy.isCancellation(
+                CancellationError()
+            )
+        )
+    }
+
+    func testCancelledURLSessionRequestDoesNotCountAsFailure() {
+        XCTAssertTrue(
+            TrainTogetherMarketplaceErrorPolicy.isCancellation(
+                URLError(.cancelled)
+            )
+        )
+        XCTAssertTrue(
+            TrainTogetherMarketplaceErrorPolicy.isCancellation(
+                NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled)
+            )
+        )
+    }
+
+    func testRealNetworkAndBackendErrorsRemainVisible() {
+        XCTAssertFalse(
+            TrainTogetherMarketplaceErrorPolicy.isCancellation(
+                URLError(.timedOut)
+            )
+        )
+        XCTAssertFalse(
+            TrainTogetherMarketplaceErrorPolicy.isCancellation(
+                NSError(domain: "PostgrestError", code: 401)
+            )
+        )
+    }
+}
