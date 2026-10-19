@@ -863,31 +863,16 @@ struct WatchHomeView: View {
     }
 }
 
-/// Lightweight vector ATHLTH A mark. Avoids loading full app-icon
-/// artwork into the memory-limited Watch home view.
+/// Reuses ATHLTH's actual vector logo from Shared/ATHLTHBrandMark.swift.
+/// No watch-only brand redesign and no extra image decode/memory cost.
 private struct ATHLTHWatchLogomark: View {
     var body: some View {
-        GeometryReader { geometry in
-            let width = geometry.size.width
-            let height = geometry.size.height
-            ZStack {
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(WatchTheme.planSelected)
-
-                Path { path in
-                    path.move(to: CGPoint(x: width * 0.24, y: height * 0.78))
-                    path.addLine(to: CGPoint(x: width * 0.49, y: height * 0.19))
-                    path.addLine(to: CGPoint(x: width * 0.78, y: height * 0.78))
-                    path.move(to: CGPoint(x: width * 0.34, y: height * 0.58))
-                    path.addLine(to: CGPoint(x: width * 0.68, y: height * 0.58))
-                }
-                .stroke(
-                    WatchTheme.planAccent,
-                    style: StrokeStyle(
-                        lineWidth: 2.7, lineCap: .round, lineJoin: .round
-                    )
-                )
-            }
+        ZStack {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(WatchTheme.planSelected)
+            ATHLTHMarkShape()
+                .fill(WatchTheme.planAccent)
+                .frame(width: 24, height: 20)
         }
         .accessibilityHidden(true)
     }
