@@ -194,8 +194,11 @@ struct ATHLTHTrainIntervalComposerView: View {
     private var estimate: (duration: Double?, distanceMeters: Double?) {
         // Project from the exact recipe being edited, including all per-drag
         // speed and pause overrides. Never persist this as recorded training.
+        let now = Date()
         let template = RunningWorkoutTemplate(
-            title: name, summary: "", blocks: blocks
+            id: UUID(), title: name, type: .intervals, summary: "",
+            blocks: blocks, routeID: nil, isBuiltIn: false,
+            createdAt: now, updatedAt: now
         )
         return (template.estimatedDurationSeconds, template.estimatedDistanceMeters)
     }
