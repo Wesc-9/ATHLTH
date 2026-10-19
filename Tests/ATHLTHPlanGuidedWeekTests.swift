@@ -80,6 +80,23 @@ final class ATHLTHPlanGuidedWeekTests: XCTestCase {
         } }, [8, 19])
     }
 
+    func testWorkoutStartTimeSurvivesPlanDraftSerialization() throws {
+        var original = workout("Morgenøkt")
+        original.startMinuteOfDay = 7 * 60 + 30
+        let data = try JSONEncoder().encode(original)
+        let restored = try JSONDecoder().decode(
+            ATHLTHPlanStructuredWorkoutBlueprint.self, from: data)
+        XCTAssertEqual(restored.startMinuteOfDay, 450)
+    }
+
+    func testLegacyWorkoutWithoutStartTimeStillDecodes() throws {
+        let legacy = workout("Uten klokkeslett")
+        let data = try JSONEncoder().encode(legacy)
+        let restored = try JSONDecoder().decode(
+            ATHLTHPlanStructuredWorkoutBlueprint.self, from: data)
+        XCTAssertNil(restored.startMinuteOfDay)
+    }
+
     func testPreviouslyPersistedEditCanDecodeWithOptionalNewFields() throws {
         let legacy = ATHLTHPlanWeekDayEdit(
             kind: .strength, title: "Legacy", durationMinutes: 40,
