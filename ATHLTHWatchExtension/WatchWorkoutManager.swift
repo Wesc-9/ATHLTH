@@ -3974,7 +3974,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 phase: finishedStep.phase,
                 activeSeconds: seconds,
                 distanceMeters: meters,
-                isUserReported: false
+                isUserReported: false,
+                targetPaceSecondsPerKilometer:
+                    finishedStep.targetPaceMinSecondsPerKilometer
             ))
         }
 
