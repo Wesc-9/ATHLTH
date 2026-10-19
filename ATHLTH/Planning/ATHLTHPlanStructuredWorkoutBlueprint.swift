@@ -9,6 +9,8 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
     var durationMinutes: Int
     var routeID: UUID?
     var blocks: [WorkoutTemplateBlock]
+    /// Minutes since local midnight; nil means no fixed start time.
+    var startMinuteOfDay: Int? = nil
 
     var isValid: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -52,6 +54,12 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
             notes: nil
         )
         workout.title = title
+        if let startMinuteOfDay, (0..<1440).contains(startMinuteOfDay),
+           let day = workout.scheduledStart {
+            let calendar = Calendar.current
+            workout.scheduledStart = calendar.date(byAdding: .minute,
+                value: startMinuteOfDay, to: calendar.startOfDay(for: day))
+        }
         workout.kind = kind
         workout.durationMinutes = min(max(durationMinutes, 5), 240)
         workout.routeID = blocks.contains(where: {
