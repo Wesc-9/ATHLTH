@@ -1143,7 +1143,10 @@ struct MessageInboxView: View {
                 .foregroundStyle(.orange)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Messages could not refresh")
+                Text(ATHLTHLocalization.choose(
+                    english: "Messages could not refresh",
+                    norwegian: "Kunne ikke oppdatere meldinger"
+                ))
                     .font(.subheadline.weight(.semibold))
 
                 Text(message)
@@ -1162,8 +1165,17 @@ struct MessageInboxView: View {
                 }
             } label: {
                 Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(width: ATHLTHPlanDesign.minTapHeight,
+                           height: ATHLTHPlanDesign.minTapHeight)
+                    .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Try updating messages again",
+                norwegian: "Prøv å oppdatere meldingene igjen"
+            ))
         }
         .padding(14)
         .background(

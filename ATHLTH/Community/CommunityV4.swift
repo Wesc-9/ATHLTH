@@ -6058,11 +6058,17 @@ private struct CommunityV4EmptyActivityCard: View {
                 alignment: .leading,
                 spacing: 4
             ) {
-                Text("Nothing shared yet")
+                Text(ATHLTHLocalization.choose(
+                    english: "Nothing shared yet",
+                    norwegian: "Ingenting delt ennå"
+                ))
                     .font(.headline)
 
                 Text(
-                    "Workouts, events, challenges and milestones from people you follow will appear here."
+                    ATHLTHLocalization.choose(
+                        english: "Workouts, events, challenges and milestones from people you follow will appear here.",
+                        norwegian: "Økter, arrangementer, utfordringer og milepæler fra dem du følger vises her."
+                    )
                 )
                 .font(.caption)
                 .foregroundStyle(

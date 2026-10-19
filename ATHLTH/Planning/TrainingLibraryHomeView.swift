@@ -2546,7 +2546,9 @@ struct PersonalizeTrainingPlanView: View {
                             Divider()
 
                             HStack {
-                                Text("Plan begins")
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Plan begins", norwegian: "Planen starter"
+                                ))
                                     .font(.subheadline)
                                     .foregroundStyle(
                                         ATHLTHTheme.mutedText
@@ -2564,7 +2566,10 @@ struct PersonalizeTrainingPlanView: View {
                             }
 
                             Text(
-                                "Library plans run Monday–Sunday. ATHLTH starts this plan on the first Monday on or after your preferred date."
+                                ATHLTHLocalization.choose(
+                                    english: "Library plans run Monday–Sunday. ATHLTH starts this plan on the first Monday on or after your preferred date.",
+                                    norwegian: "Bibliotekplaner går fra mandag til søndag. Planen starter første mandag på eller etter ønsket dato."
+                                )
                             )
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -2572,7 +2577,9 @@ struct PersonalizeTrainingPlanView: View {
                             Divider()
 
                             HStack {
-                                Text("Estimated finish")
+                                Text(ATHLTHLocalization.choose(
+                                        english: "Estimated finish", norwegian: "Forventet sluttdato"
+                                    ))
                                     .font(.subheadline)
                                     .foregroundStyle(
                                         ATHLTHTheme.mutedText
@@ -2595,7 +2602,9 @@ struct PersonalizeTrainingPlanView: View {
                         VStack(alignment: .leading, spacing: 13) {
                             HStack {
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text("TRAINING DAYS")
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "TRAINING DAYS", norwegian: "TRENINGSDAGER"
+                                    ))
                                         .font(
                                             .system(
                                                 size: 9,
@@ -2764,11 +2773,17 @@ struct PersonalizeTrainingPlanView: View {
                             .foregroundStyle(Color.orange)
 
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("This overlaps another plan")
+                                Text(ATHLTHLocalization.choose(
+                                    english: "This overlaps another plan",
+                                    norwegian: "Perioden overlapper en annen plan"
+                                ))
                                     .font(.subheadline.weight(.semibold))
 
                                 Text(
-                                    "\(conflict.title) already covers part of these dates. Choose another start date."
+                                    ATHLTHLocalization.choose(
+                                        english: "\(conflict.title) already covers part of these dates. Choose another start date.",
+                                        norwegian: "\(conflict.title) dekker allerede deler av perioden. Velg en annen startdato."
+                                    )
                                 )
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -3197,7 +3212,9 @@ struct MyTrainingPlansLibraryView: View {
                 accent: ATHLTHTheme.accent.opacity(0.26)
             )
         )
-        .navigationTitle("My Plans")
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "My Plans", norwegian: "Mine planer"
+        ))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -3206,7 +3223,9 @@ struct MyTrainingPlansLibraryView: View {
                 } label: {
                     Image(systemName: "plus")
                 }
-                .accessibilityLabel("Create training plan")
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Create training plan", norwegian: "Opprett treningsplan"
+                ))
             }
         }
         .sheet(isPresented: $showingCreatePlan) {
@@ -3725,11 +3744,17 @@ struct MissedWorkoutsReviewView: View {
                                     ATHLTHTheme.vitality
                                 )
 
-                                Text("Nothing needs your attention")
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Nothing needs your attention",
+                                    norwegian: "Alt er i rute"
+                                ))
                                     .font(.headline)
 
                                 Text(
-                                    "Your plan can continue exactly as scheduled."
+                                    ATHLTHLocalization.choose(
+                                        english: "Your plan can continue exactly as scheduled.",
+                                        norwegian: "Planen kan fortsette som planlagt."
+                                    )
                                 )
                                 .font(.subheadline)
                                 .foregroundStyle(
@@ -4204,11 +4229,17 @@ struct LibraryFavoritesView: View {
                             )
 
                         VStack(spacing: 5) {
-                            Text("Nothing saved here yet")
+                            Text(ATHLTHLocalization.choose(
+                                english: "Nothing saved here yet",
+                                norwegian: "Ingen lagrede favoritter ennå"
+                            ))
                                 .font(.title3.weight(.semibold))
 
                             Text(
-                                "Tap the star on a plan, workout, exercise or route and it will appear here."
+                                ATHLTHLocalization.choose(
+                                    english: "Tap the star on a plan, workout, exercise or route and it will appear here.",
+                                    norwegian: "Trykk på stjernen ved en plan, økt, øvelse eller rute for å lagre den her."
+                                )
                             )
                             .font(.subheadline)
                             .foregroundStyle(
