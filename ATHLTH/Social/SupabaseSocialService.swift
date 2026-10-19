@@ -673,7 +673,8 @@ final class SupabaseSocialService: Sendable {
                         activityID: activityID,
                         userID: currentUserID,
                         reaction: reaction.rawValue
-                    )
+                    ),
+                    onConflict: "activity_id,user_id"
                 )
                 .execute()
         } else {
