@@ -43,6 +43,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
     @Published private(set) var connectionText = "Connecting to iPhone"
     @Published private(set) var companionLinked = false
     @Published private(set) var todayWorkout: WatchTodayWorkoutTransfer?
+    @Published private(set) var todayWorkouts: [WatchTodayWorkoutTransfer] = []
     @Published private(set) var preparedWorkout: WatchPreparedWorkoutTransfer?
     @Published private(set) var spotifyPlaybackState =
         WatchSpotifyPlaybackState.unavailable
@@ -50,6 +51,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
     private let fileManager = FileManager.default
     private let todayWorkoutDefaultsKey =
         "athlth.watch.todayWorkout.v1"
+    private let todayWorkoutsDefaultsKey = "athlth.watch.todayWorkouts.v1"
     private let preparedWorkoutDefaultsKey =
         "athlth.watch.preparedWorkout.v1"
     private let preparedWorkoutSnapshotDateKey =
@@ -62,6 +64,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
         super.init()
         loadRoutes()
         loadTodayWorkout()
+        loadTodayWorkouts()
         loadPreparedWorkout()
         activateConnectivity()
     }
@@ -189,6 +192,25 @@ final class WatchRouteStore: NSObject, ObservableObject {
             data,
             forKey: todayWorkoutDefaultsKey
         )
+    }
+
+    private func loadTodayWorkouts() {
+        guard let data = UserDefaults.standard.data(forKey: todayWorkoutsDefaultsKey),
+              let snapshot = try? JSONDecoder().decode(WatchTodaySnapshot.self, from: data),
+              Calendar.current.isDateInToday(snapshot.updatedAt) else {
+            todayWorkouts = todayWorkout.map { [$0] } ?? []
+            return
+        }
+        todayWorkouts = snapshot.scheduledWorkouts
+    }
+
+    private func storeTodayWorkouts(_ workouts: [WatchTodayWorkoutTransfer]) {
+        todayWorkouts = workouts
+        let snapshot = WatchTodaySnapshot(
+            workout: workouts.first, updatedAt: Date(), workouts: workouts)
+        if let data = try? JSONEncoder().encode(snapshot) {
+            UserDefaults.standard.set(data, forKey: todayWorkoutsDefaultsKey)
+        }
     }
 
     private func loadPreparedWorkout() {
@@ -519,9 +541,8 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 forKey:
                     "athlth.watch.todayWorkoutSnapshotDate.v1"
             )
-            storeTodayWorkout(
-                snapshot.workout
-            )
+            storeTodayWorkout(snapshot.workout)
+            storeTodayWorkouts(snapshot.scheduledWorkouts)
 
         case .strengthSnapshot:
             guard let snapshot = try? JSONDecoder().decode(
