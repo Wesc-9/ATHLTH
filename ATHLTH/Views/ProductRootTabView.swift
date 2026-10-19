@@ -230,6 +230,9 @@ struct ProductRootTabView: View {
                 .tag(4)
         }
         .tint(ATHLTHTheme.accentDeep)
+        // Preserve measured Watch intervals before their result queue is
+        // acknowledged; recording eligibility is checked by the receiver.
+        .modifier(ATHLTHRunningPerformanceReceiver())
         .toolbarBackground(.ultraThinMaterial, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
         .toolbarColorScheme(.light, for: .tabBar)
