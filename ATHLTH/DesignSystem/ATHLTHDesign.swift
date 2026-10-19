@@ -123,7 +123,7 @@ struct ATHLTHCard<Content: View>: View {
                 style: .continuous
             )
             .stroke(
-                Color.white.opacity(0.72),
+                ATHLTHPlanDesign.outline,
                 lineWidth: 0.8
             )
         }
@@ -578,7 +578,7 @@ struct ATHLTHPremiumScreenHeader<Actions: View>: View {
 struct ATHLTHPremiumIconButton: View {
     let systemImage: String
     let accessibilityLabel: String
-    var tint: Color = ATHLTHTheme.vitality
+    var tint: Color = ATHLTHPlanDesign.accent
     let action: () -> Void
 
     var body: some View {
