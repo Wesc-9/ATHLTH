@@ -230,6 +230,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var structuredStepStartElapsedTime: TimeInterval = 0
     private var structuredStepStartDistanceMeters: Double = 0
     private var structuredWorkoutComplete = false
+    private var recordedStructuredRunSteps: [ATHLTHRecordedRunningStep] = []
     private var plannedRouteLocations: [CLLocation] = []
     private var plannedRouteCumulativeMeters: [Double] = []
     private var plannedRouteGeometryMeters: Double = 0
@@ -447,6 +448,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         structuredStepStartElapsedTime = elapsedTime
         structuredStepStartDistanceMeters = distanceMeters
         structuredWorkoutComplete = false
+        recordedStructuredRunSteps = []
         offRouteStartedAt = nil
         lastOffRouteAlertAt = nil
         routeWasOff = false
@@ -3959,7 +3961,24 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
-        let nextIndex = structuredStepIndex + 1
+        let finishedIndex = structuredStepIndex
+        let seconds = elapsedTime - structuredStepStartElapsedTime
+        let meters = distanceMeters - structuredStepStartDistanceMeters
+        if seconds >= 10, meters >= 0,
+           workout.steps.indices.contains(finishedIndex),
+           !recordedStructuredRunSteps.contains(where: { $0.index == finishedIndex }) {
+            let finishedStep = workout.steps[finishedIndex]
+            recordedStructuredRunSteps.append(ATHLTHRecordedRunningStep(
+                index: finishedIndex,
+                title: finishedStep.title,
+                phase: finishedStep.phase,
+                activeSeconds: seconds,
+                distanceMeters: meters,
+                isUserReported: false
+            ))
+        }
+
+        let nextIndex = finishedIndex + 1
 
         guard workout.steps.indices.contains(nextIndex) else {
             structuredWorkoutComplete = true
@@ -6244,6 +6263,16 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             routeTitle:
                 plannedRoute?.title
         )
+
+        if structuredWorkoutComplete,
+           let structured = structuredRunningWorkout,
+           !structured.steps.isEmpty,
+           recordedStructuredRunSteps.count == structured.steps.count {
+            result.structuredWorkoutFullyCompleted = true
+            result.structuredWorkoutSourceID = structured.sourceWorkoutID
+            result.structuredWorkoutTitle = structured.title
+            result.recordedRunningSteps = recordedStructuredRunSteps
+        }
 
         if kind == .strength {
             result.strengthSnapshot =
