@@ -851,7 +851,7 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
         let challengeID = existing?.id ?? UUID()
         let previousHeroAsset = {
             let asset = existing?.heroAsset ?? ""
-            return ["CommunityHero", "TrainHero"].contains(asset)
+            return ["CommunityHero", "TrainHero", "HomeHero", "ProfileHero"].contains(asset)
                 ? ""
                 : asset
         }()
@@ -1245,7 +1245,9 @@ struct OfficialWeeklyChallengeArtwork: View {
     private var legacyGenericAssets: Set<String> {
         [
             "CommunityHero",
-            "TrainHero"
+            "TrainHero",
+            "HomeHero",
+            "ProfileHero"
         ]
     }
 
@@ -1394,17 +1396,17 @@ struct OfficialWeeklyChallengeArtwork: View {
         switch challenge.kind {
         case .distance:
             return variant.isMultiple(of: 2)
-                ? "HomeHero"
+                ? "ProgressHero"
                 : "StrengthPostWorkoutHero"
 
         case .sessions:
-            return "HomeHero"
+            return "ProgressHero"
 
         case .minutes:
             return "StrengthPostWorkoutHero"
 
         case .streak:
-            return "ProfileHero"
+            return "ProgressHero"
         }
     }
 
@@ -1813,7 +1815,7 @@ struct OfficialWeeklyChallengeCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
                     Label(
-                        "WEEKLY CHALLENGE",
+                        ATHLTHLocalization.choose(english: "WEEKLY CHALLENGE", norwegian: "UKENS UTFORDRING"),
                         systemImage: "trophy.fill"
                     )
                     .font(.system(size: 10, weight: .bold))
@@ -2089,7 +2091,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
                         Label(
-                            "WEEKLY CHALLENGE",
+                            ATHLTHLocalization.choose(english: "WEEKLY CHALLENGE", norwegian: "UKENS UTFORDRING"),
                             systemImage: "sparkles"
                         )
                         .font(.system(size: 10, weight: .bold))
@@ -2169,7 +2171,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                 HStack(alignment: .top, spacing: 16) {
                     VStack(alignment: .leading, spacing: 5) {
                         Text(
-                            "YOUR WEEKLY TARGET"
+                            ATHLTHLocalization.choose(english: "YOUR WEEKLY TARGET", norwegian: "UKENS MÅL")
                         )
                         .font(.caption.weight(.bold))
                         .tracking(1.5)
@@ -2258,7 +2260,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                             .font(.headline.bold())
                             .monospacedDigit()
 
-                            Text("done")
+                            Text(ATHLTHLocalization.choose(english: "done", norwegian: "fullført"))
                                 .font(.system(size: 9, weight: .medium))
                                 .foregroundStyle(.secondary)
                         }
@@ -2275,19 +2277,19 @@ struct OfficialWeeklyChallengeDetailView: View {
                 ) {
                     OfficialWeeklyChallengeCompactStat(
                         icon: "scope",
-                        title: "TARGET",
+                        title: ATHLTHLocalization.choose(english: "TARGET", norwegian: "MÅL"),
                         value: compactTargetText(
                             for: challenge
                         ),
                         detail:
                             challenge.kind == .distance
-                                ? "Run or walk"
-                                : "Weekly goal"
+                                ? ATHLTHLocalization.choose(english: "Run or walk", norwegian: "Løp eller gå")
+                                : ATHLTHLocalization.choose(english: "Weekly goal", norwegian: "Ukens mål")
                     )
 
                     OfficialWeeklyChallengeCompactStat(
                         icon: "chart.bar.fill",
-                        title: "PROGRESS",
+                        title: ATHLTHLocalization.choose(english: "PROGRESS", norwegian: "FREMGANG"),
                         value: progressPercentText(
                             for: challenge
                         ),
@@ -2298,7 +2300,7 @@ struct OfficialWeeklyChallengeDetailView: View {
 
                     OfficialWeeklyChallengeCompactStat(
                         icon: "calendar",
-                        title: "TIME LEFT",
+                        title: ATHLTHLocalization.choose(english: "TIME LEFT", norwegian: "TID IGJEN"),
                         value: shortTimeRemaining(
                             for: challenge
                         ),
@@ -2309,7 +2311,7 @@ struct OfficialWeeklyChallengeDetailView: View {
 
                     OfficialWeeklyChallengeCompactStat(
                         icon: "trophy.fill",
-                        title: "YOUR RANK",
+                        title: ATHLTHLocalization.choose(english: "YOUR RANK", norwegian: "DIN PLASSERING"),
                         value: rankText(
                             for: challenge
                         ),
@@ -2362,7 +2364,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                                 spacing: 3
                             ) {
                                 Text(
-                                    "Counted workouts"
+                                    ATHLTHLocalization.choose(english: "Counted workouts", norwegian: "Tellende økter")
                                 )
                                 .font(
                                     .subheadline
@@ -2377,7 +2379,7 @@ struct OfficialWeeklyChallengeDetailView: View {
 
                                 Text(
                                     countedWorkouts.isEmpty
-                                        ? "Your qualifying workouts will appear here."
+                                        ? ATHLTHLocalization.choose(english: "Your qualifying workouts will appear here.", norwegian: "Tellende treningsøkter vises her.")
                                         : "\(countedWorkouts.count) qualifying \(countedWorkouts.count == 1 ? "workout" : "workouts") this week"
                                 )
                                 .font(.caption)
@@ -2640,7 +2642,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                     eyebrow: "GOAL",
                     value: compactTargetText(for: challenge),
                     detail: challenge.kind == .distance
-                        ? "Run or walk"
+                        ? ATHLTHLocalization.choose(english: "Run or walk", norwegian: "Løp eller gå")
                         : "This week"
                 )
 
@@ -3030,7 +3032,7 @@ struct OfficialWeeklyChallengeDetailView: View {
         ATHLTHPlanSurface {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Counted workouts")
+                    Text(ATHLTHLocalization.choose(english: "Counted workouts", norwegian: "Tellende økter"))
                         .font(.title3.bold())
 
                     Text(
@@ -5227,7 +5229,7 @@ private struct OfficialWeeklyChallengeEditorPreviewCard:
                     Label(
                         ATHLTHLocalization.choose(
                             english:
-                                "WEEKLY CHALLENGE",
+                                ATHLTHLocalization.choose(english: "WEEKLY CHALLENGE", norwegian: "UKENS UTFORDRING"),
                             norwegian:
                                 "UKENS CHALLENGE"
                         ),
