@@ -1091,6 +1091,17 @@ struct WatchTodayWorkoutTransfer: Codable, Hashable {
 struct WatchTodaySnapshot: Codable, Hashable {
     var workout: WatchTodayWorkoutTransfer?
     var updatedAt: Date
+    // Optional for backwards compatibility with existing Watch snapshots.
+    // The iPhone can send all sessions for a day, not only the first one.
+    var workouts: [WatchTodayWorkoutTransfer]? = nil
+
+    var scheduledWorkouts: [WatchTodayWorkoutTransfer] {
+        let candidates = workouts ?? workout.map { [$0] } ?? []
+        return candidates.sorted {
+            ($0.scheduledStart ?? .distantFuture) <
+                ($1.scheduledStart ?? .distantFuture)
+        }
+    }
 }
 
 struct WatchWorkoutLapSummary: Codable, Hashable {
