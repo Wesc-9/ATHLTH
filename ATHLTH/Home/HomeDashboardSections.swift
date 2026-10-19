@@ -4173,7 +4173,9 @@ private struct HomeWeeklyProgressDaySheet: View {
                     NavigationStack {
                         HomeWeeklyStandaloneWorkoutDetailView(workout: workout)
                     }
-                    .presentationDetents([.fraction(0.85), .large])
+                    // Start as a compact details sheet; expand only when needed
+                    // for longer outlines, exercise lists or accessibility text.
+                    .presentationDetents([.fraction(0.76), .large])
                     .presentationDragIndicator(.visible)
                     .presentationCornerRadius(28)
                 }
