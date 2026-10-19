@@ -470,6 +470,40 @@ struct PlannedWorkoutDetailView: View {
                     )
                 }
 
+                // Planned distance is separate from estimated distance.
+                // The latter is never considered recorded progress.
+                if currentWorkout.kind == .running ||
+                   currentWorkout.kind == .walking {
+                    if currentWorkout.targetDistanceKilometers == nil,
+                       let estimated = ATHLTHRunningEstimate.distanceMeters(
+                           for: currentWorkout.resolvedWorkoutBlocks
+                       ) {
+                        detailRow(
+                            icon: "point.topleft.down.to.point.bottomright.curvepath",
+                            title: ATHLTHLocalization.choose(
+                                english: "Estimated distance",
+                                norwegian: "Estimert distanse"
+                            ),
+                            value: String(format: "~%.2f km", estimated / 1_000)
+                        )
+                    } else if currentWorkout.targetDistanceKilometers == nil,
+                              currentWorkout.resolvedWorkoutBlocks.isEmpty,
+                              let pace = currentWorkout.targetPaceSecondsPerKilometer,
+                              pace > 0, pace.isFinite,
+                              let minutes = currentWorkout.durationMinutes,
+                              minutes > 0 {
+                        detailRow(
+                            icon: "point.topleft.down.to.point.bottomright.curvepath",
+                            title: ATHLTHLocalization.choose(
+                                english: "Estimated distance",
+                                norwegian: "Estimert distanse"
+                            ),
+                            value: String(format: "~%.2f km",
+                                          Double(minutes) * 60 / pace)
+                        )
+                    }
+                }
+
                 if let pace = currentWorkout.targetPaceSecondsPerKilometer {
                     detailRow(
                         icon: "speedometer",
