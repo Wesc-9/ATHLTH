@@ -13,6 +13,10 @@ struct ATHLTHIntervalRepetitionEditorView: View {
     @State private var workMeters: Int
     @State private var paceEnabled: Bool
     @State private var paceSeconds: Int
+    @State private var paceAsSpeed: Bool
+    @State private var targetSpeedKmh: Double
+    @State private var recoverySpeedEnabled: Bool
+    @State private var recoverySpeedKmh: Double
     @State private var heartRateEnabled: Bool
     @State private var heartRateZone: Int
     @State private var recoveryEnabled: Bool
@@ -37,6 +41,13 @@ struct ATHLTHIntervalRepetitionEditorView: View {
         _workMeters = State(initialValue: max(100, Int(work.distanceMeters ?? 1000)))
         _paceEnabled = State(initialValue: work.intensity.paceMinSecondsPerKilometer != nil)
         _paceSeconds = State(initialValue: Int(work.intensity.paceMinSecondsPerKilometer ?? 300))
+        _paceAsSpeed = State(initialValue: work.intensity.paceMinSecondsPerKilometer != nil)
+        _targetSpeedKmh = State(initialValue:
+            (3_600 / max(work.intensity.paceMinSecondsPerKilometer ?? 300, 1) * 10).rounded() / 10)
+        let recoveryPace = recovery?.intensity.paceMinSecondsPerKilometer
+        _recoverySpeedEnabled = State(initialValue: recoveryPace != nil)
+        _recoverySpeedKmh = State(initialValue:
+            (3_600 / max(recoveryPace ?? 600, 1) * 10).rounded() / 10)
         _heartRateEnabled = State(initialValue: work.intensity.heartRateZone != nil)
         _heartRateZone = State(initialValue: work.intensity.heartRateZone ?? 4)
         _recoveryEnabled = State(initialValue: recovery != nil)
@@ -66,8 +77,20 @@ struct ATHLTHIntervalRepetitionEditorView: View {
 
                     Toggle(tr("Target pace", "Måltempo"), isOn: $paceEnabled)
                     if paceEnabled {
-                        Stepper(paceLabel(paceSeconds), value: $paceSeconds,
-                                in: 150...1200, step: 5)
+                        Picker(tr("Set target using", "Angi målet som"), selection: $paceAsSpeed) {
+                            Text(tr("Speed (km/h)", "Hastighet (km/t)")).tag(true)
+                            Text(tr("Pace (min/km)", "Tempo (min/km)")).tag(false)
+                        }
+                        .pickerStyle(.segmented)
+                        if paceAsSpeed {
+                            Stepper(
+                                String(format: "%.1f km/t", targetSpeedKmh),
+                                value: $targetSpeedKmh, in: 3...25, step: 0.1
+                            )
+                        } else {
+                            Stepper(paceLabel(paceSeconds), value: $paceSeconds,
+                                    in: 150...1200, step: 5)
+                        }
                     }
 
                     Toggle(tr("Target HR zone", "Målsone for puls"), isOn: $heartRateEnabled)
@@ -102,6 +125,14 @@ struct ATHLTHIntervalRepetitionEditorView: View {
                                 Stepper("\(recoveryMeters) m",
                                         value: $recoveryMeters, in: 50...3000, step: 50)
                             }
+                            Toggle(tr("Target recovery speed", "Målhastighet i pausen"),
+                                   isOn: $recoverySpeedEnabled)
+                            if recoverySpeedEnabled {
+                                Stepper(
+                                    String(format: "%.1f km/t", recoverySpeedKmh),
+                                    value: $recoverySpeedKmh, in: 2...20, step: 0.1
+                                )
+                            }
                         }
                     } header: {
                         Text(tr("Recovery after effort", "Pause etter drag") + " \(repetition)")
@@ -125,21 +156,34 @@ struct ATHLTHIntervalRepetitionEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(tr("Save", "Lagre")) {
+                        let targetPace: Double? = paceEnabled
+                            ? (paceAsSpeed
+                                ? 3_600 / max(targetSpeedKmh, 0.1)
+                                : Double(paceSeconds))
+                            : nil
                         let intensity = RunningIntensityTarget(
                             kind: paceEnabled ? .pace : heartRateEnabled ? .heartRateZone : .easy,
-                            paceMinSecondsPerKilometer: paceEnabled ? Double(paceSeconds) : nil,
-                            paceMaxSecondsPerKilometer: paceEnabled ? Double(paceSeconds) : nil,
+                            paceMinSecondsPerKilometer: targetPace,
+                            paceMaxSecondsPerKilometer: targetPace,
                             heartRateZone: heartRateEnabled ? heartRateZone : nil,
                             rpe: nil
                         )
                         let work = measure == .time
                             ? RunningStepTarget.time(Double(workSeconds), intensity: intensity)
                             : RunningStepTarget.distance(Double(workMeters), intensity: intensity)
+                        let recoveryPace = recoverySpeedEnabled
+                            ? 3_600 / max(recoverySpeedKmh, 0.1) : nil
+                        let recoveryIntensity = RunningIntensityTarget(
+                            kind: recoverySpeedEnabled ? .pace : .easy,
+                            paceMinSecondsPerKilometer: recoveryPace,
+                            paceMaxSecondsPerKilometer: recoveryPace,
+                            heartRateZone: nil, rpe: nil
+                        )
                         let recovery: RunningStepTarget? = recoveryEnabled &&
                             repetition < totalRepetitions
                             ? (recoveryMeasure == .time
-                                ? .time(Double(recoverySeconds), intensity: .easy)
-                                : .distance(Double(recoveryMeters), intensity: .easy))
+                                ? .time(Double(recoverySeconds), intensity: recoveryIntensity)
+                                : .distance(Double(recoveryMeters), intensity: recoveryIntensity))
                             : nil
                         onSave(RunningRepetitionOverride(
                             repetition: repetition,
