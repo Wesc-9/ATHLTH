@@ -1,18 +1,18 @@
 import SwiftUI
 
 /// Arena-specific light canvas and restrained premium surfaces.
-/// Kept separate from the global app theme so other tabs are unchanged.
+/// Uses shared editorial tokens; Arena keeps dark competition accents only where needed.
 enum ATHLTHArenaLightStyle {
     // Shared editorial palette from Training Plan. All Arena surfaces use
     // these tokens, rather than introducing a competing green dashboard.
-    static let paper = Color(red: 0.986, green: 0.978, blue: 0.963)
+    static let paper = ATHLTHPlanDesign.warmCanvas
     static let canvas = paper
-    static let surface = Color.white
-    static let ink = Color(red: 0.18, green: 0.18, blue: 0.17)
-    static let secondary = Color(red: 0.48, green: 0.46, blue: 0.43)
-    static let warmGold = Color(red: 0.65, green: 0.53, blue: 0.35)
-    static let soft = Color(red: 0.964, green: 0.951, blue: 0.929)
-    static let line = Color(red: 0.89, green: 0.87, blue: 0.84)
+    static let surface = ATHLTHPlanDesign.surface
+    static let ink = ATHLTHPlanDesign.ink
+    static let secondary = ATHLTHPlanDesign.secondaryInk
+    static let warmGold = ATHLTHPlanDesign.accent
+    static let soft = ATHLTHPlanDesign.warmSurface
+    static let line = ATHLTHPlanDesign.warmDivider
     // Retain contrast on older dark competitive hero sections.
     static let action = Color(red: 0.075, green: 0.31, blue: 0.255)
     static let forest = Color(red: 0.055, green: 0.215, blue: 0.185)

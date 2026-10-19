@@ -3,16 +3,16 @@ import SwiftUI
 /// One visual language for Train Together discovery, scheduling, invitations,
 /// lobby, live progress, meetup and chat. Presentation-only; no state changes.
 enum ATHLTHTrainTogetherDesign {
-    static let canvas = Color(red: 0.985, green: 0.982, blue: 0.972)
-    static let surface = Color.white
+    static let canvas = ATHLTHPlanDesign.canvas
+    static let surface = ATHLTHPlanDesign.surface
     static let stone = ATHLTHTheme.cardWarm
-    static let ink = ATHLTHTheme.primaryText
-    static let secondary = ATHLTHTheme.mutedText
-    static let accent = ATHLTHTheme.accentDeep
-    static let accentSoft = ATHLTHTheme.accentSoft
-    static let outline = ATHLTHTheme.accentDeep.opacity(0.105)
-    static let radius: CGFloat = 22
-    static let touchTarget: CGFloat = 48
+    static let ink = ATHLTHPlanDesign.ink
+    static let secondary = ATHLTHPlanDesign.secondaryInk
+    static let accent = ATHLTHPlanDesign.accent
+    static let accentSoft = ATHLTHPlanDesign.selectedSurface
+    static let outline = ATHLTHPlanDesign.outline
+    static let radius: CGFloat = ATHLTHPlanDesign.cardRadius
+    static let touchTarget: CGFloat = ATHLTHPlanDesign.minTapHeight
 }
 
 private struct ATHLTHTrainTogetherCardChrome: ViewModifier {

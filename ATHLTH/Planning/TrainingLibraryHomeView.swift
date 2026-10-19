@@ -14,12 +14,12 @@ struct TrainingLibraryHomeView: View {
 
     let onStartRunning: (RunningWorkoutTemplate) -> Void
 
-    private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
-    private let muted = Color(red: 0.47, green: 0.46, blue: 0.45)
-    private let gold = Color(red: 0.65, green: 0.53, blue: 0.37)
-    private let slate = Color(red: 0.30, green: 0.36, blue: 0.47)
-    private let green = Color(red: 0.32, green: 0.47, blue: 0.40)
-    private let lavender = Color(red: 0.46, green: 0.41, blue: 0.66)
+    private let ink = ATHLTHPlanDesign.ink
+    private let muted = ATHLTHPlanDesign.secondaryInk
+    private let gold = ATHLTHPlanDesign.accent
+    private let slate = ATHLTHTheme.accentDeep
+    private let green = ATHLTHTheme.vitality
+    private let lavender = ATHLTHTheme.recoveryBlue
 
     private var layout: [GridItem] {
         [GridItem(.flexible(), spacing: 11), GridItem(.flexible(), spacing: 11)]

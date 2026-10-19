@@ -1,20 +1,20 @@
 import SwiftUI
 
 enum OnboardingTheme {
-    static let accent = Color(red: 0.78, green: 0.58, blue: 0.37)
-    static let success = ATHLTHTheme.accent
+    static let accent = ATHLTHPlanDesign.accent
+    static let success = ATHLTHTheme.vitality
 
     static let green = ATHLTHTheme.accent
     static let deepGreen = ATHLTHTheme.accentDeep
     static let warmHighlight = accent
 
     static let canvasTop = Color.white
-    static let canvasBottom = Color(red: 0.985, green: 0.980, blue: 0.970)
-    static let primaryText = Color(red: 0.08, green: 0.08, blue: 0.09)
-    static let mutedText = Color.black.opacity(0.58)
+    static let canvasBottom = ATHLTHPlanDesign.canvas
+    static let primaryText = ATHLTHPlanDesign.ink
+    static let mutedText = ATHLTHPlanDesign.secondaryInk
     static let faintText = Color.black.opacity(0.40)
 
-    static let card = Color.white
+    static let card = ATHLTHPlanDesign.surface
     static let cardStrong = Color.white
     static let subtleFill = Color.black.opacity(0.035)
     static let selectedFill = accent.opacity(0.095)

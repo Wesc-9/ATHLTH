@@ -10,6 +10,13 @@ enum ATHLTHPlanDesign {
     static let outline = ATHLTHTheme.accentDeep.opacity(0.10)
     static let surface = Color.white
     static let selectedSurface = accent.opacity(0.085)
+    // Shared editorial surfaces for Train, Library, Community and onboarding.
+    // Keep the legacy palette API intact while individual screens migrate.
+    static let warmCanvas = Color(red: 0.986, green: 0.978, blue: 0.963)
+    static let warmSurface = Color(red: 0.964, green: 0.951, blue: 0.929)
+    static let warmDivider = Color(red: 0.89, green: 0.87, blue: 0.84)
+    // Outgoing messages need white-text contrast; plain champagne is too light.
+    static let outgoingMessage = Color(red: 0.38, green: 0.29, blue: 0.21)
     static let cardRadius: CGFloat = 20
     static let fieldRadius: CGFloat = 14
     static let minTapHeight: CGFloat = 48

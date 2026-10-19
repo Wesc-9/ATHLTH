@@ -67,12 +67,12 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var editingPlan: TrainingPlan?
     @State private var trainingPlanPendingDeletion: TrainingPlan?
 
-    private let graphite = Color(red: 0.18, green: 0.18, blue: 0.17)
-    private let secondaryInk = Color(red: 0.48, green: 0.46, blue: 0.43)
-    private let warmGold = Color(red: 0.65, green: 0.53, blue: 0.35)
-    private let line = Color(red: 0.89, green: 0.87, blue: 0.84)
-    private let paper = Color(red: 0.986, green: 0.978, blue: 0.963)
-    private let soft = Color(red: 0.964, green: 0.951, blue: 0.929)
+    private let graphite = ATHLTHPlanDesign.ink
+    private let secondaryInk = ATHLTHPlanDesign.secondaryInk
+    private let warmGold = ATHLTHPlanDesign.accent
+    private let line = ATHLTHPlanDesign.warmDivider
+    private let paper = ATHLTHPlanDesign.warmCanvas
+    private let soft = ATHLTHPlanDesign.warmSurface
 
     private var plan: TrainingPlan? {
         if let id = focusedPlanID ?? highlightedPlanID,

@@ -27,10 +27,10 @@ struct ATHLTHTrainTodayPremiumView: View {
     let onGhostRace: () -> Void
 
 
-    private let ink = Color(red: 0.16, green: 0.16, blue: 0.16)
-    private let muted = Color(red: 0.47, green: 0.45, blue: 0.42)
-    private let champagne = Color(red: 0.65, green: 0.55, blue: 0.41)
-    private let hairline = Color(red: 0.88, green: 0.86, blue: 0.82)
+    private let ink = ATHLTHPlanDesign.ink
+    private let muted = ATHLTHPlanDesign.secondaryInk
+    private let champagne = ATHLTHPlanDesign.accent
+    private let hairline = ATHLTHPlanDesign.warmDivider
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {

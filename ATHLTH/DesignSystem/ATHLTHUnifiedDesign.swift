@@ -6,12 +6,12 @@ import SwiftUI
 enum ATHLTHUnifiedDesign {
     static let canvas = ATHLTHPlanDesign.canvas
     static let ink = ATHLTHTheme.primaryText
-    static let secondary = ATHLTHTheme.mutedText
-    static let accent = ATHLTHTheme.accentDeep
-    static let outline = ATHLTHTheme.accentDeep.opacity(0.12)
+    static let secondary = ATHLTHPlanDesign.secondaryInk
+    static let accent = ATHLTHPlanDesign.accent
+    static let outline = ATHLTHPlanDesign.outline
     static let surface = ATHLTHPlanDesign.surface
     static let selected = ATHLTHPlanDesign.selectedSurface
-    static let radius: CGFloat = 22
+    static let radius: CGFloat = ATHLTHPlanDesign.cardRadius
 }
 
 struct ATHLTHUnifiedCard<Content: View>: View {
