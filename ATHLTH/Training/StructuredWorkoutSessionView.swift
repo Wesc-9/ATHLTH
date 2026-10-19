@@ -45,7 +45,8 @@ enum StructuredWorkoutCompletionStore {
            history.contains(where: {
                $0.sourcePlanID == planID &&
                $0.sourceWorkoutID == completion.sourceWorkoutID &&
-               $0.completedBlockCount > 0
+               $0.totalBlockCount > 0 &&
+               $0.completedBlockCount == $0.totalBlockCount
            }) {
             return
         }
