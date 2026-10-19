@@ -3661,17 +3661,17 @@ struct ATHLTHHomeView: View {
     }
 
     private func syncHomeTodayWorkoutToWatch() {
-        guard let today = homeTodayPlanWorkout,
-              let watchKind =
-                PlannedWorkoutWatchBuilder.watchKind(
-                    for: today.workout.kind
-                )
-        else {
-            watchConnection.sendTodayWorkout(nil)
+        guard let plan = session.activePlan else {
+            watchConnection.sendTodayWorkouts([])
             return
         }
 
-        let workout = today.workout
+        let workouts = session.plannedSessions(on: Date(), in: plan)
+        var transfers: [WatchTodayWorkoutTransfer] = []
+        for workout in workouts {
+            guard let watchKind = PlannedWorkoutWatchBuilder.watchKind(
+                for: workout.kind
+            ) else { continue }
         let selectedRoute =
             PlannedWorkoutWatchBuilder.route(
                 for: workout,
@@ -3712,9 +3712,9 @@ struct ATHLTHHomeView: View {
                         .disabled
                 )
 
-        watchConnection.sendTodayWorkout(
+        transfers.append(
             WatchTodayWorkoutTransfer(
-                planID: today.planID,
+                planID: plan.id,
                 workoutID: workout.id,
                 title: workout.title,
                 summary:
@@ -3744,6 +3744,8 @@ struct ATHLTHHomeView: View {
                 updatedAt: Date()
             )
         )
+        }
+        watchConnection.sendTodayWorkouts(transfers)
     }
 
     private func homeStrengthWatchSnapshot(
