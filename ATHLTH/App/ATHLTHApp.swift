@@ -81,6 +81,8 @@ private struct ATHLTHSceneRootView: View {
                     .environmentObject(watchConnection)
                     .environmentObject(notifications)
                     .environmentObject(accountService)
+                    .environmentObject(social)
+                    .environmentObject(realtimeSocial)
                     .environment(
                         \.locale,
                         settings.interfaceLocale

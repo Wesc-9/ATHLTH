@@ -19,6 +19,8 @@ struct OnboardingFlowView: View {
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var accountService: SupabaseAccountService
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
@@ -41,6 +43,9 @@ struct OnboardingFlowView: View {
     @State private var appleSignInInProgress = false
     @State private var skipInProgress = false
     @State private var onboardingCompletionError: String?
+    @State private var consentToOnlineStatus = false
+    @State private var consentToTrainingStatus = false
+    @State private var finishingOnboarding = false
     @State private var showingWatchInstallHelp = false
     @State private var showingGarminSetup = false
     @State private var connectionStage: ConnectionStage = .device
@@ -1786,6 +1791,8 @@ struct OnboardingFlowView: View {
             .shadow(color: .black.opacity(0.045), radius: 18, x: 0, y: 9)
             .padding(.top, 30)
 
+            onboardingPresenceConsentCard
+
             Text("You can update your goals and connections anytime in ATHLTH.")
                 .font(.caption2)
                 .foregroundStyle(OnboardingTheme.faintText)
@@ -1809,6 +1816,7 @@ struct OnboardingFlowView: View {
                 .padding(.vertical, 5)
             }
             .buttonStyle(OnboardingPrimaryButtonStyle())
+            .disabled(finishingOnboarding)
 
             if let onboardingCompletionError {
                 Label(onboardingCompletionError, systemImage: "exclamationmark.circle.fill")
@@ -1820,6 +1828,63 @@ struct OnboardingFlowView: View {
             Spacer(minLength: 34)
         }
         .frame(maxWidth: .infinity, minHeight: 600)
+    }
+
+    // Separate optional choices. No preselected consent or forced sharing.
+    private var onboardingPresenceConsentCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 9) {
+                Image(systemName: "person.crop.circle.badge.checkmark")
+                    .foregroundStyle(OnboardingTheme.accent)
+                Text(ATHLTHLocalization.choose(
+                    english: "Social activity status",
+                    norwegian: "Sosial aktivitetsstatus"
+                ))
+                .font(.subheadline.weight(.bold))
+            }
+
+            Text(ATHLTHLocalization.choose(
+                english: "Optional: let people you follow mutually see your status. Both choices are off until you turn them on.",
+                norwegian: "Valgfritt: La personer dere følger gjensidig se statusen din. Begge valg er av til du aktiverer dem."
+            ))
+            .font(.caption)
+            .foregroundStyle(OnboardingTheme.mutedText)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Toggle(isOn: $consentToOnlineStatus) {
+                Label(ATHLTHLocalization.choose(
+                    english: "Show when I'm online",
+                    norwegian: "Vis når jeg er pålogget"
+                ), systemImage: "circle.fill")
+            }
+
+            Divider()
+
+            Toggle(isOn: $consentToTrainingStatus) {
+                Label(ATHLTHLocalization.choose(
+                    english: "Show when I'm training",
+                    norwegian: "Vis når jeg trener"
+                ), systemImage: "figure.run")
+            }
+
+            Text(ATHLTHLocalization.choose(
+                english: "Change either choice anytime under Edit profile. Your workout location and heart rate are not shared by these choices.",
+                norwegian: "Du kan endre begge valgene under Rediger profil. Posisjon og puls deles ikke av disse valgene."
+            ))
+            .font(.caption2)
+            .foregroundStyle(OnboardingTheme.faintText)
+        }
+        .toggleStyle(.switch)
+        .tint(OnboardingTheme.accent)
+        .padding(18)
+        .background(
+            OnboardingTheme.card,
+            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(OnboardingTheme.border, lineWidth: 1)
+        }
     }
 
     private var readyAppleHealthConnected: Bool {
@@ -2440,9 +2505,34 @@ struct OnboardingFlowView: View {
     }
 
     private func finishOnboarding() async {
+        guard !finishingOnboarding else { return }
+        finishingOnboarding = true
+        defer { finishingOnboarding = false }
         onboardingCompletionError = nil
 
         do {
+            // If both are off, keep the backend privacy defaults untouched.
+            // A returning user who has not completed onboarding must not have
+            // an earlier explicit sharing choice silently reset.
+            if consentToOnlineStatus || consentToTrainingStatus {
+                var privacy = try await SupabaseSocialService().loadPrivacySettings()
+                privacy.showOnlineStatus = consentToOnlineStatus
+                privacy.shareTrainingPresence = consentToTrainingStatus
+                privacy.trainingPresenceVisibility =
+                    consentToTrainingStatus ? "friends" : "private"
+                switch await social.updatePrivacy(privacy) {
+                case .success:
+                    settings.shareTrainingPresence = consentToTrainingStatus
+                    await realtime.configureOnlinePresence(
+                        appIsActive: scenePhase == .active,
+                        enabled: consentToOnlineStatus
+                    )
+                case .failure(let error):
+                    onboardingCompletionError = error.localizedDescription
+                    return
+                }
+            }
+
             if accountService.currentUserID != nil {
                 try await accountService.markOnboardingComplete()
             }

@@ -8,6 +8,8 @@ struct ATHLTHEditProfileView: View {
     @EnvironmentObject private var accountService: SupabaseAccountService
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
 
     // Allows the same header picker and upload/cropping flow to be
     // reused from the profile hero instead of creating a second editor.
@@ -30,6 +32,10 @@ struct ATHLTHEditProfileView: View {
     @State private var removingHeader = false
     @State private var editingPublicField: PublicProfileField?
     @State private var loadedProfile = false
+    @State private var showOnlineStatus = false
+    @State private var showTrainingStatus = false
+    @State private var presenceChoicesLoaded = false
+    @State private var presenceChoicesError: String?
 
     private enum PublicProfileField: String, Identifiable {
         case name, username, bio
@@ -77,6 +83,8 @@ struct ATHLTHEditProfileView: View {
 
                         trainingIdentityCard
                     }
+
+                    activityStatusCard
 
                     VStack(spacing: 12) {
                         ATHLTHSectionHeader(
@@ -216,6 +224,7 @@ struct ATHLTHEditProfileView: View {
         }
         .task {
             await gear.refresh()
+            await loadActivityStatus()
         }
         .onChange(of: selectedPhoto) { _, newItem in
             guard let newItem else { return }
@@ -869,6 +878,104 @@ struct ATHLTHEditProfileView: View {
         .buttonStyle(.plain)
     }
 
+
+    private var activityStatusCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ATHLTHSectionHeader(title: ATHLTHLocalization.choose(
+                english: "Activity status",
+                norwegian: "Aktivitetsstatus"
+            ))
+            .padding(.horizontal, 2)
+
+            ATHLTHCard {
+                VStack(alignment: .leading, spacing: 14) {
+                    if presenceChoicesLoaded {
+                        Toggle(isOn: $showOnlineStatus) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Show when I'm online",
+                                    norwegian: "Vis når jeg er pålogget"
+                                ),
+                                systemImage: "circle.fill"
+                            )
+                        }
+
+                        profileDivider
+
+                        Toggle(isOn: $showTrainingStatus) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Show when I'm training",
+                                    norwegian: "Vis når jeg trener"
+                                ),
+                                systemImage: "figure.run"
+                            )
+                        }
+
+                        Text(ATHLTHLocalization.choose(
+                            english: "Only mutual follows can see these status indicators. Both can be changed at any time.",
+                            norwegian: "Kun personer dere følger gjensidig kan se disse statusene. Du kan endre valgene når som helst."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    } else {
+                        HStack(spacing: 10) {
+                            if presenceChoicesError == nil {
+                                ProgressView()
+                            }
+                            Text(presenceChoicesError ?? ATHLTHLocalization.choose(
+                                english: "Loading status sharing…",
+                                norwegian: "Henter statusdeling…"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                    }
+                }
+                .tint(ATHLTHTheme.accentDeep)
+            }
+        }
+    }
+
+    @MainActor
+    private func loadActivityStatus() async {
+        do {
+            let privacy = try await SupabaseSocialService().loadPrivacySettings()
+            showOnlineStatus = privacy.showOnlineStatus
+            showTrainingStatus = privacy.shareTrainingPresence
+            presenceChoicesLoaded = true
+            presenceChoicesError = nil
+        } catch {
+            presenceChoicesError = ATHLTHLocalization.choose(
+                english: "Unable to load status sharing. You can still edit other profile details.",
+                norwegian: "Kunne ikke hente statusdeling. Du kan fortsatt redigere resten av profilen."
+            )
+        }
+    }
+
+    @MainActor
+    private func saveActivityStatus() async throws {
+        guard presenceChoicesLoaded else { return }
+        var privacy = try await SupabaseSocialService().loadPrivacySettings()
+        guard privacy.showOnlineStatus != showOnlineStatus ||
+                privacy.shareTrainingPresence != showTrainingStatus
+        else { return }
+
+        privacy.showOnlineStatus = showOnlineStatus
+        privacy.shareTrainingPresence = showTrainingStatus
+        privacy.trainingPresenceVisibility = showTrainingStatus ? "friends" : "private"
+        switch await social.updatePrivacy(privacy) {
+        case .success:
+            settings.shareTrainingPresence = showTrainingStatus
+            await realtime.configureOnlinePresence(
+                appIsActive: true,
+                enabled: showOnlineStatus
+            )
+        case .failure(let error):
+            throw error
+        }
+    }
+
     private var gearCard: some View {
         NavigationLink {
             ProfileGearManagerView()
@@ -1226,6 +1333,7 @@ struct ATHLTHEditProfileView: View {
                 )
             }
 
+            try await saveActivityStatus()
             selectedAvatarData = nil
             hasEditedATHLTHProfile = true
             dismiss()
