@@ -3179,6 +3179,126 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
+    private var guidedWeekNavigator: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Button {
+                    guidedDayCursor = max(0, guidedDayCursor - 7)
+                } label: {
+                    Label(ATHLTHLocalization.choose(english: "Previous week", norwegian: "Forrige uke"),
+                          systemImage: "chevron.left")
+                }
+                .disabled(guidedCurrentWeek == 0)
+                Spacer()
+                Text(ATHLTHLocalization.choose(english: "Week", norwegian: "Uke") +
+                     " \(guidedCurrentWeek + 1) / \(weekCount)")
+                    .font(.subheadline.weight(.bold))
+                Spacer()
+                Button {
+                    guidedDayCursor = min(weekCount * 7 - 1, guidedDayCursor + 7)
+                } label: {
+                    Image(systemName: "chevron.right")
+                }
+                .disabled(guidedCurrentWeek >= weekCount - 1)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Next week", norwegian: "Neste uke"))
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+
+            HStack(spacing: 6) {
+                ForEach(0..<7, id: \.self) { index in
+                    let key = weekDayKey(index + 1, weekIndex: guidedCurrentWeek)
+                    let edit = weekDayEdits[key]
+                    Button {
+                        guidedDayCursor = guidedCurrentWeek * 7 + index
+                    } label: {
+                        VStack(spacing: 7) {
+                            Text(["M", "T", "O", "T", "F", "L", "S"][index])
+                                .font(.caption2.weight(.bold))
+                            Image(systemName: edit?.isRestDay == true
+                                  ? "moon.stars.fill"
+                                  : edit?.detailedWorkout?.isValid == true
+                                  ? "checkmark.circle.fill" : "circle.dotted")
+                                .font(.caption)
+                        }
+                        .foregroundStyle(guidedDayCursor % 7 == index
+                                         ? .white : ATHLTHPlanDesign.ink)
+                        .frame(maxWidth: .infinity, minHeight: 57)
+                        .background(
+                            guidedDayCursor % 7 == index
+                                ? ATHLTHPlanDesign.ink : ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 13)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Day", norwegian: "Dag") + " \(index + 1)")
+                }
+            }
+        }
+    }
+
+    private var guidedSmartPlanningCard: some View {
+        builderPanel {
+            VStack(alignment: .leading, spacing: 10) {
+                Label(ATHLTHLocalization.choose(
+                    english: "Smart planning", norwegian: "Smart planlegging"),
+                      systemImage: "sparkles")
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                Text(ATHLTHLocalization.choose(
+                    english: "Suggestions based on the days you have planned. You always decide.",
+                    norwegian: "Forslag basert på dagene du har planlagt. Du bestemmer alltid selv."))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+                let previousKey = weekDayKey(max(1, guidedCurrentWeekday - 1),
+                                             weekIndex: guidedCurrentWeek)
+                let previous = guidedCurrentWeekday > 1 ? weekDayEdits[previousKey] : nil
+                if previous?.detailedWorkout?.kind == .running {
+                    Label(ATHLTHLocalization.choose(
+                        english: "You planned running yesterday. Consider an easy day or strength today.",
+                        norwegian: "Du har planlagt løping dagen før. Vurder en rolig dag eller styrke i dag."),
+                          systemImage: "figure.walk")
+                        .font(.subheadline)
+                } else if previous?.detailedWorkout?.kind == .strength {
+                    Label(ATHLTHLocalization.choose(
+                        english: "You planned strength yesterday. Consider recovery or an easy run.",
+                        norwegian: "Du har planlagt styrke dagen før. Vurder restitusjon eller en rolig løpetur."),
+                          systemImage: "leaf")
+                        .font(.subheadline)
+                } else {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Start with a workout that supports your goal, or plan recovery.",
+                        norwegian: "Start med en økt som støtter målet ditt, eller planlegg restitusjon."),
+                          systemImage: "target")
+                        .font(.subheadline)
+                }
+                HStack(spacing: 10) {
+                    Button {
+                        selectedPlanWeekIndex = guidedCurrentWeek
+                        addingExtraWorkout = false
+                        composingAdvancedDay = WeekDayEditorSelection(id: guidedCurrentWeekday)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Build workout", norwegian: "Bygg økt"),
+                              systemImage: "plus")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    Button {
+                        setRestDay(guidedCurrentWeekday)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Rest day", norwegian: "Hviledag"),
+                              systemImage: "moon.stars")
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+        }
+    }
+
     private var guidedCurrentDayCard: some View {
         VStack(alignment: .leading, spacing: 15) {
             HStack {
@@ -3198,6 +3318,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         .frame(height: 5)
                 }
             }
+            guidedWeekNavigator
+            guidedSmartPlanningCard
             stepIntro(
                 eyebrow: guidedCurrentDate.formatted(.dateTime.weekday(.wide).day().month(.wide)),
                 title: ATHLTHLocalization.choose(english: "Plan this day", norwegian: "Planlegg denne dagen"),
