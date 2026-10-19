@@ -15,6 +15,7 @@ on:
       - release/v1.8.1
       - release/v1.8.2
       - release/v1.8.3
+      - release/v1.8.4
     paths:
       - .github/testflight-trigger
 
