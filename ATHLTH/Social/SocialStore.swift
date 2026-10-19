@@ -967,6 +967,24 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    func syncOwnProfileTrainingFocuses(
+        _ focuses: Set<ProfileTrainingFocus>
+    ) async {
+        errorMessage = nil
+        do {
+            if let legacy = ProfileTrainingFocus.legacyFocus(focuses) {
+                try await service.syncTrainingFocus(
+                    legacy,
+                    focuses: ProfileTrainingFocus.orderedIDs(focuses)
+                )
+            } else {
+                try await service.clearTrainingFocus()
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func syncOwnPerformance(_ stats: ProfilePerformanceStats?) async {
         guard let stats else { return }
 

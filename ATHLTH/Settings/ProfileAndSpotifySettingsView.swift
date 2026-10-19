@@ -18,7 +18,8 @@ struct ATHLTHEditProfileView: View {
     @State private var displayName = ""
     @State private var username = ""
     @State private var bio = ""
-    @State private var selectedTrainingFocuses: Set<TrainingFocus> = []
+    @State private var selectedTrainingFocuses: Set<ProfileTrainingFocus> = []
+    @State private var trainingFocusExpanded = false
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedAvatarData: Data?
     @State private var pendingAvatarCropImage: UIImage?
@@ -712,172 +713,139 @@ struct ATHLTHEditProfileView: View {
         .presentationDetents([.medium, .large])
     }
 
+
     private var trainingIdentityCard: some View {
         ATHLTHCard {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 12) {
-                    profileFieldIcon(
-                        persistedTrainingFocus?.systemImage
-                            ?? "figure.run"
-                    )
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(
-                            ATHLTHLocalization.choose(
+            VStack(alignment: .leading, spacing: 13) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        trainingFocusExpanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        profileFieldIcon("bolt.heart.fill")
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(ATHLTHLocalization.choose(
                                 english: "Training focus",
                                 norwegian: "Treningsfokus"
-                            )
-                        )
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-
-                        Text(
-                            persistedTrainingFocus?.subtitle
-                                ?? ATHLTHLocalization.choose(
-                                    english:
-                                        "Choose what best describes how you train.",
-                                    norwegian:
-                                        "Velg det som best beskriver hvordan du trener."
+                            ))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            Text(selectedTrainingFocuses.isEmpty
+                                ? ATHLTHLocalization.choose(
+                                    english: "Choose how you train",
+                                    norwegian: "Velg hvordan du trener"
                                 )
-                        )
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                        .lineLimit(2)
+                                : ATHLTHLocalization.choose(
+                                    english: "\(selectedTrainingFocuses.count) selected · Tap to edit",
+                                    norwegian: "\(selectedTrainingFocuses.count) valgt · Trykk for å endre"
+                                ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        Spacer(minLength: 6)
+                        Image(systemName: trainingFocusExpanded ? "chevron.up" : "chevron.down")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
                     }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(ATHLTHLocalization.choose(
+                    english: "Expand or collapse training focus choices",
+                    norwegian: "Vis eller skjul valg for treningsfokus"
+                ))
 
-                    Spacer(minLength: 10)
-
-                    Menu {
-                        Button {
-                            selectedTrainingFocuses.removeAll()
-                        } label: {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Not set",
-                                    norwegian: "Ikke valgt"
-                                ),
-                                systemImage:
-                                    selectedTrainingFocuses.isEmpty
-                                        ? "checkmark.circle.fill"
-                                        : "circle"
-                            )
-                        }
-
-                        Divider()
-
-                        ForEach(
-                            TrainingFocus.profileSelectionCases
-                        ) { focus in
-                            Button {
-                                toggleTrainingFocus(focus)
-                            } label: {
-                                Label(
-                                    focus.title,
-                                    systemImage:
-                                        selectedTrainingFocuses.contains(focus)
-                                            ? "checkmark.circle.fill"
-                                            : focus.systemImage
-                                )
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 5) {
-                            Text(
-                                persistedTrainingFocus?.title
-                                    ?? ATHLTHLocalization.choose(
-                                        english: "Choose",
-                                        norwegian: "Velg"
-                                    )
-                            )
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.72)
-
-                            Image(systemName: "chevron.up.chevron.down")
-                                .font(.system(size: 9, weight: .semibold))
-                        }
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                if !selectedTrainingFocuses.isEmpty {
+                    // Compact when collapsed, while retaining all selected labels.
+                    ViewThatFits(in: .vertical) {
+                        trainingFocusChips
                     }
                 }
 
-                if selectedTrainingFocuses.contains(.running) ||
-                    selectedTrainingFocuses.contains(.strength) {
-                    HStack(spacing: 8) {
-                        trainingFocusChip(.running)
-                        trainingFocusChip(.strength)
+                if trainingFocusExpanded {
+                    profileDivider
+                    Text(ATHLTHLocalization.choose(
+                        english: "Select as many as you like",
+                        norwegian: "Velg så mange du ønsker"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    LazyVGrid(
+                        columns: [GridItem(.flexible(), spacing: 9), GridItem(.flexible(), spacing: 9)],
+                        spacing: 9
+                    ) {
+                        ForEach(ProfileTrainingFocus.allCases) { focus in
+                            trainingFocusChoice(focus)
+                        }
                     }
                 }
             }
         }
     }
 
-    private var persistedTrainingFocus: TrainingFocus? {
-        TrainingFocus.persistedProfileFocus(
-            from: selectedTrainingFocuses
-        )
+    private var trainingFocusChips: some View {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 112), spacing: 7)],
+            alignment: .leading,
+            spacing: 7
+        ) {
+            ForEach(ProfileTrainingFocus.allCases.filter {
+                selectedTrainingFocuses.contains($0)
+            }) { focus in
+                Label(focus.title, systemImage: focus.systemImage)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 7)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(ATHLTHTheme.accentSoft, in: Capsule())
+            }
+        }
     }
 
-    private func toggleTrainingFocus(
-        _ focus: TrainingFocus
-    ) {
-        let pairedFocuses: Set<TrainingFocus> = [
-            .running,
-            .strength
-        ]
-
-        if pairedFocuses.contains(focus) {
-            if !selectedTrainingFocuses
-                .isSubset(of: pairedFocuses) {
-                selectedTrainingFocuses = [focus]
-                return
-            }
-
-            if selectedTrainingFocuses.contains(focus) {
+    private func trainingFocusChoice(_ focus: ProfileTrainingFocus) -> some View {
+        let selected = selectedTrainingFocuses.contains(focus)
+        return Button {
+            if selected {
                 selectedTrainingFocuses.remove(focus)
             } else {
                 selectedTrainingFocuses.insert(focus)
             }
-            return
-        }
-
-        if selectedTrainingFocuses == [focus] {
-            selectedTrainingFocuses.removeAll()
-        } else {
-            selectedTrainingFocuses = [focus]
-        }
-    }
-
-    private func trainingFocusChip(
-        _ focus: TrainingFocus
-    ) -> some View {
-        let selected =
-            selectedTrainingFocuses.contains(focus)
-
-        return Button {
-            toggleTrainingFocus(focus)
         } label: {
-            Label(
-                focus.title,
-                systemImage: focus.systemImage
-            )
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(
-                selected
-                    ? ATHLTHTheme.accentDeep
-                    : ATHLTHTheme.mutedText
-            )
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: focus.systemImage)
+                        .font(.system(size: 18, weight: .medium))
+                    Spacer(minLength: 2)
+                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 15))
+                }
+                Text(focus.title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .foregroundStyle(selected ? ATHLTHTheme.accentDeep : ATHLTHTheme.primaryText)
+            .padding(12)
+            .frame(maxWidth: .infinity, minHeight: 83, alignment: .topLeading)
             .background(
-                selected
-                    ? ATHLTHTheme.accentSoft
-                    : Color.primary.opacity(0.035),
-                in: Capsule()
+                selected ? ATHLTHTheme.accentSoft : Color.primary.opacity(0.035),
+                in: RoundedRectangle(cornerRadius: 15, style: .continuous)
             )
+            .overlay {
+                RoundedRectangle(cornerRadius: 15, style: .continuous)
+                    .stroke(
+                        selected ? ATHLTHTheme.accentDeep.opacity(0.25) : Color.primary.opacity(0.07),
+                        lineWidth: 1
+                    )
+            }
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
-
 
     private var activityStatusCard: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1223,12 +1191,11 @@ struct ATHLTHEditProfileView: View {
         displayName = session.profile.displayName
         username = session.profile.username
         bio = session.profile.bio
-        selectedTrainingFocuses =
-            TrainingFocus.profileSelections(
-                from:
-                    session.onboardingProfile?
-                        .trainingFocus
-            )
+        selectedTrainingFocuses = ProfileTrainingFocus.selections(
+            ids: session.onboardingProfile?.trainingFocusIDs,
+            fallback: session.onboardingProfile?.trainingFocus
+        )
+        trainingFocusExpanded = selectedTrainingFocuses.isEmpty
         usernameAvailable = nil
     }
 
@@ -1326,12 +1293,14 @@ struct ATHLTHEditProfileView: View {
 
             session.applyBackendBootstrap(bootstrap)
 
-            if let persistedTrainingFocus {
-                session.setTrainingFocus(persistedTrainingFocus)
-                await social.syncOwnTrainingFocus(
-                    persistedTrainingFocus
-                )
+            await social.syncOwnProfileTrainingFocuses(
+                selectedTrainingFocuses
+            )
+            if let message = social.errorMessage, !message.isEmpty {
+                errorMessage = message
+                return
             }
+            session.setProfileTrainingFocuses(selectedTrainingFocuses)
 
             try await saveActivityStatus()
             selectedAvatarData = nil

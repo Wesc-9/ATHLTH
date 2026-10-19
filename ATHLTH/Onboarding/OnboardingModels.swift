@@ -181,6 +181,70 @@ enum TrainingFocus: String, CaseIterable, Identifiable, Codable, Hashable {
     }
 }
 
+/// Independent profile training interests. Legacy TrainingFocus remains a
+/// single-value compatibility field for older clients and insight screens.
+enum ProfileTrainingFocus: String, CaseIterable, Identifiable, Codable, Hashable {
+    case running, strength, walking, cycling, swimming
+    case functionalFitness, generalFitness, mobility, recovery
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .running: return ATHLTHLocalization.choose(english: "Running", norwegian: "Løping")
+        case .strength: return ATHLTHLocalization.choose(english: "Strength training", norwegian: "Styrketrening")
+        case .walking: return ATHLTHLocalization.choose(english: "Walking & hiking", norwegian: "Gåing og tur")
+        case .cycling: return ATHLTHLocalization.choose(english: "Cycling", norwegian: "Sykling")
+        case .swimming: return ATHLTHLocalization.choose(english: "Swimming", norwegian: "Svømming")
+        case .functionalFitness: return ATHLTHLocalization.choose(english: "Functional training / HYROX", norwegian: "Funksjonell trening / HYROX")
+        case .generalFitness: return ATHLTHLocalization.choose(english: "All-round fitness", norwegian: "Allsidig trening")
+        case .mobility: return ATHLTHLocalization.choose(english: "Mobility", norwegian: "Mobilitet")
+        case .recovery: return ATHLTHLocalization.choose(english: "Recovery", norwegian: "Restitusjon")
+        }
+    }
+    var systemImage: String {
+        switch self {
+        case .running: return "figure.run"
+        case .strength: return "dumbbell.fill"
+        case .walking: return "figure.walk"
+        case .cycling: return "bicycle"
+        case .swimming: return "figure.pool.swim"
+        case .functionalFitness: return "figure.strengthtraining.functional"
+        case .generalFitness: return "figure.mixed.cardio"
+        case .mobility: return "figure.flexibility"
+        case .recovery: return "leaf.fill"
+        }
+    }
+    static func selections(ids: [String]?, fallback: TrainingFocus?) -> Set<Self> {
+        if let ids { return Set(ids.compactMap(Self.init(rawValue:))) }
+        switch fallback {
+        case .hybrid: return [.running, .strength]
+        case .running: return [.running]
+        case .strength: return [.strength]
+        case .walking: return [.walking]
+        case .generalFitness: return [.generalFitness]
+        case .recovery: return [.recovery]
+        case nil: return []
+        }
+    }
+    static func orderedIDs(_ focuses: Set<Self>) -> [String] {
+        allCases.filter { focuses.contains($0) }.map(\.rawValue)
+    }
+    static func legacyFocus(_ focuses: Set<Self>) -> TrainingFocus? {
+        if focuses.contains(.running) && focuses.contains(.strength) { return .hybrid }
+        if focuses.contains(.running) { return .running }
+        if focuses.contains(.strength) { return .strength }
+        if focuses.contains(.walking) { return .walking }
+        if focuses.contains(.recovery) { return .recovery }
+        if !focuses.isEmpty { return .generalFitness }
+        return nil
+    }
+    static func profileSummary(ids: [String], fallback: TrainingFocus?) -> String? {
+        let choices = selections(ids: ids.isEmpty ? nil : ids, fallback: fallback)
+        let titles = allCases.filter { choices.contains($0) }.map(\.title)
+        return titles.isEmpty ? nil : titles.joined(separator: " · ")
+    }
+}
+
 enum AchievementGoal: String, CaseIterable, Identifiable, Codable, Hashable {
     case loseWeight
     case buildMuscle
@@ -384,6 +448,8 @@ struct OnboardingProfileData: Codable, Hashable {
     var maximumHeartRateBPM: Int? = nil
     var personalDetailsSource: PersonalDetailsSource
     var trainingFocus: TrainingFocus? = nil
+    // Optional to decode profiles stored by earlier app versions.
+    var trainingFocusIDs: [String]? = nil
 
     var currentGoal: UserGoalRecord?
     var interests: Set<ATHLTHInterest>

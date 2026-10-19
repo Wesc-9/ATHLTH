@@ -1783,7 +1783,10 @@ struct FriendProfileView: View {
                         ATHLTHProfileHeroIdentityView(
                             name: profile.card.resolvedName,
                             username: profile.card.usernameLabel,
-                            trainingFocus: profile.trainingFocus?.title,
+                            trainingFocus: ProfileTrainingFocus.profileSummary(
+                                ids: profile.trainingFocuses,
+                                fallback: profile.trainingFocus
+                            ),
                             bio: profile.card.bio
                         )
 

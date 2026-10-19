@@ -2659,6 +2659,12 @@ struct OnboardingFlowView: View {
                 heightCentimeters: importedHealthDetails.heightCentimeters,
                 personalDetailsSource: importedHealthDetails.hasAnyValue ? .appleHealth : .none,
                 trainingFocus: selectedTrainingFocus,
+                trainingFocusIDs: ProfileTrainingFocus.orderedIDs(
+                    ProfileTrainingFocus.selections(
+                        ids: nil,
+                        fallback: selectedTrainingFocus
+                    )
+                ),
                 currentGoal: selectedGoal.map { UserGoalRecord(type: $0) },
                 interests: interests,
                 personalizedOfferConsent: allowPersonalizedOffers ? .granted : .declined

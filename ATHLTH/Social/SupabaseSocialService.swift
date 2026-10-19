@@ -269,7 +269,10 @@ final class SupabaseSocialService: Sendable {
             .execute()
     }
 
-    func syncTrainingFocus(_ focus: TrainingFocus) async throws {
+    func syncTrainingFocus(
+        _ focus: TrainingFocus,
+        focuses: [String]? = nil
+    ) async throws {
         guard let currentUserID else {
             throw SocialServiceError.notAuthenticated
         }
@@ -280,9 +283,23 @@ final class SupabaseSocialService: Sendable {
                 SocialTrainingFocusRecord(
                     userID: currentUserID,
                     focus: focus,
+                    focuses: focuses ?? ProfileTrainingFocus.orderedIDs(
+                        ProfileTrainingFocus.selections(ids: nil, fallback: focus)
+                    ),
                     updatedAt: Date()
                 )
             )
+            .execute()
+    }
+
+    func clearTrainingFocus() async throws {
+        guard let currentUserID else {
+            throw SocialServiceError.notAuthenticated
+        }
+        try await client
+            .from("social_training_focus")
+            .delete()
+            .eq("user_id", value: currentUserID)
             .execute()
     }
 
@@ -580,7 +597,8 @@ final class SupabaseSocialService: Sendable {
             goals: goalRows,
             gear: gearRows,
             workoutMedia: workoutMedia,
-            recentActivities: feed
+            recentActivities: feed,
+            trainingFocuses: focusRows.first?.focuses ?? []
         )
     }
 

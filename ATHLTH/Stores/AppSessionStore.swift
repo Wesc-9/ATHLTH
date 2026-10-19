@@ -479,6 +479,14 @@ final class AppSessionStore: ObservableObject {
         )
     }
 
+    func setProfileTrainingFocuses(_ focuses: Set<ProfileTrainingFocus>) {
+        setTrainingFocus(ProfileTrainingFocus.legacyFocus(focuses))
+        if var profile = onboardingProfile {
+            profile.trainingFocusIDs = ProfileTrainingFocus.orderedIDs(focuses)
+            saveOnboardingProfile(profile)
+        }
+    }
+
     func updatePersonalDetails(
         _ basics: HealthProfileBasics,
         source: PersonalDetailsSource
@@ -494,6 +502,7 @@ final class AppSessionStore: ObservableObject {
                 maximumHeartRateBPM: basics.maximumHeartRateBPM,
                 personalDetailsSource: source,
                 trainingFocus: existing?.trainingFocus,
+                trainingFocusIDs: existing?.trainingFocusIDs,
                 currentGoal: existing?.currentGoal,
                 interests: existing?.interests ?? [],
                 personalizedOfferConsent: existing?.personalizedOfferConsent ?? .notAsked

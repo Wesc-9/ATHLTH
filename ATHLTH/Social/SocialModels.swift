@@ -217,11 +217,13 @@ struct SocialPrivacySettings: Codable, Equatable, Hashable {
 struct SocialTrainingFocusRecord: Codable, Equatable, Hashable {
     let userID: UUID
     let focus: TrainingFocus
+    var focuses: [String]? = nil
     var updatedAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case userID = "user_id"
         case focus
+        case focuses
         case updatedAt = "updated_at"
     }
 }
@@ -989,6 +991,7 @@ struct SocialFriendProfile: Hashable {
     let gear: [ProfileGearItem]
     let workoutMedia: [WorkoutMediaRecord]
     let recentActivities: [SocialFeedItem]
+    var trainingFocuses: [String] = []
 }
 
 struct SocialBlockedUser: Identifiable, Hashable {
