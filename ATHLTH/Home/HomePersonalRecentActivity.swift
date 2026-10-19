@@ -542,6 +542,8 @@ struct HomeActiveFriendsStrip: View {
     @EnvironmentObject private var messaging: MessagingStore
     @Environment(\.scenePhase) private var scenePhase
 
+    @State private var lastKnownFriends: [SocialProfileCard] = []
+    @State private var cachedForUserID: UUID?
     @State private var selectedFriendID: UUID?
     @State private var destination: FriendQuickDestination?
     @State private var challengeFriend: SocialProfileCard?
@@ -583,6 +585,17 @@ struct HomeActiveFriendsStrip: View {
         let training: Bool
         let online: Bool
         let affinity: Int
+    }
+
+    private var visibleFriends: [SocialProfileCard] {
+        let current = orderedFriends
+        if !current.isEmpty { return current }
+        // Keep existing avatars in place during a transient social refresh.
+        // Never reuse them across accounts or after a completed empty refresh.
+        if social.isRefreshing && cachedForUserID == social.currentUserID {
+            return lastKnownFriends.filter { !social.isMuted($0.userID) }
+        }
+        return []
     }
 
     private var orderedFriends: [SocialProfileCard] {
@@ -638,14 +651,14 @@ struct HomeActiveFriendsStrip: View {
     }
 
     private var activeCount: Int {
-        orderedFriends.filter {
+        visibleFriends.filter {
             realtime.isTrainingNow($0.userID) ||
             realtime.isOnline($0.userID)
         }.count
     }
 
     var body: some View {
-        if !orderedFriends.isEmpty {
+        if !visibleFriends.isEmpty {
             VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 8) {
                     Text(ATHLTHLocalization.choose(
@@ -667,7 +680,7 @@ struct HomeActiveFriendsStrip: View {
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(alignment: .top, spacing: 10) {
-                        ForEach(orderedFriends) { friend in
+                        ForEach(visibleFriends) { friend in
                             Button {
                                 selectedFriendID = friend.userID
                             } label: {
@@ -729,6 +742,10 @@ struct HomeActiveFriendsStrip: View {
                 }
             }
             .padding(.top, 2)
+            .onAppear { rememberFriends() }
+            .onChange(of: social.mutualFollows.map(\.userID)) { _, _ in
+                rememberFriends()
+            }
             .task(id: scenePhase) {
                 guard scenePhase == .active else { return }
                 // Low-frequency refresh only while this strip is mounted.
@@ -753,6 +770,27 @@ struct HomeActiveFriendsStrip: View {
             .sheet(item: $challengeFriend) { friend in
                 ChallengeCreationView(preselectedFriends: [friend])
             }
+        } else if social.isRefreshing {
+            HStack(spacing: 8) {
+                Text(ATHLTHLocalization.choose(english: "Friends", norwegian: "Venner"))
+                    .font(.system(size: 14, weight: .bold))
+                Spacer(minLength: 0)
+                ProgressView().controlSize(.small)
+            }
+            .foregroundStyle(ATHLTHTheme.mutedText)
+            .frame(height: 75, alignment: .top)
+            .padding(.top, 2)
+        }
+    }
+
+    private func rememberFriends() {
+        let current = orderedFriends
+        if !current.isEmpty {
+            lastKnownFriends = current
+            cachedForUserID = social.currentUserID
+        } else if !social.isRefreshing {
+            lastKnownFriends = []
+            cachedForUserID = nil
         }
     }
 }
