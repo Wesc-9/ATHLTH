@@ -816,21 +816,61 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    /// One reaction per athlete and post, regardless of workout category.
+    /// Update the shared feed immediately, and roll back if Supabase rejects
+    /// the write. A second tap cannot race the first request.
+    @Published private(set) var pendingReactionIDs: Set<UUID> = []
+
     func setReaction(
         activityID: UUID,
         reaction: SocialActivityReaction?
     ) async {
+        guard !pendingReactionIDs.contains(activityID) else { return }
         errorMessage = nil
+        pendingReactionIDs.insert(activityID)
+
+        let previous = feed.first { $0.id == activityID }
+        if let currentUserID, let previous {
+            var nextReactions = previous.reactions.filter {
+                $0.userID != currentUserID
+            }
+            if let reaction {
+                nextReactions.append(
+                    SocialActivityReactionRecord(
+                        id: UUID(),
+                        activityID: activityID,
+                        userID: currentUserID,
+                        reaction: reaction,
+                        createdAt: Date()
+                    )
+                )
+            }
+            let updated = SocialFeedItem(
+                activity: previous.activity,
+                actor: previous.actor,
+                reactions: nextReactions,
+                comments: previous.comments,
+                trainingPartners: previous.trainingPartners
+            )
+            feed = feed.map { $0.id == activityID ? updated : $0 }
+        }
 
         do {
             try await service.setReaction(
                 activityID: activityID,
                 reaction: reaction
             )
-            feed = scopedFeed(
-                try await service.loadFeed()
-            )
+            pendingReactionIDs.remove(activityID)
+            // A successful write is never rolled back just because a feed
+            // refresh temporarily fails. Retry on normal foreground refresh.
+            if let refreshed = try? await service.loadFeed() {
+                feed = scopedFeed(refreshed)
+            }
         } catch {
+            if let previous {
+                feed = feed.map { $0.id == activityID ? previous : $0 }
+            }
+            pendingReactionIDs.remove(activityID)
             errorMessage = error.localizedDescription
         }
     }
