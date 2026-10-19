@@ -568,6 +568,16 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
                                     .font(.subheadline)
                             }
 
+                            if mode != .rest && selectedDay != nil {
+                                DatePicker(
+                                    ATHLTHLocalization.choose(
+                                        english: "Time", norwegian: "Tidspunkt"
+                                    ),
+                                    selection: $date,
+                                    displayedComponents: .hourAndMinute
+                                )
+                            }
+
                             if mode == .rest && selectedDay?.hasWorkouts == true {
                                 Label(
                                     ATHLTHLocalization.choose(
@@ -586,7 +596,8 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
                                 ),
                                 selection: $date,
                                 in: Calendar.current.startOfDay(for: Date())...,
-                                displayedComponents: .date
+                                displayedComponents: mode == .rest
+                                    ? [.date] : [.date, .hourAndMinute]
                             )
                         }
 
@@ -682,6 +693,21 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
             return
         }
         let sessionDate = destinationDay?.date ?? date
+        let calendar = Calendar.current
+        let plannedStart: Date
+        if isRest {
+            plannedStart = calendar.startOfDay(for: sessionDate)
+        } else if let planDate = destinationDay?.date {
+            let components = calendar.dateComponents([.hour, .minute], from: date)
+            plannedStart = calendar.date(
+                bySettingHour: components.hour ?? 18,
+                minute: components.minute ?? 0,
+                second: 0,
+                of: planDate
+            ) ?? planDate
+        } else {
+            plannedStart = date
+        }
         let cleanNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         let combinedNotes = [guide?.instructions ?? "", cleanNotes]
             .filter { !$0.isEmpty }.joined(separator: "\n\n")
@@ -689,8 +715,7 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
             id: UUID(),
             title: guide?.title ?? mode.title,
             kind: mode == .stretching ? .mobility : .recovery,
-            scheduledStart: selectedPlanID == nil
-                ? Calendar.current.startOfDay(for: sessionDate) : destinationDay?.date,
+            scheduledStart: plannedStart,
             durationMinutes: isRest ? nil :
                 (guide.map { Int(ceil(Double($0.seconds) / 60.0)) } ?? durationMinutes),
             targetDistanceKilometers: nil,
