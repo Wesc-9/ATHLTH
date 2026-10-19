@@ -7,6 +7,9 @@ enum ATHLTHPlanDesign {
     static let ink = ATHLTHTheme.primaryText
     static let secondaryInk = Color(red: 0.43, green: 0.42, blue: 0.41)
     static let accent = ATHLTHTheme.premiumGold
+    // Accessible bronze for compact text/icons on light surfaces (7:1+ on white).
+    // Reserve the brighter brand gold above for decoration and selected surfaces.
+    static let accentInk = Color(red: 0.43, green: 0.32, blue: 0.20)
     static let outline = ATHLTHTheme.accentDeep.opacity(0.10)
     static let surface = Color.white
     static let selectedSurface = accent.opacity(0.085)

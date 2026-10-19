@@ -10,7 +10,7 @@ enum ATHLTHArenaLightStyle {
     static let surface = ATHLTHPlanDesign.surface
     static let ink = ATHLTHPlanDesign.ink
     static let secondary = ATHLTHPlanDesign.secondaryInk
-    static let warmGold = ATHLTHPlanDesign.accent
+    static let warmGold = ATHLTHPlanDesign.accentInk
     static let soft = ATHLTHPlanDesign.warmSurface
     static let line = ATHLTHPlanDesign.warmDivider
     // Retain contrast on older dark competitive hero sections.

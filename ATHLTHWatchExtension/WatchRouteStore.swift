@@ -370,7 +370,9 @@ final class WatchRouteStore: NSObject, ObservableObject {
         )
     }
 
-    private func requestTodayWorkoutSnapshot() {
+    // Called by WatchHomeView on appear as well as by WCSession activation.
+    // Keep transport internals private, but expose this idempotent request.
+    func requestTodayWorkoutSnapshot() {
         guard WCSession.isSupported(),
               WCSession.default.activationState == .activated
         else {

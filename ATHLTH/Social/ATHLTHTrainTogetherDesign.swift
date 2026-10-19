@@ -8,7 +8,7 @@ enum ATHLTHTrainTogetherDesign {
     static let stone = ATHLTHTheme.cardWarm
     static let ink = ATHLTHPlanDesign.ink
     static let secondary = ATHLTHPlanDesign.secondaryInk
-    static let accent = ATHLTHPlanDesign.accent
+    static let accent = ATHLTHPlanDesign.accentInk
     static let accentSoft = ATHLTHPlanDesign.selectedSurface
     static let outline = ATHLTHPlanDesign.outline
     static let radius: CGFloat = ATHLTHPlanDesign.cardRadius

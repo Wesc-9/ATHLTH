@@ -69,7 +69,7 @@ struct ATHLTHTrainPlanPremiumView: View {
 
     private let graphite = ATHLTHPlanDesign.ink
     private let secondaryInk = ATHLTHPlanDesign.secondaryInk
-    private let warmGold = ATHLTHPlanDesign.accent
+    private let warmGold = ATHLTHPlanDesign.accentInk
     private let line = ATHLTHPlanDesign.warmDivider
     private let paper = ATHLTHPlanDesign.warmCanvas
     private let soft = ATHLTHPlanDesign.warmSurface

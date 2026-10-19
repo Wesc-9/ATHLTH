@@ -16,7 +16,7 @@ struct TrainingLibraryHomeView: View {
 
     private let ink = ATHLTHPlanDesign.ink
     private let muted = ATHLTHPlanDesign.secondaryInk
-    private let gold = ATHLTHPlanDesign.accent
+    private let gold = ATHLTHPlanDesign.accentInk
     private let slate = ATHLTHTheme.accentDeep
     private let green = ATHLTHTheme.vitality
     private let lavender = ATHLTHTheme.recoveryBlue

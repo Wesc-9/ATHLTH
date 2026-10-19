@@ -29,7 +29,7 @@ struct ATHLTHTrainTodayPremiumView: View {
 
     private let ink = ATHLTHPlanDesign.ink
     private let muted = ATHLTHPlanDesign.secondaryInk
-    private let champagne = ATHLTHPlanDesign.accent
+    private let champagne = ATHLTHPlanDesign.accentInk
     private let hairline = ATHLTHPlanDesign.warmDivider
 
     var body: some View {
