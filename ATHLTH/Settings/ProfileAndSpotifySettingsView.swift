@@ -4,6 +4,7 @@ import UIKit
 
 struct ATHLTHEditProfileView: View {
     @EnvironmentObject private var session: AppSessionStore
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var accountService: SupabaseAccountService
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var gear: ProfileGearStore
@@ -1227,6 +1228,7 @@ struct ATHLTHEditProfileView: View {
 
             selectedAvatarData = nil
             hasEditedATHLTHProfile = true
+            dismiss()
         } catch {
             errorMessage = error.localizedDescription
         }
