@@ -81,6 +81,11 @@ struct WatchHomeView: View {
                 }
             }
         }
+        .onAppear {
+            // Ask iPhone for the latest planned session when the Watch opens.
+            // The cached snapshot remains available without a connection.
+            routeStore.requestTodayWorkoutSnapshot()
+        }
         .onOpenURL { url in
             guard url.scheme ==
                     "athlth-watch"
