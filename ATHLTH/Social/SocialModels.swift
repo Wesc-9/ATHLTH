@@ -480,6 +480,34 @@ struct SocialFeedItem: Identifiable, Hashable {
         self.comments = comments
         self.trainingPartners = trainingPartners
     }
+
+    /// Identical reaction behavior for every social post category.
+    /// Keep a local pending state while the same user+activity unique row
+    /// is persisted via Supabase, then reconcile from the refreshed feed.
+    func replacingReaction(
+        from userID: UUID,
+        with reaction: SocialActivityReaction?
+    ) -> Self {
+        var updated = reactions.filter { $0.userID != userID }
+        if let reaction {
+            updated.append(
+                SocialActivityReactionRecord(
+                    id: UUID(),
+                    activityID: id,
+                    userID: userID,
+                    reaction: reaction,
+                    createdAt: Date()
+                )
+            )
+        }
+        return Self(
+            activity: activity,
+            actor: actor,
+            reactions: updated,
+            comments: comments,
+            trainingPartners: trainingPartners
+        )
+    }
 }
 
 struct SocialInboxEvent: Identifiable, Codable, Hashable {
