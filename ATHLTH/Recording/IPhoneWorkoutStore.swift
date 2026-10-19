@@ -161,6 +161,9 @@ struct PhoneWorkout: Codable, Identifiable {
     var structuredStepStartElapsedTime: TimeInterval? = nil
     var structuredStepStartDistanceMeters: Double? = nil
     var structuredWorkoutComplete: Bool? = nil
+    // Recorded active-time and distance at each completed structured step.
+    // Partial runs retain this diagnostic data but never enter progression.
+    var recordedRunningSteps: [ATHLTHRecordedRunningStep]? = nil
 
     var audioCoachConfiguration:
         WatchAudioCoachConfiguration? = nil
@@ -3471,8 +3474,30 @@ final class IPhoneWorkoutStore:
             return
         }
 
-        let nextIndex =
-            (workout.structuredStepIndex ?? 0) + 1
+        let finishedIndex = workout.structuredStepIndex ?? 0
+        let endElapsed = workout.elapsed(at: Date())
+        let activeSeconds = endElapsed -
+            (workout.structuredStepStartElapsedTime ?? 0)
+        let segmentMeters = workout.distanceMeters -
+            (workout.structuredStepStartDistanceMeters ?? 0)
+        if activeSeconds >= 10, segmentMeters >= 0 {
+            var recorded = workout.recordedRunningSteps ?? []
+            // Each transition is recorded at most once; an interrupted
+            // or retried session must not duplicate a result.
+            if !recorded.contains(where: { $0.index == finishedIndex }) {
+                recorded.append(ATHLTHRecordedRunningStep(
+                    index: finishedIndex,
+                    title: step.title,
+                    phase: step.phase,
+                    activeSeconds: activeSeconds,
+                    distanceMeters: segmentMeters,
+                    isUserReported: workout.runEnvironment == .treadmill
+                ))
+                workout.recordedRunningSteps = recorded
+            }
+        }
+
+        let nextIndex = finishedIndex + 1
 
         guard plan.steps.indices.contains(
             nextIndex
