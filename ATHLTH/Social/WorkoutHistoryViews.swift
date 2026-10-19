@@ -1494,7 +1494,7 @@ struct PostWorkoutReviewView: View {
             }
 
         } else if workout.activity == .strength {
-            Image("StrengthPostWorkoutHero")
+            Image("StrengthFeedGym")
                 .resizable()
                 .scaledToFill()
                 .athlthBoundedFill()
