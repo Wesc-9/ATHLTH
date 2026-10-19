@@ -586,12 +586,14 @@ struct WatchHomeView: View {
         }
         .buttonStyle(.plain)
         .disabled(
-            workoutManager.state ==
-                .preparing
+            workoutManager.isActive ||
+            workoutManager.state == .preparing ||
+            workoutManager.state == .ending
         )
         .opacity(
-            workoutManager.state ==
-                .preparing
+            workoutManager.isActive ||
+            workoutManager.state == .preparing ||
+            workoutManager.state == .ending
                 ? 0.55
                 : 1
         )
@@ -601,6 +603,9 @@ struct WatchHomeView: View {
         _ workout:
             WatchTodayWorkoutTransfer
     ) {
+        guard !workoutManager.isActive,
+              workoutManager.state != .preparing,
+              workoutManager.state != .ending else { return }
         let route =
             workout.routeID.flatMap {
                 routeStore.route(
