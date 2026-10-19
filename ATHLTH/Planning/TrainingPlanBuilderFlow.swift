@@ -3293,11 +3293,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             source.title = next.title
             source.durationMinutes = next.durationMinutes
         } else {
+            // Explicitly mark the emptied date as rest. Otherwise the legacy
+            // scheduler would manufacture a default 45-minute workout.
             source.detailedWorkout = nil
             source.additionalDetailedWorkouts = nil
             source.kind = nil
             source.title = nil
             source.durationMinutes = nil
+            source.isRestDay = true
+            source.removeTemplateDetail = true
         }
         weekDayEdits[sourceKey] = source
 
