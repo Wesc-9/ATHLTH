@@ -56,7 +56,9 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Once TestFlight is requested, preserve same-commit iOS verification
+  # despite follow-up development pushes to the active release branch.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/release/v1.8.4' }}
 
 jobs:
   build:
