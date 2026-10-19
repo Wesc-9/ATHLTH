@@ -1234,6 +1234,34 @@ private struct OfficialWeeklyCoverRecipe {
     }
 }
 
+private enum OfficialWeeklyNorwegianCopy {
+    static func title(_ title: String) -> String {
+        guard ATHLTHLocalization.choose(english: "en", norwegian: "no") == "no" else { return title }
+        switch title {
+        case "Weekend Plus": return "Helgepluss"
+        case "Endurance Minutes": return "Utholdenhetsminutter"
+        case "Momentum Streak": return "Aktivitetsrekke"
+        case "Run/Walk Five": return "Fem løpe- eller gåøkter"
+        default: return title
+        }
+    }
+
+    static func subtitle(_ subtitle: String) -> String {
+        guard ATHLTHLocalization.choose(english: "en", norwegian: "no") == "no" else { return subtitle }
+        switch subtitle {
+        case "Build a balanced week and finish with 28 kilometres.":
+            return "Bygg en balansert treningsuke og avslutt med 28 kilometer."
+        case "Collect four hours of run or walk time this week.":
+            return "Samle fire timer med løping eller gåing denne uken."
+        case "Build momentum with activity on four different days.":
+            return "Vær aktiv på fire forskjellige dager denne uken."
+        case "Complete five qualifying sessions this week.":
+            return "Fullfør fem tellende økter denne uken."
+        default: return subtitle
+        }
+    }
+}
+
 struct OfficialWeeklyChallengeArtwork: View {
     let challenge: OfficialWeeklyChallenge
     var preserveOriginalColors = false
@@ -1863,13 +1891,13 @@ struct OfficialWeeklyChallengeCard: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(challenge.title)
+                    Text(OfficialWeeklyNorwegianCopy.title(challenge.title))
                         .font(.system(size: 24, weight: .regular, design: .serif))
                         .foregroundStyle(ATHLTHPlanDesign.ink)
                         .lineLimit(2)
                         .minimumScaleFactor(0.78)
 
-                    Text(challenge.subtitle)
+                    Text(OfficialWeeklyNorwegianCopy.subtitle(challenge.subtitle))
                         .font(.subheadline)
                         .foregroundStyle(ATHLTHTheme.primaryText.opacity(0.70))
                         .lineLimit(2)
@@ -2126,7 +2154,7 @@ struct OfficialWeeklyChallengeDetailView: View {
 
                     Spacer()
 
-                    Text(challenge.title)
+                    Text(OfficialWeeklyNorwegianCopy.title(challenge.title))
                         .font(
                             .system(
                                 size: 34,
@@ -2143,7 +2171,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                         .lineLimit(2)
                         .minimumScaleFactor(0.72)
 
-                    Text(challenge.subtitle)
+                    Text(OfficialWeeklyNorwegianCopy.subtitle(challenge.subtitle))
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.96))
                         .shadow(
@@ -3906,7 +3934,7 @@ struct OfficialWeeklyChallengeAdminListView: View {
                     )
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(challenge.title)
+                    Text(OfficialWeeklyNorwegianCopy.title(challenge.title))
                         .font(.headline)
                         .foregroundStyle(ATHLTHTheme.primaryText)
 
@@ -5267,7 +5295,7 @@ private struct OfficialWeeklyChallengeEditorPreviewCard:
                     alignment: .leading,
                     spacing: 5
                 ) {
-                    Text(challenge.title)
+                    Text(OfficialWeeklyNorwegianCopy.title(challenge.title))
                         .font(
                             .system(
                                 size: 20,
