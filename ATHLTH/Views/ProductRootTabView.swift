@@ -15316,6 +15316,7 @@ struct ATHLTHProfileView: View {
     @EnvironmentObject private var trophyStore: TrophyStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var strengthWorkout:
@@ -15714,7 +15715,7 @@ struct ATHLTHProfileView: View {
                         alignment: .top,
                         spacing: 14
                     ) {
-                        ZStack(alignment: .bottomTrailing) {
+                        ZStack(alignment: .bottomLeading) {
                             NavigationLink {
                                 ATHLTHEditProfileView(
                                     onEditHeader: {
@@ -15723,6 +15724,36 @@ struct ATHLTHProfileView: View {
                                 )
                             } label: {
                                 profileAvatar
+                                    .overlay {
+                                        if isOwnProfileTrainingNow {
+                                            Circle()
+                                                .strokeBorder(
+                                                    LinearGradient(
+                                                        colors: [
+                                                            Color(red: 0.96, green: 0.72, blue: 0.35),
+                                                            Color(red: 0.87, green: 0.46, blue: 0.16)
+                                                        ],
+                                                        startPoint: .topLeading,
+                                                        endPoint: .bottomTrailing
+                                                    ),
+                                                    lineWidth: 3
+                                                )
+                                                .padding(-4)
+                                                .allowsHitTesting(false)
+                                        }
+                                    }
+                                    .overlay(alignment: .bottomTrailing) {
+                                        if isOwnProfileOnline {
+                                            Circle()
+                                                .fill(Color(red: 0.24, green: 0.68, blue: 0.37))
+                                                .frame(width: 15, height: 15)
+                                                .overlay {
+                                                    Circle().stroke(.white, lineWidth: 2.5)
+                                                }
+                                                .offset(x: 2, y: 2)
+                                                .allowsHitTesting(false)
+                                        }
+                                    }
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel(
@@ -15879,6 +15910,18 @@ struct ATHLTHProfileView: View {
         }
         .frame(height: 236)
         .clipped()
+    }
+
+    // The avatar mirrors friends' realtime indicators but observes the
+    // owner's independent status-sharing choices. No opt-in, no badge.
+    private var isOwnProfileOnline: Bool {
+        social.privacy?.showOnlineStatus == true &&
+            realtime.isOnline(session.profile.userID)
+    }
+
+    private var isOwnProfileTrainingNow: Bool {
+        social.privacy?.shareTrainingPresence == true &&
+            realtime.isTrainingNow(session.profile.userID)
     }
 
     private var heroStatRow: some View {
@@ -16067,172 +16110,152 @@ struct ATHLTHProfileView: View {
         }
     }
 
-    private var trophyCabinetSection:
-        some View {
-        profileSection(
-            title:
-                ATHLTHLocalization.choose(
-                    english: "Trophy cabinet",
-                    norwegian: "Troféskap"
-                ),
-            icon: "trophy.fill",
-            actionTitle:
-                ATHLTHLocalization.choose(
-                    english: "Edit",
-                    norwegian: "Rediger"
-                ),
-            destination:
-                AnyView(
-                    TrophyCollectionView(
-                        startInCabinet: true
-                    )
-                )
-        ) {
-            HStack(
-                alignment: .top,
-                spacing: 8
-            ) {
-                ForEach(
-                    0..<TrophyStore.showcaseLimit,
-                    id: \.self
-                ) { index in
-                    if profileTrophySlots.indices.contains(
-                        index
-                    ) {
-                        let trophy =
-                            profileTrophySlots[
-                                index
-                            ]
+    // The four slots use the real premium trophy artwork at a readable
+    // size, with identical badge dimensions for empty and filled positions.
+    private let profileTrophyBadgeSize: CGFloat = 68
 
+    private var trophyCabinetSection: some View {
+        profileSection(
+            title: ATHLTHLocalization.choose(
+                english: "Trophy cabinet",
+                norwegian: "Troféskap"
+            ),
+            icon: "trophy.fill",
+            actionTitle: ATHLTHLocalization.choose(
+                english: "Edit",
+                norwegian: "Rediger"
+            ),
+            destination: AnyView(TrophyCollectionView(startInCabinet: true))
+        ) {
+            HStack(alignment: .top, spacing: 6) {
+                ForEach(0..<TrophyStore.showcaseLimit, id: \.self) { index in
+                    if profileTrophySlots.indices.contains(index) {
+                        let trophy = profileTrophySlots[index]
                         NavigationLink {
                             TrophyCollectionView(
                                 startInCabinet: true,
-                                replacingTrophyID:
-                                    trophy.id
+                                replacingTrophyID: trophy.id
                             )
                         } label: {
-                            VStack(
-                                spacing: 3
-                            ) {
+                            VStack(spacing: 5) {
                                 ATHLTHTrophyCoreView(
-                                    trophy:
-                                        trophy,
-                                    size: 28
+                                    trophy: trophy,
+                                    size: profileTrophyBadgeSize
+                                )
+                                .frame(
+                                    width: profileTrophyBadgeSize,
+                                    height: profileTrophyBadgeSize * 1.10
                                 )
 
-                                Text(
-                                    trophy.title
-                                )
-                                .font(
-                                    .system(
-                                        size: 8.0,
-                                        weight: .bold
+                                Text(trophy.title)
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.80)
+                                    .multilineTextAlignment(.center)
+                                    .frame(
+                                        maxWidth: .infinity,
+                                        minHeight: 26,
+                                        alignment: .top
                                     )
-                                )
-                                .foregroundStyle(
-                                    ATHLTHTheme
-                                        .primaryText
-                                )
-                                .lineLimit(1)
-                                .minimumScaleFactor(
-                                    0.68
-                                )
+
+                                if trophy.isComplete {
+                                    Text(trophy.stageLabel)
+                                        .font(.system(size: 8.5, weight: .medium))
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.80)
+                                } else if trophy.nextTargetValue != nil {
+                                    VStack(spacing: 3) {
+                                        Text("\(Int((trophy.progress * 100).rounded())) %")
+                                            .font(.system(size: 8.5, weight: .semibold))
+                                            .foregroundStyle(ATHLTHTheme.mutedText)
+                                        GeometryReader { geometry in
+                                            Capsule()
+                                                .fill(ATHLTHTheme.premiumGold.opacity(0.18))
+                                                .overlay(alignment: .leading) {
+                                                    Capsule()
+                                                        .fill(ATHLTHTheme.premiumGold)
+                                                        .frame(
+                                                            width: geometry.size.width * trophy.progress
+                                                        )
+                                                }
+                                        }
+                                        .frame(height: 4)
+                                        .padding(.horizontal, 7)
+                                    }
+                                } else {
+                                    Text(trophy.stageLabel)
+                                        .font(.system(size: 8.5, weight: .medium))
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                        .lineLimit(1)
+                                }
                             }
-                            .frame(
-                                maxWidth:
-                                    .infinity
-                            )
+                            .frame(maxWidth: .infinity, alignment: .top)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("\(trophy.title), \(trophy.stageLabel)")
                     } else {
                         NavigationLink {
-                            TrophyCollectionView(
-                        startInCabinet: true
-                    )
+                            TrophyCollectionView(startInCabinet: true)
                         } label: {
-                            VStack(
-                                spacing: 8
-                            ) {
+                            VStack(spacing: 5) {
                                 ZStack {
                                     ATHLTHTrophyPlateShape()
                                         .fill(
-                                            Color.black
-                                                .opacity(
-                                                    0.035
-                                                )
-                                        )
-
-                                    Image(
-                                        systemName:
-                                            "plus"
-                                    )
-                                    .font(
-                                        .system(
-                                            size: 13,
-                                            weight: .medium
-                                        )
-                                    )
-                                    .foregroundStyle(
-                                        ATHLTHTheme
-                                            .premiumGold
-                                            .opacity(
-                                                0.70
+                                            LinearGradient(
+                                                colors: [
+                                                    Color(.systemGray6),
+                                                    Color(.systemGray5).opacity(0.54),
+                                                    Color(.systemGray6)
+                                                ],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
                                             )
-                                    )
+                                        )
+                                        .overlay {
+                                            ATHLTHTrophyPlateShape()
+                                                .stroke(
+                                                    Color.black.opacity(0.10),
+                                                    style: StrokeStyle(
+                                                        lineWidth: 1.2,
+                                                        dash: [4, 4]
+                                                    )
+                                                )
+                                        }
+
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 21, weight: .light))
+                                        .foregroundStyle(
+                                            ATHLTHTheme.premiumGold.opacity(0.78)
+                                        )
                                 }
                                 .frame(
-                                    width: 28,
-                                    height: 32
+                                    width: profileTrophyBadgeSize,
+                                    height: profileTrophyBadgeSize * 1.10
                                 )
-                                .overlay {
-                                    ATHLTHTrophyPlateShape()
-                                        .stroke(
-                                            Color.black
-                                                .opacity(
-                                                    0.08
-                                                ),
-                                            style:
-                                                StrokeStyle(
-                                                    lineWidth:
-                                                        1,
-                                                    dash:
-                                                        [
-                                                            4,
-                                                            4
-                                                        ]
-                                                )
-                                        )
-                                }
 
-                                Text(
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "Choose",
-                                        norwegian:
-                                            "Velg"
-                                    )
-                                )
-                                .font(
-                                    .system(
-                                        size: 8.5,
-                                        weight:
-                                            .semibold
-                                    )
-                                )
-                                .foregroundStyle(
-                                    ATHLTHTheme
-                                        .mutedText
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Choose",
+                                    norwegian: "Velg"
+                                ))
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                .frame(
+                                    maxWidth: .infinity,
+                                    minHeight: 26,
+                                    alignment: .top
                                 )
                             }
-                            .frame(
-                                maxWidth:
-                                    .infinity
-                            )
+                            .frame(maxWidth: .infinity, alignment: .top)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }
                 }
             }
+            .frame(maxWidth: .infinity)
         }
     }
 
