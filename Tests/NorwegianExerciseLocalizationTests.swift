@@ -1,6 +1,7 @@
 import XCTest
 @testable import ATHLTH
 
+// CI verification: re-run iOS build and backend regressions after localization test correction.
 final class NorwegianExerciseLocalizationTests: XCTestCase {
     @MainActor
     func testEquipmentTranslationsPreserveEnglishCanonicalValues() {
