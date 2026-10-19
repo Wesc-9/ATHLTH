@@ -191,19 +191,13 @@ struct ATHLTHTrainIntervalComposerView: View {
         .foregroundStyle(ink)
     }
 
-    private var estimatedDuration: TimeInterval? {
-        let pieces = blocks.flatMap { block -> [RunningStepTarget] in
-            (1...max(block.repetitions, 1)).flatMap { repetition in
-                [block.resolvedWork(at: repetition)] +
-                (block.resolvedRecovery(after: repetition).map { [$0] } ?? [])
-            }
-        }
-        guard !pieces.isEmpty, pieces.allSatisfy({ $0.measure == .time }) else {
-            return nil
-        }
-        return pieces.reduce(0) { total, target in
-            total + max(target.durationSeconds ?? 0, 0)
-        }
+    private var estimate: (duration: Double?, distanceMeters: Double?) {
+        // Project from the exact recipe being edited, including all per-drag
+        // speed and pause overrides. Never persist this as recorded training.
+        let template = RunningWorkoutTemplate(
+            title: name, summary: "", blocks: blocks
+        )
+        return (template.estimatedDurationSeconds, template.estimatedDistanceMeters)
     }
 
     private var blockList: some View {
@@ -218,10 +212,22 @@ struct ATHLTHTrainIntervalComposerView: View {
                     Text("\(blocks.count) " + tr("blocks", "blokker"))
                         .font(.caption)
                         .foregroundStyle(muted)
-                    if let duration = estimatedDuration {
-                        Text("\(Int(duration / 60)) min")
+                    if let duration = estimate.duration {
+                        Text("~\(Int((duration / 60).rounded(.up))) min")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(ink)
+                    }
+                    if let meters = estimate.distanceMeters {
+                        Text(tr("Estimated distance", "Estimert distanse") +
+                             " · " + String(format: "%.2f km", meters / 1_000))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(bronze)
+                    } else if !blocks.isEmpty {
+                        Text(tr("Set speed for every timed phase to estimate distance",
+                                "Velg hastighet for alle tidsdeler for å anslå distanse"))
+                            .font(.caption2)
+                            .foregroundStyle(muted)
+                            .multilineTextAlignment(.trailing)
                     }
                 }
             }

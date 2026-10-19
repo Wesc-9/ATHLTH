@@ -50,6 +50,25 @@ struct ATHLTHWorkoutRecipePreview: View {
                 introduction
                 statistics
             }
+            if let meters = ATHLTHRunningEstimate.distanceMeters(for: blocks),
+               category == "running" || category == "walking" {
+                Label(
+                    tr("Estimated distance", "Estimert distanse") + " · " +
+                    String(format: "%.2f km", meters / 1_000),
+                    systemImage: "point.topleft.down.to.point.bottomright.curvepath"
+                )
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .padding(.horizontal, 15)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 15))
+                .accessibilityHint(tr(
+                    "Calculated from planned speeds and distances, not a recorded result",
+                    "Beregnet fra planlagte hastigheter og distanser – ikke en registrert økt"
+                ))
+            }
             modeControl
             timeline
         }

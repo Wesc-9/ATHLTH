@@ -199,6 +199,70 @@ struct RunningStepTarget: Codable, Hashable {
     )
 }
 
+
+/// Planning estimates only. Never treat a speed target as GPS/HealthKit evidence.
+/// A complete distance estimate requires every time-based movement phase,
+/// including active recoveries and cool-downs, to have an explicit pace.
+enum ATHLTHRunningEstimate {
+    static func distanceMeters(for target: RunningStepTarget) -> Double? {
+        switch target.measure {
+        case .distance:
+            guard let meters = target.distanceMeters,
+                  meters.isFinite, meters > 0 else { return nil }
+            return meters
+        case .time:
+            guard let seconds = target.durationSeconds,
+                  seconds.isFinite, seconds > 0,
+                  let pace = target.intensity.paceMinSecondsPerKilometer,
+                  pace.isFinite, pace > 0 else { return nil }
+            let meters = seconds / pace * 1_000
+            return meters.isFinite && meters > 0 ? meters : nil
+        case .open:
+            return nil
+        }
+    }
+
+    static func durationSeconds(for target: RunningStepTarget) -> Double? {
+        switch target.measure {
+        case .time:
+            guard let seconds = target.durationSeconds,
+                  seconds.isFinite, seconds > 0 else { return nil }
+            return seconds
+        case .distance:
+            guard let meters = target.distanceMeters,
+                  meters.isFinite, meters > 0,
+                  let pace = target.intensity.paceMinSecondsPerKilometer,
+                  pace.isFinite, pace > 0 else { return nil }
+            let seconds = meters / 1_000 * pace
+            return seconds.isFinite && seconds > 0 ? seconds : nil
+        case .open:
+            return nil
+        }
+    }
+
+    static func distanceMeters(for blocks: [WorkoutTemplateBlock]) -> Double? {
+        let steps = blocks.expandedForExecution().filter {
+            $0.kind == .run || $0.kind == .rest
+        }
+        guard !steps.isEmpty, steps.count <= 1_000 else { return nil }
+        var meters = 0.0
+        for step in steps {
+            if let distance = step.distanceMeters, distance > 0,
+               distance.isFinite {
+                meters += distance
+            } else if let duration = step.durationSeconds, duration > 0,
+                      duration.isFinite,
+                      let pace = step.targetPaceSecondsPerKilometer,
+                      pace > 0, pace.isFinite {
+                meters += duration / pace * 1_000
+            } else {
+                return nil
+            }
+        }
+        return meters.isFinite && meters > 0 ? meters : nil
+    }
+}
+
 /// Individual effort plus its following recovery (pause 3 belongs to drag 3).
 /// Legacy templates keep using the block defaults when no override is present.
 struct RunningRepetitionOverride: Codable, Hashable {
@@ -278,26 +342,38 @@ struct RunningWorkoutTemplate: Identifiable, Codable, Hashable {
     /// Optional instructions set before the workout for Audio Coach.
     var coachBrief: String? = nil
 
-    var estimatedDistanceMeters: Double? {
-        let parts: [RunningStepTarget] = blocks.flatMap { block in
-            (0..<max(block.repetitions, 1)).flatMap { i -> [RunningStepTarget] in
-                [block.resolvedWork(at: i + 1)] +
-                    (block.resolvedRecovery(after: i + 1).map { [$0] } ?? [])
+    /// Recalculates from every resolved drag and pause, including overrides.
+    private var estimateSteps: [RunningStepTarget] {
+        blocks.flatMap { block in
+            (1...min(max(block.repetitions, 1), 60)).flatMap { repetition in
+                [block.resolvedWork(at: repetition)] +
+                    (block.resolvedRecovery(after: repetition).map { [$0] } ?? [])
             }
         }
-        guard parts.allSatisfy({ $0.measure == .distance }) else { return nil }
-        return parts.reduce(0) { $0 + max($1.distanceMeters ?? 0, 0) }
+    }
+
+    var estimatedDistanceMeters: Double? {
+        let steps = estimateSteps
+        guard !steps.isEmpty, steps.count <= 1_000 else { return nil }
+        var total = 0.0
+        for step in steps {
+            guard let meters = ATHLTHRunningEstimate.distanceMeters(for: step)
+            else { return nil }
+            total += meters
+        }
+        return total.isFinite && total > 0 ? total : nil
     }
 
     var estimatedDurationSeconds: TimeInterval? {
-        let parts: [RunningStepTarget] = blocks.flatMap { block in
-            (0..<max(block.repetitions, 1)).flatMap { i -> [RunningStepTarget] in
-                [block.resolvedWork(at: i + 1)] +
-                    (block.resolvedRecovery(after: i + 1).map { [$0] } ?? [])
-            }
+        let steps = estimateSteps
+        guard !steps.isEmpty, steps.count <= 1_000 else { return nil }
+        var total = 0.0
+        for step in steps {
+            guard let seconds = ATHLTHRunningEstimate.durationSeconds(for: step)
+            else { return nil }
+            total += seconds
         }
-        guard parts.allSatisfy({ $0.measure == .time }) else { return nil }
-        return parts.reduce(0) { $0 + max($1.durationSeconds ?? 0, 0) }
+        return total.isFinite && total > 0 ? total : nil
     }
 }
 
