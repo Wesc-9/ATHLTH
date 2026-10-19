@@ -5827,9 +5827,9 @@ struct SessionEditorView: View {
                 }
 
                 if kind == .recovery || kind == .mobility {
-                    Section("Recovery / Mobility") {
+                    Section(ATHLTHLocalization.choose(english: "Recovery / Mobility", norwegian: "Restitusjon / bevegelighet")) {
                         Text(
-                            "Use duration and notes to describe the session. Structured mobility blocks can be added to the same planner model later."
+                            ATHLTHLocalization.choose(english: "Use duration and notes to describe the session. Structured mobility blocks can be added to the same planner model later.", norwegian: "Bruk varighet og notater for å beskrive økten. Strukturerte bevegelighetsblokker kan legges til senere.")
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
