@@ -69,15 +69,34 @@ final class ATHLTHStructuredWorkoutPlanIntegrationTests: XCTestCase {
         )
         XCTAssertEqual(before.completedSessions, 0)
 
+        let partial = StructuredWorkoutCompletion(
+            id: UUID(), workoutTemplateID: nil,
+            sourceWorkoutID: prepared.id, title: prepared.title,
+            category: "strength", startedAt: today,
+            endedAt: today.addingTimeInterval(300),
+            completedBlockCount: 1, totalBlockCount: 2,
+            sourcePlanID: plan.id
+        )
+        XCTAssertTrue(prepared.isStructuredWorkout)
+        // Only complete workouts count in plan progress or speed history.
+        // Saving one block must never award a completed session.
+        let afterPartial = store.trainingPlanProgress(
+            savedPlan,
+            healthWorkouts: [],
+            strengthHistory: [],
+            structuredHistory: [partial],
+            referenceDate: today
+        )
+        XCTAssertEqual(afterPartial.completedSessions, 0)
+
         let completion = StructuredWorkoutCompletion(
             id: UUID(), workoutTemplateID: nil,
             sourceWorkoutID: prepared.id, title: prepared.title,
             category: "strength", startedAt: today,
             endedAt: today.addingTimeInterval(600),
-            completedBlockCount: 1, totalBlockCount: 2,
+            completedBlockCount: 2, totalBlockCount: 2,
             sourcePlanID: plan.id
         )
-        XCTAssertTrue(prepared.isStructuredWorkout)
         let after = store.trainingPlanProgress(
             savedPlan,
             healthWorkouts: [],
@@ -93,7 +112,7 @@ final class ATHLTHStructuredWorkoutPlanIntegrationTests: XCTestCase {
             sourceWorkoutID: prepared.id, title: prepared.title,
             category: "strength", startedAt: today,
             endedAt: today.addingTimeInterval(600),
-            completedBlockCount: 1, totalBlockCount: 2,
+            completedBlockCount: 2, totalBlockCount: 2,
             sourcePlanID: UUID()
         )
         let unrelatedProgress = store.trainingPlanProgress(
