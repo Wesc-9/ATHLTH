@@ -831,26 +831,9 @@ final class SocialStore: ObservableObject {
 
         let previous = feed.first { $0.id == activityID }
         if let currentUserID, let previous {
-            var nextReactions = previous.reactions.filter {
-                $0.userID != currentUserID
-            }
-            if let reaction {
-                nextReactions.append(
-                    SocialActivityReactionRecord(
-                        id: UUID(),
-                        activityID: activityID,
-                        userID: currentUserID,
-                        reaction: reaction,
-                        createdAt: Date()
-                    )
-                )
-            }
-            let updated = SocialFeedItem(
-                activity: previous.activity,
-                actor: previous.actor,
-                reactions: nextReactions,
-                comments: previous.comments,
-                trainingPartners: previous.trainingPartners
+            let updated = previous.replacingReaction(
+                from: currentUserID,
+                with: reaction
             )
             feed = feed.map { $0.id == activityID ? updated : $0 }
         }
