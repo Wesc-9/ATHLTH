@@ -6165,6 +6165,20 @@ struct SessionEditorView: View {
 
     }
 
+    private var targetRunningSpeedBinding: Binding<Double> {
+        Binding(
+            get: {
+                let seconds = Double(targetPaceMinutes * 60 + targetPaceSeconds)
+                return seconds > 0 ? 3_600 / seconds : 12
+            },
+            set: { speed in
+                let rounded = Int((3_600 / max(speed, 0.5)).rounded())
+                targetPaceMinutes = rounded / 60
+                targetPaceSeconds = rounded % 60
+            }
+        )
+    }
+
     @ViewBuilder
     private var advancedOptions: some View {
         spotifyAdvancedOptions
@@ -6177,6 +6191,19 @@ struct SessionEditorView: View {
                 )
 
                 if targetPaceEnabled {
+                    Stepper(
+                        ATHLTHLocalization.choose(
+                            english: "Target speed",
+                            norwegian: "Målhastighet"
+                        ) + ": " + String(
+                            format: "%.1f km/t",
+                            targetRunningSpeedBinding.wrappedValue
+                        ),
+                        value: targetRunningSpeedBinding,
+                        in: 3...25,
+                        step: 0.1
+                    )
+
                     HStack {
                         Label(
                             "Pace",
