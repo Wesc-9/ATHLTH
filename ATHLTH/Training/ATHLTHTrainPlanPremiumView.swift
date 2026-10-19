@@ -874,7 +874,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                                     .lineLimit(2)
                                 if priority == 0 {
                                     Text(planLibraryStatus(item))
-                                        .font(.system(size: 10, weight: .semibold))
+                                        .font(.caption2.weight(.semibold))
                                         .foregroundStyle(warmGold)
                                         .padding(.horizontal, 6)
                                         .padding(.vertical, 3)
@@ -1002,7 +1002,7 @@ struct ATHLTHTrainPlanPremiumView: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(tr("YOUR PROGRAM", "DITT PROGRAM"))
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.caption2.weight(.semibold))
                         .tracking(2.2)
                         .foregroundStyle(warmGold)
                     Text(tr("Training plan", "Treningsplan"))
@@ -1104,7 +1104,7 @@ struct ATHLTHTrainPlanPremiumView: View {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(tr("TRAINING PROGRAM", "TRENINGSPROGRAM"))
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.caption2.weight(.bold))
                         .tracking(1.7)
                         .foregroundStyle(warmGold)
                     Text(plan.title)
@@ -1257,7 +1257,7 @@ struct ATHLTHTrainPlanPremiumView: View {
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(tr("BUILD YOUR WEEK", "PLANLEGG UKEN"))
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.caption2.weight(.bold))
                         .tracking(1.6)
                         .foregroundStyle(warmGold)
                     Text(advanced
@@ -1814,7 +1814,7 @@ struct ATHLTHTrainPlanPremiumView: View {
             HStack(alignment: .top, spacing: 11) {
                 VStack(spacing: 2) {
                     Text(weekday(day.dayIndex, plan: plan))
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.caption2.weight(.semibold))
                         .foregroundStyle(secondaryInk)
                     Text(
                         planDayDate(day.dayIndex, plan: plan)
@@ -1889,7 +1889,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                                                         "Flere øvelser i editor"))
                                             }
                                         }
-                                        .font(.system(size: 10.5))
+                                        .font(.caption2)
                                         .foregroundStyle(secondaryInk)
                                         .padding(8)
                                         .background(soft,
@@ -1929,7 +1929,7 @@ struct ATHLTHTrainPlanPremiumView: View {
         VStack(alignment: .leading, spacing: 9) {
             HStack {
                 Text(tr("EXPLORE & REUSE", "BRUK OG GJENBRUK"))
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.caption2.weight(.semibold))
                     .tracking(1.6)
                     .foregroundStyle(warmGold)
                 Spacer()
@@ -1998,7 +1998,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                 .font(.system(size: 18, weight: .medium, design: .rounded))
                 .monospacedDigit()
             Text(title)
-                .font(.system(size: 9, weight: .semibold))
+                .font(.caption2.weight(.semibold))
                 .tracking(0.8)
                 .foregroundStyle(secondaryInk)
         }

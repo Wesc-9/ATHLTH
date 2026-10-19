@@ -5227,6 +5227,7 @@ struct ATHLTHTrainView: View {
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
 
     @State private var selectedSection = 0
+    @ScaledMetric(relativeTo: .subheadline) private var premiumTabLabelSize: CGFloat = 13
     @State private var highlightedTrainPlanID: UUID?
     @State private var watchTransferMessage: String?
     @State private var watchTransferError: String?
@@ -5889,7 +5890,7 @@ struct ATHLTHTrainView: View {
     ) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 13, weight: selected ? .semibold : .medium))
+                .font(.system(size: premiumTabLabelSize, weight: selected ? .semibold : .medium))
                 .foregroundStyle(
                     selected
                         ? Color.white

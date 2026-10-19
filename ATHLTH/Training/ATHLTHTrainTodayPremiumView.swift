@@ -116,7 +116,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                             ? tr("COMPLETED TODAY", "GJENNOMFØRT I DAG")
                             : tr("TODAY'S WORKOUT", "DAGENS ØKT")
                     )
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.caption2.weight(.semibold))
                     .tracking(1.5)
                     .foregroundStyle(.white)
                     Spacer(minLength: 4)
@@ -224,7 +224,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                 if sessions.count > 1 {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(tr("ALSO TODAY", "OGSÅ I DAG"))
-                            .font(.system(size: 9, weight: .semibold))
+                            .font(.caption2.weight(.semibold))
                             .tracking(1.3)
                             .foregroundStyle(muted)
                         ForEach(sessions.filter { $0.id != workout.id }) { extra in
@@ -274,7 +274,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(champagne)
                 Text(tr("YOUR DAY", "DIN DAG"))
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.caption2.weight(.semibold))
                     .tracking(1.5)
                     .foregroundStyle(muted)
                 Spacer(minLength: 4)
@@ -314,7 +314,7 @@ struct ATHLTHTrainTodayPremiumView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(tr("TODAY'S PLAN", "DAGENS PLAN"))
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(.caption2.weight(.semibold))
                         .tracking(1.1)
                         .foregroundStyle(muted)
                     Text(hasPlan
@@ -360,7 +360,7 @@ struct ATHLTHTrainTodayPremiumView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(tr("RECOVERY", "RESTITUSJON"))
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(.caption2.weight(.semibold))
                         .tracking(1.1)
                         .foregroundStyle(muted)
 
@@ -405,7 +405,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                             Text(nextWorkoutTitle == nil
                                 ? tr("YOUR TRAINING PLAN", "DIN TRENINGSPLAN")
                                 : tr("NEXT WORKOUT", "NESTE ØKT"))
-                                .font(.system(size: 9, weight: .semibold))
+                                .font(.caption2.weight(.semibold))
                                 .tracking(1.1)
                                 .foregroundStyle(muted)
                             Text(nextWorkoutTitle ?? tr("View your plan", "Se treningsplan"))
@@ -499,7 +499,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(tr("WORKOUT LIBRARY", "FRA ØKTBIBLIOTEKET"))
-                            .font(.system(size: 9, weight: .semibold))
+                            .font(.caption2.weight(.semibold))
                             .tracking(1.5)
                             .foregroundStyle(champagne)
                         Text(tr("Find a workout", "Finn en økt"))
@@ -752,7 +752,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                         .frame(width: 30)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(tr("ACTIVE PLAN", "AKTIV PLAN"))
-                            .font(.system(size: 9, weight: .semibold))
+                            .font(.caption2.weight(.semibold))
                             .tracking(1.15)
                             .foregroundStyle(muted)
                         Text(plan.title)

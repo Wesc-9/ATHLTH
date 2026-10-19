@@ -63,7 +63,7 @@ struct TrainingLibraryHomeView: View {
                 ATHLTHBrandMark(size: .compact)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text(tr("Explore", "UTFORSK").uppercased())
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.caption2.weight(.semibold))
                     .tracking(2)
                     .foregroundStyle(gold)
                     .padding(.top, 7)
@@ -269,7 +269,7 @@ struct TrainingLibraryHomeView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(eyebrow)
-                .font(.system(size: 10, weight: .semibold))
+                .font(.caption2.weight(.semibold))
                 .tracking(1.6)
                 .foregroundStyle(gold)
             Text(title)
@@ -541,7 +541,7 @@ struct LibraryPremiumIntro<Accessory: View>: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(eyebrow)
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.caption2.weight(.bold))
                         .tracking(2.6)
                         .foregroundStyle(
                             ATHLTHTheme.mutedText
@@ -619,7 +619,7 @@ struct LibraryStatPill: View {
     var body: some View {
         HStack(spacing: 7) {
             Image(systemName: icon)
-                .font(.system(size: 10, weight: .bold))
+                .font(.caption2.weight(.bold))
                 .foregroundStyle(tint)
 
             Text(value)
@@ -1684,11 +1684,13 @@ struct TrainingPlanLibraryView: View {
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 6) {
                         Text(entry.categoryTitle.uppercased())
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.caption2.weight(.bold))
                             .tracking(1.3)
                             .foregroundStyle(planAccent(entry))
 
-                        Text("CURATED")
+                        Text(ATHLTHLocalization.choose(
+                            english: "CURATED", norwegian: "UTVALGT"
+                        ))
                             .font(.system(size: 8, weight: .bold))
                             .foregroundStyle(ATHLTHTheme.mutedText)
                             .padding(.horizontal, 6)
@@ -1863,7 +1865,7 @@ struct TrainingPlanCatalogDetailView: View {
 
                         VStack(alignment: .leading, spacing: 5) {
                             Text(entry.categoryTitle.uppercased())
-                                .font(.system(size: 10, weight: .bold))
+                                .font(.caption2.weight(.bold))
                                 .tracking(2.1)
                                 .foregroundStyle(detailAccent)
 
@@ -2152,7 +2154,7 @@ struct TrainingPlanCatalogDetailView: View {
                         english: "FULL PLAN PREVIEW",
                         norwegian: "HELE PLANEN"
                     ))
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.caption2.weight(.bold))
                         .tracking(1.6)
                         .foregroundStyle(
                             ATHLTHTheme.mutedText
@@ -2523,7 +2525,7 @@ struct PersonalizeTrainingPlanView: View {
                     ATHLTHPlanGhostCard {
                         VStack(alignment: .leading, spacing: 13) {
                             Text("START")
-                                .font(.system(size: 9, weight: .bold))
+                                .font(.caption2.weight(.bold))
                                 .tracking(1.6)
                                 .foregroundStyle(
                                     ATHLTHTheme.mutedText
@@ -2675,8 +2677,10 @@ struct PersonalizeTrainingPlanView: View {
 
                     ATHLTHPlanGhostCard {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("PLAN FIT")
-                                .font(.system(size: 9, weight: .bold))
+                            Text(ATHLTHLocalization.choose(
+                        english: "PLAN FIT", norwegian: "PLANPASSFORM"
+                    ))
+                                .font(.caption2.weight(.bold))
                                 .tracking(1.6)
                                 .foregroundStyle(
                                     ATHLTHTheme.mutedText
@@ -3273,8 +3277,10 @@ struct MyTrainingPlansLibraryView: View {
                     )
 
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("SAVED PLAN")
-                        .font(.system(size: 9, weight: .bold))
+                    Text(ATHLTHLocalization.choose(
+                        english: "SAVED PLAN", norwegian: "LAGRET PLAN"
+                    ))
+                        .font(.caption2.weight(.bold))
                         .tracking(1.4)
                         .foregroundStyle(ATHLTHTheme.accent)
 
@@ -3573,7 +3579,7 @@ struct MyTrainingPlansLibraryView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title.uppercased())
-                .font(.system(size: 10, weight: .bold))
+                .font(.caption2.weight(.bold))
                 .tracking(1.8)
                 .foregroundStyle(ATHLTHTheme.mutedText)
 
@@ -4364,7 +4370,7 @@ struct LibraryFavoritesView: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.caption2.weight(.bold))
 
                 Text(title)
             }

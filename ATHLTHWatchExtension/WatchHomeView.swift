@@ -39,7 +39,7 @@ struct WatchHomeView: View {
                                         message,
                                         systemImage: "exclamationmark.triangle.fill"
                                     )
-                                    .font(.system(size: 9))
+                                    .font(.caption2)
                                     .foregroundStyle(WatchTheme.warning)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(9)
@@ -161,7 +161,7 @@ struct WatchHomeView: View {
                     english: "READY TO MOVE",
                     norwegian: "KLAR FOR ØKT"
                 ))
-                .font(.system(size: 7, weight: .semibold))
+                .font(.system(size: 8, weight: .semibold))
                 .tracking(0.6)
                 .foregroundStyle(WatchTheme.planSecondary)
             }
@@ -235,7 +235,7 @@ struct WatchHomeView: View {
                         english: "Walk and more",
                         norwegian: "Gåtur og mer"
                     ))
-                    .font(.system(size: 9))
+                    .font(.system(size: 10))
                     .foregroundStyle(WatchTheme.planSecondary)
                 }
                 Spacer(minLength: 2)
