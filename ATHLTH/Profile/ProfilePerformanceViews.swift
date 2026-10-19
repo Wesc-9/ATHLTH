@@ -9541,10 +9541,8 @@ struct ProfileRecordShowcasePickerView:
     private var showcaseHero: some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("ATHLTH")
-                    .font(.system(size: 24, weight: .black, design: .rounded))
-                    .tracking(4)
-                    .foregroundStyle(ATHLTHTheme.primaryText)
+                ATHLTHBrandMark(size: .standard)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text("MOVE BETTER  ·  LIVE LONGER")
                     .font(.system(size: 8, weight: .semibold))
