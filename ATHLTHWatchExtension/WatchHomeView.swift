@@ -16,7 +16,7 @@ struct WatchHomeView: View {
                 let compact = geometry.size.height < 205
                 let hasAdditionalContent =
                     routeStore.preparedWorkout != nil ||
-                    routeStore.todayWorkout != nil ||
+                    !routeStore.todayWorkouts.isEmpty ||
                     workoutManager.errorMessage != nil
 
                 Group {
@@ -29,7 +29,7 @@ struct WatchHomeView: View {
                                 if let prepared = routeStore.preparedWorkout {
                                     preparedWorkoutCard(prepared)
                                 }
-                                if let today = routeStore.todayWorkout {
+                                ForEach(routeStore.todayWorkouts, id: \.workoutID) { today in
                                     todayWorkoutCard(today)
                                 }
                                 quickStartTiles(compact: compact)
@@ -95,12 +95,8 @@ struct WatchHomeView: View {
 
             switch url.host {
             case "today":
-                if let today =
-                        routeStore
-                            .todayWorkout {
-                    startTodayWorkout(
-                        today
-                    )
+                if let today = routeStore.todayWorkouts.first {
+                    startTodayWorkout(today)
                 }
 
             case "quick-run":
