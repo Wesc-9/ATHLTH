@@ -57,6 +57,29 @@ final class ATHLTHPlanGuidedWeekTests: XCTestCase {
         XCTAssertTrue(weeks[2].days[0].sessions.isEmpty)
     }
 
+    func testTwoSessionsRetainIndependentClockTimes() throws {
+        let start = try XCTUnwrap(Calendar.current.date(
+            from: DateComponents(year: 2026, month: 10, day: 17)
+        ))
+        var morning = workout("Intervaller")
+        morning.startMinuteOfDay = 8 * 60
+        var evening = workout("Rolig jogg")
+        evening.startMinuteOfDay = 19 * 60
+        var edit = ATHLTHPlanWeekDayEdit(
+            kind: .strength, title: morning.title,
+            durationMinutes: 45, detailedWorkout: morning
+        )
+        edit.additionalDetailedWorkouts = [evening]
+        var weeks = makeWeeks()
+        ATHLTHPlanWeekDayEdit.apply([6: edit], to: &weeks, startDate: start)
+        let sessions = weeks[0].days[0].sessions
+        XCTAssertEqual(sessions.count, 2)
+        XCTAssertEqual(sessions.map(\.title), ["Intervaller", "Rolig jogg"])
+        XCTAssertEqual(sessions.compactMap { $0.scheduledStart.map {
+            Calendar.current.component(.hour, from: $0)
+        } }, [8, 19])
+    }
+
     func testPreviouslyPersistedEditCanDecodeWithOptionalNewFields() throws {
         let legacy = ATHLTHPlanWeekDayEdit(
             kind: .strength, title: "Legacy", durationMinutes: 40,
