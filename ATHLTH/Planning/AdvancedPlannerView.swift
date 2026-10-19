@@ -5604,7 +5604,7 @@ struct SessionEditorView: View {
                         text: $title
                     )
 
-                    Picker("Type", selection: $kind) {
+                    Picker(ATHLTHLocalization.choose(english: "Type", norwegian: "Type"), selection: $kind) {
                         ForEach(WorkoutKind.allCases) { kind in
                             Label(
                                 kind.title,
@@ -5633,7 +5633,7 @@ struct SessionEditorView: View {
                     }
 
                     HStack {
-                        Label("Time", systemImage: "clock")
+                        Label(ATHLTHLocalization.choose(english: "Time", norwegian: "Tid"), systemImage: "clock")
                             .foregroundStyle(
                                 ATHLTHTheme.primaryText
                             )
@@ -5694,7 +5694,7 @@ struct SessionEditorView: View {
 
                     if kind == .running {
                         Picker(
-                            "Running shoes",
+                            ATHLTHLocalization.choose(english: "Running shoes", norwegian: "Løpesko"),
                             selection: runningShoeSelection
                         ) {
                             Text("–")
@@ -5713,14 +5713,14 @@ struct SessionEditorView: View {
                     }
 
                     TextField(
-                        "Notes",
+                        ATHLTHLocalization.choose(english: "Notes", norwegian: "Notater"),
                         text: $notes,
                         axis: .vertical
                     )
                     .lineLimit(2...6)
                 } header: {
                     HStack(spacing: 12) {
-                        Text("Workout")
+                        Text(ATHLTHLocalization.choose(english: "Workout", norwegian: "Økt"))
 
                         Spacer()
 
@@ -7015,98 +7015,104 @@ struct SessionEditorView: View {
 
     private var partnerPlanningSection: some View {
         Section {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 11) {
-                Image(systemName: "person.2.crop.square.stack.fill")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .frame(width: 38, height: 38)
-                    .background(ATHLTHTheme.accentSoft, in: RoundedRectangle(cornerRadius: 12))
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 12) {
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accent)
+                        .frame(width: 48, height: 48)
+                        .background(ATHLTHPlanDesign.selectedSurface,
+                                    in: RoundedRectangle(cornerRadius: 16))
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Plan with a friend",
+                            norwegian: "Planlegg med en venn"
+                        ))
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                        Text(ATHLTHLocalization.choose(
+                            english: "Invite someone to share this workout",
+                            norwegian: "Inviter noen til å dele denne økten"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    Spacer(minLength: 0)
+                }
 
                 Picker(
                     ATHLTHLocalization.choose(
-                        english: "Plan with someone",
-                        norwegian: "Planlegg med en person"
+                        english: "Training partner",
+                        norwegian: "Treningspartner"
                     ),
                     selection: $selectedPartnerID
                 ) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Just me",
-                            norwegian: "Bare meg"
-                        )
-                    )
-                    .tag(nil as UUID?)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Just me",
+                        norwegian: "Bare meg"
+                    )).tag(nil as UUID?)
 
                     ForEach(social.trainingPartners, id: \.userID) { friend in
-                        Text(friend.resolvedName)
-                            .tag(friend.userID as UUID?)
+                        Text(friend.resolvedName).tag(friend.userID as UUID?)
                     }
                 }
                 .disabled(directPartnerID != nil)
-            }
 
                 if selectedPartnerID != nil {
-                Toggle(
-                    ATHLTHLocalization.choose(
-                        english: "Allow guest to add exercises",
-                        norwegian: "La invitert legge til øvelser"
-                    ),
-                    isOn: $allowInviteeExercises
-                )
-                .tint(ATHLTHTheme.accentDeep)
+                    Picker(
+                        ATHLTHLocalization.choose(
+                            english: "Training mode",
+                            norwegian: "Hvordan trener dere?"
+                        ),
+                        selection: $physicalMeetup
+                    ) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Meet in person",
+                            norwegian: "Trene fysisk sammen"
+                        )).tag(true)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Same workout",
+                            norwegian: "Trene samme økt"
+                        )).tag(false)
+                    }
+                    .pickerStyle(.segmented)
 
-                Text(ATHLTHLocalization.choose(
-                    english: "New exercises and all shared changes must be approved by the organizer before they appear for everyone.",
-                    norwegian: "Nye øvelser og andre felles endringer må godkjennes av arrangøren før de gjelder for alle."
-                ))
-                .font(.caption2)
-                .foregroundStyle(ATHLTHTheme.mutedText)
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Allow guest to add exercises",
+                            norwegian: "La invitert legge til øvelser"
+                        ),
+                        isOn: $allowInviteeExercises
+                    )
+                    .tint(ATHLTHPlanDesign.accent)
 
-                Picker(
-                    ATHLTHLocalization.choose(
-                        english: "Training mode", norwegian: "Hvordan trener dere?"
-                    ),
-                    selection: $physicalMeetup
-                ) {
                     Text(ATHLTHLocalization.choose(
-                        english: "Meet in person", norwegian: "Trene fysisk sammen"
-                    )).tag(true)
+                        english: "Shared changes must be approved by the organizer.",
+                        norwegian: "Felles endringer må godkjennes av arrangøren."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                } else {
                     Text(ATHLTHLocalization.choose(
-                        english: "Same workout", norwegian: "Trene samme økt"
-                    )).tag(false)
+                        english: "Choose a mutual friend to send an invitation in Messages.",
+                        norwegian: "Velg en venn dere følger gjensidig for å sende invitasjon i meldinger."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
                 }
-                .pickerStyle(.segmented)
             }
-
-            Text(
-                selectedPartnerID == nil
-                    ? ATHLTHLocalization.choose(
-                        english: "Choose someone you follow mutually. Your planned workout will be shared in ATHLTH Messages.",
-                        norwegian: "Velg en person dere følger gjensidig. Den planlagte økten deles via meldinger i ATHLTH."
-                    )
-                    : ATHLTHLocalization.choose(
-                        english: "Your friend will receive the date and workout in Messages. They can respond in chat.",
-                        norwegian: "Personen får en melding med tidspunkt og øktinnhold og kan svare i chatten."
-                    )
-            )
-            .font(.caption)
-            .foregroundStyle(ATHLTHTheme.mutedText)
-            .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(.vertical, 8)
+            .padding(.vertical, 9)
         } header: {
-            Text(
-                ATHLTHLocalization.choose(
-                    english: "Train together",
-                    norwegian: "Tren sammen"
-                )
-            )
+            Text(ATHLTHLocalization.choose(
+                english: "Train together",
+                norwegian: "Tren sammen"
+            ))
         }
         .listRowBackground(ATHLTHTheme.card)
-        .listRowSeparatorTint(ATHLTHTheme.border)
+        .listRowSeparator(.hidden)
     }
-
 
     private var plannedWorkoutLogisticsSection: some View {
         Section {
