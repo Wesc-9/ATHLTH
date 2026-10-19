@@ -1346,6 +1346,34 @@ final class AppSessionStore: ObservableObject {
         return .active
     }
 
+    /// All sessions scheduled on a calendar date, retaining their distinct
+    /// session IDs. Used by Watch synchronization and day-level planning.
+    func plannedSessions(on date: Date, in plan: TrainingPlan) -> [PlannedSession] {
+        let calendar = Calendar.current
+        let requestedDay = calendar.startOfDay(for: date)
+        let start = plan.startDate.map { calendar.startOfDay(for: $0) }
+        var result: [PlannedSession] = []
+        for (weekIndex, week) in plan.weeks.enumerated() {
+            for day in week.days {
+                let fallbackDate = start.flatMap {
+                    calendar.date(byAdding: .day,
+                        value: weekIndex * 7 + max(day.dayIndex - 1, 0),
+                        to: $0)
+                } ?? plan.createdAt
+                for session in day.sessions {
+                    let sessionDate = session.scheduledStart ?? fallbackDate
+                    if calendar.isDate(sessionDate, inSameDayAs: requestedDay) {
+                        result.append(session)
+                    }
+                }
+            }
+        }
+        return result.sorted {
+            ($0.scheduledStart ?? .distantFuture) <
+                ($1.scheduledStart ?? .distantFuture)
+        }
+    }
+
     func trainingPlanProgress(
         _ plan: TrainingPlan,
         healthWorkouts: [WorkoutSummary],
