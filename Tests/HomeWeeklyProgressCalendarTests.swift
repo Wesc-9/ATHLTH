@@ -189,4 +189,99 @@ final class HomeWeeklyProgressCalendarTests: XCTestCase {
         )
     }
 
+
+    func testTodayCalendarIncludesStandaloneWithoutAnActivePlan() {
+        let today = date(2026, 10, 19)
+        let scheduled = PlannedSession(
+            id: UUID(), title: "4 × 4 intervaller", kind: .running,
+            scheduledStart: today, exercises: []
+        )
+        let tomorrow = PlannedSession(
+            id: UUID(), title: "Restitusjonsløp", kind: .running,
+            scheduledStart: date(2026, 10, 20), exercises: []
+        )
+
+        let visible = HomeTodayCalendarSchedule.workouts(
+            plan: nil, standalone: [tomorrow, scheduled],
+            on: today, calendar: calendar
+        )
+
+        XCTAssertEqual(visible.map(\.id), [scheduled.id])
+    }
+
+    func testTodayCalendarMergesPlanAndStandaloneChronologically() {
+        let day = date(2026, 10, 19)
+        let early = day.addingTimeInterval(-60 * 60)
+        let late = day.addingTimeInterval(60 * 60)
+        let planned = PlannedSession(
+            id: UUID(), title: "Styrke", kind: .strength,
+            scheduledStart: late, exercises: []
+        )
+        let extra = PlannedSession(
+            id: UUID(), title: "Intervaller", kind: .running,
+            scheduledStart: early, exercises: []
+        )
+        let plan = TrainingPlan(
+            id: UUID(), ownerID: UUID(), title: "Plan", summary: "",
+            visibility: .privateOnly, version: 1,
+            weeks: [TrainingPlanWeek(
+                id: UUID(), weekNumber: 1, title: "Uke 1",
+                days: [TrainingPlanDay(
+                    id: UUID(), dayIndex: 1, title: "Mandag",
+                    sessions: [planned]
+                )]
+            )],
+            tags: [], createdAt: day, updatedAt: day,
+            startDate: calendar.startOfDay(for: day)
+        )
+
+        let visible = HomeTodayCalendarSchedule.workouts(
+            plan: plan, standalone: [extra],
+            on: day, calendar: calendar
+        )
+
+        XCTAssertEqual(visible.map(\.id), [extra.id, planned.id])
+        XCTAssertNil(
+            HomeWeeklyProgressCalendar.containingPlanID(
+                for: extra, in: plan
+            )
+        )
+        XCTAssertEqual(
+            HomeWeeklyProgressCalendar.containingPlanID(
+                for: planned, in: plan
+            ), plan.id
+        )
+    }
+
+    func testTodayCalendarDoesNotDuplicateAWorkoutSavedInBothSources() {
+        let day = date(2026, 10, 19)
+        let original = PlannedSession(
+            id: UUID(), title: "Intervaller", kind: .running,
+            scheduledStart: day, exercises: []
+        )
+        var revised = original
+        revised.title = "Intervaller (oppdatert)"
+        let plan = TrainingPlan(
+            id: UUID(), ownerID: UUID(), title: "Plan", summary: "",
+            visibility: .privateOnly, version: 1,
+            weeks: [TrainingPlanWeek(
+                id: UUID(), weekNumber: 1, title: "Uke 1",
+                days: [TrainingPlanDay(
+                    id: UUID(), dayIndex: 1, title: "Mandag",
+                    sessions: [original]
+                )]
+            )],
+            tags: [], createdAt: day, updatedAt: day,
+            startDate: calendar.startOfDay(for: day)
+        )
+
+        let visible = HomeTodayCalendarSchedule.workouts(
+            plan: plan, standalone: [revised],
+            on: day, calendar: calendar
+        )
+
+        XCTAssertEqual(visible.count, 1)
+        XCTAssertEqual(visible.first?.title, "Intervaller (oppdatert)")
+    }
+
 }
