@@ -201,6 +201,19 @@ enum ProfileTrainingFocus: String, CaseIterable, Identifiable, Codable, Hashable
         case .recovery: return ATHLTHLocalization.choose(english: "Recovery", norwegian: "Restitusjon")
         }
     }
+    var subtitle: String {
+        switch self {
+        case .running: return ATHLTHLocalization.choose(english: "Pace, endurance and running", norwegian: "Fart, utholdenhet og løping")
+        case .strength: return ATHLTHLocalization.choose(english: "Strength and muscle building", norwegian: "Styrke og muskelutvikling")
+        case .walking: return ATHLTHLocalization.choose(english: "Walking, hikes and daily movement", norwegian: "Turgåing og daglig bevegelse")
+        case .cycling: return ATHLTHLocalization.choose(english: "Road, mountain and indoor cycling", norwegian: "Landevei, terreng og innendørssykling")
+        case .swimming: return ATHLTHLocalization.choose(english: "Pool and open-water swimming", norwegian: "Svømming i basseng og åpent vann")
+        case .functionalFitness: return ATHLTHLocalization.choose(english: "Functional fitness and HYROX", norwegian: "Funksjonell trening og HYROX")
+        case .generalFitness: return ATHLTHLocalization.choose(english: "A balanced mix of training", norwegian: "Variert og allsidig trening")
+        case .mobility: return ATHLTHLocalization.choose(english: "Flexibility and mobility", norwegian: "Bevegelighet og mobilitet")
+        case .recovery: return ATHLTHLocalization.choose(english: "Recovery and readiness", norwegian: "Restitusjon og overskudd")
+        }
+    }
     var systemImage: String {
         switch self {
         case .running: return "figure.run"
