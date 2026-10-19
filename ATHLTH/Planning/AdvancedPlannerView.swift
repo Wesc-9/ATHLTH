@@ -5530,7 +5530,7 @@ struct SessionEditorView: View {
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
 
                 if !workoutBlocks.isEmpty {
-                    Section("Workout Structure") {
+                    Section(ATHLTHLocalization.choose(english: "Workout Structure", norwegian: "Øktstruktur")) {
                         HStack {
                             Label(
                                 "\(workoutBlocks.count) blocks",
