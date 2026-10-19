@@ -3254,6 +3254,45 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         weekDayEdits[key] = edit
     }
 
+    private func moveGuidedWorkout(to destinationDay: Int, index: Int) {
+        let sourceKey = weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)
+        let destinationKey = weekDayKey(destinationDay, weekIndex: guidedCurrentWeek)
+        guard sourceKey != destinationKey,
+              var source = weekDayEdits[sourceKey],
+              let primary = source.detailedWorkout else { return }
+        var sourceWorkouts = [primary] + (source.additionalDetailedWorkouts ?? [])
+        guard sourceWorkouts.indices.contains(index) else { return }
+        let moving = sourceWorkouts.remove(at: index)
+        if let next = sourceWorkouts.first {
+            source.detailedWorkout = next
+            source.additionalDetailedWorkouts = Array(sourceWorkouts.dropFirst())
+            source.kind = next.kind
+            source.title = next.title
+            source.durationMinutes = next.durationMinutes
+        } else {
+            source.detailedWorkout = nil
+            source.additionalDetailedWorkouts = nil
+            source.kind = nil
+            source.title = nil
+            source.durationMinutes = nil
+        }
+        weekDayEdits[sourceKey] = source
+
+        var destination = weekDayEdits[destinationKey] ?? ATHLTHPlanWeekDayEdit()
+        destination.isRestDay = false
+        destination.removeTemplateDetail = false
+        if destination.detailedWorkout == nil {
+            destination.detailedWorkout = moving
+            destination.kind = moving.kind
+            destination.title = moving.title
+            destination.durationMinutes = moving.durationMinutes
+        } else {
+            destination.additionalDetailedWorkouts =
+                (destination.additionalDetailedWorkouts ?? []) + [moving]
+        }
+        weekDayEdits[destinationKey] = destination
+    }
+
     private var guidedSmartPlanningCard: some View {
         builderPanel {
             VStack(alignment: .leading, spacing: 10) {
@@ -3431,6 +3470,22 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 }
                                 .buttonStyle(.borderless)
                                 .foregroundStyle(ATHLTHPlanDesign.accent)
+                            }
+                            .contextMenu {
+                                ForEach(1...7, id: \.self) { destinationDay in
+                                    if destinationDay != guidedCurrentWeekday {
+                                        Button {
+                                            moveGuidedWorkout(to: destinationDay, index: index)
+                                        } label: {
+                                            Label(
+                                                ATHLTHLocalization.choose(
+                                                    english: "Move to day", norwegian: "Flytt til dag"
+                                                ) + " \(destinationDay)",
+                                                systemImage: "calendar.badge.clock"
+                                            )
+                                        }
+                                    }
+                                }
                             }
                             if index < (day.additionalDetailedWorkouts?.count ?? 0) {
                                 Divider()
