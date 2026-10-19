@@ -147,6 +147,15 @@ final class TrainTogetherMarketplaceStore:
         }
     }
 
+    private func recordActionError(_ error: Error) {
+        guard !Task.isCancelled,
+              !TrainTogetherMarketplaceErrorPolicy.isCancellation(error)
+        else {
+            return
+        }
+        errorMessage = error.localizedDescription
+    }
+
     func publish(
         post: TrainTogetherPostWrite,
         meetup: TrainTogetherMeetupWrite?
@@ -180,8 +189,7 @@ final class TrainTogetherMarketplaceStore:
             await refresh()
             return true
         } catch {
-            errorMessage =
-                error.localizedDescription
+            recordActionError(error)
             return false
         }
     }
@@ -212,8 +220,7 @@ final class TrainTogetherMarketplaceStore:
             await refresh()
             return true
         } catch {
-            errorMessage =
-                error.localizedDescription
+            recordActionError(error)
             return false
         }
     }
@@ -242,8 +249,7 @@ final class TrainTogetherMarketplaceStore:
             await refresh()
             return true
         } catch {
-            errorMessage =
-                error.localizedDescription
+            recordActionError(error)
             return false
         }
     }
@@ -273,8 +279,7 @@ final class TrainTogetherMarketplaceStore:
             await refresh()
             return true
         } catch {
-            errorMessage =
-                error.localizedDescription
+            recordActionError(error)
             return false
         }
     }
@@ -309,8 +314,7 @@ final class TrainTogetherMarketplaceStore:
             await refresh()
             return true
         } catch {
-            errorMessage =
-                error.localizedDescription
+            recordActionError(error)
             return false
         }
     }
@@ -339,8 +343,7 @@ final class TrainTogetherMarketplaceStore:
             await refresh()
             return true
         } catch {
-            errorMessage =
-                error.localizedDescription
+            recordActionError(error)
             return false
         }
     }
