@@ -173,7 +173,24 @@ struct ATHLTHPlanWeekDayEdit: Codable, Hashable {
                 where: { $0.dayIndex == relativeDay }
             ) else { continue }
             let previous = weeks[weekIndex].days[dayIndex].sessions
-            weeks[weekIndex].days[dayIndex].sessions = edit.scheduledSessions(from: previous)
+            var sessions = edit.scheduledSessions(from: previous)
+            // The plan's first day is startDate, regardless of weekday.
+            // Resolve each session's local clock time against its actual date.
+            if let actualDate = calendar.date(byAdding: .day,
+                value: weekIndex * 7 + relativeDay - 1, to: startDate) {
+                let midnight = calendar.startOfDay(for: actualDate)
+                let blueprints = [edit.detailedWorkout].compactMap { $0 }
+                    + (edit.additionalDetailedWorkouts ?? [])
+                for (index, blueprint) in blueprints.enumerated()
+                    where sessions.indices.contains(index) {
+                    if let minute = blueprint.startMinuteOfDay,
+                       (0..<1440).contains(minute) {
+                        sessions[index].scheduledStart = calendar.date(
+                            byAdding: .minute, value: minute, to: midnight)
+                    }
+                }
+            }
+            weeks[weekIndex].days[dayIndex].sessions = sessions
         }
     }
 }
