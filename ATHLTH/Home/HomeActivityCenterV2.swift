@@ -1538,15 +1538,37 @@ private struct HomeActivityFriendFeatureCardV3:
     private var activityArtwork:
         some View {
         ZStack {
-            LinearGradient(
-                colors: artworkColors,
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            HomeActivityMotionArtworkV3(
-                activity: workoutActivity
-            )
+            if workoutActivity == .strength {
+                // Keep the selected gym photography calm and secondary
+                // instead of an attention-grabbing athlete hero.
+                GeometryReader { proxy in
+                    Image("StrengthFeedGym")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(
+                            width: proxy.size.width,
+                            height: proxy.size.height
+                        )
+                        .clipped()
+                }
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.53),
+                        Color.white.opacity(0.78)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            } else {
+                LinearGradient(
+                    colors: artworkColors,
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                HomeActivityMotionArtworkV3(
+                    activity: workoutActivity
+                )
+            }
 
             HStack(
                 alignment: .bottom
@@ -1563,8 +1585,9 @@ private struct HomeActivityFriendFeatureCardV3:
                         )
                         .tracking(1.7)
                         .foregroundStyle(
-                            Color.white
-                                .opacity(0.72)
+                            workoutActivity == .strength
+                                ? ATHLTHTheme.primaryText.opacity(0.68)
+                                : Color.white.opacity(0.72)
                         )
 
                     Text(
@@ -1578,7 +1601,8 @@ private struct HomeActivityFriendFeatureCardV3:
                         )
                     )
                     .foregroundStyle(
-                        Color.white
+                        workoutActivity == .strength
+                            ? ATHLTHTheme.primaryText : .white
                     )
                     .lineLimit(1)
                 }
