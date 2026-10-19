@@ -3256,6 +3256,17 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
+    private func setGuidedWorkoutStart(index: Int, minute: Int?) {
+        let key = weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)
+        guard var edit = weekDayEdits[key], let primary = edit.detailedWorkout else { return }
+        var workouts = [primary] + (edit.additionalDetailedWorkouts ?? [])
+        guard workouts.indices.contains(index) else { return }
+        workouts[index].startMinuteOfDay = minute
+        edit.detailedWorkout = workouts[0]
+        edit.additionalDetailedWorkouts = Array(workouts.dropFirst())
+        weekDayEdits[key] = edit
+    }
+
     private func selectedWorkoutForEditor(day: Int) -> ATHLTHPlanStructuredWorkoutBlueprint? {
         let key = weekDayKey(day, weekIndex: selectedPlanWeekIndex)
         guard let edit = weekDayEdits[key], let primary = edit.detailedWorkout else {
@@ -3590,6 +3601,27 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                          ATHLTHLocalization.choose(english: "blocks", norwegian: "blokker"))
                                         .font(.caption)
                                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                    Menu {
+                                        Button(ATHLTHLocalization.choose(
+                                            english: "No fixed time", norwegian: "Uten fast tidspunkt")) {
+                                            setGuidedWorkoutStart(index: index, minute: nil)
+                                        }
+                                        ForEach(0..<48, id: \.self) { slot in
+                                            let minute = slot * 30
+                                            Button(String(format: "%02d:%02d", minute / 60, minute % 60)) {
+                                                setGuidedWorkoutStart(index: index, minute: minute)
+                                            }
+                                        }
+                                    } label: {
+                                        Label(
+                                            workout.startMinuteOfDay.map {
+                                                String(format: "%02d:%02d", $0 / 60, $0 % 60)
+                                            } ?? ATHLTHLocalization.choose(
+                                                english: "Set start time", norwegian: "Velg starttid"),
+                                            systemImage: "clock"
+                                        )
+                                        .font(.caption)
+                                    }
                                     ForEach(Array(workout.blocks.enumerated()), id: \.offset) { blockIndex, block in
                                         HStack(spacing: 6) {
                                             Image(systemName: "line.3.horizontal")
