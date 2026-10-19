@@ -6214,7 +6214,7 @@ struct SessionEditorView: View {
 
                         Stepper(
                             value: $targetPaceMinutes,
-                            in: 2...15
+                            in: 2...20
                         ) {
                             Text(
                                 "\(targetPaceMinutes):\(String(format: "%02d", targetPaceSeconds)) /km"
