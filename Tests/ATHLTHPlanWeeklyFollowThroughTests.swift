@@ -1196,4 +1196,38 @@ final class ATHLTHPlanWeeklyFollowThroughTests: XCTestCase {
         ))
     }
 
+
+    @MainActor
+    func testRestDayHasNoTrainingLoadOrPendingWorkout() throws {
+        let (store, defaults, suite, plan) = try prepared(weekCount: 1)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let rest = PlannedSession(
+            id: UUID(),
+            title: "Hviledag",
+            kind: .recovery,
+            scheduledStart: nil,
+            durationMinutes: nil,
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            routeID: nil,
+            exercises: [],
+            notes: nil,
+            workoutCategory: "rest_day"
+        )
+
+        store.addSession(rest, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let report = ATHLTHPlanWeeklyFollowThrough.inspect(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: plan.startDate!
+        )
+        XCTAssertEqual(report.total, 0)
+        XCTAssertEqual(ATHLTHPlanWeeklyFollowThrough.weeklyLoadSummaries(
+            plan: saved
+        ).first?.activeDays, 0)
+        XCTAssertNil(ATHLTHPlanWeeklyFollowThrough.nextWorkout(
+            plan: saved, store: store, healthWorkouts: [],
+            strengthHistory: [], referenceDate: plan.startDate!
+        ))
+    }
 }

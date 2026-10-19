@@ -177,4 +177,49 @@ final class ATHLTHPlanActualProgressTests: XCTestCase {
         XCTAssertEqual(result.totalSkipped, 0)
         XCTAssertEqual(result.weeks.first?.remaining, 1)
     }
+
+    @MainActor
+    func testExplicitRestDayDoesNotCountAsAWorkoutOrCompletion() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Recovery week",
+            summary: "",
+            weekCount: 1,
+            startDate: Calendar.current.startOfDay(for: Date())
+        ))
+        let rest = PlannedSession(
+            id: UUID(),
+            title: "Hviledag",
+            kind: .recovery,
+            scheduledStart: nil,
+            durationMinutes: nil,
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            routeID: nil,
+            exercises: [],
+            notes: nil,
+            workoutCategory: "rest_day"
+        )
+
+        XCTAssertTrue(rest.isExplicitRestDay)
+        store.addSession(rest, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.setPlanSessionManuallyCompleted(
+            planID: plan.id, sessionID: rest.id, completed: true
+        )
+        let report = ATHLTHPlanActualProgress.inspect(
+            plan: try XCTUnwrap(store.trainingPlan(withID: plan.id)),
+            store: store, healthWorkouts: [], strengthHistory: []
+        )
+        XCTAssertEqual(report.totalPlanned, 0)
+        XCTAssertEqual(report.totalCompleted, 0)
+        XCTAssertFalse(store.isPlanSessionManuallyCompleted(
+            planID: plan.id, sessionID: rest.id
+        ))
+
+        let run = plannedRun(title: "Cannot override a rest day")
+        store.addSession(run, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        let day = try XCTUnwrap(store.trainingPlan(withID: plan.id)?.weeks[0].days[0])
+        XCTAssertEqual(day.sessions.map(\.id), [rest.id])
+    }
 }
