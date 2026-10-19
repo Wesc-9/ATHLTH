@@ -1283,8 +1283,10 @@ struct ATHLTHRecordedRunningStep: Codable, Hashable {
     var distanceMeters: Double
     // A treadmill with manually entered belt speed is user-reported evidence.
     var isUserReported: Bool = false
+    var targetPaceSecondsPerKilometer: Double? = nil
 
     var actualSpeedKilometersPerHour: Double? {
+
         guard activeSeconds >= 10, distanceMeters > 0,
               activeSeconds.isFinite, distanceMeters.isFinite else {
             return nil
