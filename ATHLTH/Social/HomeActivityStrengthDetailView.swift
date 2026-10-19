@@ -729,7 +729,7 @@ struct HomeActivityStrengthDetailView: View {
     private var workoutHeroFallback:
         some View {
         Image(
-            "StrengthPostWorkoutHero"
+            "StrengthFeedGym"
         )
         .resizable()
         .scaledToFill()
@@ -783,7 +783,7 @@ struct HomeActivityStrengthDetailView: View {
                     alignment: .bottomLeading
                 ) {
                     Image(
-                        "StrengthPostWorkoutHero"
+                        "StrengthFeedGym"
                     )
                     .resizable()
                     .scaledToFill()
