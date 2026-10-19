@@ -5579,7 +5579,8 @@ struct SessionEditorView: View {
 
                     if kind == .walking || kind == .running {
                         Stepper(
-                            ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse") + ": \(distanceKilometers, specifier: "%.1f") km",
+                            ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse") +
+                                ": " + String(format: "%.1f km", distanceKilometers),
                             value: $distanceKilometers,
                             in: 0.5...100,
                             step: 0.5
