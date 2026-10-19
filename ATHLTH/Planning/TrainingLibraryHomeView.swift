@@ -385,14 +385,15 @@ private struct LibraryHubCategoryTile: View {
             }
             .padding(13)
         }
-        .frame(height: 170)
+        .frame(height: 160)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(.white.opacity(0.6), lineWidth: 0.8)
         }
         .contentShape(RoundedRectangle(cornerRadius: 20))
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title). \(detail)")
     }
 }
 
