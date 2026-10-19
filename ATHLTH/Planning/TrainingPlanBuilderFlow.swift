@@ -3239,6 +3239,21 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
+    private func moveGuidedWorkout(from index: Int, by offset: Int) {
+        let key = weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)
+        guard var edit = weekDayEdits[key], let primary = edit.detailedWorkout else { return }
+        var workouts = [primary] + (edit.additionalDetailedWorkouts ?? [])
+        let destination = index + offset
+        guard workouts.indices.contains(index), workouts.indices.contains(destination) else { return }
+        workouts.swapAt(index, destination)
+        edit.detailedWorkout = workouts[0]
+        edit.additionalDetailedWorkouts = Array(workouts.dropFirst())
+        edit.kind = workouts[0].kind
+        edit.title = workouts[0].title
+        edit.durationMinutes = workouts[0].durationMinutes
+        weekDayEdits[key] = edit
+    }
+
     private var guidedSmartPlanningCard: some View {
         builderPanel {
             VStack(alignment: .leading, spacing: 10) {
@@ -3385,6 +3400,26 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                                 }
                                 Spacer()
+                                HStack(spacing: 6) {
+                                    Button {
+                                        moveGuidedWorkout(from: index, by: -1)
+                                    } label: {
+                                        Image(systemName: "arrow.up")
+                                    }
+                                    .disabled(index == 0)
+                                    .accessibilityLabel(ATHLTHLocalization.choose(
+                                        english: "Move workout up", norwegian: "Flytt økten opp"))
+                                    Button {
+                                        moveGuidedWorkout(from: index, by: 1)
+                                    } label: {
+                                        Image(systemName: "arrow.down")
+                                    }
+                                    .disabled(index == (day.additionalDetailedWorkouts?.count ?? 0))
+                                    .accessibilityLabel(ATHLTHLocalization.choose(
+                                        english: "Move workout down", norwegian: "Flytt økten ned"))
+                                }
+                                .buttonStyle(.borderless)
+                                .foregroundStyle(ATHLTHPlanDesign.accent)
                             }
                             if index < (day.additionalDetailedWorkouts?.count ?? 0) {
                                 Divider()
