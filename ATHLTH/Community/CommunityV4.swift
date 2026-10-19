@@ -576,24 +576,14 @@ struct ATHLTHCommunityV4View: View {
     }
 
     private var referenceFriendsVsFriendsSection: some View {
-        NavigationLink {
-            CommunityFriendsVsFriendsDetailView(
-                currentUserID: session.profile.userID,
-                currentDisplayName: session.profile.displayName,
-                currentAvatarURL: session.profile.avatarURL,
-                friends: mutuals
-            )
-        } label: {
-            CommunityReferenceFriendsCard(
-                currentUserID: session.profile.userID,
-                currentDisplayName: session.profile.displayName,
-                currentAvatarURL: session.profile.avatarURL,
-                friends: mutuals,
-                feed: social.feed,
-                ownWorkouts: health.workouts
-            )
-        }
-        .buttonStyle(.plain)
+        CommunityReferenceFriendsCard(
+            currentUserID: session.profile.userID,
+            currentDisplayName: session.profile.displayName,
+            currentAvatarURL: session.profile.avatarURL,
+            friends: mutuals,
+            feed: social.feed,
+            ownWorkouts: health.workouts
+        )
     }
 
     private var referenceRecentActivitySection: some View {
@@ -1664,6 +1654,10 @@ private struct CommunityReferenceFriendsCard: View {
     let feed: [SocialFeedItem]
     let ownWorkouts: [WorkoutSummary]
 
+    @State private var showDuel = false
+    @State private var showOwnProfile = false
+    @State private var selectedFriendProfile: SocialProfileCard?
+
     private var threshold: Date {
         Calendar.current.date(
             byAdding: .day,
@@ -1799,7 +1793,8 @@ private struct CommunityReferenceFriendsCard: View {
                             currentActivityPoints,
                         workouts:
                             currentWorkoutCount,
-                        ringTint: .green
+                        ringTint: .green,
+                        openProfile: { showOwnProfile = true }
                     )
 
                     Text("VS")
@@ -1851,7 +1846,8 @@ private struct CommunityReferenceFriendsCard: View {
                             friendWorkoutCount(
                                 topFriend
                             ),
-                        ringTint: .blue
+                        ringTint: .blue,
+                        openProfile: { selectedFriendProfile = topFriend }
                     )
                 }
 
@@ -1956,6 +1952,22 @@ private struct CommunityReferenceFriendsCard: View {
                     style: .continuous
                 )
         )
+        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .onTapGesture { showDuel = true }
+        .navigationDestination(isPresented: $showDuel) {
+            CommunityFriendsVsFriendsDetailView(
+                currentUserID: currentUserID,
+                currentDisplayName: currentDisplayName,
+                currentAvatarURL: currentAvatarURL,
+                friends: friends
+            )
+        }
+        .navigationDestination(isPresented: $showOwnProfile) {
+            ATHLTHProfileView()
+        }
+        .navigationDestination(item: $selectedFriendProfile) { friend in
+            FriendProfileView(userID: friend.userID)
+        }
         .overlay {
             RoundedRectangle(
                 cornerRadius: 20,
@@ -1974,7 +1986,8 @@ private struct CommunityReferenceFriendsCard: View {
         fallback: String,
         points: Double,
         workouts: Int,
-        ringTint: Color
+        ringTint: Color,
+        openProfile: @escaping () -> Void
     ) -> some View {
         HStack(spacing: 9) {
             CommunityReferenceAvatar(
@@ -1982,6 +1995,9 @@ private struct CommunityReferenceFriendsCard: View {
                 fallback: fallback,
                 size: 58
             )
+            .contentShape(Circle())
+            .highPriorityGesture(TapGesture().onEnded { openProfile() })
+            .accessibilityAddTraits(.isButton)
             .overlay {
                 Circle()
                     .stroke(
