@@ -1089,6 +1089,12 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     var isStructuredWorkout: Bool {
         !resolvedWorkoutBlocks.isEmpty
     }
+
+    /// A deliberate calendar rest day is not an executable workout.
+    /// The category is already optional, preserving old account data.
+    var isExplicitRestDay: Bool {
+        workoutCategory == "rest_day"
+    }
 }
 
 struct TrainingPlanDay: Identifiable, Codable, Hashable {

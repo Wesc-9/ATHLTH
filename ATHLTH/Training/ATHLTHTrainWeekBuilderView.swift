@@ -16,6 +16,7 @@ struct ATHLTHTrainWeekBuilderView: View {
     @State private var removeRequest: RemoveRequest?
     @State private var transferRequest: TransferRequest?
     @State private var showingSavedWorkouts = false
+    @State private var showingRecoveryRestPlanner = false
     @State private var showingPeriodization = false
     @State private var planActionError: String?
 
@@ -161,6 +162,16 @@ struct ATHLTHTrainWeekBuilderView: View {
                     copyInsteadOfMove: request.copyInsteadOfMove
                 )
             }
+            .sheet(isPresented: $showingRecoveryRestPlanner) {
+                if let day = currentDay {
+                    ATHLTHRecoveryRestPlanningSheet(
+                        date: dayDate(day.dayIndex),
+                        planID: planID,
+                        dayID: day.id
+                    )
+                    .presentationDetents([.large])
+                }
+            }
             .sheet(isPresented: $showingSavedWorkouts) {
                 if let dayID = currentDay?.id {
                     ATHLTHTrainSavedWorkoutPickerView(
@@ -292,7 +303,7 @@ struct ATHLTHTrainWeekBuilderView: View {
                         .foregroundStyle(ink)
                 }
                 Spacer()
-                Text("\(day.sessions.count) " + tr("workouts", "økter"))
+                Text("\(day.sessions.filter { !$0.isExplicitRestDay }.count) " + tr("workouts", "økter"))
                     .font(.caption)
                     .foregroundStyle(muted)
             }
@@ -324,8 +335,9 @@ struct ATHLTHTrainWeekBuilderView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(workout.title)
                                 .font(.system(size: 20, weight: .regular, design: .serif))
-                            Text(workout.kind.title
-                                + " · \(workout.durationMinutes ?? 0) min")
+                            Text(workout.isExplicitRestDay
+                                ? tr("Rest day · No workout required", "Hviledag · Ingen trening kreves")
+                                : workout.kind.title + " · \(workout.durationMinutes ?? 0) min")
                                 .font(.caption)
                                 .foregroundStyle(muted)
                         }
@@ -450,6 +462,10 @@ struct ATHLTHTrainWeekBuilderView: View {
                 .background(ink, in: RoundedRectangle(cornerRadius: 13))
             }
             .buttonStyle(.plain)
+
+            ATHLTHRecoveryRestEntryCard {
+                showingRecoveryRestPlanner = true
+            }
 
             Button {
                 showingSavedWorkouts = true

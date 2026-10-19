@@ -5131,6 +5131,7 @@ struct SessionEditorView: View {
     @State private var workoutBlocks: [WorkoutTemplateBlock] = []
     @State private var workoutCategory: String?
     @State private var showingSavedWorkoutPicker = false
+    @State private var showingRecoveryRestPlanner = false
     @State private var selectedPartnerID: UUID?
     @State private var allowInviteeExercises = false
     @State private var directPartnerID: UUID?
@@ -5713,8 +5714,8 @@ struct SessionEditorView: View {
             onUsePlanned: {
                 showingSavedWorkoutPicker = true
             },
-            onTrainTogether: onPreparedWorkout == nil
-                ? { beginPartnerPlanningFromSource() }
+            onRecoveryRest: onPreparedWorkout == nil
+                ? { showingRecoveryRestPlanner = true }
                 : nil
         )
     }
@@ -5928,6 +5929,10 @@ struct SessionEditorView: View {
                         )
                     }
                 }
+            }
+            .sheet(isPresented: $showingRecoveryRestPlanner) {
+                ATHLTHRecoveryRestPlanningSheet(date: scheduledTime)
+                    .presentationDetents([.large])
             }
             .sheet(isPresented: $showingSavedWorkoutPicker) {
                 PlanWorkoutPickerView { workout in

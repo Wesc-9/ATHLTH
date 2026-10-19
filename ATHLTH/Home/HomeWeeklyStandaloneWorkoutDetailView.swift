@@ -104,7 +104,9 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
         .scrollIndicators(.hidden)
         .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            editActionFooter
+            if !currentWorkout.isExplicitRestDay {
+                editActionFooter
+            }
         }
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showingEditor) {
@@ -131,7 +133,8 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
                 .foregroundStyle(ATHLTHPlanDesign.accentInk)
 
                 Text(ATHLTHLocalization.choose(
-                    english: "Workout details", norwegian: "Øktdetaljer"
+                    english: currentWorkout.isExplicitRestDay ? "Rest day" : "Workout details",
+                    norwegian: currentWorkout.isExplicitRestDay ? "Hviledag" : "Øktdetaljer"
                 ))
                 .font(.system(size: titleSize, weight: .semibold, design: .serif))
                 .foregroundStyle(ATHLTHPlanDesign.ink)
@@ -157,7 +160,8 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
             HStack(alignment: .center, spacing: 10) {
                 Label(
                     ATHLTHLocalization.choose(
-                        english: "SCHEDULED WORKOUT", norwegian: "PLANLAGT ØKT"
+                        english: currentWorkout.isExplicitRestDay ? "REST DAY" : "SCHEDULED WORKOUT",
+                        norwegian: currentWorkout.isExplicitRestDay ? "HVILEDAG" : "PLANLAGT ØKT"
                     ),
                     systemImage: "calendar"
                 )

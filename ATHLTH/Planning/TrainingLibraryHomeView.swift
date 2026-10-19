@@ -13,6 +13,7 @@ struct TrainingLibraryHomeView: View {
     @EnvironmentObject private var session: AppSessionStore
 
     let onStartRunning: (RunningWorkoutTemplate) -> Void
+    @State private var showingRecoveryRestPlanner = false
 
     private let ink = ATHLTHPlanDesign.ink
     private let muted = ATHLTHPlanDesign.secondaryInk
@@ -31,6 +32,11 @@ struct TrainingLibraryHomeView: View {
 
             exploreSection
 
+            // One shared recovery/rest entry for single sessions and plans.
+            ATHLTHRecoveryRestEntryCard {
+                showingRecoveryRestPlanner = true
+            }
+
             personalLibrarySection
 
             // One relevant hint, without fabricated recommendations or
@@ -42,6 +48,10 @@ struct TrainingLibraryHomeView: View {
         .buttonStyle(.plain)
         .task {
             await favorites.refresh()
+        }
+        .sheet(isPresented: $showingRecoveryRestPlanner) {
+            ATHLTHRecoveryRestPlanningSheet()
+                .presentationDetents([.large])
         }
     }
 
