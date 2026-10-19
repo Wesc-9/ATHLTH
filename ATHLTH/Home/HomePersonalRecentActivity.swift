@@ -1451,40 +1451,52 @@ struct HomePersonalRecentActivitySection:
         for workout:
             SocialPublishableWorkout
     ) -> SocialFeedItem? {
-        let workoutID =
-            workout.id.uuidString
-                .lowercased()
+        // The social strength publisher posts StrengthWorkoutLog.id,
+        // while the personal history prefers its HealthKit UUID. Include
+        // both IDs: otherwise the published strength post looks unlikable.
+        let IDs = HomeSocialWorkoutIdentity.allIDs(
+            visibleWorkoutID: workout.id,
+            originalStrengthID: strengthWorkout(for: workout)?.id,
+            originalPhoneID: localPhoneWorkout(for: workout)?.id
+        )
 
-        return social.feed.first {
-            item in
+        return social.feed.first { item in
+            HomeSocialWorkoutIdentity.matches(
+                item: item,
+                ownerID: social.currentUserID,
+                workoutIDs: IDs
+            )
+        }
+    }
+}
 
-            guard item.activity.actorID ==
-                    social.currentUserID,
-                  item.activity.kind ==
-                    "workout"
-            else {
-                return false
-            }
+/// Published workout IDs do not necessarily equal HealthKit UUIDs.
+/// Keep this mapping shared across running, strength and phone recording.
+enum HomeSocialWorkoutIdentity {
+    static func allIDs(
+        visibleWorkoutID: UUID,
+        originalStrengthID: UUID?,
+        originalPhoneID: UUID?
+    ) -> Set<String> {
+        Set([visibleWorkoutID, originalStrengthID, originalPhoneID]
+            .compactMap { $0?.uuidString.lowercased() })
+    }
 
-            let metadataWorkoutID =
-                item.activity
-                    .metadata?["workout_id"]?
-                    .lowercased()
-
-            if metadataWorkoutID ==
-                workoutID {
-                return true
-            }
-
-            let eventKey =
-                item.activity
-                    .eventKey?
-                    .lowercased()
-
-            return eventKey ==
-                    "workout-\(workoutID)" ||
-                   eventKey ==
-                    "strength-workout-\(workoutID)"
+    static func matches(
+        item: SocialFeedItem,
+        ownerID: UUID?,
+        workoutIDs: Set<String>
+    ) -> Bool {
+        guard item.activity.actorID == ownerID,
+              item.activity.kind == "workout" else { return false }
+        if let metadataID = item.activity.metadata?["workout_id"]?.lowercased(),
+           workoutIDs.contains(metadataID) { return true }
+        guard let eventKey = item.activity.eventKey?.lowercased() else {
+            return false
+        }
+        return workoutIDs.contains {
+            eventKey == "workout-\($0)" ||
+            eventKey == "strength-workout-\($0)"
         }
     }
 }
@@ -4914,7 +4926,7 @@ private struct HomePremiumStrengthStudioBackground: View {
     var body: some View {
         GeometryReader { proxy in
             ZStack {
-                Image("StrengthPostWorkoutHero")
+                Image("StrengthFeedGym")
                     .resizable()
                     .scaledToFill()
                     .frame(
@@ -4922,8 +4934,8 @@ private struct HomePremiumStrengthStudioBackground: View {
                         height: proxy.size.height
                     )
                     .clipped()
-                    .saturation(0.86)
-                    .contrast(0.97)
+                    .saturation(0.78)
+                    .contrast(0.86)
 
                 // Light, sun-drenched photographic grade that preserves
                 // details at the edges while the anatomy floats above it.
@@ -5230,11 +5242,13 @@ private struct HomeStrengthRecentPhotoArtwork: View {
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .bottomLeading) {
-                Image("StrengthPostWorkoutHero")
+                Image("StrengthFeedGym")
                     .resizable()
                     .scaledToFill()
                     .frame(width: proxy.size.width, height: proxy.size.height)
                     .clipped()
+                    .saturation(0.85)
+                    .contrast(0.90)
 
                 LinearGradient(
                     stops: [
