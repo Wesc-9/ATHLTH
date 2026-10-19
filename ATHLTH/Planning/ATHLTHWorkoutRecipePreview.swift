@@ -187,8 +187,7 @@ struct ATHLTHWorkoutRecipePreview: View {
     private var timeline: some View {
         VStack(alignment: .leading, spacing: 11) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
-                if index == 0 ||
-                    blocks[index - 1].resolvedPhase != block.resolvedPhase {
+                if shouldShowPhaseHeader(at: index) {
                     Label(block.resolvedPhase.title.uppercased(),
                           systemImage: block.resolvedPhase.symbol)
                         .font(.caption2.weight(.bold))
@@ -219,6 +218,19 @@ struct ATHLTHWorkoutRecipePreview: View {
         }
     }
 
+    // A recovery belongs to the preceding interval. Do not repeat the
+    // HOVEDDEL heading after every pause; show the pause inside its work set.
+    private func shouldShowPhaseHeader(at index: Int) -> Bool {
+        guard blocks.indices.contains(index) else { return false }
+        let phase = blocks[index].resolvedPhase
+        if phase == .recovery {
+            return blocks.prefix(index).allSatisfy { $0.resolvedPhase == .recovery }
+        }
+        let previous = blocks.prefix(index).reversed()
+            .first { $0.resolvedPhase != .recovery }
+        return previous?.resolvedPhase != phase
+    }
+
     @ViewBuilder
     private func recipeStep(_ block: WorkoutTemplateBlock) -> some View {
         if block.kind == .exercise {
@@ -239,6 +251,15 @@ struct ATHLTHWorkoutRecipePreview: View {
 
     private func recipeStepCard(_ block: WorkoutTemplateBlock) -> some View {
         VStack(alignment: .leading, spacing: 10) {
+            if block.resolvedPhase == .recovery {
+                Label(
+                    tr("ACTIVE RECOVERY", "AKTIV PAUSE"),
+                    systemImage: "pause.circle.fill"
+                )
+                .font(.caption2.weight(.semibold))
+                .tracking(0.9)
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            }
             HStack(alignment: .top, spacing: 11) {
                 thumbnail(for: block)
 
@@ -284,7 +305,15 @@ struct ATHLTHWorkoutRecipePreview: View {
             }
         }
         .padding(13)
-        .athlthPlanCard(radius: 19)
+        .athlthPlanCard(radius: 19, warm: block.resolvedPhase != .recovery)
+        .overlay(alignment: .leading) {
+            if block.resolvedPhase == .recovery {
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(ATHLTHPlanDesign.accentInk.opacity(0.6))
+                    .frame(width: 4)
+                    .padding(.leading, 2)
+            }
+        }
     }
 
     @ViewBuilder
@@ -319,6 +348,7 @@ struct ATHLTHWorkoutRecipePreview: View {
     }
 
     private func blockIcon(_ block: WorkoutTemplateBlock) -> String {
+        if block.resolvedPhase == .recovery { return "pause.fill" }
         if block.kind == .run && block.cardioActivity == .walking { return "figure.walk" }
         return block.kind.systemImage
     }
