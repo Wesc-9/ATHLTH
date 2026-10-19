@@ -33,7 +33,7 @@ struct WatchHomeView: View {
                                     todayWorkoutCard(today)
                                 }
                                 quickStartTiles(compact: compact)
-                                otherWorkoutsCard(compact: compact)
+                                otherWorkoutsCard
                                 if let message = workoutManager.errorMessage {
                                     Label(
                                         message,
@@ -56,7 +56,7 @@ struct WatchHomeView: View {
                             header
                             Spacer(minLength: 0)
                             quickStartTiles(compact: compact)
-                            otherWorkoutsCard(compact: compact)
+                            otherWorkoutsCard
                             Spacer(minLength: 0)
                         }
                         .padding(.horizontal, 7)
