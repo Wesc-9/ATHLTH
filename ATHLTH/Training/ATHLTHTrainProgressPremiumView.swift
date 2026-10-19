@@ -605,6 +605,10 @@ private struct ATHLTHTrainGeneralProgressContent: View {
                 )
             }
 
+            // Interval progression is backed only by completed recordings,
+            // like exercise progression is backed by finished strength logs.
+            ATHLTHRunningSpeedProgressCard()
+
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(tr("WEIGHT PROGRESSION", "VEKTUTVIKLING"))
