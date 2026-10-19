@@ -9538,123 +9538,57 @@ struct ProfileRecordShowcasePickerView:
         }
     }
 
-    private var showcaseHero:
-        some View {
-        GeometryReader {
-            proxy in
+    private var showcaseHero: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("ATHLTH")
+                    .font(.system(size: 24, weight: .black, design: .rounded))
+                    .tracking(4)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
 
-            ZStack(
-                alignment: .leading
-            ) {
-                Image("GoalProgress")
-                    .resizable()
-                    .scaledToFill()
-                    .scaleEffect(1.10)
-                    .frame(
-                        width:
-                            proxy.size
-                                .width,
-                        height:
-                            proxy.size
-                                .height
+                Text("MOVE BETTER  ·  LIVE LONGER")
+                    .font(.system(size: 8, weight: .semibold))
+                    .tracking(2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Your personal records",
+                        norwegian: "Dine personlige rekorder"
                     )
-                    .clipped()
-
-                LinearGradient(
-                    colors: [
-                        Color.black
-                            .opacity(0.72),
-                        ATHLTHTheme
-                            .accentDeep
-                            .opacity(0.54),
-                        Color.clear
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
                 )
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 6
-                ) {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "PERSONAL RECORDS",
-                            norwegian:
-                                "PERSONLIGE REKORDER"
-                        ),
-                        systemImage:
-                            "trophy.fill"
-                    )
-                    .font(
-                        .caption2
-                            .weight(.bold)
-                    )
-                    .tracking(1.0)
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .premiumGold
-                    )
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Build your record showcase",
-                            norwegian:
-                                "Bygg rekordhyllen din"
-                        )
-                    )
-                    .font(
-                        .title2
-                            .weight(.bold)
-                    )
-                    .foregroundStyle(
-                        .white
-                    )
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Choose up to four verified performances that best represent you.",
-                            norwegian:
-                                "Velg opptil fire verifiserte prestasjoner som best representerer deg."
-                        )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
-                        .white
-                            .opacity(0.86)
-                    )
-                    .fixedSize(
-                        horizontal: false,
-                        vertical: true
-                    )
-                    .frame(
-                        maxWidth:
-                            proxy.size
-                                .width *
-                            0.68,
-                        alignment: .leading
-                    )
-                }
-                .padding(18)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .padding(.top, 5)
             }
+
+            Spacer(minLength: 0)
+
+            Image(systemName: "trophy")
+                .font(.system(size: 27, weight: .ultraLight))
+                .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.6))
+                .frame(width: 52, height: 52)
+                .background(Color.white.opacity(0.75), in: Circle())
+                .accessibilityHidden(true)
         }
-        .frame(height: 116)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 26,
-                style: .continuous
-            )
+        .padding(.horizontal, 18)
+        .padding(.vertical, 15)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white,
+                    Color(red: 0.94, green: 0.96, blue: 0.98)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
         )
-        .shadow(
-            color:
-                Color.black
-                    .opacity(0.12),
-            radius: 16,
-            y: 8
-        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(ATHLTHTheme.primaryText.opacity(0.07), lineWidth: 0.8)
+        }
     }
 
     private func showcaseSlot(_ index: Int) -> some View {
