@@ -18,7 +18,7 @@ final class NorwegianExerciseLocalizationTests: XCTestCase {
         XCTAssertEqual(library.localizedEquipmentTitle("Ab Crunch Machine"), "Magemaskin")
         XCTAssertEqual(library.localizedEquipmentTitle("Ab Wheel"), "Magehjul")
         XCTAssertEqual(library.localizedEquipmentTitle("Barbell"), "Vektstang")
-        XCTAssertEqual(library.localizedEquipmentTitle("Battle Rope"), "Treningstau")
+        XCTAssertEqual(library.localizedEquipmentTitle("Battle Rope"), "Battle rope")
         XCTAssertEqual(library.localizedEquipmentTitle("Bench"), "Benk")
         XCTAssertEqual(library.localizedEquipmentTitle("Bodyweight"), "Kroppsvekt")
         XCTAssertEqual(library.localizedEquipmentTitle("Smith Machine"), "Smithmaskin")
