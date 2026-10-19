@@ -32,8 +32,6 @@ struct TrainingLibraryHomeView: View {
         VStack(alignment: .leading, spacing: 25) {
             introduction
 
-            createSection
-
             exploreSection
 
             personalLibrarySection
@@ -57,82 +55,42 @@ struct TrainingLibraryHomeView: View {
     }
 
     private var introduction: some View {
-        HStack(alignment: .center, spacing: 13) {
-            Image(systemName: "square.stack.3d.up")
-                .font(.system(size: 23, weight: .medium))
-                .foregroundStyle(gold)
-                .frame(width: 57, height: 57)
-                .background(
-                    gold.opacity(0.10),
-                    in: RoundedRectangle(cornerRadius: 18)
-                )
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text(tr("Your training library", "Ditt treningsbibliotek"))
-                    .font(.system(size: 23, weight: .semibold, design: .serif))
-                    .foregroundStyle(ink)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.85)
-                Text(tr("Find, build and save what you want to train.",
-                        "Finn, bygg og lagre treningen du ønsker."))
-                    .font(.subheadline)
-                    .foregroundStyle(muted)
-                    .fixedSize(horizontal: false, vertical: true)
+        ZStack(alignment: .bottomLeading) {
+            GeometryReader { geometry in
+                Image("GoalMountain")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
             }
-            Spacer(minLength: 0)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
             LinearGradient(
-                colors: [.white, Color(red: 0.973, green: 0.965, blue: 0.95)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: 23)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 23)
-                .strokeBorder(.white.opacity(0.85), lineWidth: 1)
-        }
-    }
-
-    private var createSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeading(
-                tr("START HERE", "START HER"),
-                title: tr("What would you like to create?", "Hva vil du lage?")
+                colors: [.white.opacity(0.96), .white.opacity(0.72), .white.opacity(0.08)],
+                startPoint: .leading,
+                endPoint: .trailing
             )
-
-            LazyVGrid(columns: layout, spacing: 11) {
-                Button {
-                    showingCreatePlan = true
-                } label: {
-                    LibraryHubActionTile(
-                        title: tr("New training plan", "Ny treningsplan"),
-                        detail: tr("Simple or advanced", "Enkel eller avansert"),
-                        symbol: "calendar.badge.plus",
-                        tint: gold
-                    )
-                }
-                .accessibilityHint(tr("Open training plan creation",
-                                      "Åpner opprettelse av treningsplan"))
-
-                Button {
-                    showingCreateWorkout = true
-                } label: {
-                    LibraryHubActionTile(
-                        title: tr("Build a workout", "Bygg en økt"),
-                        detail: tr("Exercises, intervals and rest",
-                                   "Øvelser, intervaller og pauser"),
-                        symbol: "plus.square.on.square",
-                        tint: slate
-                    )
-                }
-                .accessibilityHint(tr("Open the complete workout builder",
-                                      "Åpner øktbyggeren"))
+            VStack(alignment: .leading, spacing: 7) {
+                ATHLTHBrandMark(size: .compact)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(tr("Explore", "UTFORSK").uppercased())
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(2)
+                    .foregroundStyle(gold)
+                    .padding(.top, 7)
+                Text(tr("Training library", "Treningsbiblioteket"))
+                    .font(.system(size: 27, weight: .semibold, design: .serif))
+                    .foregroundStyle(ink)
+                Text(tr(
+                    "Discover plans, workouts, exercises and routes.",
+                    "Finn treningsplaner, økter, øvelser og ruter."
+                ))
+                .font(.subheadline)
+                .foregroundStyle(muted)
             }
+            .padding(18)
         }
+        .frame(height: 185)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 
     private var exploreSection: some View {
@@ -152,6 +110,7 @@ struct TrainingLibraryHomeView: View {
                         title: tr("Training plans", "Treningsplaner"),
                         detail: tr("Find a complete plan", "Finn en ferdig plan"),
                         symbol: "square.stack.3d.up.fill",
+                        artwork: "GoalProgress",
                         tint: gold
                     )
                 }
@@ -164,6 +123,7 @@ struct TrainingLibraryHomeView: View {
                         detail: tr("Strength, running and more",
                                    "Styrke, løping og mer"),
                         symbol: "dumbbell.fill",
+                        artwork: "StrengthQuickHero",
                         tint: lavender
                     )
                 }
@@ -176,6 +136,7 @@ struct TrainingLibraryHomeView: View {
                         detail: tr("Search by muscle and equipment",
                                    "Søk på muskel og utstyr"),
                         symbol: "figure.strengthtraining.traditional",
+                        artwork: "GoalStrength",
                         tint: slate
                     )
                 }
@@ -188,6 +149,7 @@ struct TrainingLibraryHomeView: View {
                         detail: tr("Find a route to explore",
                                    "Finn en ny tur eller løperute"),
                         symbol: "map.fill",
+                        artwork: "GoalAdventure",
                         tint: green
                     )
                 }
