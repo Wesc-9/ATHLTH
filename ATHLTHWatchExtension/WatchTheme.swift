@@ -7,9 +7,9 @@ enum WatchTheme {
     static let planCanvas = Color(red: 0.991, green: 0.986, blue: 0.979)
     static let planInk = Color(red: 0.18, green: 0.18, blue: 0.17)
     static let planSecondary = Color(red: 0.43, green: 0.42, blue: 0.41)
-    static let planAccent = Color(red: 0.65, green: 0.53, blue: 0.35)
+    static let planAccent = Color(red: 0.72, green: 0.55, blue: 0.31)
     static let planSelected = Color(red: 0.975, green: 0.958, blue: 0.93)
-    static let planBorder = Color(red: 0.88, green: 0.86, blue: 0.83)
+    static let planBorder = Color(red: 0.89, green: 0.87, blue: 0.84)
     static let planConnected = Color(red: 0.19, green: 0.61, blue: 0.43)
 
     // High-contrast workout-only palette. Navigation and non-training

@@ -6642,15 +6642,30 @@ private struct MessageBubble: View {
     private var provenanceText: String {
         if let sourceOwnerID = message.sourceOwnerID {
             if sourceOwnerID == currentUserID {
-                return "Created by you"
+                return ATHLTHLocalization.choose(
+                    english: "Created by you", norwegian: "Opprettet av deg"
+                )
             }
             if sourceOwnerID == friend.userID {
-                return "Created by \(friend.resolvedName)"
+                return ATHLTHLocalization.choose(
+                    english: "Created by \(friend.resolvedName)",
+                    norwegian: "Opprettet av \(friend.resolvedName)"
+                )
             }
-            return "Original creator preserved"
+            return ATHLTHLocalization.choose(
+                english: "Original creator preserved",
+                norwegian: "Opprinnelig oppretter er bevart"
+            )
         }
 
-        return isMine ? "Shared by you" : "Shared by \(friend.resolvedName)"
+        return isMine
+            ? ATHLTHLocalization.choose(
+                english: "Shared by you", norwegian: "Delt av deg"
+            )
+            : ATHLTHLocalization.choose(
+                english: "Shared by \(friend.resolvedName)",
+                norwegian: "Delt av \(friend.resolvedName)"
+            )
     }
 
     private enum ChallengeStatusKind {
@@ -7117,11 +7132,8 @@ private struct MessageBubble: View {
                                 ? AnyShapeStyle(
                                     LinearGradient(
                                         colors: [
-                                            ATHLTHTheme
-                                                .vitality,
-                                            ATHLTHTheme
-                                                .accent
-                                                .opacity(0.92)
+                                            ATHLTHPlanDesign.outgoingMessage,
+                                            ATHLTHPlanDesign.outgoingMessage.opacity(0.94)
                                         ],
                                         startPoint:
                                             .topLeading,
@@ -7155,9 +7167,9 @@ private struct MessageBubble: View {
                         .shadow(
                             color:
                                 isMine
-                                    ? ATHLTHTheme
-                                        .vitality
-                                        .opacity(0.08)
+                                    ? ATHLTHPlanDesign
+                                        .outgoingMessage
+                                        .opacity(0.10)
                                     : ATHLTHTheme
                                         .accentDeep
                                         .opacity(0.04),

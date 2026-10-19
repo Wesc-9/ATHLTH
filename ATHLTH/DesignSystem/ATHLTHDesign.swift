@@ -599,8 +599,8 @@ struct ATHLTHPremiumIconButton: View {
                     .primaryText
             )
             .frame(
-                width: 42,
-                height: 42
+                width: 48,
+                height: 48
             )
             .background(
                 Color.white.opacity(0.78),

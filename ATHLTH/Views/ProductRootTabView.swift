@@ -5310,7 +5310,7 @@ struct ATHLTHTrainView: View {
             }
             .scrollIndicators(.hidden)
             .background(
-                Color(red: 0.983, green: 0.976, blue: 0.964)
+                ATHLTHPlanDesign.warmCanvas
                     .ignoresSafeArea()
             )
             .navigationDestination(
@@ -5814,23 +5814,24 @@ struct ATHLTHTrainView: View {
     // The reference-led Today design is isolated from the workout engine.
     // The existing recording flows and plan workspace remain unchanged.
     private var premiumTrainBrandHeader: some View {
-        HStack {
-            Text("A T H L T H")
-                .font(.system(size: 16, weight: .medium, design: .serif))
-                .foregroundStyle(Color(red: 0.18, green: 0.18, blue: 0.17))
-                .accessibilityLabel("ATHLTH")
-            Spacer()
+        HStack(spacing: 12) {
+            // Reuse the authentic shared vector mark rather than a typed logo.
+            ATHLTHBrandMark(size: .compact)
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+            Spacer(minLength: 0)
             Button {
                 showingLibrary = true
             } label: {
                 Image(systemName: "square.grid.2x2")
-                    .font(.system(size: 17, weight: .regular))
-                    .foregroundStyle(Color(red: 0.25, green: 0.24, blue: 0.22))
-                    .frame(width: 37, height: 37)
-                    .background(
-                        Color.white.opacity(0.78),
-                        in: Circle()
-                    )
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .frame(width: ATHLTHPlanDesign.minTapHeight, height: ATHLTHPlanDesign.minTapHeight)
+                    .background(ATHLTHPlanDesign.surface, in: Circle())
+                    .overlay {
+                        Circle()
+                            .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.8)
+                    }
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(
@@ -5876,7 +5877,7 @@ struct ATHLTHTrainView: View {
         }
         .padding(4)
         .background(
-            Color(red: 0.931, green: 0.919, blue: 0.903),
+            ATHLTHPlanDesign.warmSurface,
             in: RoundedRectangle(cornerRadius: 13)
         )
     }
@@ -5888,18 +5889,18 @@ struct ATHLTHTrainView: View {
     ) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 11.5, weight: selected ? .semibold : .medium))
+                .font(.system(size: 13, weight: selected ? .semibold : .medium))
                 .foregroundStyle(
                     selected
                         ? Color.white
-                        : Color(red: 0.43, green: 0.41, blue: 0.39)
+                        : ATHLTHPlanDesign.secondaryInk
                 )
                 .frame(maxWidth: .infinity)
-                .frame(height: 36)
+                .frame(minHeight: ATHLTHPlanDesign.minTapHeight)
                 .background {
                     if selected {
                         RoundedRectangle(cornerRadius: 10)
-                            .fill(Color(red: 0.17, green: 0.17, blue: 0.17))
+                            .fill(ATHLTHPlanDesign.ink)
                     }
                 }
                 .contentShape(Rectangle())
