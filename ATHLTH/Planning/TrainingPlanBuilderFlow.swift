@@ -66,6 +66,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var pendingStudioDay: WeekDayEditorSelection?
     @State private var addingExtraWorkout = false
     @State private var editingWorkoutIndex = 0
+    @State private var previousGuidedEdits: [Int: ATHLTHPlanWeekDayEdit]?
     @State private var selectingExtraFromLibrary = false
 
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
@@ -3325,6 +3326,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private func moveGuidedBlock(
         from sourceIndex: Int,
         blockIndex: Int,
+        copy: Bool = false,
         to destinationDay: Int,
         workoutIndex: Int
     ) {
@@ -3354,14 +3356,17 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
         let movingBlocks = movingIndices.map { sourceBlocks[$0] }
         var updatedSource = sourceWorkouts[sourceIndex]
-        updatedSource.blocks = sourceBlocks.enumerated().compactMap {
-            movingIndices.contains($0.offset) ? nil : $0.element
+        if !copy {
+            updatedSource.blocks = sourceBlocks.enumerated().compactMap {
+                movingIndices.contains($0.offset) ? nil : $0.element
+            }
         }
         var updatedTarget = targetWorkouts[workoutIndex]
         updatedTarget.blocks.append(contentsOf: movingBlocks)
         // An empty or otherwise invalid source requires explicit session
         // deletion instead; never silently lose a workout or break a superset.
         guard updatedSource.isValid, updatedTarget.isValid else { return }
+        previousGuidedEdits = weekDayEdits
         // A move changes the recipe. Recalculate only when the estimator has
         // enough information; never replace a known duration with a guess.
         if let minutes = ATHLTHWorkoutDurationEstimator.minutes(for: updatedSource.blocks) {
@@ -3496,6 +3501,20 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
             }
             guidedWeekNavigator
+            if let previousGuidedEdits {
+                Button {
+                    weekDayEdits = previousGuidedEdits
+                    self.previousGuidedEdits = nil
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Undo last transfer", norwegian: "Angre siste flytting"),
+                        systemImage: "arrow.uturn.backward")
+                }
+                .buttonStyle(.bordered)
+                .accessibilityHint(ATHLTHLocalization.choose(
+                    english: "Restore the plan before the last transfer",
+                    norwegian: "Gjenopprett planen før siste flytting"))
+            }
             stepIntro(
                 eyebrow: guidedCurrentDate.formatted(.dateTime.weekday(.wide).day().month(.wide)),
                 title: ATHLTHLocalization.choose(english: "Plan this day", norwegian: "Planlegg denne dagen"),
@@ -3604,6 +3623,20 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                                                     Label(
                                                                         "\(targetDay) · \(targetWorkout.title)",
                                                                         systemImage: "arrow.right"
+                                                                    )
+                                                                }
+                                                                Button {
+                                                                    moveGuidedBlock(
+                                                                        from: index, blockIndex: blockIndex,
+                                                                        copy: true,
+                                                                        to: targetDay, workoutIndex: targetIndex
+                                                                    )
+                                                                } label: {
+                                                                    Label(
+                                                                        ATHLTHLocalization.choose(
+                                                                            english: "Copy to", norwegian: "Kopier til"
+                                                                        ) + " \(targetDay) · \(targetWorkout.title)",
+                                                                        systemImage: "doc.on.doc"
                                                                     )
                                                                 }
                                                             }
