@@ -838,16 +838,23 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     func sendTodayWorkout(
         _ workout: WatchTodayWorkoutTransfer?
     ) {
-        let snapshot =
-            WatchTodaySnapshot(
-                workout: workout,
-                updatedAt: Date()
-            )
-        latestTodaySnapshot = snapshot
-        sendWatchPayload(
-            snapshot,
-            kind: .todayWorkout
+        sendTodayWorkouts(workout.map { [$0] } ?? [])
+    }
+
+    /// Send the full day in one atomic snapshot. The legacy single-workout
+    /// field remains populated for older Watch app versions.
+    func sendTodayWorkouts(_ workouts: [WatchTodayWorkoutTransfer]) {
+        let ordered = workouts.sorted {
+            ($0.scheduledStart ?? .distantFuture) <
+                ($1.scheduledStart ?? .distantFuture)
+        }
+        let snapshot = WatchTodaySnapshot(
+            workout: ordered.first,
+            updatedAt: Date(),
+            workouts: ordered
         )
+        latestTodaySnapshot = snapshot
+        sendWatchPayload(snapshot, kind: .todayWorkout)
     }
 
     func sendLiveSurfaceConfiguration(
