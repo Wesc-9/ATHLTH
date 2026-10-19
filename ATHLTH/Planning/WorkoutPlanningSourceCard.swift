@@ -235,15 +235,15 @@ struct ATHLTHRecoveryRestEntryCard: View {
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text(ATHLTHLocalization.choose(
-                                english: "Recovery / rest day",
-                                norwegian: "Restitusjon / hviledag"
+                                english: "Recovery & wellbeing",
+                                norwegian: "Restitusjon og velvære"
                             ))
                             .font(.subheadline.weight(.bold))
                             .foregroundStyle(ATHLTHTheme.primaryText)
 
                             Text(ATHLTHLocalization.choose(
-                                english: "Plan gentle recovery or a full day off.",
-                                norwegian: "Planlegg lett restitusjon eller en hel hviledag."
+                                english: "Breathe, stretch, recover or plan a rest day.",
+                                norwegian: "Pust, tøying, restitusjon eller hviledag."
                             ))
                             .font(.caption)
                             .foregroundStyle(ATHLTHTheme.mutedText)
@@ -283,10 +283,14 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
     @EnvironmentObject private var session: AppSessionStore
 
     enum Mode: String, CaseIterable, Identifiable {
-        case recovery, rest
+        case zen, stretching, recovery, rest
         var id: String { rawValue }
         var title: String {
             switch self {
+            case .zen: return ATHLTHLocalization.choose(
+                english: "Zen & breathing", norwegian: "Zen / pust og ro")
+            case .stretching: return ATHLTHLocalization.choose(
+                english: "Stretching", norwegian: "Utstrekking")
             case .recovery: return ATHLTHLocalization.choose(
                 english: "Active recovery", norwegian: "Aktiv restitusjon")
             case .rest: return ATHLTHLocalization.choose(
@@ -295,6 +299,12 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
         }
         var explanation: String {
             switch self {
+            case .zen: return ATHLTHLocalization.choose(
+                english: "Gentle breathing with a guided timer.",
+                norwegian: "Pusteøvelser med forklaring og nedtelling.")
+            case .stretching: return ATHLTHLocalization.choose(
+                english: "Gentle stretches with guidance and a timer.",
+                norwegian: "Tøyeøvelser med forklaring og nedtelling.")
             case .recovery: return ATHLTHLocalization.choose(
                 english: "Light movement, mobility or recovery without a hard training target.",
                 norwegian: "Rolig bevegelse, mobilitet eller restitusjon uten harde treningsmål.")
@@ -303,7 +313,14 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
                 norwegian: "En planlagt treningsfri dag. Ingen økt, klokke, belastning eller fullføring kreves.")
             }
         }
-        var symbol: String { self == .rest ? "moon.stars.fill" : "leaf.fill" }
+        var symbol: String {
+            switch self {
+            case .zen: return "wind"
+            case .stretching: return "figure.flexibility"
+            case .recovery: return "leaf.fill"
+            case .rest: return "moon.stars.fill"
+            }
+        }
     }
 
     private struct PlanDay: Identifiable {
@@ -322,6 +339,7 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
     @State private var selectedDayID: UUID?
     @State private var date: Date
     @State private var mode: Mode = .recovery
+    @State private var selectedGuideID = "calm-46"
     @State private var durationMinutes = 20
     @State private var notes = ""
     @State private var errorMessage: String?
@@ -379,6 +397,15 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
         availableDays.first { $0.dayID == selectedDayID }
     }
 
+    private var guides: [ATHLTHWellnessGuide] {
+        let category: ATHLTHWellnessGuide.Category = mode == .zen ? .zen : .stretching
+        return ATHLTHWellnessGuide.all.filter { $0.category == category }
+    }
+
+    private var selectedGuide: ATHLTHWellnessGuide? {
+        guides.first { $0.id == selectedGuideID } ?? guides.first
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -389,13 +416,13 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
                             .tracking(2)
                             .foregroundStyle(ATHLTHTheme.accentDeep)
                         Text(ATHLTHLocalization.choose(
-                            english: "Plan recovery",
-                            norwegian: "Planlegg restitusjon"
+                            english: "Recovery & wellbeing",
+                            norwegian: "Restitusjon og velvære"
                         ))
                         .font(.system(size: 28, weight: .semibold, design: .rounded))
                         Text(ATHLTHLocalization.choose(
-                            english: "Recovery is part of training. Choose what this day needs.",
-                            norwegian: "Restitusjon er en del av treningen. Velg hva dagen skal brukes til."
+                            english: "Breathe, stretch, recover or plan a rest day.",
+                            norwegian: "Pust, tøy ut, hent deg inn eller planlegg hviledag."
                         ))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -444,6 +471,50 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
                             }
                             .buttonStyle(.plain)
                         }
+                    }
+
+                    if mode == .zen || mode == .stretching {
+                        VStack(alignment: .leading, spacing: 11) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Guided exercises", norwegian: "Veiledede øvelser"
+                            ))
+                            .font(.headline)
+                            ForEach(guides) { guide in
+                                Button {
+                                    selectedGuideID = guide.id
+                                } label: {
+                                    HStack(spacing: 9) {
+                                        Image(systemName: guide.icon).frame(width: 26)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(guide.title).font(.subheadline.weight(.semibold))
+                                            Text(guide.durationText)
+                                                .font(.caption)
+                                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                        }
+                                        Spacer()
+                                        Image(systemName: selectedGuide?.id == guide.id
+                                            ? "checkmark.circle.fill" : "circle")
+                                    }
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                                    .padding(12)
+                                    .background(
+                                        selectedGuide?.id == guide.id
+                                            ? ATHLTHTheme.recoveryBlueSoft : Color.white,
+                                        in: RoundedRectangle(cornerRadius: 14)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            if let guide = selectedGuide {
+                                ATHLTHWellnessGuideTimer(guide: guide)
+                                    .id(guide.id)
+                            }
+                        }
+                        .padding(15)
+                        .background(
+                            ATHLTHTheme.surfaceStone.opacity(0.48),
+                            in: RoundedRectangle(cornerRadius: 20)
+                        )
                     }
 
                     VStack(alignment: .leading, spacing: 15) {
@@ -554,7 +625,7 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
             }
             .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
             .navigationTitle(ATHLTHLocalization.choose(
-                english: "Recovery / Rest", norwegian: "Restitusjon / hvile"
+                english: "Recovery & wellbeing", norwegian: "Restitusjon og velvære"
             ))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -603,21 +674,32 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
         }
 
         let isRest = mode == .rest
+        let guide = (mode == .zen || mode == .stretching) ? selectedGuide : nil
+        guard (mode != .zen && mode != .stretching) || guide != nil else {
+            errorMessage = ATHLTHLocalization.choose(
+                english: "Choose an exercise first.", norwegian: "Velg en øvelse først."
+            )
+            return
+        }
         let sessionDate = destinationDay?.date ?? date
         let cleanNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        let combinedNotes = [guide?.instructions ?? "", cleanNotes]
+            .filter { !$0.isEmpty }.joined(separator: "\n\n")
         let planned = PlannedSession(
             id: UUID(),
-            title: mode.title,
-            kind: .recovery,
+            title: guide?.title ?? mode.title,
+            kind: mode == .stretching ? .mobility : .recovery,
             scheduledStart: selectedPlanID == nil
                 ? Calendar.current.startOfDay(for: sessionDate) : destinationDay?.date,
-            durationMinutes: isRest ? nil : durationMinutes,
+            durationMinutes: isRest ? nil :
+                (guide.map { Int(ceil(Double($0.seconds) / 60.0)) } ?? durationMinutes),
             targetDistanceKilometers: nil,
             targetPaceSecondsPerKilometer: nil,
             routeID: nil,
             exercises: [],
-            notes: cleanNotes.isEmpty ? nil : cleanNotes,
-            workoutCategory: isRest ? "rest_day" : "recovery"
+            notes: combinedNotes.isEmpty ? nil : combinedNotes,
+            workoutCategory: isRest ? "rest_day" :
+                (guide.map { "wellness." + $0.id } ?? "recovery")
         )
 
         if let selectedPlanID, let destinationDay {
