@@ -2847,16 +2847,25 @@ private struct HomeActivityStrengthCardV2: View {
             .padding(.vertical, 13)
 
             ZStack {
+                // The supplied gym photograph is atmospheric, never the
+                // primary content. The muscle map stays visually dominant.
+                GeometryReader { canvas in
+                    Image("StrengthFeedGym")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(
+                            width: canvas.size.width,
+                            height: canvas.size.height
+                        )
+                        .clipped()
+                }
+                .accessibilityHidden(true)
+
                 LinearGradient(
                     colors: [
-                        Color(
-                            red: 0.95,
-                            green: 0.95,
-                            blue: 0.98
-                        ),
-                        Color.white,
-                        ATHLTHTheme.cardWarm
-                            .opacity(0.58)
+                        Color.white.opacity(0.75),
+                        Color.white.opacity(0.84),
+                        ATHLTHTheme.cardWarm.opacity(0.86)
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
