@@ -3338,14 +3338,25 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
               sourceWorkouts[sourceIndex].blocks.indices.contains(blockIndex),
               sourceKey != targetKey || sourceIndex != workoutIndex else { return }
 
-        let block = sourceWorkouts[sourceIndex].blocks[blockIndex]
-        // Grouped movements (supersets etc.) must be edited as a group,
-        // rather than silently separating linked exercises.
-        guard block.groupID == nil else { return }
+        let selected = sourceWorkouts[sourceIndex].blocks[blockIndex]
+        let sourceBlocks = sourceWorkouts[sourceIndex].blocks
+        // Move a complete linked group together, retaining its internal order.
+        // Unlinked blocks move individually.
+        let movingIndices = sourceBlocks.indices.filter { candidate in
+            if let group = selected.groupID {
+                return sourceBlocks[candidate].groupID == group
+            }
+            return candidate == blockIndex
+        }
+        let movingBlocks = movingIndices.map { sourceBlocks[$0] }
         var updatedSource = sourceWorkouts[sourceIndex]
-        updatedSource.blocks.remove(at: blockIndex)
+        updatedSource.blocks = sourceBlocks.enumerated().compactMap {
+            movingIndices.contains($0.offset) ? nil : $0.element
+        }
         var updatedTarget = targetWorkouts[workoutIndex]
-        updatedTarget.blocks.append(block)
+        updatedTarget.blocks.append(contentsOf: movingBlocks)
+        // An empty or otherwise invalid source requires explicit session
+        // deletion instead; never silently lose a workout or break a superset.
         guard updatedSource.isValid, updatedTarget.isValid else { return }
 
         if sourceKey == targetKey {
@@ -3542,8 +3553,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                                         }
                                         .contextMenu {
-                                            if block.groupID == nil {
-                                                ForEach(1...7, id: \.self) { targetDay in
+                                            ForEach(1...7, id: \.self) { targetDay in
                                                     let key = weekDayKey(targetDay, weekIndex: guidedCurrentWeek)
                                                     if let target = weekDayEdits[key],
                                                        let first = target.detailedWorkout {
@@ -3565,7 +3575,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                                         }
                                                     }
                                                 }
-                                            }
                                         }
                                     }
                                 }
