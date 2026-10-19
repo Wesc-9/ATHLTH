@@ -813,7 +813,8 @@ final class AppSessionStore: ObservableObject {
                 .contains(where: {
                     $0.sourceWorkoutID == sessionID &&
                     ($0.sourcePlanID == nil || $0.sourcePlanID == planID) &&
-                    $0.completedBlockCount > 0
+                    $0.totalBlockCount > 0 &&
+                    $0.completedBlockCount == $0.totalBlockCount
                 }) {
             return true
         }
@@ -1437,7 +1438,8 @@ final class AppSessionStore: ObservableObject {
         let finishedStructuredSessionIDs = Set(
             (structuredHistory ?? StructuredWorkoutCompletionStore.load(userID: profile.userID))
                 .filter {
-                    $0.completedBlockCount > 0 &&
+                    $0.totalBlockCount > 0 &&
+                    $0.completedBlockCount == $0.totalBlockCount &&
                     ($0.sourcePlanID == nil || $0.sourcePlanID == plan.id)
                 }
                 .map(\.sourceWorkoutID)
