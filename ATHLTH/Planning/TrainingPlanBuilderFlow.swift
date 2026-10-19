@@ -3222,13 +3222,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
             HStack(spacing: 6) {
                 ForEach(0..<7, id: \.self) { index in
-                    let key = weekDayKey(index + 1, weekIndex: guidedCurrentWeek)
+                    let date = Calendar.current.date(byAdding: .day,
+                        value: guidedCurrentWeek * 7 + index, to: startDate) ?? startDate
+                    let weekday = (Calendar.current.component(.weekday, from: date) + 5) % 7 + 1
+                    let key = weekDayKey(weekday, weekIndex: guidedCurrentWeek)
                     let edit = weekDayEdits[key]
                     Button {
                         guidedDayCursor = guidedCurrentWeek * 7 + index
                     } label: {
                         VStack(spacing: 7) {
-                            Text(["M", "T", "O", "T", "F", "L", "S"][index])
+                            Text(date.formatted(.dateTime.weekday(.abbreviated)))
                                 .font(.caption2.weight(.bold))
                             Image(systemName: edit?.isRestDay == true
                                   ? "moon.stars.fill"
@@ -3247,7 +3250,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "Day", norwegian: "Dag") + " \(index + 1)")
+                        english: "Day", norwegian: "Dag") + " \(date.formatted(.dateTime.day().month()))")
                 }
             }
         }
