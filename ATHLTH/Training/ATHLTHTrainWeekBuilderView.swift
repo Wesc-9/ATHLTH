@@ -447,6 +447,19 @@ struct ATHLTHTrainWeekBuilderView: View {
                 }
             }
 
+            if day.sessions.contains(where: { $0.isExplicitRestDay }) {
+                Label(
+                    tr(
+                        "This is a planned rest day. Remove it before adding a workout.",
+                        "Dette er en planlagt hviledag. Fjern hviledagen før du legger til trening."
+                    ),
+                    systemImage: "moon.stars.fill"
+                )
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHTheme.recoveryBlue)
+                .padding(14)
+                .athlthPlanCard(radius: 13, warm: false)
+            } else {
             Button {
                 editorRequest = .init(
                     dayID: day.id,
@@ -491,6 +504,7 @@ struct ATHLTHTrainWeekBuilderView: View {
                 }
             }
             .buttonStyle(.plain)
+            }
 
             if advanced {
                 Label(tr(

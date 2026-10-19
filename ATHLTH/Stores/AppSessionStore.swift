@@ -3681,6 +3681,13 @@ final class AppSessionStore: ObservableObject {
                 continue
             }
 
+            // An intentional rest day and a workout cannot occupy the same
+            // plan day. Never silently turn rest into a scheduled workout.
+            let daySessions = plan.weeks[weekIndex].days[dayIndex].sessions
+            guard !daySessions.contains(where: { $0.isExplicitRestDay }),
+                  !session.isExplicitRestDay || daySessions.isEmpty
+            else { return }
+
             plan.weeks[weekIndex]
                 .days[dayIndex]
                 .sessions
