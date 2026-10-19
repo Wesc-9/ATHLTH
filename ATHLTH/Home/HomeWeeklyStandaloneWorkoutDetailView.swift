@@ -270,6 +270,57 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
         .accessibilityElement(children: .combine)
     }
 
+    // These labels are inferred only from the user's actual notes. The
+    // numeric prescription itself is never synthesized or modified.
+    private func noteStepIdentity(
+        _ text: String,
+        index: Int
+    ) -> (title: String, symbol: String) {
+        let value = text.lowercased()
+        if value.contains("oppvarm") || value.contains("warm-up") ||
+           value.contains("warmup") {
+            return (
+                ATHLTHLocalization.choose(
+                    english: "Warm-up", norwegian: "Oppvarming"
+                ),
+                "figure.walk"
+            )
+        }
+        if value.contains("nedjogg") || value.contains("cooldown") ||
+           value.contains("cool-down") {
+            return (
+                ATHLTHLocalization.choose(
+                    english: "Cool-down", norwegian: "Nedjogging"
+                ),
+                "figure.run"
+            )
+        }
+        if value.contains("pause") || value.contains("recovery") ||
+           value.contains("rest") {
+            return (
+                ATHLTHLocalization.choose(
+                    english: "Recovery", norwegian: "Pause"
+                ),
+                "pause.circle"
+            )
+        }
+        if value.contains("intervall") || value.contains("drag") ||
+           value.contains("interval") {
+            return (
+                ATHLTHLocalization.choose(
+                    english: "Work intervals", norwegian: "Arbeidsdrag"
+                ),
+                "bolt"
+            )
+        }
+        return (
+            ATHLTHLocalization.choose(
+                english: "Step \(index + 1)", norwegian: "Del \(index + 1)"
+            ),
+            "circle.grid.2x2"
+        )
+    }
+
     private func notesCard(_ notes: String) -> some View {
         let steps = workoutSteps(from: notes)
 
@@ -298,23 +349,35 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
             } else {
                 VStack(alignment: .leading, spacing: 12) {
                     ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
+                        let identity = noteStepIdentity(step, index: index)
                         HStack(alignment: .top, spacing: 12) {
-                            Text("\(index + 1)")
-                                .font(.caption2.weight(.bold))
+                            Image(systemName: identity.symbol)
+                                .font(.system(size: 16, weight: .medium))
                                 .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                                .frame(width: 25, height: 25)
+                                .frame(width: 42, height: 42)
                                 .background(
                                     ATHLTHPlanDesign.selectedSurface,
-                                    in: Circle()
+                                    in: RoundedRectangle(cornerRadius: 13)
                                 )
+                                .accessibilityHidden(true)
 
-                            Text(step)
-                                .font(.subheadline)
-                                .foregroundStyle(ATHLTHPlanDesign.ink)
-                                .fixedSize(horizontal: false, vertical: true)
-
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(identity.title.uppercased())
+                                    .font(.caption2.weight(.semibold))
+                                    .tracking(1)
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                Text(step)
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                             Spacer(minLength: 0)
                         }
+                        .padding(11)
+                        .background(
+                            ATHLTHPlanDesign.warmSurface.opacity(0.55),
+                            in: RoundedRectangle(cornerRadius: 16)
+                        )
                         .accessibilityElement(children: .combine)
                     }
                 }
