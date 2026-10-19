@@ -3158,6 +3158,216 @@ private struct ProgramStartView: View {
         )
     }
 
+    private var workoutBasicsSection: some View {
+                Section {
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english: "Workout name (required)",
+                            norwegian: "Øktnavn (obligatorisk)"
+                        ),
+                        text: $title
+                    )
+
+                    Picker(ATHLTHLocalization.choose(english: "Type", norwegian: "Type"), selection: $kind) {
+                        ForEach(WorkoutKind.allCases) { kind in
+                            Label(
+                                kind.title,
+                                systemImage: kind.systemImage
+                            )
+                            .tag(kind)
+                        }
+                    }
+
+                    if isStandalone {
+                        DatePicker(
+                            ATHLTHLocalization.choose(
+                                english: "Date",
+                                norwegian: "Dato"
+                            ),
+                            selection:
+                                $scheduledTime,
+                            in:
+                                Calendar.current
+                                    .startOfDay(
+                                        for: Date()
+                                    )...,
+                            displayedComponents:
+                                .date
+                        )
+                    }
+
+                    HStack {
+                        Label(ATHLTHLocalization.choose(english: "Time", norwegian: "Tid"), systemImage: "clock")
+                            .foregroundStyle(
+                                ATHLTHTheme.primaryText
+                            )
+
+                        Spacer()
+
+                        if scheduledTimeEnabled {
+                            DatePicker(
+                                "",
+                                selection: $scheduledTime,
+                                displayedComponents: .hourAndMinute
+                            )
+                            .labelsHidden()
+
+                            if !isStandalone {
+                                Button {
+                                    scheduledTimeEnabled = false
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Clear workout time")
+                            }
+                        } else {
+                            Button("–") {
+                                scheduledTime = Date()
+                                scheduledTimeEnabled = true
+                            }
+                            .font(.headline)
+                            .foregroundStyle(
+                                ATHLTHTheme.mutedText
+                            )
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Set workout time")
+                        }
+                    }
+
+                    Stepper(
+                        ATHLTHLocalization.choose(
+                            english: "Duration",
+                            norwegian: "Varighet"
+                        ) + ": " +
+                        (resolvedDurationMinutes == 0 ? "–" : "\(resolvedDurationMinutes) min"),
+                        value: plannedDurationBinding,
+                        in: 0...300,
+                        step: 5
+                    )
+
+                    if kind == .walking || kind == .running {
+                        Stepper(
+                            ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse") + ": \(distanceKilometers, specifier: "%.1f") km",
+                            value: $distanceKilometers,
+                            in: 0.5...100,
+                            step: 0.5
+                        )
+                    }
+
+                    if kind == .running {
+                        Picker(
+                            ATHLTHLocalization.choose(english: "Running shoes", norwegian: "Løpesko"),
+                            selection: runningShoeSelection
+                        ) {
+                            Text("–")
+                                .tag(nil as UUID?)
+
+                            ForEach(activeRunningShoes) { shoe in
+                                Text(
+                                    shoe.id ==
+                                        gear.defaultRunningShoe?.id
+                                        ? "\(shoe.name) · Default"
+                                        : shoe.name
+                                )
+                                .tag(shoe.id as UUID?)
+                            }
+                        }
+                    }
+
+                    TextField(
+                        ATHLTHLocalization.choose(english: "Notes", norwegian: "Notater"),
+                        text: $notes,
+                        axis: .vertical
+                    )
+                    .lineLimit(2...6)
+                } header: {
+                    HStack(spacing: 12) {
+                        Text(ATHLTHLocalization.choose(english: "Workout", norwegian: "Økt"))
+
+                        Spacer()
+
+                        ATHLTHPremiumSegmentedControl(
+                            titles:
+                                SessionEditorMode
+                                    .allCases
+                                    .map(\.title),
+                            selection:
+                                editorModeIndex
+                        )
+                        .frame(width: 182)
+                    }
+                    .textCase(nil)
+                }
+                .listRowBackground(
+                    ATHLTHTheme.card
+                )
+                .listRowSeparatorTint(
+                    ATHLTHTheme.border
+                )
+    }
+
+    @ViewBuilder
+    private var workoutSourcesSection: some View {
+                if onPreparedWorkout == nil ||
+                    initialSourceWorkout?.allowInviteeExercises == true {
+                    Section {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Label(
+                                ATHLTHLocalization.choose(english: "Add to workout", norwegian: "Legg til"),
+                                systemImage: "plus.circle.fill"
+                            )
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+
+                            HStack(spacing: 10) {
+                                Button {
+                                    showingSavedWorkoutPicker = true
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 7) {
+                                        Image(systemName: "rectangle.stack.fill")
+                                            .font(.title3)
+                                        Text(ATHLTHLocalization.choose(english: "Workout", norwegian: "Treningsøkt"))
+                                            .font(.subheadline.weight(.semibold))
+                                        Text(ATHLTHLocalization.choose(english: "Use a saved workout", norwegian: "Bruk en lagret økt"))
+                                            .font(.caption2)
+                                            .foregroundStyle(ATHLTHTheme.mutedText)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(14)
+                                    .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 17))
+                                }
+                                .buttonStyle(.plain)
+
+                                Button {
+                                    kind = .strength
+                                    showingExerciseLibrary = true
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 7) {
+                                        Image(systemName: "dumbbell.fill")
+                                            .font(.title3)
+                                        Text(ATHLTHLocalization.choose(english: "Exercise", norwegian: "Øvelse"))
+                                            .font(.subheadline.weight(.semibold))
+                                        Text(ATHLTHLocalization.choose(english: "Choose from library", norwegian: "Velg fra biblioteket"))
+                                            .font(.caption2)
+                                            .foregroundStyle(ATHLTHTheme.mutedText)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(14)
+                                    .background(ATHLTHTheme.accentSoft, in: RoundedRectangle(cornerRadius: 17))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .foregroundStyle(ATHLTHPlanDesign.accent)
+                        }
+                        .padding(.vertical, 10)
+                    }
+                    .listRowBackground(ATHLTHTheme.card)
+                    .listRowSeparator(.hidden)
+                }
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -5592,211 +5802,14 @@ struct SessionEditorView: View {
 
                 workoutStructurePreviewSection
 
-                Section {
-                    TextField(
-                        ATHLTHLocalization.choose(
-                            english: "Workout name (required)",
-                            norwegian: "Øktnavn (obligatorisk)"
-                        ),
-                        text: $title
-                    )
-
-                    Picker(ATHLTHLocalization.choose(english: "Type", norwegian: "Type"), selection: $kind) {
-                        ForEach(WorkoutKind.allCases) { kind in
-                            Label(
-                                kind.title,
-                                systemImage: kind.systemImage
-                            )
-                            .tag(kind)
-                        }
-                    }
-
-                    if isStandalone {
-                        DatePicker(
-                            ATHLTHLocalization.choose(
-                                english: "Date",
-                                norwegian: "Dato"
-                            ),
-                            selection:
-                                $scheduledTime,
-                            in:
-                                Calendar.current
-                                    .startOfDay(
-                                        for: Date()
-                                    )...,
-                            displayedComponents:
-                                .date
-                        )
-                    }
-
-                    HStack {
-                        Label(ATHLTHLocalization.choose(english: "Time", norwegian: "Tid"), systemImage: "clock")
-                            .foregroundStyle(
-                                ATHLTHTheme.primaryText
-                            )
-
-                        Spacer()
-
-                        if scheduledTimeEnabled {
-                            DatePicker(
-                                "",
-                                selection: $scheduledTime,
-                                displayedComponents: .hourAndMinute
-                            )
-                            .labelsHidden()
-
-                            if !isStandalone {
-                                Button {
-                                    scheduledTimeEnabled = false
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundStyle(.secondary)
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel("Clear workout time")
-                            }
-                        } else {
-                            Button("–") {
-                                scheduledTime = Date()
-                                scheduledTimeEnabled = true
-                            }
-                            .font(.headline)
-                            .foregroundStyle(
-                                ATHLTHTheme.mutedText
-                            )
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Set workout time")
-                        }
-                    }
-
-                    Stepper(
-                        ATHLTHLocalization.choose(
-                            english: "Duration",
-                            norwegian: "Varighet"
-                        ) + ": " +
-                        (resolvedDurationMinutes == 0 ? "–" : "\(resolvedDurationMinutes) min"),
-                        value: plannedDurationBinding,
-                        in: 0...300,
-                        step: 5
-                    )
-
-                    if kind == .walking || kind == .running {
-                        Stepper(
-                            ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse") + ": \(distanceKilometers, specifier: "%.1f") km",
-                            value: $distanceKilometers,
-                            in: 0.5...100,
-                            step: 0.5
-                        )
-                    }
-
-                    if kind == .running {
-                        Picker(
-                            ATHLTHLocalization.choose(english: "Running shoes", norwegian: "Løpesko"),
-                            selection: runningShoeSelection
-                        ) {
-                            Text("–")
-                                .tag(nil as UUID?)
-
-                            ForEach(activeRunningShoes) { shoe in
-                                Text(
-                                    shoe.id ==
-                                        gear.defaultRunningShoe?.id
-                                        ? "\(shoe.name) · Default"
-                                        : shoe.name
-                                )
-                                .tag(shoe.id as UUID?)
-                            }
-                        }
-                    }
-
-                    TextField(
-                        ATHLTHLocalization.choose(english: "Notes", norwegian: "Notater"),
-                        text: $notes,
-                        axis: .vertical
-                    )
-                    .lineLimit(2...6)
-                } header: {
-                    HStack(spacing: 12) {
-                        Text(ATHLTHLocalization.choose(english: "Workout", norwegian: "Økt"))
-
-                        Spacer()
-
-                        ATHLTHPremiumSegmentedControl(
-                            titles:
-                                SessionEditorMode
-                                    .allCases
-                                    .map(\.title),
-                            selection:
-                                editorModeIndex
-                        )
-                        .frame(width: 182)
-                    }
-                    .textCase(nil)
-                }
-                .listRowBackground(
-                    ATHLTHTheme.card
-                )
-                .listRowSeparatorTint(
-                    ATHLTHTheme.border
-                )
+                workoutBasicsSection
 
 
-                if onPreparedWorkout == nil ||
-                    initialSourceWorkout?.allowInviteeExercises == true {
-                    Section {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Label(
-                                ATHLTHLocalization.choose(english: "Add to workout", norwegian: "Legg til"),
-                                systemImage: "plus.circle.fill"
-                            )
-                            .font(.headline)
-                            .foregroundStyle(ATHLTHTheme.primaryText)
 
-                            HStack(spacing: 10) {
-                                Button {
-                                    showingSavedWorkoutPicker = true
-                                } label: {
-                                    VStack(alignment: .leading, spacing: 7) {
-                                        Image(systemName: "rectangle.stack.fill")
-                                            .font(.title3)
-                                        Text(ATHLTHLocalization.choose(english: "Workout", norwegian: "Treningsøkt"))
-                                            .font(.subheadline.weight(.semibold))
-                                        Text(ATHLTHLocalization.choose(english: "Use a saved workout", norwegian: "Bruk en lagret økt"))
-                                            .font(.caption2)
-                                            .foregroundStyle(ATHLTHTheme.mutedText)
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(14)
-                                    .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 17))
-                                }
-                                .buttonStyle(.plain)
 
-                                Button {
-                                    kind = .strength
-                                    showingExerciseLibrary = true
-                                } label: {
-                                    VStack(alignment: .leading, spacing: 7) {
-                                        Image(systemName: "dumbbell.fill")
-                                            .font(.title3)
-                                        Text(ATHLTHLocalization.choose(english: "Exercise", norwegian: "Øvelse"))
-                                            .font(.subheadline.weight(.semibold))
-                                        Text(ATHLTHLocalization.choose(english: "Choose from library", norwegian: "Velg fra biblioteket"))
-                                            .font(.caption2)
-                                            .foregroundStyle(ATHLTHTheme.mutedText)
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(14)
-                                    .background(ATHLTHTheme.accentSoft, in: RoundedRectangle(cornerRadius: 17))
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            .foregroundStyle(ATHLTHPlanDesign.accent)
-                        }
-                        .padding(.vertical, 10)
-                    }
-                    .listRowBackground(ATHLTHTheme.card)
-                    .listRowSeparator(.hidden)
-                }
+                @ViewBuilder
+    workoutSourcesSection
+
 
                 if onPreparedWorkout == nil && !prioritizePartnerPlanning {
                     partnerPlanningSection
