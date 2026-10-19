@@ -1,6 +1,19 @@
 import Foundation
 import Supabase
 
+/// A cancelled task is not an application error. SwiftUI can cancel
+/// view-scoped refresh tasks when their view is dismissed or replaced.
+enum TrainTogetherMarketplaceErrorPolicy {
+    static func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+        let nsError = error as NSError
+        return nsError.domain == NSURLErrorDomain &&
+            nsError.code == NSURLErrorCancelled
+    }
+}
+
 @MainActor
 final class TrainTogetherMarketplaceStore:
     ObservableObject
@@ -16,6 +29,8 @@ final class TrainTogetherMarketplaceStore:
     @Published private(set) var isWorking =
         false
     @Published var errorMessage: String?
+    @Published private(set) var refreshErrorMessage: String?
+    @Published private(set) var hasLoaded = false
 
     private let client =
         SupabaseEnvironment.client
@@ -37,6 +52,7 @@ final class TrainTogetherMarketplaceStore:
         }
 
         isLoading = true
+        refreshErrorMessage = nil
         defer { isLoading = false }
 
         do {
@@ -113,10 +129,21 @@ final class TrainTogetherMarketplaceStore:
             }
             requests = loadedRequests
             lastSuccessfulRefresh = Date()
-            errorMessage = nil
+            hasLoaded = true
+            refreshErrorMessage = nil
         } catch {
-            errorMessage =
-                error.localizedDescription
+            // Navigation and pull-to-refresh can cancel the in-flight
+            // Supabase queries. Never show a system CancellationError alert.
+            guard !Task.isCancelled,
+                  !TrainTogetherMarketplaceErrorPolicy.isCancellation(error)
+            else {
+                return
+            }
+
+            // Keep any previously loaded posts while offering a retry.
+            // Do not turn a genuine network/database failure into
+            // a misleading "No workouts" empty state.
+            refreshErrorMessage = error.localizedDescription
         }
     }
 
