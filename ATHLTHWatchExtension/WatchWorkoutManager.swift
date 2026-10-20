@@ -249,6 +249,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var ghostFinalPhaseAnnounced = false
     private var lastLiveGhostConnectionText: String?
     private var lastGhostMapPublishedAt: Date?
+    private var ghostLastTrustedCourseMeters: Double?
+    private var ghostLastTrustedCourseElapsed: TimeInterval?
+    private var ghostOffRoute = false
+    private var ghostReentryReliableSamples = 0
+    private var ghostLastAnnouncedGapPercent: Double?
+    private var ghostLastGapAlertAt: Date?
     private var lastRouteNavigationMapPublishedAt: Date?
     private var lastSpokenRouteTurnIndex: Int?
     private var lastSpokenRouteTurnAt: Date?
@@ -637,6 +643,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         ghostFinalPhaseAnnounced = false
         lastLiveGhostConnectionText = nil
         lastGhostMapPublishedAt = nil
+        ghostLastTrustedCourseMeters = nil
+        ghostLastTrustedCourseElapsed = nil
+        ghostOffRoute = false
+        ghostReentryReliableSamples = 0
+        ghostLastAnnouncedGapPercent = nil
+        ghostLastGapAlertAt = nil
         lastRouteNavigationMapPublishedAt = nil
 
         if let interval =
@@ -4529,14 +4541,38 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         userLocation: CLLocation
     ) {
         guard let ghost = ghostRaceConfiguration,
-              !ghost.points.isEmpty else { return }
+              ghost.points.count >= 2,
+              ghost.routeDistanceMeters > 0 else { return }
 
-        // Never display or announce a fresh pass on unreliable Watch GPS.
-        // The user keeps recording while the Ghost comparison waits.
-        guard userLocation.horizontalAccuracy >= 0,
-              userLocation.horizontalAccuracy <= 50,
-              deviationMeters.isFinite,
-              (0...80).contains(deviationMeters) else {
+        let points = ghost.points
+        let targetTime = max(elapsedTime, 0)
+        // Crucial: Ghost runs on its own fixed course clock. Its location
+        // keeps moving even while the athlete is off the planned route.
+        guard let ghostAtTime = ATHLTHGhostTimeline.interpolate(
+            at: targetTime,
+            count: points.count,
+            position: { points[$0].elapsedTime },
+            value: { points[$0].cumulativeMeters }
+        ), ghostAtTime.isFinite else { return }
+
+        if userLocation.horizontalAccuracy >= 0 &&
+            userLocation.horizontalAccuracy <= 65 {
+            publishGhostMapPositionIfNeeded(
+                userLocation: userLocation,
+                ghostDistanceMeters: ghostAtTime,
+                routeDistanceMeters: ghost.routeDistanceMeters
+            )
+        }
+
+        let reliable = ATHLTHGhostCourseProgressPolicy.isReliableOnRoute(
+            horizontalAccuracy: userLocation.horizontalAccuracy,
+            deviationMeters: deviationMeters,
+            alertThresholdMeters: routeAlertConfiguration.deviationMeters
+        )
+
+        if !reliable {
+            ghostOffRoute = true
+            ghostReentryReliableSamples = 0
             ghostOvertakeTracker.invalidatePending()
             publish {
                 self.ghostDistanceDeltaMeters = nil
@@ -4546,27 +4582,49 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
-        let points = ghost.points
-        let targetTime = max(elapsedTime, 0)
-        let ghostAtTime = ATHLTHGhostTimeline.interpolate(
-            at: targetTime,
-            count: points.count,
-            position: { points[$0].elapsedTime },
-            value: { points[$0].cumulativeMeters }
-        )
+        // Two good fixes are required before comparing again after an
+        // excursion. No status is announced on the first GPS snap-back.
+        if ghostOffRoute {
+            ghostReentryReliableSamples += 1
+            if ghostReentryReliableSamples < 2 {
+                ghostOvertakeTracker.invalidatePending()
+                return
+            }
+            ghostOffRoute = false
+            ghostReentryReliableSamples = 0
+        }
+
         let userDistance = min(max(traveledAlongRoute, 0),
-                               max(ghost.routeDistanceMeters, 1))
+                               ghost.routeDistanceMeters)
+        guard ATHLTHGhostCourseProgressPolicy.plausibleCourseAdvance(
+            previousMeters: ghostLastTrustedCourseMeters,
+            previousElapsed: ghostLastTrustedCourseElapsed,
+            candidateMeters: userDistance,
+            elapsed: elapsedTime
+        ) else {
+            ghostOvertakeTracker.invalidatePending()
+            publish {
+                self.ghostDistanceDeltaMeters = nil
+                self.ghostTimeDeltaSeconds = nil
+                self.ghostComparisonUpdatedAt = nil
+            }
+            return
+        }
+
         let ghostAtDistance = ATHLTHGhostTimeline.interpolate(
             at: userDistance,
             count: points.count,
             position: { points[$0].cumulativeMeters },
             value: { points[$0].elapsedTime }
         )
+        guard let ghostAtDistance, ghostAtDistance.isFinite else { return }
+        ghostLastTrustedCourseMeters = max(
+            ghostLastTrustedCourseMeters ?? 0, userDistance
+        )
+        ghostLastTrustedCourseElapsed = elapsedTime
 
-        guard let ghostAtTime, let ghostAtDistance,
-              ghostAtTime.isFinite, ghostAtDistance.isFinite
-        else { return }
-
+        // Off-course extra kilometres cost elapsed time. They never advance
+        // own course progress or drag the Ghost icon toward the runner.
         let distanceDelta = userDistance - ghostAtTime
         let timeDelta = ghostAtDistance - elapsedTime
         publish {
@@ -4575,26 +4633,39 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.ghostComparisonUpdatedAt = Date()
         }
 
-        publishGhostMapPositionIfNeeded(
-            userLocation:
-                userLocation,
-            ghostDistanceMeters:
-                ghostAtTime,
-            routeDistanceMeters:
-                ghost
-                    .routeDistanceMeters
+        evaluateGhostRaceCoach(
+            configuration: ghost.audio,
+            userDistance: userDistance,
+            distanceDelta: distanceDelta,
+            timeDelta: timeDelta
         )
 
-        evaluateGhostRaceCoach(
-            configuration:
-                ghost.audio,
-            userDistance:
-                userDistance,
-            distanceDelta:
-                distanceDelta,
-            timeDelta:
-                timeDelta
-        )
+        if let gap = ATHLTHGhostCourseProgressPolicy.ghostLeadPercent(
+            runnerCourseMeters: userDistance,
+            ghostCourseMeters: ghostAtTime,
+            routeLengthMeters: ghost.routeDistanceMeters
+        ), ATHLTHGhostCourseProgressPolicy.shouldAnnouncePercentGap(
+            ghostLeadPercent: gap,
+            lastAnnouncedPercent: ghostLastAnnouncedGapPercent,
+            secondsSinceLast: ghostLastGapAlertAt.map {
+                Date().timeIntervalSince($0)
+            }
+        ), let audio = ghost.audio, audio.enabled {
+            ghostLastAnnouncedGapPercent = gap
+            ghostLastGapAlertAt = Date()
+            let percent = Int(abs(gap).rounded())
+            deliverWorkoutAlert(
+                english: gap > 0
+                    ? "On the planned route, Ghost is about \\(percent) percent ahead."
+                    : "On the planned route, you are about \\(percent) percent ahead.",
+                norwegian: gap > 0
+                    ? "På den planlagte ruten ligger Ghost omtrent \\(percent) prosent foran."
+                    : "På den planlagte ruten ligger du omtrent \\(percent) prosent foran.",
+                delivery: audio.resolvedImportantLeadChangeDelivery,
+                haptic: .notification,
+                priority: .ghostImportant
+            )
+        }
     }
 
     private func publishGhostMapPositionIfNeeded(
