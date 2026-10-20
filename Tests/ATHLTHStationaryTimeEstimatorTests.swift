@@ -76,11 +76,11 @@ final class ATHLTHStationaryTimeEstimatorTests: XCTestCase {
             point(seconds: 0, longitude: 15.3900),
             point(seconds: 5, longitude: 15.3903),
             point(seconds: 10, longitude: 15.3903),
-            point(seconds: 15, longitude: 15.3903),
-            point(seconds: 20, longitude: 15.3906),
-            point(seconds: 25, longitude: 15.3909),
-            point(seconds: 30, longitude: 15.3912),
-            point(seconds: 35, longitude: 15.3915)
+            point(seconds: 15, longitude: 15.3906),
+            point(seconds: 20, longitude: 15.3909),
+            point(seconds: 25, longitude: 15.3912),
+            point(seconds: 30, longitude: 15.3915),
+            point(seconds: 35, longitude: 15.3918)
         ]
         XCTAssertEqual(ATHLTHStationaryTimeEstimator.waitingSeconds(
             from: locations, workoutDuration: 35
