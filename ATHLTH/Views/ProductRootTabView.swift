@@ -16392,7 +16392,8 @@ struct ATHLTHProfileView: View {
             destination:
                 AnyView(
                     ProfileGearManagerView()
-                )
+                ),
+            compact: true
         ) {
             if featuredGear.isEmpty {
                 NavigationLink {
@@ -16555,11 +16556,12 @@ struct ATHLTHProfileView: View {
         icon: String,
         actionTitle: String,
         destination: AnyView,
+        compact: Bool = false,
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(
             alignment: .leading,
-            spacing: 12
+            spacing: compact ? 8 : 12
         ) {
             HStack(spacing: 9) {
                 Image(systemName: icon)
@@ -16607,7 +16609,8 @@ struct ATHLTHProfileView: View {
 
             content()
         }
-        .padding(14)
+        // Only the gear preview opts into smaller section insets.
+        .padding(compact ? 10 : 14)
         .background(
             Color.white.opacity(0.91),
             in: RoundedRectangle(
@@ -16887,7 +16890,7 @@ struct ATHLTHProfileView: View {
     private func gearTile(
         _ item: ProfileGearItem
     ) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 5) {
             ZStack {
                 RoundedRectangle(
                     cornerRadius: 10,
@@ -16917,7 +16920,7 @@ struct ATHLTHProfileView: View {
                             ProfileGearCategoryIcon(
                                 category:
                                     item.category,
-                                size: 19
+                                size: 18
                             )
                         }
                     }
@@ -16925,13 +16928,13 @@ struct ATHLTHProfileView: View {
                     ProfileGearCategoryIcon(
                         category:
                             item.category,
-                        size: 19
+                        size: 18
                     )
                 }
             }
             .frame(
-                width: 32,
-                height: 36
+                width: 30,
+                height: 32
             )
 
             VStack(
@@ -16972,10 +16975,10 @@ struct ATHLTHProfileView: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 6)
-        .padding(.vertical, 8)
+        .padding(.vertical, 5)
         .frame(
             maxWidth: .infinity,
-            minHeight: 70,
+            minHeight: 56,
             alignment: .leading
         )
         .background(
