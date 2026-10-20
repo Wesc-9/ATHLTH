@@ -3746,6 +3746,51 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             ATHLTHPlanDesign.canvas.opacity(0.75),
                             in: RoundedRectangle(cornerRadius: 10)
                         )
+                        .contextMenu {
+                            // Preserve the former drag-alternative actions,
+                            // including moving/copying a single structured step.
+                            ForEach(1...7, id: \.self) { targetDay in
+                                let key = weekDayKey(targetDay, weekIndex: guidedCurrentWeek)
+                                if let target = weekDayEdits[key],
+                                   let first = target.detailedWorkout {
+                                    ForEach(Array(([first] + (target.additionalDetailedWorkouts ?? [])).enumerated()),
+                                            id: \.offset) { targetIndex, targetWorkout in
+                                        if targetDay != guidedCurrentWeekday || targetIndex != index {
+                                            Button {
+                                                moveGuidedBlock(
+                                                    from: index,
+                                                    blockIndex: blockIndex,
+                                                    to: targetDay,
+                                                    workoutIndex: targetIndex
+                                                )
+                                            } label: {
+                                                Label(
+                                                    targetWorkout.title,
+                                                    systemImage: "arrow.right"
+                                                )
+                                            }
+                                            Button {
+                                                moveGuidedBlock(
+                                                    from: index,
+                                                    blockIndex: blockIndex,
+                                                    copy: true,
+                                                    to: targetDay,
+                                                    workoutIndex: targetIndex
+                                                )
+                                            } label: {
+                                                Label(
+                                                    ATHLTHLocalization.choose(
+                                                        english: "Copy to ",
+                                                        norwegian: "Kopier til "
+                                                    ) + targetWorkout.title,
+                                                    systemImage: "doc.on.doc"
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
