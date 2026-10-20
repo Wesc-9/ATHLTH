@@ -5806,6 +5806,22 @@ struct SessionEditorView: View {
                             ))
                             .font(.caption)
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+                            Button {
+                                distanceWasAdjustedManually = false
+                                durationWasAdjustedManually = false
+                                syncRunningMetricsFromSelection()
+                            } label: {
+                                Label(ATHLTHLocalization.choose(
+                                    english: "Use estimated distance and duration",
+                                    norwegian: "Bruk beregnet distanse og varighet"
+                                ), systemImage: "arrow.clockwise")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 9)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
 
