@@ -37,8 +37,9 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
             return walkingOnly ? "walking" : "running"
         }
         if hasStrength { return "strength" }
-        if blocks.contains(where: { $0.wellnessKind != nil }) {
-            return blocks.allSatisfy { $0.wellnessKind == .meditation }
+        let wellness = blocks.compactMap(\.wellnessKind)
+        if !wellness.isEmpty {
+            return wellness.allSatisfy { $0 == .meditation }
                 ? "recovery" : "mobility"
         }
         return "custom"
@@ -117,6 +118,11 @@ struct ATHLTHPlanWeekDayEdit: Codable, Hashable {
 
     func scheduledSessions(from originals: [PlannedSession]) -> [PlannedSession] {
         if isRestDay == true { return [] }
+        // Selecting only a place must not manufacture a workout on an empty day.
+        if originals.isEmpty, detailedWorkout == nil, kind == nil,
+           title == nil, (additionalDetailedWorkouts ?? []).isEmpty {
+            return []
+        }
         let first = applying(to: originals.first)
         let extras = (additionalDetailedWorkouts ?? [])
             .filter(\.isValid)
