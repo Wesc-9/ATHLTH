@@ -30,6 +30,8 @@ final class ATHLTHTrainingPlaceSearch: NSObject, ObservableObject,
     }
 
     nonisolated func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
+        guard !completer.queryFragment.trimmingCharacters(in: .whitespacesAndNewlines)
+            .isEmpty else { return }
         let suggestions = completer.results.prefix(8).map {
             ATHLTHTrainingPlaceSuggestion(title: $0.title, subtitle: $0.subtitle)
         }
