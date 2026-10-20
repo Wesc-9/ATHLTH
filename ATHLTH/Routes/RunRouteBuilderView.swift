@@ -549,25 +549,6 @@ struct RunRouteBuilderView: View {
                 }
             }
 
-            if let route = selectedAlternative {
-                HStack(spacing: 12) {
-                    Label(String(format: "%.2f km", route.distanceMeters / 1_000),
-                          systemImage: "point.topleft.down.to.point.bottomright.curvepath")
-                    Spacer()
-                    Label(ATHLTHLocalization.choose(english: "Run ~", norwegian: "Løp ca. ") +
-                        "\(max(1, Int((route.distanceMeters / 1_000 * 6).rounded()))) min",
-                          systemImage: "figure.run")
-                }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(ATHLTHPlanDesign.ink)
-                Text(ATHLTHLocalization.choose(
-                    english: "Run estimate uses 6:00 min/km. Apple Maps calculates walkable routes between the pins.",
-                    norwegian: "Løpetiden er estimert med 6:00 min/km. Apple Maps beregner gangbare traséer mellom punktene."
-                ))
-                .font(.caption2)
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-            }
-
             HStack(spacing: 8) {
                 Button {
                     undoMapEdit()
@@ -833,79 +814,67 @@ struct RunRouteBuilderView: View {
     }
 
     private var routeDetailsCard: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            Text("Route Details")
+        VStack(alignment: .leading, spacing: 12) {
+            Text(ATHLTHLocalization.choose(
+                english: "Route overview", norwegian: "Ruteoversikt"))
                 .font(.headline)
+                .foregroundStyle(ATHLTHPlanDesign.ink)
 
-            if let selectedAlternative {
-                routeDetailRow(
-                    icon: "point.topleft.down.to.point.bottomright.curvepath",
-                    title: "Distance",
-                    value: String(format: "%.2f km", selectedAlternative.distanceMeters / 1_000)
-                )
-
-                routeDetailRow(
-                    icon: "location.fill",
-                    title: "Start",
-                    value: startDisplayName
-                )
-
-                routeDetailRow(
-                    icon: "flag.checkered",
-                    title: "Finish",
-                    value: endDisplayName
-                )
-
-                if !viaPoints.isEmpty {
-                    routeDetailRow(
-                        icon: "point.3.connected.trianglepath.dotted",
-                        title: "Via",
-                        value: viaPoints.count == 1
-                            ? viaDisplayName(viaPoints[0])
-                            : "\(viaPoints.count) points"
+            if let route = selectedAlternative {
+                HStack(spacing: 8) {
+                    routeMetric(
+                        icon: "point.topleft.down.to.point.bottomright.curvepath",
+                        value: String(format: "%.2f km",
+                                      route.distanceMeters / 1_000),
+                        label: ATHLTHLocalization.choose(
+                            english: "Distance", norwegian: "Distanse")
+                    )
+                    routeMetric(
+                        icon: "clock",
+                        value: "\(max(1, Int(ceil(route.distanceMeters / 1_000 * 6)))) min",
+                        label: ATHLTHLocalization.choose(
+                            english: "Running time", norwegian: "Løpetid")
+                    )
+                    routeMetric(
+                        icon: "mappin.and.ellipse",
+                        value: "\(viaPoints.count)",
+                        label: "Via"
                     )
                 }
-
-                routeDetailRow(
-                    icon: settings.trainingDeviceProvider.systemImage,
-                    title: settings.trainingDeviceProvider.title,
-                    value: routeDeviceStatus
-                )
-
-                routeDetailRow(
-                    icon: "trophy.fill",
-                    title: "Challenges",
-                    value: "Challenge-ready"
-                )
+                Label(ATHLTHLocalization.choose(
+                    english: "Running time at 6:00 min/km; Apple Maps uses walkable paths.",
+                    norwegian: "Løpetid ved 6:00 min/km. Apple Maps beregner gangbare traséer."),
+                    systemImage: "info.circle")
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding()
+        .padding(15)
         .routeBuilderCard()
     }
 
-    private var saveCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Save Route")
-                .font(.headline)
-
-            Picker("Visibility", selection: $visibility) {
-                Text("Private").tag(ProfileVisibility.privateOnly)
-                Text("Friends").tag(ProfileVisibility.friends)
-                Text("Public").tag(ProfileVisibility.publicProfile)
-            }
-
-            if visibility == .publicProfile {
-                Label(
-                    "Public routes can appear in Around You for nearby ATHLTH users and can be used in public challenges.",
-                    systemImage: "globe.europe.africa.fill"
-                )
-                .font(.caption)
-                .foregroundStyle(ATHLTHTheme.accent)
-            }
-
+    private func routeMetric(
+        icon: String, value: String, label: String
+    ) -> some View {
+        VStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            Text(value)
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
         }
-        .padding()
-        .routeBuilderCard()
+        .frame(maxWidth: .infinity, minHeight: 76)
+        .padding(.vertical, 5)
+        .background(ATHLTHPlanDesign.selectedSurface,
+                    in: RoundedRectangle(cornerRadius: 14))
     }
 
     private var saveRouteFooter: some View {
