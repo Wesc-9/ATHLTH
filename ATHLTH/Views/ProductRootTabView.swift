@@ -826,8 +826,10 @@ struct ATHLTHHomeView: View {
                     HomeWeeklyProgressStrip(
                         plan: session.activePlan,
                         workouts: health.workouts,
-                        events:
-                            homeWeeklyCommunityEvents
+                        events: homeWeeklyCommunityEvents,
+                        onStartStandaloneWorkout: { workout, device in
+                            startHomeStandaloneWorkout(workout, device: device)
+                        }
                     )
 
                     homeGoalAndCalendarRow
@@ -1164,7 +1166,12 @@ struct ATHLTHHomeView: View {
             // Independent sessions share the calendar but not a plan ID.
             .sheet(item: $selectedHomeStandaloneWorkout) { workout in
                 NavigationStack {
-                    HomeWeeklyStandaloneWorkoutDetailView(workout: workout)
+                    HomeWeeklyStandaloneWorkoutDetailView(
+                        workout: workout,
+                        onStartWorkout: { selected, device in
+                            startHomeStandaloneWorkout(selected, device: device)
+                        }
+                    )
                 }
                 .presentationDetents([.fraction(0.76), .large])
                 .presentationDragIndicator(.visible)
@@ -2618,7 +2625,12 @@ struct ATHLTHHomeView: View {
         }
         .sheet(item: $selectedHomeAllStandaloneWorkout) { workout in
             NavigationStack {
-                HomeWeeklyStandaloneWorkoutDetailView(workout: workout)
+                HomeWeeklyStandaloneWorkoutDetailView(
+                    workout: workout,
+                    onStartWorkout: { selected, device in
+                        startHomeStandaloneWorkout(selected, device: device)
+                    }
+                )
             }
             .presentationDetents([.fraction(0.76), .large])
             .presentationDragIndicator(.visible)
@@ -4253,6 +4265,144 @@ struct ATHLTHHomeView: View {
         .opacity(enabled ? 1 : 0.62)
     }
 
+    // A standalone calendar workout has no plan ID. Launch the original
+    // scheduled recipe with the existing Home iPhone/Watch recording engines.
+    // Allow the detail sheet to close before showing a recorder cover.
+    private func startHomeStandaloneWorkout(
+        _ workout: PlannedSession,
+        device: WorkoutCaptureDevice
+    ) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard let persisted = session.standalonePlannedSessions.first(
+                where: { $0.id == workout.id }
+            ), !persisted.isExplicitRestDay else {
+                homeWatchTransferError = ATHLTHLocalization.choose(
+                    english: "This scheduled workout is no longer available.",
+                    norwegian: "Denne planlagte økten er ikke lenger tilgjengelig."
+                )
+                return
+            }
+
+            guard !homeDirectStartInProgress,
+                  phoneWorkout.active == nil,
+                  strengthWorkout.activeWorkout == nil,
+                  !watchConnection.hasActiveWatchWorkout,
+                  !ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
+            else {
+                homeWatchTransferError = ATHLTHLocalization.choose(
+                    english: "Finish your current workout before starting another.",
+                    norwegian: "Avslutt økten som pågår før du starter en ny."
+                )
+                return
+            }
+
+            if device == .appleWatch &&
+                !watchConnection.isVerifiedForLiveLaunch {
+                homeWatchTransferError = ATHLTHLocalization.choose(
+                    english: "Apple Watch is unavailable. Start with iPhone instead.",
+                    norwegian: "Apple Watch er ikke tilgjengelig. Start med iPhone i stedet."
+                )
+                return
+            }
+
+            switch persisted.kind {
+            case .strength:
+                startHomePlannedStrengthWorkout(
+                    persisted, device: device
+                )
+            case .running, .walking:
+                if device == .appleWatch {
+                    startHomePlannedWorkoutOnWatch(persisted)
+                } else {
+                    startHomeStandalonePhoneEndurance(persisted)
+                }
+            case .mobility, .recovery, .custom:
+                homeWatchTransferError = ATHLTHLocalization.choose(
+                    english: "This activity cannot be started from the calendar yet.",
+                    norwegian: "Denne aktiviteten kan foreløpig ikke startes fra kalenderen."
+                )
+            }
+        }
+    }
+
+    private func startHomeStandalonePhoneEndurance(
+        _ workout: PlannedSession
+    ) {
+        let selectedRoute = PlannedWorkoutWatchBuilder.route(
+            for: workout, routes: session.savedRoutes
+        )
+        let autoPause = workout.autoPauseEnabled ??
+            settings.autoPauseOutdoorWorkouts
+        let audioCoach = PlannedWorkoutWatchBuilder.audioCoachConfiguration(
+            for: workout,
+            selectedRoute: selectedRoute,
+            defaultConfiguration: settings.audioCoachConfiguration(
+                enabled: settings.audioCoachEnabledByDefault
+            )
+        )
+
+        if let ghostTarget = workout.ghostTargetDurationSeconds {
+            guard let selectedRoute else {
+                homeWatchTransferError = ATHLTHLocalization.choose(
+                    english: "This Ghost workout needs a saved route.",
+                    norwegian: "Denne Ghost-økten trenger en lagret rute."
+                )
+                return
+            }
+            do {
+                try ghostRace.prepareTarget(
+                    route: selectedRoute,
+                    targetDurationSeconds: ghostTarget
+                )
+            } catch {
+                homeWatchTransferError = error.localizedDescription
+                return
+            }
+        } else {
+            ghostRace.cancel()
+        }
+
+        if let plannedGearIDs = workout.gearIDs {
+            gear.prepareNextWorkoutGear(Set(plannedGearIDs))
+        } else {
+            gear.clearPreparedWorkoutGear()
+        }
+
+        // The running transfer carries intervals, pace and target alerts to
+        // iPhone just like the Watch path, even without a training plan.
+        let runTransfer: WatchRunningWorkoutTransfer? =
+            workout.kind == .running
+                ? PlannedWorkoutWatchBuilder.runningTransfer(
+                    from: workout,
+                    routeAlerts: settings.routeAlertConfiguration,
+                    autoPauseEnabled: autoPause
+                )
+                : nil
+
+        phoneWorkout.start(
+            walking: workout.kind == .walking,
+            route: selectedRoute,
+            title: workout.title,
+            audioCoach: audioCoach,
+            structuredWorkout: runTransfer,
+            routeAlerts: settings.routeAlertConfiguration,
+            ghostUpdates: workout.ghostUpdates,
+            autoPauseEnabled: autoPause
+        )
+        watchConnection.updateLocalWorkoutActivity(
+            isActive: true,
+            title: workout.title
+        )
+        session.beginTrainingStatus(for: workout)
+        WorkoutLaunchCoordinator.startLinkedSpotifyIfNeeded(
+            workout: workout,
+            session: session,
+            settings: settings,
+            spotify: spotifyPlayback
+        )
+    }
+
     private func startHomeWorkout(
         _ workout: PlannedSession
     ) {
@@ -4470,7 +4620,8 @@ struct ATHLTHHomeView: View {
     }
 
     private func startHomePlannedStrengthWorkout(
-        _ workout: PlannedSession
+        _ workout: PlannedSession,
+        device: WorkoutCaptureDevice
     ) {
         guard strengthWorkout.activeWorkout == nil else {
             return
@@ -4481,7 +4632,7 @@ struct ATHLTHHomeView: View {
                 ? .advanced
                 : .simple
 
-        let useAppleWatch = watchConnection.isReady
+        let useAppleWatch = device == .appleWatch
 
         homeDirectStartInProgress = true
         homeWatchTransferError = nil
