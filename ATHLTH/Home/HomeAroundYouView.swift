@@ -898,7 +898,7 @@ struct AroundYouExploreView: View {
                     }
 
                     if filter == .all || filter == .routes {
-                        ForEach(nearbyRoutes.prefix(35)) { route in
+                        ForEach(mapVisibleRoutes) { route in
                             let isSelected =
                                 selectedRoute?.id == route.id
                             let isDimmed =
@@ -1908,8 +1908,8 @@ struct AroundYouExploreView: View {
             longitude: coordinate.longitude
         )
 
-        let candidate = nearbyRoutes
-            .prefix(35)
+        let candidate = mapVisibleRoutes
+            .prefix(60)
             .compactMap {
                 route ->
                     (TrainingRoute, CLLocationDistance)?
@@ -2957,6 +2957,39 @@ struct AroundYouExploreView: View {
             routeActionError =
                 error.localizedDescription
         }
+    }
+
+    /// Render only routes crossing the visible viewport before applying the
+    /// 60-route drawing limit. Previously nearby off-screen routes consumed
+    /// the first 35 slots and hid real trails in towns like Bodø.
+    private var mapVisibleRoutes: [AroundYouRouteItem] {
+        let routes = nearbyRoutes
+        guard let visibleRegion else { return Array(routes.prefix(60)) }
+        let paddingLatitude = max(0.003, abs(visibleRegion.span.latitudeDelta) * 0.08)
+        let paddingLongitude = max(0.003, abs(visibleRegion.span.longitudeDelta) * 0.08)
+        let south = visibleRegion.center.latitude -
+            visibleRegion.span.latitudeDelta / 2 - paddingLatitude
+        let north = visibleRegion.center.latitude +
+            visibleRegion.span.latitudeDelta / 2 + paddingLatitude
+        let west = visibleRegion.center.longitude -
+            visibleRegion.span.longitudeDelta / 2 - paddingLongitude
+        let east = visibleRegion.center.longitude +
+            visibleRegion.span.longitudeDelta / 2 + paddingLongitude
+        return Array(routes.filter { route in
+            guard let start = route.renderCoordinates.first else { return false }
+            var minLatitude = start.latitude
+            var maxLatitude = start.latitude
+            var minLongitude = start.longitude
+            var maxLongitude = start.longitude
+            for point in route.renderCoordinates.dropFirst() {
+                minLatitude = min(minLatitude, point.latitude)
+                maxLatitude = max(maxLatitude, point.latitude)
+                minLongitude = min(minLongitude, point.longitude)
+                maxLongitude = max(maxLongitude, point.longitude)
+            }
+            return maxLatitude >= south && minLatitude <= north &&
+                maxLongitude >= west && minLongitude <= east
+        }.prefix(60))
     }
 
     private var nearbyRoutes: [AroundYouRouteItem] {
