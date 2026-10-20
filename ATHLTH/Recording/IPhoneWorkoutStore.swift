@@ -343,6 +343,8 @@ final class IPhoneWorkoutStore:
     private var nextFuelAnnouncementSeconds: TimeInterval?
     private var offRouteStartedAt: Date?
     private var lastOffRouteAlertAt: Date?
+    private var lastSpokenRouteTurnAt: Date?
+    private var lastSpokenRouteTurnIndex: Int?
     private var routeWasOff = false
     private var nextGhostDistanceAnnouncementMeters: Double?
     private var nextGhostTimeAnnouncementSeconds: TimeInterval?
@@ -2507,6 +2509,8 @@ final class IPhoneWorkoutStore:
     private func resetRouteAlertRuntime() {
         offRouteStartedAt = nil
         lastOffRouteAlertAt = nil
+        lastSpokenRouteTurnAt = nil
+        lastSpokenRouteTurnIndex = nil
         routeWasOff = false
     }
 
@@ -2729,12 +2733,27 @@ final class IPhoneWorkoutStore:
                         .nearestRoutePointIndex
             )
 
+        let coordinates = plannedRouteLocations.map(\.coordinate)
+        let recoveryCue = ATHLTHRouteNavigationCue.recovery(
+            user: location.coordinate,
+            courseDegrees: location.course >= 0 && location.course < 360
+                ? location.course : nil,
+            route: coordinates,
+            nearestIndex: guidance.nearestRoutePointIndex,
+            deviationMeters: guidance.deviationMeters
+        )
         evaluateRouteAlert(
             workout: workout,
-            deviationMeters:
-                guidance.deviationMeters,
-            horizontalAccuracy:
-                location.horizontalAccuracy
+            deviationMeters: guidance.deviationMeters,
+            horizontalAccuracy: location.horizontalAccuracy,
+            recoveryCue: recoveryCue
+        )
+        evaluateUpcomingTurn(
+            workout: workout,
+            location: location,
+            route: coordinates,
+            index: guidance.nearestRoutePointIndex,
+            deviationMeters: guidance.deviationMeters
         )
     }
 
@@ -3373,10 +3392,44 @@ final class IPhoneWorkoutStore:
             "\(Int(meters.rounded())) meters"
     }
 
+    private func evaluateUpcomingTurn(
+        workout: PhoneWorkout,
+        location: CLLocation,
+        route: [CLLocationCoordinate2D],
+        index: Int,
+        deviationMeters: Double
+    ) {
+        guard let configuration = workout.routeAlertConfiguration,
+              configuration.enabled,
+              workout.audioCoachConfiguration?.enabled == true,
+              location.horizontalAccuracy >= 0,
+              location.horizontalAccuracy <= 25,
+              deviationMeters <= configuration.deviationMeters,
+              let cue = ATHLTHRouteNavigationCue.nextTurn(
+                  route: route, nearestIndex: index
+              ),
+              let turnIndex = cue.pointIndex,
+              (25...85).contains(cue.distanceMeters),
+              lastSpokenRouteTurnIndex != turnIndex else { return }
+        if let lastSpokenRouteTurnAt,
+           Date().timeIntervalSince(lastSpokenRouteTurnAt) < 35 { return }
+        lastSpokenRouteTurnIndex = turnIndex
+        lastSpokenRouteTurnAt = Date()
+        let meters = Int(cue.distanceMeters.rounded())
+        let isRight = cue.direction == .right
+        deliverRouteAlert(
+            configuration: configuration,
+            english: "In \(meters) meters, the route bends \(isRight ? "right" : "left").",
+            norwegian: "Om \(meters) meter svinger ruten mot \(isRight ? "høyre" : "venstre").",
+            haptic: .success
+        )
+    }
+
     private func evaluateRouteAlert(
         workout: PhoneWorkout,
         deviationMeters: Double,
-        horizontalAccuracy: Double
+        horizontalAccuracy: Double,
+        recoveryCue: ATHLTHRouteNavigationCue.Instruction?
     ) {
         guard let configuration =
                 workout.routeAlertConfiguration,
@@ -3440,12 +3493,10 @@ final class IPhoneWorkoutStore:
 
         deliverRouteAlert(
             configuration: configuration,
-            english:
-                "You are off route. " +
-                "\(Int(deviationMeters.rounded())) meters.",
-            norwegian:
-                "Du er utenfor ruten. " +
-                "\(Int(deviationMeters.rounded())) meter.",
+            english: "You are \(Int(deviationMeters.rounded())) meters off route. " +
+                (recoveryCue?.text(norwegian: false) ?? "Head toward the marked route."),
+            norwegian: "Du er \(Int(deviationMeters.rounded())) meter utenfor ruten. " +
+                (recoveryCue?.text(norwegian: true) ?? "Gå mot den markerte ruten."),
             haptic: .warning
         )
     }
@@ -4131,8 +4182,11 @@ final class IPhoneWorkoutStore:
     ) {
         Task { @MainActor [weak self] in
             guard let self,
-                  !self.speechSynthesizer.isSpeaking
+                  !self.speechSynthesizer.isSpeaking,
+                  !self.azureCoachSpeech.isBusy
             else {
+                // A delayed AVSpeechSynthesizer completion must not release
+                // the audio session while a newer Azure cue is playing.
                 return
             }
 
@@ -4150,8 +4204,11 @@ final class IPhoneWorkoutStore:
     ) {
         Task { @MainActor [weak self] in
             guard let self,
-                  !self.speechSynthesizer.isSpeaking
+                  !self.speechSynthesizer.isSpeaking,
+                  !self.azureCoachSpeech.isBusy
             else {
+                // A delayed AVSpeechSynthesizer completion must not release
+                // the audio session while a newer Azure cue is playing.
                 return
             }
 
