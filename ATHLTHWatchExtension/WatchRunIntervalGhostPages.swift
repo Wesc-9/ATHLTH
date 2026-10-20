@@ -442,6 +442,27 @@ struct WatchRunGhostFocusPage: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .watchSurface(radius: 17)
 
+                    if isRecordedGhost {
+                        Button {
+                            workout.disableGhostDuringWorkout()
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Turn off Ghost",
+                                    norwegian: "Slå av Ghost"
+                                ),
+                                systemImage: "eye.slash"
+                            )
+                            .font(.system(size: 11, weight: .semibold))
+                            .frame(maxWidth: .infinity, minHeight: 42)
+                        }
+                        .buttonStyle(.bordered)
+                        .accessibilityHint(ATHLTHLocalization.choose(
+                            english: "Continue recording without Ghost comparison",
+                            norwegian: "Fortsett å registrere økten uten Ghost"
+                        ))
+                    }
+
                     if let own = ghost?.ownProgressPercent,
                        own.isFinite, (0...100).contains(own),
                        let other = ghost?.opponentProgressPercent,
