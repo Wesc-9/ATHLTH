@@ -117,7 +117,9 @@ enum ATHLTHRouteGuidanceEngine {
         geometryTotalMeters: Double,
         advertisedDistanceMeters: Double?,
         workoutDistanceMeters: Double? = nil,
-        previousRouteMeters: Double? = nil
+        previousRouteMeters: Double? = nil,
+        courseAnchorMeters: Double? = nil,
+        secondsSinceCourseAnchor: TimeInterval? = nil
     ) -> ATHLTHRouteGuidanceState? {
         guard routeLocations.count >= 2,
               cumulativeMeters.count == routeLocations.count,
@@ -130,31 +132,41 @@ enum ATHLTHRouteGuidanceEngine {
         // proximity alone MUST NOT choose the finish when the workout has
         // just begun. Real workout distance anchors us near the beginning
         // and only makes later route segments eligible as we run.
+        // With a route-based Ghost, HealthKit workout distance is NOT the
+        // athlete's distance completed on the planned course. Detours may
+        // add many kilometres. Search only course positions physically
+        // reachable since the last trusted on-route fix instead.
+        let anchor = courseAnchorMeters.flatMap {
+            $0.isFinite && $0 >= 0 ? min($0, geometryTotalMeters) : nil
+        }
         let measuredWorkoutDistance = workoutDistanceMeters.flatMap {
             $0.isFinite && $0 >= 0 ? $0 : nil
         }
-        let progressTolerance: Double
         let forwardLimit: Double
-        if let measuredWorkoutDistance {
-            progressTolerance = max(75, min(measuredWorkoutDistance * 0.10, 180))
+        if let anchor {
+            let seconds = max(0, min(secondsSinceCourseAnchor ?? 0, 86_400))
+            forwardLimit = min(
+                geometryTotalMeters, anchor + max(90, 35 + seconds * 9)
+            )
+        } else if let measuredWorkoutDistance {
+            let tolerance = max(75, min(measuredWorkoutDistance * 0.10, 180))
             forwardLimit = min(
                 geometryTotalMeters,
-                measuredWorkoutDistance + progressTolerance
+                measuredWorkoutDistance + tolerance
             )
         } else {
-            // Preserve previous callers that don't have workout distance.
-            progressTolerance = geometryTotalMeters
+            // Preserve earlier callers with no distance and no Ghost anchor.
             forwardLimit = geometryTotalMeters
         }
 
-        let stablePrevious = previousRouteMeters.flatMap {
+        let stablePrevious = anchor ?? previousRouteMeters.flatMap {
             $0.isFinite && $0 >= 0 && $0 <= forwardLimit + 75
                 ? $0 : nil
         }
-        // Allow small backward corrections from GPS jitter without switching
-        // to an earlier pass through a crossing or a nearby parallel road.
+        // Intersections and routes returning to their start must not allow
+        // a GPS fix to credit earlier/later legs merely because they overlap.
         let backwardLimit = stablePrevious.map {
-            max(0, $0 - 85)
+            max(0, $0 - (anchor == nil ? 85 : 35))
         } ?? 0
 
         var nearestIndex: Int?
@@ -175,11 +187,19 @@ enum ATHLTHRouteGuidanceEngine {
             // At self-intersections, prefer the part of the route consistent
             // with measured workout progress; preserve visual GPS proximity
             // as the dominant signal elsewhere.
-            let progressPenalty = measuredWorkoutDistance.map {
-                abs(routeMeters - min($0, geometryTotalMeters)) * 0.12
-            } ?? 0
+            let progressPenalty: Double
+            if anchor != nil {
+                // Only use the last confirmed *course* position as a hint.
+                // Position remains dominant, permitting a genuine downstream
+                // reentry without rewarding kilometres spent off-course.
+                progressPenalty = 0
+            } else {
+                progressPenalty = measuredWorkoutDistance.map {
+                    abs(routeMeters - min($0, geometryTotalMeters)) * 0.12
+                } ?? 0
+            }
             let continuityPenalty = stablePrevious.map {
-                abs(routeMeters - $0) * 0.015
+                abs(routeMeters - $0) * (anchor == nil ? 0.015 : 0.035)
             } ?? 0
             let score = distance + progressPenalty + continuityPenalty
 
