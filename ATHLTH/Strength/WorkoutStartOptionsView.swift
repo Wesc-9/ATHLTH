@@ -249,6 +249,9 @@ struct WorkoutStartOptionsView: View {
             )
             .navigationBarTitleDisplayMode(.inline)
             .task {
+                if let invited = social.takePreparedQuickTrainFriends() {
+                    selectedFriendIDs = invited
+                }
                 if !audioCoachLoaded {
                     audioCoachDraft.load(
                         from: settings
