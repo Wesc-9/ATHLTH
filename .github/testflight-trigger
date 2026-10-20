@@ -117,3 +117,5 @@ ATHLTH v1.8.4 build 91 — user-approved TestFlight upload after correcting misp
 ATHLTH 1.8.4 build 91 — user-authorized TestFlight retry 2026-10-19, after fixing AdvancedPlanner distance Stepper type inference at 2633ba7b1b190c60271aed77c5af95a6a0e99a3a; require passing same-commit iOS+Watch tests, backend regressions, signed archive and App Store Connect upload. Keep release/v1.8.4 active and unlocked.
 
 ATHLTH 1.8.4 build 91 — user-authorized TestFlight retry after updating structured-workout plan integration test: partial 1/2 is not a completion, 2/2 is; 2026-10-19. Run same-commit Xcode and backend gates and validate signing before App Store Connect upload. Keep 1.8.4 active.
+
+ATHLTH 1.8.5 build 92 — user-authorized TestFlight upload 2026-10-20. Use current release/v1.8.5 source with Explore route coverage and geometric deduplication; require passing same-commit Build ATHLTH and backend regression workflows, signed iPhone/Watch/Widget archive, and App Store Connect validation. Keep release/v1.8.5 active and unlocked.
