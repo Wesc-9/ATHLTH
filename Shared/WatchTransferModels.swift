@@ -1385,6 +1385,13 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var routeRemainingMeters: Double? = nil
     var routeDeviationMeters: Double? = nil
     var routeDeviationThresholdMeters: Double? = nil
+    // Watch-provided navigational cues are presentation-only, optional for
+    // older Watch snapshots and do not assert a street intersection exists.
+    var routeCueEnglish: String? = nil
+    var routeCueNorwegian: String? = nil
+    var routeCueSymbol: String? = nil
+    var routeCueDistanceMeters: Double? = nil
+    var routeCueOffRoute: Bool? = nil
 
     // Shared structured-running state for iPhone, Apple Watch, Lock Screen
     // and Dynamic Island. Optional defaults preserve older transfers.
