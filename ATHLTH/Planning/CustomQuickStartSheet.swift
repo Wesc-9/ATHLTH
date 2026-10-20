@@ -304,8 +304,8 @@ struct CustomQuickStartSheet: View {
 
                     configurationControls
 
-                    ATHLTHCard {
-                        VStack(alignment: .leading, spacing: 13) {
+                    ATHLTHPlanSurface(ghost: false, density: .compact) {
+                        VStack(alignment: .leading, spacing: 10) {
                             WorkoutFriendPicker(
                                 selectedFriendIDs: $selectedFriendIDs
                             )
