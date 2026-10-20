@@ -818,7 +818,8 @@ struct RunRouteBuilderView: View {
     private var alternativesCard: some View {
         VStack(alignment: .leading, spacing: 11) {
             HStack {
-                Text("Choose Route")
+                Text(ATHLTHLocalization.choose(
+                    english: "Choose route", norwegian: "Velg trasé"))
                     .font(.headline)
                 Spacer()
                 Text("\(alternatives.count) option\(alternatives.count == 1 ? "" : "s")")
@@ -850,9 +851,11 @@ struct RunRouteBuilderView: View {
 
                             Text(
                                 String(
-                                    format: "%.2f km · %@ walking-route estimate",
+                                    format: "%.2f km · %@ · %@",
                                     alternative.distanceMeters / 1_000,
-                                    alternative.expectedTravelTime.routeBuilderDuration
+                                    alternative.expectedTravelTime.routeBuilderDuration,
+                                    ATHLTHLocalization.choose(
+                                        english: "walkable route", norwegian: "gangbar trasé")
                                 )
                             )
                             .font(.caption)
@@ -1135,11 +1138,12 @@ struct RunRouteBuilderView: View {
             }
         }
         .buttonStyle(.plain)
-        .padding(12)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 9)
         .background(
-            ATHLTHTheme.surfaceStone.opacity(0.78),
+            ATHLTHPlanDesign.selectedSurface,
             in: RoundedRectangle(
-                cornerRadius: 15,
+                cornerRadius: 13,
                 style: .continuous
             )
         )
@@ -1448,14 +1452,26 @@ private struct RunRouteSearchField: View {
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
 
-                    TextField(
-                        selectedItem.map {
-                            RunRouteLocationSearchModel.displayName(for: $0)
-                        } ?? "Search address or place",
-                        text: $model.query
-                    )
-                    .textInputAutocapitalization(.words)
-                    .autocorrectionDisabled()
+                    ZStack(alignment: .leading) {
+                        TextField(
+                            ATHLTHLocalization.choose(
+                                english: "Search address or place",
+                                norwegian: "Søk etter adresse eller sted"),
+                            text: $model.query
+                        )
+                        .font(.subheadline)
+                        .textInputAutocapitalization(.words)
+                        .autocorrectionDisabled()
+                        if model.query.isEmpty, let selectedItem {
+                            Text(RunRouteLocationSearchModel.displayName(
+                                for: selectedItem))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .allowsHitTesting(false)
+                        }
+                    }
                 }
 
                 if !model.query.isEmpty {
@@ -1467,11 +1483,12 @@ private struct RunRouteSearchField: View {
                     }
                 }
             }
-            .padding(12)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 9)
             .background(
-                ATHLTHTheme.surfaceStone.opacity(0.78),
+                ATHLTHPlanDesign.selectedSurface,
                 in: RoundedRectangle(
-                    cornerRadius: 15,
+                    cornerRadius: 13,
                     style: .continuous
                 )
             )
