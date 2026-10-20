@@ -4583,7 +4583,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
 
     // Information for the UI. HTTP in the Tailscale address range is
     // permitted by the scoped iOS ATS exception in project.yml.
-    // This address is trusted only while the user's Tailscale VPN is active.
+    // The range is not proof of VPN membership. The user must keep Home
+    // Assistant accessible only through a trusted, authenticated tailnet.
     static func isTailnetHTTPAddress(_ raw: String) -> Bool {
         guard let url = normalizedBaseURL(from: raw),
               url.scheme?.lowercased() == "http",

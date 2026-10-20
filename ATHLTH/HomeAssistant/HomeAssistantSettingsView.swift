@@ -447,7 +447,7 @@ struct HomeAssistantSettingsView: View {
                 )
 
                 TextField(
-                    "https://device.tailnet.ts.net",
+                    "http://100.x.x.x:8123",
                     text:
                         $alternateAddress
                 )
@@ -472,8 +472,8 @@ struct HomeAssistantSettingsView: View {
 
                 Text(
                     ATHLTHLocalization.choose(
-                        english: "You can use http://100.x.x.x:8123 while connected to your trusted Tailscale VPN. HTTPS via Tailscale Serve is also supported.",
-                        norwegian: "Du kan bruke http://100.x.x.x:8123 når du er tilkoblet ditt betrodde Tailscale-VPN. HTTPS via Tailscale Serve støttes også."
+                        english: "Tailscale: enter http://100.x.x.x:8123 directly, or an HTTPS .ts.net address from Tailscale Serve. Your iPhone must be connected to your tailnet.",
+                        norwegian: "Tailscale: legg inn http://100.x.x.x:8123 direkte, eller en HTTPS-adresse fra Tailscale Serve (.ts.net). iPhone må være koblet til tailnettet ditt."
                     )
                 )
                 .font(.caption2)
@@ -483,13 +483,13 @@ struct HomeAssistantSettingsView: View {
                 if HomeAssistantConnectionStore.isTailnetHTTPAddress(alternateAddress) {
                     Label(
                         ATHLTHLocalization.choose(
-                            english: "Direct HTTP works while connected to Tailscale. Activate Tailscale on your iPhone before connecting.",
-                            norwegian: "Direkte HTTP fungerer når du er koblet til Tailscale. Aktiver Tailscale på iPhone før tilkobling."
+                            english: "Direct Tailscale IP supported. Check that Tailscale is connected on your iPhone.",
+                            norwegian: "Direkte Tailscale-IP støttes. Kontroller at Tailscale er tilkoblet på iPhone."
                         ),
-                        systemImage: "exclamationmark.triangle.fill"
+                        systemImage: "info.circle"
                     )
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
                 }
 
                 HStack(spacing: 10) {
@@ -528,8 +528,7 @@ struct HomeAssistantSettingsView: View {
                                 in:
                                     .whitespacesAndNewlines
                             )
-                            .isEmpty ||
-                        HomeAssistantConnectionStore.isTailnetHTTPAddress(alternateAddress)
+                            .isEmpty
                     )
 
                     if homeAssistant
@@ -578,9 +577,9 @@ struct HomeAssistantSettingsView: View {
             Text(
                 ATHLTHLocalization.choose(
                     english:
-                        "On Wi-Fi, ATHLTH prefers the local route; otherwise it prefers VPN/external, with automatic fallback. Use an HTTPS Tailscale Serve address for VPN access.",
+                        "ATHLTH prefers your local address on Wi-Fi and your VPN / external address on other networks, with automatic fallback. Tailscale supports direct HTTP IP addresses (100.x.x.x) or HTTPS via Serve.",
                     norwegian:
-                        "På Wi‑Fi prioriterer ATHLTH lokalruten. På andre nett prioriteres VPN/ekstern, med automatisk reserve. Bruk en HTTPS-adresse fra Tailscale Serve for VPN-tilgang."
+                        "ATHLTH prioriterer lokaladressen på Wi-Fi og VPN-/eksternadressen på andre nett, med automatisk reserve. Tailscale støtter direkte HTTP til 100.x.x.x eller HTTPS via Serve."
                 )
             )
             .font(.caption2)
@@ -1328,9 +1327,9 @@ struct HomeAssistantSettingsView: View {
             Text(
                 ATHLTHLocalization.choose(
                     english:
-                        "Use this only if your Home Assistant instance is not discovered automatically. The same 6-digit pairing code above is used.",
+                        "If Home Assistant is not found automatically, enter its local URL or Tailscale IP (http://100.x.x.x:8123). Use the same 6-digit pairing code.",
                     norwegian:
-                        "Bruk dette kun dersom Home Assistant ikke blir funnet automatisk. Den samme 6-sifrede paringskoden over brukes."
+                        "Hvis Home Assistant ikke blir funnet automatisk, skriv inn lokaladressen eller Tailscale-IP (http://100.x.x.x:8123). Bruk den samme 6-sifrede paringskoden."
                 )
             )
             .font(.caption)
@@ -1356,13 +1355,13 @@ struct HomeAssistantSettingsView: View {
             if HomeAssistantConnectionStore.isTailnetHTTPAddress(manualAddress) {
                 Label(
                     ATHLTHLocalization.choose(
-                        english: "Enable Tailscale on your phone before pairing over this private IP address.",
-                        norwegian: "Aktiver Tailscale på telefonen før parkobling via denne private IP-adressen."
+                        english: "HTTP is supported over the Tailscale VPN. Enable Tailscale on this iPhone before pairing.",
+                        norwegian: "HTTP støttes over Tailscale-VPN. Aktiver Tailscale på denne iPhonen før parkobling."
                     ),
-                    systemImage: "exclamationmark.triangle.fill"
+                    systemImage: "info.circle"
                 )
                 .font(.caption)
-                .foregroundStyle(.orange)
+                .foregroundStyle(ATHLTHTheme.mutedText)
             }
 
             Button {
