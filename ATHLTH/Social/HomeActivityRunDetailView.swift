@@ -22,6 +22,9 @@ struct HomeActivityRunDetailView: View {
     @State private var treadmillInclineDraft = 0.0
     @State private var showingResultShare = false
     @State private var showingFullscreenMap = false
+    @State private var showingSaveRouteConfirmation = false
+    @State private var savedRouteMessage: String?
+    @State private var routeToOpen: TrainingRoute?
 
     init(
         workout: SocialPublishableWorkout,
@@ -157,6 +160,58 @@ struct HomeActivityRunDetailView: View {
 
     private var elevationProfile: [ATHLTHRunningResultInsights.ElevationPoint] {
         ATHLTHRunningResultInsights.elevationProfile(from: route)
+    }
+
+    private var recordedRouteSource: String {
+        "recorded_workout:" + workout.id.uuidString
+    }
+
+    private var savedRecordedRoute: TrainingRoute? {
+        session.savedRoutes.first { $0.routeSource == recordedRouteSource }
+    }
+
+    private func saveRecordedRoute() {
+        guard !isTreadmillWorkout, route.count >= 2,
+              savedRecordedRoute == nil,
+              let distance = workout.distanceMeters,
+              distance.isFinite, distance >= 100
+        else { return }
+        // Do not store dense traces or invent a route without usable GPS.
+        let step = max(1, Int(ceil(Double(route.count) / 1_500)))
+        let sampled = Swift.stride(from: 0, to: route.count, by: step)
+            .map { route[$0] }
+        let clean = sampled + (sampled.last?.timestamp != route.last?.timestamp
+            ? [route[route.count - 1]] : [])
+        guard clean.count >= 2 else { return }
+        let coordinates = clean.enumerated().map { item in
+            RouteCoordinate(
+                latitude: item.element.coordinate.latitude,
+                longitude: item.element.coordinate.longitude,
+                altitude: item.element.verticalAccuracy >= 0
+                    ? item.element.altitude : nil,
+                sequence: item.offset
+            )
+        }
+        let saved = TrainingRoute(
+            id: UUID(),
+            ownerID: session.profile.userID,
+            title: tr("Recorded run", "Registrert løpetur") + " · " +
+                workout.startDate.formatted(.dateTime.day().month(.abbreviated)),
+            visibility: .privateOnly,
+            coordinates: coordinates,
+            distanceKilometers: distance / 1_000,
+            elevationGainMeters: elevationProfile.count >= 5
+                ? elevationGainMeters : nil,
+            importedFilename: nil,
+            createdAt: Date(),
+            startName: nil,
+            endName: nil,
+            expectedTravelTimeSeconds: workout.duration,
+            routeSource: recordedRouteSource
+        )
+        session.addImportedRoute(saved)
+        savedRouteMessage = tr("Route saved privately. Open it from the menu to set up a Ghost Race.",
+                               "Ruten er lagret privat. Åpne den fra menyen for å sette opp Ghost Race.")
     }
 
     private var leaderboardEntries:
@@ -299,6 +354,21 @@ struct HomeActivityRunDetailView: View {
                                   systemImage: "map")
                         }
                     }
+                    if let existing = linkedRoute ?? savedRecordedRoute {
+                        Button {
+                            routeToOpen = existing
+                        } label: {
+                            Label(tr("Open saved route / Ghost", "Åpne lagret rute / Ghost"),
+                                  systemImage: "figure.run.circle")
+                        }
+                    } else if !isTreadmillWorkout && routeCoordinates.count >= 2 {
+                        Button {
+                            showingSaveRouteConfirmation = true
+                        } label: {
+                            Label(tr("Save as private route", "Lagre som privat rute"),
+                                  systemImage: "bookmark")
+                        }
+                    }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                         .font(.title3)
@@ -319,6 +389,31 @@ struct HomeActivityRunDetailView: View {
                 rawRoute: isTreadmillWorkout ? [] : route,
                 highlights: verifiedSplits
             )
+        }
+        .sheet(item: $routeToOpen) { route in
+            NavigationStack {
+                RouteDetailView(route: route)
+            }
+        }
+        .confirmationDialog(
+            tr("Save this route privately?", "Lagre denne ruten privat?"),
+            isPresented: $showingSaveRouteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(tr("Save private route", "Lagre privat rute")) {
+                saveRecordedRoute()
+            }
+        } message: {
+            Text(tr("This saves your recorded GPS trail in your private route library. Sharing it later is a separate choice.",
+                    "Den registrerte GPS-ruten lagres privat i rutebiblioteket. Deling velger du separat."))
+        }
+        .alert(tr("Saved route", "Lagret rute"), isPresented: Binding(
+            get: { savedRouteMessage != nil },
+            set: { if !$0 { savedRouteMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { savedRouteMessage = nil }
+        } message: {
+            Text(savedRouteMessage ?? "")
         }
         .sheet(isPresented: $showingFullscreenMap) {
             NavigationStack {
