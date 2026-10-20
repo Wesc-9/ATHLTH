@@ -1716,9 +1716,12 @@ struct AroundYouExploreView: View {
                 pitch: shouldEnable3D ? 55 : 0
             )
         } else {
-            let center = visibleRegion?.center
-                ?? locationStore.location?.coordinate
-                ?? CLLocationCoordinate2D(latitude: 67.28, longitude: 14.40)
+            // If the map has not resolved a region yet, do not jump
+            // to an unrelated city just to enable 3D.
+            guard let center = visibleRegion?.center
+                ?? locationStore.location?.coordinate else {
+                return
+            }
             camera = MapCamera(
                 centerCoordinate: center,
                 distance: 4_000,
