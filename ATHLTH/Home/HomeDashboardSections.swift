@@ -4004,6 +4004,34 @@ struct HomeWeeklyProgressStrip:
     }
 }
 
+/// Reconcile the selected day's snapshot with persisted state after edits,
+/// deletion and scheduling while the calendar sheet remains open.
+enum ATHLTHHomePlannedDayReconciliation {
+    static func current(
+        selection: [PlannedSession],
+        originalPlanIDs: Set<UUID>,
+        persistedPlan: [PlannedSession],
+        standalone: [PlannedSession]
+    ) -> [PlannedSession] {
+        let standaloneIDs = Set(standalone.map(\.id))
+        let planByID = Dictionary(uniqueKeysWithValues:
+            persistedPlan.map { ($0.id, $0) })
+        // The selected day originates only from an owning plan and the
+        // standalone calendar. Never retain a removed standalone from
+        // the frozen selection snapshot.
+        let activePlan = selection.compactMap { workout -> PlannedSession? in
+            guard originalPlanIDs.contains(workout.id),
+                  !standaloneIDs.contains(workout.id)
+            else { return nil }
+            return planByID[workout.id]
+        }
+        return (activePlan + standalone).sorted {
+            ($0.scheduledStart ?? .distantFuture) <
+                ($1.scheduledStart ?? .distantFuture)
+        }
+    }
+}
+
 private struct HomeWeeklyProgressDaySheet: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var strength: StrengthWorkoutStore
@@ -4039,31 +4067,18 @@ private struct HomeWeeklyProgressDaySheet: View {
     private let dayCanvas = ATHLTHPlanDesign.canvas
 
     private var currentPlanned: [PlannedSession] {
-        // Selection is a snapshot. Observe the saved standalone sessions so
-        // the newly scheduled workout appears immediately in "Dagens økt".
-        let standalone = session.standalonePlannedSessions(on: selection.date)
-        let standaloneIDs = Set(standalone.map(\.id))
-
-        // The selected day is a snapshot; re-read the plan's persisted
-        // sessions so a removed workout disappears without closing the sheet.
         let originalPlanIDs = Set(
             plan?.weeks.flatMap(\.days).flatMap(\.sessions).map(\.id) ?? []
         )
-        let liveSessions: [PlannedSession] = plan.flatMap {
+        let live: [PlannedSession] = plan.flatMap {
             session.trainingPlan(withID: $0.id)
         }?.weeks.flatMap(\.days).flatMap(\.sessions) ?? []
-        let liveByID = Dictionary(uniqueKeysWithValues:
-            liveSessions.map { ($0.id, $0) })
-        let snapshot = selection.planned.compactMap { workout -> PlannedSession? in
-            if standaloneIDs.contains(workout.id) { return nil }
-            return originalPlanIDs.contains(workout.id)
-                ? liveByID[workout.id] : workout
-        }
-        return (snapshot + standalone)
-            .sorted {
-                ($0.scheduledStart ?? .distantFuture) <
-                    ($1.scheduledStart ?? .distantFuture)
-            }
+        return ATHLTHHomePlannedDayReconciliation.current(
+            selection: selection.planned,
+            originalPlanIDs: originalPlanIDs,
+            persistedPlan: live,
+            standalone: session.standalonePlannedSessions(on: selection.date)
+        )
     }
 
     private var canPlanWorkout: Bool {
