@@ -877,6 +877,74 @@ struct HomeActivityRunDetailView: View {
     }
 
     @ViewBuilder
+    // Reuse the same colour-coded route for the card and full-screen map.
+    private var routeMapContent: some View {
+    Map(
+        initialPosition: .region(
+            routeRegion
+        )
+    ) {
+        MapPolyline(
+            coordinates:
+                routeCoordinates
+        )
+        .stroke(
+            Color.white
+                .opacity(0.92),
+            lineWidth: 11
+        )
+
+        if paceSegments.isEmpty {
+            MapPolyline(
+                coordinates:
+                    routeCoordinates
+            )
+            .stroke(
+                ATHLTHTheme.vitality,
+                lineWidth: 7
+            )
+        } else {
+            ForEach(
+                paceSegments
+            ) { segment in
+                MapPolyline(
+                    coordinates:
+                        segment
+                            .coordinates
+                )
+                .stroke(
+                    paceColor(
+                        segment
+                            .paceSecondsPerKilometer
+                    ),
+                    lineWidth: 7
+                )
+            }
+        }
+
+        if let first =
+            routeCoordinates.first {
+            Marker(
+                "Start",
+                coordinate: first
+            )
+            .tint(
+                HomeActivityPaceScale
+                    .fast
+            )
+        }
+
+        if let last =
+            routeCoordinates.last {
+            Marker(
+                tr("Finish", "Mål"),
+                coordinate: last
+            )
+            .tint(.black)
+        }
+    }
+    }
+
     private var mapCard: some View {
         ATHLTHPlanSurface {
             VStack(
@@ -889,11 +957,7 @@ struct HomeActivityRunDetailView: View {
                     spacing: 2
                 ) {
                     Text(tr("Route", "Rute"))
-                        .font(
-                            .headline.weight(
-                                .semibold
-                            )
-                        )
+                        .font(.system(size: 22, weight: .semibold, design: .serif))
                         .foregroundStyle(
                             ATHLTHTheme.primaryText
                         )
@@ -916,70 +980,7 @@ struct HomeActivityRunDetailView: View {
             }
 
             if routeCoordinates.count >= 2 {
-                Map(
-                    initialPosition: .region(
-                        routeRegion
-                    )
-                ) {
-                    MapPolyline(
-                        coordinates:
-                            routeCoordinates
-                    )
-                    .stroke(
-                        Color.white
-                            .opacity(0.92),
-                        lineWidth: 11
-                    )
-
-                    if paceSegments.isEmpty {
-                        MapPolyline(
-                            coordinates:
-                                routeCoordinates
-                        )
-                        .stroke(
-                            ATHLTHTheme.vitality,
-                            lineWidth: 7
-                        )
-                    } else {
-                        ForEach(
-                            paceSegments
-                        ) { segment in
-                            MapPolyline(
-                                coordinates:
-                                    segment
-                                        .coordinates
-                            )
-                            .stroke(
-                                paceColor(
-                                    segment
-                                        .paceSecondsPerKilometer
-                                ),
-                                lineWidth: 7
-                            )
-                        }
-                    }
-
-                    if let first =
-                        routeCoordinates.first {
-                        Marker(
-                            "Start",
-                            coordinate: first
-                        )
-                        .tint(
-                            HomeActivityPaceScale
-                                .fast
-                        )
-                    }
-
-                    if let last =
-                        routeCoordinates.last {
-                        Marker(
-                            tr("Finish", "Mål"),
-                            coordinate: last
-                        )
-                        .tint(.black)
-                    }
-                }
+                routeMapContent
                 .frame(height: 350)
                 .clipShape(
                     RoundedRectangle(
@@ -999,6 +1000,22 @@ struct HomeActivityRunDetailView: View {
                     )
                 }
 
+                HStack {
+                    Label(tr("Pace by segment", "Tempo per segment"),
+                          systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    Spacer()
+                    Button {
+                        showingFullscreenMap = true
+                    } label: {
+                        Label(tr("Full screen", "Fullskjerm"),
+                              systemImage: "arrow.up.left.and.arrow.down.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    }
+                    .buttonStyle(.plain)
+                }
                 paceLegend
             } else {
                 ContentUnavailableView(
