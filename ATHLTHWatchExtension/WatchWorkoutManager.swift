@@ -6667,6 +6667,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 routeDeviationMeters,
             routeDeviationThresholdMeters:
                 routeAlertConfiguration.deviationMeters,
+            routeCueEnglish: routeNavigationCue?.text(norwegian: false),
+            routeCueNorwegian: routeNavigationCue?.text(norwegian: true),
+            routeCueSymbol: routeNavigationCue?.symbol,
+            routeCueDistanceMeters: routeNavigationCue?.distanceMeters,
+            routeCueOffRoute: routeNavigationCue?.offRoute,
             runningStepTitle:
                 currentRunningStep?.title,
             runningStepIndex:
