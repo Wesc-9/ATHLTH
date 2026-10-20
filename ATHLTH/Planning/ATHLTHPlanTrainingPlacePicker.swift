@@ -1,4 +1,35 @@
 import SwiftUI
+import MapKit
+import Combine
+
+/// Apple Maps address and point-of-interest suggestions without requiring
+/// the athlete's current location or making a place publicly visible.
+final class ATHLTHTrainingPlaceSearch: NSObject, ObservableObject,
+    MKLocalSearchCompleterDelegate {
+    @Published private(set) var results: [MKLocalSearchCompletion] = []
+    private let completer = MKLocalSearchCompleter()
+
+    override init() {
+        super.init()
+        completer.delegate = self
+        completer.resultTypes = [.address, .pointOfInterest]
+    }
+
+    func search(_ text: String) {
+        let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if clean.isEmpty { results = [] }
+        completer.queryFragment = clean
+    }
+
+    func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
+        results = completer.results
+    }
+
+    func completer(_ completer: MKLocalSearchCompleter,
+                   didFailWithError error: Error) {
+        results = []
+    }
+}
 
 /// Account-local favorites, not public map pins and never shared with other athletes.
 enum ATHLTHTrainingPlaceFavorites {
@@ -36,12 +67,14 @@ struct ATHLTHPlanTrainingPlacePicker: View {
     @State private var name: String
     @State private var address: String
     @State private var favorites: [ATHLTHTrainingPlace] = []
+    @StateObject private var placeSearch = ATHLTHTrainingPlaceSearch()
+    @State private var query = ""
 
     let onSave: (ATHLTHTrainingPlace?) -> Void
 
     init(initial: ATHLTHTrainingPlace?,
          onSave: @escaping (ATHLTHTrainingPlace?) -> Void) {
-        _kind = State(initialValue: initial?.kind ?? .gym)
+        _kind = State(initialValue: initial?.kind ?? .other)
         _name = State(initialValue: initial?.name ?? "")
         _address = State(initialValue: initial?.address ?? "")
         self.onSave = onSave
@@ -68,6 +101,44 @@ struct ATHLTHPlanTrainingPlacePicker: View {
                             english: "Choose a favorite or add a new location for this day.",
                             norwegian: "Velg et favorittsted eller legg til et nytt sted for denne dagen."),
                         icon: "mappin.and.ellipse")
+
+                    ATHLTHPlanSurface {
+                        VStack(alignment: .leading, spacing: 10) {
+                            TextField(ATHLTHLocalization.choose(
+                                english: "Search Apple Maps for a place or address",
+                                norwegian: "Søk etter sted eller adresse i Apple Maps"),
+                                text: $query)
+                                .textInputAutocapitalization(.words)
+                                .autocorrectionDisabled()
+                                .onChange(of: query) { _, value in
+                                    placeSearch.search(value)
+                                }
+                            ForEach(Array(placeSearch.results.prefix(6).enumerated()),
+                                    id: \.offset) { _, result in
+                                Button {
+                                    name = result.title
+                                    address = result.subtitle
+                                    query = ""
+                                    placeSearch.search("")
+                                } label: {
+                                    HStack(alignment: .top, spacing: 8) {
+                                        Image(systemName: "mappin.and.ellipse")
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(result.title)
+                                                .font(.subheadline.weight(.semibold))
+                                            Text(result.subtitle)
+                                                .font(.caption)
+                                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                        }
+                                        Spacer()
+                                    }
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
 
                     ATHLTHPlanSurface {
                         VStack(alignment: .leading, spacing: 14) {
