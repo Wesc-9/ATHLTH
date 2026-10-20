@@ -437,205 +437,345 @@ struct RunGuidanceSetupView: View {
     }
 }
 
-struct PerWorkoutAudioCoachView:
-    View
-{
-    @EnvironmentObject private var session:
-        AppSessionStore
-
-    @Binding var draft:
-        AudioCoachDraft
+struct PerWorkoutAudioCoachView: View {
+    @EnvironmentObject private var session: AppSessionStore
+    @Binding var draft: AudioCoachDraft
     let showRouteOptions: Bool
     let showStructuredOptions: Bool
 
     var body: some View {
         ScrollView {
-            ATHLTHPlusFeatureGate(
-                feature: .audioCoach,
-                title:
-                    "Audio Coach · ATHLTH+",
-                message:
-                    "Spoken workout guidance is available with ATHLTH+ on iPhone and Apple Watch."
-            ) {
-                AudioCoachSetupCard(
-                    draft: $draft,
-                    showRouteOptions:
-                        showRouteOptions,
-                    showStructuredOptions:
-                        showStructuredOptions
+            VStack(spacing: 14) {
+                ATHLTHPlanSectionIntro(
+                    eyebrow: ATHLTHLocalization.choose(
+                        english: "VOICE GUIDANCE",
+                        norwegian: "STEMMEVEILEDNING"
+                    ),
+                    title: "Audio Coach",
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Your voice, your pace, your workout.",
+                        norwegian: "Din stemme, ditt tempo og din økt."
+                    ),
+                    icon: "waveform.and.person.filled"
                 )
+
+                ATHLTHPlusFeatureGate(
+                    feature: .audioCoach,
+                    title: "Audio Coach · ATHLTH+",
+                    message: "Spoken workout guidance is available with ATHLTH+ on iPhone and Apple Watch."
+                ) {
+                    AudioCoachSetupCard(
+                        draft: $draft,
+                        showRouteOptions: showRouteOptions,
+                        showStructuredOptions: showStructuredOptions
+                    )
+                }
             }
-            .padding()
+            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+            .frame(maxWidth: .infinity)
+            .padding(16)
         }
-        .background(
-            Color(.systemGroupedBackground)
-                .ignoresSafeArea()
-        )
+        .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+        .tint(ATHLTHPlanDesign.accentInk)
         .navigationTitle("Audio Coach")
         .navigationBarTitleDisplayMode(.inline)
     }
 }
 
-struct PerWorkoutRouteGuardianView:
-    View
-{
-    @Binding var draft:
-        RouteGuardianDraft
+struct PerWorkoutRouteGuardianView: View {
+    @Binding var draft: RouteGuardianDraft
 
     var body: some View {
-        Form {
-            Section {
-                Toggle(
-                    "Route Guardian",
-                    isOn: $draft.enabled
+        ScrollView {
+            VStack(spacing: 14) {
+                ATHLTHPlanSectionIntro(
+                    eyebrow: ATHLTHLocalization.choose(
+                        english: "ROUTE GUIDANCE",
+                        norwegian: "RUTEVEILEDNING"
+                    ),
+                    title: ATHLTHLocalization.choose(
+                        english: "Route Guardian",
+                        norwegian: "Hold deg på ruten"
+                    ),
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Choose when and how the coach warns you about route deviation.",
+                        norwegian: "Velg når og hvordan coachen varsler at du er utenfor ruten."
+                    ),
+                    icon: "location.north.line"
                 )
-            }
 
-            if draft.enabled {
-                Section("Trigger") {
-                    Picker(
-                        "Alert when off route",
-                        selection:
-                            $draft
-                                .deviationMeters
-                    ) {
-                        Text("25 m").tag(25.0)
-                        Text("50 m").tag(50.0)
-                        Text("80 m").tag(80.0)
-                        Text("100 m").tag(100.0)
-                        Text("150 m").tag(150.0)
-                        Text("250 m").tag(250.0)
-                    }
-
-                    Picker(
-                        "Wait before alert",
-                        selection:
-                            $draft.graceSeconds
-                    ) {
-                        Text("Immediately").tag(0)
-                        Text("5 sec").tag(5)
-                        Text("10 sec").tag(10)
-                        Text("20 sec").tag(20)
-                        Text("30 sec").tag(30)
-                    }
-
-                    Picker(
-                        "Repeat",
-                        selection:
-                            $draft.repeatSeconds
-                    ) {
-                        Text("30 sec").tag(30)
-                        Text("1 min").tag(60)
-                        Text("2 min").tag(120)
-                        Text("5 min").tag(300)
-                    }
-                }
-
-                Section("Delivery") {
-                    Picker(
-                        "Alert style",
-                        selection:
-                            $draft.delivery
-                    ) {
-                        ForEach(
-                            WatchAlertDelivery
-                                .allCases
-                        ) { delivery in
-                            Text(delivery.title)
-                                .tag(delivery)
+                ATHLTHPlanSurface(ghost: false) {
+                    Toggle(isOn: $draft.enabled) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Route Guardian",
+                                norwegian: "Ruteveiledning"
+                            ))
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Alerts during this run",
+                                norwegian: "Varsler under denne økten"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         }
                     }
+                    .tint(ATHLTHPlanDesign.accentInk)
+                    if draft.enabled {
+                        Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                        Text(ATHLTHLocalization.choose(
+                            english: "DEVIATION",
+                            norwegian: "AVVIK FRA RUTEN"
+                        ))
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.25)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
 
-                    Toggle(
-                        "Tell me when I'm back on route",
-                        isOn:
-                            $draft
-                                .announceBackOnRoute
-                    )
+                        HStack {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Alert distance", norwegian: "Avstand for varsel"
+                            ))
+                            .font(.subheadline)
+                            Spacer()
+                            Picker(ATHLTHLocalization.choose(
+                                english: "Alert distance", norwegian: "Avstand for varsel"
+                            ), selection: $draft.deviationMeters) {
+                                ForEach([25.0, 50.0, 80.0, 100.0, 150.0, 250.0],
+                                        id: \.self) { value in
+                                    Text("\(Int(value)) m").tag(value)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                        }
+                        .frame(minHeight: 44)
+
+                        Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                        HStack {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Wait before alert", norwegian: "Vent før varsel"
+                            ))
+                            .font(.subheadline)
+                            Spacer()
+                            Picker(ATHLTHLocalization.choose(
+                                english: "Wait before alert", norwegian: "Vent før varsel"
+                            ), selection: $draft.graceSeconds) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Immediately", norwegian: "Straks"
+                                )).tag(0)
+                                Text("5 s").tag(5)
+                                Text("10 s").tag(10)
+                                Text("20 s").tag(20)
+                                Text("30 s").tag(30)
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                        }
+                        .frame(minHeight: 44)
+
+                        Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                        HStack {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Repeat interval", norwegian: "Gjenta varsel"
+                            ))
+                            .font(.subheadline)
+                            Spacer()
+                            Picker(ATHLTHLocalization.choose(
+                                english: "Repeat interval", norwegian: "Gjenta varsel"
+                            ), selection: $draft.repeatSeconds) {
+                                Text("30 s").tag(30)
+                                Text("1 min").tag(60)
+                                Text("2 min").tag(120)
+                                Text("5 min").tag(300)
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                        }
+                        .frame(minHeight: 44)
+                    }
+                }
+
+                if draft.enabled {
+                    ATHLTHPlanSurface(ghost: false) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "HOW YOU'RE NOTIFIED",
+                            norwegian: "SLIK VARSLES DU"
+                        ))
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.25)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+
+                        HStack {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Alert style", norwegian: "Varseltype"
+                            ))
+                            .font(.subheadline)
+                            Spacer()
+                            Picker(ATHLTHLocalization.choose(
+                                english: "Alert style", norwegian: "Varseltype"
+                            ), selection: $draft.delivery) {
+                                ForEach(WatchAlertDelivery.allCases) { delivery in
+                                    Text(delivery.title).tag(delivery)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                        }
+                        .frame(minHeight: 44)
+
+                        Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                        Toggle(isOn: $draft.announceBackOnRoute) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Announce when back on route",
+                                norwegian: "Gi beskjed når jeg er tilbake på ruten"
+                            ))
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                        }
+                        .tint(ATHLTHPlanDesign.accentInk)
+                    }
                 }
             }
+            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+            .frame(maxWidth: .infinity)
+            .padding(16)
         }
-        .navigationTitle("Route Guardian")
+        .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+        .tint(ATHLTHPlanDesign.accentInk)
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Route Guardian", norwegian: "Ruteveiledning"
+        ))
         .navigationBarTitleDisplayMode(.inline)
     }
 }
 
 struct PerWorkoutGhostView: View {
-    @Binding var draft:
-        GhostQuickStartDraft
+    @Binding var draft: GhostQuickStartDraft
     let route: TrainingRoute?
 
     var body: some View {
-        Form {
-            Section {
-                Toggle(
-                    "Use target Ghost",
-                    isOn: $draft.enabled
+        ScrollView {
+            VStack(spacing: 14) {
+                ATHLTHPlanSectionIntro(
+                    eyebrow: "GHOST RACE",
+                    title: ATHLTHLocalization.choose(
+                        english: "Run against a goal", norwegian: "Løp mot et mål"
+                    ),
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Your Ghost follows the chosen route and target finish time.",
+                        norwegian: "Ghost følger den valgte ruten og din måltid."
+                    ),
+                    icon: "figure.run.circle"
                 )
-            } footer: {
-                Text(
-                    "Target Ghost compares your live progress against a finish time on the selected route. It works with iPhone and Apple Watch."
-                )
-            }
 
-            if draft.enabled {
-                Section("Target") {
-                    TextField(
-                        "45:00",
-                        text:
-                            $draft.targetTimeText
-                    )
-                    .keyboardType(
-                        .numbersAndPunctuation
-                    )
-                    .font(
-                        .title3
-                            .monospacedDigit()
-                    )
+                ATHLTHPlanSurface(ghost: false) {
+                    Toggle(isOn: $draft.enabled) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Target Ghost", norwegian: "Mål-Ghost"
+                            ))
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Compare your progress on this route",
+                                norwegian: "Sammenlign fremdrift langs ruten"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                    }
+                    .tint(ATHLTHPlanDesign.accentInk)
 
-                    if let route,
-                       let duration =
-                            draft
-                                .targetDuration {
-                        HStack {
-                            Text("Target pace")
+                    if draft.enabled {
+                        Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "TARGET FINISH TIME",
+                                    norwegian: "MÅLTID"
+                                ))
+                                .font(.caption2.weight(.bold))
+                                .tracking(1.2)
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                TextField("45:00", text: $draft.targetTimeText)
+                                    .keyboardType(.numbersAndPunctuation)
+                                    .font(.system(size: 27, weight: .semibold,
+                                                  design: .rounded))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                    .monospacedDigit()
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled()
+                            }
                             Spacer()
-                            Text(
-                                GhostTargetTimeFormatter
-                                    .paceText(
-                                        distanceKilometers:
-                                            route
-                                                .distanceKilometers,
-                                        duration:
-                                            duration
-                                    )
-                            )
-                            .foregroundStyle(
-                                .secondary
-                            )
+                            Image(systemName: "stopwatch")
+                                .font(.system(size: 24, weight: .medium))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        }
+
+                        if let route, let duration = draft.targetDuration {
+                            Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                            HStack {
+                                Label(ATHLTHLocalization.choose(
+                                    english: "Target pace", norwegian: "Måltempo"
+                                ), systemImage: "speedometer")
+                                .font(.subheadline)
+                                Spacer()
+                                Text(GhostTargetTimeFormatter.paceText(
+                                    distanceKilometers: route.distanceKilometers,
+                                    duration: duration
+                                ))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            }
                         }
                     }
                 }
 
-                Section("Updates") {
-                    Toggle(
-                        "Ghost Updates",
-                        isOn:
-                            $draft
-                                .updatesEnabled
-                    )
+                if draft.enabled {
+                    ATHLTHPlanSurface(ghost: false) {
+                        Toggle(isOn: $draft.updatesEnabled) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Ghost Updates")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Hear race updates while running",
+                                    norwegian: "Få oppdateringer mens du løper"
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+                        }
+                        .tint(ATHLTHPlanDesign.accentInk)
 
-                    NavigationLink {
-                        ATHLTHGhostUpdatesSettingsView()
-                    } label: {
-                        Text(
-                            "Adjust Ghost Updates defaults"
-                        )
+                        NavigationLink {
+                            ATHLTHGhostUpdatesSettingsView()
+                        } label: {
+                            HStack {
+                                Label(ATHLTHLocalization.choose(
+                                    english: "Adjust update preferences",
+                                    norwegian: "Juster oppdateringene"
+                                ), systemImage: "slider.horizontal.3")
+                                .font(.subheadline.weight(.medium))
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                            }
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            .frame(minHeight: 42)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
+            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+            .frame(maxWidth: .infinity)
+            .padding(16)
         }
-        .navigationTitle("Ghost Updates")
+        .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+        .tint(ATHLTHPlanDesign.accentInk)
+        .navigationTitle("Ghost Race")
         .navigationBarTitleDisplayMode(.inline)
     }
 }
