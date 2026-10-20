@@ -89,6 +89,22 @@ final class ATHLTHRunningPlanningEstimateTests: XCTestCase {
         XCTAssertNil(estimate.durationSeconds)
     }
 
+
+    func testScheduledTreadmillWorkoutOpensIndoorRatherThanGPS() {
+        var workout = PlannedSession(
+            id: UUID(), title: "Mølle 4×4", kind: .running,
+            scheduledStart: nil, durationMinutes: 42,
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: 300,
+            routeID: nil, exercises: [], notes: nil
+        )
+        XCTAssertEqual(RunEnvironment.forPlannedSession(workout), .outdoor)
+        workout.workoutCategory = "treadmill"
+        XCTAssertEqual(RunEnvironment.forPlannedSession(workout), .treadmill)
+        XCTAssertEqual(RunEnvironment.forPlannedSession(nil), .outdoor)
+    }
+
+
     func testTreadmillKilometersPerHourConvertsToSecondsPerKilometer() {
         // Standard treadmill display: 12 km/t => 5:00 min/km.
         let speedKilometersPerHour = 12.0
