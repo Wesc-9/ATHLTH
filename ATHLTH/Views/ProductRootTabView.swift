@@ -5901,7 +5901,12 @@ struct ATHLTHTrainView: View {
                         // the timer/Watch. The setup sheet will already have
                         // dismissed, so the phone cover is opened directly.
                         Task { @MainActor in
-                            if destination == .watch &&
+                            let usesWatch: Bool
+                            switch destination {
+                            case .watch: usesWatch = true
+                            case .phoneTimer, .retrospective: usesWatch = false
+                            }
+                            if usesWatch &&
                                !watchConnection.isVerifiedForLiveLaunch {
                                 watchTransferError = ATHLTHLocalization.choose(
                                     english: "Connect Apple Watch before inviting friends.",
@@ -5916,7 +5921,7 @@ struct ATHLTHTrainView: View {
                                 creatorName: session.profile.displayName,
                                 creatorUsername: session.profile.username,
                                 invitePayload: configuration.trainTogetherInvitePayload,
-                                creatorCaptureDevice: destination == .watch
+                                creatorCaptureDevice: usesWatch
                                     ? .appleWatch : .iPhone
                             ) else { return }
 
