@@ -166,18 +166,6 @@ struct HomeAssistantCalendarEventPayload: Hashable {
     let start: Date
     let end: Date
     let type: String
-    let status: String
-    let planID: String?
-}
-
-// Consent-gated, read-only plan metadata. Do not export the entire plan
-// hierarchy or health history into Home Assistant entity attributes.
-struct HomeAssistantTrainingPlanPayload: Hashable {
-    let id: String
-    let title: String
-    let currentWeek: Int
-    let totalWeeks: Int
-    let startsAt: Date?
 }
 
 private struct HomeAssistantPendingDelivery: Codable, Identifiable {
@@ -2035,9 +2023,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         goalProgress: Double?,
         goalDaysRemaining: Int?,
         calendarEvents:
-            [HomeAssistantCalendarEventPayload],
-        trainingPlan:
-            HomeAssistantTrainingPlanPayload? = nil
+            [HomeAssistantCalendarEventPayload]
     ) async {
         guard isConnected else {
             return
@@ -2274,46 +2260,39 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                     calendarEvents
                         .prefix(64)
                         .map { event in
-                            var fields: [String: HomeAssistantJSONValue] = [
-                                "id": .string(event.id),
-                                "title": .string(
-                                    Self.sanitizedText(event.title) ?? "Workout"
-                                ),
-                                "start": .string(Self.iso8601(event.start)),
-                                "end": .string(Self.iso8601(event.end)),
-                                "type": .string(
-                                    Self.sanitizedText(event.type) ?? "workout"
-                                ),
-                                "status": .string(event.status)
-                            ]
-                            if let planID = event.planID {
-                                fields["plan_id"] = .string(planID)
-                            }
-                            return .object(fields)
+                            .object([
+                                "id":
+                                    .string(event.id),
+                                "title":
+                                    .string(
+                                        Self.sanitizedText(
+                                            event.title
+                                        ) ??
+                                        "Workout"
+                                    ),
+                                "start":
+                                    .string(
+                                        Self.iso8601(
+                                            event.start
+                                        )
+                                    ),
+                                "end":
+                                    .string(
+                                        Self.iso8601(
+                                            event.end
+                                        )
+                                    ),
+                                "type":
+                                    .string(
+                                        Self.sanitizedText(
+                                            event.type
+                                        ) ??
+                                        "workout"
+                                    )
+                            ])
                         }
                 )
                 : .array([])
-
-        if shareTrainingCalendar, let trainingPlan {
-            var fields: [String: HomeAssistantJSONValue] = [
-                "id": .string(trainingPlan.id),
-                "title": .string(
-                    Self.sanitizedText(trainingPlan.title) ?? "Training plan"
-                ),
-                "current_week": .int(
-                    max(0, min(trainingPlan.currentWeek, 520))
-                ),
-                "total_weeks": .int(
-                    max(1, min(trainingPlan.totalWeeks, 520))
-                )
-            ]
-            if let startsAt = trainingPlan.startsAt {
-                fields["starts_at"] = .string(Self.iso8601(startsAt))
-            }
-            state["training_plan"] = .object(fields)
-        } else {
-            state["training_plan"] = .null
-        }
 
         state["pending_delivery_count"] =
             .int(pendingDeliveryCount)
@@ -2406,7 +2385,6 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         }
         if !shareTrainingCalendar {
             state["calendar_events"] = .array([])
-            state["training_plan"] = .null
         }
 
         guard !state.isEmpty else {
