@@ -377,6 +377,80 @@ struct RunningWorkoutTemplate: Identifiable, Codable, Hashable {
     }
 }
 
+
+/// Planning-only duration and distance estimates from the same resolved interval
+/// repetitions that the workout/Watch engine uses. No planned value is a
+/// measured distance. Unpaced recoveries are stationary unless explicitly
+/// given a recovery pace; open-ended blocks keep totals unknown.
+enum ATHLTHRunningPlanningEstimate {
+    static func totals(
+        for workouts: [RunningWorkoutTemplate],
+        defaultPaceSecondsPerKilometer: Double = 360
+    ) -> (distanceMeters: Double?, durationSeconds: Double?) {
+        guard !workouts.isEmpty,
+              defaultPaceSecondsPerKilometer.isFinite,
+              defaultPaceSecondsPerKilometer > 0
+        else { return (nil, nil) }
+
+        var meters = 0.0
+        var seconds = 0.0
+        var completeDistance = true
+        var completeDuration = true
+        var count = 0
+
+        for workout in workouts {
+            for block in workout.blocks {
+                let repetitions = min(max(block.repetitions, 1), 60)
+                for repetition in 1...repetitions {
+                    var steps: [(target: RunningStepTarget, isRecovery: Bool)] = [
+                        (block.resolvedWork(at: repetition), block.kind == .recovery)
+                    ]
+                    if let recovery = block.resolvedRecovery(after: repetition) {
+                        steps.append((recovery, true))
+                    }
+                    for step in steps {
+                        count += 1
+                        guard count <= 1_000 else { return (nil, nil) }
+                        let explicitPace = step.target.intensity.paceMinSecondsPerKilometer
+                        let pace = explicitPace ?? defaultPaceSecondsPerKilometer
+                        guard pace.isFinite, pace > 0 else { return (nil, nil) }
+
+                        switch step.target.measure {
+                        case .time:
+                            guard let duration = step.target.durationSeconds,
+                                  duration.isFinite, duration > 0 else {
+                                completeDistance = false
+                                completeDuration = false
+                                continue
+                            }
+                            seconds += duration
+                            if !step.isRecovery || explicitPace != nil {
+                                meters += duration / pace * 1_000
+                            }
+                        case .distance:
+                            guard let distance = step.target.distanceMeters,
+                                  distance.isFinite, distance > 0 else {
+                                completeDistance = false
+                                completeDuration = false
+                                continue
+                            }
+                            meters += distance
+                            seconds += distance / 1_000 * pace
+                        case .open:
+                            completeDistance = false
+                            completeDuration = false
+                        }
+                    }
+                }
+            }
+        }
+        return (
+            completeDistance && meters > 0 ? meters : nil,
+            completeDuration && seconds > 0 ? seconds : nil
+        )
+    }
+}
+
 enum ExerciseLibrarySource: String, Codable, Hashable {
     case athlthCatalog
     case repDB
