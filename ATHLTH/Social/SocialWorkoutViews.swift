@@ -5257,7 +5257,11 @@ struct WorkoutPublishView: View {
                 includeRoute = false
                 sharingRoute = []
                 loadingRoute = false
-                hideRouteStartAndEnd = settings.hideRouteStartAndEnd
+                // Publishing from a completed-result card starts with safe
+                // map masking, even if a general default was changed.
+                // The athlete can explicitly choose to reveal the full map.
+                hideRouteStartAndEnd = initialVisibility != nil
+                    ? true : settings.hideRouteStartAndEnd
                 guard let selectedWorkoutID else {
                     selectedAlreadyPublished = false
                     caption = ""
