@@ -41,6 +41,34 @@ enum WorkoutTemplateBlockKind: String, Codable, CaseIterable, Hashable {
     }
 }
 
+/// Timed recovery and mobility activities reuse the existing non-strength
+/// timeline block kind. This avoids misclassifying meditation as strength.
+enum WorkoutWellnessKind: String, Codable, CaseIterable {
+    case meditation, stretching, mobility, yoga
+
+    var title: String {
+        switch self {
+        case .meditation: return ATHLTHLocalization.choose(english: "Meditation", norwegian: "Meditasjon")
+        case .stretching: return ATHLTHLocalization.choose(english: "Stretching", norwegian: "Uttøying")
+        case .mobility: return ATHLTHLocalization.choose(english: "Mobility", norwegian: "Mobilitet")
+        case .yoga: return "Yoga"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .meditation: return "sparkles"
+        case .stretching: return "figure.flexibility"
+        case .mobility: return "figure.cooldown"
+        case .yoga: return "figure.yoga"
+        }
+    }
+
+    var workoutKind: WorkoutKind {
+        self == .meditation ? .recovery : .mobility
+    }
+}
+
 /// Common phase taxonomy for running, strength, mobility and hybrid blocks.
 enum WorkoutPhaseKind: String, Codable, CaseIterable, Identifiable {
     case warmup
@@ -120,6 +148,8 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     /// Exact identifier for personal exercises; never infer two owners'
     /// exercises are equivalent merely from their displayed names.
     var exerciseID: UUID? = nil
+    /// Optional, so historic note blocks continue decoding unchanged.
+    var wellnessKind: WorkoutWellnessKind? = nil
 
     var resolvedPhase: WorkoutPhaseKind {
         phase ?? (kind == .rest ? .recovery : .main)
@@ -152,6 +182,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         case isIndoor = "is_indoor"
         case exerciseSnapshot = "exercise_snapshot"
         case exerciseID = "exercise_id"
+        case wellnessKind = "wellness_kind"
     }
 
     var targetText: String? {
@@ -1736,6 +1767,11 @@ struct WorkoutTemplateBuilderView: View {
         blocks.contains(where: { $0.kind == .exercise })
     }
 
+    private var hasTimedWellness: Bool {
+        blocks.contains { $0.kind == .note && $0.wellnessKind != nil
+            && ($0.durationSeconds ?? 0) > 0 }
+    }
+
     // Infer the workout type from its actual content, instead of forcing a type
     // before the user has added any blocks.
     private var category: String {
@@ -1743,6 +1779,11 @@ struct WorkoutTemplateBuilderView: View {
         if hasWalking { return "walking" }
         if hasRunning { return "running" }
         if hasStrength { return "strength" }
+        if hasTimedWellness {
+            return blocks.contains {
+                $0.wellnessKind != nil && $0.wellnessKind != .meditation
+            } ? "mobility" : "recovery"
+        }
         return "custom"
     }
 
@@ -1752,12 +1793,14 @@ struct WorkoutTemplateBuilderView: View {
         case "running": return tr("Running", "Løping")
         case "walking": return tr("Walking", "Gåing")
         case "strength": return tr("Strength", "Styrke")
+        case "mobility": return tr("Mobility", "Mobilitet")
+        case "recovery": return tr("Recovery", "Restitusjon")
         default: return tr("Custom", "Egendefinert")
         }
     }
 
     private var canSave: Bool {
-        (hasRunning || hasStrength) && !hasIncompleteSuperset
+        (hasRunning || hasStrength || hasTimedWellness) && !hasIncompleteSuperset
     }
 
     private var hasIncompleteSuperset: Bool {
@@ -2768,7 +2811,18 @@ struct WorkoutTemplateBuilderView: View {
                 durationEntryEditor(index)
 
             case .note:
-                EmptyView()
+                TextField(tr("Activity", "Aktivitet"), text: Binding(
+                    get: { blocks[index].title },
+                    set: { blocks[index].title = $0 }
+                ))
+                .font(.subheadline)
+                durationEntryEditor(index)
+                TextField(tr("Guidance (optional)", "Veiledning (valgfritt)"),
+                    text: Binding(
+                        get: { blocks[index].notes ?? "" },
+                        set: { blocks[index].notes = $0.isEmpty ? nil : $0 }
+                    ), axis: .vertical)
+                    .font(.caption)
             }
     }
 
@@ -2830,6 +2884,35 @@ struct WorkoutTemplateBuilderView: View {
                     studioLibraryTile(tr("Groups", "Grupper"), icon: "square.on.square",
                                       color: Color(red: 0.45, green: 0.27, blue: 0.91))
                 }
+            }
+
+            Menu {
+                Button {
+                    addWellnessBlock(.meditation)
+                } label: { Label(WorkoutWellnessKind.meditation.title, systemImage: "sparkles") }
+                Button {
+                    addWellnessBlock(.stretching)
+                } label: { Label(WorkoutWellnessKind.stretching.title, systemImage: "figure.flexibility") }
+                Button {
+                    addWellnessBlock(.mobility)
+                } label: { Label(WorkoutWellnessKind.mobility.title, systemImage: "figure.cooldown") }
+                Button {
+                    addWellnessBlock(.yoga)
+                } label: { Label("Yoga", systemImage: "figure.yoga") }
+                Divider()
+                ForEach(ATHLTHWellnessGuide.all) { guide in
+                    Button {
+                        addWellnessGuide(guide)
+                    } label: {
+                        Label(guide.title + " · " + guide.durationText, systemImage: guide.icon)
+                    }
+                }
+            } label: {
+                Label(tr("Stretching, yoga and meditation", "Uttøying, yoga og meditasjon"),
+                      systemImage: "figure.mind.and.body")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(studioAccent)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             }
         }
         .padding(ATHLTHPlanDesign.Density.comfortable.cardPadding)
@@ -2905,6 +2988,17 @@ struct WorkoutTemplateBuilderView: View {
                 }
                 Button(tr("Rest", "Pause"), systemImage: "pause.fill") {
                     addRestBlock()
+                }
+                ForEach(WorkoutWellnessKind.allCases, id: \.self) { wellness in
+                    Button(wellness.title, systemImage: wellness.symbol) {
+                        addWellnessBlock(wellness)
+                    }
+                }
+                Divider()
+                ForEach(ATHLTHWellnessGuide.all) { guide in
+                    Button(guide.title, systemImage: guide.icon) {
+                        addWellnessGuide(guide)
+                    }
                 }
                 Button(tr("Superset", "Supersett"), systemImage: "dumbbell.fill") {
                     createSuperset()
@@ -3064,6 +3158,32 @@ struct WorkoutTemplateBuilderView: View {
         insertBlock(block, toGroup: groupID)
     }
 
+    private func addWellnessBlock(_ wellness: WorkoutWellnessKind) {
+        let minutes: Double = wellness == .meditation ? 5 : wellness == .yoga ? 15 : 10
+        var block = WorkoutTemplateBlock(
+            sequence: 0, kind: .note, title: wellness.title,
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: minutes * 60,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: wellness == .meditation ? .recovery : selectedPhase
+        )
+        block.wellnessKind = wellness
+        insertBlock(block, toGroup: nil)
+    }
+
+    private func addWellnessGuide(_ guide: ATHLTHWellnessGuide) {
+        var block = WorkoutTemplateBlock(
+            sequence: 0, kind: .note, title: guide.title,
+            exerciseSlug: nil, distanceMeters: nil, repetitions: nil,
+            durationSeconds: Double(guide.seconds),
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: guide.instructions,
+            phase: guide.category == .zen ? .recovery : selectedPhase
+        )
+        block.wellnessKind = guide.category == .zen ? .meditation : .stretching
+        insertBlock(block, toGroup: nil)
+    }
+
     private func addRestBlock(toGroup groupID: UUID? = nil) {
         insertBlock(WorkoutTemplateBlock(
             sequence: 0, kind: .rest,
@@ -3155,6 +3275,7 @@ struct WorkoutTemplateBuilderView: View {
             copy.isIndoor = block.isIndoor
             copy.exerciseSnapshot = block.exerciseSnapshot
             copy.exerciseID = block.exerciseID
+            copy.wellnessKind = block.wellnessKind
             return copy
         }
     }
@@ -3196,6 +3317,8 @@ struct WorkoutTemplateBuilderView: View {
         case "running": return .running
         case "walking": return .walking
         case "strength": return .strength
+        case "mobility": return .mobility
+        case "recovery": return .recovery
         default: return .custom
         }
     }
