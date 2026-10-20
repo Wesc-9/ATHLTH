@@ -320,17 +320,21 @@ struct RunRouteBuilderView: View {
                 Spacer()
 
                 Button {
-                    showingViaSearch.toggle()
-                    if !showingViaSearch {
-                        viaSearch.clear()
+                    let oldStart = startItem
+                    startItem = endItem
+                    endItem = oldStart
+                    viaPoints.reverse()
+                    Task {
+                        await calculateRoutesIfReady(force: true)
                     }
                 } label: {
                     Label(
-                        showingViaSearch ? "Done" : "Via",
-                        systemImage: showingViaSearch
-                            ? "checkmark"
-                            : "plus"
+                        ATHLTHLocalization.choose(
+                            english: "Swap", norwegian: "Bytt"
+                        ),
+                        systemImage: "arrow.up.arrow.down"
                     )
+                    .font(.caption.weight(.semibold))
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -341,7 +345,9 @@ struct RunRouteBuilderView: View {
                 icon: "circle.fill",
                 tint: ATHLTHTheme.accent,
                 model: startSearch,
-                selectedItem: startItem
+                selectedItem: startItem,
+                referenceCoordinate: searchLocation.location?.coordinate
+                    ?? searchMapCenter
             ) { item in
                 startItem = item
                 startSearch.clear()
@@ -368,7 +374,10 @@ struct RunRouteBuilderView: View {
                     icon: "mappin.and.ellipse",
                     tint: ATHLTHTheme.premiumGold,
                     model: viaSearch,
-                    selectedItem: nil
+                    selectedItem: nil,
+                    referenceCoordinate: startItem?.placemark.coordinate
+                        ?? searchLocation.location?.coordinate
+                        ?? searchMapCenter
                 ) { item in
                     addViaPoint(item)
                 }
@@ -380,20 +389,20 @@ struct RunRouteBuilderView: View {
                 Spacer()
 
                 Button {
-                    let oldStart = startItem
-                    startItem = endItem
-                    endItem = oldStart
-                    viaPoints.reverse()
-                        Task {
-                        await calculateRoutesIfReady(force: true)
+                    showingViaSearch.toggle()
+                    if !showingViaSearch {
+                        viaSearch.clear()
                     }
                 } label: {
                     Label(
-                        "Swap",
-                        systemImage: "arrow.up.arrow.down"
+                        showingViaSearch ? "Done" : "Via",
+                        systemImage: showingViaSearch
+                            ? "checkmark"
+                            : "plus"
                     )
-                    .font(.caption.weight(.semibold))
                 }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
             }
 
             RunRouteSearchField(
@@ -401,7 +410,10 @@ struct RunRouteBuilderView: View {
                 icon: "mappin.circle.fill",
                 tint: .red,
                 model: endSearch,
-                selectedItem: endItem
+                selectedItem: endItem,
+                referenceCoordinate: startItem?.placemark.coordinate
+                    ?? searchLocation.location?.coordinate
+                    ?? searchMapCenter
             ) { item in
                 endItem = item
                 endSearch.clear()
@@ -495,6 +507,9 @@ struct RunRouteBuilderView: View {
                             ATHLTHTheme.vitality,
                             lineWidth: 6
                         )
+                    }
+                    .onMapCameraChange(frequency: .onEnd) { context in
+                        searchMapCenter = context.region.center
                     }
                     .onTapGesture { point in
                         guard shapeRouteMode,
