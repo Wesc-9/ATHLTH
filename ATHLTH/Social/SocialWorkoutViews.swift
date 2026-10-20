@@ -42,15 +42,12 @@ struct WorkoutFriendPicker: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "Train with someone",
-                        norwegian: "Trene med noen"
-                    ),
-                    systemImage: "person.2.fill"
-                )
+                Text(ATHLTHLocalization.choose(
+                    english: "Training partner",
+                    norwegian: "Treningspartner"
+                ))
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.primaryText)
+                .foregroundStyle(ATHLTHPlanDesign.ink)
 
                 Spacer(minLength: 4)
 
@@ -61,13 +58,13 @@ struct WorkoutFriendPicker: View {
                         selectedFriendIDs.count
                     ))
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .foregroundStyle(ATHLTHPlanDesign.accent)
                 }
             }
 
-            HStack(alignment: .top, spacing: 6) {
+            HStack(alignment: .top, spacing: 8) {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top, spacing: 7) {
+                    HStack(alignment: .top, spacing: 9) {
                         Button {
                             selectedFriendIDs.removeAll()
                         } label: {
@@ -91,20 +88,20 @@ struct WorkoutFriendPicker: View {
                                 VStack(spacing: 6) {
                                     ATHLTHSocialStatusAvatar(
                                         profile: friend,
-                                        size: 44
+                                        size: 46
                                     )
-                                    .frame(width: 48, height: 45)
+                                    .frame(width: 54, height: 46)
                                     Text(friend.resolvedName)
                                         .font(.system(size: 11, weight: .medium))
-                                        .foregroundStyle(ATHLTHTheme.primaryText)
+                                        .foregroundStyle(ATHLTHPlanDesign.ink)
                                         .lineLimit(1)
                                         .minimumScaleFactor(0.8)
                                 }
-                                .frame(width: 73)
+                                .frame(width: 77)
                                 .padding(.vertical, 7)
                                 .background(
                                     selectedFriendIDs.contains(friend.userID)
-                                        ? ATHLTHTheme.accentSoft
+                                        ? ATHLTHPlanDesign.selectedSurface
                                         : Color.clear,
                                     in: RoundedRectangle(cornerRadius: 15)
                                 )
@@ -112,9 +109,9 @@ struct WorkoutFriendPicker: View {
                                     RoundedRectangle(cornerRadius: 15)
                                         .stroke(
                                             selectedFriendIDs.contains(friend.userID)
-                                                ? ATHLTHTheme.accentDeep
+                                                ? ATHLTHPlanDesign.accent
                                                 : Color.clear,
-                                            lineWidth: 1.4
+                                            lineWidth: 1.5
                                         )
                                 }
                             }
@@ -179,7 +176,7 @@ struct WorkoutFriendPicker: View {
                                 Image(systemName: "person.fill")
                                     .font(.title3)
                                     .frame(width: 45, height: 45)
-                                    .background(ATHLTHTheme.accentSoft, in: Circle())
+                                    .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
                                 Text(ATHLTHLocalization.choose(
                                     english: "Just me", norwegian: "Bare meg"
                                 ))
@@ -187,11 +184,11 @@ struct WorkoutFriendPicker: View {
                                 Spacer()
                                 if selectedFriendIDs.isEmpty {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                        .foregroundStyle(ATHLTHPlanDesign.accent)
                                 }
                             }
                         }
-                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
                     }
                     Section {
                         if searchablePartners.isEmpty {
@@ -221,12 +218,12 @@ struct WorkoutFriendPicker: View {
                                         selectedFriendIDs.contains(friend.userID)
                                         ? "checkmark.circle.fill" : "circle"
                                     )
-                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    .foregroundStyle(ATHLTHPlanDesign.accent)
                                 }
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
                             .disabled(
                                 selectedFriendIDs.count >= maximumPartners &&
                                 !selectedFriendIDs.contains(friend.userID)
@@ -275,25 +272,25 @@ struct WorkoutFriendPicker: View {
         VStack(spacing: 6) {
             Image(systemName: systemImage)
                 .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(ATHLTHTheme.accentDeep)
-                .frame(width: 44, height: 45)
-                .background(ATHLTHTheme.accentSoft, in: Circle())
+                .foregroundStyle(ATHLTHPlanDesign.accent)
+                .frame(width: 46, height: 46)
+                .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
             Text(title)
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(ATHLTHTheme.primaryText)
+                .foregroundStyle(ATHLTHPlanDesign.ink)
                 .lineLimit(1)
         }
-        .frame(width: 73)
+        .frame(width: 77)
         .padding(.vertical, 7)
         .background(
-            selected ? ATHLTHTheme.accentSoft : Color.clear,
+            selected ? ATHLTHPlanDesign.selectedSurface : Color.clear,
             in: RoundedRectangle(cornerRadius: 15)
         )
         .overlay {
             RoundedRectangle(cornerRadius: 15)
                 .stroke(
-                    selected ? ATHLTHTheme.accentDeep : Color.clear,
-                    lineWidth: 1.4
+                    selected ? ATHLTHPlanDesign.accent : Color.clear,
+                    lineWidth: 1.5
                 )
         }
     }
