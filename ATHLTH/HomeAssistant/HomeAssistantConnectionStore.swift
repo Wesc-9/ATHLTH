@@ -3271,7 +3271,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         calendarEvents:
             [HomeAssistantCalendarEventPayload],
         trainingPlan:
-            HomeAssistantTrainingPlanPayload? = nil
+            HomeAssistantTrainingPlanPayload? = nil,
+        lastWorkoutDetails: WorkoutSummary? = nil
     ) async {
         guard isConnected else {
             return
@@ -3310,6 +3311,55 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                     ?? .null
                 )
                 : .null
+
+        // Foreground snapshots must match the metadata already exported by
+        // background HealthKit refresh. Otherwise the latest activity title
+        // can be paired with stale distance, duration or time on the HA card.
+        if shareCompletedWorkouts, let workout = lastWorkoutDetails {
+            let type: String
+            if workout.activity == .running, workout.isIndoor == true {
+                type = "indoor_running"
+            } else if workout.activity == .running, workout.isIndoor == false {
+                type = "outdoor_running"
+            } else {
+                type = workout.activity.rawValue
+            }
+            state["last_workout_type"] = .string(type)
+            state["last_workout_duration_seconds"] =
+                workout.duration.isFinite
+                ? .double(min(max(workout.duration, 0), 604_800))
+                : .null
+            state["last_workout_distance_meters"] =
+                workout.distanceMeters.flatMap { value in
+                    value.isFinite
+                        ? .double(min(max(value, 0), 5_000_000))
+                        : nil
+                } ?? .null
+            state["last_workout_ended_at"] =
+                .string(Self.iso8601(workout.endDate))
+            state["last_workout_active_energy_kcal"] =
+                workout.activeEnergyKilocalories.flatMap { value in
+                    value.isFinite
+                        ? .double(min(max(value, 0), 100_000))
+                        : nil
+                } ?? .null
+            // Heart rates are unavailable on the generic HealthKit summary.
+            // Do not carry a reading from an older, different workout.
+            state["last_workout_average_heart_rate_bpm"] = .null
+            state["last_workout_max_heart_rate_bpm"] = .null
+        } else {
+            for key in [
+                "last_workout_type",
+                "last_workout_duration_seconds",
+                "last_workout_distance_meters",
+                "last_workout_ended_at",
+                "last_workout_active_energy_kcal",
+                "last_workout_average_heart_rate_bpm",
+                "last_workout_max_heart_rate_bpm"
+            ] {
+                state[key] = .null
+            }
+        }
 
         state["recovery_score"] =
             shareRecovery && recoveryScore != nil

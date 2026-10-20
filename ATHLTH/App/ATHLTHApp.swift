@@ -3899,7 +3899,8 @@ struct AppRootView: View {
                     from: plannedOccurrences
                 ),
             trainingPlan:
-                homeAssistantActiveTrainingPlan()
+                homeAssistantActiveTrainingPlan(),
+            lastWorkoutDetails: latestWorkout
         )
 
         await syncHomeAssistantPhoneWorkoutLiveState(
