@@ -2342,13 +2342,33 @@ struct GhostRaceLivePanel: View {
                 } else if ghostRace.result == nil {
                     ATHLTHUnifiedCard {
                         HStack(spacing: 12) {
-                            ProgressView()
+                            if isOffReferenceRoute {
+                                Image(systemName: "location.slash")
+                                    .font(.title3)
+                                    .foregroundStyle(.orange)
+                            } else {
+                                ProgressView()
+                            }
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("Waiting for live GPS")
+                                Text(isOffReferenceRoute
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Off the planned route",
+                                        norwegian: "Utenfor den planlagte ruten"
+                                      )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Waiting for reliable GPS",
+                                        norwegian: "Venter på pålitelig GPS"
+                                      ))
                                     .font(.subheadline.weight(.semibold))
-                                Text(
-                                    "ATHLTH will place you and your ghost on the route as soon as Apple Watch sends the first GPS point."
-                                )
+                                Text(isOffReferenceRoute
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Ghost continues along the course. Your comparison resumes when you rejoin.",
+                                        norwegian: "Ghost fortsetter langs løypen. Sammenligningen fortsetter når du er tilbake."
+                                      )
+                                    : ATHLTHLocalization.choose(
+                                        english: "The comparison resumes after a trusted position on the course.",
+                                        norwegian: "Sammenligningen fortsetter når posisjonen på løypen er bekreftet."
+                                      ))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             }
@@ -2617,6 +2637,25 @@ struct GhostRaceLivePanel: View {
                     tint:
                         ATHLTHTheme.vitality
                 )
+
+                let gapPercent = (
+                    comparison.userProgress - comparison.ghostProgress
+                ) * 100
+                if abs(gapPercent) >= 1 {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: gapPercent >= 0
+                                ? String(format: "You are %.0f%% ahead along the route", gapPercent)
+                                : String(format: "Ghost is %.0f%% ahead along the route", abs(gapPercent)),
+                            norwegian: gapPercent >= 0
+                                ? String(format: "Du er %.0f %% foran langs ruten", gapPercent)
+                                : String(format: "Ghost er %.0f %% foran langs ruten", abs(gapPercent))
+                        ),
+                        systemImage: "point.topleft.down.to.point.bottomright.curvepath"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                }
             }
         }
     }
@@ -2764,11 +2803,27 @@ struct GhostRaceLivePanel: View {
         )
     }
 
+    private var isOffReferenceRoute: Bool {
+        guard let deviation = snapshot.routeDeviationMeters,
+              deviation.isFinite else { return false }
+        return deviation > ATHLTHGhostCourseProgressPolicy.trustedCorridorMeters(
+            alertThresholdMeters: snapshot.routeDeviationThresholdMeters ?? 35
+        )
+    }
+
     private var mainStatus: String {
         guard let comparison =
                 ghostRace.comparison
         else {
-            return "Finding your position…"
+            return isOffReferenceRoute
+                ? ATHLTHLocalization.choose(
+                    english: "Ghost follows the route",
+                    norwegian: "Ghost følger ruten"
+                  )
+                : ATHLTHLocalization.choose(
+                    english: "Finding your position…",
+                    norwegian: "Finner posisjonen din…"
+                  )
         }
 
         let meters =
