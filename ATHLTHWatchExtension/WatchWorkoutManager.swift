@@ -348,13 +348,17 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 WatchRoutePoint(latitude: point.latitude, longitude: point.longitude,
                                 altitude: point.altitude, sequence: offset)
             }
-        var trip = original
-        trip.id = UUID()
-        trip.title = ATHLTHLocalization.choose(
-            english: "Return to start", norwegian: "Tilbake til start"
+        let trip = WatchRouteTransfer(
+            id: UUID(),
+            comparisonRouteID: nil,
+            title: ATHLTHLocalization.choose(
+                english: "Return to start", norwegian: "Tilbake til start"
+            ),
+            distanceKilometers: original.distanceKilometers,
+            elevationGainMeters: nil,
+            points: reversed,
+            updatedAt: Date()
         )
-        trip.points = reversed
-        trip.updatedAt = Date()
         // Keep the HealthKit workout running. Only navigation changes;
         // ghost progress on the original A–B course is no longer comparable.
         configureGhostRace(nil)
