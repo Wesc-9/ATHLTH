@@ -11,6 +11,8 @@ struct RunRouteBuilderView: View {
     @StateObject private var startSearch = RunRouteLocationSearchModel()
     @StateObject private var endSearch = RunRouteLocationSearchModel()
     @StateObject private var viaSearch = RunRouteLocationSearchModel()
+    @StateObject private var searchLocation = HomeLocationStore()
+    @State private var searchMapCenter: CLLocationCoordinate2D?
 
     @State private var startItem: MKMapItem?
     @State private var endItem: MKMapItem?
@@ -24,7 +26,6 @@ struct RunRouteBuilderView: View {
 
     @State private var title = ""
     @State private var visibility: ProfileVisibility = .privateOnly
-    @State private var sendToWatchAfterSaving = false
     @State private var isCalculating = false
     @State private var errorMessage: String?
     @State private var savedMessage: String?
@@ -59,6 +60,15 @@ struct RunRouteBuilderView: View {
                 }
             }
             .padding()
+            .padding(.bottom, 10)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if selectedAlternative != nil {
+                saveRouteFooter
+            }
+        }
+        .task {
+            searchLocation.start()
         }
         .background(
             LinearGradient(
@@ -91,110 +101,53 @@ struct RunRouteBuilderView: View {
         }
     }
 
+    // Training Plan's ink, champagne accents, light panels and serif heading.
     private var hero: some View {
-        ATHLTHCard {
-            HStack(
-                alignment: .center,
-                spacing: 14
-            ) {
-                Image(
-                    systemName:
-                        "point.topleft.down.to.point.bottomright.curvepath"
-                )
-                .font(.title2)
-                .foregroundStyle(
-                    ATHLTHTheme.vitality
-                )
-                .frame(
-                    width: 48,
-                    height: 48
-                )
+        HStack(alignment: .center, spacing: 14) {
+            Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .frame(width: 52, height: 52)
                 .background(
-                    ATHLTHTheme
-                        .vitalitySoft,
-                    in: Circle()
+                    ATHLTHPlanDesign.selectedSurface,
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                 )
 
-                VStack(
-                    alignment: .leading,
-                    spacing: 4
-                ) {
-                    Text(
-                        "ATHLTH ROUTE BUILDER"
-                    )
-                    .font(
-                        .caption2
-                            .weight(.bold)
-                    )
-                    .tracking(1.4)
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
-                    )
+            VStack(alignment: .leading, spacing: 6) {
+                Text(ATHLTHLocalization.choose(
+                    english: "ATHLTH ROUTE PLANNER",
+                    norwegian: "ATHLTH RUTEBYGGER"
+                ))
+                .font(.caption2.weight(.bold))
+                .tracking(1.6)
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
 
-                    HStack(spacing: 8) {
-                        Text(
-                            ATHLTHLocalization
-                                .choose(
-                                    english:
-                                        "Build your route",
-                                    norwegian:
-                                        "Bygg ruten din"
-                                )
+                HStack(spacing: 8) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Build your route",
+                        norwegian: "Bygg ruten din"
+                    ))
+                    .font(.system(size: 25, weight: .semibold, design: .serif))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Text("A → B")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(
+                            ATHLTHPlanDesign.selectedSurface,
+                            in: Capsule()
                         )
-                        .font(
-                            .title3
-                                .weight(.bold)
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .primaryText
-                        )
-
-                        Text("A → B")
-                            .font(
-                                .caption
-                                    .weight(.bold)
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .vitality
-                            )
-                            .padding(
-                                .horizontal,
-                                8
-                            )
-                            .padding(
-                                .vertical,
-                                4
-                            )
-                            .background(
-                                ATHLTHTheme
-                                    .vitalitySoft,
-                                in: Capsule()
-                            )
-                    }
-
-                    Text(
-                        routeBuilderSubtitle
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
-                    )
-                    .fixedSize(
-                        horizontal: false,
-                        vertical: true
-                    )
                 }
-
-                Spacer(
-                    minLength: 0
-                )
+                Text(routeBuilderSubtitle)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            Spacer(minLength: 0)
         }
-        .athlthLightweightCardChrome()
+        .padding(18)
+        .routeBuilderCard()
     }
 
     private var effectiveRouteTitle:
@@ -764,48 +717,36 @@ struct RunRouteBuilderView: View {
                 .foregroundStyle(ATHLTHTheme.accent)
             }
 
-            if settings.trainingDeviceProvider == .appleWatch {
-                Toggle(
-                    "Send to Apple Watch after saving",
-                    isOn: $sendToWatchAfterSaving
-                )
-                .disabled(!watchConnection.isReady)
-
-                if !watchConnection.isReady {
-                    Text(watchConnection.state.subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            } else if settings.trainingDeviceProvider == .garmin {
-                Label(
-                    "Garmin route sync is prepared and will unlock after authorization approval.",
-                    systemImage: "watch.analog"
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            } else {
-                Label(
-                    "The route will stay available on this iPhone.",
-                    systemImage: "iphone"
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-
-            Button {
-                saveRoute()
-            } label: {
-                Label("Save Running Route", systemImage: "square.and.arrow.down.fill")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(ATHLTHTheme.vitality)
-            .disabled(
-                selectedAlternative == nil
-            )
         }
         .padding()
         .routeBuilderCard()
+    }
+
+    private var saveRouteFooter: some View {
+        VStack(spacing: 0) {
+            Divider().overlay(ATHLTHPlanDesign.warmDivider)
+            Button(action: saveRoute) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Save Running Route",
+                        norwegian: "Lagre løperute"
+                    ),
+                    systemImage: "square.and.arrow.down.fill"
+                )
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, minHeight: 50)
+                .background(
+                    ATHLTHPlanDesign.accent,
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                )
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
+            .padding(.bottom, 8)
+        }
+        .background(ATHLTHPlanDesign.canvas)
     }
 
     private var startDisplayName: String {
@@ -1199,31 +1140,19 @@ struct RunRouteBuilderView: View {
             await routeDiscovery.publish(route)
         }
 
-        if sendToWatchAfterSaving &&
-            settings.trainingDeviceProvider == .appleWatch &&
-            watchConnection.isReady {
-            do {
-                try watchConnection.sendRoute(route)
-                savedMessage = "Route saved and sent to Apple Watch."
-            } catch {
-                savedMessage = "Route saved. Apple Watch transfer failed: \(error.localizedDescription)"
-            }
-        } else {
-            savedMessage = "Route saved to ATHLTH."
-        }
+        savedMessage = ATHLTHLocalization.choose(
+            english: "Route saved to ATHLTH.",
+            norwegian: "Ruten er lagret i ATHLTH."
+        )
 
         dismiss()
     }
 
     private var routeBuilderSubtitle: String {
-        switch settings.trainingDeviceProvider {
-        case .appleWatch:
-            return "Choose your path, shape it with Via points, then save or send it to Apple Watch."
-        case .garmin:
-            return "Choose your path, shape it with Via points and save it for your run."
-        case .none:
-            return "Choose your path, shape it with Via points and save it to ATHLTH."
-        }
+        ATHLTHLocalization.choose(
+            english: "Choose start and finish, add Via points if needed, then save.",
+            norwegian: "Velg start og mål, legg til via-punkter ved behov, og lagre."
+        )
     }
 
     private var routeDeviceStatus: String {
