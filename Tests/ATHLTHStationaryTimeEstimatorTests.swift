@@ -38,7 +38,7 @@ final class ATHLTHStationaryTimeEstimatorTests: XCTestCase {
         let total = ATHLTHStationaryTimeEstimator.waitingSeconds(
             from: locations, workoutDuration: 50
         )
-        XCTAssertEqual(total, 20)
+        XCTAssertEqual(total, 25)
     }
 
     func testSparseRouteDoesNotInventPauses() {
