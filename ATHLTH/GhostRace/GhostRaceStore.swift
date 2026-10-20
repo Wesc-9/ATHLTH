@@ -598,6 +598,7 @@ final class GhostRaceStore: ObservableObject {
                     to: currentLocation,
                     expectedDistanceMeters:
                         expectedDistanceForMatching,
+                    elapsedSeconds: snapshot.elapsedTime,
                     in: reference
                 )
         else {
@@ -915,6 +916,7 @@ final class GhostRaceStore: ObservableObject {
     private func nearestReferenceIndex(
         to location: CLLocation,
         expectedDistanceMeters: Double,
+        elapsedSeconds: TimeInterval,
         in reference: GhostRaceReference
     ) -> Int? {
         guard !reference.points.isEmpty else {
@@ -972,6 +974,37 @@ final class GhostRaceStore: ObservableObject {
 
                 if localDistance <= 220 {
                     return local
+                }
+            }
+        }
+
+        // An athlete who leaves the course for several minutes may rejoin
+        // more than the usual 900 m continuity window farther down it.
+        // Search the full geometry only inside a physically reachable route
+        // interval. This recovers genuine reentries without treating skipped
+        // course or a nearby start/finish crossing as instant progress.
+        if let previous = lastReliableCourseSample,
+           elapsedSeconds.isFinite,
+           elapsedSeconds >= previous.elapsed {
+            let lowerMeters = max(previous.meters - 35, 0)
+            let upperMeters = min(
+                routeDistance,
+                previous.meters + 35 +
+                    (elapsedSeconds - previous.elapsed) * 9
+            )
+            if upperMeters >= lowerMeters {
+                let center = (lowerMeters + upperMeters) / 2
+                let radius = (upperMeters - lowerMeters) / 2 + 1
+                if let reachable = nearestIndex(
+                    to: location,
+                    points: reference.points,
+                    range: 0...(reference.points.count - 1),
+                    expectedDistanceMeters: center,
+                    maximumProgressDriftMeters: radius
+                ), location.distance(
+                    from: reference.points[reachable].location
+                ) <= 50 {
+                    return reachable
                 }
             }
         }
