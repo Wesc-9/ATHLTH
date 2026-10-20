@@ -1011,6 +1011,20 @@ struct IPhoneWorkoutView: View {
                                     .secondary
                                 )
                             }
+
+                            Button {
+                                recorder.disableGhostDuringWorkout()
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Turn off Ghost Race",
+                                        norwegian: "Slå av Ghost Race"
+                                    ),
+                                    systemImage: "eye.slash"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                            }
+                            .buttonStyle(.bordered)
                         }
                     }
 
@@ -1109,31 +1123,65 @@ struct IPhoneWorkoutView: View {
                                 )
                             }
 
-                            if let bearing =
-                                workout
-                                    .routeNextBearingDegrees {
-                                HStack {
-                                    Image(
-                                        systemName:
-                                            "location.north.fill"
-                                    )
-                                    .rotationEffect(
-                                        .degrees(
-                                            bearing
-                                        )
-                                    )
+                            HStack(alignment: .center, spacing: 12) {
+                                let cue = recorder.liveRouteNavigationCue
+                                Image(systemName: cue?.symbol ?? "arrow.up")
+                                    .font(.system(size: 25, weight: .semibold))
                                     .foregroundStyle(
-                                        ATHLTHTheme.vitality
+                                        cue?.offRoute == true
+                                            ? Color.orange : ATHLTHPlanDesign.accentInk
                                     )
-
-                                    Text(
-                                        "Next route segment"
-                                    )
-                                    .font(.caption)
-                                    .foregroundStyle(
-                                        .secondary
-                                    )
+                                    .frame(width: 37)
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: cue?.offRoute == true
+                                            ? "BACK TO ROUTE" : "NEXT TURN",
+                                        norwegian: cue?.offRoute == true
+                                            ? "TILBAKE TIL RUTEN" : "NESTE SVING"
+                                    ))
+                                    .font(.caption2.weight(.bold))
+                                    .tracking(1.2)
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                    Text(cue?.text(norwegian: ATHLTHLocalization.isNorwegian)
+                                        ?? ATHLTHLocalization.choose(
+                                            english: "Follow the highlighted route.",
+                                            norwegian: "Følg den markerte ruten videre."
+                                        ))
+                                        .font(.subheadline.weight(.semibold))
+                                        .fixedSize(horizontal: false, vertical: true)
                                 }
+                                Spacer(minLength: 2)
+                                if let meters = cue?.distanceMeters {
+                                    Text(meters < 1000
+                                        ? String(format: "%.0f m", meters)
+                                        : String(format: "%.1f km", meters / 1000))
+                                    .font(.caption.weight(.bold))
+                                    .monospacedDigit()
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                }
+                            }
+                            .padding(11)
+                            .background(
+                                ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 15)
+                            )
+
+                            if recorder.canRunBackToStart {
+                                Button {
+                                    recorder.startReturnToRouteStart()
+                                } label: {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english: "Run back to start",
+                                            norwegian: "Løp tilbake til start"
+                                        ),
+                                        systemImage: "arrow.uturn.backward"
+                                    )
+                                    .font(.subheadline.weight(.semibold))
+                                    .frame(maxWidth: .infinity, minHeight: 44)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(ATHLTHPlanDesign.accentInk)
                             }
 
                             if let toStart =
