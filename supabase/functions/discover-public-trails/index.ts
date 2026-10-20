@@ -976,15 +976,24 @@ function similarTrailGeometry(
     return false;
   }
 
-  const centerA = {lat: Number(left.center_latitude), lon: Number(left.center_longitude)};
-  const centerB = {lat: Number(right.center_latitude), lon: Number(right.center_longitude)};
-  if (![centerA.lat, centerA.lon, centerB.lat, centerB.lon].every(Number.isFinite)) return false;
-  if (haversineMeters(centerA, centerB) > Math.min(700, Math.max(250, lengthA * 70))) {
-    return false;
-  }
-
   const a = trailCoordinates(left), b = trailCoordinates(right);
   if (a.length < 2 || b.length < 2) return false;
+
+  const centerA = {lat: Number(left.center_latitude), lon: Number(left.center_longitude)};
+  const centerB = {lat: Number(right.center_latitude), lon: Number(right.center_longitude)};
+  const centersValid = [centerA.lat, centerA.lon, centerB.lat, centerB.lon]
+    .every(Number.isFinite);
+  // Different sample densities can shift the stored coordinate average even
+  // when the track is identical. Accept matching endpoints as a candidate,
+  // then require bidirectional geometry overlap below.
+  if (centersValid && haversineMeters(centerA, centerB) >
+      Math.max(700, lengthA * 120)) {
+    const direct = Math.max(haversineMeters(a[0], b[0]),
+      haversineMeters(a[a.length - 1], b[b.length - 1]));
+    const reverse = Math.max(haversineMeters(a[0], b[b.length - 1]),
+      haversineMeters(a[a.length - 1], b[0]));
+    if (Math.min(direct, reverse) > 350) return false;
+  }
 
   const sameName = normalizedTrailName(left.name) === normalizedTrailName(right.name) &&
     normalizedTrailName(left.name).length > 0;
