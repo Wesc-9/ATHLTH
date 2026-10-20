@@ -129,7 +129,10 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
                     .padding(.vertical, 12)
                 }
                 .background(ATHLTHPlanDesign.canvas)
-            } else if onStartWorkout != nil {
+            } else if onStartWorkout != nil &&
+                        (currentWorkout.kind == .running ||
+                         currentWorkout.kind == .walking ||
+                         currentWorkout.kind == .strength) {
                 startActionFooter
             }
         }
