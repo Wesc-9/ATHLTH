@@ -4656,11 +4656,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             let percent = Int(abs(gap).rounded())
             deliverWorkoutAlert(
                 english: gap > 0
-                    ? "On the planned route, Ghost is about \\(percent) percent ahead."
-                    : "On the planned route, you are about \\(percent) percent ahead.",
+                    ? "On the planned route, Ghost is about \(percent) percent ahead."
+                    : "On the planned route, you are about \(percent) percent ahead.",
                 norwegian: gap > 0
-                    ? "På den planlagte ruten ligger Ghost omtrent \\(percent) prosent foran."
-                    : "På den planlagte ruten ligger du omtrent \\(percent) prosent foran.",
+                    ? "På den planlagte ruten ligger Ghost omtrent \(percent) prosent foran."
+                    : "På den planlagte ruten ligger du omtrent \(percent) prosent foran.",
                 delivery: audio.resolvedImportantLeadChangeDelivery,
                 haptic: .notification,
                 priority: .ghostImportant
