@@ -66,6 +66,31 @@ struct MirroredWorkoutLiveView: View {
                             runningDashboard(snapshot)
                             if snapshot.routeTitle != nil {
                                 mirroredRouteNextTurnCard(snapshot)
+                                if snapshot.routeCanReturnToStart == true {
+                                    Button {
+                                        _ = mirroring.requestRunBackToStart()
+                                    } label: {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Run back to start",
+                                                norwegian: "Løp tilbake til start"
+                                            ),
+                                            systemImage: "arrow.uturn.backward"
+                                        )
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.white)
+                                        .frame(maxWidth: .infinity, minHeight: 48)
+                                        .background(
+                                            ATHLTHPlanDesign.accentInk,
+                                            in: RoundedRectangle(cornerRadius: 15)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityHint(ATHLTHLocalization.choose(
+                                        english: "Keep recording and reverse navigation to the starting point",
+                                        norwegian: "Fortsett å registrere økten og følg ruten tilbake"
+                                    ))
+                                }
                             }
                         } else {
                             if snapshot.kind == .strength {
