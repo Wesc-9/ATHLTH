@@ -992,7 +992,7 @@ struct PostWorkoutReviewView: View {
     @State private var saving = false
     @State private var alreadyPublished = false
     @State private var replayContext: WorkoutAIInsightContext?
-    @State private var completionCadenceSPM: Int?
+    @State private var completionWaitingSeconds: TimeInterval?
     @State private var completionRoute: [CLLocation] = []
     @State private var isAdvancedReview = false
     @State private var showingTrainingPartners = false
@@ -1082,7 +1082,7 @@ struct PostWorkoutReviewView: View {
             .background(
                 ATHLTHPremiumCanvas(
                     accent:
-                        completionAccent.opacity(0.12)
+                        ATHLTHPlanDesign.accent.opacity(0.18)
                 )
             )
             .navigationTitle(
@@ -1220,8 +1220,6 @@ struct PostWorkoutReviewView: View {
                     loadReplayContext()
                 async let routeLoad: Void =
                     loadCompletionRoute()
-                async let cadenceLoad: Void =
-                    loadCompletionCadence()
                 async let mediaLoad: Void =
                     social.refreshWorkoutMedia()
 
@@ -1229,7 +1227,6 @@ struct PostWorkoutReviewView: View {
                     reviewLoad,
                     replayLoad,
                     routeLoad,
-                    cadenceLoad,
                     mediaLoad
                 )
             }
@@ -1447,7 +1444,7 @@ struct PostWorkoutReviewView: View {
                         )
                 )
                 .stroke(
-                    completionAccent,
+                    ATHLTHPlanDesign.accent,
                     lineWidth: 5
                 )
             }
@@ -1462,14 +1459,14 @@ struct PostWorkoutReviewView: View {
                 LinearGradient(
                     colors: [
                         Color(
-                            red: 0.07,
-                            green: 0.22,
+                            red: 0.31,
+                            green: 0.24,
                             blue: 0.17
                         ),
                         Color(
-                            red: 0.06,
-                            green: 0.08,
-                            blue: 0.10
+                            red: 0.10,
+                            green: 0.09,
+                            blue: 0.09
                         )
                     ],
                     startPoint: .topLeading,
@@ -1691,7 +1688,7 @@ struct PostWorkoutReviewView: View {
     }
 
     /// All values here are backed by the completed workout or HealthKit.
-    /// Missing pulse, energy, cadence or treadmill incline is shown as a dash.
+    /// Missing pulse, energy, reliable GPS stillness or incline shows a dash.
     private var enduranceResultsGrid: some View {
         VStack(spacing: 0) {
             completionStatsRow(
@@ -1719,24 +1716,38 @@ struct PostWorkoutReviewView: View {
             completionStatsRow(
                 (ATHLTHLocalization.choose(english: "Avg speed", norwegian: "Hastighet snitt"),
                  averageSpeedText, "speedometer", completionAccent),
-                (ATHLTHLocalization.choose(english: "Avg cadence", norwegian: "Kadens snitt"),
-                 completionCadenceSPM.map { "\($0) spm" } ?? "—",
-                 "figure.walk", completionAccent),
+                (ATHLTHLocalization.choose(english: "Waiting time", norwegian: "Ventetid"),
+                 completionWaitingSeconds.map { waitingTimeText($0) } ?? "—",
+                 "pause.circle", completionAccent),
                 (workout.isIndoor == true
                     ? ATHLTHLocalization.choose(english: "Incline", norwegian: "Stigning")
                     : ATHLTHLocalization.choose(english: "Elevation", norwegian: "Høydemeter"),
                  elevationOrInclineText, "mountain.2.fill", completionAccent)
             )
+            if completionWaitingSeconds != nil {
+                Text(ATHLTHLocalization.choose(
+                    english: "Estimated GPS stillness (stops of 10 s or longer). Pauses without location data may be missing.",
+                    norwegian: "Anslått GPS-stillstand (stopp på minst 10 sek). Pauser uten posisjonsdata kan mangle."
+                ))
+                .font(.system(size: 10))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .padding(.horizontal, 8)
+                .padding(.bottom, 6)
+            }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .background(
-            Color.white.opacity(0.97),
+            LinearGradient(
+                colors: [ATHLTHPlanDesign.surface, ATHLTHPlanDesign.canvas],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
             in: RoundedRectangle(cornerRadius: 25, style: .continuous)
         )
         .overlay {
             RoundedRectangle(cornerRadius: 25, style: .continuous)
-                .stroke(Color.white.opacity(0.96), lineWidth: 0.8)
+                .stroke(ATHLTHPlanDesign.warmDivider, lineWidth: 0.8)
         }
     }
 
@@ -1748,11 +1759,11 @@ struct PostWorkoutReviewView: View {
         HStack(spacing: 0) {
             completionStat(left.0, value: left.1, icon: left.2, tint: left.3)
             Rectangle()
-                .fill(ATHLTHTheme.divider.opacity(0.60))
+                .fill(ATHLTHPlanDesign.warmDivider.opacity(0.70))
                 .frame(width: 1, height: 55)
             completionStat(middle.0, value: middle.1, icon: middle.2, tint: middle.3)
             Rectangle()
-                .fill(ATHLTHTheme.divider.opacity(0.60))
+                .fill(ATHLTHPlanDesign.warmDivider.opacity(0.70))
                 .frame(width: 1, height: 55)
             completionStat(right.0, value: right.1, icon: right.2, tint: right.3)
         }
@@ -3354,8 +3365,8 @@ struct PostWorkoutReviewView: View {
         .background(
             LinearGradient(
                 colors: [
-                    completionAccent.opacity(0.065),
-                    Color.white.opacity(0.94)
+                    ATHLTHPlanDesign.selectedSurface,
+                    ATHLTHPlanDesign.surface
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -3916,8 +3927,8 @@ struct PostWorkoutReviewView: View {
                     .background(
                         LinearGradient(
                             colors: [
-                                Color(red: 0.09, green: 0.38, blue: 0.32),
-                                Color(red: 0.20, green: 0.52, blue: 0.41)
+                                ATHLTHPlanDesign.accentInk,
+                                ATHLTHPlanDesign.ink
                             ],
                             startPoint: .leading, endPoint: .trailing
                         ),
@@ -3962,30 +3973,9 @@ struct PostWorkoutReviewView: View {
         .padding(.top, 4)
     }
 
+    // The same accessible bronze accent across all workouts as Training Plan.
     private var completionAccent: Color {
-        switch workout.activity {
-        case .running:
-            return ATHLTHTheme.vitality
-        case .walking,
-             .hiking:
-            return .teal
-        case .cycling,
-             .swimming:
-            return .blue
-        case .strength:
-            return .indigo
-        case .hiit:
-            return .orange
-        case .rowing,
-             .elliptical,
-             .stairClimbing:
-            return .cyan
-        case .yoga,
-             .coreTraining:
-            return .purple
-        case .other:
-            return ATHLTHTheme.accentDeep
-        }
+        ATHLTHPlanDesign.accentInk
     }
 
     private var strengthVolumeText: String? {
@@ -4108,23 +4098,9 @@ struct PostWorkoutReviewView: View {
         )
     }
 
-    @MainActor
-    private func loadCompletionCadence() async {
-        guard workout.activity == .running ||
-                workout.activity == .walking,
-              workout.duration > 0 else {
-            completionCadenceSPM = nil
-            return
-        }
-        let detail = await health.workoutDetail(for: workout.id)
-        guard let steps = detail.stepCount,
-              steps.isFinite, steps > 0 else {
-            completionCadenceSPM = nil
-            return
-        }
-        let cadence = steps / (workout.duration / 60)
-        completionCadenceSPM = cadence.isFinite && (30...260).contains(cadence)
-            ? Int(cadence.rounded()) : nil
+    private func waitingTimeText(_ seconds: TimeInterval) -> String {
+        let whole = max(0, Int(seconds.rounded()))
+        return String(format: "%d:%02d", whole / 60, whole % 60)
     }
 
     @MainActor
@@ -4133,24 +4109,21 @@ struct PostWorkoutReviewView: View {
                 workout.activity == .walking
         else {
             completionRoute = []
+            completionWaitingSeconds = nil
             return
         }
 
-        let detail =
-            await health.workoutDetail(
-                for: workout.id
-            )
+        let detail = await health.workoutDetail(for: workout.id)
+        completionRoute = detail.route
+            .filter { $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= 65 }
+            .sorted { $0.timestamp < $1.timestamp }
 
-        completionRoute =
-            detail.route
-                .filter {
-                    $0.horizontalAccuracy >= 0 &&
-                    $0.horizontalAccuracy <= 65
-                }
-                .sorted {
-                    $0.timestamp <
-                    $1.timestamp
-                }
+        completionWaitingSeconds = workout.isIndoor == true
+            ? nil
+            : ATHLTHStationaryTimeEstimator.waitingSeconds(
+                from: completionRoute,
+                workoutDuration: workout.duration
+            )
     }
 
     private func loadExistingReview() async {
@@ -4381,5 +4354,66 @@ struct PostWorkoutReviewView: View {
         }
 
         return String(format: "%d:%02d", minutes, remainder)
+    }
+}
+
+
+/// Conservative stationary-time estimate from continuous recorded GPS fixes.
+/// It never infers waiting during unrecorded GPS gaps or indoor treadmill use.
+enum ATHLTHStationaryTimeEstimator {
+    static func waitingSeconds(
+        from samples: [CLLocation],
+        workoutDuration: TimeInterval
+    ) -> TimeInterval? {
+        guard workoutDuration.isFinite, workoutDuration > 0 else { return nil }
+
+        let good = samples
+            .filter { $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= 20 }
+            .sorted { $0.timestamp < $1.timestamp }
+        guard good.count >= 4 else { return nil }
+
+        var observedSeconds: TimeInterval = 0
+        var waitingSeconds: TimeInterval = 0
+        var candidateSeconds: TimeInterval = 0
+        var candidatePairs = 0
+        func finishCandidate() {
+            if candidateSeconds >= 10, candidatePairs >= 2 {
+                waitingSeconds += candidateSeconds
+            }
+            candidateSeconds = 0
+            candidatePairs = 0
+        }
+
+        for index in 1..<good.count {
+            let previous = good[index - 1]
+            let next = good[index]
+            let delta = next.timestamp.timeIntervalSince(previous.timestamp)
+            // Never treat a gap in HealthKit location samples as a pause.
+            guard delta >= 1, delta <= 20 else {
+                finishCandidate()
+                continue
+            }
+            observedSeconds += delta
+
+            let displacement = previous.distance(from: next)
+            let inferredSpeed = displacement / delta
+            let limitedDrift = displacement <= max(
+                3.5, min(max(previous.horizontalAccuracy,
+                             next.horizontalAccuracy) * 0.65, 9)
+            )
+            // Speed < 0 signals that a GPS speed fix is unavailable.
+            let speedAllowsStop = next.speed < 0 || next.speed <= 0.55
+            if limitedDrift && inferredSpeed <= 0.55 && speedAllowsStop {
+                candidateSeconds += delta
+                candidatePairs += 1
+            } else {
+                finishCandidate()
+            }
+        }
+        finishCandidate()
+
+        // Sparse tracks are not evidence of zero waiting time.
+        guard observedSeconds >= 30 else { return nil }
+        return min(waitingSeconds, workoutDuration)
     }
 }
