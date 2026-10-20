@@ -1210,6 +1210,7 @@ private struct RunRouteSearchField: View {
     let tint: Color
     @ObservedObject var model: RunRouteLocationSearchModel
     let selectedItem: MKMapItem?
+    let referenceCoordinate: CLLocationCoordinate2D?
     let onSelect: (MKMapItem) -> Void
 
     var body: some View {
@@ -1262,16 +1263,31 @@ private struct RunRouteSearchField: View {
                                 }
                             }
                         } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(suggestion.title)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(.primary)
-
-                                if !suggestion.subtitle.isEmpty {
-                                    Text(suggestion.subtitle)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
+                            HStack(spacing: 8) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(suggestion.title)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.primary)
+                                    if !suggestion.subtitle.isEmpty {
+                                        Text(suggestion.subtitle)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                    }
+                                }
+                                Spacer(minLength: 6)
+                                if let distance = model.distanceLabel(for: suggestion) {
+                                    Text(distance)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                        .monospacedDigit()
+                                        .fixedSize(horizontal: true, vertical: false)
+                                        .accessibilityLabel(
+                                            ATHLTHLocalization.choose(
+                                                english: "Distance \(distance)",
+                                                norwegian: "Avstand \(distance)"
+                                            )
+                                        )
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1294,6 +1310,15 @@ private struct RunRouteSearchField: View {
                 )
             }
         }
+        .onAppear {
+            model.setReferenceCoordinate(referenceCoordinate)
+        }
+        .onChange(of: referenceCoordinate?.latitude) { _, _ in
+            model.setReferenceCoordinate(referenceCoordinate)
+        }
+        .onChange(of: referenceCoordinate?.longitude) { _, _ in
+            model.setReferenceCoordinate(referenceCoordinate)
+        }
     }
 }
 
@@ -1311,14 +1336,66 @@ final class RunRouteLocationSearchModel:
 {
     @Published var query = "" {
         didSet {
+            distanceTask?.cancel()
+            suggestionDistances = [:]
             completer.queryFragment = query
         }
     }
 
     @Published private(set) var suggestions:
         [RunRouteLocationSuggestion] = []
+    @Published private(set) var suggestionDistances: [String: CLLocationDistance] = [:]
 
     private let completer = MKLocalSearchCompleter()
+    private var referenceCoordinate: CLLocationCoordinate2D?
+    private var distanceTask: Task<Void, Never>?
+
+    func setReferenceCoordinate(_ coordinate: CLLocationCoordinate2D?) {
+        if let coordinate, let current = referenceCoordinate {
+            let movement = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+                .distance(from: CLLocation(latitude: current.latitude, longitude: current.longitude))
+            if movement < 25 { return }
+        } else if coordinate == nil && referenceCoordinate == nil {
+            return
+        }
+        referenceCoordinate = coordinate
+        refreshSuggestionDistances()
+    }
+
+    func distanceLabel(for suggestion: RunRouteLocationSuggestion) -> String? {
+        guard let meters = suggestionDistances[suggestion.distanceKey] else { return nil }
+        if meters < 1_000 {
+            return "\(Int((meters / 10).rounded() * 10)) m"
+        }
+        return String(format: "%.1f km", meters / 1_000)
+    }
+
+    private func refreshSuggestionDistances() {
+        distanceTask?.cancel()
+        suggestionDistances = [:]
+        guard let referenceCoordinate else { return }
+        let results = Array(suggestions.prefix(6))
+        guard !results.isEmpty else { return }
+
+        distanceTask = Task { @MainActor [weak self] in
+            let origin = CLLocation(
+                latitude: referenceCoordinate.latitude,
+                longitude: referenceCoordinate.longitude
+            )
+            for suggestion in results {
+                guard !Task.isCancelled, let self else { return }
+                // These are straight-line distances to geocoded MapKit places,
+                // not walking-route lengths or estimates from a text label.
+                guard let place = await self.resolve(suggestion),
+                      !Task.isCancelled else { continue }
+                let point = place.placemark.coordinate
+                let meters = origin.distance(
+                    from: CLLocation(latitude: point.latitude, longitude: point.longitude)
+                )
+                self.suggestionDistances[suggestion.distanceKey] = meters
+            }
+        }
+    }
 
     override init() {
         super.init()
@@ -1343,6 +1420,7 @@ final class RunRouteLocationSearchModel:
 
         Task { @MainActor [weak self] in
             self?.suggestions = mapped
+            self?.refreshSuggestionDistances()
         }
     }
 
@@ -1351,13 +1429,17 @@ final class RunRouteLocationSearchModel:
         didFailWithError error: Error
     ) {
         Task { @MainActor [weak self] in
+            self?.distanceTask?.cancel()
             self?.suggestions = []
+            self?.suggestionDistances = [:]
         }
     }
 
     func clear() {
+        distanceTask?.cancel()
         query = ""
         suggestions = []
+        suggestionDistances = [:]
     }
 
     func resolve(
@@ -1370,6 +1452,12 @@ final class RunRouteLocationSearchModel:
         ]
         .filter { !$0.isEmpty }
         .joined(separator: ", ")
+        if let referenceCoordinate {
+            request.region = MKCoordinateRegion(
+                center: referenceCoordinate,
+                span: MKCoordinateSpan(latitudeDelta: 0.8, longitudeDelta: 0.8)
+            )
+        }
 
         let fallbackName =
             suggestion.title.isEmpty
@@ -1475,6 +1563,8 @@ struct RunRouteLocationSuggestion:
     let id = UUID()
     let title: String
     let subtitle: String
+
+    var distanceKey: String { title + "|" + subtitle }
 }
 
 private struct RunRouteViaPoint: Identifiable {
