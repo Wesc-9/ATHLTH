@@ -50,6 +50,7 @@ struct ATHLTHTrainPlanPremiumView: View {
         var id: UUID { workout.id }
     }
     @State private var openingWorkout: WorkoutDestination?
+    @State private var editingTrainingPlaceWorkout: WorkoutDestination?
     @State private var selectedDayID: UUID?
     @State private var queuedLaunchPlanID: UUID?
     @State private var queuedLaunchWorkout: PlannedSession?
@@ -581,6 +582,24 @@ struct ATHLTHTrainPlanPremiumView: View {
                 expectedPlanVersion: destination.version,
                 existingWorkout: destination.workout
             )
+        }
+        .sheet(item: $editingTrainingPlaceWorkout) { destination in
+            ATHLTHPlanTrainingPlacePicker(initial: destination.workout.plannedTrainingPlace) { place in
+                guard let latest = session.trainingPlan(withID: destination.planID)?
+                    .weeks.flatMap(\.days).flatMap(\.sessions)
+                    .first(where: { $0.id == destination.workout.id }),
+                      !session.isPlanSessionSkipped(planID: destination.planID,
+                                                   sessionID: latest.id),
+                      !session.isPlanSessionCompleted(
+                          planID: destination.planID, sessionID: latest.id,
+                          healthWorkouts: health.workouts,
+                          strengthHistory: strength.workoutHistory
+                      ) else { return }
+                var updated = latest
+                updated.plannedTrainingPlace = place
+                session.updateSession(updated, inPlan: destination.planID)
+                editingTrainingPlaceWorkout = nil
+            }
         }
         .confirmationDialog(
             trainingPlanPendingDeletion.map {
@@ -1505,6 +1524,11 @@ struct ATHLTHTrainPlanPremiumView: View {
                                         .font(.caption)
                                         .foregroundStyle(secondaryInk)
                                     }
+                                    if let place = workout.plannedTrainingPlace {
+                                        Label(place.name, systemImage: place.kind.symbol)
+                                            .font(.caption)
+                                            .foregroundStyle(secondaryInk)
+                                    }
                                     if isToday && !completed && !skipped {
                                         Label(tr("Today", "I dag"),
                                               systemImage: "calendar")
@@ -1545,6 +1569,21 @@ struct ATHLTHTrainPlanPremiumView: View {
                                         .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
                                         .padding(.horizontal, 18)
                                         .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                Divider().overlay(line.opacity(0.55)).padding(.horizontal, 16)
+                                Button {
+                                    editingTrainingPlaceWorkout = WorkoutDestination(
+                                        planID: plan.id, workout: workout)
+                                } label: {
+                                    Label(workout.plannedTrainingPlace?.name ??
+                                          tr("Choose training place", "Velg treningssted"),
+                                          systemImage: "mappin.and.ellipse")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(graphite)
+                                        .frame(maxWidth: .infinity, minHeight: 48,
+                                               alignment: .leading)
+                                        .padding(.horizontal, 18)
                                 }
                                 .buttonStyle(.plain)
                             }
