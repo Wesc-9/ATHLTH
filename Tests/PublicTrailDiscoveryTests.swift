@@ -99,4 +99,92 @@ final class PublicTrailDiscoveryTests:
 
         XCTAssertFalse(trail.isUsable)
     }
+
+    private func routeRecord(
+        name: String, source: String,
+        coordinates: [RouteCoordinate],
+        sourceID: Int64 = 1
+    ) -> PublicTrailRecord {
+        PublicTrailRecord(
+            id: UUID(),
+            osmRelationID: sourceID,
+            name: name,
+            routeKind: "hiking",
+            network: nil,
+            reference: nil,
+            operatorName: nil,
+            symbol: nil,
+            coordinates: coordinates,
+            distanceKilometers: 1.3,
+            centerLatitude: 67.28,
+            centerLongitude: 14.44,
+            leaderboardEnabled: false,
+            athlthVerified: false,
+            source: source
+        )
+    }
+
+    func testKartverketAndOSMGeometryAreOneRouteDespiteDifferentNamesAndDirection() {
+        let geometry = (0...10).map {
+            RouteCoordinate(
+                latitude: 67.28, longitude: 14.42 + Double($0) * 0.003,
+                altitude: nil, sequence: $0
+            )
+        }
+        let kartverket = routeRecord(
+            name: "Kystløypa", source: "kartverket_turrutebasen",
+            coordinates: geometry, sourceID: -1
+        )
+        let osm = routeRecord(
+            name: "Running Trail Bodø", source: "openstreetmap",
+            coordinates: geometry.reversed().enumerated().map {
+                RouteCoordinate(
+                    latitude: $0.element.latitude, longitude: $0.element.longitude,
+                    altitude: nil, sequence: $0.offset
+                )
+            }, sourceID: 123
+        )
+        let found = PublicTrailDeduplicator.unique([osm, kartverket])
+        XCTAssertEqual(found.count, 1)
+        XCTAssertEqual(found.first?.id, kartverket.id)
+    }
+
+    func testCrossingTrailsRemainSeparateEvenWithSameCenterAndLength() {
+        let eastWest = (0...10).map {
+            RouteCoordinate(latitude: 67.28,
+                            longitude: 14.425 + Double($0) * 0.003,
+                            altitude: nil, sequence: $0)
+        }
+        let northSouth = (0...10).map {
+            RouteCoordinate(latitude: 67.265 + Double($0) * 0.003,
+                            longitude: 14.44,
+                            altitude: nil, sequence: $0)
+        }
+        let first = routeRecord(
+            name: "Øst–vest", source: "kartverket_turrutebasen",
+            coordinates: eastWest
+        )
+        let second = routeRecord(
+            name: "Nord–sør", source: "openstreetmap",
+            coordinates: northSouth
+        )
+        XCTAssertEqual(PublicTrailDeduplicator.unique([first, second]).count, 2)
+    }
+
+    func testSourceIndependentDuplicatesDoNotDiscardTwoOwnRouteObjects() {
+        let points = (0...10).map {
+            RouteCoordinate(latitude: 67.28,
+                            longitude: 14.425 + Double($0) * 0.003,
+                            altitude: nil, sequence: $0)
+        }
+        let first = routeRecord(
+            name: "Alternativ A", source: "kartverket_turrutebasen",
+            coordinates: points, sourceID: -10
+        )
+        let second = routeRecord(
+            name: "Alternativ B", source: "kartverket_turrutebasen",
+            coordinates: points, sourceID: -11
+        )
+        XCTAssertEqual(PublicTrailDeduplicator.unique([first, second]).count, 2)
+    }
 }
