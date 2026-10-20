@@ -318,6 +318,42 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         return true
     }
 
+    /// Continue the SAME HealthKit workout on the reversed A–B route.
+    /// An explicit workout start token prevents stale mirror commands
+    /// redirecting a newer session after Watch reconnect.
+    @discardableResult
+    func requestRunBackToStart() -> Bool {
+        guard let mirroredSession,
+              let snapshot,
+              snapshot.routeCanReturnToStart == true,
+              let startedAt = snapshot.startedAt,
+              hasActiveMirroredWorkout else {
+            publish {
+                self.errorMessage = ATHLTHLocalization.choose(
+                    english: "Return guidance is available near the end of the planned route.",
+                    norwegian: "Returveiledning er tilgjengelig når du nærmer deg slutten av ruten."
+                )
+            }
+            return false
+        }
+
+        guard let data = try? JSONEncoder().encode(
+            WatchWorkoutMirrorCommand(
+                command: .returnToStart,
+                workoutStartedAt: startedAt
+            )
+        ) else { return false }
+
+        Task {
+            do {
+                try await mirroredSession.sendToRemoteWorkoutSession(data: data)
+            } catch {
+                publish { self.errorMessage = error.localizedDescription }
+            }
+        }
+        return true
+    }
+
     @discardableResult
     func sendTreadmillInclinePercent(
         _ percent: Double
