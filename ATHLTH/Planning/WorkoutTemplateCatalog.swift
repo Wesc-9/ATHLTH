@@ -2488,6 +2488,10 @@ struct WorkoutTemplateBuilderView: View {
                             .foregroundStyle(studioInk)
                             .lineLimit(2)
 
+                        Text(block.resolvedPhase.title.uppercased())
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(0.7)
+                            .foregroundStyle(studioAccent)
                         if let summary = block.targetText {
                             Text(summary)
                                 .font(.system(size: 11))
@@ -2596,6 +2600,15 @@ struct WorkoutTemplateBuilderView: View {
 
             if isExpanded {
                 Divider()
+                Picker(tr("Section", "Del"), selection: Binding(
+                    get: { blocks[index].resolvedPhase },
+                    set: { blocks[index].phase = $0 }
+                )) {
+                    ForEach(WorkoutPhaseKind.allCases) { phase in
+                        Label(phase.title, systemImage: phase.symbol).tag(phase)
+                    }
+                }
+                .font(.caption)
                 blockDetails(index)
                     .padding(.horizontal, 4)
                     .padding(.bottom, 4)
@@ -2653,10 +2666,10 @@ struct WorkoutTemplateBuilderView: View {
                 .frame(width: size, height: size)
                 .clipShape(RoundedRectangle(cornerRadius: 11))
         } else {
-            let icon = block.kind == .run
+            let icon = block.wellnessKind?.symbol ?? (block.kind == .run
                 ? ((block.cardioActivity == .walking || block.resolvedPhase == .cooldown)
                     ? "figure.walk" : "figure.run")
-                : block.kind.systemImage
+                : block.kind.systemImage)
             Image(systemName: icon)
                 .font(.system(size: 21, weight: .medium))
                 .foregroundStyle(studioInk.opacity(0.82))
@@ -2839,6 +2852,25 @@ struct WorkoutTemplateBuilderView: View {
                         "Legg til blokker i økten din."))
                     .font(.system(size: 10))
                     .foregroundStyle(studioInk.opacity(0.55))
+            }
+
+            if isPlannedWorkout {
+                Button {
+                    addWarmUpRun()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "figure.run")
+                        Text(tr("Add running warm-up", "Legg til joggeoppvarming"))
+                        Spacer()
+                        Image(systemName: "plus.circle")
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(studioAccent)
+                    .padding(12)
+                    .background(ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 13))
+                }
+                .buttonStyle(.plain)
             }
 
             HStack(spacing: 9) {
@@ -3157,6 +3189,21 @@ struct WorkoutTemplateBuilderView: View {
         )
         block.cardioActivity = activity
         insertBlock(block, toGroup: groupID)
+    }
+
+    private func addWarmUpRun() {
+        var block = WorkoutTemplateBlock(
+            sequence: 0, kind: .run,
+            title: tr("Easy jogging warm-up", "Oppvarming – rolig jogg"),
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 600,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: .warmup
+        )
+        block.cardioActivity = .running
+        blocks.insert(block, at: 0)
+        resequence()
+        expandedBlockIndex = 0
     }
 
     private func addWellnessBlock(_ wellness: WorkoutWellnessKind) {
