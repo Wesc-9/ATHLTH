@@ -139,6 +139,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     @Published private(set) var routeNavigationCourseDegrees: Double?
     @Published private(set) var routeNavigationNearestPointIndex: Int?
     @Published private(set) var routeNavigationRevision = 0
+    @Published private(set) var returningToRouteStart = false
     @Published private(set) var routeAlertConfiguration:
         WatchRouteAlertConfiguration = .standard
     @Published private(set) var targetAlertConfiguration:
@@ -246,6 +247,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var lastLiveGhostConnectionText: String?
     private var lastGhostMapPublishedAt: Date?
     private var lastRouteNavigationMapPublishedAt: Date?
+    private var lastSpokenRouteTurnIndex: Int?
+    private var lastSpokenRouteTurnAt: Date?
     private var offRouteStartedAt: Date?
     private var lastOffRouteAlertAt: Date?
     private var routeWasOff = false
@@ -295,10 +298,89 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         locationManager.activityType = .fitness
     }
 
+    var routeNavigationCue: ATHLTHRouteNavigationCue.Instruction? {
+        guard let index = routeNavigationNearestPointIndex,
+              let latitude = routeNavigationLatitude,
+              let longitude = routeNavigationLongitude,
+              let deviation = routeDeviationMeters,
+              plannedRouteLocations.count >= 2 else { return nil }
+        let route = plannedRouteLocations.map(\.coordinate)
+        if routeAlertConfiguration.enabled &&
+            deviation > routeAlertConfiguration.deviationMeters {
+            return ATHLTHRouteNavigationCue.recovery(
+                user: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
+                courseDegrees: routeNavigationCourseDegrees,
+                route: route,
+                nearestIndex: index,
+                deviationMeters: deviation
+            )
+        }
+        return ATHLTHRouteNavigationCue.nextTurn(
+            route: route, nearestIndex: index
+        )
+    }
+
+    var canRunBackToStart: Bool {
+        guard isActive, !returningToRouteStart,
+              let route = plannedRoute, route.points.count >= 2,
+              let remaining = routeRemainingMeters, remaining <= 125,
+              let progress = routeProgressPercent, progress >= 85,
+              let latitude = routeNavigationLatitude,
+              let longitude = routeNavigationLongitude else { return false }
+        let sorted = route.points.sorted { $0.sequence < $1.sequence }
+        guard let start = sorted.first, let finish = sorted.last else {
+            return false
+        }
+        let startPoint = CLLocation(latitude: start.latitude, longitude: start.longitude)
+        let finishPoint = CLLocation(latitude: finish.latitude, longitude: finish.longitude)
+        let current = CLLocation(latitude: latitude, longitude: longitude)
+        return startPoint.distance(from: finishPoint) > 60 &&
+            current.distance(from: finishPoint) <= 100
+    }
+
+    func startReturnToRouteStart() {
+        guard canRunBackToStart, let original = plannedRoute else { return }
+        let reversed = original.points
+            .sorted { $0.sequence < $1.sequence }
+            .reversed()
+            .enumerated()
+            .map { offset, point in
+                WatchRoutePoint(latitude: point.latitude, longitude: point.longitude,
+                                altitude: point.altitude, sequence: offset)
+            }
+        var trip = original
+        trip.id = UUID()
+        trip.title = ATHLTHLocalization.choose(
+            english: "Return to start", norwegian: "Tilbake til start"
+        )
+        trip.points = reversed
+        trip.updatedAt = Date()
+        // Keep the HealthKit workout running. Only navigation changes;
+        // ghost progress on the original A–B course is no longer comparable.
+        configureGhostRace(nil)
+        configurePlannedRoute(trip)
+        returningToRouteStart = true
+        lastSpokenRouteTurnIndex = nil
+        deliverWorkoutAlert(
+            english: "Returning to start. Follow the route in reverse.",
+            norwegian: "Vi løper tilbake til start. Følg ruten motsatt vei.",
+            delivery: routeAlertConfiguration.delivery,
+            haptic: .success,
+            priority: .routeCritical
+        )
+    }
+
+    func disableGhostDuringWorkout() {
+        guard ghostRaceConfiguration != nil else { return }
+        configureGhostRace(nil)
+    }
+
     func configurePlannedRoute(
         _ route: WatchRouteTransfer?
     ) {
         cachePlannedRouteGeometry(route)
+        lastSpokenRouteTurnIndex = nil
+        lastSpokenRouteTurnAt = nil
 
         publish {
             self.plannedRoute = route
@@ -4366,6 +4448,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             horizontalAccuracy:
                 location.horizontalAccuracy
         )
+        evaluateUpcomingRouteTurn(
+            location: location,
+            nearestIndex: guidance.nearestRoutePointIndex,
+            deviationMeters: guidance.deviationMeters
+        )
     }
 
     private func publishRouteNavigationPositionIfNeeded(
@@ -5329,6 +5416,42 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         return distanceDelta > 0 ? 1 : -1
     }
 
+    private func evaluateUpcomingRouteTurn(
+        location: CLLocation,
+        nearestIndex: Int,
+        deviationMeters: Double
+    ) {
+        guard isActive, state == .running,
+              routeAlertConfiguration.enabled,
+              audioCoachConfiguration.enabled,
+              location.horizontalAccuracy >= 0,
+              location.horizontalAccuracy <= 25,
+              deviationMeters <= routeAlertConfiguration.deviationMeters,
+              let cue = ATHLTHRouteNavigationCue.nextTurn(
+                  route: plannedRouteLocations.map(\.coordinate),
+                  nearestIndex: nearestIndex
+              ),
+              let turnIndex = cue.pointIndex,
+              (25...85).contains(cue.distanceMeters),
+              lastSpokenRouteTurnIndex != turnIndex
+        else { return }
+        let now = Date()
+        if let lastSpokenRouteTurnAt,
+           now.timeIntervalSince(lastSpokenRouteTurnAt) < 35 { return }
+        lastSpokenRouteTurnAt = now
+        lastSpokenRouteTurnIndex = turnIndex
+
+        let distance = spokenDistance(cue.distanceMeters)
+        let isRight = cue.direction == .right
+        deliverWorkoutAlert(
+            english: "In \(distance), the route bends \(isRight ? "right" : "left").",
+            norwegian: "Om \(distance) svinger ruten mot \(isRight ? "høyre" : "venstre").",
+            delivery: routeAlertConfiguration.delivery,
+            haptic: .notification,
+            priority: .routeCritical
+        )
+    }
+
     private func evaluateRouteAlert(
         deviationMeters: Double,
         horizontalAccuracy: Double
@@ -5392,13 +5515,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         routeWasOff = true
         lastOffRouteAlertAt = now
 
+        let recovery = routeNavigationCue
+        let englishRecovery = recovery?.text(norwegian: false) ??
+            "Move toward the highlighted route."
+        let norwegianRecovery = recovery?.text(norwegian: true) ??
+            "Gå mot den markerte ruten."
         deliverWorkoutAlert(
-            english:
-                "You are off route. " +
-                spokenDistance(deviationMeters),
-            norwegian:
-                "Du er utenfor ruten. " +
-                spokenDistance(deviationMeters),
+            english: "Off route by \(spokenDistance(deviationMeters)). " + englishRecovery,
+            norwegian: "Du er \(spokenDistance(deviationMeters)) utenfor ruten. " +
+                norwegianRecovery,
             delivery:
                 configuration.delivery,
             haptic: .directionDown,
