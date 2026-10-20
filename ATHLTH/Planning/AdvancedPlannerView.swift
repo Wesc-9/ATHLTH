@@ -8720,61 +8720,29 @@ struct SessionEditorView: View {
     }
 
     private var runningSelectionSummary: String {
+        let totals = estimatedRunningTotals()
         var parts: [String] = []
-
-        let distanceValues =
-            selectedRunningWorkouts
-                .compactMap(\.estimatedDistanceMeters)
-
-        if distanceValues.count == selectedRunningWorkouts.count,
-           !distanceValues.isEmpty {
-            let kilometers =
-                distanceValues.reduce(0, +) / 1_000
-            parts.append(
-                String(format: "%.1f km", kilometers)
-            )
+        if let meters = totals.distanceMeters {
+            parts.append(String(format: "~%.1f km", meters / 1_000))
         }
-
-        let durationValues =
-            selectedRunningWorkouts
-                .compactMap(\.estimatedDurationSeconds)
-
-        if durationValues.count == selectedRunningWorkouts.count,
-           !durationValues.isEmpty {
-            let minutes = Int(
-                (durationValues.reduce(0, +) / 60).rounded()
-            )
-            parts.append("\(minutes) min")
+        if let seconds = totals.durationSeconds {
+            parts.append("\(Int((seconds / 60).rounded())) min")
         }
-
-        return parts.isEmpty
-            ? "Totals can be adjusted manually above."
-            : parts.joined(separator: " · ")
+        return parts.isEmpty ? ATHLTHLocalization.choose(
+            english: "Add a pace or time target to estimate totals.",
+            norwegian: "Legg til tempo eller tidsmål for å beregne totalen."
+        ) : parts.joined(separator: " · ")
     }
 
-    private func runningWorkoutMetricSummary(
-        _ workout: RunningWorkoutTemplate
-    ) -> String {
-        var parts = [
-            workout.type.title,
-            "\(workout.blocks.count) blocks"
-        ]
-
-        if let distance = workout.estimatedDistanceMeters {
-            parts.append(
-                String(
-                    format: "%.1f km",
-                    distance / 1_000
-                )
-            )
+    private func runningWorkoutMetricSummary(_ workout: RunningWorkoutTemplate) -> String {
+        let totals = estimatedRunningTotals(for: [workout])
+        var parts = [workout.type.title, "\(workout.blocks.count) blokker"]
+        if let meters = totals.distanceMeters {
+            parts.append(String(format: "~%.1f km", meters / 1_000))
         }
-
-        if let duration = workout.estimatedDurationSeconds {
-            parts.append(
-                "\(Int((duration / 60).rounded())) min"
-            )
+        if let seconds = totals.durationSeconds {
+            parts.append("\(Int((seconds / 60).rounded())) min")
         }
-
         return parts.joined(separator: " · ")
     }
 
@@ -8826,8 +8794,11 @@ struct SessionEditorView: View {
         }
     }
 
-    private func estimatedRunningTotals() -> (distanceMeters: Double?, durationSeconds: Double?) {
-        guard !selectedRunningWorkouts.isEmpty else { return (nil, nil) }
+    private func estimatedRunningTotals(
+        for templates: [RunningWorkoutTemplate]? = nil
+    ) -> (distanceMeters: Double?, durationSeconds: Double?) {
+        let workouts = templates ?? selectedRunningWorkouts
+        guard !workouts.isEmpty else { return (nil, nil) }
         let defaultPace = targetPaceEnabled
             ? Double(targetPaceMinutes * 60 + targetPaceSeconds)
             : 360.0
@@ -8837,7 +8808,7 @@ struct SessionEditorView: View {
         var durationComplete = true
         var stepCount = 0
 
-        for workout in selectedRunningWorkouts {
+        for workout in workouts {
             for block in workout.blocks {
                 let repetitions = min(max(block.repetitions, 1), 60)
                 for repetition in 1...repetitions {
