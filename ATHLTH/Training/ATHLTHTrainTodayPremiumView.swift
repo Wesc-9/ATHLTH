@@ -65,7 +65,14 @@ struct ATHLTHTrainTodayPremiumView: View {
 
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .task { await workoutCatalog.refresh() }
+        .task {
+            await workoutCatalog.refresh()
+            // The friend row must populate even when Today is the first
+            // social surface opened after signing in.
+            if social.visibleProfiles.isEmpty && !social.isRefreshing {
+                await social.refresh()
+            }
+        }
     }
 
     private var primaryWorkout: PlannedSession? {
