@@ -3858,8 +3858,14 @@ struct AppRootView: View {
             trainingLoad = nil
         }
 
-        let presence =
-            appSession.profile.presence
+        let presence = appSession.profile.presence
+        // Never infer an active workout from social/profile availability.
+        // A real iPhone recording or mirrored Apple Watch workout is required.
+        let actuallyTraining =
+            phoneWorkout.active != nil ||
+            strengthWorkout.activeWorkout != nil ||
+            workoutMirroring.hasActiveMirroredWorkout ||
+            ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
         let plannedOccurrences =
             homeAssistantPlannedOccurrences()
         let nextWorkout =
@@ -3877,16 +3883,11 @@ struct AppRootView: View {
             )
 
         await homeAssistant.syncSnapshot(
-            workoutActive:
-                presence.state == .training,
+            workoutActive: actuallyTraining,
             activeWorkout:
-                presence.state == .training
-                    ? presence.workoutTitle
-                    : nil,
+                actuallyTraining ? presence.workoutTitle : nil,
             activeWorkoutStartedAt:
-                presence.state == .training
-                    ? presence.startedAt
-                    : nil,
+                actuallyTraining ? presence.startedAt : nil,
             lastWorkout:
                 latestWorkout?
                     .activity
