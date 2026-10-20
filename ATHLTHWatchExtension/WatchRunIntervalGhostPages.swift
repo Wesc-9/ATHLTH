@@ -351,6 +351,17 @@ struct WatchRunGhostFocusPage: View {
                     .foregroundStyle(WatchTheme.accentDeep)
 
                     VStack(alignment: .leading, spacing: 7) {
+                        if isRecordedGhost && workout.ghostIsOffPlannedRoute {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Off course – Ghost keeps following the route",
+                                    norwegian: "Utenfor ruten – Ghost fortsetter langs løypen"
+                                ),
+                                systemImage: "location.slash"
+                            )
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(WatchTheme.warning)
+                        }
                         Text(ghost?.opponentName ??
                              workout.ghostRaceTitle ??
                              ATHLTHLocalization.choose(
@@ -403,6 +414,21 @@ struct WatchRunGhostFocusPage: View {
                                     ) == "no"
                                 )
                             )
+
+                            if isRecordedGhost,
+                               let percent = workout.ghostRouteGapPercent,
+                               percent.isFinite, abs(percent) >= 1 {
+                                Text(ATHLTHLocalization.choose(
+                                    english: percent >= 0
+                                        ? String(format: "%.0f%% ahead on route", percent)
+                                        : String(format: "%.0f%% behind on route", abs(percent)),
+                                    norwegian: percent >= 0
+                                        ? String(format: "%.0f %% foran på ruten", percent)
+                                        : String(format: "%.0f %% bak på ruten", abs(percent))
+                                ))
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(WatchTheme.textSecondary)
+                            }
 
                             if let time = visibleTime,
                                time.isFinite {
