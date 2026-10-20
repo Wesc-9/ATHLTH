@@ -146,4 +146,106 @@ final class HomeWorkoutSuggestionPlannerTests: XCTestCase {
         XCTAssertEqual(calendar.component(.minute, from: result), 30)
     }
 
+
+    func testDefaultStartIsSixBeforeSixAndCurrentMinuteAfterSix() throws {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Oslo"))
+        let day = try XCTUnwrap(cal.date(from: DateComponents(
+            year: 2026, month: 10, day: 19, hour: 0
+        )))
+        let at1726 = try XCTUnwrap(cal.date(from: DateComponents(
+            year: 2026, month: 10, day: 19, hour: 17, minute: 26, second: 32
+        )))
+        let at1832 = try XCTUnwrap(cal.date(from: DateComponents(
+            year: 2026, month: 10, day: 19, hour: 18, minute: 32, second: 42
+        )))
+        let six = try XCTUnwrap(HomeWorkoutSuggestionPlanner.defaultStart(
+            on: day, now: at1726, calendar: cal
+        ))
+        XCTAssertEqual(cal.component(.hour, from: six), 18)
+        XCTAssertEqual(cal.component(.minute, from: six), 0)
+        XCTAssertTrue(HomeWorkoutSuggestionPlanner.canSchedule(
+            on: day, at: six, now: at1726, calendar: cal
+        ))
+        let thisMinute = try XCTUnwrap(HomeWorkoutSuggestionPlanner.defaultStart(
+            on: day, now: at1832, calendar: cal
+        ))
+        XCTAssertEqual(cal.component(.hour, from: thisMinute), 18)
+        XCTAssertEqual(cal.component(.minute, from: thisMinute), 32)
+        XCTAssertTrue(HomeWorkoutSuggestionPlanner.canSchedule(
+            on: day, at: thisMinute, now: at1832, calendar: cal,
+            automaticSelectionCreatedAt: at1832
+        ))
+        // A manual choice of a now-past minute remains invalid.
+        XCTAssertFalse(HomeWorkoutSuggestionPlanner.canSchedule(
+            on: day, at: thisMinute, now: at1832, calendar: cal
+        ))
+    }
+
+    func testAutomaticStartHasFifteenMinuteGraceForLongSetup() throws {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Oslo"))
+        let opened = try XCTUnwrap(cal.date(from: DateComponents(
+            year: 2026, month: 10, day: 19, hour: 18, minute: 25, second: 31
+        )))
+        let chosen = try XCTUnwrap(HomeWorkoutSuggestionPlanner.defaultStart(
+            on: opened, now: opened, calendar: cal
+        ))
+        let tenMinutesLater = opened.addingTimeInterval(10 * 60)
+        let sixteenMinutesLater = opened.addingTimeInterval(16 * 60)
+        XCTAssertTrue(HomeWorkoutSuggestionPlanner.canSchedule(
+            on: opened, at: chosen, now: tenMinutesLater, calendar: cal,
+            automaticSelectionCreatedAt: opened
+        ))
+        XCTAssertFalse(HomeWorkoutSuggestionPlanner.canSchedule(
+            on: opened, at: chosen, now: sixteenMinutesLater, calendar: cal,
+            automaticSelectionCreatedAt: opened
+        ))
+        XCTAssertFalse(HomeWorkoutSuggestionPlanner.canSchedule(
+            on: opened, at: chosen, now: tenMinutesLater, calendar: cal
+        ))
+    }
+
+    func testSixOClockDefaultRemainsValidShortlyAfterSix() throws {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Oslo"))
+        let opened = try XCTUnwrap(cal.date(from: DateComponents(
+            year: 2026, month: 10, day: 19, hour: 17, minute: 56
+        )))
+        let saved = try XCTUnwrap(cal.date(from: DateComponents(
+            year: 2026, month: 10, day: 19, hour: 18, minute: 7
+        )))
+        let defaultStart = try XCTUnwrap(HomeWorkoutSuggestionPlanner.defaultStart(
+            on: opened, now: opened, calendar: cal
+        ))
+        XCTAssertTrue(HomeWorkoutSuggestionPlanner.canSchedule(
+            on: opened, at: defaultStart, now: saved, calendar: cal,
+            automaticSelectionCreatedAt: opened
+        ))
+    }
+
+    func testFutureDayStillDefaultsToSixButPastDayCannotBeSaved() throws {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Oslo"))
+        let now = try XCTUnwrap(cal.date(from: DateComponents(
+            year: 2026, month: 10, day: 20, hour: 20, minute: 40
+        )))
+        let tomorrow = try XCTUnwrap(cal.date(byAdding: .day, value: 1, to: now))
+        let yesterday = try XCTUnwrap(cal.date(byAdding: .day, value: -1, to: now))
+        let futureDefault = try XCTUnwrap(HomeWorkoutSuggestionPlanner.defaultStart(
+            on: tomorrow, now: now, calendar: cal
+        ))
+        XCTAssertEqual(cal.component(.hour, from: futureDefault), 18)
+        XCTAssertEqual(cal.component(.minute, from: futureDefault), 0)
+        XCTAssertTrue(HomeWorkoutSuggestionPlanner.canSchedule(
+            on: tomorrow, at: futureDefault, now: now, calendar: cal
+        ))
+        let pastDefault = try XCTUnwrap(HomeWorkoutSuggestionPlanner.defaultStart(
+            on: yesterday, now: yesterday, calendar: cal
+        ))
+        XCTAssertFalse(HomeWorkoutSuggestionPlanner.canSchedule(
+            on: yesterday, at: pastDefault, now: now, calendar: cal,
+            automaticSelectionCreatedAt: yesterday
+        ))
+    }
 }
