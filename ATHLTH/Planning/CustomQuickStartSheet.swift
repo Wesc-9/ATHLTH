@@ -184,6 +184,8 @@ struct CustomQuickWorkoutConfiguration: Hashable {
     var restSeconds: Int
     var rounds: Int
     var audioCoach: WatchAudioCoachConfiguration = .disabled
+    var selectedFriendIDs: Set<UUID> = []
+    var socialMode: SocialWorkoutParticipationMode = .physical
 
     var title: String {
         method == .open
@@ -209,6 +211,28 @@ struct CustomQuickWorkoutConfiguration: Hashable {
     }
 }
 
+extension CustomQuickWorkoutConfiguration {
+    var trainTogetherInvitePayload: SocialWorkoutInvitePayload {
+        let snapshot = PlannedSession(
+            id: UUID(),
+            title: title,
+            kind: .custom,
+            scheduledStart: nil,
+            durationMinutes: method == .open ? nil : durationMinutes,
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            routeID: nil,
+            exercises: [],
+            notes: detail
+        )
+        return SocialWorkoutInvitePayload(
+            workout: snapshot,
+            participationMode: socialMode,
+            maxParticipants: min(6, max(2, selectedFriendIDs.count + 1))
+        )
+    }
+}
+
 enum CustomQuickStartDestination {
     case watch
     case phoneTimer
@@ -219,6 +243,7 @@ struct CustomQuickStartSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
 
     let trainingDeviceProvider: TrainingDeviceProvider
@@ -233,6 +258,8 @@ struct CustomQuickStartSheet: View {
     @State private var rounds = 8
     @State private var audioCoachDraft = AudioCoachDraft()
     @State private var audioCoachLoaded = false
+    @State private var selectedFriendIDs: Set<UUID> = []
+    @State private var socialMode: SocialWorkoutParticipationMode = .physical
 
     private let ink = ATHLTHTheme.primaryText
     private let muted = ATHLTHTheme.mutedText
@@ -276,6 +303,18 @@ struct CustomQuickStartSheet: View {
                     }
 
                     configurationControls
+
+                    ATHLTHCard {
+                        VStack(alignment: .leading, spacing: 13) {
+                            WorkoutFriendPicker(
+                                selectedFriendIDs: $selectedFriendIDs
+                            )
+                            if !selectedFriendIDs.isEmpty {
+                                Divider()
+                                WorkoutSocialModePicker(mode: $socialMode)
+                            }
+                        }
+                    }
 
                     if canUseWatch {
                         DisclosureGroup(tr("Audio coach (optional)", "Lydcoach (valgfritt)")) {
@@ -343,7 +382,18 @@ struct CustomQuickStartSheet: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.plain)
+                    .disabled(!selectedFriendIDs.isEmpty)
                     .padding(.horizontal, 16)
+
+                    if !selectedFriendIDs.isEmpty {
+                        Text(tr(
+                            "Train Together invitations require a live workout, not a retrospective entry.",
+                            "Tren sammen-invitasjoner krever en aktiv økt, ikke registrering i etterkant."
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(muted)
+                        .padding(.horizontal, 20)
+                    }
                 }
                 .background(.regularMaterial)
             }
@@ -358,6 +408,9 @@ struct CustomQuickStartSheet: View {
             // Probe availability whenever the chooser is opened. Paired
             // does not mean the athlete brought their Watch to the gym.
             watchConnection.connect()
+            if social.trainingPartners.isEmpty {
+                await social.refresh()
+            }
         }
     }
 
@@ -464,7 +517,9 @@ struct CustomQuickStartSheet: View {
             workSeconds: workSeconds,
             restSeconds: restSeconds,
             rounds: rounds,
-            audioCoach: audioCoachDraft.configuration()
+            audioCoach: audioCoachDraft.configuration(),
+            selectedFriendIDs: selectedFriendIDs,
+            socialMode: socialMode
         )
     }
 
