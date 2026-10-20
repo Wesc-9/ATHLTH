@@ -4574,6 +4574,18 @@ private struct HomeWeeklyProgressDaySheet: View {
         )
     }
 
+    private var suggestionTimePickerBinding: Binding<Date> {
+        Binding(
+            get: { suggestionStartTime },
+            set: { newTime in
+                // Only actual DatePicker input counts as a manual choice.
+                // Programmatic defaults/reset must retain the 15-minute grace.
+                suggestionStartTime = newTime
+                suggestionTimeWasEdited = true
+            }
+        )
+    }
+
     private var canScheduleSuggestion: Bool {
         guard canPlanWorkout, let start = resolvedSuggestionStart else { return false }
         return HomeWorkoutSuggestionPlanner.canSchedule(
@@ -4716,15 +4728,12 @@ private struct HomeWeeklyProgressDaySheet: View {
                                     ATHLTHLocalization.choose(
                                         english: "Time", norwegian: "Klokkeslett"
                                     ),
-                                    selection: $suggestionStartTime,
+                                    selection: suggestionTimePickerBinding,
                                     displayedComponents: .hourAndMinute
                                 )
                                 .datePickerStyle(.compact)
                                 .labelsHidden()
                                 .tint(dayInk)
-                                .onChange(of: suggestionStartTime) { _, _ in
-                                    suggestionTimeWasEdited = true
-                                }
                             }
 
                             if !canScheduleSuggestion {
