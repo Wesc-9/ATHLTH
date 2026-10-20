@@ -6047,8 +6047,10 @@ struct SessionEditorView: View {
 
                 if kind == .running {
                     runningBuilder
-                    routeBuilder
-                    plannedRunGuidanceSection
+                    if runEnvironment == .outdoor {
+                        routeBuilder
+                        plannedRunGuidanceSection
+                    }
                 }
 
                 if kind == .walking {
@@ -6067,17 +6069,8 @@ struct SessionEditorView: View {
                 } // shared workout-source selection
             }
             .scrollContentBackground(.hidden)
-            .background(
-                ATHLTHPremiumCanvas(
-                    accent:
-                        editorMode == .advanced
-                            ? ATHLTHTheme.vitality
-                            : ATHLTHTheme.accent
-                )
-            )
-            .tint(
-                ATHLTHTheme.accentDeep
-            )
+            .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
+            .tint(ATHLTHPlanDesign.accentInk)
             .listSectionSpacing(14)
             .environment(
                 \.defaultMinListRowHeight,
@@ -6283,6 +6276,8 @@ struct SessionEditorView: View {
             .onChange(of: runEnvironment) { _, value in
                 if value == .treadmill {
                     selectedRouteID = nil
+                    routeGuardianDraft.enabled = false
+                    ghostDraft.enabled = false
                 }
                 syncRunningMetricsFromSelection()
             }
@@ -8985,8 +8980,11 @@ struct SessionEditorView: View {
         // (Apple Maps stores a walking estimate). Preserve the user's
         // current implied pace when switching to a different run route.
         let impliedMinutesPerKilometer =
-            Double(previousDuration) /
-            previousDistance
+            targetPaceEnabled
+                ? Double(targetPaceMinutes * 60 + targetPaceSeconds) / 60
+                : (durationMinutes > 0 && previousDistance > 0.01
+                    ? Double(previousDuration) / previousDistance
+                    : 6.0)
 
         durationMinutes = max(
             5,
@@ -9285,8 +9283,8 @@ struct SessionEditorView: View {
             strengthDurationAdjustmentMinutes = 0
         }
         distanceKilometers = workout.targetDistanceKilometers ?? 0
-        distanceWasAdjustedManually = false
-        durationWasAdjustedManually = false
+        distanceWasAdjustedManually = workout.targetDistanceKilometers != nil
+        durationWasAdjustedManually = workout.durationMinutes != nil
         runEnvironment = workout.workoutCategory == "treadmill" ||
             workout.resolvedWorkoutBlocks.contains(where: { $0.kind == .run && $0.isIndoor == true })
                 ? .treadmill : .outdoor
@@ -9430,19 +9428,19 @@ struct SessionEditorView: View {
                     ? workoutTargetAlertConfigurationForSave
                     : nil,
             routeAlertConfiguration:
-                kind == .running &&
+                kind == .running && runEnvironment == .outdoor &&
                 selectedRoute != nil
                     ? routeGuardianDraft
                         .configuration
                     : nil,
             ghostTargetDurationSeconds:
-                kind == .running &&
+                kind == .running && runEnvironment == .outdoor &&
                 selectedRoute != nil
                     ? ghostDraft
                         .targetDuration
                     : nil,
             ghostUpdates:
-                kind == .running &&
+                kind == .running && runEnvironment == .outdoor &&
                 selectedRoute != nil &&
                 ghostDraft.enabled
                     ? (
