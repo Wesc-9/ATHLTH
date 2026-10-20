@@ -567,8 +567,8 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
         } label: {
             Label(
                 ATHLTHLocalization.choose(
-                    english: "Start on \\(title)",
-                    norwegian: "Start på \\(title)"
+                    english: "Start on \(title)",
+                    norwegian: "Start på \(title)"
                 ),
                 systemImage: systemImage
             )
