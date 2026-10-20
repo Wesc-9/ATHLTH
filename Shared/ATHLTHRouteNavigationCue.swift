@@ -65,7 +65,8 @@ enum ATHLTHRouteNavigationCue {
         route: [CLLocationCoordinate2D],
         nearestIndex: Int
     ) -> Instruction? {
-        guard route.count >= 4, route.indices.contains(nearestIndex) else {
+        guard route.count >= 4, route.indices.contains(nearestIndex),
+              nearestIndex < route.count - 2 else {
             return nil
         }
         let cumulative = cumulativeDistance(route)
