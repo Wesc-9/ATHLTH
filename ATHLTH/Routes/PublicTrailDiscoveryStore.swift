@@ -374,44 +374,83 @@ final class PublicTrailDiscoveryStore:
         }
     }
 
+
     func refresh(
         in region: MKCoordinateRegion,
         force: Bool = true
     ) async {
-        guard region.center.latitude.isFinite,
-              region.center.longitude.isFinite,
+        guard CLLocationCoordinate2DIsValid(region.center),
               region.span.latitudeDelta.isFinite,
-              region.span.longitudeDelta.isFinite
-        else {
+              region.span.longitudeDelta.isFinite,
+              region.span.latitudeDelta > 0,
+              region.span.longitudeDelta > 0 else { return }
+
+        let center = CLLocation(latitude: region.center.latitude,
+                                longitude: region.center.longitude)
+        let corner = CLLocation(
+            latitude: min(89.9, region.center.latitude + region.span.latitudeDelta / 2),
+            longitude: min(179.9, region.center.longitude + region.span.longitudeDelta / 2)
+        )
+        let radius = center.distance(from: corner) / 1000
+        if radius <= 19 {
+            await refresh(near: center, radiusKilometers: max(3, radius + 1), force: force)
             return
         }
+        guard !isLoading else { return }
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
 
-        let center = CLLocation(
-            latitude: region.center.latitude,
-            longitude: region.center.longitude
-        )
-        let corner = CLLocation(
-            latitude:
-                region.center.latitude +
-                region.span.latitudeDelta / 2,
-            longitude:
-                region.center.longitude +
-                region.span.longitudeDelta / 2
-        )
-        let radiusKilometers =
-            min(
-                max(
-                    center.distance(from: corner) / 1_000,
-                    3
-                ),
-                20
-            )
-
-        await refresh(
-            near: center,
-            radiusKilometers: radiusKilometers,
-            force: force
-        )
+        let tileRadius = min(20.0, max(12.0, radius / 2 + 2))
+        let lat = region.span.latitudeDelta / 4
+        let lon = region.span.longitudeDelta / 4
+        let centers = [
+            CLLocation(latitude: region.center.latitude - lat, longitude: region.center.longitude - lon),
+            CLLocation(latitude: region.center.latitude - lat, longitude: region.center.longitude + lon),
+            CLLocation(latitude: region.center.latitude + lat, longitude: region.center.longitude - lon),
+            CLLocation(latitude: region.center.latitude + lat, longitude: region.center.longitude + lon)
+        ].filter { CLLocationCoordinate2DIsValid($0.coordinate) }
+        let service = self.service
+        let responses = await withTaskGroup(
+            of: PublicTrailDiscoveryResponse?.self,
+            returning: [PublicTrailDiscoveryResponse].self
+        ) { group in
+            for place in centers {
+                group.addTask {
+                    try? await service.discover(
+                        near: place, radiusKilometers: tileRadius, forceRefresh: force
+                    )
+                }
+            }
+            var values: [PublicTrailDiscoveryResponse] = []
+            for await item in group {
+                if let item { values.append(item) }
+            }
+            return values
+        }
+        guard !Task.isCancelled else { return }
+        guard !responses.isEmpty else {
+            if trails.isEmpty {
+                errorMessage = ATHLTHLocalization.choose(
+                    english: "Unable to load trails in this area. Try again.",
+                    norwegian: "Kunne ikke hente turstier i området. Prøv igjen."
+                )
+            }
+            return
+        }
+        var found: [UUID: PublicTrailRecord] = [:]
+        for result in responses {
+            for trail in result.trails where trail.isUsable {
+                found[trail.id] = trail
+            }
+        }
+        trails = Array(found.values)
+        attribution = responses.contains { $0.attribution.contains("Kartverket") }
+            ? "© OpenStreetMap contributors · © Kartverket"
+            : "© OpenStreetMap contributors"
+        lastRefreshAt = Date()
+        lastCenter = center
+        isWarmingCache = trails.isEmpty && responses.contains(\.isRefreshing)
     }
 
     func similar(
