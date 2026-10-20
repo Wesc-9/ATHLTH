@@ -3,65 +3,90 @@ import MapKit
 import SwiftUI
 import UIKit
 
-/// Reusable Quick Train partner row: identical interaction across running,
-/// walking, strength and other. The full list is always mutual follows only.
+/// Compact optional partner selector for every Quick Train setup.
+/// Mutual friends use the live lobby; new contacts receive a DM invitation.
 struct WorkoutFriendPicker: View {
     @EnvironmentObject private var social: SocialStore
     @Binding var selectedFriendIDs: Set<UUID>
 
     @State private var showingAllFriends = false
+    @State private var isExpanded = false
     @State private var searchText = ""
+    @State private var remotePartners: [SocialProfileCard] = []
 
     private let maximumPartners = 5
 
     private var highlightedPartners: [SocialProfileCard] {
-        let all = social.trainingPartners
-        let selected = all.filter { selectedFriendIDs.contains($0.userID) }
-        return selected + Array(all.filter {
+        let chosen = social.resolvedQuickTrainPartners(selectedFriendIDs)
+        let others = social.trainingPartners.filter {
             !selectedFriendIDs.contains($0.userID)
-        }.prefix(maximumPartners - min(selected.count, maximumPartners)))
+        }
+        return chosen + Array(others.prefix(max(0, maximumPartners - chosen.count)))
     }
 
     private var searchablePartners: [SocialProfileCard] {
-        let query = searchText
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "@"))
-        guard !query.isEmpty else { return social.trainingPartners }
-        return social.trainingPartners.filter {
-            $0.resolvedName.localizedStandardContains(query) ||
-            ($0.username ?? "").localizedStandardContains(query)
+        let selected = social.resolvedQuickTrainPartners(selectedFriendIDs)
+        let pool = query.count >= 2
+            ? remotePartners + selected + social.trainingPartners
+            : selected + social.trainingPartners
+        var seen = Set<UUID>()
+        return pool.filter { profile in
+            guard seen.insert(profile.userID).inserted else { return false }
+            return query.count < 2 ||
+                profile.resolvedName.localizedStandardContains(query) ||
+                (profile.username ?? "").localizedStandardContains(query)
         }
     }
 
     var selectedFriends: [SocialProfileCard] {
-        social.trainingPartners.filter {
-            selectedFriendIDs.contains($0.userID)
-        }
+        social.resolvedQuickTrainPartners(selectedFriendIDs)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Text(ATHLTHLocalization.choose(
-                    english: "Training partner",
-                    norwegian: "Treningspartner"
-                ))
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(ATHLTHPlanDesign.ink)
-
-                Spacer(minLength: 4)
-
-                if !selectedFriendIDs.isEmpty {
-                    Text(ATHLTHLocalization.format(
-                        english: "%d selected",
-                        norwegian: "%d valgt",
-                        selectedFriendIDs.count
-                    ))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHPlanDesign.accent)
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
                 }
+            } label: {
+                HStack(spacing: 9) {
+                    Image(systemName: "person.2")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accent)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Training partner (optional)",
+                        norwegian: "Treningspartner (valgfritt)"
+                    ))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Spacer(minLength: 4)
+                    Text(selectedFriendIDs.isEmpty
+                         ? ATHLTHLocalization.choose(
+                             english: "Add", norwegian: "Legg til"
+                         )
+                         : ATHLTHLocalization.format(
+                             english: "%d selected",
+                             norwegian: "%d valgt",
+                             selectedFriendIDs.count
+                         ))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ATHLTHPlanDesign.accent)
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                .frame(minHeight: 36)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityHint(ATHLTHLocalization.choose(
+                english: "Expand or collapse training partner options",
+                norwegian: "Vis eller skjul valg av treningspartner"
+            ))
 
+            if isExpanded {
             HStack(alignment: .top, spacing: 8) {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(alignment: .top, spacing: 9) {
@@ -144,26 +169,27 @@ struct WorkoutFriendPicker: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "View and search all friends",
-                    norwegian: "Vis og søk blant alle venner"
+                    english: "Find more ATHLTH athletes",
+                    norwegian: "Finn flere ATHLTH-brukere"
                 ))
             }
 
-            if social.trainingPartners.isEmpty {
+            if social.trainingPartners.isEmpty && selectedFriendIDs.isEmpty {
                 Text(ATHLTHLocalization.choose(
-                    english: "People who follow you back will appear here.",
-                    norwegian: "Venner dere følger gjensidig vises her."
+                    english: "Tap Others to search for athletes.",
+                    norwegian: "Trykk Andre for å søke etter brukere."
                 ))
                 .font(.caption)
                 .foregroundStyle(ATHLTHTheme.mutedText)
             } else if !selectedFriendIDs.isEmpty {
                 Text(ATHLTHLocalization.choose(
-                    english: "Invited friends join in a private workout lobby.",
-                    norwegian: "Valgte venner inviteres til en privat treningslobby."
+                    english: "Mutual friends join a live lobby. New contacts receive a workout invitation in a message request.",
+                    norwegian: "Gjensidige venner inviteres til lobbyen. Nye kontakter får øktinvitasjonen i en meldingsforespørsel."
                 ))
                 .font(.caption)
                 .foregroundStyle(ATHLTHTheme.mutedText)
             }
+            } // Only show the avatar list after choosing to expand.
         }
         .sheet(isPresented: $showingAllFriends) {
             NavigationStack {
@@ -193,8 +219,8 @@ struct WorkoutFriendPicker: View {
                     Section {
                         if searchablePartners.isEmpty {
                             Text(ATHLTHLocalization.choose(
-                                english: "No matching mutual friends.",
-                                norwegian: "Fant ingen venner dere følger gjensidig."
+                                english: "No matches. Search by name or @username.",
+                                norwegian: "Ingen treff. Søk på navn eller @brukernavn."
                             ))
                             .foregroundStyle(ATHLTHTheme.mutedText)
                         }
@@ -235,8 +261,8 @@ struct WorkoutFriendPicker: View {
                         ))
                     } footer: {
                         Text(ATHLTHLocalization.choose(
-                            english: "Up to five friends can join you.",
-                            norwegian: "Du kan invitere opptil fem venner."
+                            english: "Choose up to five athletes. New contacts receive a message request with the workout invitation.",
+                            norwegian: "Velg opptil fem personer. Nye kontakter får meldingsforespørsel med øktinvitasjonen."
                         ))
                     }
                 }
@@ -248,6 +274,19 @@ struct WorkoutFriendPicker: View {
                         norwegian: "Navn eller @brukernavn"
                     )
                 )
+                .task(id: searchText) {
+                    let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        .trimmingCharacters(in: CharacterSet(charactersIn: "@"))
+                    guard query.count >= 2 else {
+                        remotePartners = []
+                        return
+                    }
+                    try? await Task.sleep(for: .milliseconds(300))
+                    guard !Task.isCancelled else { return }
+                    let results = await social.searchQuickTrainPartners(query)
+                    guard !Task.isCancelled else { return }
+                    remotePartners = results
+                }
                 .navigationTitle(ATHLTHLocalization.choose(
                     english: "Choose training partners",
                     norwegian: "Velg treningsvenner"
@@ -296,12 +335,11 @@ struct WorkoutFriendPicker: View {
     }
 
     private func toggle(_ friend: SocialProfileCard) {
-        guard social.trainingPartners.contains(where: {
-            $0.userID == friend.userID
-        }) else { return }
+        guard friend.userID != social.currentUserID else { return }
         if selectedFriendIDs.contains(friend.userID) {
             selectedFriendIDs.remove(friend.userID)
         } else if selectedFriendIDs.count < maximumPartners {
+            social.rememberQuickTrainPartner(friend)
             selectedFriendIDs.insert(friend.userID)
         }
     }
