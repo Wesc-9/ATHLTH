@@ -221,6 +221,9 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
         // Plan-free and unscheduled days show a compact overview.
         // Verify it and the remaining heroes fit narrow phone widths.
         let scenarios: [TrainingPlan?] = [nil, plan]
+        // Quick Train's friend strip requires the same social environment
+        // injected by the production tab root.
+        let social = SocialStore()
         for width in [320.0, 375.0, 430.0] {
             for currentPlan in scenarios {
                 for hasActiveWorkout in [false, true] {
@@ -247,7 +250,9 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
                     onGhostRace: {}
                 )
 
-                let host = UIHostingController(rootView: today)
+                let host = UIHostingController(
+                    rootView: today.environmentObject(social)
+                )
                 host.loadViewIfNeeded()
                 let measured = host.sizeThatFits(
                     in: CGSize(width: width, height: 1_600)
