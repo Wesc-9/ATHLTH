@@ -6,9 +6,13 @@ import SwiftUI
 struct HomeWeeklyStandaloneWorkoutDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @ScaledMetric(relativeTo: .title) private var titleSize: CGFloat = 30
 
     let workout: PlannedSession
+    // Hand off to Home's existing recording engines; this detail view never
+    // creates its own workout or starts an untracked timer.
+    var onStartWorkout: ((PlannedSession, WorkoutCaptureDevice) -> Void)? = nil
 
     @State private var showingEditor = false
     @State private var showingInvitationLobby = false
@@ -125,8 +129,8 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
                     .padding(.vertical, 12)
                 }
                 .background(ATHLTHPlanDesign.canvas)
-            } else {
-                editActionFooter
+            } else if onStartWorkout != nil {
+                startActionFooter
             }
         }
         .toolbar(.hidden, for: .navigationBar)
@@ -163,15 +167,38 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
 
             Spacer(minLength: 6)
 
-            Image(systemName: "calendar.badge.clock")
-                .font(.system(size: 21, weight: .medium))
-                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                .frame(width: 48, height: 48)
-                .background(
-                    ATHLTHPlanDesign.selectedSurface,
-                    in: RoundedRectangle(cornerRadius: 15, style: .continuous)
-                )
-                .accessibilityHidden(true)
+            if !currentWorkout.isExplicitRestDay {
+                Button {
+                    showingEditor = true
+                } label: {
+                    Image(systemName: "square.and.pencil")
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(width: 48, height: 48)
+                        .background(
+                            ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 15, style: .continuous)
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Edit workout", norwegian: "Rediger økt"
+                ))
+                .accessibilityHint(ATHLTHLocalization.choose(
+                    english: "Update this scheduled workout",
+                    norwegian: "Endre den planlagte økten"
+                ))
+            } else {
+                Image(systemName: "calendar.badge.clock")
+                    .font(.system(size: 21, weight: .medium))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(width: 48, height: 48)
+                    .background(
+                        ATHLTHPlanDesign.selectedSurface,
+                        in: RoundedRectangle(cornerRadius: 15, style: .continuous)
+                    )
+                    .accessibilityHidden(true)
+            }
         }
         .padding(.top, 1)
     }
@@ -466,42 +493,98 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
         .buttonStyle(.plain)
     }
 
-    private var editActionFooter: some View {
-        VStack(spacing: 0) {
+    private var startActionFooter: some View {
+        VStack(alignment: .leading, spacing: 10) {
             Rectangle()
                 .fill(ATHLTHPlanDesign.outline)
                 .frame(height: 0.7)
 
-            Button {
-                showingEditor = true
-            } label: {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "Edit workout", norwegian: "Rediger økt"
-                    ),
-                    systemImage: "square.and.pencil"
+            Text(ATHLTHLocalization.choose(
+                english: "START WORKOUT", norwegian: "START ØKT"
+            ))
+            .font(.caption2.weight(.bold))
+            .tracking(1.4)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            .padding(.top, 6)
+
+            HStack(spacing: 10) {
+                launchButton(
+                    title: "iPhone",
+                    systemImage: "iphone",
+                    device: .iPhone,
+                    prominent: true,
+                    enabled: true
                 )
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(Color.white)
-                .frame(maxWidth: .infinity, minHeight: 54)
-                .background(
-                    ATHLTHPlanDesign.ink,
-                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+
+                launchButton(
+                    title: "Apple Watch",
+                    systemImage: "applewatch",
+                    device: .appleWatch,
+                    prominent: false,
+                    enabled: watchConnection.isVerifiedForLiveLaunch
                 )
             }
-            .buttonStyle(.plain)
-            .accessibilityHint(
-                ATHLTHLocalization.choose(
-                    english: "Update the existing scheduled workout",
-                    norwegian: "Oppdater den eksisterende planlagte økten"
-                )
-            )
-            .padding(.horizontal, 19)
-            .padding(.top, 11)
-            .padding(.bottom, 8)
-            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+
+            if !watchConnection.isVerifiedForLiveLaunch {
+                Text(ATHLTHLocalization.choose(
+                    english: "Apple Watch is unavailable. You can still start on iPhone.",
+                    norwegian: "Apple Watch er ikke tilgjengelig. Du kan fortsatt starte på iPhone."
+                ))
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
         }
+        .padding(.horizontal, 19)
+        .padding(.top, 10)
+        .padding(.bottom, 10)
+        .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
         .frame(maxWidth: .infinity)
         .background(ATHLTHPlanDesign.canvas)
+    }
+
+    private func launchButton(
+        title: String,
+        systemImage: String,
+        device: WorkoutCaptureDevice,
+        prominent: Bool,
+        enabled: Bool
+    ) -> some View {
+        Button {
+            // A calendar detail can outlive an edit or deletion. Only the
+            // persisted standalone workout may be used at launch time.
+            guard let persisted = session.standalonePlannedSessions.first(
+                where: { $0.id == workout.id }
+            ), !persisted.isExplicitRestDay,
+               enabled else { return }
+
+            if persisted.trainTogetherMode != nil {
+                showingInvitationLobby = true
+                return
+            }
+
+            dismiss()
+            onStartWorkout?(persisted, device)
+        } label: {
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Start on \\(title)",
+                    norwegian: "Start på \\(title)"
+                ),
+                systemImage: systemImage
+            )
+            .font(.subheadline.weight(.bold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .frame(maxWidth: .infinity, minHeight: 54)
+            .foregroundStyle(prominent ? .white : ATHLTHPlanDesign.ink)
+            .background(
+                prominent ? ATHLTHPlanDesign.ink :
+                    ATHLTHPlanDesign.selectedSurface,
+                in: RoundedRectangle(cornerRadius: 17, style: .continuous)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.48)
     }
 }
