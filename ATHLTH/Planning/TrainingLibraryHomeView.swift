@@ -1257,6 +1257,32 @@ struct TrainingPlanCatalogEntry: Identifiable, Codable, Hashable {
         sessionBlueprints.map(\.kind)
     }
 
+    /// A muscle filter means the plan explicitly names that muscle as a focus
+    /// in its editorial tags, title or programmed session names. Do not
+    /// advertise generic strength plans as specialized muscle plans.
+    func explicitlyTargets(_ muscle: ExerciseMuscleGroup) -> Bool {
+        let text = (tags + workoutPattern + [slug, title, goal])
+            .joined(separator: " ")
+            .lowercased()
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+        let aliases: [String]
+        switch muscle {
+        case .chest: aliases = ["chest", "bryst", "pecs"]
+        case .back: aliases = ["back", "rygg", "pull"]
+        case .shoulders: aliases = ["shoulders", "skuldre", "delts"]
+        case .biceps: aliases = ["biceps"]
+        case .triceps: aliases = ["triceps"]
+        case .forearms: aliases = ["forearms", "underarmer"]
+        case .core: aliases = ["core", "kjerne", "mage"]
+        case .glutes: aliases = ["glutes", "sete"]
+        case .quads: aliases = ["quads", "quadriceps", "fremside lår", "forside lår"]
+        case .hamstrings: aliases = ["hamstrings", "bakside lår"]
+        case .calves: aliases = ["calves", "legger"]
+        }
+        return aliases.contains { text.localizedStandardContains($0) }
+    }
+
     var categoryTitle: String {
         switch category {
         case "muscle_focus":
@@ -1460,6 +1486,7 @@ struct TrainingPlanLibraryView: View {
     @StateObject private var catalog = TrainingPlanLibraryStore()
     @State private var query = ""
     @State private var selectedCategory = "All"
+    @State private var selectedMuscle: ExerciseMuscleGroup?
     @State private var favoritesOnly = false
 
     private var categories: [String] {
@@ -1477,6 +1504,7 @@ struct TrainingPlanLibraryView: View {
             let categoryMatches =
                 selectedCategory == "All" ||
                 entry.categoryTitle == selectedCategory
+            let muscleMatches = selectedMuscle.map { entry.explicitlyTargets($0) } ?? true
             let favoriteMatches =
                 !favoritesOnly ||
                 favorites.isFavorite(
@@ -1492,6 +1520,7 @@ struct TrainingPlanLibraryView: View {
                 entry.tags.joined(separator: " ").localizedCaseInsensitiveContains(cleanQuery)
 
             return categoryMatches &&
+                muscleMatches &&
                 favoriteMatches &&
                 searchMatches
         }
@@ -1553,6 +1582,71 @@ struct TrainingPlanLibraryView: View {
                         }
                     }
                 }
+
+                HStack(spacing: 9) {
+                    Menu {
+                        Button {
+                            selectedMuscle = nil
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "All muscle groups",
+                                    norwegian: "Alle muskelgrupper"
+                                ),
+                                systemImage: selectedMuscle == nil ? "checkmark" : "circle"
+                            )
+                        }
+                        Divider()
+                        ForEach(ExerciseMuscleGroup.allCases) { muscle in
+                            Button {
+                                selectedMuscle = muscle
+                            } label: {
+                                if selectedMuscle == muscle {
+                                    Label(muscle.title, systemImage: "checkmark")
+                                } else {
+                                    Text(muscle.title)
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "figure.strengthtraining.traditional")
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            Text(selectedMuscle?.title ?? ATHLTHLocalization.choose(
+                                english: "Muscle group", norwegian: "Muskelgruppe"
+                            ))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Image(systemName: "chevron.down")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 42)
+                        .background(
+                            ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 13)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 13)
+                                .stroke(ATHLTHPlanDesign.warmDivider, lineWidth: 1)
+                        }
+                    }
+                    Spacer()
+                    if selectedMuscle != nil {
+                        Button {
+                            selectedMuscle = nil
+                        } label: {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Clear", norwegian: "Nullstill"
+                            ))
+                            .font(.caption.weight(.semibold))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    }
+                }
+                .accessibilityElement(children: .contain)
 
                 if filteredEntries.isEmpty {
                     ContentUnavailableView(
