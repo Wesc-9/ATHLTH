@@ -1813,7 +1813,7 @@ struct RunRouteLocationSuggestion:
     var distanceKey: String { title + "|" + subtitle }
 }
 
-private enum RunRouteMapPointMode: String, CaseIterable {
+enum RunRouteMapPointMode: String, CaseIterable {
     case automatic, start, finish, via
 
     static func resolve(
