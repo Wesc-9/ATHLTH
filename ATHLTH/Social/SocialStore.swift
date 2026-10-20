@@ -32,6 +32,11 @@ final class SocialStore: ObservableObject {
     @Published private(set) var isHomeFeedRefreshing = false
     @Published var errorMessage: String?
 
+    // Session-local Quick Train choice. This is never persisted to the backend.
+    // The one-shot handoff prevents planned workouts inheriting Quick Train friends.
+    @Published var quickTrainFriendIDs: Set<UUID> = []
+    private var preparedQuickTrainFriendIDs: Set<UUID>?
+
     private let service: SupabaseSocialService
     private var lastHomeFeedRefreshAt: Date?
     private var lastFullRefreshAt: Date?
@@ -145,6 +150,24 @@ final class SocialStore: ObservableObject {
     /// Workout invitation RLS requires a mutual follow relationship.
     var trainingPartners: [SocialProfileCard] {
         mutualFollows
+    }
+
+    /// Prepare the chosen mutual friends for exactly one Quick Train launch.
+    func prepareQuickTrainFriendsForLaunch() {
+        let eligible = Set(trainingPartners.map(\.userID))
+        preparedQuickTrainFriendIDs = Set(
+            quickTrainFriendIDs.intersection(eligible).prefix(5)
+        )
+    }
+
+    /// The start sheet consumes this once; other workout entry points get nil.
+    func takePreparedQuickTrainFriends() -> Set<UUID>? {
+        defer { preparedQuickTrainFriendIDs = nil }
+        return preparedQuickTrainFriendIDs
+    }
+
+    func discardPreparedQuickTrainFriends() {
+        preparedQuickTrainFriendIDs = nil
     }
 
     func acceptedTrainingPartnerNames(for workoutID: UUID) -> [String] {
@@ -3228,6 +3251,8 @@ final class SocialStore: ObservableObject {
     }
 
     private func reset() {
+        quickTrainFriendIDs = []
+        preparedQuickTrainFriendIDs = nil
         followerIDs = []
         followingIDs = []
         incomingRequests = []
