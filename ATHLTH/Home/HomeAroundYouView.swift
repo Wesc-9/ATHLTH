@@ -1150,7 +1150,9 @@ struct AroundYouExploreView: View {
                         // Open-data credit opposite MapKit's lower-left legal link.
                         // Never hide or reposition Apple's required attribution.
                         .padding(.trailing, 10)
-                        .padding(.bottom, 34)
+                        // Keep required OSM/Kartverket credit visible while
+                        // sitting closer to the bottom safe-area boundary.
+                        .padding(.bottom, 13)
                     }
                 }
                 .overlay(alignment: .bottom) {
