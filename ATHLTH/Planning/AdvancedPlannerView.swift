@@ -8231,250 +8231,144 @@ struct SessionEditorView: View {
                 .joined(separator: " · ")
     }
 
-    private var plannedRunGuidanceSection:
-        some View {
+    // Mirrors Quick Run's three-tool layout, but uses this editor's persisted
+    // per-session overrides instead of creating an unrelated settings store.
+    private var plannedRunGuidanceSection: some View {
         Section {
-            VStack(
-                alignment: .leading,
-                spacing: 12
-            ) {
+            VStack(alignment: .leading, spacing: 11) {
                 HStack(spacing: 11) {
-                    Image(
-                        systemName:
-                            "waveform.and.mic"
-                    )
-                    .font(
-                        .system(
-                            size: 17,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .premiumGold
-                    )
-                    .frame(
-                        width: 40,
-                        height: 40
-                    )
-                    .background(
-                        ATHLTHTheme
-                            .premiumGoldSoft,
-                        in: RoundedRectangle(
-                            cornerRadius: 12,
-                            style: .continuous
-                        )
-                    )
-
-                    VStack(
-                        alignment: .leading,
-                        spacing: 2
-                    ) {
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Run guidance",
-                                norwegian:
-                                    "Løpeveiledning"
-                            )
-                        )
-                        .font(
-                            .headline
-                        )
-
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Set Coach, Ghost and live alerts before the workout.",
-                                norwegian:
-                                    "Sett opp Coach, Ghost og live-varsler før økten."
-                            )
-                        )
+                    Image(systemName: "waveform.and.mic")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(width: 40, height: 40)
+                        .background(ATHLTHPlanDesign.selectedSurface,
+                                    in: RoundedRectangle(cornerRadius: 12))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Run tools", norwegian: "Løpsverktøy"
+                        ))
+                        .font(.headline)
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Audio Coach, Ghost and route tools for this run",
+                            norwegian: "Audio Coach, Ghost og ruteverktøy for denne økten"
+                        ))
                         .font(.caption)
-                        .foregroundStyle(
-                            .secondary
-                        )
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     }
+                    Spacer(minLength: 2)
                 }
 
                 HStack(spacing: 8) {
-                    plannedGuidanceStatusPill(
-                        title: "Audio Coach",
-                        icon:
-                            "waveform.and.person.filled",
-                        active:
-                            resolvedAudioCoachEnabled
-                    )
+                    Button {
+                        var configuration = audioCoachOverride ??
+                            settings.audioCoachConfiguration(
+                                enabled: settings.audioCoachEnabledByDefault)
+                        configuration.enabled.toggle()
+                        audioCoachOverride = configuration
+                    } label: {
+                        plannedGuidanceStatusPill(
+                            title: "Audio Coach",
+                            icon: "waveform.and.person.filled",
+                            active: resolvedAudioCoachEnabled)
+                    }
+                    .buttonStyle(.plain)
 
-                    plannedGuidanceStatusPill(
-                        title: "Ghost",
-                        icon:
-                            "figure.run.circle.fill",
-                        active:
-                            ghostDraft.enabled &&
-                            selectedRoute != nil,
-                        unavailable:
-                            selectedRoute == nil
-                    )
+                    Button {
+                        guard runEnvironment == .outdoor, selectedRoute != nil else { return }
+                        ghostDraft.enabled.toggle()
+                    } label: {
+                        plannedGuidanceStatusPill(
+                            title: "Ghost",
+                            icon: "figure.run.circle.fill",
+                            active: runEnvironment == .outdoor && ghostDraft.enabled && selectedRoute != nil,
+                            unavailable: runEnvironment == .treadmill || selectedRoute == nil)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(runEnvironment == .treadmill || selectedRoute == nil)
 
-                    plannedGuidanceStatusPill(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "Route",
-                                norwegian: "Rute"
-                            ),
-                        icon:
-                            "location.fill",
-                        active:
-                            routeGuardianDraft.enabled &&
-                            selectedRoute != nil,
-                        unavailable:
-                            selectedRoute == nil
-                    )
-                }
-            }
-            .padding(
-                .vertical,
-                4
-            )
-
-            Button {
-                showingAudioCoachEditor =
-                    true
-            } label: {
-                guidancePlannerRow(
-                    title: "Audio Coach",
-                    subtitle:
-                        audioCoachStatusText,
-                    icon:
-                        "waveform.and.person.filled",
-                    tint:
-                        ATHLTHTheme
-                            .premiumGold
-                )
-            }
-            .buttonStyle(.plain)
-
-            if selectedRoute != nil {
-                NavigationLink {
-                    PerWorkoutRouteGuardianView(
-                        draft:
-                            $routeGuardianDraft
-                    )
-                } label: {
-                    guidancePlannerRow(
-                        title: "Route Guardian",
-                        subtitle:
-                            routeGuardianDraft
-                                .enabled
-                                ? ATHLTHLocalization.format(
-                                    english:
-                                        "Alert at %.0f m off route",
-                                    norwegian:
-                                        "Varsle ved %.0f m utenfor ruten",
-                                    routeGuardianDraft
-                                        .deviationMeters
-                                )
-                                : ATHLTHLocalization.choose(
-                                    english: "Off",
-                                    norwegian: "Av"
-                                ),
-                        icon: "location.fill",
-                        tint:
-                            ATHLTHTheme
-                                .vitality
-                    )
+                    Button {
+                        guard runEnvironment == .outdoor, selectedRoute != nil else { return }
+                        routeGuardianDraft.enabled.toggle()
+                    } label: {
+                        plannedGuidanceStatusPill(
+                            title: ATHLTHLocalization.choose(english: "Route", norwegian: "Rute"),
+                            icon: "location.fill",
+                            active: runEnvironment == .outdoor &&
+                                routeGuardianDraft.enabled && selectedRoute != nil,
+                            unavailable: runEnvironment == .treadmill || selectedRoute == nil)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(runEnvironment == .treadmill || selectedRoute == nil)
                 }
 
-                NavigationLink {
-                    PerWorkoutGhostView(
-                        draft:
-                            $ghostDraft,
-                        route:
-                            selectedRoute
-                    )
-                } label: {
-                    guidancePlannerRow(
-                        title: "Ghost",
-                        subtitle:
-                            ghostDraft.enabled
-                                ? ATHLTHLocalization.format(
-                                    english:
-                                        "Target %@",
-                                    norwegian:
-                                        "Mål %@",
-                                    ghostDraft
-                                        .targetTimeText
-                                )
-                                : ATHLTHLocalization.choose(
-                                    english: "Off",
-                                    norwegian: "Av"
-                                ),
-                        icon:
-                            "figure.run.circle.fill",
-                        tint:
-                            ATHLTHTheme
-                                .accent
-                    )
-                }
-            } else {
-                guidancePlannerRow(
-                    title: "Ghost + Route Guardian",
-                    subtitle:
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Choose a route to enable these tools",
-                            norwegian:
-                                "Velg en rute for å aktivere disse verktøyene"
-                        ),
-                    icon:
-                        "map.circle",
-                    tint:
-                        ATHLTHTheme
-                            .mutedText
-                )
-                .opacity(0.68)
-            }
+                Text(runEnvironment == .treadmill
+                    ? ATHLTHLocalization.choose(
+                        english: "Indoor run: GPS, route monitoring and route Ghost stay off. Audio Coach and phase targets remain available.",
+                        norwegian: "Innendørs: GPS, rutevarsler og rute-Ghost er av. Audio Coach og mål per del fungerer fortsatt.")
+                    : selectedRoute == nil
+                        ? ATHLTHLocalization.choose(
+                            english: "Choose an outdoor route to unlock Ghost and route monitoring.",
+                            norwegian: "Velg en utendørs rute for å bruke Ghost og rutevarsler.")
+                        : ATHLTHLocalization.choose(
+                            english: "Tap a tool to enable or disable it for this workout.",
+                            norwegian: "Trykk på et verktøy for å slå det av eller på for denne økten."))
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
 
-            Button {
-                editorMode = .advanced
-            } label: {
-                guidancePlannerRow(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Live targets & alerts",
-                            norwegian:
-                                "Live-mål og varsler"
-                        ),
-                    subtitle:
-                        plannedLiveAlertSummary,
-                    icon:
-                        "scope",
-                    tint:
-                        .orange
-                )
+                HStack(spacing: 16) {
+                    Button {
+                        showingAudioCoachEditor = true
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Set up Coach", norwegian: "Tilpass Coach"
+                        ), systemImage: "slider.horizontal.3")
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        editorMode = .advanced
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Live targets", norwegian: "Live-mål"
+                        ), systemImage: "scope")
+                    }
+                    .buttonStyle(.plain)
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+
+                if runEnvironment == .outdoor && selectedRoute != nil {
+                    DisclosureGroup(ATHLTHLocalization.choose(
+                        english: "Advanced route tools", norwegian: "Avanserte ruteverktøy"
+                    )) {
+                        NavigationLink {
+                            PerWorkoutRouteGuardianView(draft: $routeGuardianDraft)
+                        } label: {
+                            guidancePlannerRow(
+                                title: "Route Guardian",
+                                subtitle: ATHLTHLocalization.choose(
+                                    english: "Route deviation alerts", norwegian: "Varsler ved avvik fra ruten"),
+                                icon: "location.fill", tint: ATHLTHTheme.vitality)
+                        }
+                        NavigationLink {
+                            PerWorkoutGhostView(draft: $ghostDraft, route: selectedRoute)
+                        } label: {
+                            guidancePlannerRow(
+                                title: "Ghost",
+                                subtitle: ATHLTHLocalization.choose(
+                                    english: "Target time and audio updates", norwegian: "Måltid og lydoppdateringer"),
+                                icon: "figure.run.circle.fill", tint: ATHLTHPlanDesign.accentInk)
+                        }
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                }
             }
-            .buttonStyle(.plain)
-        } header: {
-            Text(
-                ATHLTHLocalization.choose(
-                    english:
-                        "Guidance & alerts",
-                    norwegian:
-                        "Veiledning og varsler"
-                )
-            )
-        } footer: {
-            Text(
-                ATHLTHLocalization.choose(
-                    english:
-                        "These choices are stored with the planned workout and follow it into the training plan.",
-                    norwegian:
-                        "Valgene lagres med den planlagte økten og følger økten i treningsplanen."
-                )
-            )
+            .padding(.vertical, 4)
         }
+        .listRowBackground(ATHLTHPlanDesign.surface)
+        .listRowSeparator(.hidden)
     }
 
     private var resolvedAudioCoachEnabled:
