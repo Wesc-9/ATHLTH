@@ -3462,37 +3462,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                           systemImage: "target")
                         .font(.subheadline)
                 }
-                HStack(spacing: 10) {
-                    Button {
-                        selectedPlanWeekIndex = guidedCurrentWeek
-                        addingExtraWorkout = false
-                        composingAdvancedDay = WeekDayEditorSelection(id: guidedCurrentWeekday)
-                    } label: {
-                        Label(ATHLTHLocalization.choose(
-                            english: "Build workout", norwegian: "Bygg økt"),
-                              systemImage: "plus")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    Button {
-                        setRestDay(guidedCurrentWeekday)
-                    } label: {
-                        Label(ATHLTHLocalization.choose(
-                            english: "Rest day", norwegian: "Hviledag"),
-                              systemImage: "moon.stars")
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(weekDayEdits[weekDayKey(guidedCurrentWeekday,
-                                                    weekIndex: guidedCurrentWeek)]?.detailedWorkout != nil)
-                }
-                if weekDayEdits[weekDayKey(guidedCurrentWeekday,
-                                          weekIndex: guidedCurrentWeek)]?.detailedWorkout != nil {
-                    Text(ATHLTHLocalization.choose(
-                        english: "To replace a planned training day with rest, remove its workouts in the day editor first.",
-                        norwegian: "For å endre en treningsdag til hviledag må du først fjerne øktene i dagsredigeringen."
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                }
             }
         }
     }
@@ -3837,14 +3806,18 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 ),
                 icon: "calendar.day.timeline.left"
             )
-            guidedSmartPlanningCard
-            if let edit = weekDayEdits[weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)] {
+            if weekDayEdits[weekDayKey(guidedCurrentWeekday,
+                                        weekIndex: guidedCurrentWeek)]?.detailedWorkout == nil {
+                guidedSmartPlanningCard
+            }
+            if let edit = weekDayEdits[weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)],
+               edit.isRestDay == true {
                 builderPanel {
                     Label(
                         edit.isRestDay == true
                             ? ATHLTHLocalization.choose(english: "Rest day chosen", norwegian: "Hviledag valgt")
                             : (edit.detailedWorkout?.title ?? ATHLTHLocalization.choose(english: "Workout chosen", norwegian: "Økt valgt")),
-                        systemImage: edit.isRestDay == true ? "moon.stars" : "checkmark.circle.fill"
+                        systemImage: "moon.stars.fill"
                     )
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHPlanDesign.ink)
@@ -3887,6 +3860,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     }
                 }
             }
+            if weekDayEdits[weekDayKey(guidedCurrentWeekday,
+                                       weekIndex: guidedCurrentWeek)]?.detailedWorkout == nil {
             ATHLTHPlanWeekApproachCard(
                 icon: "plus.circle",
                 title: ATHLTHLocalization.choose(english: "Build planned workout", norwegian: "Bygg planlagt økt"),
@@ -3911,6 +3886,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 selectingExtraFromLibrary = false
                 selectingLibraryDay = WeekDayEditorSelection(id: guidedCurrentWeekday)
             }
+            }
             if weekDayEdits[weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)]?.detailedWorkout != nil {
                 ATHLTHPlanWeekApproachCard(
                     icon: "plus.square.on.square",
@@ -3933,6 +3909,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
                 .font(.subheadline.weight(.medium))
             }
+            if weekDayEdits[weekDayKey(guidedCurrentWeekday,
+                                       weekIndex: guidedCurrentWeek)]?.detailedWorkout == nil {
             ATHLTHPlanWeekApproachCard(
                 icon: "moon.stars",
                 title: ATHLTHLocalization.choose(english: "Rest day", norwegian: "Hviledag"),
@@ -3943,9 +3921,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             ) {
                 setRestDay(guidedCurrentWeekday)
             }
+            }
             Text(ATHLTHLocalization.choose(
-                english: "Select a workout or rest day before continuing. Your choices are saved as a draft.",
-                norwegian: "Velg en økt eller hviledag før du fortsetter. Valgene lagres som utkast."
+                english: "Your work is saved as a draft. Tap Edit workout to change any detail.",
+                norwegian: "Endringene lagres som utkast. Trykk Rediger økt for å endre alle detaljer."
             ))
             .font(.caption)
             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
