@@ -690,11 +690,11 @@ struct RunRouteBuilderView: View {
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .joined(separator: " ")
-        let candidate = street.isEmpty ? (placemark.name ?? "") : street
-        let label = [candidate, placemark.locality ?? ""]
-            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-            .joined(separator: ", ")
-        guard !label.isEmpty else { return }
+        guard let label = RunRouteAddressPresentation.name(
+            street: street,
+            fallbackName: placemark.name,
+            locality: placemark.locality
+        ) else { return }
 
         let item = MKMapItem(placemark: MKPlacemark(placemark: placemark))
         item.name = label
@@ -1804,6 +1804,28 @@ final class RunRouteLocationSearchModel:
         ]
         .compactMap { $0 }
         .joined(separator: ", ")
+    }
+}
+
+/// Keep a resolved map label short and avoid repeating the same town twice.
+/// A failed reverse-geocode keeps the explicit coordinate label instead.
+enum RunRouteAddressPresentation {
+    static func name(
+        street: String, fallbackName: String?, locality: String?
+    ) -> String? {
+        let cleanStreet = street.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanName = (fallbackName ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanTown = (locality ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let primary = !cleanStreet.isEmpty ? cleanStreet : cleanName
+        guard !primary.isEmpty || !cleanTown.isEmpty else { return nil }
+        if primary.isEmpty { return cleanTown }
+        if cleanTown.isEmpty ||
+            primary.localizedCaseInsensitiveCompare(cleanTown) == .orderedSame {
+            return primary
+        }
+        return "\(primary), \(cleanTown)"
     }
 }
 
