@@ -14,7 +14,6 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
     // creates its own workout or starts an untracked timer.
     var onStartWorkout: ((PlannedSession, WorkoutCaptureDevice) -> Void)? = nil
 
-    @State private var showingEditor = false
     @State private var showingInvitationLobby = false
 
     private var currentWorkout: PlannedSession {
@@ -137,13 +136,6 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
-        .sheet(isPresented: $showingEditor) {
-            SessionEditorView(
-                standaloneDate: currentWorkout.scheduledStart ?? Date(),
-                initialSourceWorkout: currentWorkout,
-                preserveSourceID: true
-            )
-        }
         .sheet(isPresented: $showingInvitationLobby) {
             PlannedWorkoutLobbyView(workout: currentWorkout)
                 .presentationDetents([.medium, .large])
@@ -170,38 +162,7 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
 
             Spacer(minLength: 6)
 
-            if !currentWorkout.isExplicitRestDay {
-                Button {
-                    showingEditor = true
-                } label: {
-                    Image(systemName: "square.and.pencil")
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                        .frame(width: 48, height: 48)
-                        .background(
-                            ATHLTHPlanDesign.selectedSurface,
-                            in: RoundedRectangle(cornerRadius: 15, style: .continuous)
-                        )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "Edit workout", norwegian: "Rediger økt"
-                ))
-                .accessibilityHint(ATHLTHLocalization.choose(
-                    english: "Update this scheduled workout",
-                    norwegian: "Endre den planlagte økten"
-                ))
-            } else {
-                Image(systemName: "calendar.badge.clock")
-                    .font(.system(size: 21, weight: .medium))
-                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    .frame(width: 48, height: 48)
-                    .background(
-                        ATHLTHPlanDesign.selectedSurface,
-                        in: RoundedRectangle(cornerRadius: 15, style: .continuous)
-                    )
-                    .accessibilityHidden(true)
-            }
+
         }
         .padding(.top, 1)
     }
