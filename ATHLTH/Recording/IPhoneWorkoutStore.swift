@@ -153,6 +153,11 @@ struct PhoneWorkout: Codable, Identifiable {
     var routeDistanceToStartMeters: Double? = nil
     var routeDistanceToFinishMeters: Double? = nil
     var routeNextBearingDegrees: Double? = nil
+    var routeNearestPointIndex: Int? = nil
+    var routeCurrentCourseDegrees: Double? = nil
+    var returningToRouteStart: Bool? = nil
+    var routeLegDistanceOffsetMeters: Double? = nil
+    var ghostDisabledDuringWorkout: Bool? = nil
     var currentPaceSecondsPerKilometer: TimeInterval? = nil
 
     // The same structured running model is used by Apple Watch.
@@ -2158,6 +2163,7 @@ final class IPhoneWorkoutStore:
             return
         }
 
+        guard workout.ghostDisabledDuringWorkout != true else { return }
         ghostOpponentName =
             workout.ghostOpponentName ??
             ghostOpponentName
@@ -2573,6 +2579,101 @@ final class IPhoneWorkoutStore:
         }
     }
 
+    var liveRouteNavigationCue: ATHLTHRouteNavigationCue.Instruction? {
+        guard let workout = active,
+              let index = workout.routeNearestPointIndex,
+              let coords = workout.plannedRouteCoordinates,
+              let point = workout.points.last,
+              let deviation = workout.routeDeviationMeters else { return nil }
+        let sorted = coords.sorted { $0.sequence < $1.sequence }
+        let route = sorted.map {
+            CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+        }
+        if workout.routeAlertConfiguration?.enabled == true &&
+            deviation > (workout.routeAlertConfiguration?.deviationMeters ?? 80) {
+            return ATHLTHRouteNavigationCue.recovery(
+                user: CLLocationCoordinate2D(
+                    latitude: point.latitude, longitude: point.longitude
+                ),
+                courseDegrees: workout.routeCurrentCourseDegrees,
+                route: route,
+                nearestIndex: index,
+                deviationMeters: deviation
+            )
+        }
+        return ATHLTHRouteNavigationCue.nextTurn(route: route, nearestIndex: index)
+    }
+
+    var canRunBackToStart: Bool {
+        guard let workout = active,
+              !workout.walking,
+              workout.runEnvironment != .treadmill,
+              workout.returningToRouteStart != true,
+              (workout.routeRemainingMeters ?? .infinity) <= 125,
+              (workout.routeProgressPercent ?? 0) >= 85,
+              (workout.routeDistanceToFinishMeters ?? .infinity) <= 100,
+              let coordinates = workout.plannedRouteCoordinates,
+              coordinates.count >= 2
+        else { return false }
+        let sorted = coordinates.sorted { $0.sequence < $1.sequence }
+        guard let first = sorted.first, let last = sorted.last else {
+            return false
+        }
+        return CLLocation(latitude: first.latitude, longitude: first.longitude)
+            .distance(from: CLLocation(latitude: last.latitude,
+                                       longitude: last.longitude)) > 60
+    }
+
+    func startReturnToRouteStart() {
+        guard canRunBackToStart, var workout = active,
+              let coordinates = workout.plannedRouteCoordinates else { return }
+        workout.plannedRouteCoordinates = coordinates
+            .sorted { $0.sequence < $1.sequence }
+            .reversed()
+            .enumerated()
+            .map { index, point in
+                RouteCoordinate(latitude: point.latitude,
+                                longitude: point.longitude,
+                                altitude: point.altitude,
+                                sequence: index)
+            }
+        workout.plannedRouteTitle = ATHLTHLocalization.choose(
+            english: "Return to start", norwegian: "Tilbake til start"
+        )
+        workout.plannedComparisonRouteID = nil
+        workout.returningToRouteStart = true
+        workout.routeLegDistanceOffsetMeters = workout.distanceMeters
+        workout.routeProgressPercent = 0
+        workout.routeRemainingMeters =
+            (workout.plannedRouteDistanceKilometers ?? 0) * 1000
+        workout.routeDeviationMeters = nil
+        workout.routeNearestPointIndex = nil
+        // Keep active elapsed time, completed distance and HealthKit recording.
+        active = workout
+        plannedRouteLocations = []
+        plannedRouteCumulativeMeters = []
+        plannedRouteGeometryMeters = 0
+        restoreRouteGeometry(from: workout)
+        persistActiveCheckpoint(force: true)
+        syncLiveActivity()
+    }
+
+    func disableGhostDuringWorkout() {
+        guard var workout = active,
+              workout.ghostRaceTitle != nil else { return }
+        workout.ghostDisabledDuringWorkout = true
+        workout.ghostRaceTitle = nil
+        workout.ghostOpponentName = nil
+        workout.ghostDistanceDeltaMeters = nil
+        workout.ghostTimeDeltaSeconds = nil
+        workout.ghostAudioConfiguration = nil
+        active = workout
+        ghostOpponentName = nil
+        resetGhostRuntime(configuration: nil)
+        persistActiveCheckpoint(force: true)
+        syncLiveActivity()
+    }
+
     private func updateRouteGuidance(
         workout: inout PhoneWorkout,
         location: CLLocation
@@ -2594,7 +2695,10 @@ final class IPhoneWorkoutStore:
                         workout
                             .plannedRouteDistanceKilometers
                             .map { $0 * 1_000 },
-                    workoutDistanceMeters: workout.distanceMeters,
+                    workoutDistanceMeters: max(
+                        0, workout.distanceMeters -
+                            (workout.routeLegDistanceOffsetMeters ?? 0)
+                    ),
                     previousRouteMeters: workout.routeProgressPercent.map {
                         $0 / 100 * plannedRouteGeometryMeters
                     }
@@ -2613,6 +2717,10 @@ final class IPhoneWorkoutStore:
             guidance.distanceToStartMeters
         workout.routeDistanceToFinishMeters =
             guidance.distanceToFinishMeters
+        workout.routeNearestPointIndex = guidance.nearestRoutePointIndex
+        workout.routeCurrentCourseDegrees =
+            location.course >= 0 && location.course < 360
+                ? location.course : nil
         workout.routeNextBearingDegrees =
             nextBearing(
                 from: location,
