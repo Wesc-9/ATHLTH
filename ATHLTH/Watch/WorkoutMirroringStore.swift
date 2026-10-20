@@ -22,6 +22,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     @Published private(set) var liveViewIsVisible = false
     @Published private(set) var presentationGeneration = 0
     @Published private(set) var lastCoachMessage: String?
+    @Published private(set) var ghostDisableRequestGeneration = 0
 
     func setAIConversationActive(_ active: Bool) {
         guard aiConversationActive != active else { return }
@@ -484,11 +485,18 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         var latestSnapshot: WatchWorkoutLiveSnapshot?
         var receipts: [ATHLTHCoachDeliveryReceipt] = []
         var acknowledgements: [ATHLTHAudioCoachLeaseAcknowledgement] = []
+        var ghostDisableRequests: [ATHLTHGhostDisableDuringWorkout] = []
 
         // Decode the whole batch before acting on receipts or lease acks.
         // HealthKit can deliver these alongside the first snapshot for a
         // workout, while the cached snapshot still describes another state.
         for data in incoming {
+            if let command = try? JSONDecoder().decode(
+                ATHLTHGhostDisableDuringWorkout.self, from: data
+            ) {
+                ghostDisableRequests.append(command)
+                continue
+            }
             if let receipt = try? JSONDecoder().decode(
                 ATHLTHCoachDeliveryReceipt.self,
                 from: data
@@ -511,6 +519,13 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
             ) {
                 latestSnapshot = decoded
             }
+        }
+
+        let currentStart = latestSnapshot?.startedAt ?? snapshot?.startedAt
+        if ghostDisableRequests.contains(where: {
+            $0.isValid(workoutStart: currentStart)
+        }) {
+            publish { self.ghostDisableRequestGeneration &+= 1 }
         }
 
         // Record Watch speech before handling the snapshot: otherwise the
