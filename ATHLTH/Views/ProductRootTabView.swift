@@ -5878,17 +5878,60 @@ struct ATHLTHTrainView: View {
                         watchConnection.isReady ? .appleWatch : .none,
                     watchConnected: watchConnection.isVerifiedForLiveLaunch
                 ) { configuration, destination in
-                    switch destination {
-                    case .watch:
-                        startCustomWorkoutOnWatch(configuration)
-                    case .phoneTimer:
-                        pendingCustomIPhoneQuick = CustomIPhoneQuickLaunch(
-                            configuration: configuration, mode: .timed
-                        )
-                    case .retrospective:
-                        pendingCustomIPhoneQuick = CustomIPhoneQuickLaunch(
-                            configuration: configuration, mode: .retrospective
-                        )
+                    let invitedFriends = social.trainingPartners.filter {
+                        configuration.selectedFriendIDs.contains($0.userID)
+                    }
+
+                    if invitedFriends.isEmpty {
+                        // Solo keeps the existing dismissal/launch behavior.
+                        switch destination {
+                        case .watch:
+                            startCustomWorkoutOnWatch(configuration)
+                        case .phoneTimer:
+                            pendingCustomIPhoneQuick = CustomIPhoneQuickLaunch(
+                                configuration: configuration, mode: .timed
+                            )
+                        case .retrospective:
+                            pendingCustomIPhoneQuick = CustomIPhoneQuickLaunch(
+                                configuration: configuration, mode: .retrospective
+                            )
+                        }
+                    } else {
+                        // The real invitation lobby must finish before starting
+                        // the timer/Watch. The setup sheet will already have
+                        // dismissed, so the phone cover is opened directly.
+                        Task { @MainActor in
+                            if destination == .watch &&
+                               !watchConnection.isVerifiedForLiveLaunch {
+                                watchTransferError = ATHLTHLocalization.choose(
+                                    english: "Connect Apple Watch before inviting friends.",
+                                    norwegian: "Koble til Apple Watch før du inviterer venner."
+                                )
+                                return
+                            }
+                            guard await social.beginWorkoutWithFriends(
+                                title: configuration.title,
+                                kind: .custom,
+                                friends: invitedFriends,
+                                creatorName: session.profile.displayName,
+                                creatorUsername: session.profile.username,
+                                invitePayload: configuration.trainTogetherInvitePayload,
+                                creatorCaptureDevice: destination == .watch
+                                    ? .appleWatch : .iPhone
+                            ) else { return }
+
+                            switch destination {
+                            case .watch:
+                                startCustomWorkoutOnWatch(configuration)
+                            case .phoneTimer:
+                                activeCustomIPhoneQuick = CustomIPhoneQuickLaunch(
+                                    configuration: configuration, mode: .timed
+                                )
+                            case .retrospective:
+                                // Retrospective logging cannot invite anyone.
+                                break
+                            }
+                        }
                     }
                 }
             }
@@ -10706,9 +10749,15 @@ struct ATHLTHTrainView: View {
                 try await watchConnection.startWorkoutOnWatch(
                     configuration.activity.watchKind
                 )
+                if !configuration.selectedFriendIDs.isEmpty {
+                    _ = await social.confirmCurrentJoinedWorkoutStarted()
+                }
                 watchTransferMessage =
                     "\(configuration.title) started on Apple Watch · \(configuration.detail)."
             } catch {
+                if !configuration.selectedFriendIDs.isEmpty {
+                    await social.markCurrentJoinedWorkoutLaunchFailed()
+                }
                 watchTransferError = error.localizedDescription
             }
         }
