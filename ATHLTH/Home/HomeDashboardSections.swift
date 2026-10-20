@@ -4018,6 +4018,7 @@ private struct HomeWeeklyProgressDaySheet: View {
     @State private var suggestionStartTime = Date()
     @State private var suggestionDefaultSelectedAt = Date()
     @State private var suggestionTimeWasEdited = false
+    @State private var suggestionScheduleNeedsRefresh = false
     @State private var scheduleConfirmation: String?
     @State private var selectedInvitationLobby: PlannedSession?
     @State private var selectedPlannedWorkout: PlannedSession?
@@ -4560,6 +4561,7 @@ private struct HomeWeeklyProgressDaySheet: View {
         let now = Date()
         suggestionDefaultSelectedAt = now
         suggestionTimeWasEdited = false
+        suggestionScheduleNeedsRefresh = false
         suggestionStartTime = HomeWorkoutSuggestionPlanner.defaultStart(
             on: selection.date, now: now
         ) ?? now
@@ -4597,7 +4599,12 @@ private struct HomeWeeklyProgressDaySheet: View {
     }
 
     private func scheduleSuggestedWorkout(_ workout: PlannedSession) {
-        guard canScheduleSuggestion, let start = resolvedSuggestionStart else { return }
+        guard canScheduleSuggestion, let start = resolvedSuggestionStart else {
+            // If the sheet was left open past the grace period, allow the
+            // athlete to refresh the time instead of silently doing nothing.
+            suggestionScheduleNeedsRefresh = true
+            return
+        }
         let copy = HomeWorkoutSuggestionPlanner.independentSession(
             from: workout, start: start
         )
@@ -4853,6 +4860,34 @@ private struct HomeWeeklyProgressDaySheet: View {
                     .padding(.vertical, 10)
                     .background(.regularMaterial)
                 }
+            }
+            .alert(
+                ATHLTHLocalization.choose(
+                    english: "The suggested time has passed",
+                    norwegian: "Det foreslåtte tidspunktet er passert"
+                ),
+                isPresented: $suggestionScheduleNeedsRefresh
+            ) {
+                Button(ATHLTHLocalization.choose(
+                    english: "Use current suggested time",
+                    norwegian: "Bruk foreslått tidspunkt nå"
+                )) {
+                    let now = Date()
+                    suggestionDefaultSelectedAt = now
+                    suggestionStartTime =
+                        HomeWorkoutSuggestionPlanner.defaultStart(
+                            on: selection.date, now: now
+                        ) ?? now
+                    suggestionTimeWasEdited = false
+                }
+                Button(ATHLTHLocalization.choose(
+                    english: "Cancel", norwegian: "Avbryt"
+                ), role: .cancel) {}
+            } message: {
+                Text(ATHLTHLocalization.choose(
+                    english: "Update the time before adding this workout.",
+                    norwegian: "Oppdater klokkeslettet før du legger til økten."
+                ))
             }
         }
     }
