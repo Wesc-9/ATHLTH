@@ -826,15 +826,18 @@ final class MirroredWorkoutAudioCoach:
             guard let self,
                   !self
                     .synthesizer
-                    .isSpeaking
+                    .isSpeaking,
+                  !self.azureCoachSpeech.isBusy
             else {
                 return
             }
 
             self.guidanceGate
                 .voiceDidFinish()
-            ATHLTHSpokenAudioSession
-                .deactivate()
+            // A cancelled system utterance can finish its delegate callback
+            // after an Azure replacement has already started. Never release
+            // the ducking audio session while a second coach voice is active.
+            ATHLTHSpokenAudioSession.deactivate()
             self.deliverNextQueuedCue()
         }
     }
@@ -849,15 +852,18 @@ final class MirroredWorkoutAudioCoach:
             guard let self,
                   !self
                     .synthesizer
-                    .isSpeaking
+                    .isSpeaking,
+                  !self.azureCoachSpeech.isBusy
             else {
                 return
             }
 
             self.guidanceGate
                 .voiceDidFinish()
-            ATHLTHSpokenAudioSession
-                .deactivate()
+            // A cancelled system utterance can finish its delegate callback
+            // after an Azure replacement has already started. Never release
+            // the ducking audio session while a second coach voice is active.
+            ATHLTHSpokenAudioSession.deactivate()
             self.deliverNextQueuedCue()
         }
     }
