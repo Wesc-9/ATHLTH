@@ -76,7 +76,7 @@ enum ATHLTHRouteNavigationCue {
             let distance = cumulative[index] - origin
             if distance < 15 { continue }
             if distance > 220 { break }
-            guard let before = indexAtDistance(cumulative, cumulative[index] - 28),
+            guard let before = priorIndex(cumulative, cumulative[index] - 28),
                   let after = indexAtDistance(cumulative, cumulative[index] + 28),
                   before < index, after > index else { continue }
             let inbound = bearing(route[before], route[index])
@@ -139,6 +139,13 @@ enum ATHLTHRouteNavigationCue {
                                                longitude: route[index].longitude)))
         }
         return cumulative
+    }
+
+    private static func priorIndex(
+        _ cumulative: [Double], _ distance: Double
+    ) -> Int? {
+        guard distance >= 0 else { return nil }
+        return cumulative.lastIndex(where: { $0 <= distance })
     }
 
     private static func indexAtDistance(
