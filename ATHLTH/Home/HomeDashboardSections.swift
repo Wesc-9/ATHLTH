@@ -4016,6 +4016,8 @@ private struct HomeWeeklyProgressDaySheet: View {
     @State private var pendingPickedWorkout: PlannedSession?
     @State private var selectedSuggestion: PlannedSession?
     @State private var suggestionStartTime = Date()
+    @State private var suggestionDefaultSelectedAt = Date()
+    @State private var suggestionTimeWasEdited = false
     @State private var scheduleConfirmation: String?
     @State private var selectedInvitationLobby: PlannedSession?
     @State private var selectedPlannedWorkout: PlannedSession?
@@ -4555,15 +4557,12 @@ private struct HomeWeeklyProgressDaySheet: View {
     }
 
     private func presentSuggestion(_ workout: PlannedSession) {
-        let preferredStart = Calendar.current.date(
-            bySettingHour: 18, minute: 0, second: 0,
-            of: selection.date
-        ) ?? selection.date
         let now = Date()
-        suggestionStartTime = Calendar.current.isDateInToday(selection.date)
-            && preferredStart <= now
-            ? now.addingTimeInterval(15 * 60)
-            : preferredStart
+        suggestionDefaultSelectedAt = now
+        suggestionTimeWasEdited = false
+        suggestionStartTime = HomeWorkoutSuggestionPlanner.defaultStart(
+            on: selection.date, now: now
+        ) ?? now
         selectedSuggestion = workout
     }
 
@@ -4578,7 +4577,10 @@ private struct HomeWeeklyProgressDaySheet: View {
     private var canScheduleSuggestion: Bool {
         guard canPlanWorkout, let start = resolvedSuggestionStart else { return false }
         return HomeWorkoutSuggestionPlanner.canSchedule(
-            on: selection.date, at: start
+            on: selection.date,
+            at: start,
+            automaticSelectionCreatedAt: suggestionTimeWasEdited
+                ? nil : suggestionDefaultSelectedAt
         )
     }
 
@@ -4720,15 +4722,38 @@ private struct HomeWeeklyProgressDaySheet: View {
                                 .datePickerStyle(.compact)
                                 .labelsHidden()
                                 .tint(dayInk)
+                                .onChange(of: suggestionStartTime) { _, _ in
+                                    suggestionTimeWasEdited = true
+                                }
                             }
 
                             if !canScheduleSuggestion {
-                                Label(ATHLTHLocalization.choose(
-                                    english: "Choose a future time on the selected day.",
-                                    norwegian: "Velg et fremtidig klokkeslett på den valgte dagen."
-                                ), systemImage: "clock.badge.exclamationmark")
-                                .font(.caption)
-                                .foregroundStyle(Color(red: 0.59, green: 0.34, blue: 0.25))
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Label(ATHLTHLocalization.choose(
+                                        english: "Choose a future time or update the suggested time.",
+                                        norwegian: "Velg et fremtidig klokkeslett eller oppdater foreslått tid."
+                                    ), systemImage: "clock.badge.exclamationmark")
+                                    .font(.caption)
+                                    .foregroundStyle(Color(red: 0.59, green: 0.34, blue: 0.25))
+
+                                    Button {
+                                        let now = Date()
+                                        suggestionDefaultSelectedAt = now
+                                        suggestionStartTime =
+                                            HomeWorkoutSuggestionPlanner.defaultStart(
+                                                on: selection.date, now: now
+                                            ) ?? now
+                                        suggestionTimeWasEdited = false
+                                    } label: {
+                                        Label(ATHLTHLocalization.choose(
+                                            english: "Use suggested time",
+                                            norwegian: "Bruk foreslått tidspunkt"
+                                        ), systemImage: "arrow.clockwise")
+                                        .font(.caption.weight(.semibold))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                }
                             }
                         }
                         .padding(17)

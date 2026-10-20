@@ -22,13 +22,47 @@ enum HomeWorkoutSuggestionPlanner {
         return resolved
     }
 
+    /// Use 18:00 until it passes on the selected day; after that use the
+    /// current clock minute. For future dates, retain 18:00 as default.
+    static func defaultStart(
+        on selectedDay: Date,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Date? {
+        guard let atSix = calendar.date(
+            bySettingHour: 18, minute: 0, second: 0,
+            of: selectedDay, matchingPolicy: .strict
+        ) else { return nil }
+
+        if calendar.isDate(selectedDay, inSameDayAs: now), now >= atSix {
+            // DatePicker uses minute precision, so normalize to the actual day.
+            return scheduledStart(on: selectedDay, clockTime: now, calendar: calendar)
+        }
+        return atSix
+    }
+
+    /// An untouched automatic default may have just passed during setup.
+    /// Give it a 15-minute grace window; never relax manually selected times
+    /// or allow booking on an earlier calendar day.
     static func canSchedule(
         on selectedDay: Date,
         at start: Date,
         now: Date = Date(),
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        automaticSelectionCreatedAt: Date? = nil
     ) -> Bool {
-        calendar.isDate(start, inSameDayAs: selectedDay) && start > now
+        guard calendar.isDate(start, inSameDayAs: selectedDay),
+              calendar.startOfDay(for: selectedDay) >= calendar.startOfDay(for: now)
+        else { return false }
+        if start > now { return true }
+
+        guard let openedAt = automaticSelectionCreatedAt,
+              openedAt <= now,
+              calendar.isDate(openedAt, inSameDayAs: selectedDay),
+              calendar.isDate(now, inSameDayAs: selectedDay)
+        else { return false }
+
+        return now <= max(start, openedAt).addingTimeInterval(15 * 60)
     }
 
     static func independentSession(
