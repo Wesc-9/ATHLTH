@@ -628,7 +628,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 updateWeekDay(selection.id) { edit in
                     edit.trainingPlace = place
                 }
-                reopenDayAfterPlace = selection
                 editingTrainingPlaceDay = nil
             }
         }
@@ -3921,6 +3920,20 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 ),
                 icon: "calendar.day.timeline.left"
             )
+            ATHLTHPlanWeekApproachCard(
+                icon: "mappin.and.ellipse",
+                title: weekDayEdits[weekDayKey(guidedCurrentWeekday,
+                    weekIndex: guidedCurrentWeek)]?.trainingPlace?.name ??
+                    ATHLTHLocalization.choose(
+                        english: "Training place (optional)",
+                        norwegian: "Treningssted (valgfritt)"),
+                subtitle: ATHLTHLocalization.choose(
+                    english: "Find a gym, hotel, sports ground, address or favorite.",
+                    norwegian: "Finn senter, hotell, idrettsanlegg, adresse eller favoritt.")
+            ) {
+                selectedPlanWeekIndex = guidedCurrentWeek
+                editingTrainingPlaceDay = WeekDayEditorSelection(id: guidedCurrentWeekday)
+            }
             if weekDayEdits[weekDayKey(guidedCurrentWeekday,
                                         weekIndex: guidedCurrentWeek)]?.detailedWorkout == nil {
                 guidedSmartPlanningCard
@@ -4035,6 +4048,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     norwegian: "Ingen treningsøkt denne dagen."
                 )
             ) {
+                selectedPlanWeekIndex = guidedCurrentWeek
                 setRestDay(guidedCurrentWeekday)
             }
             }
@@ -4359,6 +4373,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 english: "Address, gym, hotel, sports ground or favorites.",
                                 norwegian: "Adresse, senter, hotell, idrettsanlegg eller favoritter.")
                     ) {
+                        reopenDayAfterPlace = WeekDayEditorSelection(id: day)
                         pendingTrainingPlaceDay = WeekDayEditorSelection(id: day)
                         editingWeekDay = nil
                     }
