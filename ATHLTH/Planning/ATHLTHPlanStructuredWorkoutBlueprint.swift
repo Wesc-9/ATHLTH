@@ -37,6 +37,10 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
             return walkingOnly ? "walking" : "running"
         }
         if hasStrength { return "strength" }
+        if blocks.contains(where: { $0.wellnessKind != nil }) {
+            return blocks.allSatisfy { $0.wellnessKind == .meditation }
+                ? "recovery" : "mobility"
+        }
         return "custom"
     }
 
