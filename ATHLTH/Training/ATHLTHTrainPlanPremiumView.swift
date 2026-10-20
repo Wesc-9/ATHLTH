@@ -585,19 +585,25 @@ struct ATHLTHTrainPlanPremiumView: View {
         }
         .sheet(item: $editingTrainingPlaceWorkout) { destination in
             ATHLTHPlanTrainingPlacePicker(initial: destination.workout.plannedTrainingPlace) { place in
-                guard let latest = session.trainingPlan(withID: destination.planID)?
-                    .weeks.flatMap(\.days).flatMap(\.sessions)
-                    .first(where: { $0.id == destination.workout.id }),
-                      !session.isPlanSessionSkipped(planID: destination.planID,
-                                                   sessionID: latest.id),
-                      !session.isPlanSessionCompleted(
-                          planID: destination.planID, sessionID: latest.id,
-                          healthWorkouts: health.workouts,
-                          strengthHistory: strength.workoutHistory
-                      ) else { return }
-                var updated = latest
-                updated.plannedTrainingPlace = place
-                session.updateSession(updated, inPlan: destination.planID)
+                guard let day = session.trainingPlan(withID: destination.planID)?
+                    .weeks.flatMap(\.days)
+                    .first(where: { $0.sessions.contains {
+                        $0.id == destination.workout.id
+                    } }) else { return }
+                // A place is selected for the DATE. Keep every unfinished
+                // workout on that day aligned without rewriting workout history.
+                for workout in day.sessions {
+                    guard !session.isPlanSessionSkipped(
+                            planID: destination.planID, sessionID: workout.id),
+                          !session.isPlanSessionCompleted(
+                            planID: destination.planID, sessionID: workout.id,
+                            healthWorkouts: health.workouts,
+                            strengthHistory: strength.workoutHistory)
+                    else { continue }
+                    var updated = workout
+                    updated.plannedTrainingPlace = place
+                    session.updateSession(updated, inPlan: destination.planID)
+                }
                 editingTrainingPlaceWorkout = nil
             }
         }
