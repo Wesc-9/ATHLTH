@@ -1117,7 +1117,7 @@ struct AroundYouExploreView: View {
                         nearestTo: coordinate
                     )
                 }
-                .overlay(alignment: .bottomLeading) {
+                .overlay(alignment: .bottomTrailing) {
                     if !publicTrailDiscovery
                         .trails
                         .isEmpty {
@@ -1147,9 +1147,9 @@ struct AroundYouExploreView: View {
                             .ultraThinMaterial,
                             in: Capsule()
                         )
-                        // Keep open-data attribution immediately above MapKit's
-                        // own map-rights/legal attribution in the lower-left.
-                        .padding(.leading, 10)
+                        // Open-data credit opposite MapKit's lower-left legal link.
+                        // Never hide or reposition Apple's required attribution.
+                        .padding(.trailing, 10)
                         .padding(.bottom, 34)
                     }
                 }
@@ -1190,6 +1190,16 @@ struct AroundYouExploreView: View {
                     alignment: .top
                 )
                 .allowsHitTesting(true)
+
+            // Map-first actions stay within thumb reach without occupying
+            // the filter row or obscuring the search/recenter controls.
+            exploreMapQuickActions
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: .trailing
+                )
+                .padding(.trailing, 12)
         }
         .background(ATHLTHPremiumCanvas())
         .navigationTitle(
@@ -1327,27 +1337,6 @@ struct AroundYouExploreView: View {
     private var exploreFloatingControls:
         some View {
         VStack(spacing: 10) {
-            if embeddedInTab {
-                Text(ATHLTHLocalization.choose(
-                    english: "Explore", norwegian: "Utforsk"
-                ))
-                    .font(
-                        .system(
-                            size: 22,
-                            weight: .bold,
-                            design: .rounded
-                        )
-                    )
-                    .foregroundStyle(.white)
-                    .shadow(
-                        color:
-                            Color.black.opacity(0.24),
-                        radius: 5,
-                        y: 2
-                    )
-                    .padding(.bottom, 2)
-            }
-
             HStack(spacing: 8) {
                 Button {
                     locationStore.start()
@@ -1525,65 +1514,13 @@ struct AroundYouExploreView: View {
                 )
             }
 
-            // Kept outside the Routes tab: accessible in every Explore mode.
-            exploreMapQuickActions
-
-            if !session.savedRoutes.isEmpty {
-                HStack(spacing: 8) {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showOwnedRoutesOnly.toggle()
-                            filter = .routes
-                            selectedRoute = nil
-                        }
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "My Routes", norwegian: "Mine ruter"
-                            ) + " (\(session.savedRoutes.count))",
-                            systemImage: showOwnedRoutesOnly ? "bookmark.fill" : "bookmark"
-                        )
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                        .padding(.horizontal, 14)
-                        .frame(height: 37)
-                        .background(.regularMaterial, in: Capsule())
-                        .overlay {
-                            Capsule().stroke(
-                                showOwnedRoutesOnly ? ATHLTHTheme.premiumGold : .white.opacity(0.75),
-                                lineWidth: showOwnedRoutesOnly ? 1.5 : 1
-                            )
-                        }
-                    }
-                    .buttonStyle(.plain)
-
-                    if showOwnedRoutesOnly {
-                        NavigationLink {
-                            SavedRoutesView()
-                        } label: {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "View all", norwegian: "Se alle"
-                                ),
-                                systemImage: "arrow.up.right"
-                            )
-                            .font(.caption.weight(.semibold))
-                            .padding(.horizontal, 12)
-                            .frame(height: 37)
-                            .background(.regularMaterial, in: Capsule())
-                        }
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                    }
-                }
-            }
-
-            if visibleRegion != nil && shouldSearchVisibleArea {
+             if visibleRegion != nil && shouldSearchVisibleArea {
                 Button {
                     Task {
                         await searchVisibleArea()
                     }
                 } label: {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 6) {
                         if isSearchingVisibleArea {
                             ProgressView()
                                 .controlSize(.small)
@@ -1598,35 +1535,21 @@ struct AroundYouExploreView: View {
                             english: "Search this area", norwegian: "Søk i dette området"
                         ))
                     }
-                    .font(
-                        .subheadline.weight(
-                            .semibold
-                        )
-                    )
+                    .font(.caption.weight(.medium))
                     .foregroundStyle(
-                        ATHLTHTheme.primaryText
+                        ATHLTHTheme.primaryText.opacity(0.72)
                     )
-                    .padding(.horizontal, 17)
-                    .frame(height: 42)
+                    .padding(.horizontal, 12)
+                    .frame(height: 32)
                     .background(
-                        .ultraThinMaterial,
+                        .regularMaterial.opacity(0.70),
                         in: Capsule()
                     )
                     .overlay {
-                        Capsule()
-                            .stroke(
-                                Color.white.opacity(
-                                    0.76
-                                ),
-                                lineWidth: 1
-                            )
+                        Capsule().stroke(
+                            Color.white.opacity(0.55), lineWidth: 0.8
+                        )
                     }
-                    .shadow(
-                        color:
-                            .black.opacity(0.12),
-                        radius: 10,
-                        y: 4
-                    )
                 }
                 .buttonStyle(.plain)
                 .disabled(isSearchingVisibleArea)
@@ -1635,72 +1558,87 @@ struct AroundYouExploreView: View {
             exploreTrailStatusOverlay
         }
         .padding(.horizontal, 12)
-        .padding(.top, embeddedInTab ? 6 : 0)
+        .padding(.top, embeddedInTab ? 0 : 0)
     }
 
     private var exploreMapQuickActions: some View {
-        HStack(spacing: 9) {
-            Spacer(minLength: 0)
-
+        VStack(spacing: 9) {
             Button(action: toggleMapPitch) {
                 Text(is3DMapEnabled ? "2D" : "3D")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .frame(width: 53, height: 44)
+                    .frame(width: 48, height: 48)
                     .background(
-                        .ultraThinMaterial,
-                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .regularMaterial,
+                        in: RoundedRectangle(cornerRadius: 15, style: .continuous)
                     )
                     .overlay {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        RoundedRectangle(cornerRadius: 15, style: .continuous)
                             .stroke(
                                 is3DMapEnabled
-                                    ? ATHLTHTheme.premiumGold.opacity(0.72)
-                                    : Color.white.opacity(0.75),
+                                    ? ATHLTHTheme.premiumGold.opacity(0.78)
+                                    : .white.opacity(0.72),
                                 lineWidth: 1
                             )
                     }
-                    .shadow(color: .black.opacity(0.10), radius: 9, y: 4)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(
-                ATHLTHLocalization.choose(
-                    english: is3DMapEnabled ? "Switch to 2D map" : "Switch to 3D map",
-                    norwegian: is3DMapEnabled ? "Bytt til 2D-kart" : "Bytt til 3D-kart"
-                )
-            )
-            .accessibilityHint(
-                ATHLTHLocalization.choose(
-                    english: "Changes the camera tilt without changing the route filters.",
-                    norwegian: "Endrer kartvinkelen uten å endre rutefiltrene."
-                )
-            )
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: is3DMapEnabled ? "Switch to 2D map" : "Switch to 3D map",
+                norwegian: is3DMapEnabled ? "Bytt til 2D-kart" : "Bytt til 3D-kart"
+            ))
 
             NavigationLink {
                 RunRouteBuilderView()
             } label: {
                 Image(systemName: "plus")
-                    .font(.system(size: 19, weight: .semibold))
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(ATHLTHTheme.primaryText)
-                    .frame(width: 44, height: 44)
+                    .frame(width: 48, height: 48)
                     .background(
                         ATHLTHTheme.premiumGold,
-                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        in: RoundedRectangle(cornerRadius: 15, style: .continuous)
                     )
                     .overlay {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.white.opacity(0.62), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 15, style: .continuous)
+                            .stroke(.white.opacity(0.72), lineWidth: 1)
                     }
-                    .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(
-                ATHLTHLocalization.choose(
-                    english: "Create a new route",
-                    norwegian: "Opprett ny rute"
-                )
-            )
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Create a new route", norwegian: "Opprett ny rute"
+            ))
+
+            NavigationLink {
+                SavedRoutesView()
+            } label: {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "bookmark")
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 48, height: 48)
+                        .background(
+                            .regularMaterial,
+                            in: RoundedRectangle(cornerRadius: 15, style: .continuous)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                                .stroke(.white.opacity(0.72), lineWidth: 1)
+                        }
+                    if !session.savedRoutes.isEmpty {
+                        Circle()
+                            .fill(ATHLTHTheme.premiumGold)
+                            .frame(width: 8, height: 8)
+                            .offset(x: -6, y: 6)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "My routes", norwegian: "Mine ruter"
+            ))
         }
+        .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
     }
 
     private func toggleMapPitch() {
