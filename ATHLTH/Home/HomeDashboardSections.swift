@@ -4031,22 +4031,39 @@ private struct HomeWeeklyProgressDaySheet: View {
     @State private var scheduleConfirmation: String?
     @State private var selectedInvitationLobby: PlannedSession?
     @State private var selectedPlannedWorkout: PlannedSession?
+    @State private var workoutPendingRemoval: PlannedSession?
+    @State private var showingRemoveConfirmation = false
+    @State private var showingRemovalFailure = false
 
-    private let dayInk = Color(red: 0.17, green: 0.21, blue: 0.29)
-    private let dayCanvas = Color(red: 0.968, green: 0.971, blue: 0.985)
+    private let dayInk = ATHLTHPlanDesign.ink
+    private let dayCanvas = ATHLTHPlanDesign.canvas
 
     private var currentPlanned: [PlannedSession] {
         // Selection is a snapshot. Observe the saved standalone sessions so
         // the newly scheduled workout appears immediately in "Dagens økt".
         let standalone = session.standalonePlannedSessions(on: selection.date)
         let standaloneIDs = Set(standalone.map(\.id))
-        return (selection.planned.filter {
-            !standaloneIDs.contains($0.id)
-        } + standalone)
-        .sorted {
-            ($0.scheduledStart ?? .distantFuture) <
-                ($1.scheduledStart ?? .distantFuture)
+
+        // The selected day is a snapshot; re-read the plan's persisted
+        // sessions so a removed workout disappears without closing the sheet.
+        let originalPlanIDs = Set(
+            plan?.weeks.flatMap(\.days).flatMap(\.sessions).map(\.id) ?? []
+        )
+        let liveSessions: [PlannedSession] = plan.flatMap {
+            session.trainingPlan(withID: $0.id)
+        }?.weeks.flatMap(\.days).flatMap(\.sessions) ?? []
+        let liveByID = Dictionary(uniqueKeysWithValues:
+            liveSessions.map { ($0.id, $0) })
+        let snapshot = selection.planned.compactMap { workout -> PlannedSession? in
+            if standaloneIDs.contains(workout.id) { return nil }
+            return originalPlanIDs.contains(workout.id)
+                ? liveByID[workout.id] : workout
         }
+        return (snapshot + standalone)
+            .sorted {
+                ($0.scheduledStart ?? .distantFuture) <
+                    ($1.scheduledStart ?? .distantFuture)
+            }
     }
 
     private var canPlanWorkout: Bool {
@@ -4121,12 +4138,11 @@ private struct HomeWeeklyProgressDaySheet: View {
                     Text(selection.date.formatted(
                         .dateTime.weekday(.wide).day().month(.wide)
                     ))
-                    .font(.system(size: 22, weight: .semibold, design: .rounded))
+                    .font(.system(size: 28, weight: .semibold, design: .serif))
                     .foregroundStyle(dayInk)
                     .frame(maxWidth: .infinity)
-                    // Give the date breathing room below the sheet handle.
                     .padding(.top, 30)
-                    .padding(.bottom, 5)
+                    .padding(.bottom, 7)
 
                     dayActionHeader
 
@@ -4160,6 +4176,48 @@ private struct HomeWeeklyProgressDaySheet: View {
             }
             .background(dayCanvas.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
+            .confirmationDialog(
+                ATHLTHLocalization.choose(
+                    english: "Remove planned workout?",
+                    norwegian: "Fjerne planlagt økt?"
+                ),
+                isPresented: $showingRemoveConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button(
+                    ATHLTHLocalization.choose(
+                        english: "Remove from calendar",
+                        norwegian: "Fjern fra kalenderen"
+                    ),
+                    role: .destructive
+                ) {
+                    if let workoutPendingRemoval {
+                        removePlannedWorkout(workoutPendingRemoval)
+                    }
+                    self.workoutPendingRemoval = nil
+                }
+                Button(ATHLTHLocalization.choose(
+                    english: "Cancel", norwegian: "Avbryt"
+                ), role: .cancel) {
+                    workoutPendingRemoval = nil
+                }
+            } message: {
+                Text(ATHLTHLocalization.choose(
+                    english: "Only this scheduled workout is removed. Completed activities and saved workouts remain.",
+                    norwegian: "Bare denne planlagte økten fjernes. Fullførte aktiviteter og lagrede økter beholdes."
+                ))
+            }
+            .alert(ATHLTHLocalization.choose(
+                english: "Could not remove workout",
+                norwegian: "Kunne ikke fjerne økten"
+            ), isPresented: $showingRemovalFailure) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(ATHLTHLocalization.choose(
+                    english: "The plan changed, or the workout is already completed. Open the calendar again.",
+                    norwegian: "Planen er endret, eller økten er allerede fullført. Åpne kalenderen på nytt."
+                ))
+            }
             .sheet(isPresented: $showingStandaloneSessionEditor) {
                 SessionEditorView(standaloneDate: selection.date)
                     .presentationDetents([.large])
@@ -4252,8 +4310,9 @@ private struct HomeWeeklyProgressDaySheet: View {
                 ),
                 systemImage: "calendar"
             )
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(dayInk)
+            .font(.system(size: 11, weight: .bold))
+            .tracking(1.1)
+            .foregroundStyle(ATHLTHPlanDesign.accentInk)
 
             Spacer(minLength: 6)
 
@@ -4271,8 +4330,8 @@ private struct HomeWeeklyProgressDaySheet: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 16)
-                    .frame(minHeight: 43)
-                    .background(dayInk, in: Capsule())
+                    .frame(minHeight: 44)
+                    .background(ATHLTHPlanDesign.ink, in: Capsule())
                 }
                 .buttonStyle(.plain)
                 .accessibilityHint(ATHLTHLocalization.choose(
@@ -4527,16 +4586,7 @@ private struct HomeWeeklyProgressDaySheet: View {
                     english: "Planned", norwegian: "Planlagt"
                 ))
                 ForEach(currentPlanned) { workout in
-                    if workout.trainTogetherMode != nil {
-                        Button {
-                            selectedInvitationLobby = workout
-                        } label: {
-                            plannedRowContent(workout)
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        plannedRow(workout)
-                    }
+                    plannedRow(workout)
                 }
             }
 
@@ -4565,8 +4615,7 @@ private struct HomeWeeklyProgressDaySheet: View {
             }
         }
         .padding(16)
-        .background(Color.white.opacity(0.86),
-                    in: RoundedRectangle(cornerRadius: 23))
+        .athlthPlanCard(radius: 23)
     }
 
     private func presentSuggestion(_ workout: PlannedSession) {
