@@ -1542,7 +1542,7 @@ struct AroundYouExploreView: View {
                     .padding(.horizontal, 12)
                     .frame(height: 32)
                     .background(
-                        .regularMaterial.opacity(0.70),
+                        .regularMaterial,
                         in: Capsule()
                     )
                     .overlay {
