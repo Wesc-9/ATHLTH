@@ -336,6 +336,19 @@ enum RunEnvironment: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var id: String { rawValue }
 
+    /// A persisted planned session selects its own recording environment.
+    /// Treadmill never implicitly inherits an outdoor route or GPS session.
+    static func forPlannedSession(_ workout: PlannedSession?) -> RunEnvironment {
+        guard let workout, workout.kind == .running else { return .outdoor }
+        if workout.workoutCategory == "treadmill" ||
+            workout.resolvedWorkoutBlocks.contains(where: {
+                $0.kind == .run && $0.isIndoor == true
+            }) {
+            return .treadmill
+        }
+        return .outdoor
+    }
+
     var title: String {
         switch self {
         case .outdoor:
@@ -1094,10 +1107,7 @@ struct RunQuickStartSheet: View {
 
         // A planned indoor workout must start without GPS. Keep its
         // structured 4×4 steps, but do not let a saved route force outdoor mode.
-        let plannedIndoor = plannedSession?.workoutCategory == "treadmill" ||
-            plannedSession?.resolvedWorkoutBlocks.contains(where: {
-                $0.kind == .run && $0.isIndoor == true
-            }) == true
+        let plannedIndoor = RunEnvironment.forPlannedSession(plannedSession) == .treadmill
         let initialMode: RunQuickStartMode =
             initialWorkout != nil ? .structured :
             (initialRoute != nil && !plannedIndoor ? .route : .free)
