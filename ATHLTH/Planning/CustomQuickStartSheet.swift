@@ -401,6 +401,9 @@ struct CustomQuickStartSheet: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .task {
+            if let invited = social.takePreparedQuickTrainFriends() {
+                selectedFriendIDs = invited
+            }
             if !audioCoachLoaded {
                 audioCoachDraft.load(from: settings)
                 audioCoachLoaded = true
