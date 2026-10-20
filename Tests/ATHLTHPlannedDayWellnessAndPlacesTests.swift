@@ -61,6 +61,8 @@ final class ATHLTHPlannedDayWellnessAndPlacesTests: XCTestCase {
         XCTAssertNil(chosen.first?.meetingPoint)
         XCTAssertNil(ATHLTHPlanWeekDayEdit().scheduledSessions(from: [sample])
             .first?.plannedTrainingPlace)
+        XCTAssertTrue(edit.scheduledSessions(from: []).isEmpty,
+            "Choosing only a place must not create a phantom workout")
         edit.isRestDay = true
         XCTAssertTrue(edit.scheduledSessions(from: [sample]).isEmpty)
     }
