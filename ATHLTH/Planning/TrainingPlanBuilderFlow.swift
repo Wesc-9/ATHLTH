@@ -4373,7 +4373,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
                                 ForEach(Array(([primary] +
                                     (dayEdit.additionalDetailedWorkouts ?? [])).enumerated()),
-                                        id: \.offset) { index, workout in
+                                        id: \.offset) { entry in
+                                    let index = entry.offset
+                                    let workout = entry.element
                                     Button {
                                         editingWorkoutIndex = index
                                         addingExtraWorkout = false
