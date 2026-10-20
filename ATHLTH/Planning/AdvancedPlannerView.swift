@@ -5260,7 +5260,7 @@ private struct ATHLTHPlannedRunningPhaseEditor: View {
         self.target = target
         self.environment = environment
         self.onSave = onSave
-        _selectedZone = State(initialValue: target.intensity.heartRateZone ?? 0)
+        _selectedZone = State(initialValue: min(max(target.intensity.heartRateZone ?? 0, 0), 5))
         _paceEnabled = State(initialValue:
             target.intensity.paceMinSecondsPerKilometer != nil)
         _paceSecondsPerKm = State(initialValue: min(max(
@@ -5452,6 +5452,7 @@ struct SessionEditorView: View {
 
     @State private var selectedRunningWorkouts: [RunningWorkoutTemplate] = []
     @State private var showingRunningLibrary = false
+    @State private var replacingRunningWorkoutID: UUID?
     @State private var editingRunningPhase: SessionRunningPhaseSelection?
     @State private var editingRunningRepetition: SessionRunningRepetitionSelection?
     @State private var selectedRouteID: UUID?
@@ -6391,9 +6392,20 @@ struct SessionEditorView: View {
             .sheet(isPresented: $showingRunningLibrary) {
                 NavigationStack {
                     RunningWorkoutLibraryView(
-                        selectionTitle: "Add to Plan"
+                        selectionTitle: ATHLTHLocalization.choose(
+                            english: "Choose running workout", norwegian: "Velg løpeøkt"
+                        )
                     ) { workout in
-                        addRunningWorkout(workout)
+                        if let replacingRunningWorkoutID,
+                           let index = selectedRunningWorkouts.firstIndex(where: {
+                               $0.id == replacingRunningWorkoutID
+                           }) {
+                            selectedRunningWorkouts[index] = workout
+                            self.replacingRunningWorkoutID = nil
+                            syncRunningMetricsFromSelection()
+                        } else {
+                            addRunningWorkout(workout)
+                        }
                     }
                 }
             }
@@ -8570,6 +8582,7 @@ struct SessionEditorView: View {
                                 }
                                 Spacer(minLength: 2)
                                 Button {
+                                    replacingRunningWorkoutID = workout.id
                                     showingRunningLibrary = true
                                 } label: {
                                     Text(ATHLTHLocalization.choose(english: "Change", norwegian: "Endre"))
