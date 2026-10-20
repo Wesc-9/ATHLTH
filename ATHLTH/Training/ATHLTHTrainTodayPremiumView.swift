@@ -67,11 +67,6 @@ struct ATHLTHTrainTodayPremiumView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .task {
             await workoutCatalog.refresh()
-            // The friend row must populate even when Today is the first
-            // social surface opened after signing in.
-            if social.visibleProfiles.isEmpty && !social.isRefreshing {
-                await social.refresh()
-            }
         }
     }
 
@@ -681,15 +676,6 @@ struct ATHLTHTrainTodayPremiumView: View {
             }
 
             VStack(alignment: .leading, spacing: 12) {
-                // Show the same immediate friend line as the Home planner.
-                // Selection is passed to the next Quick Train start sheet.
-                WorkoutFriendPicker(
-                    selectedFriendIDs: $social.quickTrainFriendIDs
-                )
-
-                Divider()
-                    .overlay(hairline.opacity(0.55))
-
                 HStack(spacing: 12) {
                     quickChoice("figure.run", tr("Run", "Løping"), kind: .running)
                     quickChoice("figure.walk", tr("Walk", "Gå"), kind: .walking)
@@ -711,14 +697,10 @@ struct ATHLTHTrainTodayPremiumView: View {
         kind: WorkoutKind
     ) -> some View {
         Button {
-            // Strength presents an additional builder before its start sheet;
-            // its choice is handed over after that builder has been completed.
-            switch kind {
-            case .strength:
-                social.discardPreparedQuickTrainFriends()
-            default:
-                social.prepareQuickTrainFriendsForLaunch()
-            }
+            // Friends are selected explicitly in the workout setup, not in
+            // Quick Train. Never inherit a hidden selection from an older view.
+            social.quickTrainFriendIDs.removeAll()
+            social.discardPreparedQuickTrainFriends()
             onQuickTrain(kind)
         } label: {
             HStack(spacing: 10) {
