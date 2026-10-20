@@ -3977,6 +3977,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
             if weekDayEdits[weekDayKey(guidedCurrentWeekday,
                                        weekIndex: guidedCurrentWeek)]?.detailedWorkout == nil {
+            quickDayChoiceGrid(for: guidedCurrentWeekday)
             ATHLTHPlanWeekApproachCard(
                 icon: "plus.circle",
                 title: ATHLTHLocalization.choose(english: "Build planned workout", norwegian: "Bygg planlagt økt"),
@@ -4209,8 +4210,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         quickStudioOption = option
         addingExtraWorkout = false
         editingWorkoutIndex = 0
-        pendingStudioDay = WeekDayEditorSelection(id: day)
-        editingWeekDay = nil
+        if editingWeekDay != nil {
+            pendingStudioDay = WeekDayEditorSelection(id: day)
+            editingWeekDay = nil
+        } else {
+            composingAdvancedDay = WeekDayEditorSelection(id: day)
+        }
     }
 
     private func quickDayChoiceGrid(for day: Int) -> some View {
