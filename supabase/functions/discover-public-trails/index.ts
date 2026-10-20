@@ -916,15 +916,9 @@ function normalizedTrailName(
     .trim();
 }
 
-type TrailDedupeInput = {
-  name?: unknown;
-  source?: unknown;
-  athlth_verified?: unknown;
-  distance_kilometers?: unknown;
-  center_latitude?: unknown;
-  center_longitude?: unknown;
-  coordinates?: unknown;
-};
+// Database writes and cached PostgREST rows use the same loose record
+// representation. Typed access is validated inside the matcher.
+type TrailDedupeInput = Record<string, unknown>;
 
 function trailCoordinates(row: TrailDedupeInput): OSMPoint[] {
   if (!Array.isArray(row.coordinates)) return [];
@@ -1013,7 +1007,9 @@ function dedupeTrailRows<T extends TrailDedupeInput>(rows: T[]): T[] {
   const ordered = rows.slice().sort((a, b) => priority(b) - priority(a));
   const unique: T[] = [];
   for (const row of ordered) {
-    if (!unique.some((saved) => similarTrailGeometry(saved, row))) unique.push(row);
+    if (!unique.some((saved) =>
+      saved.source !== row.source && similarTrailGeometry(saved, row)
+    )) unique.push(row);
   }
   return unique;
 }
