@@ -8857,7 +8857,11 @@ struct SessionEditorView: View {
                         case .time:
                             if let time = step.durationSeconds, time > 0, time.isFinite {
                                 seconds += time
-                                meters += time / pace * 1_000
+                                // An unpaced recovery represents stationary
+                                // rest, not imaginary treadmill/GPS distance.
+                                if !isRecovery || step.intensity.paceMinSecondsPerKilometer != nil {
+                                    meters += time / pace * 1_000
+                                }
                             } else {
                                 durationComplete = false
                                 distanceComplete = false
