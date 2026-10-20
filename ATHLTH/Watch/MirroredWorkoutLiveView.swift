@@ -1154,6 +1154,32 @@ struct MirroredWorkoutLiveView: View {
                 .accessibilityElement(children: .combine)
             }
 
+            if snapshot.routeCanReturnToStart == true {
+                Button {
+                    _ = mirroring.requestRunBackToStart()
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Continue running back to start",
+                            norwegian: "Fortsett å løpe tilbake til start"
+                        ),
+                        systemImage: "arrow.uturn.backward"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 49)
+                    .background(
+                        ATHLTHPlanDesign.accentInk,
+                        in: RoundedRectangle(cornerRadius: 15)
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(ATHLTHLocalization.choose(
+                    english: "Keeps the Watch workout running and reverses route guidance",
+                    norwegian: "Beholder Watch-økten og snur navigasjonen tilbake"
+                ))
+            }
+
             HStack(spacing: 10) {
                 runningMetric(
                     title: walkFirst ? paceLabel : ATHLTHLocalization.choose(
