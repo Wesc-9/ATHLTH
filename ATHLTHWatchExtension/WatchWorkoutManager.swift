@@ -6070,15 +6070,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         do {
-            // If the normal mixed route cannot activate, use the long-form
-            // Watch route policy. On supported Watch models this can resolve
-            // to the built-in speaker; otherwise watchOS may ask the user for
-            // an available audio route.
+            // The alternate Watch route must preserve the SAME mixing
+            // options. Previously the fallback discarded .duckOthers, so
+            // some spoken cues lowered music and others did not.
+            // WatchOS may select the built-in speaker or request another route.
             try session.setCategory(
                 .playback,
                 mode: .spokenAudio,
                 policy: .longFormAudio,
-                options: []
+                options: options
             )
 
             if try await session.activate(
