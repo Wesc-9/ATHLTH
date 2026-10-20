@@ -27,6 +27,11 @@ enum ATHLTHWorkoutAudioDockPolicy {
     ) -> Bool {
         coachVisible || spotifyConnected
     }
+
+    static func showsSpotifyLauncher(spotifyConnected: Bool) -> Bool {
+        // Never surface a Spotify shortcut before ATHLTH is authorized.
+        spotifyConnected
+    }
 }
 
 struct ATHLTHWorkoutAudioDock: View {
@@ -72,7 +77,9 @@ struct ATHLTHWorkoutAudioDock: View {
                         if coachVisible {
                             launcher(for: .coach)
                         }
-                        if spotify.isConnected {
+                        if ATHLTHWorkoutAudioDockPolicy.showsSpotifyLauncher(
+                            spotifyConnected: spotify.isConnected
+                        ) {
                             launcher(for: .spotify)
                         }
                     }
