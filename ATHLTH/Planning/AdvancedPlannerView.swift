@@ -5235,6 +5235,149 @@ enum PlannedSessionDurationEstimator {
     }
 }
 
+/// One editor for both outdoor pace and treadmill km/t. The saved
+/// RunningStepTarget always stores seconds per km, which the existing Watch
+/// transfer and interval estimator already understand.
+private struct ATHLTHPlannedRunningPhaseEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    let title: String
+    let target: RunningStepTarget
+    let environment: RunEnvironment
+    let onSave: (RunningStepTarget) -> Void
+
+    @State private var selectedZone: Int
+    @State private var paceEnabled: Bool
+    @State private var paceSecondsPerKm: Double
+
+    init(
+        title: String,
+        target: RunningStepTarget,
+        environment: RunEnvironment,
+        fallbackPace: Double,
+        onSave: @escaping (RunningStepTarget) -> Void
+    ) {
+        self.title = title
+        self.target = target
+        self.environment = environment
+        self.onSave = onSave
+        _selectedZone = State(initialValue: target.intensity.heartRateZone ?? 0)
+        _paceEnabled = State(initialValue:
+            target.intensity.paceMinSecondsPerKilometer != nil)
+        _paceSecondsPerKm = State(initialValue: min(max(
+            target.intensity.paceMinSecondsPerKilometer ?? fallbackPace, 150
+        ), 1200))
+    }
+
+    private var speedBinding: Binding<Double> {
+        Binding(
+            get: { 3600 / max(paceSecondsPerKm, 1) },
+            set: { value in paceSecondsPerKm = 3600 / max(value, 0.5) }
+        )
+    }
+
+    private var paceText: String {
+        let total = Int(paceSecondsPerKm.rounded())
+        return String(format: "%d:%02d min/km", total / 60, total % 60)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Picker(
+                        ATHLTHLocalization.choose(english: "Heart-rate zone", norwegian: "Pulssone"),
+                        selection: $selectedZone
+                    ) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "No zone target", norwegian: "Ingen sonemål"
+                        )).tag(0)
+                        ForEach(1...5, id: \.self) { zone in
+                            Text(ATHLTHLocalization.choose(
+                                english: "Zone", norwegian: "Sone"
+                            ) + " \(zone)").tag(zone)
+                        }
+                    }
+                    Text(ATHLTHLocalization.choose(
+                        english: "A zone is a target, not a measured heart rate. Use your individual Health Profile zones.",
+                        norwegian: "Sonen er et mål, ikke en målt puls. Bruk dine personlige pulssoner fra helseprofilen."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                } header: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Training zone", norwegian: "Treningssone"
+                    ))
+                }
+                .listRowBackground(ATHLTHPlanDesign.surface)
+
+                Section {
+                    Toggle(
+                        ATHLTHLocalization.choose(english: "Set target pace", norwegian: "Angi måltempo"),
+                        isOn: $paceEnabled
+                    )
+                    .tint(ATHLTHPlanDesign.accentInk)
+                    if paceEnabled {
+                        if environment == .treadmill {
+                            Stepper(
+                                String(format: "%.1f km/t", speedBinding.wrappedValue),
+                                value: speedBinding,
+                                in: 3...24, step: 0.1
+                            )
+                            Text(paceText)
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        } else {
+                            Stepper(paceText, value: $paceSecondsPerKm,
+                                    in: 150...1200, step: 5)
+                            Text(String(format: "%.1f km/t", 3600 / max(paceSecondsPerKm, 1)))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                    }
+                } header: {
+                    Text(environment == .treadmill
+                        ? ATHLTHLocalization.choose(english: "Treadmill speed", norwegian: "Møllehastighet")
+                        : ATHLTHLocalization.choose(english: "Outdoor pace", norwegian: "Utendørstempo"))
+                } footer: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Each phase may have its own zone and pace. The target is saved with the planned run and sent to Apple Watch.",
+                        norwegian: "Hver del kan ha egen sone og eget tempo. Målet lagres med økten og sendes til Apple Watch."
+                    ))
+                }
+                .listRowBackground(ATHLTHPlanDesign.surface)
+            }
+            .scrollContentBackground(.hidden)
+            .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt")) {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Save", norwegian: "Lagre")) {
+                        var updated = target
+                        var intensity = updated.intensity
+                        intensity.paceMinSecondsPerKilometer = paceEnabled ? paceSecondsPerKm : nil
+                        intensity.paceMaxSecondsPerKilometer = paceEnabled ? paceSecondsPerKm : nil
+                        intensity.heartRateZone = selectedZone > 0 ? selectedZone : nil
+                        intensity.kind = paceEnabled
+                            ? .pace
+                            : (selectedZone > 0 ? .heartRateZone : .easy)
+                        updated.intensity = intensity
+                        onSave(updated)
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+
 private struct SessionRunningPhaseSelection: Identifiable {
     let workoutID: UUID
     let blockID: UUID
