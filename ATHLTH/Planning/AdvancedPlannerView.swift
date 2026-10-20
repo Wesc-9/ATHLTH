@@ -5235,6 +5235,20 @@ enum PlannedSessionDurationEstimator {
     }
 }
 
+private struct SessionRunningPhaseSelection: Identifiable {
+    let workoutID: UUID
+    let blockID: UUID
+    let isRecovery: Bool
+    var id: String { workoutID.uuidString + blockID.uuidString + (isRecovery ? "recovery" : "work") }
+}
+
+private struct SessionRunningRepetitionSelection: Identifiable {
+    let workoutID: UUID
+    let blockID: UUID
+    let repetition: Int
+    var id: String { workoutID.uuidString + blockID.uuidString + "\(repetition)" }
+}
+
 struct SessionEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -5295,6 +5309,8 @@ struct SessionEditorView: View {
 
     @State private var selectedRunningWorkouts: [RunningWorkoutTemplate] = []
     @State private var showingRunningLibrary = false
+    @State private var editingRunningPhase: SessionRunningPhaseSelection?
+    @State private var editingRunningRepetition: SessionRunningRepetitionSelection?
     @State private var selectedRouteID: UUID?
 
     @State private var scheduledTimeEnabled = false
@@ -6041,8 +6057,10 @@ struct SessionEditorView: View {
 
                 workoutBasicsSection
 
-
-
+                if kind == .running {
+                    runningBuilder
+                    plannedRunGuidanceSection
+                }
 
                 workoutSourcesSection
 
@@ -6061,12 +6079,8 @@ struct SessionEditorView: View {
                     strengthBuilder
                 }
 
-                if kind == .running {
-                    runningBuilder
-                    if runEnvironment == .outdoor {
-                        routeBuilder
-                        plannedRunGuidanceSection
-                    }
+                if kind == .running && runEnvironment == .outdoor {
+                    routeBuilder
                 }
 
                 if kind == .walking {
@@ -6219,6 +6233,33 @@ struct SessionEditorView: View {
                         selectionTitle: "Add to Plan"
                     ) { workout in
                         addRunningWorkout(workout)
+                    }
+                }
+            }
+            .sheet(item: $editingRunningPhase) { selection in
+                if let workout = selectedRunningWorkouts.first(where: { $0.id == selection.workoutID }),
+                   let block = workout.blocks.first(where: { $0.id == selection.blockID }),
+                   let target = selection.isRecovery ? block.recovery : block.work {
+                    ATHLTHPlannedRunningPhaseEditor(
+                        title: selection.isRecovery
+                            ? ATHLTHLocalization.choose(english: "Active recovery", norwegian: "Aktiv pause")
+                            : runningPhaseTitle(block.kind),
+                        target: target,
+                        environment: runEnvironment,
+                        fallbackPace: targetPaceEnabled
+                            ? Double(targetPaceMinutes * 60 + targetPaceSeconds) : 360
+                    ) { updated in
+                        updateRunningPhase(selection, target: updated)
+                    }
+                }
+            }
+            .sheet(item: $editingRunningRepetition) { selection in
+                if let workout = selectedRunningWorkouts.first(where: { $0.id == selection.workoutID }),
+                   let block = workout.blocks.first(where: { $0.id == selection.blockID }) {
+                    ATHLTHIntervalRepetitionEditorView(
+                        block: block, repetition: selection.repetition
+                    ) { override in
+                        updateRunningRepetition(selection, override: override)
                     }
                 }
             }
@@ -8417,128 +8458,269 @@ struct SessionEditorView: View {
         )
     }
 
+    // The chosen workout is deliberately presented before "Legg til".
+    // Phase targets edit the real persisted RunningWorkoutTemplate and flow
+    // unchanged into WatchRunningWorkoutTransfer on both devices.
     private var runningBuilder: some View {
-        Section("Running Workout") {
-            if selectedRunningWorkouts.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 10) {
+        Section {
+            VStack(alignment: .leading, spacing: 13) {
+                if selectedRunningWorkouts.isEmpty {
+                    HStack(spacing: 12) {
                         Image(systemName: "figure.run")
-                            .foregroundStyle(ATHLTHTheme.accent)
+                            .font(.title3)
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            .frame(width: 44, height: 44)
+                            .background(ATHLTHPlanDesign.selectedSurface,
+                                        in: RoundedRectangle(cornerRadius: 13))
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Open running session",
+                                norwegian: "Åpen løpeøkt"
+                            ))
+                            .font(.subheadline.weight(.semibold))
+                            Text(ATHLTHLocalization.choose(
+                                english: "Optional: choose an interval workout to set zones and pace for each phase.",
+                                norwegian: "Valgfritt: Velg en intervalløkt for å angi sone og tempo for hver del."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                    }
+                    Button {
+                        showingRunningLibrary = true
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Choose running workout", norwegian: "Velg løpeøkt"
+                        ), systemImage: "plus.circle.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    }
+                } else {
+                    ForEach(Array(selectedRunningWorkouts.enumerated()), id: \.element.id) { index, workout in
+                        VStack(alignment: .leading, spacing: 11) {
+                            HStack(spacing: 11) {
+                                Image(systemName: workout.type.systemImage)
+                                    .font(.title3)
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                    .frame(width: 45, height: 45)
+                                    .background(ATHLTHPlanDesign.selectedSurface,
+                                                in: RoundedRectangle(cornerRadius: 13))
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(workout.title)
+                                        .font(.headline)
+                                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                                    Text(runningWorkoutMetricSummary(workout))
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                }
+                                Spacer(minLength: 2)
+                                Button {
+                                    showingRunningLibrary = true
+                                } label: {
+                                    Text(ATHLTHLocalization.choose(english: "Change", norwegian: "Endre"))
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                        .padding(.horizontal, 12)
+                                        .frame(height: 34)
+                                        .background(ATHLTHPlanDesign.warmSurface, in: Capsule())
+                                }
+                                .buttonStyle(.plain)
+                                Button(role: .destructive) {
+                                    removeRunningWorkout(at: index)
+                                } label: {
+                                    Image(systemName: "xmark.circle")
+                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(ATHLTHLocalization.choose(
+                                    english: "Remove workout", norwegian: "Fjern løpeøkt"
+                                ))
+                            }
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Open run")
+                            Divider().overlay(ATHLTHPlanDesign.warmDivider)
+
+                            HStack(spacing: 8) {
+                                Image(systemName: "waveform.path")
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Running guidance", norwegian: "Løpeveiledning"
+                                ))
                                 .font(.subheadline.weight(.semibold))
-
-                            Text(
-                                "Use the duration and distance above, or add one or more structured workouts."
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    Button {
-                        showingRunningLibrary = true
-                    } label: {
-                        Label(
-                            "Add Structured Running Workout",
-                            systemImage: "plus.circle.fill"
-                        )
-                    }
-                }
-            } else {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(
-                            selectedRunningWorkouts.count == 1
-                                ? "1 structured workout"
-                                : "\(selectedRunningWorkouts.count) structured workouts"
-                        )
-                        .font(.subheadline.weight(.semibold))
-
-                        Text(runningSelectionSummary)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-
-                    Button {
-                        showingRunningLibrary = true
-                    } label: {
-                        Label("Add", systemImage: "plus")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                }
-
-                ForEach(
-                    Array(selectedRunningWorkouts.enumerated()),
-                    id: \.element.id
-                ) { index, workout in
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 10) {
-                            Image(systemName: workout.type.systemImage)
-                                .foregroundStyle(ATHLTHTheme.accent)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(workout.title)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(.primary)
-
-                                Text(runningWorkoutMetricSummary(workout))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
-                            Button(role: .destructive) {
-                                removeRunningWorkout(at: index)
-                            } label: {
-                                Image(systemName: "minus.circle.fill")
-                                    .foregroundStyle(.red)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(
-                                ATHLTHLocalization.format(
-                        english: "Remove %@",
-                        norwegian: "Fjern %@",
-                        workout.title
-                    )
-                            )
-                        }
-
-                        DisclosureGroup("Workout structure") {
-                            VStack(alignment: .leading, spacing: 8) {
-                                ForEach(
-                                    Array(workout.blocks.enumerated()),
-                                    id: \.element.id
-                                ) { blockIndex, block in
-                                    RunningWorkoutBlockRow(
-                                        index: blockIndex + 1,
-                                        block: block
-                                    )
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                                Spacer()
+                                if let seconds = estimatedRunningTotals(for: [workout]).durationSeconds {
+                                    Text("\(Int((seconds / 60).rounded())) min")
+                                        .font(.caption.weight(.medium))
+                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                                 }
                             }
-                            .padding(.top, 8)
+
+                            ForEach(workout.blocks) { block in
+                                phaseTargetRow(workout: workout, block: block, isRecovery: false)
+                                if block.recovery != nil && block.repetitions > 1 {
+                                    phaseTargetRow(workout: workout, block: block, isRecovery: true)
+                                }
+                                if block.kind == .work && block.repetitions > 1 {
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        HStack(spacing: 8) {
+                                            ForEach(1...min(max(block.repetitions, 1), 60), id: \.self) { repetition in
+                                                Button {
+                                                    editingRunningRepetition = SessionRunningRepetitionSelection(
+                                                        workoutID: workout.id,
+                                                        blockID: block.id,
+                                                        repetition: repetition
+                                                    )
+                                                } label: {
+                                                    HStack(spacing: 4) {
+                                                        Text(ATHLTHLocalization.choose(
+                                                            english: "Effort", norwegian: "Drag"
+                                                        ) + " \(repetition)")
+                                                        Image(systemName: "slider.horizontal.3")
+                                                    }
+                                                    .font(.caption2.weight(.semibold))
+                                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                                    .padding(.horizontal, 10)
+                                                    .frame(height: 31)
+                                                    .background(ATHLTHPlanDesign.warmSurface, in: Capsule())
+                                                }
+                                                .buttonStyle(.plain)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Text(ATHLTHLocalization.choose(
+                                english: "Choose a heart-rate zone and pace per phase. Adjust individual efforts when needed. All targets are saved with the workout.",
+                                norwegian: "Velg pulssone og tempo per del. Juster enkelt-drag ved behov. Alle målene lagres med økten."
+                            ))
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         }
-                        .font(.caption.weight(.semibold))
+                        if index < selectedRunningWorkouts.count - 1 {
+                            Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                                .padding(.vertical, 3)
+                        }
                     }
                 }
             }
+            .padding(.vertical, 5)
+        }
+        .listRowBackground(ATHLTHPlanDesign.surface)
+        .listRowSeparator(.hidden)
+    }
+
+    private func runningPhaseTitle(_ kind: RunningBlockKind) -> String {
+        switch kind {
+        case .warmup: return ATHLTHLocalization.choose(english: "Warm-up", norwegian: "Oppvarming")
+        case .work: return ATHLTHLocalization.choose(english: "Effort", norwegian: "Drag")
+        case .recovery: return ATHLTHLocalization.choose(english: "Recovery", norwegian: "Pause")
+        case .steady: return ATHLTHLocalization.choose(english: "Steady run", norwegian: "Rolig løp")
+        case .cooldown: return ATHLTHLocalization.choose(english: "Cool-down", norwegian: "Nedjogg")
         }
     }
 
-    private var selectedRoute: TrainingRoute? {
-        guard let selectedRouteID else {
-            return nil
+    private func phaseTargetRow(
+        workout: RunningWorkoutTemplate,
+        block: RunningWorkoutBlock,
+        isRecovery: Bool
+    ) -> some View {
+        let target = isRecovery ? block.recovery ?? .open : block.work
+        let count = isRecovery ? max(0, block.repetitions - 1) : max(1, block.repetitions)
+        let name = isRecovery
+            ? ATHLTHLocalization.choose(english: "Active recovery", norwegian: "Aktiv pause")
+            : runningPhaseTitle(block.kind)
+        let zone = target.intensity.heartRateZone
+        let pace = target.intensity.paceMinSecondsPerKilometer
+        let targetDescription = [
+            zone.map { ATHLTHLocalization.choose(english: "Zone", norwegian: "Sone") + " \($0)" },
+            pace.map { value in
+                runEnvironment == .treadmill
+                    ? String(format: "%.1f km/t", 3600 / value)
+                    : String(format: "%d:%02d min/km", Int(value) / 60, Int(value) % 60)
+            }
+        ].compactMap { $0 }.joined(separator: " · ")
+        return Button {
+            editingRunningPhase = SessionRunningPhaseSelection(
+                workoutID: workout.id, blockID: block.id, isRecovery: isRecovery
+            )
+        } label: {
+            HStack(spacing: 9) {
+                Circle()
+                    .fill(isRecovery ? Color.blue.opacity(0.8) :
+                          (block.kind == .work ? Color.orange : ATHLTHTheme.vitality))
+                    .frame(width: 9, height: 9)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(name)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Text(targetDescription.isEmpty
+                        ? ATHLTHLocalization.choose(
+                            english: "Set zone and pace", norwegian: "Angi sone og tempo"
+                        ) : targetDescription)
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                Spacer(minLength: 4)
+                if let seconds = target.durationSeconds {
+                    Text(count > 1
+                        ? "\(count) × \(Int((seconds / 60).rounded())) min"
+                        : "\(Int((seconds / 60).rounded())) min")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .monospacedDigit()
+                } else if let meters = target.distanceMeters {
+                    Text(count > 1 ? "\(count) × \(Int(meters)) m" : "\(Int(meters)) m")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+            .padding(.horizontal, 11)
+            .padding(.vertical, 10)
+            .background(ATHLTHPlanDesign.warmSurface, in: RoundedRectangle(cornerRadius: 12))
         }
-
-        return session.savedRoutes.first {
-            $0.id == selectedRouteID
-        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(name + ": " + targetDescription)
     }
+
+    private func updateRunningPhase(
+        _ selection: SessionRunningPhaseSelection,
+        target: RunningStepTarget
+    ) {
+        guard let workoutIndex = selectedRunningWorkouts.firstIndex(where: { $0.id == selection.workoutID }),
+              let blockIndex = selectedRunningWorkouts[workoutIndex].blocks.firstIndex(where: { $0.id == selection.blockID })
+        else { return }
+        var selected = selectedRunningWorkouts[workoutIndex]
+        if selection.isRecovery {
+            selected.blocks[blockIndex].recovery = target
+        } else {
+            selected.blocks[blockIndex].work = target
+        }
+        selectedRunningWorkouts[workoutIndex] = selected
+        syncRunningMetricsFromSelection()
+    }
+
+    private func updateRunningRepetition(
+        _ selection: SessionRunningRepetitionSelection,
+        override: RunningRepetitionOverride
+    ) {
+        guard let workoutIndex = selectedRunningWorkouts.firstIndex(where: { $0.id == selection.workoutID }),
+              let blockIndex = selectedRunningWorkouts[workoutIndex].blocks.firstIndex(where: { $0.id == selection.blockID })
+        else { return }
+        var selected = selectedRunningWorkouts[workoutIndex]
+        var block = selected.blocks[blockIndex]
+        var overrides = block.repetitionOverrides ?? []
+        overrides.removeAll { $0.repetition == selection.repetition }
+        overrides.append(override)
+        block.repetitionOverrides = overrides.sorted { $0.repetition < $1.repetition }
+        selected.blocks[blockIndex] = block
+        selectedRunningWorkouts[workoutIndex] = selected
+        syncRunningMetricsFromSelection()
+    }
+
 
     private var routeBuilder: some View {
         Section("Route") {
