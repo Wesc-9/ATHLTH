@@ -39,6 +39,25 @@ final class ATHLTHWorkoutAudioDockTests: XCTestCase {
         ), .spotify)
     }
 
+    func testSpotifyLauncherRequiresATHLTHSpotifyConnection() {
+        XCTAssertFalse(ATHLTHWorkoutAudioDockPolicy.showsSpotifyLauncher(
+            spotifyConnected: false
+        ))
+        XCTAssertTrue(ATHLTHWorkoutAudioDockPolicy.showsSpotifyLauncher(
+            spotifyConnected: true
+        ))
+    }
+
+    func testCoachLauncherStillVisibleWithoutSpotify() {
+        XCTAssertTrue(ATHLTHWorkoutAudioDockPolicy.isVisible(
+            coachVisible: true,
+            spotifyConnected: false
+        ))
+        XCTAssertFalse(ATHLTHWorkoutAudioDockPolicy.showsSpotifyLauncher(
+            spotifyConnected: false
+        ))
+    }
+
     func testAudioDockDisappearsWithoutEitherSource() {
         XCTAssertFalse(ATHLTHWorkoutAudioDockPolicy.isVisible(
             coachVisible: false,
