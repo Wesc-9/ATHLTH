@@ -94,6 +94,12 @@ struct WatchHomeView: View {
             }
 
             switch url.host {
+            case "home":
+                // A Watch-face tap opens the first ATHLTH screen. Never
+                // auto-start a workout or discard an active recording.
+                shortcutPath.removeAll()
+                routeStore.requestTodayWorkoutSnapshot()
+
             case "today":
                 if let today = routeStore.todayWorkouts.first {
                     startTodayWorkout(today)
