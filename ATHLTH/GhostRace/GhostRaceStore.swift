@@ -576,10 +576,11 @@ final class GhostRaceStore: ObservableObject {
         }()
         let expectedDistanceForMatching =
             measuredCoursePosition ??
-            lastMatchedIndex.map { reference.points[$0].cumulativeMeters } ??
-            (snapshot.elapsedTime < 40
-                ? 0
-                : ghostPoint(at: snapshot.elapsedTime, in: reference).cumulativeMeters)
+            lastReliableCourseSample?.meters ??
+            0
+        // Never seed the athlete's position using Ghost's own elapsed-time
+        // position. After a detour that made the two appear side by side
+        // even though they had followed completely different paths.
 
         if let routeDeviation = snapshot.routeDeviationMeters,
            let tolerance = snapshot.routeDeviationThresholdMeters,
@@ -972,9 +973,34 @@ final class GhostRaceStore: ObservableObject {
                             ].location
                     )
 
-                if localDistance <= 220 {
+                if localDistance <= 50 {
                     return local
                 }
+                // The old local window can point to a previous crossing.
+                // Keep looking for a reachable later course section.
+            }
+        }
+
+        // If the very first course fix arrives after a long off-route run,
+        // don't assume the runner has reached Ghost's predicted position.
+        // Search every physically reachable part of the REFERENCE route,
+        // then require a close GPS match before awarding any course progress.
+        if lastReliableCourseSample == nil {
+            let upperMeters = min(
+                routeDistance,
+                max(85, elapsedSeconds * 9 + 35)
+            )
+            let center = upperMeters / 2
+            if let reached = nearestIndex(
+                to: location,
+                points: reference.points,
+                range: 0...(reference.points.count - 1),
+                expectedDistanceMeters: center,
+                maximumProgressDriftMeters: center + 1
+            ), location.distance(
+                from: reference.points[reached].location
+            ) <= 50 {
+                return reached
             }
         }
 
