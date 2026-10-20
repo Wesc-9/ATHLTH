@@ -619,9 +619,7 @@ struct QuickWorkoutStartSheet: View {
                     }
 
                     Button {
-                        let selected = social.trainingPartners.filter {
-                            selectedFriendIDs.contains($0.userID)
-                        }
+                        let selected = social.resolvedQuickTrainPartners(selectedFriendIDs)
 
                         onStart(
                             selected,
