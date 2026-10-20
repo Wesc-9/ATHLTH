@@ -1081,6 +1081,54 @@ struct MirroredWorkoutLiveView: View {
                 .padding(.vertical, 4)
             }
 
+            if snapshot.routeTitle != nil || snapshot.routeCueEnglish != nil {
+                ATHLTHUnifiedCard {
+                    HStack(spacing: 12) {
+                        Image(systemName: snapshot.routeCueSymbol ?? "arrow.up")
+                            .font(.system(size: 27, weight: .semibold))
+                            .foregroundStyle(
+                                snapshot.routeCueOffRoute == true
+                                    ? Color.orange : ATHLTHPlanDesign.accentInk
+                            )
+                            .frame(width: 40)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(snapshot.routeCueOffRoute == true
+                                ? ATHLTHLocalization.choose(
+                                    english: "BACK TO ROUTE",
+                                    norwegian: "TILBAKE TIL RUTEN"
+                                  )
+                                : ATHLTHLocalization.choose(
+                                    english: "NEXT TURN",
+                                    norwegian: "NESTE SVING"
+                                  ))
+                                .font(.caption2.weight(.bold))
+                                .tracking(1)
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+
+                            Text(
+                                ATHLTHLocalization.isNorwegian
+                                    ? (snapshot.routeCueNorwegian ??
+                                        "Følg den markerte ruten.")
+                                    : (snapshot.routeCueEnglish ??
+                                        "Follow the highlighted route.")
+                            )
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                            if let distance = snapshot.routeCueDistanceMeters {
+                                Text(String(format: "%.0f m", distance))
+                                    .font(.caption.weight(.bold))
+                                    .monospacedDigit()
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .accessibilityElement(children: .combine)
+            }
+
             HStack(spacing: 10) {
                 runningMetric(
                     title: walkFirst ? paceLabel : ATHLTHLocalization.choose(
