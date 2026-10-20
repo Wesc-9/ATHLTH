@@ -98,6 +98,53 @@ final class ATHLTHGhostRaceScenarioTests: XCTestCase {
         XCTAssertFalse(result.completedRoute)
     }
 
+    @MainActor
+    func testFirstValidPositionAfterLongDetourIsNotPlacedBesideGhost() throws {
+        let route = reference()
+        let store = GhostRaceStore()
+        try store.prepare(reference: route)
+        // The Watch ran far from the reference route for ten minutes.
+        // Ghost has reached the finish; the runner has rejoined at the start.
+        store.updatePhoneWorkout(
+            location: CLLocation(latitude: 63.45, longitude: 10.45),
+            elapsedTime: 550, state: .running
+        )
+        XCTAssertNil(store.comparison)
+        store.updatePhoneWorkout(
+            location: route.points[0].location,
+            elapsedTime: 605, state: .running
+        )
+        let match = try XCTUnwrap(store.comparison)
+        XCTAssertEqual(match.userProgress, 0, accuracy: 0.001)
+        XCTAssertEqual(match.ghostProgress, 1, accuracy: 0.001)
+        XCTAssertLessThan(match.signedDistanceMeters, -1_900)
+    }
+
+    @MainActor
+    func testGhostDoesNotGetDraggedBackWhenRunnerRejoinsAfterDetour() throws {
+        let route = reference()
+        let store = GhostRaceStore()
+        try store.prepare(reference: route)
+        store.updatePhoneWorkout(
+            location: route.points[4].location,
+            elapsedTime: 120, state: .running
+        )
+        XCTAssertNotNil(store.comparison)
+        store.updatePhoneWorkout(
+            location: CLLocation(latitude: 63.45, longitude: 10.45),
+            elapsedTime: 170, state: .running
+        )
+        XCTAssertNil(store.comparison)
+        store.updatePhoneWorkout(
+            location: route.points[5].location,
+            elapsedTime: 610, state: .running
+        )
+        let match = try XCTUnwrap(store.comparison)
+        XCTAssertEqual(match.userProgress, 0.25, accuracy: 0.01)
+        XCTAssertEqual(match.ghostProgress, 1, accuracy: 0.001)
+        XCTAssertLessThan(match.signedDistanceMeters, -1_400)
+    }
+
     func testReplayAndWatchInterpolationAgreeAtIrregularTimestamps() throws {
         let times: [Double] = [0, 17, 43, 91, 140, 202]
         let metres: [Double] = [0, 60, 180, 310, 545, 800]
