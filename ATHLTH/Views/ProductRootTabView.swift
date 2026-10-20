@@ -4353,11 +4353,14 @@ struct ATHLTHHomeView: View {
     private func startHomeStandalonePhoneEndurance(
         _ workout: PlannedSession
     ) {
-        let selectedRoute = PlannedWorkoutWatchBuilder.route(
+        let treadmill = RunEnvironment.forPlannedSession(workout) == .treadmill
+        let selectedRoute = treadmill ? nil : PlannedWorkoutWatchBuilder.route(
             for: workout, routes: session.savedRoutes
         )
-        let autoPause = workout.autoPauseEnabled ??
-            settings.autoPauseOutdoorWorkouts
+        let autoPause = !treadmill && (workout.autoPauseEnabled ??
+            settings.autoPauseOutdoorWorkouts)
+        var routeAlerts = settings.routeAlertConfiguration
+        if treadmill { routeAlerts.enabled = false }
         let audioCoach = PlannedWorkoutWatchBuilder.audioCoachConfiguration(
             for: workout,
             selectedRoute: selectedRoute,
@@ -4366,7 +4369,7 @@ struct ATHLTHHomeView: View {
             )
         )
 
-        if let ghostTarget = workout.ghostTargetDurationSeconds {
+        if !treadmill, let ghostTarget = workout.ghostTargetDurationSeconds {
             guard let selectedRoute else {
                 homeWatchTransferError = ATHLTHLocalization.choose(
                     english: "This Ghost workout needs a saved route.",
@@ -4399,7 +4402,7 @@ struct ATHLTHHomeView: View {
             workout.kind == .running
                 ? PlannedWorkoutWatchBuilder.runningTransfer(
                     from: workout,
-                    routeAlerts: settings.routeAlertConfiguration,
+                    routeAlerts: routeAlerts,
                     autoPauseEnabled: autoPause
                 )
                 : nil
@@ -4408,10 +4411,11 @@ struct ATHLTHHomeView: View {
             walking: workout.kind == .walking,
             route: selectedRoute,
             title: workout.title,
+            environment: treadmill ? .treadmill : .outdoor,
             audioCoach: audioCoach,
             structuredWorkout: runTransfer,
-            routeAlerts: settings.routeAlertConfiguration,
-            ghostUpdates: workout.ghostUpdates,
+            routeAlerts: routeAlerts,
+            ghostUpdates: treadmill ? nil : workout.ghostUpdates,
             autoPauseEnabled: autoPause
         )
         watchConnection.updateLocalWorkoutActivity(
@@ -4492,11 +4496,14 @@ struct ATHLTHHomeView: View {
             return
         }
 
-        let selectedRoute =
-            PlannedWorkoutWatchBuilder.route(
+        let treadmill = RunEnvironment.forPlannedSession(workout) == .treadmill
+        let selectedRoute: TrainingRoute? =
+            treadmill ? nil : PlannedWorkoutWatchBuilder.route(
                 for: workout,
                 routes: session.savedRoutes
             )
+        var routeAlerts = settings.routeAlertConfiguration
+        if treadmill { routeAlerts.enabled = false }
 
         do {
             if let selectedRoute {
@@ -4512,7 +4519,7 @@ struct ATHLTHHomeView: View {
             return
         }
 
-        if let ghostTarget =
+        if !treadmill, let ghostTarget =
                 workout
                     .ghostTargetDurationSeconds {
             guard let selectedRoute else {
@@ -4568,7 +4575,7 @@ struct ATHLTHHomeView: View {
 
             do {
                 try await watchConnection
-                    .startWorkoutOnWatch(watchKind)
+                    .startWorkoutOnWatch(watchKind, indoor: treadmill)
 
                 if let plannedGearIDs = workout.gearIDs {
                     gear.prepareNextWorkoutGear(
@@ -4599,11 +4606,10 @@ struct ATHLTHHomeView: View {
                     watchConnection.sendRunningWorkout(
                         PlannedWorkoutWatchBuilder.runningTransfer(
                             from: workout,
-                            routeAlerts:
-                                settings.routeAlertConfiguration,
-                            autoPauseEnabled:
-                                workout.autoPauseEnabled ??
-                                settings.autoPauseOutdoorWorkouts
+                            routeAlerts: routeAlerts,
+                            autoPauseEnabled: !treadmill &&
+                                (workout.autoPauseEnabled ??
+                                settings.autoPauseOutdoorWorkouts)
                         )
                     )
                 } else {
