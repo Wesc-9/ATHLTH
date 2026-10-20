@@ -11,6 +11,7 @@ struct RunRouteBuilderView: View {
     @StateObject private var startSearch = RunRouteLocationSearchModel()
     @StateObject private var endSearch = RunRouteLocationSearchModel()
     @StateObject private var viaSearch = RunRouteLocationSearchModel()
+    var initialSearchCenter: CLLocationCoordinate2D? = nil
     @StateObject private var searchLocation = HomeLocationStore()
     @State private var searchMapCenter: CLLocationCoordinate2D?
 
@@ -198,15 +199,14 @@ struct RunRouteBuilderView: View {
                         .weight(.semibold)
                 )
                 .foregroundStyle(
-                    ATHLTHTheme.vitality
+                    ATHLTHPlanDesign.accentInk
                 )
                 .frame(
                     width: 34,
                     height: 34
                 )
                 .background(
-                    ATHLTHTheme
-                        .vitalitySoft,
+                    ATHLTHPlanDesign.selectedSurface,
                     in:
                         RoundedRectangle(
                             cornerRadius: 10,
@@ -347,7 +347,7 @@ struct RunRouteBuilderView: View {
                 model: startSearch,
                 selectedItem: startItem,
                 referenceCoordinate: searchLocation.location?.coordinate
-                    ?? searchMapCenter
+                    ?? searchMapCenter ?? initialSearchCenter
             ) { item in
                 startItem = item
                 startSearch.clear()
@@ -377,7 +377,7 @@ struct RunRouteBuilderView: View {
                     selectedItem: nil,
                     referenceCoordinate: startItem?.placemark.coordinate
                         ?? searchLocation.location?.coordinate
-                        ?? searchMapCenter
+                        ?? searchMapCenter ?? initialSearchCenter
                 ) { item in
                     addViaPoint(item)
                 }
@@ -413,7 +413,7 @@ struct RunRouteBuilderView: View {
                 selectedItem: endItem,
                 referenceCoordinate: startItem?.placemark.coordinate
                     ?? searchLocation.location?.coordinate
-                    ?? searchMapCenter
+                    ?? searchMapCenter ?? initialSearchCenter
             ) { item in
                 endItem = item
                 endSearch.clear()
@@ -432,7 +432,7 @@ struct RunRouteBuilderView: View {
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .tint(ATHLTHTheme.vitality)
+            .tint(ATHLTHPlanDesign.accent)
             .disabled(
                 startItem == nil ||
                 endItem == nil ||
@@ -460,7 +460,7 @@ struct RunRouteBuilderView: View {
                                 coordinate:
                                     startItem.placemark.coordinate
                             )
-                            .tint(ATHLTHTheme.vitality)
+                            .tint(ATHLTHPlanDesign.accent)
                         }
 
                         ForEach(
@@ -1634,10 +1634,8 @@ private extension View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            ATHLTHTheme.card,
-                            ATHLTHTheme
-                                .cardWarm
-                                .opacity(0.62)
+                            Color.white,
+                            ATHLTHPlanDesign.canvas.opacity(0.70)
                         ],
                         startPoint:
                             .topLeading,
@@ -1654,8 +1652,7 @@ private extension View {
                     style: .continuous
                 )
                 .stroke(
-                    Color.white
-                        .opacity(0.72),
+                    ATHLTHPlanDesign.warmDivider,
                     lineWidth: 0.8
                 )
             }
