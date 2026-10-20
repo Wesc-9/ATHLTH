@@ -143,8 +143,8 @@ struct WorkoutStartOptionsView: View {
                     exerciseSelectionCard
 
                     // Same immediate avatar row as Quick Run and Quick Walk.
-                    ATHLTHCard {
-                        VStack(alignment: .leading, spacing: 13) {
+                    ATHLTHPlanSurface(ghost: false, density: .compact) {
+                        VStack(alignment: .leading, spacing: 10) {
                             WorkoutFriendPicker(
                                 selectedFriendIDs: $selectedFriendIDs
                             )
