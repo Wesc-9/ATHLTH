@@ -58,91 +58,114 @@ struct ATHLTHWorkoutAudioDock: View {
                 spotifyConnected: spotify.isConnected
             ) {
                 VStack(spacing: 7) {
-                    HStack(spacing: 7) {
-                        if coachVisible && spotify.isConnected {
-                            modeButton(
-                                .coach,
-                                title: "Audio Coach",
-                                systemImage: "waveform"
-                            )
-                            modeButton(
-                                .spotify,
-                                title: "Spotify",
-                                systemImage: "music.note"
-                            )
-                        } else {
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english: "AUDIO",
-                                    norwegian: "LYD"
-                                )
-                            )
-                            .font(.caption2.weight(.bold))
-                            .tracking(0.9)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                        }
-
-                        Spacer(minLength: 0)
-
-                        if selectedMode == .coach, let onCoachSettings {
-                            Button(action: onCoachSettings) {
-                                Image(systemName: "slider.horizontal.3")
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                                    .frame(width: 35, height: 35)
-                                    .background(
-                                        Color.white.opacity(0.85),
-                                        in: Circle()
-                                    )
+                    if selectedMode == .spotify && !coachVisible {
+                        // One compact row when Spotify is the only audio source:
+                        // leave maximum room for Set/Next Exercise controls.
+                        HStack(spacing: 9) {
+                            Image(systemName: "music.note")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .frame(width: 28, height: 35)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                                    .lineLimit(1)
+                                Text(subtitle)
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                    .lineLimit(1)
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(
-                                ATHLTHLocalization.choose(
-                                    english: "Audio Coach settings",
-                                    norwegian: "Innstillinger for Audio Coach"
-                                )
-                            )
-                        }
-
-                        if coachVisible && coachEnabled && !coachManagedOnWatch {
-                            ATHLTHAudioRouteControl(compact: true)
-                                .frame(width: 37, height: 35)
-                        }
-                    }
-
-                    HStack(spacing: 8) {
-                        Image(
-                            systemName: selectedMode == .coach
-                                ? "waveform"
-                                : "music.note"
-                        )
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 34, height: 34)
-                        .background(
-                            ATHLTHTheme.accentDeep,
-                            in: Circle()
-                        )
-                        .accessibilityHidden(true)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(title)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ATHLTHTheme.primaryText)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-
-                            Text(subtitle)
-                                .font(.caption2)
-                                .foregroundStyle(ATHLTHTheme.mutedText)
-                                .lineLimit(1)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                        if selectedMode == .coach {
-                            coachActions
-                        } else {
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             spotifyActions
+                        }
+                    } else {
+                        HStack(spacing: 7) {
+                            if coachVisible && spotify.isConnected {
+                                modeButton(
+                                    .coach,
+                                    title: "Audio Coach",
+                                    systemImage: "waveform"
+                                )
+                                modeButton(
+                                    .spotify,
+                                    title: "Spotify",
+                                    systemImage: "music.note"
+                                )
+                            } else {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english: "AUDIO",
+                                        norwegian: "LYD"
+                                    )
+                                )
+                                .font(.caption2.weight(.bold))
+                                .tracking(0.9)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+
+                            Spacer(minLength: 0)
+
+                            if selectedMode == .coach, let onCoachSettings {
+                                Button(action: onCoachSettings) {
+                                    Image(systemName: "slider.horizontal.3")
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                        .frame(width: 35, height: 35)
+                                        .background(
+                                            Color.white.opacity(0.85),
+                                            in: Circle()
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(
+                                    ATHLTHLocalization.choose(
+                                        english: "Audio Coach settings",
+                                        norwegian: "Innstillinger for Audio Coach"
+                                    )
+                                )
+                            }
+
+                            if coachVisible && coachEnabled && !coachManagedOnWatch {
+                                ATHLTHAudioRouteControl(compact: true)
+                                    .frame(width: 37, height: 35)
+                            }
+                        }
+
+                        HStack(spacing: 8) {
+                            Image(
+                                systemName: selectedMode == .coach
+                                    ? "waveform"
+                                    : "music.note"
+                            )
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 34, height: 34)
+                            .background(
+                                ATHLTHTheme.accentDeep,
+                                in: Circle()
+                            )
+                            .accessibilityHidden(true)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+
+                                Text(subtitle)
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                    .lineLimit(1)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                            if selectedMode == .coach {
+                                coachActions
+                            } else {
+                                spotifyActions
+                            }
                         }
                     }
                 }
@@ -168,7 +191,7 @@ struct ATHLTHWorkoutAudioDock: View {
                 .task(id: spotify.isConnected) {
                     // Read-only metadata refresh: never auto-resume playback.
                     guard spotify.isConnected else { return }
-                    await spotify.handleWatchRemoteCommand(.requestState)
+                    await spotify.handleIPhoneAudioDockCommand(.requestState)
                 }
                 .onAppear {
                     if !coachEnabled && spotify.isConnected {
@@ -319,7 +342,7 @@ struct ATHLTHWorkoutAudioDock: View {
                     )
             ) {
                 Task {
-                    await spotify.handleWatchRemoteCommand(
+                    await spotify.handleIPhoneAudioDockCommand(
                         spotify.isPlaying ? .pause : .resume
                     )
                 }
@@ -333,7 +356,7 @@ struct ATHLTHWorkoutAudioDock: View {
                 )
             ) {
                 Task {
-                    await spotify.handleWatchRemoteCommand(.next)
+                    await spotify.handleIPhoneAudioDockCommand(.next)
                 }
             }
         }
