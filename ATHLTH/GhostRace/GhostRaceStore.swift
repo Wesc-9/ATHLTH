@@ -670,6 +670,12 @@ final class GhostRaceStore: ObservableObject {
         ) else {
             comparison = nil
             leadTracker.invalidatePending()
+            // A physically impossible final GPS jump is not a verified
+            // finish, but ending the workout must still produce an incomplete
+            // race result instead of leaving Ghost Race running indefinitely.
+            if snapshot.state == .completed {
+                complete(snapshot: snapshot, reference: reference)
+            }
             return
         }
 
