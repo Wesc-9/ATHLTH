@@ -3,6 +3,7 @@ import SwiftUI
 /// The light "I dag" surface is deliberately separate from workout recording.
 /// Plans feed this view, while launching still goes through ATHLTHTrainView.
 struct ATHLTHTrainTodayPremiumView: View {
+    @EnvironmentObject private var social: SocialStore
     @ObservedObject var workoutCatalog: WorkoutTemplateCatalogStore
 
     let plan: TrainingPlan?
@@ -672,7 +673,16 @@ struct ATHLTHTrainTodayPremiumView: View {
                     .foregroundStyle(muted)
             }
 
-            VStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 12) {
+                // Show the same immediate friend line as the Home planner.
+                // Selection is passed to the next Quick Train start sheet.
+                WorkoutFriendPicker(
+                    selectedFriendIDs: $social.quickTrainFriendIDs
+                )
+
+                Divider()
+                    .overlay(hairline.opacity(0.55))
+
                 HStack(spacing: 12) {
                     quickChoice("figure.run", tr("Run", "Løping"), kind: .running)
                     quickChoice("figure.walk", tr("Walk", "Gå"), kind: .walking)
@@ -694,6 +704,14 @@ struct ATHLTHTrainTodayPremiumView: View {
         kind: WorkoutKind
     ) -> some View {
         Button {
+            // Strength presents an additional builder before its start sheet;
+            // its choice is handed over after that builder has been completed.
+            switch kind {
+            case .strength:
+                social.discardPreparedQuickTrainFriends()
+            default:
+                social.prepareQuickTrainFriendsForLaunch()
+            }
             onQuickTrain(kind)
         } label: {
             HStack(spacing: 10) {
