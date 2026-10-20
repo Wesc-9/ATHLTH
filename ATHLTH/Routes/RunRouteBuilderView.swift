@@ -84,9 +84,10 @@ struct RunRouteBuilderView: View {
                     if canOfferReturn {
                         outAndBackChoice
                     }
-                    alternativesCard
+                    if alternatives.count > 1 {
+                        alternativesCard
+                    }
                     routeDetailsCard
-                    saveCard
                 }
             }
             .padding()
@@ -224,141 +225,95 @@ struct RunRouteBuilderView: View {
     }
 
     private var routeNameCard: some View {
-        VStack(
-            alignment: .leading,
-            spacing: 10
-        ) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                Image(
-                    systemName:
-                        "character.cursor.ibeam"
-                )
-                .font(
-                    .subheadline
-                        .weight(.semibold)
-                )
-                .foregroundStyle(
-                    ATHLTHPlanDesign.accentInk
-                )
-                .frame(
-                    width: 34,
-                    height: 34
-                )
-                .background(
-                    ATHLTHPlanDesign.selectedSurface,
-                    in:
-                        RoundedRectangle(
-                            cornerRadius: 10,
-                            style: .continuous
-                        )
-                )
+                Image(systemName: "character.cursor.ibeam")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(width: 34, height: 34)
+                    .background(ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 10))
 
-                VStack(
-                    alignment: .leading,
-                    spacing: 2
-                ) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Route name",
-                            norwegian: "Rutenavn"
-                        )
-                    )
-                    .font(
-                        .subheadline
-                            .weight(.semibold)
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .primaryText
-                    )
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Optional",
-                            norwegian: "Valgfritt"
-                        )
-                    )
+                Text(ATHLTHLocalization.choose(
+                    english: "Route name", norwegian: "Rutenavn"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                Text(ATHLTHLocalization.choose(
+                    english: "Optional", norwegian: "Valgfritt"))
                     .font(.caption2)
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
-                    )
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                Spacer(minLength: 0)
+                Menu {
+                    Picker(ATHLTHLocalization.choose(
+                        english: "Visibility", norwegian: "Synlighet"),
+                        selection: $visibility) {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Private", norwegian: "Privat"),
+                            systemImage: "lock.fill").tag(ProfileVisibility.privateOnly)
+                        Label(ATHLTHLocalization.choose(
+                            english: "Friends", norwegian: "Venner"),
+                            systemImage: "person.2").tag(ProfileVisibility.friends)
+                        Label(ATHLTHLocalization.choose(
+                            english: "Public", norwegian: "Offentlig"),
+                            systemImage: "globe").tag(ProfileVisibility.publicProfile)
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: visibility == .privateOnly ? "lock.fill"
+                              : visibility == .friends ? "person.2" : "globe")
+                        Text(visibility == .privateOnly
+                             ? ATHLTHLocalization.choose(english: "Private", norwegian: "Privat")
+                             : visibility == .friends
+                             ? ATHLTHLocalization.choose(english: "Friends", norwegian: "Venner")
+                             : ATHLTHLocalization.choose(english: "Public", norwegian: "Offentlig"))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .padding(.horizontal, 10)
+                    .frame(height: 32)
+                    .background(ATHLTHPlanDesign.selectedSurface, in: Capsule())
                 }
-
-                Spacer()
             }
 
-            TextField(
-                ATHLTHLocalization.choose(
-                    english: "Give the route a name",
-                    norwegian: "Gi ruten et navn"
-                ),
-                text: $title
-            )
-            .textInputAutocapitalization(
-                .words
-            )
-            .padding(
-                .horizontal,
-                13
-            )
-            .frame(height: 46)
-            .background(
-                ATHLTHTheme
-                    .surfaceStone
-                    .opacity(0.78),
-                in:
-                    RoundedRectangle(
-                        cornerRadius: 14,
-                        style: .continuous
-                    )
-            )
+            TextField(ATHLTHLocalization.choose(
+                english: "Give the route a name", norwegian: "Gi ruten et navn"),
+                text: $title)
+                .textInputAutocapitalization(.words)
+                .font(.subheadline)
+                .padding(.horizontal, 12)
+                .frame(height: 44)
+                .background(ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 13))
 
-            if let automaticRouteTitle {
-                Text(
-                    ATHLTHLocalization.format(
-                        english:
-                            "Leave empty to use “%@”.",
-                        norwegian:
-                            "La feltet stå tomt for å bruke «%@».",
-                        automaticRouteTitle
-                    )
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .mutedText
-                )
-                .lineLimit(2)
-            } else {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "If left empty, the start and finish addresses become the route name.",
-                        norwegian:
-                            "Hvis feltet er tomt, brukes start- og sluttadressen som rutenavn."
-                    )
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .mutedText
-                )
+            if title.isEmpty, let automaticRouteTitle {
+                Text(automaticRouteTitle)
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            if visibility == .publicProfile {
+                Text(ATHLTHLocalization.choose(
+                    english: "Public routes may appear in Explore.",
+                    norwegian: "Offentlige ruter kan vises i Utforsk."))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
         }
-        .padding()
+        .padding(15)
         .routeBuilderCard()
     }
 
     private var endpointsCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 9) {
             HStack {
-                Text(ATHLTHLocalization.choose(english: "Route", norwegian: "Rute"))
-                    .font(.title3.bold())
+                Text(ATHLTHLocalization.choose(
+                    english: "Route", norwegian: "Rute"))
+                    .font(.headline.weight(.bold))
                     .foregroundStyle(ATHLTHPlanDesign.ink)
-
                 Spacer()
-
                 Button {
                     rememberMapState()
                     let oldStart = startItem
@@ -368,22 +323,22 @@ struct RunRouteBuilderView: View {
                     invalidateCalculatedRoute()
                     Task { await calculateRoutesIfReady(force: true) }
                 } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Swap", norwegian: "Bytt"
-                        ),
-                        systemImage: "arrow.up.arrow.down"
-                    )
-                    .font(.caption.weight(.semibold))
+                    Label(ATHLTHLocalization.choose(
+                        english: "Swap", norwegian: "Bytt"),
+                        systemImage: "arrow.up.arrow.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .padding(.horizontal, 11)
+                        .frame(height: 32)
+                        .background(ATHLTHPlanDesign.selectedSurface, in: Capsule())
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                .buttonStyle(.plain)
             }
 
             RunRouteSearchField(
-                title: "From",
+                title: "Start",
                 icon: "circle.fill",
-                tint: ATHLTHTheme.accent,
+                tint: ATHLTHPlanDesign.accentInk,
                 model: startSearch,
                 selectedItem: startItem,
                 referenceCoordinate: searchLocation.location?.coordinate
@@ -398,15 +353,8 @@ struct RunRouteBuilderView: View {
 
             routeConnector
 
-            ForEach(
-                Array(viaPoints.enumerated()),
-                id: \.element.id
-            ) { index, point in
-                viaPointRow(
-                    point,
-                    index: index
-                )
-
+            ForEach(Array(viaPoints.enumerated()), id: \.element.id) { index, point in
+                viaPointRow(point, index: index)
                 routeConnector
             }
 
@@ -423,34 +371,14 @@ struct RunRouteBuilderView: View {
                 ) { item in
                     addViaPoint(item)
                 }
-
                 routeConnector
             }
 
-            HStack {
-                Spacer()
-
-                Button {
-                    showingViaSearch.toggle()
-                    if !showingViaSearch {
-                        viaSearch.clear()
-                    }
-                } label: {
-                    Label(
-                        showingViaSearch ? "Done" : "Via",
-                        systemImage: showingViaSearch
-                            ? "checkmark"
-                            : "plus"
-                    )
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            }
-
             RunRouteSearchField(
-                title: "To",
-                icon: "mappin.circle.fill",
-                tint: .red,
+                title: ATHLTHLocalization.choose(
+                    english: "Finish", norwegian: "Mål"),
+                icon: "flag.checkered",
+                tint: ATHLTHPlanDesign.accentInk,
                 model: endSearch,
                 selectedItem: endItem,
                 referenceCoordinate: startItem?.placemark.coordinate
@@ -464,33 +392,44 @@ struct RunRouteBuilderView: View {
                 Task { await calculateRoutesIfReady(force: true) }
             }
 
-            Button {
-                Task {
-                    await calculateRoutesIfReady(force: true)
+            HStack(spacing: 9) {
+                Button {
+                    showingViaSearch.toggle()
+                    if !showingViaSearch { viaSearch.clear() }
+                } label: {
+                    Label(showingViaSearch
+                          ? ATHLTHLocalization.choose(english: "Done", norwegian: "Ferdig")
+                          : ATHLTHLocalization.choose(english: "Via point", norwegian: "Via-punkt"),
+                          systemImage: showingViaSearch ? "checkmark" : "plus")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .padding(.horizontal, 11)
+                        .frame(height: 35)
+                        .background(ATHLTHPlanDesign.selectedSurface, in: Capsule())
                 }
-            } label: {
-                Label(
-                    "Build Route",
-                    systemImage: "point.topleft.down.to.point.bottomright.curvepath"
-                )
-                .frame(maxWidth: .infinity)
+                .buttonStyle(.plain)
+                Spacer()
+                if startItem != nil && endItem != nil {
+                    Button {
+                        Task { await calculateRoutesIfReady(force: true) }
+                    } label: {
+                        Label(selectedAlternative == nil
+                            ? ATHLTHLocalization.choose(english: "Build route", norwegian: "Bygg rute")
+                            : ATHLTHLocalization.choose(english: "Update route", norwegian: "Oppdater rute"),
+                            systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .frame(height: 35)
+                            .background(ATHLTHPlanDesign.accent, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isCalculating)
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .tint(ATHLTHPlanDesign.accent)
-            .disabled(
-                startItem == nil ||
-                endItem == nil ||
-                isCalculating
-            )
-
-            Text(ATHLTHLocalization.choose(
-                english: "Search for an address, or set start, finish and via points on the map below.",
-                norwegian: "Søk etter adresse, eller sett start, mål og via-punkter direkte i kartet under."
-            ))
-            .font(.caption)
-            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            .padding(.top, 2)
         }
-        .padding()
+        .padding(15)
         .routeBuilderCard()
     }
 
@@ -1102,8 +1041,8 @@ struct RunRouteBuilderView: View {
     private var routeConnector: some View {
         Rectangle()
             .fill(.secondary.opacity(0.22))
-            .frame(width: 2, height: 18)
-            .padding(.leading, 20)
+            .frame(width: 2, height: 10)
+            .padding(.leading, 19)
     }
 
     private func viaPointRow(
