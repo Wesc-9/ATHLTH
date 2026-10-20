@@ -98,6 +98,8 @@ private struct WatchPersistedWorkoutState: Codable {
     var lastLapDistanceMeters: Double
     var automaticPauseCount: Int
     var automaticPauseEnabled: Bool? = nil
+    var returningToRouteStart: Bool? = nil
+    var routeLegDistanceOffsetMeters: Double? = nil
     var strengthSession:
         WatchStrengthSessionSnapshot? = nil
     var strengthCommands:
@@ -140,6 +142,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     @Published private(set) var routeNavigationNearestPointIndex: Int?
     @Published private(set) var routeNavigationRevision = 0
     @Published private(set) var returningToRouteStart = false
+    private var routeLegDistanceOffsetMeters: Double = 0
     @Published private(set) var routeAlertConfiguration:
         WatchRouteAlertConfiguration = .standard
     @Published private(set) var targetAlertConfiguration:
@@ -362,8 +365,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         // Keep the HealthKit workout running. Only navigation changes;
         // ghost progress on the original A–B course is no longer comparable.
         disableGhostDuringWorkout()
-        configurePlannedRoute(trip)
+        routeLegDistanceOffsetMeters = distanceMeters
         returningToRouteStart = true
+        configurePlannedRoute(trip)
         lastSpokenRouteTurnIndex = nil
         deliverWorkoutAlert(
             english: "Returning to start. Follow the route in reverse.",
@@ -3201,6 +3205,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     automaticPauseCount,
                 automaticPauseEnabled:
                     automaticPauseEnabled,
+                returningToRouteStart: returningToRouteStart,
+                routeLegDistanceOffsetMeters: routeLegDistanceOffsetMeters,
                 strengthSession:
                     strengthSession,
                 strengthCommands:
@@ -3243,6 +3249,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             snapshot.startedAt
         ghostRaceConfiguration =
             snapshot.ghostRace
+        returningToRouteStart = snapshot.returningToRouteStart ?? false
+        routeLegDistanceOffsetMeters = max(
+            0, snapshot.routeLegDistanceOffsetMeters ?? 0
+        )
         strengthCommandJournal =
             snapshot.strengthCommands ?? []
         structuredStepStartElapsedTime =
@@ -3338,6 +3348,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     private func prepareForLocalWorkoutStart() {
         ghostRaceConfiguration = nil
+        returningToRouteStart = false
+        routeLegDistanceOffsetMeters = 0
         cachePlannedRouteGeometry(nil)
 
         publish {
@@ -3530,6 +3542,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         guard !isActive, state != .preparing, state != .ending else { return }
 
         let resolvedRoute = route ?? plannedRoute
+        returningToRouteStart = false
+        routeLegDistanceOffsetMeters = 0
         cachePlannedRouteGeometry(resolvedRoute)
 
         publish {
@@ -4419,7 +4433,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                                 0
                             )
                         },
-                    workoutDistanceMeters: distanceMeters,
+                    workoutDistanceMeters: max(
+                        distanceMeters - routeLegDistanceOffsetMeters, 0
+                    ),
                     previousRouteMeters: routeProgressPercent.map {
                         $0 / 100 * plannedRouteGeometryMeters
                     }
