@@ -6034,64 +6034,82 @@ struct SessionEditorView: View {
 
     @ViewBuilder
     private var workoutSourcesSection: some View {
-                if onPreparedWorkout == nil ||
-                    initialSourceWorkout?.allowInviteeExercises == true {
-                    Section {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Label(
-                                ATHLTHLocalization.choose(english: "Add to workout", norwegian: "Legg til"),
-                                systemImage: "plus.circle.fill"
-                            )
-                            .font(.headline)
-                            .foregroundStyle(ATHLTHTheme.primaryText)
+        Group {
+            if onPreparedWorkout == nil || initialSourceWorkout?.allowInviteeExercises == true {
+                Section {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(
+                            ATHLTHLocalization.choose(english: "Add to workout", norwegian: "Legg til"),
+                            systemImage: "plus.circle.fill"
+                        )
+                        .font(.headline)
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
 
-                            HStack(spacing: 10) {
-                                Button {
-                                    showingSavedWorkoutPicker = true
-                                } label: {
-                                    VStack(alignment: .leading, spacing: 7) {
-                                        Image(systemName: "rectangle.stack.fill")
-                                            .font(.title3)
-                                        Text(ATHLTHLocalization.choose(english: "Workout", norwegian: "Treningsøkt"))
-                                            .font(.subheadline.weight(.semibold))
-                                        Text(ATHLTHLocalization.choose(english: "Use a saved workout", norwegian: "Bruk en lagret økt"))
-                                            .font(.caption2)
-                                            .foregroundStyle(ATHLTHTheme.mutedText)
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(14)
-                                    .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 17))
-                                }
-                                .buttonStyle(.plain)
-
-                                Button {
-                                    kind = .strength
-                                    showingExerciseLibrary = true
-                                } label: {
-                                    VStack(alignment: .leading, spacing: 7) {
-                                        Image(systemName: "dumbbell.fill")
-                                            .font(.title3)
-                                        Text(ATHLTHLocalization.choose(english: "Exercise", norwegian: "Øvelse"))
-                                            .font(.subheadline.weight(.semibold))
-                                        Text(ATHLTHLocalization.choose(english: "Choose from library", norwegian: "Velg fra biblioteket"))
-                                            .font(.caption2)
-                                            .foregroundStyle(ATHLTHTheme.mutedText)
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(14)
-                                    .background(ATHLTHPlanDesign.warmSurface, in: RoundedRectangle(cornerRadius: 17))
-                                }
-                                .buttonStyle(.plain)
+                        HStack(spacing: 9) {
+                            Button {
+                                showingSavedWorkoutPicker = true
+                            } label: {
+                                compactAddTile(
+                                    icon: "rectangle.stack.fill",
+                                    title: ATHLTHLocalization.choose(english: "Workout", norwegian: "Treningsøkt"),
+                                    subtitle: ATHLTHLocalization.choose(english: "Use saved", norwegian: "Bruk lagret"),
+                                    background: ATHLTHPlanDesign.selectedSurface
+                                )
                             }
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            .buttonStyle(.plain)
+
+                            Button {
+                                kind = .strength
+                                showingExerciseLibrary = true
+                            } label: {
+                                compactAddTile(
+                                    icon: "dumbbell.fill",
+                                    title: ATHLTHLocalization.choose(english: "Exercise", norwegian: "Øvelse"),
+                                    subtitle: ATHLTHLocalization.choose(english: "From library", norwegian: "Fra biblioteket"),
+                                    background: ATHLTHPlanDesign.warmSurface
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .padding(.vertical, 10)
                     }
-                    .listRowBackground(ATHLTHPlanDesign.surface)
-                    .listRowSeparator(.hidden)
+                    .padding(.vertical, 3)
                 }
+                .listRowBackground(ATHLTHPlanDesign.surface)
+                .listRowSeparator(.hidden)
+            }
+        }
     }
 
+    private func compactAddTile(
+        icon: String,
+        title: String,
+        subtitle: String,
+        background: Color
+    ) -> some View {
+        HStack(spacing: 9) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .frame(width: 29)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                Text(subtitle)
+                    .font(.system(size: 10))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+        }
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, minHeight: 65)
+        .background(background, in: RoundedRectangle(cornerRadius: 14))
+        .contentShape(RoundedRectangle(cornerRadius: 14))
+    }
 
     private var sourceChoiceCard: some View {
         WorkoutPlanningSourceCard(
@@ -8768,7 +8786,7 @@ struct SessionEditorView: View {
         block: RunningWorkoutBlock,
         isRecovery: Bool
     ) -> some View {
-        let target = isRecovery ? block.recovery ?? .open : block.work
+        let target: RunningStepTarget = isRecovery ? (block.recovery ?? .open) : block.work
         let count = isRecovery ? max(0, block.repetitions - 1) : max(1, block.repetitions)
         let name = isRecovery
             ? ATHLTHLocalization.choose(english: "Active recovery", norwegian: "Aktiv pause")
