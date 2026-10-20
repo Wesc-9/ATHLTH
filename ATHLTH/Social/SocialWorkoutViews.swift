@@ -5020,6 +5020,7 @@ private struct HomeActivityCommunityCard: View {
 
 struct WorkoutPublishView: View {
     let initialWorkoutID: UUID?
+    var initialVisibility: ProfileVisibility? = nil
 
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var health: HealthKitManager
@@ -5038,8 +5039,10 @@ struct WorkoutPublishView: View {
     @State private var loadingRoute = false
     @State private var successMessage: String?
 
-    init(initialWorkoutID: UUID? = nil) {
+    init(initialWorkoutID: UUID? = nil,
+         initialVisibility: ProfileVisibility? = nil) {
         self.initialWorkoutID = initialWorkoutID
+        self.initialVisibility = initialVisibility
     }
 
     private var workouts: [SocialPublishableWorkout] {
@@ -5238,7 +5241,7 @@ struct WorkoutPublishView: View {
                 }
             }
             .task {
-                visibility = settings.defaultActivityVisibility
+                visibility = initialVisibility ?? settings.defaultActivityVisibility
 
                 if health.hasRequestedAuthorization && health.workouts.isEmpty {
                     await health.refreshAll()
@@ -5258,7 +5261,7 @@ struct WorkoutPublishView: View {
                 guard let selectedWorkoutID else {
                     selectedAlreadyPublished = false
                     caption = ""
-                    visibility = settings.defaultActivityVisibility
+                    visibility = initialVisibility ?? settings.defaultActivityVisibility
                     return
                 }
 
