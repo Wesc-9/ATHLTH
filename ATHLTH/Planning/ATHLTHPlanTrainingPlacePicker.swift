@@ -1,12 +1,20 @@
 import SwiftUI
-import MapKit
+@preconcurrency import MapKit
 import Combine
 
+/// MapKit result types are not Sendable. Transfer only these immutable strings
+/// from the delegate to the SwiftUI main actor.
+private struct ATHLTHTrainingPlaceSuggestion: Sendable {
+    let title: String
+    let subtitle: String
+}
+
 /// Apple Maps address and point-of-interest suggestions without requiring
-/// the athlete's current location or making a place publicly visible.
+/// the athlete's current location.
+@MainActor
 final class ATHLTHTrainingPlaceSearch: NSObject, ObservableObject,
     MKLocalSearchCompleterDelegate {
-    @Published private(set) var results: [MKLocalSearchCompletion] = []
+    @Published private(set) var results: [ATHLTHTrainingPlaceSuggestion] = []
     private let completer = MKLocalSearchCompleter()
 
     override init() {
@@ -21,13 +29,20 @@ final class ATHLTHTrainingPlaceSearch: NSObject, ObservableObject,
         completer.queryFragment = clean
     }
 
-    func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
-        results = completer.results
+    nonisolated func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
+        let suggestions = completer.results.prefix(8).map {
+            ATHLTHTrainingPlaceSuggestion(title: $0.title, subtitle: $0.subtitle)
+        }
+        Task { @MainActor [weak self] in
+            self?.results = suggestions
+        }
     }
 
-    func completer(_ completer: MKLocalSearchCompleter,
-                   didFailWithError error: Error) {
-        results = []
+    nonisolated func completer(_ completer: MKLocalSearchCompleter,
+                              didFailWithError error: Error) {
+        Task { @MainActor [weak self] in
+            self?.results = []
+        }
     }
 }
 
