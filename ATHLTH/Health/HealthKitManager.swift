@@ -53,6 +53,112 @@ private final class HealthRouteQueryAccumulator:
 }
 
 
+ // MARK: - Shared HealthKit sleep-session grouping
+ //
+ // Sleep may have a long, explicitly recorded awake interval in the middle of
+ // one night. Splitting all gaps above two hours drops genuine asleep stages
+ // from both the latest value and the historical trend.
+ enum SleepSessionGrouping {
+     static func sessions(from samples: [HKCategorySample]) -> [[HKCategorySample]] {
+         let asleep = samples.filter { sample in
+             guard sample.endDate > sample.startDate,
+                   let value = HKCategoryValueSleepAnalysis(rawValue: sample.value)
+             else { return false }
+             switch value {
+             case .asleepCore, .asleepDeep, .asleepREM, .asleepUnspecified:
+                 return true
+             default:
+                 return false
+             }
+         }
+         .sorted { $0.startDate < $1.startDate }
+
+         let sleepWindowEvidence = samples.filter { sample in
+             guard sample.endDate > sample.startDate,
+                   let value = HKCategoryValueSleepAnalysis(rawValue: sample.value)
+             else { return false }
+             switch value {
+             case .awake, .inBed:
+                 return true
+             default:
+                 return false
+             }
+         }
+
+         var sessions: [[HKCategorySample]] = []
+         for sample in asleep {
+             guard let current = sessions.indices.last else {
+                 sessions.append([sample])
+                 continue
+             }
+             guard let latestSample = sessions[current].max(by: {
+                 $0.endDate < $1.endDate
+             }) else {
+                 sessions.append([sample])
+                 continue
+             }
+
+             let gapStart = latestSample.endDate
+             let gap = sample.startDate.timeIntervalSince(gapStart)
+             if gap <= 2 * 3_600 ||
+                 (gap <= 4 * 3_600 &&
+                  hasRecordedSleepWindow(
+                      from: gapStart,
+                      to: sample.startDate,
+                      sources: Set([
+                          latestSample.sourceRevision.source.bundleIdentifier,
+                          sample.sourceRevision.source.bundleIdentifier
+                      ]),
+                      evidence: sleepWindowEvidence
+                  )) {
+                 sessions[current].append(sample)
+             } else {
+                 sessions.append([sample])
+             }
+         }
+         return sessions
+     }
+
+     private static func hasRecordedSleepWindow(
+         from start: Date,
+         to end: Date,
+         sources: Set<String>,
+         evidence: [HKCategorySample]
+     ) -> Bool {
+         let gap = end.timeIntervalSince(start)
+         guard gap > 0 else { return false }
+
+         // Use explicit awake/in-bed coverage belonging to the adjoining
+         // sleep sources. Merely being on the same calendar day is not proof
+         // that two otherwise separate naps are one sleep session.
+         let intervals = evidence.compactMap { sample -> (Date, Date)? in
+             guard sources.contains(sample.sourceRevision.source.bundleIdentifier),
+                   sample.startDate < end,
+                   sample.endDate > start
+             else { return nil }
+             return (max(start, sample.startDate), min(end, sample.endDate))
+         }
+         .sorted { $0.0 < $1.0 }
+
+         guard let first = intervals.first else { return false }
+         var currentStart = first.0
+         var currentEnd = first.1
+         var covered: TimeInterval = 0
+
+         for (segmentStart, segmentEnd) in intervals.dropFirst() {
+             if segmentStart <= currentEnd {
+                 currentEnd = max(currentEnd, segmentEnd)
+             } else {
+                 covered += currentEnd.timeIntervalSince(currentStart)
+                 currentStart = segmentStart
+                 currentEnd = segmentEnd
+             }
+         }
+         covered += currentEnd.timeIntervalSince(currentStart)
+         return covered >= gap * 0.75
+     }
+ }
+
 @MainActor
 final class HealthKitManager: ObservableObject {
     static let shared = HealthKitManager()
@@ -4878,17 +4984,6 @@ final class HealthKitManager: ObservableObject {
             HKCategoryValueSleepAnalysis(rawValue: sample.value)
         }
 
-        func isAsleep(_ sample: HKCategorySample) -> Bool {
-            guard let value = sleepValue(sample) else { return false }
-
-            switch value {
-            case .asleepCore, .asleepDeep, .asleepREM, .asleepUnspecified:
-                return true
-            default:
-                return false
-            }
-        }
-
         func mergedDuration(_ input: [HKCategorySample]) -> TimeInterval {
             let sorted = input
                 .filter { $0.endDate > $0.startDate }
@@ -4914,34 +5009,8 @@ final class HealthKitManager: ObservableObject {
             return max(total, 0)
         }
 
-        let asleepSamples = samples.filter(isAsleep)
-        guard !asleepSamples.isEmpty else {
-            return .empty
-        }
-
-        // Build sleep sessions while allowing normal awake gaps during the
-        // night. Selecting the longest recent session keeps a later short nap
-        // from replacing the main overnight sleep.
-        let sortedAsleep = asleepSamples.sorted { $0.startDate < $1.startDate }
-        var sessions: [[HKCategorySample]] = []
-
-        for sample in sortedAsleep {
-            guard !sessions.isEmpty else {
-                sessions.append([sample])
-                continue
-            }
-
-            let currentIndex = sessions.index(before: sessions.endIndex)
-            let latestEnd = sessions[currentIndex]
-                .map(\.endDate)
-                .max() ?? sample.startDate
-
-            if sample.startDate.timeIntervalSince(latestEnd) <= 2 * 60 * 60 {
-                sessions[currentIndex].append(sample)
-            } else {
-                sessions.append([sample])
-            }
-        }
+        let sessions = SleepSessionGrouping.sessions(from: samples)
+        guard !sessions.isEmpty else { return .empty }
 
         // Prefer the newest substantial sleep session. The previous
         // 36-hour query could begin in the middle of an older overnight
@@ -5893,21 +5962,8 @@ final class HealthKitManager: ObservableObject {
             healthStore.execute(query)
         }
 
-        let asleepSamples = samples.filter { sample in
-            guard let value = HKCategoryValueSleepAnalysis(rawValue: sample.value) else {
-                return false
-            }
-
-            switch value {
-            case .asleepCore, .asleepDeep, .asleepREM, .asleepUnspecified:
-                return sample.endDate > sample.startDate
-            default:
-                return false
-            }
-        }
-        .sorted { $0.startDate < $1.startDate }
-
-        guard !asleepSamples.isEmpty else { return [:] }
+        let sessions = SleepSessionGrouping.sessions(from: samples)
+        guard !sessions.isEmpty else { return [:] }
 
         func mergedDuration(_ input: [HKCategorySample]) -> TimeInterval {
             let sorted = input.sorted { $0.startDate < $1.startDate }
@@ -5929,28 +5985,6 @@ final class HealthKitManager: ObservableObject {
 
             total += currentEnd.timeIntervalSince(currentStart)
             return max(total, 0)
-        }
-
-        // Build complete sleep sessions first. A normal awake period inside a
-        // night does not create a new session, while a long daytime gap does.
-        var sessions: [[HKCategorySample]] = []
-
-        for sample in asleepSamples {
-            guard !sessions.isEmpty else {
-                sessions.append([sample])
-                continue
-            }
-
-            let currentIndex = sessions.index(before: sessions.endIndex)
-            let latestEnd = sessions[currentIndex]
-                .map(\.endDate)
-                .max() ?? sample.startDate
-
-            if sample.startDate.timeIntervalSince(latestEnd) <= 2 * 60 * 60 {
-                sessions[currentIndex].append(sample)
-            } else {
-                sessions.append([sample])
-            }
         }
 
         // Tie the complete session to its wake-up day. If a nap and an
