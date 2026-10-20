@@ -379,6 +379,7 @@ struct WorkoutGearSelectionCard: View {
 
     @Binding var selectedGearIDs: Set<UUID>
     let activity: WorkoutActivity
+    @State private var isExpanded = false
 
     private var eligibleItems: [ProfileGearItem] {
         gear.activeItems(for: activity)
@@ -392,129 +393,155 @@ struct WorkoutGearSelectionCard: View {
         eligibleItems.filter { $0.category != .shoes }
     }
 
-    var body: some View {
-        ATHLTHUnifiedCard {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Gear")
-                        .font(.headline)
-
-                    Text(
-                        activity == .running
-                            ? ATHLTHLocalization.choose(
-                                english:
-                                    "Choose your running shoes and anything else you used.",
-                                norwegian:
-                                    "Velg løpeskoene dine og annet utstyr du brukte."
-                            )
-                            : ATHLTHLocalization.choose(
-                                english:
-                                    "Add the equipment used for this workout.",
-                                norwegian:
-                                    "Velg utstyret du brukte i denne økten."
-                            )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                NavigationLink {
-                    ProfileGearManagerView()
-                } label: {
-                    Text("Manage")
-                        .font(.caption.weight(.semibold))
-                }
+    private var selectionSummary: String {
+        let selected = eligibleItems.filter { selectedGearIDs.contains($0.id) }
+        guard !selected.isEmpty else {
+            return ATHLTHLocalization.choose(
+                english: "Optional · choose equipment",
+                norwegian: "Valgfritt · velg utstyr"
+            )
+        }
+        if let shoe = selected.first(where: { $0.category == .shoes }) {
+            let otherCount = selected.count - 1
+            if otherCount > 0 {
+                return shoe.name + " · +" + String(otherCount)
             }
+            return shoe.name
+        }
+        return ATHLTHLocalization.format(
+            english: "%d items selected",
+            norwegian: "%d valgt",
+            selected.count
+        )
+    }
 
-            if eligibleItems.isEmpty {
-                NavigationLink {
-                    ProfileGearManagerView()
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(ATHLTHTheme.accent)
+    var body: some View {
+        ATHLTHPlanSurface(ghost: false, density: .compact) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.20)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 11) {
+                    Image(systemName: "shoeprints.fill")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(width: 40, height: 40)
+                        .background(
+                            ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 12)
+                        )
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english: "Add your first gear",
-                                    norwegian: "Legg til ditt første utstyr"
-                                )
-                            )
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.primary)
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "Shoes and other equipment can be linked to workouts.",
-                                    norwegian:
-                                        "Sko og annet utstyr kan knyttes til treningsøktene dine."
-                                )
-                            )
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Equipment", norwegian: "Utstyr"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                        Text(selectionSummary)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        Image(systemName: "chevron.right")
-                            .font(.caption2.bold())
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                     }
-                    .padding(.top, 10)
+                    Spacer(minLength: 5)
+                    Text(isExpanded
+                        ? ATHLTHLocalization.choose(english: "Close", norwegian: "Lukk")
+                        : ATHLTHLocalization.choose(english: "Change", norwegian: "Endre")
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 }
-                .buttonStyle(.plain)
-            } else {
-                VStack(spacing: 9) {
-                    if !shoes.isEmpty {
-                        gearSectionLabel(
+                .frame(minHeight: 48)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(ATHLTHLocalization.choose(
+                english: "Expand or collapse equipment for this workout",
+                norwegian: "Vis eller skjul utstyr for denne økten"
+            ))
+
+            if isExpanded {
+                Divider()
+                    .overlay(ATHLTHPlanDesign.warmDivider)
+
+                HStack {
+                    Text(ATHLTHLocalization.choose(
+                        english: "For this workout",
+                        norwegian: "For denne økten"
+                    ))
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    Spacer()
+                    NavigationLink {
+                        ProfileGearManagerView()
+                    } label: {
+                        Label(
                             ATHLTHLocalization.choose(
-                                english: "RUNNING SHOES",
-                                norwegian: "LØPESKO"
+                                english: "Manage", norwegian: "Administrer"
                             ),
-                            detail:
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "One pair per workout",
-                                    norwegian:
-                                        "Ett par per økt"
-                                )
+                            systemImage: "slider.horizontal.3"
                         )
-
-                        ForEach(shoes) { item in
-                            selectionRow(item)
-                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
                     }
+                }
 
-                    if !otherGear.isEmpty {
+                if eligibleItems.isEmpty {
+                    NavigationLink {
+                        ProfileGearManagerView()
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Add your first equipment",
+                                norwegian: "Legg til ditt første utstyr"
+                            ),
+                            systemImage: "plus.circle"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                } else {
+                    VStack(spacing: 9) {
                         if !shoes.isEmpty {
-                            Divider()
-                                .padding(.vertical, 3)
-                        }
-
-                        gearSectionLabel(
-                            ATHLTHLocalization.choose(
-                                english: "OTHER GEAR",
-                                norwegian: "ANNET UTSTYR"
-                            ),
-                            detail:
+                            gearSectionLabel(
                                 ATHLTHLocalization.choose(
-                                    english:
-                                        "Select any that you used",
-                                    norwegian:
-                                        "Velg det du brukte"
+                                    english: "RUNNING SHOES", norwegian: "LØPESKO"
+                                ),
+                                detail: ATHLTHLocalization.choose(
+                                    english: "One pair per workout",
+                                    norwegian: "Ett par per økt"
                                 )
-                        )
-
-                        ForEach(otherGear) { item in
-                            selectionRow(item)
+                            )
+                            ForEach(shoes) { item in
+                                selectionRow(item)
+                            }
+                        }
+                        if !otherGear.isEmpty {
+                            if !shoes.isEmpty {
+                                Divider()
+                                    .overlay(ATHLTHPlanDesign.warmDivider)
+                            }
+                            gearSectionLabel(
+                                ATHLTHLocalization.choose(
+                                    english: "OTHER EQUIPMENT",
+                                    norwegian: "ANNET UTSTYR"
+                                ),
+                                detail: ATHLTHLocalization.choose(
+                                    english: "Select what you used",
+                                    norwegian: "Velg det du brukte"
+                                )
+                            )
+                            ForEach(otherGear) { item in
+                                selectionRow(item)
+                            }
                         }
                     }
                 }
-                .padding(.top, 12)
             }
         }
         .task {
