@@ -2709,9 +2709,7 @@ struct WatchRunWorkoutExperienceView: View {
 
     private var routeNextTurnCard: some View {
         let cue = workoutManager.routeNavigationCue
-        let norwegian = ATHLTHLocalization.choose(
-            english: false, norwegian: true
-        )
+        let norwegian = ATHLTHLocalization.isNorwegian
         return HStack(alignment: .center, spacing: 9) {
             Image(systemName: cue?.symbol ?? "arrow.up")
                 .font(.system(size: 22, weight: .bold))
