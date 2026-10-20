@@ -124,6 +124,9 @@ enum ATHLTHUnifiedWorkout {
             $0.kind == .run && $0.cardioActivity != .walking
         }
         let hasStrength = blocks.contains { $0.kind == .exercise }
+        let wellness = blocks.compactMap(\.wellnessKind)
+        let wellnessKind: WorkoutKind = wellness.allSatisfy({ $0 == .meditation })
+            ? .recovery : .mobility
 
         workout.workoutBlocks = blocks
         let plannedKind = workout.kind
@@ -136,11 +139,13 @@ enum ATHLTHUnifiedWorkout {
             ? .custom
             : effectiveWalking && !effectiveRunning ? .walking
             : effectiveRunning ? .running
+            : !wellness.isEmpty ? wellnessKind
             : (plannedKind == .mobility ? .mobility : .strength)
         workout.workoutCategory = workout.kind == .custom ? "hybrid" :
             workout.kind == .walking ? "walking" :
             workout.kind == .running ? "running" :
-            (workout.kind == .mobility ? "mobility" : "strength")
+            (workout.kind == .mobility ? "mobility" :
+               workout.kind == .recovery ? "recovery" : "strength")
         workout.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
             .isEmpty ? workout.kind.title : title
         workout.routeID = blocks.contains { $0.kind == .run && $0.isIndoor != true } ? routeID : nil
