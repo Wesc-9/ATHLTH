@@ -165,6 +165,11 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
 
     private var pendingPlaybackURI: String?
     private var pendingPlaybackPlaylist: SpotifyPlaylistReference?
+    // Spotify started outside ATHLTH is still controllable through App Remote.
+    // This flag only allows re-establishing a remote control connection; it
+    // never permits restarting playback or choosing a playlist.
+    private var hasRequestedOnDemandRemoteControls = false
+    private var connectingForRemoteControl = false
     private var workoutAutoplayGate = SpotifyWorkoutAutoplayGate()
     private var pkceSession: SpotifyPKCESession?
     private var webAuthenticationSession: ASWebAuthenticationSession?
@@ -326,16 +331,16 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     func applicationDidBecomeActive() {
         // A remembered playlist does not authorize restarting music.
         // Reconnect only to control a still-active linked workout.
-        guard workoutAutoplayGate.shouldReconnectForControls,
+        guard (workoutAutoplayGate.shouldReconnectForControls ||
+                   hasRequestedOnDemandRemoteControls),
               let appRemote,
-              !appRemote.isConnected,
-              activePlaylist != nil
+              !appRemote.isConnected
         else { return }
 
         Task {
             guard let token = await accessTokenForRequest(),
-                  workoutAutoplayGate.shouldReconnectForControls,
-                  activePlaylist != nil,
+                  (workoutAutoplayGate.shouldReconnectForControls ||
+                   hasRequestedOnDemandRemoteControls),
                   !appRemote.isConnected
             else { return }
             appRemote.connectionParameters.accessToken = token
@@ -354,6 +359,8 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     }
 
     func disconnect() {
+        hasRequestedOnDemandRemoteControls = false
+        connectingForRemoteControl = false
         workoutAutoplayGate.end()
         appRemote?.disconnect()
         sessionManager?.session = nil
@@ -608,6 +615,126 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         watchTrackTitle = nil
         watchArtistName = nil
         lastStartedAt = nil
+    }
+
+    /// iPhone controls prefer Spotify App Remote, which talks to the actual
+    /// Spotify app already playing on this iPhone. The Web API is only a
+    /// fallback, as its player endpoints can reject otherwise valid sessions.
+    /// Neither transport starts a playlist or resumes audio on reconnection.
+    func handleIPhoneAudioDockCommand(_ kind: WatchSpotifyCommandKind) async {
+        guard isConfigured, isConnected else {
+            lastErrorMessage = ATHLTHLocalization.choose(
+                english: "Connect Spotify in Settings to control music.",
+                norwegian: "Koble til Spotify i Innstillinger for å styre musikken."
+            )
+            return
+        }
+
+        if await connectAppRemoteForControls(),
+           let playerAPI = appRemote?.playerAPI {
+            switch kind {
+            case .requestState:
+                await refreshAppRemotePlayerState(playerAPI)
+            case .pause, .resume, .next:
+                let errorText: String? = await withCheckedContinuation { continuation in
+                    switch kind {
+                    case .pause:
+                        playerAPI.pause { _, error in
+                            continuation.resume(returning: error?.localizedDescription)
+                        }
+                    case .resume:
+                        playerAPI.resume { _, error in
+                            continuation.resume(returning: error?.localizedDescription)
+                        }
+                    case .next:
+                        playerAPI.skip(toNext: { _, error in
+                            continuation.resume(returning: error?.localizedDescription)
+                        })
+                    case .requestState:
+                        continuation.resume(returning: nil)
+                    }
+                }
+                if let errorText {
+                    lastErrorMessage = ATHLTHLocalization.choose(
+                        english: "Spotify control failed: \\(errorText)",
+                        norwegian: "Kunne ikke styre Spotify: \\(errorText)"
+                    )
+                    return
+                }
+                lastErrorMessage = nil
+                if kind == .pause { isPlaying = false }
+                if kind == .resume { isPlaying = true }
+                await refreshAppRemotePlayerState(playerAPI)
+            }
+            return
+        }
+
+        // The Spotify app is unavailable to App Remote. Use the authorized
+        // Web API for an active Spotify Connect device as a fallback.
+        await handleWatchRemoteCommand(kind)
+        if let error = lastErrorMessage, error.contains("HTTP 403") {
+            lastErrorMessage = ATHLTHLocalization.choose(
+                english: "Spotify denied playback control (403). Check Premium, device and app access.",
+                norwegian: "Spotify avviste styring (403). Sjekk Premium, enhet og apptilgang."
+            )
+        }
+    }
+
+    /// Bounded on-demand connection. Never opens a playlist or silently
+    /// resumes music the athlete paused in Spotify.
+    private func connectAppRemoteForControls() async -> Bool {
+        guard let appRemote else { return false }
+        if appRemote.isConnected { return true }
+        guard let token = await accessTokenForRequest() else { return false }
+        hasRequestedOnDemandRemoteControls = true
+        if !connectingForRemoteControl {
+            connectingForRemoteControl = true
+            appRemote.connectionParameters.accessToken = token
+            appRemote.connect()
+        }
+        // The delegate is asynchronous and can be delayed during app switching.
+        for _ in 0..<12 {
+            if appRemote.isConnected {
+                connectingForRemoteControl = false
+                return true
+            }
+            try? await Task.sleep(for: .milliseconds(150))
+            if Task.isCancelled { return false }
+        }
+        connectingForRemoteControl = false
+        return appRemote.isConnected
+    }
+
+    private func refreshAppRemotePlayerState(
+        _ playerAPI: SPTAppRemotePlayerAPI
+    ) async {
+        let result: (Bool, String?, String?, String?) =
+            await withCheckedContinuation { continuation in
+                playerAPI.getPlayerState { playerState, error in
+                    guard let state = playerState as? SPTAppRemotePlayerState else {
+                        continuation.resume(returning:
+                            (false, nil, nil, error?.localizedDescription))
+                        return
+                    }
+                    continuation.resume(returning: (
+                        !state.isPaused,
+                        state.track.name,
+                        state.track.artist.name,
+                        nil
+                    ))
+                }
+            }
+        if let error = result.3 {
+            lastErrorMessage = ATHLTHLocalization.choose(
+                english: "Could not read Spotify playback: \\(error)",
+                norwegian: "Kunne ikke lese Spotify-avspilling: \\(error)"
+            )
+        } else {
+            isPlaying = result.0
+            watchTrackTitle = result.1
+            watchArtistName = result.2
+            lastErrorMessage = nil
+        }
     }
 
     func handleWatchRemoteCommand(
