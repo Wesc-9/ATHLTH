@@ -4413,7 +4413,9 @@ enum ATHLTHStationaryTimeEstimator {
         finishCandidate()
 
         // Sparse tracks are not evidence of zero waiting time.
-        guard observedSeconds >= 30 else { return nil }
+        // Require a meaningful portion of the workout to be represented.
+        // A tiny route fragment must never report zero waiting for a long run.
+        guard observedSeconds >= max(30, workoutDuration * 0.45) else { return nil }
         return min(waitingSeconds, workoutDuration)
     }
 }
