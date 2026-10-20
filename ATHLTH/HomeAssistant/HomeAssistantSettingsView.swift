@@ -61,6 +61,9 @@ struct HomeAssistantSettingsView: View {
         .onDisappear {
             homeAssistant.stopDiscovery()
         }
+        .onChange(of: homeAssistant.shareOnlineStatus) { _, _ in
+            clearDisabledValues()
+        }
         .onChange(of: homeAssistant.shareWorkoutState) { _, _ in
             clearDisabledValues()
         }
@@ -747,6 +750,19 @@ struct HomeAssistantSettingsView: View {
             }
 
             Divider()
+
+            sharingToggle(
+                title: ATHLTHLocalization.choose(
+                    english: "Online status",
+                    norwegian: "Online-status"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english: "Show when ATHLTH is open on this iPhone. This status expires automatically if updates stop. Off by default.",
+                    norwegian: "Vis når ATHLTH er åpen på denne iPhonen. Statusen utløper automatisk hvis oppdateringene stopper. Av som standard."
+                ),
+                icon: "circle.fill",
+                isOn: $homeAssistant.shareOnlineStatus
+            )
 
             sharingToggle(
                 title: ATHLTHLocalization.choose(

@@ -1164,6 +1164,15 @@ struct AppRootView: View {
                 }
             }
 
+            if appSession.signedIn,
+               ATHLTHDeviceRole.isIPhone {
+                Task {
+                    await homeAssistant.sendOnlinePresence(
+                        appIsActive: phase == .active
+                    )
+                }
+            }
+
             if phase != .active,
                appSession.signedIn {
                 let userID = appSession.profile.userID
@@ -1221,6 +1230,36 @@ struct AppRootView: View {
 
                 syncHomeAssistantWatchConfiguration()
                 await syncHomeAssistantSnapshot()
+            }
+        }
+        .task(id: scenePhase) {
+            guard ATHLTHDeviceRole.isIPhone,
+                  scenePhase == .active else { return }
+
+            // Keep the optional Home Assistant online indicator fresh while
+            // the app is foregrounded. iOS cancels the loop in background.
+            while !Task.isCancelled {
+                if appSession.signedIn,
+                   homeAssistant.isConnected,
+                   homeAssistant.shareOnlineStatus {
+                    await homeAssistant.sendOnlinePresence(
+                        appIsActive: true
+                    )
+                }
+                do {
+                    try await Task.sleep(for: .seconds(90))
+                } catch {
+                    break
+                }
+            }
+        }
+        .onChange(of: homeAssistant.shareOnlineStatus) { _, _ in
+            guard appSession.signedIn,
+                  ATHLTHDeviceRole.isIPhone else { return }
+            Task {
+                await homeAssistant.sendOnlinePresence(
+                    appIsActive: scenePhase == .active
+                )
             }
         }
         .onChange(of: appSession.signedIn) { _, signedIn in

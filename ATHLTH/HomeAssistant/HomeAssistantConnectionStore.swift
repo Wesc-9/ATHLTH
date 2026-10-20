@@ -414,6 +414,15 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         }
     }
 
+    @Published var shareOnlineStatus: Bool {
+        didSet {
+            UserDefaults.standard.set(
+                shareOnlineStatus,
+                forKey: Self.shareOnlineStatusKey
+            )
+        }
+    }
+
     @Published var shareWorkoutState: Bool {
         didSet {
             UserDefaults.standard.set(
@@ -561,6 +570,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
 
     private static let syncModeKey =
         "athlth.homeAssistant.syncMode"
+    private static let shareOnlineStatusKey =
+        "athlth.homeAssistant.shareOnlineStatus"
     private static let shareWorkoutStateKey =
         "athlth.homeAssistant.shareWorkoutState"
     private static let shareCompletedWorkoutsKey =
@@ -802,6 +813,11 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                             Self.syncModeKey
                     ) ?? ""
             ) ?? .smart
+        shareOnlineStatus = Self.storedBool(
+            defaults,
+            key: Self.shareOnlineStatusKey,
+            defaultValue: false
+        )
         shareWorkoutState = Self.storedBool(
             defaults,
             key: Self.shareWorkoutStateKey,
@@ -2188,6 +2204,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     }
 
     func enableAllSharing() {
+        shareOnlineStatus = true
         shareWorkoutState = true
         shareCompletedWorkouts = true
         shareWorkoutRouteMap = true
@@ -3246,6 +3263,18 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         )
     }
 
+    /// Ephemeral presence must NEVER be queued and replayed hours later.
+    /// An old 'online' message would misrepresent the user's availability.
+    func sendOnlinePresence(appIsActive: Bool) async {
+        guard isConnected else { return }
+        let value: HomeAssistantJSONValue =
+            shareOnlineStatus ? .bool(appIsActive) : .null
+        try? await send(
+            event: "sync_snapshot",
+            payload: ["state": .object(["app_foreground": value])]
+        )
+    }
+
     func syncSnapshot(
         workoutActive: Bool,
         activeWorkout: String?,
@@ -3626,6 +3655,9 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
 
         var state: [String: HomeAssistantJSONValue] = [:]
 
+        if !shareOnlineStatus {
+            state["app_foreground"] = .null
+        }
         if !shareWorkoutState {
             state["workout_active"] = .bool(false)
             state["active_workout"] = .null
