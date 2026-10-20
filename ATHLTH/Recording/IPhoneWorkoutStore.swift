@@ -2213,7 +2213,8 @@ final class IPhoneWorkoutStore:
             WatchGhostRaceAudioConfiguration?
     ) {
         guard var workout = active,
-              !workout.walking
+              !workout.walking,
+              workout.ghostDisabledDuringWorkout != true
         else {
             return
         }
@@ -2262,7 +2263,8 @@ final class IPhoneWorkoutStore:
                 ? trimmed
                 : nil
 
-        if var workout = active {
+        if var workout = active,
+           workout.ghostDisabledDuringWorkout != true {
             workout.ghostOpponentName =
                 ghostOpponentName
             if ghostOpponentName != nil {
@@ -2658,6 +2660,7 @@ final class IPhoneWorkoutStore:
         plannedRouteCumulativeMeters = []
         plannedRouteGeometryMeters = 0
         restoreRouteGeometry(from: workout)
+        resetRouteAlertRuntime()
         persistActiveCheckpoint(force: true)
         syncLiveActivity()
     }
