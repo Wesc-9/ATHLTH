@@ -107,4 +107,64 @@ final class ATHLTHRouteGuidanceProgressTests: XCTestCase {
         ))
         XCTAssertEqual(result.nearestRoutePointIndex, 4)
     }
+    func testGhostDetourDistanceNeverTeleportsFromStartToNearbyFinish() throws {
+        let points = route()
+        let geometry = ATHLTHRouteGuidanceEngine.cumulativeGeometry(
+            locations: points
+        )
+        // HealthKit counted 3 km off route. The last reliable position was
+        // at the start just 12 seconds ago, beside a nearby loop finish.
+        let result = try XCTUnwrap(ATHLTHRouteGuidanceEngine.state(
+            location: points.last!,
+            routeLocations: points,
+            cumulativeMeters: geometry.cumulativeMeters,
+            geometryTotalMeters: geometry.totalMeters,
+            advertisedDistanceMeters: geometry.totalMeters,
+            workoutDistanceMeters: 3_000,
+            previousRouteMeters: 0,
+            courseAnchorMeters: 0,
+            secondsSinceCourseAnchor: 12
+        ))
+        XCTAssertEqual(result.nearestRoutePointIndex, 0)
+        XCTAssertLessThan(result.progressPercent, 5)
+    }
+
+    func testGhostCanRejoinFartherAheadAfterEnoughRealTime() throws {
+        let points = route()
+        let geometry = ATHLTHRouteGuidanceEngine.cumulativeGeometry(
+            locations: points
+        )
+        let result = try XCTUnwrap(ATHLTHRouteGuidanceEngine.state(
+            location: points[3],
+            routeLocations: points,
+            cumulativeMeters: geometry.cumulativeMeters,
+            geometryTotalMeters: geometry.totalMeters,
+            advertisedDistanceMeters: geometry.totalMeters,
+            workoutDistanceMeters: 3_000,
+            previousRouteMeters: 100,
+            courseAnchorMeters: 100,
+            secondsSinceCourseAnchor: 80
+        ))
+        XCTAssertEqual(result.nearestRoutePointIndex, 3)
+    }
+
+    func testGhostReentryCannotClaimLateSegmentImmediately() throws {
+        let points = route()
+        let geometry = ATHLTHRouteGuidanceEngine.cumulativeGeometry(
+            locations: points
+        )
+        let result = try XCTUnwrap(ATHLTHRouteGuidanceEngine.state(
+            location: points.last!,
+            routeLocations: points,
+            cumulativeMeters: geometry.cumulativeMeters,
+            geometryTotalMeters: geometry.totalMeters,
+            advertisedDistanceMeters: geometry.totalMeters,
+            workoutDistanceMeters: 3_000,
+            previousRouteMeters: 100,
+            courseAnchorMeters: 100,
+            secondsSinceCourseAnchor: 3
+        ))
+        XCTAssertLessThan(result.progressPercent, 70)
+    }
+
 }
