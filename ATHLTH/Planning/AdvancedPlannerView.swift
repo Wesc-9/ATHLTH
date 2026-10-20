@@ -5265,7 +5265,10 @@ struct SessionEditorView: View {
     @State private var durationMinutes = 0
     @State private var strengthDurationAdjustmentMinutes = 0
     @State private var pendingInvitationWorkout: PlannedSession?
-    @State private var distanceKilometers = 5.0
+    @State private var distanceKilometers = 0.0
+    @State private var distanceWasAdjustedManually = false
+    @State private var durationWasAdjustedManually = false
+    @State private var runEnvironment: RunEnvironment = .outdoor
     @State private var notes = ""
     @State private var workoutTemplateID: UUID?
     @State private var workoutBlocks: [WorkoutTemplateBlock] = []
@@ -5441,7 +5444,7 @@ struct SessionEditorView: View {
                 : 0
         )
         _distanceKilometers = State(
-            initialValue: workout.targetDistanceKilometers ?? 5.0
+            initialValue: workout.targetDistanceKilometers ?? 0.0
         )
         _notes = State(initialValue: workout.notes ?? "")
         _workoutTemplateID = State(
@@ -5452,6 +5455,11 @@ struct SessionEditorView: View {
         )
         _workoutCategory = State(
             initialValue: workout.workoutCategory
+        )
+        _runEnvironment = State(initialValue:
+            workout.workoutCategory == "treadmill" ||
+            workout.resolvedWorkoutBlocks.contains(where: { $0.kind == .run && $0.isIndoor == true })
+                ? .treadmill : .outdoor
         )
         _meetingPoint = State(initialValue: workout.meetingPoint)
         _physicalMeetup = State(initialValue:
@@ -5723,10 +5731,82 @@ struct SessionEditorView: View {
                         Stepper(
                             ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse") +
                                 ": " + String(format: "%.1f km", distanceKilometers),
-                            value: $distanceKilometers,
-                            in: 0.5...100,
+                            value: Binding(
+                                get: { distanceKilometers },
+                                set: { newValue in
+                                    distanceKilometers = newValue
+                                    distanceWasAdjustedManually = true
+                                }
+                            ),
+                            in: 0...100,
                             step: 0.5
                         )
+                        Text(ATHLTHLocalization.choose(
+                            english: "0 km means no distance target. Adding a structured run can estimate distance automatically.",
+                            norwegian: "0 km betyr uten distansemål. Når du legger til en intervalløkt, kan distansen beregnes automatisk."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+
+                    if kind == .running {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(ATHLTHLocalization.choose(english: "Running environment", norwegian: "Hvor løper du?"))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Picker(ATHLTHLocalization.choose(english: "Running environment", norwegian: "Løpemiljø"),
+                                   selection: $runEnvironment) {
+                                Label(ATHLTHLocalization.choose(english: "Outdoor · GPS", norwegian: "Ute · GPS"),
+                                      systemImage: "location").tag(RunEnvironment.outdoor)
+                                Label(ATHLTHLocalization.choose(english: "Treadmill", norwegian: "Tredemølle"),
+                                      systemImage: "figure.run.treadmill").tag(RunEnvironment.treadmill)
+                            }
+                            .pickerStyle(.segmented)
+                            Text(runEnvironment == .treadmill
+                                ? ATHLTHLocalization.choose(
+                                    english: "Indoor running without GPS. Enter belt speed in km/h or target pace in min/km.",
+                                    norwegian: "Innendørs uten GPS. Legg inn møllehastighet i km/t eller tempo i min/km.")
+                                : ATHLTHLocalization.choose(
+                                    english: "Outdoor running can use GPS, routes and Ghost Race.",
+                                    norwegian: "Utendørs løping kan bruke GPS, ruter og Ghost Race."))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        .padding(.vertical, 6)
+
+                        Toggle(ATHLTHLocalization.choose(
+                            english: "Estimated running pace", norwegian: "Estimert løpetempo"
+                        ), isOn: $targetPaceEnabled)
+                        .tint(ATHLTHPlanDesign.accentInk)
+
+                        if targetPaceEnabled {
+                            Stepper(
+                                ATHLTHLocalization.choose(english: "Speed", norwegian: "Hastighet")
+                                    + ": " + String(format: "%.1f km/t", targetRunningSpeedBinding.wrappedValue),
+                                value: targetRunningSpeedBinding, in: 3...25, step: 0.1
+                            )
+                            HStack {
+                                Text(ATHLTHLocalization.choose(english: "Pace", norwegian: "Tempo"))
+                                Spacer()
+                                Stepper(value: $targetPaceMinutes, in: 2...20) {
+                                    Text(String(format: "%d:%02d min/km", targetPaceMinutes, targetPaceSeconds))
+                                        .monospacedDigit()
+                                }
+                            }
+                            Stepper(
+                                ATHLTHLocalization.choose(english: "Pace seconds", norwegian: "Sekunder i tempo")
+                                    + ": \(targetPaceSeconds)",
+                                value: $targetPaceSeconds, in: 0...55, step: 5
+                            )
+                        }
+                        if !selectedRunningWorkouts.isEmpty {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Estimated totals include warm-up, intervals, recoveries and cool-down. Per-step pace takes priority; missing pace uses the selected pace or a conservative estimate.",
+                                norwegian: "Estimatet inkluderer oppvarming, intervaller, pauser og nedjogg. Tempo per drag prioriteres; manglende tempo beregnes med valgt tempo eller et forsiktig anslag."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
                     }
 
                     if kind == .running {
@@ -5773,12 +5853,8 @@ struct SessionEditorView: View {
                     }
                     .textCase(nil)
                 }
-                .listRowBackground(
-                    ATHLTHTheme.card
-                )
-                .listRowSeparatorTint(
-                    ATHLTHTheme.border
-                )
+                .listRowBackground(ATHLTHPlanDesign.surface)
+                .listRowSeparatorTint(ATHLTHPlanDesign.warmDivider)
     }
 
     @ViewBuilder
@@ -5828,15 +5904,15 @@ struct SessionEditorView: View {
                                     }
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(14)
-                                    .background(ATHLTHTheme.accentSoft, in: RoundedRectangle(cornerRadius: 17))
+                                    .background(ATHLTHPlanDesign.warmSurface, in: RoundedRectangle(cornerRadius: 17))
                                 }
                                 .buttonStyle(.plain)
                             }
-                            .foregroundStyle(ATHLTHPlanDesign.accent)
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
                         }
                         .padding(.vertical, 10)
                     }
-                    .listRowBackground(ATHLTHTheme.card)
+                    .listRowBackground(ATHLTHPlanDesign.surface)
                     .listRowSeparator(.hidden)
                 }
     }
@@ -6201,8 +6277,18 @@ struct SessionEditorView: View {
             .onChange(of: kind) { _, newKind in
                 if newKind == .running {
                     applyDefaultRunningShoeIfNeeded()
+                    syncRunningMetricsFromSelection()
                 }
             }
+            .onChange(of: runEnvironment) { _, value in
+                if value == .treadmill {
+                    selectedRouteID = nil
+                }
+                syncRunningMetricsFromSelection()
+            }
+            .onChange(of: targetPaceEnabled) { _, _ in syncRunningMetricsFromSelection() }
+            .onChange(of: targetPaceMinutes) { _, _ in syncRunningMetricsFromSelection() }
+            .onChange(of: targetPaceSeconds) { _, _ in syncRunningMetricsFromSelection() }
         }
     }
 
@@ -6354,57 +6440,7 @@ struct SessionEditorView: View {
     private var advancedOptions: some View {
         spotifyAdvancedOptions
 
-        if kind == .running {
-            Section("Performance") {
-                Toggle(
-                    "Target pace",
-                    isOn: $targetPaceEnabled
-                )
-
-                if targetPaceEnabled {
-                    Stepper(
-                        ATHLTHLocalization.choose(
-                            english: "Target speed",
-                            norwegian: "Målhastighet"
-                        ) + ": " + String(
-                            format: "%.1f km/t",
-                            targetRunningSpeedBinding.wrappedValue
-                        ),
-                        value: targetRunningSpeedBinding,
-                        in: 3...25,
-                        step: 0.1
-                    )
-
-                    HStack {
-                        Label(
-                            "Pace",
-                            systemImage: "speedometer"
-                        )
-
-                        Spacer()
-
-                        Stepper(
-                            value: $targetPaceMinutes,
-                            in: 2...20
-                        ) {
-                            Text(
-                                "\(targetPaceMinutes):\(String(format: "%02d", targetPaceSeconds)) /km"
-                            )
-                            .monospacedDigit()
-                        }
-                    }
-
-                    Stepper(
-                        "Pace seconds: \(targetPaceSeconds)",
-                        value: $targetPaceSeconds,
-                        in: 0...55,
-                        step: 5
-                    )
-                }
-            }
-
-        }
-
+        // Pace and treadmill controls live in Basics for both modes.
         if kind == .running || kind == .walking {
             Section(
                 ATHLTHLocalization.choose(
@@ -7792,6 +7828,7 @@ struct SessionEditorView: View {
                     strengthDurationAdjustmentMinutes = newValue - estimate
                 } else {
                     durationMinutes = newValue
+                    durationWasAdjustedManually = true
                 }
             }
         )
@@ -8781,80 +8818,77 @@ struct SessionEditorView: View {
     }
 
     private func syncRunningMetricsFromSelection() {
-        guard !selectedRunningWorkouts.isEmpty else {
-            return
+        guard !selectedRunningWorkouts.isEmpty else { return }
+
+        let totals = estimatedRunningTotals()
+        if let selectedRoute, runEnvironment != .treadmill {
+            if !distanceWasAdjustedManually { distanceKilometers = selectedRoute.distanceKilometers }
+        } else if let meters = totals.distanceMeters, !distanceWasAdjustedManually {
+            distanceKilometers = (meters / 100).rounded() / 10
         }
-
-        let distanceValues =
-            selectedRunningWorkouts
-                .compactMap(\.estimatedDistanceMeters)
-
-        let durationValues =
-            selectedRunningWorkouts
-                .compactMap(\.estimatedDurationSeconds)
-
-        let hasCompleteDistance =
-            distanceValues.count == selectedRunningWorkouts.count
-        let hasCompleteDuration =
-            durationValues.count == selectedRunningWorkouts.count
-
-        if let selectedRoute {
-            // A selected route defines the actual planned distance.
-            distanceKilometers =
-                selectedRoute.distanceKilometers
-
-            if hasCompleteDuration {
-                let totalSeconds =
-                    durationValues.reduce(0, +)
-
-                if hasCompleteDistance {
-                    let totalMeters =
-                        distanceValues.reduce(0, +)
-
-                    if totalMeters > 0 {
-                        let secondsPerMeter =
-                            totalSeconds / totalMeters
-                        durationMinutes = max(
-                            5,
-                            Int(
-                                (
-                                    selectedRoute.distanceKilometers *
-                                    1_000 *
-                                    secondsPerMeter /
-                                    60
-                                )
-                                .rounded()
-                            )
-                        )
-                    }
-                } else {
-                    // Time-based structured workouts already define the
-                    // intended session duration even if distance is route-led.
-                    durationMinutes = max(
-                        5,
-                        Int((totalSeconds / 60).rounded())
-                    )
-                }
-            }
-
-            return
-        }
-
-        if hasCompleteDistance {
-            distanceKilometers =
-                distanceValues.reduce(0, +) / 1_000
-        }
-
-        if hasCompleteDuration {
-            durationMinutes = max(
-                5,
-                Int(
-                    (durationValues.reduce(0, +) / 60)
-                        .rounded()
-                )
-            )
+        if let seconds = totals.durationSeconds, !durationWasAdjustedManually {
+            durationMinutes = max(1, Int((seconds / 60).rounded()))
         }
     }
+
+    private func estimatedRunningTotals() -> (distanceMeters: Double?, durationSeconds: Double?) {
+        guard !selectedRunningWorkouts.isEmpty else { return (nil, nil) }
+        let defaultPace = targetPaceEnabled
+            ? Double(targetPaceMinutes * 60 + targetPaceSeconds)
+            : 360.0
+        var meters = 0.0
+        var seconds = 0.0
+        var distanceComplete = true
+        var durationComplete = true
+        var stepCount = 0
+
+        for workout in selectedRunningWorkouts {
+            for block in workout.blocks {
+                let repetitions = min(max(block.repetitions, 1), 60)
+                for repetition in 1...repetitions {
+                    var steps: [(RunningStepTarget, Bool)] = [
+                        (block.resolvedWork(at: repetition), block.kind == .recovery)
+                    ]
+                    if let recovery = block.resolvedRecovery(after: repetition) {
+                        steps.append((recovery, true))
+                    }
+                    for (step, isRecovery) in steps {
+                        stepCount += 1
+                        if stepCount > 1_000 { return (nil, nil) }
+                        let pace = step.intensity.paceMinSecondsPerKilometer ??
+                            (isRecovery ? 540.0 : defaultPace)
+                        guard pace.isFinite, pace > 0 else { return (nil, nil) }
+                        switch step.measure {
+                        case .time:
+                            if let time = step.durationSeconds, time > 0, time.isFinite {
+                                seconds += time
+                                meters += time / pace * 1_000
+                            } else {
+                                durationComplete = false
+                                distanceComplete = false
+                            }
+                        case .distance:
+                            if let distance = step.distanceMeters, distance > 0, distance.isFinite {
+                                meters += distance
+                                seconds += distance / 1_000 * pace
+                            } else {
+                                durationComplete = false
+                                distanceComplete = false
+                            }
+                        case .open:
+                            durationComplete = false
+                            distanceComplete = false
+                        }
+                    }
+                }
+            }
+        }
+        return (
+            distanceComplete && meters > 0 ? meters : nil,
+            durationComplete && seconds > 0 ? seconds : nil
+        )
+    }
+
 
     private func syncMetricsFromRouteChange(
         previousRouteID: UUID?,
@@ -9250,9 +9284,12 @@ struct SessionEditorView: View {
         } else {
             strengthDurationAdjustmentMinutes = 0
         }
-        distanceKilometers =
-            workout.targetDistanceKilometers ??
-            distanceKilometers
+        distanceKilometers = workout.targetDistanceKilometers ?? 0
+        distanceWasAdjustedManually = false
+        durationWasAdjustedManually = false
+        runEnvironment = workout.workoutCategory == "treadmill" ||
+            workout.resolvedWorkoutBlocks.contains(where: { $0.kind == .run && $0.isIndoor == true })
+                ? .treadmill : .outdoor
         notes = workout.notes ?? ""
 
         let copiedExercises =
@@ -9325,17 +9362,16 @@ struct SessionEditorView: View {
             scheduledTime = scheduled
         }
 
+        targetPaceEnabled = false
         if let pace =
                 workout.targetPaceSecondsPerKilometer,
            pace > 0 {
-            let total = max(
-                Int(pace.rounded()),
-                0
-            )
+            let total = max(Int(pace.rounded()), 0)
             targetPaceEnabled = true
             targetPaceMinutes = total / 60
             targetPaceSeconds = total % 60
         }
+        if kind == .running { syncRunningMetricsFromSelection() }
     }
 
     private func composeSession() -> PlannedSession {
@@ -9355,9 +9391,8 @@ struct SessionEditorView: View {
                         : nil,
             durationMinutes: resolvedDurationMinutes > 0 ? resolvedDurationMinutes : nil,
             targetDistanceKilometers:
-                (kind == .walking || kind == .running)
-                    ? distanceKilometers
-                    : nil,
+                (kind == .walking || kind == .running) && distanceKilometers > 0
+                    ? distanceKilometers : nil,
             targetPaceSecondsPerKilometer:
                 kind == .running &&
                 targetPaceEnabled
@@ -9366,7 +9401,7 @@ struct SessionEditorView: View {
                         targetPaceSeconds
                     )
                     : nil,
-            routeID: selectedRouteID,
+            routeID: kind == .running && runEnvironment == .treadmill ? nil : selectedRouteID,
             // Preserve exercises for hybrid/custom structured
             // workouts too (for example HYROX), not only .strength.
             exercises: plannedExercises,
@@ -9425,7 +9460,9 @@ struct SessionEditorView: View {
                     ? nil
                     : workoutBlocks,
             workoutCategory:
-                workoutCategory,
+                kind == .running && runEnvironment == .treadmill
+                    ? "treadmill"
+                    : (workoutCategory == "treadmill" ? nil : workoutCategory),
             meetingPoint: physicalMeetup ? meetingPoint : nil,
             reminderMinutesBefore: scheduledTimeEnabled && reminderMinutesBefore > 0
                 ? reminderMinutesBefore : nil,
