@@ -365,7 +365,6 @@ struct SavedRoutesView: View {
                     }
                     Divider()
                     Button {
-                        lengthPreference = 6
                         showingCustomLength = true
                     } label: {
                         Label(tr("Custom range", "Egendefinert lengde"), systemImage: "slider.horizontal.3")
@@ -493,11 +492,17 @@ struct SavedRoutesView: View {
                     Text(tr("From \(Int(minLength)) km", "Fra \(Int(minLength)) km"))
                     Slider(value: $minLength, in: 0...100, step: 1)
                         .tint(ATHLTHPlanDesign.accentInk)
+                        .onChange(of: minLength) { _, value in
+                            if value > maxLength { maxLength = value }
+                        }
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     Text(tr("To \(Int(maxLength)) km", "Til \(Int(maxLength)) km"))
                     Slider(value: $maxLength, in: 0...100, step: 1)
                         .tint(ATHLTHPlanDesign.accentInk)
+                        .onChange(of: maxLength) { _, value in
+                            if value < minLength { minLength = value }
+                        }
                 }
                 Spacer()
                 Button(tr("Show routes", "Vis ruter")) {
@@ -600,14 +605,19 @@ struct SavedRoutesView: View {
                        caption: tr("DISTANCE", "DISTANSE"), icon: "point.topleft.down.to.point.bottomright.curvepath")
                 Divider().frame(height: 35)
                 metric(value: durationText(kilometers: route.distanceKilometers, paceMinutes: walkPaceMinutes),
-                       caption: tr("WALK", "GANGE"), icon: "figure.walk")
+                       caption: tr("EST. WALK", "EST. GANGE"), icon: "figure.walk")
                 Divider().frame(height: 35)
                 metric(value: durationText(kilometers: route.distanceKilometers, paceMinutes: runPaceMinutes),
-                       caption: tr("RUN", "LØPING"), icon: "figure.run")
+                       caption: tr("EST. RUN", "EST. LØPING"), icon: "figure.run")
             }
             .padding(.vertical, 12)
             .background(ATHLTHPlanDesign.warmSurface.opacity(0.7),
                         in: RoundedRectangle(cornerRadius: 14))
+
+            Text(tr("Time estimates use your recent workouts or a standard pace; elevation and stops may affect actual time.",
+                    "Tidsanslagene bruker dine siste økter eller standardtempo. Stigning og stopp kan endre faktisk tid."))
+                .font(.system(size: 10))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
 
             HStack(spacing: 12) {
                 NavigationLink {
