@@ -5362,10 +5362,10 @@ private struct HomeWeeklyProgressDaySheet: View {
             HStack(alignment: .center, spacing: 11) {
                 Image(systemName: workout.activity.icon)
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
                     .frame(width: 42, height: 42)
                     .background(
-                        ATHLTHTheme.accentSoft.opacity(0.78),
+                        ATHLTHPlanDesign.selectedSurface,
                         in: RoundedRectangle(
                             cornerRadius: 14,
                             style: .continuous
@@ -5384,14 +5384,14 @@ private struct HomeWeeklyProgressDaySheet: View {
                             )
                     )
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
                     .lineLimit(1)
 
                     Text(HomeCompletedWorkoutPresentation.timeAndLocation(
                         for: workout
                     ))
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     .lineLimit(1)
                 }
 
@@ -5404,7 +5404,7 @@ private struct HomeWeeklyProgressDaySheet: View {
 
                     Image(systemName: "chevron.right")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 }
                 .accessibilityLabel(
                     ATHLTHLocalization.choose(
@@ -5426,12 +5426,12 @@ private struct HomeWeeklyProgressDaySheet: View {
                     HStack(spacing: 6) {
                         Image(systemName: metric.icon)
                             .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
                             .frame(width: 14)
 
                         Text(metric.text)
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
                             .lineLimit(1)
                             .minimumScaleFactor(0.85)
 
@@ -5440,7 +5440,7 @@ private struct HomeWeeklyProgressDaySheet: View {
                     .padding(.horizontal, 9)
                     .frame(height: 29)
                     .background(
-                        ATHLTHTheme.accentSoft.opacity(0.25),
+                        ATHLTHPlanDesign.warmSurface.opacity(0.55),
                         in: RoundedRectangle(
                             cornerRadius: 10,
                             style: .continuous
@@ -5451,7 +5451,7 @@ private struct HomeWeeklyProgressDaySheet: View {
         }
         .padding(12)
         .background(
-            Color.white.opacity(0.94),
+            ATHLTHPlanDesign.surface,
             in: RoundedRectangle(
                 cornerRadius: 18,
                 style: .continuous
@@ -5462,7 +5462,7 @@ private struct HomeWeeklyProgressDaySheet: View {
                 cornerRadius: 18,
                 style: .continuous
             )
-            .stroke(Color.primary.opacity(0.045), lineWidth: 0.8)
+            .stroke(ATHLTHPlanDesign.warmDivider.opacity(0.7), lineWidth: 0.7)
         }
         .accessibilityElement(children: .combine)
     }
