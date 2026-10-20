@@ -4362,7 +4362,7 @@ private struct HomeWeeklyProgressDaySheet: View {
                         english: "You have no workout planned today",
                         norwegian: "Du har ingen planlagt økt i dag"
                     ))
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .font(.system(size: 22, weight: .semibold, design: .serif))
                     .foregroundStyle(dayInk)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -4382,8 +4382,8 @@ private struct HomeWeeklyProgressDaySheet: View {
                     .background(
                         LinearGradient(
                             colors: [
-                                Color(red: 0.94, green: 0.95, blue: 0.99),
-                                Color(red: 0.985, green: 0.98, blue: 0.97)
+                                ATHLTHPlanDesign.selectedSurface,
+                                ATHLTHPlanDesign.warmSurface.opacity(0.6)
                             ],
                             startPoint: .topLeading, endPoint: .bottomTrailing
                         ),
@@ -4399,7 +4399,7 @@ private struct HomeWeeklyProgressDaySheet: View {
                     HStack(spacing: 9) {
                         Image(systemName: "sparkles")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Color(red: 0.67, green: 0.47, blue: 0.28))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
                         Text(ATHLTHLocalization.choose(
                             english: "Get inspired", norwegian: "Bli inspirert"
                         ))
@@ -4412,7 +4412,7 @@ private struct HomeWeeklyProgressDaySheet: View {
                     .padding(.horizontal, 15)
                     .frame(height: 46)
                     .background(
-                        Color(red: 0.953, green: 0.956, blue: 0.973),
+                        ATHLTHPlanDesign.warmSurface,
                         in: RoundedRectangle(cornerRadius: 14)
                     )
                 }
@@ -4427,13 +4427,14 @@ private struct HomeWeeklyProgressDaySheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             LinearGradient(
-                colors: [.white, Color(red: 0.985, green: 0.984, blue: 0.98)],
+                colors: [ATHLTHPlanDesign.surface,
+                         ATHLTHPlanDesign.warmSurface.opacity(0.35)],
                 startPoint: .topLeading, endPoint: .bottomTrailing
             ), in: RoundedRectangle(cornerRadius: 23)
         )
         .overlay {
             RoundedRectangle(cornerRadius: 23)
-                .strokeBorder(dayInk.opacity(0.065), lineWidth: 0.8)
+                .strokeBorder(ATHLTHPlanDesign.warmDivider.opacity(0.65), lineWidth: 0.8)
         }
     }
 
@@ -4489,9 +4490,9 @@ private struct HomeWeeklyProgressDaySheet: View {
     private func suggestionTile(_ workout: PlannedSession, index: Int) -> some View {
         let isStrength = workout.workoutCategory == "strength" || workout.kind == .strength
         let isRun = workout.workoutCategory == "running" || workout.kind == .running
-        let accent = isStrength ? Color(red: 0.40, green: 0.45, blue: 0.61)
-            : isRun ? Color(red: 0.27, green: 0.54, blue: 0.46)
-            : Color(red: 0.63, green: 0.48, blue: 0.34)
+        // A single calm branded accent connects the suggestion rail to
+        // the warm Training Plan surfaces; category stays clear in text.
+        let accent = ATHLTHPlanDesign.accentInk
         let symbol = workout.workoutCategory == "hybrid"
             ? "figure.run.square.stack.fill" : workout.kind.systemImage
         let category = isStrength
@@ -4564,11 +4565,12 @@ private struct HomeWeeklyProgressDaySheet: View {
             .frame(width: 164, height: 138, alignment: .topLeading)
         }
         .frame(width: 164, height: 233)
-        .background(.white, in: RoundedRectangle(cornerRadius: 20))
+        .background(ATHLTHPlanDesign.surface,
+                    in: RoundedRectangle(cornerRadius: 20))
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .overlay {
             RoundedRectangle(cornerRadius: 20)
-                .strokeBorder(accent.opacity(0.13), lineWidth: 0.8)
+                .strokeBorder(ATHLTHPlanDesign.warmDivider, lineWidth: 0.7)
         }
         .accessibilityElement(children: .combine)
         .accessibilityHint(ATHLTHLocalization.choose(
