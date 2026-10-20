@@ -215,6 +215,104 @@ final class SupabasePublicTrailDiscoveryService {
 
 }
 
+/// Prevent duplicate public markers when overlapping Explore cells return
+/// the same physical trail with different Kartverket / OSM source IDs.
+/// This supplements server-side deduplication during cache warming.
+enum PublicTrailDeduplicator {
+    static func unique(_ trails: [PublicTrailRecord]) -> [PublicTrailRecord] {
+        let prioritized = trails.sorted {
+            let lhs = priority($0), rhs = priority($1)
+            if lhs != rhs { return lhs > rhs }
+            return $0.id.uuidString < $1.id.uuidString
+        }
+        var seen = Set<UUID>()
+        var selected: [PublicTrailRecord] = []
+        for trail in prioritized {
+            guard seen.insert(trail.id).inserted else { continue }
+            if selected.contains(where: {
+                $0.source != trail.source && sameGeometry($0, trail)
+            }) { continue }
+            selected.append(trail)
+        }
+        return selected
+    }
+
+    private static func priority(_ trail: PublicTrailRecord) -> Int {
+        (trail.athlthVerified ? 4 : 0) +
+        (trail.source == "kartverket_turrutebasen" ? 2 : 1)
+    }
+
+    private static func meters(_ a: RouteCoordinate, _ b: RouteCoordinate) -> Double {
+        CLLocation(latitude: a.latitude, longitude: a.longitude)
+            .distance(from: CLLocation(latitude: b.latitude, longitude: b.longitude))
+    }
+
+    private static func sameGeometry(_ lhs: PublicTrailRecord, _ rhs: PublicTrailRecord) -> Bool {
+        let length = min(lhs.distanceKilometers, rhs.distanceKilometers)
+        guard length >= 0.5,
+              abs(lhs.distanceKilometers - rhs.distanceKilometers) <= max(0.18, length * 0.10),
+              lhs.coordinates.count >= 2, rhs.coordinates.count >= 2
+        else { return false }
+
+        let centerDistance = CLLocation(
+            latitude: lhs.centerLatitude, longitude: lhs.centerLongitude
+        ).distance(from: CLLocation(
+            latitude: rhs.centerLatitude, longitude: rhs.centerLongitude
+        ))
+        if centerDistance > max(700, length * 120) {
+            let a = lhs.coordinates, b = rhs.coordinates
+            guard let aFirst = a.first, let aLast = a.last,
+                  let bFirst = b.first, let bLast = b.last else { return false }
+            let forward = max(meters(aFirst, bFirst), meters(aLast, bLast))
+            let reversed = max(meters(aFirst, bLast), meters(aLast, bFirst))
+            if min(forward, reversed) > 350 { return false }
+        }
+
+        let nameMatches = lhs.name.folding(options: [.diacriticInsensitive, .caseInsensitive],
+                                          locale: .current)
+            == rhs.name.folding(options: [.diacriticInsensitive, .caseInsensitive],
+                                locale: .current)
+        let required = nameMatches ? 0.74 : 0.84
+        return overlap(lhs.coordinates, rhs.coordinates) >= required &&
+            overlap(rhs.coordinates, lhs.coordinates) >= required
+    }
+
+    private static func overlap(
+        _ sample: [RouteCoordinate], _ target: [RouteCoordinate]
+    ) -> Double {
+        let count = min(16, sample.count)
+        guard count > 1, target.count > 1 else { return 0 }
+        var matching = 0
+        for index in 0..<count {
+            let pointIndex = Int(
+                (Double(index) * Double(sample.count - 1) / Double(count - 1)).rounded()
+            )
+            if metersToPath(sample[pointIndex], target) <= 90 { matching += 1 }
+        }
+        return Double(matching) / Double(count)
+    }
+
+    private static func metersToPath(
+        _ point: RouteCoordinate, _ line: [RouteCoordinate]
+    ) -> Double {
+        let latitudeMeters = 111_195.0
+        let longitudeMeters = latitudeMeters * cos(point.latitude * .pi / 180)
+        var nearest = Double.infinity
+        for index in 1..<line.count {
+            let first = line[index - 1], last = line[index]
+            let x = (first.longitude - point.longitude) * longitudeMeters
+            let y = (first.latitude - point.latitude) * latitudeMeters
+            let dx = (last.longitude - first.longitude) * longitudeMeters
+            let dy = (last.latitude - first.latitude) * latitudeMeters
+            let squared = dx * dx + dy * dy
+            let fraction = squared > 0 ? max(0, min(1, -(x * dx + y * dy) / squared)) : 0
+            nearest = min(nearest, hypot(x + fraction * dx, y + fraction * dy))
+            if nearest < 8 { break }
+        }
+        return nearest
+    }
+}
+
 @MainActor
 final class PublicTrailDiscoveryStore:
     ObservableObject {
@@ -444,7 +542,7 @@ final class PublicTrailDiscoveryStore:
                 found[trail.id] = trail
             }
         }
-        trails = Array(found.values)
+        trails = PublicTrailDeduplicator.unique(Array(found.values))
         attribution = responses.contains { $0.attribution.contains("Kartverket") }
             ? "© OpenStreetMap contributors · © Kartverket"
             : "© OpenStreetMap contributors"
@@ -525,7 +623,7 @@ final class PublicTrailDiscoveryStore:
             response.trails
                 .filter(\.isUsable)
 
-        trails = usable
+        trails = PublicTrailDeduplicator.unique(usable)
 
         attribution =
             response.attribution
