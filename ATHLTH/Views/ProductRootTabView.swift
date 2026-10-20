@@ -933,10 +933,9 @@ struct ATHLTHHomeView: View {
                                 creatorCaptureDevice:
                                     configuration.captureDevice
                             ) else {
-                                homeWatchTransferError = social.errorMessage ?? ATHLTHLocalization.choose(
-                                    english: "Could not deliver the workout invitation.",
-                                    norwegian: "Kunne ikke sende øktinvitasjonen."
-                                )
+                                if let message = social.errorMessage {
+                                    homeWatchTransferError = message
+                                }
                                 return
                             }
 
@@ -1079,10 +1078,9 @@ struct ATHLTHHomeView: View {
                                 creatorCaptureDevice:
                                     .appleWatch
                             ) else {
-                                homeWatchTransferError = social.errorMessage ?? ATHLTHLocalization.choose(
-                                    english: "Could not deliver the workout invitation.",
-                                    norwegian: "Kunne ikke sende øktinvitasjonen."
-                                )
+                                if let message = social.errorMessage {
+                                    homeWatchTransferError = message
+                                }
                                 return
                             }
 
@@ -5802,10 +5800,9 @@ struct ATHLTHTrainView: View {
                             creatorCaptureDevice:
                                 configuration.captureDevice
                         ) else {
-                            watchTransferError = social.errorMessage ?? ATHLTHLocalization.choose(
-                                    english: "Could not deliver the workout invitation.",
-                                    norwegian: "Kunne ikke sende øktinvitasjonen."
-                                )
+                            if let message = social.errorMessage {
+                                watchTransferError = message
+                            }
                                 return
                         }
                         do {
@@ -5870,10 +5867,9 @@ struct ATHLTHTrainView: View {
                             creatorCaptureDevice:
                                 configuration.captureDevice
                         ) else {
-                            watchTransferError = social.errorMessage ?? ATHLTHLocalization.choose(
-                                    english: "Could not deliver the workout invitation.",
-                                    norwegian: "Kunne ikke sende øktinvitasjonen."
-                                )
+                            if let message = social.errorMessage {
+                                watchTransferError = message
+                            }
                                 return
                         }
                         do {
@@ -6016,10 +6012,9 @@ struct ATHLTHTrainView: View {
                                     configuration.captureDevice
                             )
                         else {
-                            watchTransferError = social.errorMessage ?? ATHLTHLocalization.choose(
-                                    english: "Could not deliver the workout invitation.",
-                                    norwegian: "Kunne ikke sende øktinvitasjonen."
-                                )
+                            if let message = social.errorMessage {
+                                watchTransferError = message
+                            }
                                 return
                         }
                         do {
@@ -6116,10 +6111,9 @@ struct ATHLTHTrainView: View {
                                 invitePayload: configuration.trainTogetherInvitePayload,
                                 creatorCaptureDevice: usesWatch
                                     ? .appleWatch : .iPhone
-                            ) else { watchTransferError = social.errorMessage ?? ATHLTHLocalization.choose(
-                                    english: "Could not deliver the workout invitation.",
-                                    norwegian: "Kunne ikke sende øktinvitasjonen."
-                                )
+                            ) else { if let message = social.errorMessage {
+     watchTransferError = message
+ }
                                 return }
 
                             switch destination {
