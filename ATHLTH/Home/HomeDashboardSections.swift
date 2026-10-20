@@ -2446,6 +2446,11 @@ struct HomeHealthMetricDetailView:
 
     private var latestValueText:
         String {
+        // Match the live Home sleep value, not a possibly older trend cache.
+        if kind == .sleep, health.sleep.totalAsleep > 0 {
+            return formattedMetricValue(health.sleep.totalAsleep / 3_600)
+        }
+
         guard let value =
                 points
                     .reversed()
@@ -2491,7 +2496,7 @@ struct HomeHealthMetricDetailView:
             let totalMinutes =
                 Int(
                     (value * 60)
-                        .rounded()
+                        .rounded(.down)
                 )
             return
                 "\(totalMinutes / 60) t \(totalMinutes % 60) min"
