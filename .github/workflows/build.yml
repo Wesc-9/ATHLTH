@@ -41,6 +41,7 @@ on:
       - release/v1.8.3
       - release/v1.8.4
       - release/v1.8.5
+      - release/v1.8.6
       - fix/v1.4.2-swift6-release
   pull_request:
     branches:
@@ -59,7 +60,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   # Once TestFlight is requested, preserve same-commit iOS verification
   # despite follow-up development pushes to the active release branch.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/release/v1.8.4' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/release/v1.8.6' }}
 
 jobs:
   build:
