@@ -822,6 +822,8 @@ struct AroundYouExploreView: View {
 
     @State private var filter: AroundYouFilter = .all
     @State private var mapPosition: MapCameraPosition = .automatic
+    @State private var lastObservedMapCamera: MapCamera?
+    @State private var is3DMapEnabled = false
     @State private var hasCenteredOnUser = false
     @State private var selectedRoute: TrainingRoute?
     @State private var selectedEvent: CommunityEventItem?
@@ -1087,6 +1089,8 @@ struct AroundYouExploreView: View {
                     frequency: .onEnd
                 ) { context in
                     visibleRegion = context.region
+                    lastObservedMapCamera = context.camera
+                    is3DMapEnabled = context.camera.pitch > 15
 
                     if suppressNextSearchPrompt {
                         suppressNextSearchPrompt = false
@@ -1521,6 +1525,9 @@ struct AroundYouExploreView: View {
                 )
             }
 
+            // Kept outside the Routes tab: accessible in every Explore mode.
+            exploreMapQuickActions
+
             if !session.savedRoutes.isEmpty {
                 HStack(spacing: 8) {
                     Button {
@@ -1629,6 +1636,101 @@ struct AroundYouExploreView: View {
         }
         .padding(.horizontal, 12)
         .padding(.top, embeddedInTab ? 6 : 0)
+    }
+
+    private var exploreMapQuickActions: some View {
+        HStack(spacing: 9) {
+            Spacer(minLength: 0)
+
+            Button(action: toggleMapPitch) {
+                Text(is3DMapEnabled ? "2D" : "3D")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 53, height: 44)
+                    .background(
+                        .ultraThinMaterial,
+                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(
+                                is3DMapEnabled
+                                    ? ATHLTHTheme.premiumGold.opacity(0.72)
+                                    : Color.white.opacity(0.75),
+                                lineWidth: 1
+                            )
+                    }
+                    .shadow(color: .black.opacity(0.10), radius: 9, y: 4)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                ATHLTHLocalization.choose(
+                    english: is3DMapEnabled ? "Switch to 2D map" : "Switch to 3D map",
+                    norwegian: is3DMapEnabled ? "Bytt til 2D-kart" : "Bytt til 3D-kart"
+                )
+            )
+            .accessibilityHint(
+                ATHLTHLocalization.choose(
+                    english: "Changes the camera tilt without changing the route filters.",
+                    norwegian: "Endrer kartvinkelen uten å endre rutefiltrene."
+                )
+            )
+
+            NavigationLink {
+                RunRouteBuilderView()
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        ATHLTHTheme.premiumGold,
+                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.white.opacity(0.62), lineWidth: 1)
+                    }
+                    .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                ATHLTHLocalization.choose(
+                    english: "Create a new route",
+                    norwegian: "Opprett ny rute"
+                )
+            )
+        }
+    }
+
+    private func toggleMapPitch() {
+        // Preserve the current center, distance and heading while tilting.
+        // Switching pitch alone must not prompt a new area search.
+        let shouldEnable3D = !is3DMapEnabled
+        let camera: MapCamera
+        if let observed = lastObservedMapCamera {
+            camera = MapCamera(
+                centerCoordinate: observed.centerCoordinate,
+                distance: observed.distance,
+                heading: observed.heading,
+                pitch: shouldEnable3D ? 55 : 0
+            )
+        } else {
+            let center = visibleRegion?.center
+                ?? locationStore.location?.coordinate
+                ?? CLLocationCoordinate2D(latitude: 67.28, longitude: 14.40)
+            camera = MapCamera(
+                centerCoordinate: center,
+                distance: 4_000,
+                heading: 0,
+                pitch: shouldEnable3D ? 55 : 0
+            )
+        }
+        suppressNextSearchPrompt = true
+        is3DMapEnabled = shouldEnable3D
+        withAnimation(.easeInOut(duration: 0.4)) {
+            mapPosition = .camera(camera)
+        }
     }
 
     @ViewBuilder
