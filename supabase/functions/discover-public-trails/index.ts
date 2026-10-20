@@ -916,97 +916,115 @@ function normalizedTrailName(
     .trim();
 }
 
+type TrailDedupeInput = {
+  name?: unknown;
+  source?: unknown;
+  athlth_verified?: unknown;
+  distance_kilometers?: unknown;
+  center_latitude?: unknown;
+  center_longitude?: unknown;
+  coordinates?: unknown;
+};
+
+function trailCoordinates(row: TrailDedupeInput): OSMPoint[] {
+  if (!Array.isArray(row.coordinates)) return [];
+  return row.coordinates.flatMap((point: unknown) => {
+    if (!point || typeof point !== "object") return [];
+    const p = point as Record<string, unknown>;
+    const lat = Number(p.latitude), lon = Number(p.longitude);
+    return Number.isFinite(lat) && Number.isFinite(lon) &&
+        Math.abs(lat) <= 90 && Math.abs(lon) <= 180 ? [{lat, lon}] : [];
+  });
+}
+
+function sampleTrail(points: OSMPoint[]): OSMPoint[] {
+  if (points.length <= 16) return points;
+  const result: OSMPoint[] = [];
+  for (let i = 0; i <= 15; i += 1) {
+    result.push(points[Math.round(i * (points.length - 1) / 15)]);
+  }
+  return result;
+}
+
+// Distance in metres to the closest part of a path (including segments),
+// not just the nearest vertex. Necessary when Kartverket's polyline is
+// sampled differently from the OpenStreetMap geometry.
+function distanceToTrail(point: OSMPoint, line: OSMPoint[]): number {
+  if (line.length === 0) return Infinity;
+  const latScale = 111_195;
+  const lonScale = latScale * Math.cos(point.lat * Math.PI / 180);
+  let best = Infinity;
+  for (let i = 1; i < line.length; i += 1) {
+    const a = line[i - 1], b = line[i];
+    const x = (a.lon - point.lon) * lonScale;
+    const y = (a.lat - point.lat) * latScale;
+    const dx = (b.lon - a.lon) * lonScale;
+    const dy = (b.lat - a.lat) * latScale;
+    const lengthSq = dx * dx + dy * dy;
+    const t = lengthSq > 0 ? Math.max(0, Math.min(1, -(x * dx + y * dy) / lengthSq)) : 0;
+    best = Math.min(best, Math.hypot(x + t * dx, y + t * dy));
+    if (best < 8) return best;
+  }
+  return best;
+}
+
+function similarTrailGeometry(
+  left: TrailDedupeInput,
+  right: TrailDedupeInput,
+): boolean {
+  const lengthA = Number(left.distance_kilometers);
+  const lengthB = Number(right.distance_kilometers);
+  if (!Number.isFinite(lengthA) || !Number.isFinite(lengthB) ||
+      lengthA < 0.5 || lengthB < 0.5) return false;
+  // Route fragments that share a trail but have different endpoints are NOT
+  // duplicates. They should remain individually discoverable.
+  if (Math.abs(lengthA - lengthB) > Math.max(0.18, Math.min(lengthA, lengthB) * 0.10)) {
+    return false;
+  }
+
+  const centerA = {lat: Number(left.center_latitude), lon: Number(left.center_longitude)};
+  const centerB = {lat: Number(right.center_latitude), lon: Number(right.center_longitude)};
+  if (![centerA.lat, centerA.lon, centerB.lat, centerB.lon].every(Number.isFinite)) return false;
+  if (haversineMeters(centerA, centerB) > Math.min(700, Math.max(250, lengthA * 70))) {
+    return false;
+  }
+
+  const a = trailCoordinates(left), b = trailCoordinates(right);
+  if (a.length < 2 || b.length < 2) return false;
+
+  const sameName = normalizedTrailName(left.name) === normalizedTrailName(right.name) &&
+    normalizedTrailName(left.name).length > 0;
+
+  const threshold = 90;
+  const fractionNear = (sample: OSMPoint[], target: OSMPoint[]): number => {
+    const points = sampleTrail(sample);
+    return points.filter((p) => distanceToTrail(p, target) <= threshold).length / points.length;
+  };
+  const coverage = sameName ? 0.74 : 0.84;
+  return fractionNear(a, b) >= coverage && fractionNear(b, a) >= coverage;
+}
+
+function dedupeTrailRows<T extends TrailDedupeInput>(rows: T[]): T[] {
+  // Prefer source-of-record Kartverket, then verified ATHLTH imports.
+  // Preserve original IDs; never delete an entry that may be bookmarked.
+  const priority = (row: T): number =>
+    (row.athlth_verified === true ? 4 : 0) +
+    (row.source === "kartverket_turrutebasen" ? 2 : 1);
+  const ordered = rows.slice().sort((a, b) => priority(b) - priority(a));
+  const unique: T[] = [];
+  for (const row of ordered) {
+    if (!unique.some((saved) => similarTrailGeometry(saved, row))) unique.push(row);
+  }
+  return unique;
+}
+
 function mergeSecondaryTrails(
   primary: TrailWrite[],
   secondary: TrailWrite[],
 ): TrailWrite[] {
-  const result =
-    primary.slice();
-
-  for (
-    const candidate
-    of secondary
-  ) {
-    const candidateName =
-      normalizedTrailName(
-        candidate.name,
-      );
-    const candidateLat =
-      Number(
-        candidate.center_latitude,
-      );
-    const candidateLon =
-      Number(
-        candidate.center_longitude,
-      );
-
-    const duplicate =
-      result.some(
-        (existing) => {
-          if (
-            normalizedTrailName(
-              existing.name,
-            ) !==
-            candidateName
-          ) {
-            return false;
-          }
-
-          const existingLat =
-            Number(
-              existing
-                .center_latitude,
-            );
-          const existingLon =
-            Number(
-              existing
-                .center_longitude,
-            );
-
-          if (
-            !Number.isFinite(
-              candidateLat,
-            ) ||
-            !Number.isFinite(
-              candidateLon,
-            ) ||
-            !Number.isFinite(
-              existingLat,
-            ) ||
-            !Number.isFinite(
-              existingLon,
-            )
-          ) {
-            return true;
-          }
-
-          return (
-            haversineMeters(
-              {
-                lat:
-                  candidateLat,
-                lon:
-                  candidateLon,
-              },
-              {
-                lat:
-                  existingLat,
-                lon:
-                  existingLon,
-              },
-            ) < 1_000
-          );
-        },
-      );
-
-    if (!duplicate) {
-      result.push(
-        candidate,
-      );
-    }
-  }
-
-  return result;
+  // Dedupe while saving AND again while reading the older cached rows.
+  // Both directions are checked geometrically, not by name or source ID.
+  return dedupeTrailRows([...secondary, ...primary]);
 }
 
 function splitBounds(
@@ -1528,15 +1546,17 @@ async function loadCachedTrails(
           ascending: true,
         },
       )
+      // Read extra candidates so legacy duplicate rows do not consume
+      // the entire result window before geometry-based deduplication.
       .limit(
-        MAX_RESULT_ROUTES,
+        MAX_RESULT_ROUTES * 3,
       );
 
   if (error) {
     throw error;
   }
 
-  return data ?? [];
+  return dedupeTrailRows(data ?? []).slice(0, MAX_RESULT_ROUTES);
 }
 
 async function refreshCell(
