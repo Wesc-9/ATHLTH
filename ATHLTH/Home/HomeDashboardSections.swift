@@ -2966,7 +2966,11 @@ struct HomeWeeklyProgressStrip:
                 selection: selection,
                 plan: plan,
                 recentWorkouts: workouts,
-                onStartStandaloneWorkout: onStartStandaloneWorkout,
+                onStartStandaloneWorkout: { workout, device in
+                    // Close the day sheet before the chosen recorder opens.
+                    selectedDay = nil
+                    onStartStandaloneWorkout?(workout, device)
+                },
                 onOpenWorkout: {
                     daySheetDetent = .large
                 }
