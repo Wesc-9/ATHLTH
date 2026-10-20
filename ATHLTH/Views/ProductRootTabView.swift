@@ -1169,6 +1169,7 @@ struct ATHLTHHomeView: View {
                     HomeWeeklyStandaloneWorkoutDetailView(
                         workout: workout,
                         onStartWorkout: { selected, device in
+                            selectedHomeStandaloneWorkout = nil
                             startHomeStandaloneWorkout(selected, device: device)
                         }
                     )
@@ -2628,6 +2629,8 @@ struct ATHLTHHomeView: View {
                 HomeWeeklyStandaloneWorkoutDetailView(
                     workout: workout,
                     onStartWorkout: { selected, device in
+                        selectedHomeAllStandaloneWorkout = nil
+                        showingHomeTodayCalendarAll = false
                         startHomeStandaloneWorkout(selected, device: device)
                     }
                 )
@@ -4273,7 +4276,7 @@ struct ATHLTHHomeView: View {
         device: WorkoutCaptureDevice
     ) {
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(250))
+            try? await Task.sleep(for: .milliseconds(450))
             guard let persisted = session.standalonePlannedSessions.first(
                 where: { $0.id == workout.id }
             ), !persisted.isExplicitRestDay else {
