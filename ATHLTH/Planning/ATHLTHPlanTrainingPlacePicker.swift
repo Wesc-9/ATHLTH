@@ -114,7 +114,8 @@ struct ATHLTHPlanTrainingPlacePicker: View {
                                     placeSearch.search(value)
                                 }
                             ForEach(Array(placeSearch.results.prefix(6).enumerated()),
-                                    id: \.offset) { _, result in
+                                    id: \.offset) { entry in
+                                let result = entry.element
                                 Button {
                                     name = result.title
                                     address = result.subtitle
