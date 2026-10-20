@@ -1392,6 +1392,7 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var routeCueSymbol: String? = nil
     var routeCueDistanceMeters: Double? = nil
     var routeCueOffRoute: Bool? = nil
+    var routeCanReturnToStart: Bool? = nil
 
     // Shared structured-running state for iPhone, Apple Watch, Lock Screen
     // and Dynamic Island. Optional defaults preserve older transfers.
@@ -1633,6 +1634,9 @@ struct WatchWorkoutMirrorCommand: Codable, Hashable {
     // Optional keeps pause/resume/end payloads and older paired builds
     // decodable while allowing treadmill incline changes during a workout.
     var treadmillInclinePercent: Double? = nil
+    // Only return-route commands need a workout identity; default nil
+    // preserves pause/resume/end compatibility with existing Watch versions.
+    var workoutStartedAt: Date? = nil
 }
 
 enum WatchWorkoutCommand: String, Codable, Hashable {
@@ -1640,6 +1644,7 @@ enum WatchWorkoutCommand: String, Codable, Hashable {
     case pause
     case resume
     case setTreadmillIncline
+    case returnToStart
 }
 
 enum WatchSpotifyCommandKind: String, Codable, Hashable {
