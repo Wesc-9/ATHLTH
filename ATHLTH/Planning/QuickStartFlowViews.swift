@@ -1158,10 +1158,10 @@ struct RunQuickStartSheet: View {
 
                     quickRunGuidanceCard
 
-                    ATHLTHCard {
+                    ATHLTHPlanSurface(ghost: false, density: .compact) {
                         VStack(
                             alignment: .leading,
-                            spacing: 14
+                            spacing: 10
                         ) {
                             WorkoutFriendPicker(
                                 selectedFriendIDs:
