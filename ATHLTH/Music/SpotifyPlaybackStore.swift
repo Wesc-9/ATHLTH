@@ -656,8 +656,8 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
                 }
                 if let errorText {
                     lastErrorMessage = ATHLTHLocalization.choose(
-                        english: "Spotify control failed: \\(errorText)",
-                        norwegian: "Kunne ikke styre Spotify: \\(errorText)"
+                        english: "Spotify control failed: \(errorText)",
+                        norwegian: "Kunne ikke styre Spotify: \(errorText)"
                     )
                     return
                 }
@@ -726,8 +726,8 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
             }
         if let error = result.3 {
             lastErrorMessage = ATHLTHLocalization.choose(
-                english: "Could not read Spotify playback: \\(error)",
-                norwegian: "Kunne ikke lese Spotify-avspilling: \\(error)"
+                english: "Could not read Spotify playback: \(error)",
+                norwegian: "Kunne ikke lese Spotify-avspilling: \(error)"
             )
         } else {
             isPlaying = result.0
