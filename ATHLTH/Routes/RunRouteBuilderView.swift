@@ -19,7 +19,10 @@ struct RunRouteBuilderView: View {
     @State private var endItem: MKMapItem?
     @State private var viaPoints: [RunRouteViaPoint] = []
     @State private var showingViaSearch = false
-    @State private var shapeRouteMode = false
+    @State private var mapPointMode: RunRouteMapPointMode = .automatic
+    @State private var mapUndoStack: [RunRouteMapSnapshot] = []
+    @State private var mapInitiallyCentered = false
+    @State private var routeCalculationID = UUID()
     @State private var returnOnSamePath = false
     @State private var alternatives: [RunRouteAlternative] = []
     @State private var selectedAlternativeID: UUID?
@@ -63,6 +66,8 @@ struct RunRouteBuilderView: View {
                 hero
                 routeNameCard
                 endpointsCard
+                // Map-first planning must work with no address selection.
+                routeMap
 
                 if isCalculating {
                     HStack(spacing: 10) {
@@ -79,7 +84,6 @@ struct RunRouteBuilderView: View {
                     if canOfferReturn {
                         outAndBackChoice
                     }
-                    routeMap
                     alternativesCard
                     routeDetailsCard
                     saveCard
@@ -94,7 +98,15 @@ struct RunRouteBuilderView: View {
             }
         }
         .task {
+            if let initialSearchCenter {
+                centerMapInitially(on: initialSearchCenter)
+            }
             searchLocation.start()
+        }
+        .onChange(of: searchLocation.location?.coordinate.latitude) { _, _ in
+            if let coordinate = searchLocation.location?.coordinate {
+                centerMapInitially(on: coordinate)
+            }
         }
         .background(
             LinearGradient(
@@ -341,19 +353,20 @@ struct RunRouteBuilderView: View {
     private var endpointsCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Route")
+                Text(ATHLTHLocalization.choose(english: "Route", norwegian: "Rute"))
                     .font(.title3.bold())
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
 
                 Spacer()
 
                 Button {
+                    rememberMapState()
                     let oldStart = startItem
                     startItem = endItem
                     endItem = oldStart
                     viaPoints.reverse()
-                    Task {
-                        await calculateRoutesIfReady(force: true)
-                    }
+                    invalidateCalculatedRoute()
+                    Task { await calculateRoutesIfReady(force: true) }
                 } label: {
                     Label(
                         ATHLTHLocalization.choose(
@@ -376,9 +389,11 @@ struct RunRouteBuilderView: View {
                 referenceCoordinate: searchLocation.location?.coordinate
                     ?? searchMapCenter ?? initialSearchCenter
             ) { item in
+                rememberMapState()
                 startItem = item
                 startSearch.clear()
-                Task { await calculateRoutesIfReady() }
+                invalidateCalculatedRoute()
+                Task { await calculateRoutesIfReady(force: true) }
             }
 
             routeConnector
@@ -442,9 +457,11 @@ struct RunRouteBuilderView: View {
                     ?? searchLocation.location?.coordinate
                     ?? searchMapCenter ?? initialSearchCenter
             ) { item in
+                rememberMapState()
                 endItem = item
                 endSearch.clear()
-                Task { await calculateRoutesIfReady() }
+                invalidateCalculatedRoute()
+                Task { await calculateRoutesIfReady(force: true) }
             }
 
             Button {
@@ -466,165 +483,319 @@ struct RunRouteBuilderView: View {
                 isCalculating
             )
 
-            Text(
-                "Add Via points by search, or use Shape on the map and tap where you want the route to pass."
-            )
+            Text(ATHLTHLocalization.choose(
+                english: "Search for an address, or set start, finish and via points on the map below.",
+                norwegian: "Søk etter adresse, eller sett start, mål og via-punkter direkte i kartet under."
+            ))
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
         }
         .padding()
         .routeBuilderCard()
     }
 
     private var routeMap: some View {
-        Group {
-            if let selectedAlternative {
-                MapReader { proxy in
-                    Map(position: $mapPosition) {
-                        if let startItem {
-                            Marker(
-                                startItem.name ?? "Start",
-                                coordinate:
-                                    startItem.placemark.coordinate
-                            )
-                            .tint(ATHLTHPlanDesign.accent)
-                        }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 9) {
+                Image(systemName: "map.fill")
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(width: 33, height: 33)
+                    .background(ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 10))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Build on the map", norwegian: "Tegn ruten i kartet"
+                    ))
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Text(mapInstruction)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                Spacer(minLength: 0)
+            }
 
-                        ForEach(
-                            Array(viaPoints.enumerated()),
-                            id: \.element.id
-                        ) { index, point in
-                            Annotation(
-                                "Via \(index + 1)",
-                                coordinate:
-                                    point.item.placemark.coordinate
-                            ) {
-                                Text("\(index + 1)")
-                                    .font(.caption2.bold())
-                                    .foregroundStyle(.white)
-                                    .frame(width: 26, height: 26)
-                                    .background(
-                                        ATHLTHTheme.premiumGold,
-                                        in: Circle()
-                                    )
-                                    .overlay {
-                                        Circle()
-                                            .stroke(
-                                                .white.opacity(0.9),
-                                                lineWidth: 2
-                                            )
-                                    }
-                            }
-                        }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 7) {
+                    modeButton(.automatic,
+                        text: ATHLTHLocalization.choose(english: "Automatic", norwegian: "Automatisk"),
+                        icon: "hand.tap")
+                    modeButton(.start, text: "Start", icon: "circle.fill")
+                    modeButton(.finish,
+                        text: ATHLTHLocalization.choose(english: "Finish", norwegian: "Mål"),
+                        icon: "flag.checkered")
+                    modeButton(.via, text: "Via",
+                               icon: "point.3.connected.trianglepath.dotted")
+                }
+            }
 
-                        if let endItem {
-                            Marker(
-                                endItem.name ?? "Finish",
-                                coordinate:
-                                    endItem.placemark.coordinate
-                            )
-                            .tint(.red)
-                        }
-
-                        MapPolyline(
-                            coordinates:
-                                selectedAlternative.coordinates
-                        )
-                        .stroke(
-                            ATHLTHTheme.vitality,
-                            lineWidth: 6
-                        )
+            MapReader { proxy in
+                Map(position: $mapPosition) {
+                    if let route = selectedAlternative,
+                       route.coordinates.count >= 2 {
+                        MapPolyline(coordinates: route.coordinates)
+                            .stroke(ATHLTHTheme.vitality, lineWidth: 5)
                     }
-                    .onMapCameraChange(frequency: .onEnd) { context in
-                        searchMapCenter = context.region.center
-                    }
-                    .onTapGesture { point in
-                        guard shapeRouteMode,
-                              let coordinate = proxy.convert(
-                                point,
-                                from: .local
-                              )
-                        else {
-                            return
+                    if let startItem {
+                        Annotation("Start", coordinate: startItem.placemark.coordinate) {
+                            Image(systemName: "figure.run")
+                                .font(.caption.bold())
+                                .foregroundStyle(.white)
+                                .frame(width: 34, height: 34)
+                                .background(ATHLTHPlanDesign.accentInk, in: Circle())
+                                .overlay(Circle().stroke(.white, lineWidth: 2))
                         }
-
-                        addViaPoint(at: coordinate)
+                    }
+                    ForEach(Array(viaPoints.enumerated()), id: \.element.id) { index, point in
+                        Annotation("Via \(index + 1)", coordinate: point.item.placemark.coordinate) {
+                            Text("\(index + 1)")
+                                .font(.caption2.bold())
+                                .foregroundStyle(.white)
+                                .frame(width: 27, height: 27)
+                                .background(ATHLTHTheme.premiumGold, in: Circle())
+                                .overlay(Circle().stroke(.white, lineWidth: 2))
+                        }
+                    }
+                    if let endItem {
+                        Annotation("Mål", coordinate: endItem.placemark.coordinate) {
+                            Image(systemName: "flag.checkered")
+                                .font(.caption.bold())
+                                .foregroundStyle(.white)
+                                .frame(width: 34, height: 34)
+                                .background(Color.red, in: Circle())
+                                .overlay(Circle().stroke(.white, lineWidth: 2))
+                        }
                     }
                 }
-                .frame(height: 310)
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: 24,
-                        style: .continuous
-                    )
-                )
-                .overlay(alignment: .topLeading) {
-                    Label(
-                        String(
-                            format: "%.2f km",
-                            selectedAlternative.distanceMeters /
-                            1_000
-                        ),
-                        systemImage: "figure.run"
-                    )
-                    .font(.caption.bold())
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .background(
-                        .ultraThinMaterial,
-                        in: Capsule()
-                    )
-                    .padding(12)
+                .mapStyle(.standard(elevation: .realistic))
+                .mapControls {
+                    MapCompass()
+                    MapScaleView()
                 }
-                .overlay(alignment: .topTrailing) {
-                    Button {
-                        shapeRouteMode.toggle()
-                    } label: {
-                        Label(
-                            shapeRouteMode ? "Done" : "Shape",
-                            systemImage: shapeRouteMode
-                                ? "checkmark"
-                                : "point.3.connected.trianglepath.dotted"
-                        )
+                .onMapCameraChange(frequency: .onEnd) { context in
+                    searchMapCenter = context.region.center
+                }
+                .onTapGesture { point in
+                    guard let coordinate = proxy.convert(point, from: .local),
+                          CLLocationCoordinate2DIsValid(coordinate) else { return }
+                    handleMapTap(at: coordinate)
+                }
+            }
+            .frame(height: 345)
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .overlay(RoundedRectangle(cornerRadius: 20)
+                .stroke(ATHLTHPlanDesign.warmDivider, lineWidth: 1))
+            .overlay(alignment: .topLeading) {
+                if let route = selectedAlternative {
+                    Label(String(format: "%.2f km", route.distanceMeters / 1_000),
+                          systemImage: "figure.run")
+                        .font(.caption.bold())
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 8)
+                        .background(.regularMaterial, in: Capsule())
+                        .padding(12)
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if !isCalculating && selectedAlternative == nil {
+                    Text(mapInstruction)
                         .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
-                        .background(
-                            shapeRouteMode
-                                ? ATHLTHTheme.accent
-                                : Color.clear
-                        )
-                        .foregroundStyle(
-                            shapeRouteMode
-                                ? Color.white
-                                : ATHLTHTheme.primaryText
-                        )
-                        .background(
-                            .ultraThinMaterial,
-                            in: Capsule()
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .padding(12)
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 9)
+                        .background(.regularMaterial, in: Capsule())
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 12)
+                        .allowsHitTesting(false)
                 }
-                .overlay(alignment: .bottom) {
-                    if shapeRouteMode {
-                        Text("Tap the map to add a Via point")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(
-                                ATHLTHTheme.primaryText
-                            )
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(
-                                .ultraThinMaterial,
-                                in: Capsule()
-                            )
-                            .padding(.bottom, 12)
+            }
+
+            if let route = selectedAlternative {
+                HStack(spacing: 12) {
+                    Label(String(format: "%.2f km", route.distanceMeters / 1_000),
+                          systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                    Spacer()
+                    Label(ATHLTHLocalization.choose(english: "Run ~", norwegian: "Løp ca. ") +
+                        "\(max(1, Int((route.distanceMeters / 1_000 * 6).rounded()))) min",
+                          systemImage: "figure.run")
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                Text(ATHLTHLocalization.choose(
+                    english: "Run estimate uses 6:00 min/km. Apple Maps calculates walkable routes between the pins.",
+                    norwegian: "Løpetiden er estimert med 6:00 min/km. Apple Maps beregner gangbare traséer mellom punktene."
+                ))
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+
+            HStack(spacing: 8) {
+                Button {
+                    undoMapEdit()
+                } label: {
+                    Label(ATHLTHLocalization.choose(english: "Undo", norwegian: "Angre"),
+                          systemImage: "arrow.uturn.backward")
+                }
+                .disabled(mapUndoStack.isEmpty)
+
+                Button {
+                    clearMapPoints()
+                } label: {
+                    Label(ATHLTHLocalization.choose(english: "Clear", norwegian: "Nullstill"),
+                          systemImage: "trash")
+                }
+                .disabled(startItem == nil && endItem == nil && viaPoints.isEmpty)
+                Spacer(minLength: 0)
+                if let coordinate = searchLocation.location?.coordinate,
+                   CLLocationCoordinate2DIsValid(coordinate) {
+                    Button {
+                        rememberMapState()
+                        startItem = mapItem(coordinate, name: ATHLTHLocalization.choose(
+                            english: "My position", norwegian: "Min posisjon"))
+                        startSearch.clear()
+                        invalidateCalculatedRoute()
+                        Task { await calculateRoutesIfReady(force: true) }
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "My location", norwegian: "Min posisjon"),
+                              systemImage: "location.fill")
                     }
                 }
             }
+            .font(.caption.weight(.semibold))
+            .buttonStyle(.bordered)
+            .tint(ATHLTHPlanDesign.accentInk)
         }
+        .padding(15)
+        .routeBuilderCard()
+    }
+
+    private var mapInstruction: String {
+        switch mapPointMode {
+        case .automatic:
+            if startItem == nil {
+                return ATHLTHLocalization.choose(
+                    english: "Tap the map to choose a starting point",
+                    norwegian: "Trykk i kartet for å velge startpunkt")
+            }
+            if endItem == nil {
+                return ATHLTHLocalization.choose(
+                    english: "Tap the map to choose a finish",
+                    norwegian: "Trykk i kartet for å velge mål")
+            }
+            return ATHLTHLocalization.choose(
+                english: "Tap the map to add a via point",
+                norwegian: "Trykk i kartet for å legge til et via-punkt")
+        case .start:
+            return ATHLTHLocalization.choose(english: "Tap for start", norwegian: "Trykk for startpunkt")
+        case .finish:
+            return ATHLTHLocalization.choose(english: "Tap for finish", norwegian: "Trykk for mål")
+        case .via:
+            return ATHLTHLocalization.choose(english: "Tap for via point", norwegian: "Trykk for via-punkt")
+        }
+    }
+
+    private func modeButton(
+        _ mode: RunRouteMapPointMode, text: String, icon: String
+    ) -> some View {
+        Button { mapPointMode = mode } label: {
+            Label(text, systemImage: icon)
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 11)
+                .frame(height: 36)
+                .foregroundStyle(mapPointMode == mode ? Color.white : ATHLTHPlanDesign.ink)
+                .background(mapPointMode == mode
+                    ? ATHLTHPlanDesign.accentInk : ATHLTHPlanDesign.warmSurface,
+                    in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(mapPointMode == mode ? .isSelected : [])
+    }
+
+    private func centerMapInitially(on coordinate: CLLocationCoordinate2D) {
+        guard !mapInitiallyCentered, CLLocationCoordinate2DIsValid(coordinate)
+        else { return }
+        mapInitiallyCentered = true
+        mapPosition = .region(MKCoordinateRegion(
+            center: coordinate,
+            span: MKCoordinateSpan(latitudeDelta: 0.025, longitudeDelta: 0.025)
+        ))
+    }
+
+    private func rememberMapState() {
+        mapUndoStack.append(RunRouteMapSnapshot(
+            start: startItem, finish: endItem, via: viaPoints))
+        if mapUndoStack.count > 30 { mapUndoStack.removeFirst() }
+    }
+
+    private func invalidateCalculatedRoute() {
+        routeCalculationID = UUID()
+        lastCalculatedSignature = ""
+        alternatives = []
+        selectedAlternativeID = nil
+        isCalculating = false
+        returnOnSamePath = false
+        errorMessage = nil
+    }
+
+    private func mapItem(_ coordinate: CLLocationCoordinate2D, name: String) -> MKMapItem {
+        let item = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
+        item.name = name
+        return item
+    }
+
+    private func handleMapTap(at coordinate: CLLocationCoordinate2D) {
+        let action = RunRouteMapPointMode.resolve(
+            mode: mapPointMode, hasStart: startItem != nil, hasFinish: endItem != nil)
+        if action == .via && (startItem == nil || endItem == nil) {
+            errorMessage = ATHLTHLocalization.choose(
+                english: "Choose start and finish before adding via points.",
+                norwegian: "Velg start og mål før du legger til via-punkter.")
+            return
+        }
+        rememberMapState()
+        switch action {
+        case .start:
+            startItem = mapItem(coordinate, name:
+                ATHLTHLocalization.choose(english: "Map start", norwegian: "Start fra kart"))
+            startSearch.clear()
+        case .finish:
+            endItem = mapItem(coordinate, name:
+                ATHLTHLocalization.choose(english: "Map finish", norwegian: "Mål fra kart"))
+            endSearch.clear()
+        case .via:
+            viaPoints.append(RunRouteViaPoint(
+                item: mapItem(coordinate, name: "Via \(viaPoints.count + 1)")))
+        case .automatic:
+            break
+        }
+        invalidateCalculatedRoute()
+        Task { await calculateRoutesIfReady(force: true) }
+    }
+
+    private func undoMapEdit() {
+        guard let previous = mapUndoStack.popLast() else { return }
+        startItem = previous.start
+        endItem = previous.finish
+        viaPoints = previous.via
+        startSearch.clear()
+        endSearch.clear()
+        viaSearch.clear()
+        invalidateCalculatedRoute()
+        Task { await calculateRoutesIfReady(force: true) }
+    }
+
+    private func clearMapPoints() {
+        guard startItem != nil || endItem != nil || !viaPoints.isEmpty else { return }
+        rememberMapState()
+        startItem = nil
+        endItem = nil
+        viaPoints = []
+        startSearch.clear()
+        endSearch.clear()
+        viaSearch.clear()
+        mapPointMode = .automatic
+        invalidateCalculatedRoute()
     }
 
     private var outAndBackChoice: some View {
@@ -851,9 +1022,13 @@ struct RunRouteBuilderView: View {
             return
         }
 
+        let calculationID = UUID()
+        routeCalculationID = calculationID
         isCalculating = true
         errorMessage = nil
-        defer { isCalculating = false }
+        defer {
+            if routeCalculationID == calculationID { isCalculating = false }
+        }
 
         do {
             let mapped: [RunRouteAlternative]
@@ -903,9 +1078,10 @@ struct RunRouteBuilderView: View {
                 ]
             }
 
-            guard !mapped.isEmpty else {
-                throw RunRouteBuilderError.noRoute
-            }
+            // Stale MapKit requests must not overwrite newer point selections.
+            guard routeCalculationID == calculationID,
+                  signature == routeSignature else { return }
+            guard !mapped.isEmpty else { throw RunRouteBuilderError.noRoute }
 
             alternatives = mapped
             selectedAlternativeID = mapped.first?.id
@@ -915,7 +1091,11 @@ struct RunRouteBuilderView: View {
                 updateMapRegion(for: first)
             }
         } catch {
-            errorMessage = error.localizedDescription
+            if routeCalculationID == calculationID {
+                alternatives = []
+                selectedAlternativeID = nil
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -997,9 +1177,9 @@ struct RunRouteBuilderView: View {
     private func addViaPoint(
         _ item: MKMapItem
     ) {
-        viaPoints.append(
-            RunRouteViaPoint(item: item)
-        )
+        rememberMapState()
+        viaPoints.append(RunRouteViaPoint(item: item))
+        invalidateCalculatedRoute()
         viaSearch.clear()
         showingViaSearch = false
 
@@ -1022,7 +1202,9 @@ struct RunRouteBuilderView: View {
     private func removeViaPoint(
         _ id: UUID
     ) {
+        rememberMapState()
         viaPoints.removeAll { $0.id == id }
+        invalidateCalculatedRoute()
 
         Task {
             await calculateRoutesIfReady(force: true)
@@ -1041,7 +1223,9 @@ struct RunRouteBuilderView: View {
             return
         }
 
+        rememberMapState()
         viaPoints.swapAt(index, destination)
+        invalidateCalculatedRoute()
 
         Task {
             await calculateRoutesIfReady(force: true)
@@ -1227,8 +1411,8 @@ struct RunRouteBuilderView: View {
 
     private var routeBuilderSubtitle: String {
         ATHLTHLocalization.choose(
-            english: "Choose start and finish, add Via points if needed, then save.",
-            norwegian: "Velg start og mål, legg til via-punkter ved behov, og lagre."
+            english: "Search by address or tap the map to shape your running route.",
+            norwegian: "Søk etter adresser, eller trykk i kartet for å bygge løperuten."
         )
     }
 
@@ -1627,6 +1811,25 @@ struct RunRouteLocationSuggestion:
     let subtitle: String
 
     var distanceKey: String { title + "|" + subtitle }
+}
+
+private enum RunRouteMapPointMode: String, CaseIterable {
+    case automatic, start, finish, via
+
+    static func resolve(
+        mode: RunRouteMapPointMode, hasStart: Bool, hasFinish: Bool
+    ) -> RunRouteMapPointMode {
+        guard mode == .automatic else { return mode }
+        if !hasStart { return .start }
+        if !hasFinish { return .finish }
+        return .via
+    }
+}
+
+private struct RunRouteMapSnapshot {
+    let start: MKMapItem?
+    let finish: MKMapItem?
+    let via: [RunRouteViaPoint]
 }
 
 private struct RunRouteViaPoint: Identifiable {
