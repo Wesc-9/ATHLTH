@@ -3236,7 +3236,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             Image(systemName: edit?.isRestDay == true
                                   ? "moon.stars.fill"
                                   : edit?.detailedWorkout?.isValid == true
-                                  ? "checkmark.circle.fill" : "circle.dotted")
+                                  ? (edit?.detailedWorkout?.kind.systemImage ?? "figure.run")
+                                  : "circle.dotted")
                                 .font(.caption)
                         }
                         .foregroundStyle(guidedDayCursor % 7 == index
@@ -4592,34 +4593,50 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
             }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 7) {
-                    ForEach(Array(1...7).sorted {
-                        dateForWeekDay($0, weekIndex: selectedPlanWeekIndex) <
-                        dateForWeekDay($1, weekIndex: selectedPlanWeekIndex)
-                    }, id: \.self) { day in
-                        Button {
-                            editingWeekDay = WeekDayEditorSelection(id: day)
-                        } label: {
-                            VStack(spacing: 5) {
-                                Text(shortDayName(day))
-                                    .font(.caption2.weight(.medium))
-                                Text(dateForWeekDay(day, weekIndex: selectedPlanWeekIndex)
-                                    .formatted(.dateTime.day()))
-                                    .font(.subheadline.weight(.semibold))
-                                Circle()
-                                    .fill(selectedDays.contains(day)
-                                          ? ATHLTHTheme.accentDeep : Color.clear)
-                                    .frame(width: 5, height: 5)
-                            }
-                            .foregroundStyle(ATHLTHPlanDesign.ink)
-                            .frame(width: 44, height: 56)
-                            .athlthPlanCard(radius: 12)
+            // Seven dates must fill the plan card on both iPhone and iPad.
+            // A horizontal scroller with hard-coded 44pt tiles wastes width.
+            HStack(spacing: 5) {
+                ForEach(Array(1...7).sorted {
+                    dateForWeekDay($0, weekIndex: selectedPlanWeekIndex) <
+                    dateForWeekDay($1, weekIndex: selectedPlanWeekIndex)
+                }, id: \.self) { day in
+                    Button {
+                        editingWeekDay = WeekDayEditorSelection(id: day)
+                    } label: {
+                        VStack(spacing: 6) {
+                            Text(shortDayName(day))
+                                .font(.caption2.weight(.semibold))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                            Text(dateForWeekDay(day, weekIndex: selectedPlanWeekIndex)
+                                .formatted(.dateTime.day()))
+                                .font(.subheadline.weight(.bold))
+                            Image(systemName:
+                                weekDayEdits[weekDayKey(day)]?.isRestDay == true
+                                    ? "moon.stars.fill"
+                                    : weekDayEdits[weekDayKey(day)]?.detailedWorkout != nil
+                                    ? effectiveWorkoutKind(for: day).systemImage
+                                    : "circle")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                .frame(height: 13)
                         }
-                        .buttonStyle(.plain)
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .frame(maxWidth: .infinity, minHeight: 66)
+                        .background(
+                            ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 12)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(ATHLTHPlanDesign.warmDivider, lineWidth: 0.8)
+                        }
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
                 }
             }
+            .frame(maxWidth: .infinity)
             Text(ATHLTHLocalization.choose(
                 english: "Weeks repeat the template until you customize a date.",
                 norwegian: "Ukene følger grunnmønsteret til du tilpasser en dato."
