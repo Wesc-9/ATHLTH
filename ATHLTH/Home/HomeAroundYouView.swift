@@ -144,6 +144,7 @@ private struct AroundYouRouteItem: Identifiable {
     let coordinates: [RouteCoordinate]
     let ownerID: UUID
     let isMine: Bool
+    let isSaved: Bool
     let isPublicTrail: Bool
     let trainingRoute: TrainingRoute
     let centerCoordinate: CLLocationCoordinate2D?
@@ -158,6 +159,7 @@ private struct AroundYouRouteItem: Identifiable {
         coordinates: [RouteCoordinate],
         ownerID: UUID,
         isMine: Bool,
+        isSaved: Bool = false,
         isPublicTrail: Bool = false,
         trainingRoute: TrainingRoute
     ) {
@@ -168,6 +170,7 @@ private struct AroundYouRouteItem: Identifiable {
         self.coordinates = coordinates
         self.ownerID = ownerID
         self.isMine = isMine
+        self.isSaved = isSaved
         self.isPublicTrail = isPublicTrail
         self.trainingRoute = trainingRoute
 
@@ -837,6 +840,7 @@ struct AroundYouExploreView: View {
     @State private var isSearchingVisibleArea = false
     @State private var activeSearchCenter: CLLocation?
     @State private var suppressNextSearchPrompt = false
+    @State private var showOwnedRoutesOnly = false
     @State private var routeLengthFilter:
         ExploreRouteLengthFilter = .any
     @State private var routeSort:
@@ -910,9 +914,11 @@ struct AroundYouExploreView: View {
                                     ? Color.secondary.opacity(0.28)
                                     : route.isMine
                                         ? ATHLTHTheme.premiumGold
-                                        : route.isPublicTrail
-                                            ? ATHLTHTheme.vitality
-                                            : ATHLTHTheme.accent,
+                                        : route.isSaved
+                                            ? ATHLTHTheme.accentDeep
+                                            : route.isPublicTrail
+                                                ? ATHLTHTheme.vitality
+                                                : ATHLTHTheme.accent,
                                 lineWidth: isSelected
                                     ? 8
                                     : isDimmed
@@ -920,9 +926,11 @@ struct AroundYouExploreView: View {
                                         : (
                                             route.isMine
                                                 ? 5
-                                                : route.isPublicTrail
-                                                    ? 4.5
-                                                    : 4
+                                                : route.isSaved
+                                                    ? 4.6
+                                                    : route.isPublicTrail
+                                                        ? 4
+                                                        : 3.8
                                         )
                             )
 
@@ -940,7 +948,9 @@ struct AroundYouExploreView: View {
                                             systemName:
                                                 isSelected
                                                     ? "figure.run.circle.fill"
-                                                    : "figure.run.circle"
+                                                    : route.isSaved && !route.isMine
+                                                        ? "bookmark.circle.fill"
+                                                        : "figure.run.circle"
                                         )
                                         .font(
                                             isSelected
@@ -950,9 +960,11 @@ struct AroundYouExploreView: View {
                                         .foregroundStyle(
                                             route.isMine
                                                 ? ATHLTHTheme.premiumGold
-                                                : route.isPublicTrail
-                                                    ? ATHLTHTheme.vitality
-                                                    : ATHLTHTheme.accentDeep
+                                                : route.isSaved
+                                                    ? ATHLTHTheme.accentDeep
+                                                    : route.isPublicTrail
+                                                        ? ATHLTHTheme.vitality
+                                                        : ATHLTHTheme.accentDeep
                                         )
                                         .background(
                                             .white,
@@ -1061,6 +1073,11 @@ struct AroundYouExploreView: View {
                 }
                 .mapStyle(
                     .standard(elevation: .realistic)
+                )
+                // Keep the map behind Dynamic Island, not its controls.
+                .ignoresSafeArea(
+                    .container,
+                    edges: embeddedInTab ? .top : []
                 )
                 .mapControls {
                     MapCompass()
@@ -1171,10 +1188,6 @@ struct AroundYouExploreView: View {
                 .allowsHitTesting(true)
         }
         .background(ATHLTHPremiumCanvas())
-        .ignoresSafeArea(
-            .container,
-            edges: embeddedInTab ? .top : []
-        )
         .navigationTitle(
             embeddedInTab ? "" : "Around You"
         )
@@ -1249,7 +1262,10 @@ struct AroundYouExploreView: View {
                 centerOnUser()
             }
         }
-        .onChange(of: filter) { _, _ in
+        .onChange(of: filter) { _, nextFilter in
+            if nextFilter != .routes {
+                showOwnedRoutesOnly = false
+            }
             withAnimation(.easeInOut(duration: 0.18)) {
                 selectedRoute = nil
                 selectedEvent = nil
@@ -1308,7 +1324,9 @@ struct AroundYouExploreView: View {
         some View {
         VStack(spacing: 10) {
             if embeddedInTab {
-                Text("Explore")
+                Text(ATHLTHLocalization.choose(
+                    english: "Explore", norwegian: "Utforsk"
+                ))
                     .font(
                         .system(
                             size: 22,
@@ -1345,8 +1363,8 @@ struct AroundYouExploreView: View {
                         ATHLTHTheme.accentDeep
                     )
                     .frame(
-                        width: 48,
-                        height: 48
+                        width: 44,
+                        height: 44
                     )
                     .background(
                         .ultraThinMaterial,
@@ -1503,7 +1521,56 @@ struct AroundYouExploreView: View {
                 )
             }
 
-            if visibleRegion != nil {
+            if !session.savedRoutes.isEmpty {
+                HStack(spacing: 8) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showOwnedRoutesOnly.toggle()
+                            filter = .routes
+                            selectedRoute = nil
+                        }
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "My Routes", norwegian: "Mine ruter"
+                            ) + " (\(session.savedRoutes.count))",
+                            systemImage: showOwnedRoutesOnly ? "bookmark.fill" : "bookmark"
+                        )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .padding(.horizontal, 14)
+                        .frame(height: 37)
+                        .background(.regularMaterial, in: Capsule())
+                        .overlay {
+                            Capsule().stroke(
+                                showOwnedRoutesOnly ? ATHLTHTheme.premiumGold : .white.opacity(0.75),
+                                lineWidth: showOwnedRoutesOnly ? 1.5 : 1
+                            )
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    if showOwnedRoutesOnly {
+                        NavigationLink {
+                            SavedRoutesView()
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "View all", norwegian: "Se alle"
+                                ),
+                                systemImage: "arrow.up.right"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 12)
+                            .frame(height: 37)
+                            .background(.regularMaterial, in: Capsule())
+                        }
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                    }
+                }
+            }
+
+            if visibleRegion != nil && shouldSearchVisibleArea {
                 Button {
                     Task {
                         await searchVisibleArea()
@@ -1520,7 +1587,9 @@ struct AroundYouExploreView: View {
                             )
                         }
 
-                        Text("Search this area")
+                        Text(ATHLTHLocalization.choose(
+                            english: "Search this area", norwegian: "Søk i dette området"
+                        ))
                     }
                     .font(
                         .subheadline.weight(
@@ -1559,10 +1628,7 @@ struct AroundYouExploreView: View {
             exploreTrailStatusOverlay
         }
         .padding(.horizontal, 12)
-        .safeAreaPadding(
-            .top,
-            embeddedInTab ? 8 : 0
-        )
+        .padding(.top, embeddedInTab ? 6 : 0)
     }
 
     @ViewBuilder
@@ -2908,9 +2974,10 @@ struct AroundYouExploreView: View {
                         route.elevationGainMeters,
                     coordinates: route.coordinates,
                     ownerID: route.ownerID,
-                    isMine:
-                        route.ownerID ==
-                        session.profile.userID,
+                    isMine: route.ownerID == session.profile.userID,
+                    isSaved: session.savedRoutes.contains {
+                        $0.id == route.id || $0.sharedSourceRouteID == route.id
+                    },
                     trainingRoute:
                         route.trainingRoute
                 )
@@ -2928,7 +2995,9 @@ struct AroundYouExploreView: View {
                     coordinates:
                         route.coordinates,
                     ownerID: route.ownerID,
-                    isMine: true,
+                    isMine: route.ownerID == session.profile.userID &&
+                        route.sharedSourceRouteID == nil,
+                    isSaved: true,
                     trainingRoute: route
                 )
         }
@@ -2948,6 +3017,9 @@ struct AroundYouExploreView: View {
                         route.coordinates,
                     ownerID: route.ownerID,
                     isMine: false,
+                    isSaved: session.savedRoutes.contains {
+                        $0.sharedSourceRouteID == route.id
+                    },
                     isPublicTrail: true,
                     trainingRoute: route
                 )
@@ -2956,9 +3028,8 @@ struct AroundYouExploreView: View {
         let values =
             Array(routesByID.values)
                 .filter {
-                    routeLengthFilter.matches(
-                        $0.distanceKilometers
-                    )
+                    routeLengthFilter.matches($0.distanceKilometers) &&
+                    (!showOwnedRoutesOnly || $0.isMine || $0.isSaved)
                 }
 
         guard let location =
@@ -3004,6 +3075,10 @@ struct AroundYouExploreView: View {
 
         return candidates
             .sorted { lhs, rhs in
+                // Own and saved routes must not be pushed off the 35-route
+                // map cap by a nearby collection of public trail fragments.
+                if lhs.0.isMine != rhs.0.isMine { return lhs.0.isMine }
+                if lhs.0.isSaved != rhs.0.isSaved { return lhs.0.isSaved }
                 switch routeSort {
                 case .nearest:
                     return lhs.1 < rhs.1
@@ -3257,10 +3332,14 @@ struct AroundYouExploreView: View {
             selectedPublicWorkout = nil
         }
 
-        await publicTrailDiscovery.refresh(
+        async let trails: Void = publicTrailDiscovery.refresh(
             in: visibleRegion,
             force: true
         )
+        async let routes: Void = routeDiscovery.refresh(force: true)
+        async let events: Void = community.refresh()
+        async let posts: Void = marketplace.refresh()
+        _ = await (trails, routes, events, posts)
 
         shouldSearchVisibleArea = false
     }
