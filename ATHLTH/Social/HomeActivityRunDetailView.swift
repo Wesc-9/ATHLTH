@@ -20,6 +20,8 @@ struct HomeActivityRunDetailView: View {
     @State private var isLoadingRouteResult = false
     @State private var showingTreadmillInclineEditor = false
     @State private var treadmillInclineDraft = 0.0
+    @State private var showingResultShare = false
+    @State private var showingFullscreenMap = false
 
     init(
         workout: SocialPublishableWorkout,
@@ -147,6 +149,16 @@ struct HomeActivityRunDetailView: View {
         return (fast, slow)
     }
 
+    private var verifiedSplits: [ATHLTHRunningResultInsights.KilometerSplit] {
+        ATHLTHRunningResultInsights.kilometerSplits(
+            from: route, reportedDistanceMeters: workout.distanceMeters
+        )
+    }
+
+    private var elevationProfile: [ATHLTHRunningResultInsights.ElevationPoint] {
+        ATHLTHRunningResultInsights.elevationProfile(from: route)
+    }
+
     private var leaderboardEntries:
         [RouteAttemptRecord] {
         var bestByUser:
@@ -243,20 +255,21 @@ struct HomeActivityRunDetailView: View {
             VStack(spacing: 16) {
                 summaryCard
 
-                if !isTreadmillWorkout && linkedRoute != nil {
-                    routeResultCard
-                }
-
                 if workout.allowsTrainingPlaceCheckIn {
-                    WorkoutPlaceCheckInSection(
-                        workoutID: workout.id
-                    )
+                    WorkoutPlaceCheckInSection(workoutID: workout.id)
                 }
 
                 if isTreadmillWorkout {
                     treadmillFactsCard
                 } else {
                     mapCard
+                    ATHLTHRunningResultAnalysisCard(
+                        splits: verifiedSplits,
+                        elevation: elevationProfile,
+                        activeEnergyKilocalories: workout.activeEnergyKilocalories,
+                        maxHeartRateBPM: detail?.maxHeartRate
+                    )
+                    if linkedRoute != nil { routeResultCard }
                     routeFactsCard
                 }
 
@@ -267,227 +280,175 @@ struct HomeActivityRunDetailView: View {
             .padding(.bottom, 28)
         }
         .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
-        .navigationTitle(
-            detailNavigationTitle
-        )
+        .navigationTitle(detailNavigationTitle)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button {
+                        showingResultShare = true
+                    } label: {
+                        Label(tr("Share result", "Del resultat"),
+                              systemImage: "square.and.arrow.up")
+                    }
+                    if !isTreadmillWorkout && routeCoordinates.count >= 2 {
+                        Button {
+                            showingFullscreenMap = true
+                        } label: {
+                            Label(tr("Open route map", "Åpne rutekart"),
+                                  systemImage: "map")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.title3)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                }
+                .accessibilityLabel(tr("More workout actions", "Flere økthandlinger"))
+            }
+        }
         .task(id: workout.id) {
             await loadDetailAndCoach()
         }
-        .sheet(
-            isPresented:
-                $showingTreadmillInclineEditor
-        ) {
+        .sheet(isPresented: $showingResultShare) {
+            ATHLTHRunningResultShareSheet(
+                workout: workout,
+                averageHeartRateBPM: detail?.averageHeartRate,
+                elevationGainMeters: isTreadmillWorkout ? nil :
+                    (ascentText == nil ? nil : elevationGainMeters),
+                rawRoute: isTreadmillWorkout ? [] : route,
+                highlights: verifiedSplits
+            )
+        }
+        .sheet(isPresented: $showingFullscreenMap) {
+            NavigationStack {
+                routeMapContent
+                    .ignoresSafeArea(edges: .bottom)
+                    .navigationTitle(tr("Route", "Rute"))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(tr("Done", "Ferdig")) {
+                                showingFullscreenMap = false
+                            }
+                        }
+                    }
+            }
+        }
+        .sheet(isPresented: $showingTreadmillInclineEditor) {
             TreadmillInclineEditorView(
-                initialValue:
-                    treadmillInclineDraft
+                initialValue: treadmillInclineDraft
             ) { value in
-                phoneWorkout
-                    .setCompletedTreadmillInclinePercent(
-                        value,
-                        workoutID:
-                            workout.id
-                    )
-                treadmillInclineDraft =
-                    value
+                phoneWorkout.setCompletedTreadmillInclinePercent(
+                    value, workoutID: workout.id
+                )
+                treadmillInclineDraft = value
             }
         }
     }
 
+    // Result-first hierarchy shared with Training Plan: the detailed map
+    // and measured insights follow; no duplicate metric strip on the map.
     private var summaryCard: some View {
         ATHLTHPlanSurface {
-            VStack(
-                alignment: .leading,
-                spacing: 14
-            ) {
-            HStack(
-                alignment: .firstTextBaseline
-            ) {
-                VStack(
-                    alignment: .leading,
-                    spacing: 4
-                ) {
-                    Label(
-                        activityTitle,
-                        systemImage:
-                            workout.activity.icon
-                    )
-                    .font(
-                        .caption.weight(
-                            .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.accentDeep
-                    )
-
-                    Text(
-                        workout.startDate.formatted(
-                            date: .abbreviated,
-                            time: .shortened
-                        )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-                }
-
-                Spacer()
-
-                if !isTreadmillWorkout, let ascentText {
-                    Label(
-                        ascentText,
-                        systemImage:
-                            "mountain.2.fill"
-                    )
-                    .font(
-                        .caption.weight(
-                            .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.vitality
-                    )
-                }
-            }
-
-            HStack(
-                alignment: .lastTextBaseline,
-                spacing: 6
-            ) {
-                Text(distanceText)
-                    .font(
-                        .system(
-                            size: 36,
-                            weight: .bold,
-                            design: .rounded
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
-
-                if distanceText != "—" {
-                    Text(tr("completed", "fullført"))
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .top, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("ATHLTH  /  " + tr("RUNNING", "LØPING"))
+                            .font(.caption2.weight(.bold))
+                            .tracking(1.5)
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        Text(workout.startDate.formatted(
+                            .dateTime.day().month(.wide).year().hour().minute()
+                        ))
                         .font(.caption)
-                        .foregroundStyle(
-                            ATHLTHTheme.mutedText
-                        )
-                }
-            }
-
-            ViewThatFits(
-                in: .horizontal
-            ) {
-                HStack(spacing: 0) {
-                    summaryMetric(
-                        tr("Time", "Tid"),
-                        durationText
-                    )
-                    summaryDivider
-                    summaryMetric(
-                        tr("Avg. pace", "Snittempo"),
-                        paceText
-                    )
-                    summaryDivider
-                    summaryMetric(
-                        tr("Avg. HR", "Snittpuls"),
-                        averageHeartRateText
-                    )
-                    summaryDivider
-                    summaryMetric(
-                        tr("Max HR", "Makspuls"),
-                        maxHeartRateText
-                    )
-                }
-
-                LazyVGrid(
-                    columns: [
-                        GridItem(.flexible()),
-                        GridItem(.flexible())
-                    ],
-                    spacing: 12
-                ) {
-                    summaryMetric(
-                        tr("Time", "Tid"),
-                        durationText
-                    )
-                    summaryMetric(
-                        tr("Avg. pace", "Snittempo"),
-                        paceText
-                    )
-                    summaryMetric(
-                        tr("Avg. HR", "Snittpuls"),
-                        averageHeartRateText
-                    )
-                    summaryMetric(
-                        tr("Max HR", "Makspuls"),
-                        maxHeartRateText
-                    )
-                }
-            }
-
-            if workout.activity == .running &&
-                workout.isIndoor == true {
-                Divider()
-
-                HStack(spacing: 10) {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Incline",
-                            norwegian: "Stigning"
-                        ),
-                        systemImage:
-                            "arrow.up.right"
-                    )
-                    .font(
-                        .subheadline
-                            .weight(.semibold)
-                    )
-
-                    Spacer()
-
-                    Text(
-                        String(
-                            format: "%.1f%%",
-                            phoneWorkout
-                                .treadmillInclinePercent(
-                                    for:
-                                        workout.id
-                                ) ??
-                            0
-                        )
-                    )
-                    .font(
-                        .subheadline
-                            .weight(.bold)
-                            .monospacedDigit()
-                    )
-
-                    Button(
-                        ATHLTHLocalization.choose(
-                            english: "Adjust",
-                            norwegian: "Juster"
-                        )
-                    ) {
-                        treadmillInclineDraft =
-                            phoneWorkout
-                                .treadmillInclinePercent(
-                                    for:
-                                        workout.id
-                                ) ??
-                            0
-                        showingTreadmillInclineEditor =
-                            true
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    Spacer()
+                    Label(tr("Completed", "Fullført"), systemImage: "checkmark.seal.fill")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 7)
+                        .background(ATHLTHPlanDesign.selectedSurface, in: Capsule())
+                }
+
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(distanceText)
+                        .font(.system(size: 39, weight: .semibold, design: .serif))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .minimumScaleFactor(0.7)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+
+                Rectangle()
+                    .fill(ATHLTHPlanDesign.warmDivider)
+                    .frame(height: 0.7)
+
+                LazyVGrid(columns: [
+                    GridItem(.flexible(), spacing: 9),
+                    GridItem(.flexible(), spacing: 9)
+                ], spacing: 10) {
+                    resultValue(tr("Time", "Tid"), durationText, icon: "timer")
+                    resultValue(tr("Average pace", "Snittempo"), paceText, icon: "speedometer")
+                    resultValue(tr("Average HR", "Snittpuls"), averageHeartRateText, icon: "heart")
+                    resultValue(
+                        isTreadmillWorkout
+                            ? tr("Max HR", "Makspuls")
+                            : tr("Elevation gain", "Høydemeter"),
+                        isTreadmillWorkout ? maxHeartRateText : (ascentText ?? "—"),
+                        icon: isTreadmillWorkout ? "heart.fill" : "mountain.2"
+                    )
+                }
+
+                if isTreadmillWorkout {
+                    HStack(spacing: 10) {
+                        Label(tr("Incline", "Stigning"), systemImage: "arrow.up.right")
+                        Spacer()
+                        Text(String(format: "%.1f%%",
+                            phoneWorkout.treadmillInclinePercent(for: workout.id) ?? 0))
+                            .monospacedDigit()
+                        Button(tr("Adjust", "Juster")) {
+                            treadmillInclineDraft = phoneWorkout
+                                .treadmillInclinePercent(for: workout.id) ?? 0
+                            showingTreadmillInclineEditor = true
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
                 }
             }
         }
-        }
+    }
 
+    private func resultValue(_ title: String, _ value: String, icon: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .frame(width: 28, height: 28)
+                .background(ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 9))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                Text(value)
+                    .font(.subheadline.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, minHeight: 62, alignment: .leading)
+        .background(ATHLTHPlanDesign.warmSurface.opacity(0.47),
+                    in: RoundedRectangle(cornerRadius: 13))
     }
 
     @ViewBuilder
