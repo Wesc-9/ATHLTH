@@ -235,19 +235,30 @@ struct ThreadWorkoutInvitationCard: View {
 
                 } else if response?.decision == .accepted {
                     Label(
-                        ATHLTHLocalization.choose(
-                            english: "Added to your workout calendar",
-                            norwegian: "Økten ligger nå i kalenderen din"
-                        ),
-                        systemImage: "calendar.badge.checkmark"
+                        workout.scheduledStart != nil
+                            ? ATHLTHLocalization.choose(
+                                english: "Added to your workout calendar",
+                                norwegian: "Økten ligger nå i kalenderen din"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Workout saved to your shared workouts",
+                                norwegian: "Økten er lagret blant dine delte økter"
+                            ),
+                        systemImage: workout.scheduledStart != nil
+                            ? "calendar.badge.checkmark" : "checkmark.circle"
                     )
                     .font(.caption)
                     .foregroundStyle(ATHLTHTheme.mutedText)
                 } else if isMine && response == nil {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Your own workout stays scheduled whether or not your friend joins.",
-                        norwegian: "Din økt blir stående i kalenderen selv om vennen ikke blir med."
-                    ))
+                    Text(workout.scheduledStart != nil
+                        ? ATHLTHLocalization.choose(
+                            english: "Your own workout stays scheduled whether or not your friend joins.",
+                            norwegian: "Din økt blir stående i kalenderen selv om vennen ikke blir med."
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Your invitation is waiting for a reply.",
+                            norwegian: "Øktinvitasjonen venter på svar."
+                        ))
                     .font(.caption)
                     .foregroundStyle(ATHLTHTheme.mutedText)
                     .fixedSize(horizontal: false, vertical: true)
