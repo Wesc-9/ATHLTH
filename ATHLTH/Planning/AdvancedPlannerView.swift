@@ -6389,7 +6389,8 @@ struct SessionEditorView: View {
                     exerciseBeingEdited = nil
                 }
             }
-            .sheet(isPresented: $showingRunningLibrary) {
+            .sheet(isPresented: $showingRunningLibrary,
+                   onDismiss: { replacingRunningWorkoutID = nil }) {
                 NavigationStack {
                     RunningWorkoutLibraryView(
                         selectionTitle: ATHLTHLocalization.choose(
@@ -6430,7 +6431,8 @@ struct SessionEditorView: View {
                 if let workout = selectedRunningWorkouts.first(where: { $0.id == selection.workoutID }),
                    let block = workout.blocks.first(where: { $0.id == selection.blockID }) {
                     ATHLTHIntervalRepetitionEditorView(
-                        block: block, repetition: selection.repetition
+                        block: block, repetition: selection.repetition,
+                        environment: runEnvironment
                     ) { override in
                         updateRunningRepetition(selection, override: override)
                     }
