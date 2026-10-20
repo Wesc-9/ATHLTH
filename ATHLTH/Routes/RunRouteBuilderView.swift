@@ -676,7 +676,8 @@ struct RunRouteBuilderView: View {
     private func resolveMapPointAddress(
         coordinate: CLLocationCoordinate2D,
         role: RunRouteMapPointMode,
-        viaID: UUID? = nil
+        viaID: UUID? = nil,
+        expectedItem: MKMapItem
     ) async {
         let location = CLLocation(latitude: coordinate.latitude,
                                   longitude: coordinate.longitude)
@@ -698,9 +699,7 @@ struct RunRouteBuilderView: View {
         let item = MKMapItem(placemark: MKPlacemark(placemark: placemark))
         item.name = label
         let matches: (MKMapItem?) -> Bool = { selected in
-            guard let point = selected?.placemark.coordinate else { return false }
-            return CLLocation(latitude: point.latitude, longitude: point.longitude)
-                .distance(from: location) < 2
+            selected === expectedItem
         }
 
         switch role {
@@ -748,12 +747,21 @@ struct RunRouteBuilderView: View {
             break
         }
         invalidateCalculatedRoute()
-        Task {
-            async let address: Void = resolveMapPointAddress(
-                coordinate: coordinate, role: action, viaID: newViaID)
-            await calculateRoutesIfReady(force: true)
-            await address
+        let target: MKMapItem?
+        switch action {
+        case .start: target = startItem
+        case .finish: target = endItem
+        case .via: target = viaPoints.last?.item
+        case .automatic: target = nil
         }
+        if let target {
+            Task {
+                await resolveMapPointAddress(
+                    coordinate: coordinate, role: action,
+                    viaID: newViaID, expectedItem: target)
+            }
+        }
+        Task { await calculateRoutesIfReady(force: true) }
     }
 
     private func undoMapEdit() {
@@ -1175,7 +1183,8 @@ struct RunRouteBuilderView: View {
         if let id = viaPoints.last?.id {
             Task {
                 await resolveMapPointAddress(
-                    coordinate: coordinate, role: .via, viaID: id)
+                    coordinate: coordinate, role: .via, viaID: id,
+                    expectedItem: item)
             }
         }
     }
@@ -1454,9 +1463,11 @@ private struct RunRouteSearchField: View {
 
                     ZStack(alignment: .leading) {
                         TextField(
-                            ATHLTHLocalization.choose(
-                                english: "Search address or place",
-                                norwegian: "Søk etter adresse eller sted"),
+                            selectedItem == nil
+                                ? ATHLTHLocalization.choose(
+                                    english: "Search address or place",
+                                    norwegian: "Søk etter adresse eller sted")
+                                : "",
                             text: $model.query
                         )
                         .font(.subheadline)
