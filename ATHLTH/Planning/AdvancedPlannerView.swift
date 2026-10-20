@@ -8797,68 +8797,14 @@ struct SessionEditorView: View {
     private func estimatedRunningTotals(
         for templates: [RunningWorkoutTemplate]? = nil
     ) -> (distanceMeters: Double?, durationSeconds: Double?) {
-        let workouts = templates ?? selectedRunningWorkouts
-        guard !workouts.isEmpty else { return (nil, nil) }
-        let defaultPace = targetPaceEnabled
+        let targetPace = targetPaceEnabled
             ? Double(targetPaceMinutes * 60 + targetPaceSeconds)
             : 360.0
-        var meters = 0.0
-        var seconds = 0.0
-        var distanceComplete = true
-        var durationComplete = true
-        var stepCount = 0
-
-        for workout in workouts {
-            for block in workout.blocks {
-                let repetitions = min(max(block.repetitions, 1), 60)
-                for repetition in 1...repetitions {
-                    var steps: [(RunningStepTarget, Bool)] = [
-                        (block.resolvedWork(at: repetition), block.kind == .recovery)
-                    ]
-                    if let recovery = block.resolvedRecovery(after: repetition) {
-                        steps.append((recovery, true))
-                    }
-                    for (step, isRecovery) in steps {
-                        stepCount += 1
-                        if stepCount > 1_000 { return (nil, nil) }
-                        let pace = step.intensity.paceMinSecondsPerKilometer ??
-                            (isRecovery ? 540.0 : defaultPace)
-                        guard pace.isFinite, pace > 0 else { return (nil, nil) }
-                        switch step.measure {
-                        case .time:
-                            if let time = step.durationSeconds, time > 0, time.isFinite {
-                                seconds += time
-                                // An unpaced recovery represents stationary
-                                // rest, not imaginary treadmill/GPS distance.
-                                if !isRecovery || step.intensity.paceMinSecondsPerKilometer != nil {
-                                    meters += time / pace * 1_000
-                                }
-                            } else {
-                                durationComplete = false
-                                distanceComplete = false
-                            }
-                        case .distance:
-                            if let distance = step.distanceMeters, distance > 0, distance.isFinite {
-                                meters += distance
-                                seconds += distance / 1_000 * pace
-                            } else {
-                                durationComplete = false
-                                distanceComplete = false
-                            }
-                        case .open:
-                            durationComplete = false
-                            distanceComplete = false
-                        }
-                    }
-                }
-            }
-        }
-        return (
-            distanceComplete && meters > 0 ? meters : nil,
-            durationComplete && seconds > 0 ? seconds : nil
+        return ATHLTHRunningPlanningEstimate.totals(
+            for: templates ?? selectedRunningWorkouts,
+            defaultPaceSecondsPerKilometer: targetPace
         )
     }
-
 
     private func syncMetricsFromRouteChange(
         previousRouteID: UUID?,
