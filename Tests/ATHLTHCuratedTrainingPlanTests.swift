@@ -164,4 +164,27 @@ final class ATHLTHCuratedTrainingPlanTests: XCTestCase {
         let roundTrip = try JSONDecoder().decode(PlannedSession.self, from: data)
         XCTAssertEqual(first.resolvedWorkoutBlocks, roundTrip.resolvedWorkoutBlocks)
     }
+
+    @MainActor
+    func testPlanMuscleFilterReusesExerciseLibraryGroupsWithoutFalseMatches() throws {
+        let plans = TrainingPlanCatalogEntry.bundledCatalog
+        let chest = try XCTUnwrap(plans.first { $0.slug == "focus-chest-triceps" })
+        XCTAssertTrue(chest.explicitlyTargets(.chest))
+        XCTAssertTrue(chest.explicitlyTargets(.triceps))
+        XCTAssertFalse(chest.explicitlyTargets(.calves))
+
+        let pull = try XCTUnwrap(plans.first { $0.slug == "focus-back-biceps" })
+        XCTAssertTrue(pull.explicitlyTargets(.back))
+        XCTAssertTrue(pull.explicitlyTargets(.biceps))
+        XCTAssertFalse(pull.explicitlyTargets(.quads))
+
+        let posterior = try XCTUnwrap(plans.first { $0.slug == "focus-glutes-hamstrings" })
+        XCTAssertTrue(posterior.explicitlyTargets(.glutes))
+        XCTAssertTrue(posterior.explicitlyTargets(.hamstrings))
+
+        let first5K = try XCTUnwrap(plans.first { $0.slug == "first-5k" })
+        XCTAssertFalse(ExerciseMuscleGroup.allCases.contains {
+            first5K.explicitlyTargets($0)
+        })
+    }
 }
