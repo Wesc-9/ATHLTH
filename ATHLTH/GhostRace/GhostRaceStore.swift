@@ -555,18 +555,43 @@ final class GhostRaceStore: ObservableObject {
             return
         }
 
-        // Watch snapshots normally include live distance. Phone Ghost updates
-        // only carry GPS + elapsed time, so a literal 0 m distance would pin
-        // route matching to the start of the course and reject valid points
-        // later in the race. Fall back to the reference distance expected at
-        // the current elapsed time while keeping the normal route-drift window.
+        // A detour may add kilometres to the HealthKit distance without
+        // moving the runner along the planned course. Never use the workout's
+        // total distance as an expected Ghost-route position.
+        // Prefer the Watch's route-progress match when the chosen course has
+        // the same geometry length, otherwise anchor to the last reliable
+        // position on this particular reference.
+        let plannedDistance = snapshot.routeDistanceMeters ?? 0
+        let sameCourseLength = plannedDistance.isFinite &&
+            plannedDistance > 0 &&
+            abs(plannedDistance - reference.routeDistanceMeters) <=
+                max(75, reference.routeDistanceMeters * 0.10)
+        let measuredCoursePosition: Double? = {
+            guard sameCourseLength,
+                  let percent = snapshot.routeProgressPercent,
+                  percent.isFinite, (0...100).contains(percent) else {
+                return nil
+            }
+            return reference.routeDistanceMeters * percent / 100
+        }()
         let expectedDistanceForMatching =
-            snapshot.distanceMeters > 0
-                ? snapshot.distanceMeters
-                : ghostPoint(
-                    at: snapshot.elapsedTime,
-                    in: reference
-                ).cumulativeMeters
+            measuredCoursePosition ??
+            lastMatchedIndex.map { reference.points[$0].cumulativeMeters } ??
+            (snapshot.elapsedTime < 40
+                ? 0
+                : ghostPoint(at: snapshot.elapsedTime, in: reference).cumulativeMeters)
+
+        if let routeDeviation = snapshot.routeDeviationMeters,
+           let tolerance = snapshot.routeDeviationThresholdMeters,
+           !ATHLTHGhostCourseProgressPolicy.isReliableOnRoute(
+                horizontalAccuracy: 0,
+                deviationMeters: routeDeviation,
+                alertThresholdMeters: tolerance
+           ) {
+            comparison = nil
+            leadTracker.invalidatePending()
+            return
+        }
 
         guard let matchedIndex =
                 nearestReferenceIndex(
@@ -584,8 +609,6 @@ final class GhostRaceStore: ObservableObject {
             }
             return
         }
-
-        lastMatchedIndex = matchedIndex
 
         let matched =
             reference.points[matchedIndex]
@@ -628,7 +651,7 @@ final class GhostRaceStore: ObservableObject {
 
         // A nearby route point may still be on a parallel path or a
         // shortcut. An unreliable map match never counts as a new lead.
-        guard deviation.isFinite, deviation <= 80 else {
+        guard deviation.isFinite, deviation <= 50 else {
             comparison = nil
             leadTracker.invalidatePending()
             if snapshot.state == .completed {
@@ -636,6 +659,20 @@ final class GhostRaceStore: ObservableObject {
             }
             return
         }
+
+        guard ATHLTHGhostCourseProgressPolicy.plausibleCourseAdvance(
+            previousMeters: lastReliableCourseSample?.meters,
+            previousElapsed: lastReliableCourseSample?.elapsed,
+            candidateMeters: matched.cumulativeMeters,
+            elapsed: snapshot.elapsedTime
+        ) else {
+            comparison = nil
+            leadTracker.invalidatePending()
+            return
+        }
+
+        // Rejecting an outlier must not reset the trusted route anchor.
+        lastMatchedIndex = matchedIndex
 
         recordFinishCrossing(
             courseMeters: matched.cumulativeMeters,
@@ -717,7 +754,9 @@ final class GhostRaceStore: ObservableObject {
                 currentLongitude:
                     location?
                         .coordinate
-                        .longitude
+                        .longitude,
+                routeProgressPercent: routeProgressPercent,
+                routeDistanceMeters: routeDistance > 0 ? routeDistance : nil
             )
 
         update(with: snapshot)
