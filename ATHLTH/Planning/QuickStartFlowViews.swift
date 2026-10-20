@@ -2178,14 +2178,7 @@ struct RunQuickStartSheet: View {
             return
         }
 
-        let friends =
-            social.trainingPartners
-                .filter {
-                    selectedFriendIDs
-                        .contains(
-                            $0.userID
-                        )
-                }
+        let friends = social.resolvedQuickTrainPartners(selectedFriendIDs)
 
         var routeAlerts =
             routeGuardianDraft
@@ -3072,9 +3065,7 @@ struct WalkQuickStartSheet: View {
     private func startWalk(using device: WorkoutCaptureDevice) {
         guard device == .iPhone ||
             watchConnected || ATHLTHDeviceRole.isIPad else { return }
-        let friends = social.trainingPartners.filter {
-            selectedFriendIDs.contains($0.userID)
-        }
+        let friends = social.resolvedQuickTrainPartners(selectedFriendIDs)
 
         onStart(
             WalkQuickStartConfiguration(
