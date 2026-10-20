@@ -987,6 +987,41 @@ struct PlannedWorkoutMeetingPoint: Codable, Hashable {
     var longitude: Double
 }
 
+/// The workout's private, user-selected training location; separate from
+/// Train Together meeting points, which require an explicit shared pin.
+enum ATHLTHTrainingPlaceKind: String, Codable, CaseIterable, Identifiable {
+    case gym, hotel, sportsGround, address, other
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .gym: return ATHLTHLocalization.choose(english: "Gym", norwegian: "Treningssenter")
+        case .hotel: return ATHLTHLocalization.choose(english: "Hotel", norwegian: "Hotell")
+        case .sportsGround: return ATHLTHLocalization.choose(english: "Sports ground", norwegian: "Idrettsanlegg")
+        case .address: return ATHLTHLocalization.choose(english: "Address", norwegian: "Adresse")
+        case .other: return ATHLTHLocalization.choose(english: "Other", norwegian: "Annet sted")
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .gym: return "dumbbell.fill"
+        case .hotel: return "building.2"
+        case .sportsGround: return "sportscourt"
+        case .address: return "mappin"
+        case .other: return "location"
+        }
+    }
+}
+
+struct ATHLTHTrainingPlace: Identifiable, Codable, Hashable {
+    var id: UUID = UUID()
+    var kind: ATHLTHTrainingPlaceKind
+    var name: String
+    var address: String
+}
+
 struct PlannedSession: Identifiable, Codable, Hashable {
     let id: UUID
     var title: String
@@ -1047,6 +1082,8 @@ struct PlannedSession: Identifiable, Codable, Hashable {
 
     // Optional to keep all historical saved sessions decodable.
     var meetingPoint: PlannedWorkoutMeetingPoint? = nil
+    /// Optional. No location is assumed for existing plans.
+    var plannedTrainingPlace: ATHLTHTrainingPlace? = nil
     // nil/0 disables reminders; a local notification is scheduled only
     // when a valid future start time has been chosen.
     var reminderMinutesBefore: Int? = nil
