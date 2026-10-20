@@ -17,6 +17,36 @@ final class RunRouteMapPointModeTests: XCTestCase {
         )
     }
 
+    func testResolvedMapAddressUsesStreetAndLocality() {
+        XCTAssertEqual(
+            RunRouteAddressPresentation.name(
+                street: "Storgata 12", fallbackName: "Storgata",
+                locality: "Fauske"),
+            "Storgata 12, Fauske"
+        )
+    }
+
+    func testResolvedMapPlaceAvoidsRepeatingLocality() {
+        XCTAssertEqual(
+            RunRouteAddressPresentation.name(
+                street: "", fallbackName: "Fauske", locality: "Fauske"),
+            "Fauske"
+        )
+        XCTAssertEqual(
+            RunRouteAddressPresentation.name(
+                street: "", fallbackName: "Hauan idrettspark",
+                locality: "Fauske"),
+            "Hauan idrettspark, Fauske"
+        )
+    }
+
+    func testFailedGeocodeNeverInventsAddress() {
+        XCTAssertNil(RunRouteAddressPresentation.name(
+            street: "", fallbackName: nil, locality: nil))
+        XCTAssertEqual(RunRouteAddressPresentation.name(
+            street: "", fallbackName: nil, locality: "Fauske"), "Fauske")
+    }
+
     func testSelectedPointModeOverridesAutomaticOrder() {
         XCTAssertEqual(
             RunRouteMapPointMode.resolve(mode: .start, hasStart: true, hasFinish: true),
