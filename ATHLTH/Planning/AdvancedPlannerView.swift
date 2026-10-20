@@ -6197,134 +6197,148 @@ struct SessionEditorView: View {
         }
     }
 
+    // Keeping the outer View type small is deliberate: on iOS 27,
+    // Swift runtime metadata resolution for the old, deeply nested chain
+    // of Form + eleven sheets + lifecycle modifiers exhausted the main
+    // thread stack during UISheetPresentationController presentation.
+    // AnyView only at stable section boundaries caps generic type depth.
     var body: some View {
         NavigationStack {
-            Form {
-                if isStandalone && !hasSelectedWorkoutSource {
-                    Section {
-                        sourceChoiceCard
-                    }
-                    .listRowBackground(SwiftUI.Color.clear)
-                    .listRowInsets(EdgeInsets(top: 14, leading: 14,
-                                              bottom: 14, trailing: 14))
-                } else {
-                // Entry from the "Train together" card puts partner selection
-                // first while retaining the exact same workout editor.
-                if prioritizePartnerPlanning && onPreparedWorkout == nil {
-                    partnerPlanningSection
-                }
+            AnyView(editorLifecycle)
+        }
+    }
+
+    private var editorBaseForm: some View {
+        Form {
+            if isStandalone && !hasSelectedWorkoutSource {
                 Section {
-                    workoutBuilderOverview
+                    sourceChoiceCard
                 }
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-
-                workoutStructurePreviewSection
-
-                workoutBasicsSection
-
-                if kind == .running {
-                    runningBuilder
-                    plannedRunGuidanceSection
-                }
-
-                workoutSourcesSection
-
-
-                if onPreparedWorkout == nil && !prioritizePartnerPlanning {
-                    partnerPlanningSection
-                }
-                plannedWorkoutLogisticsSection
-
-                if editorMode == .advanced {
-                    advancedOptions
-                }
-
-                if kind == .strength ||
-                    !plannedExercises.isEmpty {
-                    strengthBuilder
-                }
-
-                if kind == .running && runEnvironment == .outdoor {
-                    routeBuilder
-                }
-
-                if kind == .walking {
-                    routeBuilder
-                }
-
-                if kind == .recovery || kind == .mobility {
-                    Section(ATHLTHLocalization.choose(english: "Recovery / Mobility", norwegian: "Restitusjon / bevegelighet")) {
-                        Text(
-                            ATHLTHLocalization.choose(english: "Use duration and notes to describe the session. Structured mobility blocks can be added to the same planner model later.", norwegian: "Bruk varighet og notater for å beskrive økten. Strukturerte bevegelighetsblokker kan legges til senere.")
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                }
-                } // shared workout-source selection
+                .listRowBackground(SwiftUI.Color.clear)
+                .listRowInsets(EdgeInsets(top: 14, leading: 14,
+                                          bottom: 14, trailing: 14))
+            } else {
+            // Entry from the "Train together" card puts partner selection
+            // first while retaining the exact same workout editor.
+            if prioritizePartnerPlanning && onPreparedWorkout == nil {
+                partnerPlanningSection
             }
-            .scrollContentBackground(.hidden)
-            .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
-            .tint(ATHLTHPlanDesign.accentInk)
-            .listSectionSpacing(14)
-            .environment(
-                \.defaultMinListRowHeight,
-                52
-            )
-            .navigationTitle(
-                isStandalone
-                    ? ATHLTHLocalization.choose(
-                        english:
-                            "Plan Extra Workout",
-                        norwegian:
-                            "Planlegg ekstra økt"
+            Section {
+                workoutBuilderOverview
+            }
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+
+            workoutStructurePreviewSection
+
+            workoutBasicsSection
+
+            if kind == .running {
+                runningBuilder
+                plannedRunGuidanceSection
+            }
+
+            workoutSourcesSection
+
+
+            if onPreparedWorkout == nil && !prioritizePartnerPlanning {
+                partnerPlanningSection
+            }
+            plannedWorkoutLogisticsSection
+
+            if editorMode == .advanced {
+                advancedOptions
+            }
+
+            if kind == .strength ||
+                !plannedExercises.isEmpty {
+                strengthBuilder
+            }
+
+            if kind == .running && runEnvironment == .outdoor {
+                routeBuilder
+            }
+
+            if kind == .walking {
+                routeBuilder
+            }
+
+            if kind == .recovery || kind == .mobility {
+                Section(ATHLTHLocalization.choose(english: "Recovery / Mobility", norwegian: "Restitusjon / bevegelighet")) {
+                    Text(
+                        ATHLTHLocalization.choose(english: "Use duration and notes to describe the session. Structured mobility blocks can be added to the same planner model later.", norwegian: "Bruk varighet og notater for å beskrive økten. Strukturerte bevegelighetsblokker kan legges til senere.")
                     )
-                    : existingWorkout == nil
-                        ? ATHLTHLocalization.choose(english: "Add workout", norwegian: "Legg til økt")
-                        : ATHLTHLocalization.choose(english: "Edit workout", norwegian: "Rediger økt")
-            )
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(
-                        ATHLTHLocalization.choose(
-                            english: "Cancel", norwegian: "Avbryt"
-                        )
-                    ) {
-                        finishDraft()
-                        dismiss()
-                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
+            }
+            } // shared workout-source selection
+        }
+        .scrollContentBackground(.hidden)
+        .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
+        .tint(ATHLTHPlanDesign.accentInk)
+        .listSectionSpacing(14)
+        .environment(
+            \.defaultMinListRowHeight,
+            52
+        )
+        .navigationTitle(
+            isStandalone
+                ? ATHLTHLocalization.choose(
+                    english:
+                        "Plan Extra Workout",
+                    norwegian:
+                        "Planlegg ekstra økt"
+                )
+                : existingWorkout == nil
+                    ? ATHLTHLocalization.choose(english: "Add workout", norwegian: "Legg til økt")
+                    : ATHLTHLocalization.choose(english: "Edit workout", norwegian: "Rediger økt")
+        )
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button(
+                    ATHLTHLocalization.choose(
+                        english: "Cancel", norwegian: "Avbryt"
+                    )
+                ) {
+                    finishDraft()
+                    dismiss()
+                }
+            }
 
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(
-                        isStandalone
-                            ? ATHLTHLocalization.choose(
-                                english: "Plan",
-                                norwegian: "Planlegg"
-                            )
-                            : existingWorkout == nil
-                                ? ATHLTHLocalization.choose(english: "Add", norwegian: "Legg til")
-                                : ATHLTHLocalization.choose(english: "Save", norwegian: "Lagre")
-                    ) {
-                        saveSession()
-                    }
-                    .disabled(!hasSelectedWorkoutSource || !canAdd || isSaving)
+            ToolbarItem(placement: .confirmationAction) {
+                Button(
+                    isStandalone
+                        ? ATHLTHLocalization.choose(
+                            english: "Plan",
+                            norwegian: "Planlegg"
+                        )
+                        : existingWorkout == nil
+                            ? ATHLTHLocalization.choose(english: "Add", norwegian: "Legg til")
+                            : ATHLTHLocalization.choose(english: "Save", norwegian: "Lagre")
+                ) {
+                    saveSession()
                 }
+                .disabled(!hasSelectedWorkoutSource || !canAdd || isSaving)
             }
-            .alert(
-                ATHLTHLocalization.choose(
-                    english: "Invitation not sent",
-                    norwegian: "Invitasjonen ble ikke sendt"
-                ),
-                isPresented: $showingInvitationError
-            ) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(invitationError)
-            }
+        }
+        .alert(
+            ATHLTHLocalization.choose(
+                english: "Invitation not sent",
+                norwegian: "Invitasjonen ble ikke sendt"
+            ),
+            isPresented: $showingInvitationError
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(invitationError)
+        }
+    }
+
+    private var editorPartnerSheets: some View {
+        AnyView(editorBaseForm)
             .sheet(isPresented: $showingAllTrainingPartners) {
                 SessionTrainingPartnerSelectionSheet(
                     selectedPartnerID: $selectedPartnerID
@@ -6363,6 +6377,10 @@ struct SessionEditorView: View {
                     showingSavedWorkoutPicker = false
                 }
             }
+    }
+
+    private var editorLibrarySheets: some View {
+        AnyView(editorPartnerSheets)
             .sheet(isPresented: $showingExerciseLibrary) {
                 NavigationStack {
                     ExerciseLibraryView(
@@ -6418,6 +6436,10 @@ struct SessionEditorView: View {
             .sheet(item: $editingRunningPhase) { selection in
                 phaseEditor(for: selection)
             }
+    }
+
+    private var editorDetailSheets: some View {
+        AnyView(editorLibrarySheets)
             .sheet(item: $editingRunningRepetition) { selection in
                 repetitionEditor(for: selection)
             }
@@ -6441,6 +6463,10 @@ struct SessionEditorView: View {
                         spotifyWorkoutPlaylistSelection
                 )
             }
+    }
+
+    private var editorLifecycle: some View {
+        AnyView(editorDetailSheets)
             .onAppear {
                 let existingDraft = UserDefaults.standard.data(
                     forKey: draftStorageKey
@@ -6499,7 +6525,6 @@ struct SessionEditorView: View {
             .onChange(of: targetPaceEnabled) { _, _ in syncRunningMetricsFromSelection() }
             .onChange(of: targetPaceMinutes) { _, _ in syncRunningMetricsFromSelection() }
             .onChange(of: targetPaceSeconds) { _, _ in syncRunningMetricsFromSelection() }
-        }
     }
 
     private func prepareSessionEditor() async {
