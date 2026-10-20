@@ -2676,32 +2676,65 @@ struct WatchRunWorkoutExperienceView: View {
                     )
                 }
 
-                Text(
-                    navigationInstructionText
-                )
-                .font(
-                    .system(
-                        size: 9,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(
-                    navigationStatusTint
-                )
-                .multilineTextAlignment(
-                    .center
-                )
-                .frame(
-                    maxWidth: .infinity
-                )
-                .padding(
-                    .horizontal,
-                    8
-                )
+                routeNextTurnCard
+
+                if workoutManager.canRunBackToStart {
+                    Button {
+                        workoutManager.startReturnToRouteStart()
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Run back to start",
+                                norwegian: "Løp tilbake til start"
+                            ),
+                            systemImage: "arrow.uturn.backward"
+                        )
+                        .font(.system(size: 11, weight: .bold))
+                        .frame(maxWidth: .infinity, minHeight: 42)
+                        .foregroundStyle(.white)
+                        .background(WatchTheme.accent,
+                                    in: RoundedRectangle(cornerRadius: 13))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(ATHLTHLocalization.choose(
+                        english: "Continue the same workout on the reversed route",
+                        norwegian: "Fortsett samme økt på ruten motsatt vei"
+                    ))
+                }
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
         }
+    }
+
+    private var routeNextTurnCard: some View {
+        let cue = workoutManager.routeNavigationCue
+        let norwegian = ATHLTHLocalization.choose(
+            english: false, norwegian: true
+        )
+        return HStack(alignment: .center, spacing: 9) {
+            Image(systemName: cue?.symbol ?? "arrow.up")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(cue?.offRoute == true ? .orange : WatchTheme.accent)
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(cue?.text(norwegian: norwegian) ?? navigationInstructionText)
+                    .font(.system(size: 11, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                if let cue {
+                    Text(ATHLTHLocalization.choose(
+                        english: "In ", norwegian: "Om "
+                    ) + String(format: "%.0f m", cue.distanceMeters))
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(cue.offRoute ? .orange : WatchTheme.accent)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
+        .padding(10)
+        .watchSurface(radius: 16)
+        .accessibilityElement(children: .combine)
     }
 
     private var navigationUserCoordinate:
@@ -3128,6 +3161,20 @@ struct WatchRunWorkoutExperienceView: View {
                 if workoutManager
                         .ghostRaceTitle != nil {
                     ghostCard
+                    Button {
+                        workoutManager.disableGhostDuringWorkout()
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Turn off Ghost Race",
+                                norwegian: "Slå av Ghost Race"
+                            ),
+                            systemImage: "eye.slash"
+                        )
+                        .font(.system(size: 11, weight: .semibold))
+                        .frame(maxWidth: .infinity, minHeight: 40)
+                    }
+                    .buttonStyle(.bordered)
                 } else if workoutManager
                             .plannedRoute == nil {
                     Text(
