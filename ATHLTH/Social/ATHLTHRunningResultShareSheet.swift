@@ -316,15 +316,71 @@ struct ATHLTHRunningResultShareSheet: View {
                 path.lineCapStyle = .round
                 UIColor.white.withAlphaComponent(0.93).setStroke()
                 path.stroke()
-                path.lineWidth = 6
-                UIColor(red: 0.43, green: 0.32, blue: 0.20, alpha: 1).setStroke()
-                path.stroke()
+                // The result image uses the same pace narrative as the
+                // detail map. Only visible, sanitized points are rendered.
+                // Never connect invisible private sections.
+                let paces = paceValues(for: visible)
+                let validPaces = paces.compactMap { $0 }.sorted()
+                let fast = validPaces.first ?? 300
+                let slow = validPaces.last ?? 600
+                for index in 1..<visible.count {
+                    let from = snapshot.point(for: visible[index - 1].coordinate)
+                    let to = snapshot.point(for: visible[index].coordinate)
+                    let segment = UIBezierPath()
+                    segment.move(to: from)
+                    segment.addLine(to: to)
+                    segment.lineWidth = 6
+                    segment.lineCapStyle = .round
+                    let fallback = UIColor(red: 0.43, green: 0.32, blue: 0.20, alpha: 1)
+                    if index - 1 < paces.count, let pace = paces[index - 1] {
+                        let position = max(0, min(1, (pace - fast) / max(1, slow - fast)))
+                        UIColor(
+                            red: 0.05 + 0.91 * position,
+                            green: 0.62 - 0.17 * position,
+                            blue: 0.49 - 0.37 * position,
+                            alpha: 1
+                        ).setStroke()
+                    } else {
+                        fallback.setStroke()
+                    }
+                    segment.stroke()
+                }
             }
             // The route list used for the snapshot is the same sanitized list
             // displayed in the preview, never the private original route.
             mapSnapshot = overlaid
         } catch {
             mapSnapshot = nil
+        }
+    }
+
+    // Source coordinates are preserved exactly by WorkoutRouteSharing.
+    // Monotonic matching avoids leaking gaps or colouring a line by a GPS
+    // sample that was deliberately withheld from the shared preview.
+    private func paceValues(for visible: [RouteCoordinate]) -> [Double?] {
+        guard visible.count >= 2 else { return [] }
+        var matched: [CLLocation] = []
+        var next = 0
+        for point in visible {
+            while next < rawRoute.count {
+                let original = rawRoute[next]
+                next += 1
+                if original.coordinate.latitude == point.latitude &&
+                   original.coordinate.longitude == point.longitude {
+                    matched.append(original)
+                    break
+                }
+            }
+        }
+        guard matched.count == visible.count else {
+            return Array(repeating: nil, count: visible.count - 1)
+        }
+        return zip(matched, matched.dropFirst()).map { before, after in
+            let meters = after.distance(from: before)
+            let seconds = after.timestamp.timeIntervalSince(before.timestamp)
+            guard seconds > 0, seconds <= 300, meters >= 10,
+                  meters.isFinite, meters / seconds <= 12.5 else { return nil }
+            return seconds / (meters / 1_000)
         }
     }
 
