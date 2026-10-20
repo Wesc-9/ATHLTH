@@ -456,14 +456,7 @@ struct WorkoutStartOptionsView: View {
 
     private func startStrength(using device: WorkoutCaptureDevice) {
         guard device == .iPhone || appleWatchSelectable else { return }
-    let selectedFriends =
-        social.trainingPartners
-            .filter {
-                selectedFriendIDs
-                    .contains(
-                        $0.userID
-                    )
-            }
+    let selectedFriends = social.resolvedQuickTrainPartners(selectedFriendIDs)
 
     let advancedConfiguration =
         StrengthAdvancedConfiguration(
