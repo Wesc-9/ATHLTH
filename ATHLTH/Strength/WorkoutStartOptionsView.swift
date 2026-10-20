@@ -52,7 +52,7 @@ struct WorkoutStartOptionsView: View {
     @State private var didLoadSpotifySelection = false
     @State private var showingAudioCoachSettings = false
     @State private var showingRestCueSettings = false
-    @State private var showingTrainingPartners = false
+
     @State private var showingDisplayControls = false
 
     init(
@@ -142,34 +142,17 @@ struct WorkoutStartOptionsView: View {
                     // core ability to build the strength session before starting.
                     exerciseSelectionCard
 
-                    advancedOptionButton(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Train with someone",
-                                norwegian:
-                                    "Trene med noen"
-                            ),
-                        subtitle:
-                            selectedFriendIDs.isEmpty
-                                ? ATHLTHLocalization.choose(
-                                    english:
-                                        "Private invite · optional",
-                                    norwegian:
-                                        "Privat invitasjon · valgfritt"
-                                )
-                                : ATHLTHLocalization.format(
-                                    english:
-                                        "%d selected · %@",
-                                    norwegian:
-                                        "%d valgt · %@",
-                                    selectedFriendIDs.count,
-                                    socialMode.title
-                                ),
-                        icon: "person.2.fill",
-                        tint: ATHLTHTheme.vitality
-                    ) {
-                        showingTrainingPartners = true
+                    // Same immediate avatar row as Quick Run and Quick Walk.
+                    ATHLTHCard {
+                        VStack(alignment: .leading, spacing: 13) {
+                            WorkoutFriendPicker(
+                                selectedFriendIDs: $selectedFriendIDs
+                            )
+                            if !selectedFriendIDs.isEmpty {
+                                Divider()
+                                WorkoutSocialModePicker(mode: $socialMode)
+                            }
+                        }
                     }
 
                     // Audio Coach is a core workout option, not an
@@ -411,62 +394,6 @@ struct WorkoutStartOptionsView: View {
                     configuration:
                         $restCues
                 )
-            }
-            .sheet(
-                isPresented:
-                    $showingTrainingPartners
-            ) {
-                NavigationStack {
-                    ScrollView {
-                        ATHLTHCard {
-                            VStack(
-                                alignment:
-                                    .leading,
-                                spacing: 14
-                            ) {
-                                WorkoutFriendPicker(
-                                    selectedFriendIDs:
-                                        $selectedFriendIDs
-                                )
-
-                                if !selectedFriendIDs
-                                    .isEmpty {
-                                    Divider()
-
-                                    WorkoutSocialModePicker(
-                                        mode:
-                                            $socialMode
-                                    )
-                                }
-                            }
-                        }
-                        .padding(16)
-                    }
-                    .navigationTitle(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Train with someone",
-                            norwegian:
-                                "Trene med noen"
-                        )
-                    )
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(
-                            placement: .confirmationAction
-                        ) {
-                            Button(
-                                ATHLTHLocalization.choose(
-                                    english: "Done",
-                                    norwegian: "Ferdig"
-                                )
-                            ) {
-                                showingTrainingPartners = false
-                            }
-                        }
-                    }
-                }
-                .presentationDetents([.medium, .large])
             }
             .sheet(
                 isPresented:
