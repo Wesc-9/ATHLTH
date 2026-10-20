@@ -50,6 +50,53 @@ final class ATHLTHIntervalWorkoutTests: XCTestCase {
         }
     }
 
+    func testPlannedPhaseZonesAndPacesReachWatchWithoutChangingTheIntervals() throws {
+        var template = try XCTUnwrap(RunningWorkoutLibraryStore.builtInTemplates.first {
+            $0.title == "4 × 4 intervaller"
+        })
+        template.blocks[0].work.intensity.kind = .pace
+        template.blocks[0].work.intensity.paceMinSecondsPerKilometer = 420
+        template.blocks[0].work.intensity.paceMaxSecondsPerKilometer = 420
+        template.blocks[0].work.intensity.heartRateZone = 2
+        template.blocks[1].work.intensity.kind = .pace
+        template.blocks[1].work.intensity.paceMinSecondsPerKilometer = 300
+        template.blocks[1].work.intensity.paceMaxSecondsPerKilometer = 300
+        template.blocks[1].work.intensity.heartRateZone = 4
+        template.blocks[1].recovery?.intensity.heartRateZone = 2
+
+        // The workout recipe is Codable and survives the planner's persistence.
+        let restored = try JSONDecoder().decode(
+            RunningWorkoutTemplate.self,
+            from: JSONEncoder().encode(template)
+        )
+        var planned = PlannedSession(
+            id: UUID(), title: "Mølle 4 × 4",
+            kind: .running, scheduledStart: nil,
+            durationMinutes: nil, targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil, routeID: nil,
+            exercises: [], notes: nil
+        )
+        planned.runningWorkout = restored
+        planned.runningWorkouts = [restored]
+        planned.workoutCategory = "treadmill"
+
+        let transfer = PlannedWorkoutWatchBuilder.runningTransfer(
+            from: planned, routeAlerts: .standard
+        )
+        let warmup = try XCTUnwrap(transfer.steps.first(where: { $0.phase == "warmup" }))
+        XCTAssertEqual(warmup.targetHeartRateZone, 2)
+        XCTAssertEqual(warmup.targetPaceMinSecondsPerKilometer ?? 0, 420, accuracy: 0.01)
+
+        let effort = try XCTUnwrap(transfer.steps.first(where: { $0.phase == "work" }))
+        XCTAssertEqual(effort.targetHeartRateZone, 4)
+        // 12 km/t = 5:00 min/km, also used for treadmill.
+        XCTAssertEqual(effort.targetPaceMinSecondsPerKilometer ?? 0, 300, accuracy: 0.01)
+
+        let recovery = try XCTUnwrap(transfer.steps.first(where: { $0.phase == "recovery" }))
+        XCTAssertEqual(recovery.targetHeartRateZone, 2)
+        XCTAssertEqual(transfer.steps.count, 9)
+    }
+
     func testCoachBriefOnlyAddsCuesDuringWork() {
         let work = WatchRunningWorkoutStep(
             id: UUID(), title: "Drag", measure: .time,
