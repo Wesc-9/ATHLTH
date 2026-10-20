@@ -548,7 +548,7 @@ final class PublicTrailDiscoveryStore:
             : "© OpenStreetMap contributors"
         lastRefreshAt = Date()
         lastCenter = center
-        isWarmingCache = trails.isEmpty && responses.contains(\.isRefreshing)
+        isWarmingCache = trails.isEmpty && responses.contains(where: { $0.isRefreshing })
     }
 
     func similar(
