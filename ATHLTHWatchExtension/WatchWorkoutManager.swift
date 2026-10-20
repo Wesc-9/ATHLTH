@@ -6672,6 +6672,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             routeCueSymbol: routeNavigationCue?.symbol,
             routeCueDistanceMeters: routeNavigationCue?.distanceMeters,
             routeCueOffRoute: routeNavigationCue?.offRoute,
+            routeCanReturnToStart: canRunBackToStart,
             runningStepTitle:
                 currentRunningStep?.title,
             runningStepIndex:
@@ -7315,6 +7316,14 @@ extension WatchWorkoutManager:
                 }
 
                 switch command.command {
+                case .returnToStart:
+                    // This can arrive delayed after a reconnect. It must
+                    // never redirect a later workout or an older session.
+                    if let requested = command.workoutStartedAt,
+                       let startedAt = self.startedAt,
+                       abs(requested.timeIntervalSince(startedAt)) < 5 {
+                        self.startReturnToRouteStart()
+                    }
                 case .end:
                     self.end()
                 case .pause:
