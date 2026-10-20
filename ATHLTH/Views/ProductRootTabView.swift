@@ -704,6 +704,7 @@ struct ATHLTHHomeView: View {
     @State private var selectedHomeStandaloneWorkout: PlannedSession?
     @State private var selectedHomeAllStandaloneWorkout: PlannedSession?
     @State private var selectedHomeStrengthSession: PlannedSession?
+    @State private var selectedHomeStructuredWorkout: PlannedSession?
     @State private var pendingHomeQuickStartKind: WorkoutKind?
     @State private var showingHomeStrengthWorkout = false
     @State private var homeDirectStartInProgress = false
@@ -1081,6 +1082,12 @@ struct ATHLTHHomeView: View {
                         }
                     }
                 }
+            }
+            .fullScreenCover(item: $selectedHomeStructuredWorkout) { workout in
+                // Newer workout builders store their ordered sets in blocks,
+                // not legacy session.exercises. Reuse the real timeline
+                // recorder rather than starting an empty strength log.
+                StructuredWorkoutSessionView(workout: workout)
             }
             .fullScreenCover(isPresented: $showingHomeStrengthWorkout) {
                 ActiveStrengthWorkoutView()
@@ -4311,9 +4318,13 @@ struct ATHLTHHomeView: View {
 
             switch persisted.kind {
             case .strength:
-                startHomePlannedStrengthWorkout(
-                    persisted, device: device
-                )
+                if device == .iPhone && persisted.isStructuredWorkout {
+                    selectedHomeStructuredWorkout = persisted
+                } else {
+                    startHomePlannedStrengthWorkout(
+                        persisted, device: device
+                    )
+                }
             case .running, .walking:
                 if device == .appleWatch {
                     startHomePlannedWorkoutOnWatch(persisted)
