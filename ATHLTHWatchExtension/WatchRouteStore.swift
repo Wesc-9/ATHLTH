@@ -645,6 +645,10 @@ final class WatchRouteStore: NSObject, ObservableObject {
             // applied in WatchWorkoutManager. A raw WCSession command has no
             // value, so it must not overwrite the current incline.
             break
+        case .returnToStart:
+            // Require the workout-scoped identity carried by the live
+            // HealthKit mirror, never act on a stale WCSession command.
+            break
         }
     }
 
