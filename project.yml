@@ -56,6 +56,11 @@ targets:
           - _home-assistant._tcp
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+          # iOS 17+ permits scoped HTTP exceptions for IPv4 CIDR ranges.
+          # Only the Tailscale CGNAT range is allowed; global ATS stays on.
+          NSExceptionDomains:
+            "100.64.0.0/10":
+              NSExceptionAllowsInsecureHTTPLoads: true
         UIBackgroundModes: [location, audio, fetch, remote-notification]
         BGTaskSchedulerPermittedIdentifiers:
           - com.wesc9.athlth.home-assistant-refresh

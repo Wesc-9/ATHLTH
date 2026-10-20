@@ -472,19 +472,19 @@ struct HomeAssistantSettingsView: View {
 
                 Text(
                     ATHLTHLocalization.choose(
-                        english: "For Tailscale, use the HTTPS .ts.net address shown by Tailscale Serve—not http://100.x.x.x:8123. Both routes can be kept.",
-                        norwegian: "For Tailscale bruker du HTTPS-adressen som slutter på .ts.net fra Tailscale Serve, ikke http://100.x.x.x:8123. Begge tilkoblingene kan beholdes."
+                        english: "You can use http://100.x.x.x:8123 while connected to your trusted Tailscale VPN. HTTPS via Tailscale Serve is also supported.",
+                        norwegian: "Du kan bruke http://100.x.x.x:8123 når du er tilkoblet ditt betrodde Tailscale-VPN. HTTPS via Tailscale Serve støttes også."
                     )
                 )
                 .font(.caption2)
                 .foregroundStyle(ATHLTHTheme.mutedText)
                 .fixedSize(horizontal: false, vertical: true)
 
-                if HomeAssistantConnectionStore.isInsecureTailnetAddress(alternateAddress) {
+                if HomeAssistantConnectionStore.isTailnetHTTPAddress(alternateAddress) {
                     Label(
                         ATHLTHLocalization.choose(
-                            english: "iOS blocks HTTP over this Tailscale IP. Set up HTTPS with Tailscale Serve.",
-                            norwegian: "iOS blokkerer HTTP til denne Tailscale-IP-en. Konfigurer HTTPS med Tailscale Serve."
+                            english: "Direct HTTP works while connected to Tailscale. Activate Tailscale on your iPhone before connecting.",
+                            norwegian: "Direkte HTTP fungerer når du er koblet til Tailscale. Aktiver Tailscale på iPhone før tilkobling."
                         ),
                         systemImage: "exclamationmark.triangle.fill"
                     )
@@ -529,7 +529,7 @@ struct HomeAssistantSettingsView: View {
                                     .whitespacesAndNewlines
                             )
                             .isEmpty ||
-                        HomeAssistantConnectionStore.isInsecureTailnetAddress(alternateAddress)
+                        HomeAssistantConnectionStore.isTailnetHTTPAddress(alternateAddress)
                     )
 
                     if homeAssistant
@@ -1298,9 +1298,9 @@ struct HomeAssistantSettingsView: View {
             Label(
                 ATHLTHLocalization.choose(
                     english:
-                        "Code pairing is available over your home network or a trusted Tailscale HTTPS route. Home Assistant sign-in remains a fallback.",
+                        "Pair with a code on home Wi-Fi or over your active Tailscale VPN, including an HTTP Tailscale IP address.",
                     norwegian:
-                        "Kodeparing fungerer på hjemmenettverket eller via en betrodd Tailscale HTTPS-rute. Home Assistant-innlogging er reserve."
+                        "Par med kode på hjemmenett eller via ditt aktive Tailscale-VPN, også med HTTP til en Tailscale-IP-adresse."
                 ),
                 systemImage: "lock.shield"
             )
@@ -1353,11 +1353,11 @@ struct HomeAssistantSettingsView: View {
                 )
             )
 
-            if HomeAssistantConnectionStore.isInsecureTailnetAddress(manualAddress) {
+            if HomeAssistantConnectionStore.isTailnetHTTPAddress(manualAddress) {
                 Label(
                     ATHLTHLocalization.choose(
-                        english: "Use an HTTPS .ts.net URL for Tailscale, or pair over your home Wi-Fi first.",
-                        norwegian: "Bruk en HTTPS-adresse som slutter på .ts.net for Tailscale, eller par først via hjemmenettverket."
+                        english: "Enable Tailscale on your phone before pairing over this private IP address.",
+                        norwegian: "Aktiver Tailscale på telefonen før parkobling via denne private IP-adressen."
                     ),
                     systemImage: "exclamationmark.triangle.fill"
                 )
@@ -1387,7 +1387,6 @@ struct HomeAssistantSettingsView: View {
                 )
                 .isEmpty ||
                 pairingCode.filter(\.isNumber).count != 6 ||
-                HomeAssistantConnectionStore.isInsecureTailnetAddress(manualAddress) ||
                 homeAssistant.connectionState == .pairing
             )
 
@@ -1415,8 +1414,7 @@ struct HomeAssistantSettingsView: View {
                     in: .whitespacesAndNewlines
                 )
                 .isEmpty ||
-                !homeAssistant.isOAuthClientConfigured ||
-                HomeAssistantConnectionStore.isInsecureTailnetAddress(manualAddress)
+                !homeAssistant.isOAuthClientConfigured
             )
         }
         .padding(18)
