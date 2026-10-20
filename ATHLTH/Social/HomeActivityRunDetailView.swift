@@ -1177,102 +1177,66 @@ struct HomeActivityRunDetailView: View {
         .padding(.horizontal, 2)
     }
 
-    // Treadmill sessions show recorded workout metrics instead of GPS or elevation.
+    // No GPS-based claims on treadmill runs; keep measurements without
+    // repeating the max HR or pace already shown in the result header.
+    @ViewBuilder
     private var treadmillFactsCard: some View {
-        ATHLTHPlanSurface {
-            VStack(alignment: .leading, spacing: 12) {
-                Label(tr("Workout data", "Øktdata"), systemImage: "figure.run")
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-
-                HStack(spacing: 10) {
-                    routeFact(
-                        icon: "flame.fill",
-                        label: tr("Active energy", "Aktiv energi"),
-                        value: activeEnergyText
-                    )
-                    routeFact(
-                        icon: runningPowerText == "—" ? "heart.fill" : "bolt.fill",
-                        label: runningPowerText == "—"
-                            ? tr("Max heart rate", "Makspuls")
-                            : tr("Avg. power", "Snitteffekt"),
-                        value: runningPowerText == "—" ? maxHeartRateText : runningPowerText
-                    )
+        if activeEnergyText != "—" || runningPowerText != "—" {
+            ATHLTHPlanSurface {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(tr("Additional measurements", "Flere målinger"))
+                        .font(.system(size: 21, weight: .semibold, design: .serif))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                    HStack(spacing: 10) {
+                        if activeEnergyText != "—" {
+                            routeFact(icon: "flame.fill",
+                                      label: tr("Active energy", "Aktiv energi"),
+                                      value: activeEnergyText)
+                        }
+                        if runningPowerText != "—" {
+                            routeFact(icon: "bolt.fill",
+                                      label: tr("Average power", "Snitteffekt"),
+                                      value: runningPowerText)
+                        }
+                    }
                 }
             }
         }
     }
 
+    @ViewBuilder
     private var routeFactsCard: some View {
-        ATHLTHPlanSurface {
-            VStack(
-                alignment: .leading,
-                spacing: 12
-            ) {
-            Text(tr("Route details", "Rutedetaljer"))
-                .font(
-                    .headline.weight(
-                        .semibold
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.primaryText
-                )
-
-            LazyVGrid(
-                columns: [
-                    GridItem(
-                        .flexible(),
-                        spacing: 10
-                    ),
-                    GridItem(
-                        .flexible(),
-                        spacing: 10
-                    )
-                ],
-                spacing: 10
-            ) {
-                routeFact(
-                    icon: "mountain.2.fill",
-                    label: tr("Elevation gain", "Høydemeter"),
-                    value:
-                        ascentText ??
-                        "—"
-                )
-
-                routeFact(
-                    icon:
-                        "arrow.up.right.circle.fill",
-                    label: tr("Highest point", "Høyeste punkt"),
-                    value:
-                        highestPointText
-                )
-
-                routeFact(
-                    icon: "flame.fill",
-                    label: tr("Active energy", "Aktiv energi"),
-                    value:
-                        activeEnergyText
-                )
-
-                routeFact(
-                    icon:
-                        runningPowerText == "—"
-                            ? "heart.fill"
-                            : "bolt.fill",
-                    label:
-                        runningPowerText == "—"
-                            ? tr("Max heart rate", "Makspuls")
-                            : tr("Avg. power", "Snitteffekt"),
-                    value:
-                        runningPowerText == "—"
-                            ? maxHeartRateText
-                            : runningPowerText
-                )
+        if highestPointText != "—" ||
+           maxHeartRateText != "—" ||
+           runningPowerText != "—" {
+            ATHLTHPlanSurface {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(tr("Route measurements", "Rutedetaljer"))
+                        .font(.system(size: 21, weight: .semibold, design: .serif))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                    LazyVGrid(columns: [
+                        GridItem(.flexible(), spacing: 10),
+                        GridItem(.flexible(), spacing: 10)
+                    ], spacing: 10) {
+                        if highestPointText != "—" {
+                            routeFact(icon: "mountain.2",
+                                      label: tr("Highest point", "Høyeste punkt"),
+                                      value: highestPointText)
+                        }
+                        if maxHeartRateText != "—" {
+                            routeFact(icon: "heart.fill",
+                                      label: tr("Max heart rate", "Makspuls"),
+                                      value: maxHeartRateText)
+                        }
+                        if runningPowerText != "—" {
+                            routeFact(icon: "bolt.fill",
+                                      label: tr("Average power", "Snitteffekt"),
+                                      value: runningPowerText)
+                        }
+                    }
+                }
             }
         }
-        }
-
     }
 
     private var coachCard: some View {
@@ -1569,15 +1533,14 @@ struct HomeActivityRunDetailView: View {
                     )
                 )
                 .foregroundStyle(
-                    ATHLTHTheme.vitality
+                    ATHLTHPlanDesign.accentInk
                 )
                 .frame(
                     width: 34,
                     height: 34
                 )
                 .background(
-                    ATHLTHTheme
-                        .surfaceSage,
+                    ATHLTHPlanDesign.selectedSurface,
                     in: RoundedRectangle(
                         cornerRadius: 10,
                         style: .continuous
@@ -1591,7 +1554,7 @@ struct HomeActivityRunDetailView: View {
                 Text(label)
                     .font(.caption2)
                     .foregroundStyle(
-                        ATHLTHTheme.mutedText
+                        ATHLTHPlanDesign.secondaryInk
                     )
                     .lineLimit(1)
 
@@ -1602,7 +1565,7 @@ struct HomeActivityRunDetailView: View {
                         )
                     )
                     .foregroundStyle(
-                        ATHLTHTheme.primaryText
+                        ATHLTHPlanDesign.ink
                     )
                     .lineLimit(1)
                     .minimumScaleFactor(
@@ -1614,8 +1577,7 @@ struct HomeActivityRunDetailView: View {
         }
         .padding(10)
         .background(
-            ATHLTHTheme.surfaceStone
-                .opacity(0.62),
+            ATHLTHPlanDesign.warmSurface.opacity(0.65),
             in: RoundedRectangle(
                 cornerRadius: 14,
                 style: .continuous
