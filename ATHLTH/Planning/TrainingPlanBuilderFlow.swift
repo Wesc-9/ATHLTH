@@ -3237,7 +3237,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             Image(systemName: edit?.isRestDay == true
                                   ? "moon.stars.fill"
                                   : edit?.detailedWorkout?.isValid == true
-                                  ? (edit?.detailedWorkout?.kind.systemImage ?? "figure.run")
+                                  ? (edit?.detailedWorkout.map { guidedWorkoutIcon(for: $0) } ?? "figure.run")
                                   : "circle.dotted")
                                 .font(.caption)
                         }
@@ -3466,6 +3466,19 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
+    private func guidedWorkoutIcon(
+        for workout: ATHLTHPlanStructuredWorkoutBlueprint
+    ) -> String {
+        let strengthSteps = workout.blocks.filter { $0.kind == .exercise }.count
+        let runSteps = workout.blocks.filter { $0.kind == .run }.count
+        // A short running warm-up must not turn a strength workout into
+        // an unrelated generic/check icon.
+        if strengthSteps > 0 && strengthSteps >= runSteps {
+            return WorkoutKind.strength.systemImage
+        }
+        return workout.kind.systemImage
+    }
+
     /// A genuine workout summary: phase-aware, grouped and editable through
     /// the shared studio. The technical block sequence stays collapsed until
     /// requested; nothing in the source workout is flattened or discarded.
@@ -3482,7 +3495,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 11) {
-                Image(systemName: workout.kind.systemImage)
+                Image(systemName: guidedWorkoutIcon(for: workout))
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
                     .frame(width: 44, height: 44)
