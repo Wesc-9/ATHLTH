@@ -6,6 +6,7 @@ struct ATHLTHIntervalRepetitionEditorView: View {
     @Environment(\.dismiss) private var dismiss
     let repetition: Int
     let totalRepetitions: Int
+    let environment: RunEnvironment
     let onSave: (RunningRepetitionOverride) -> Void
 
     @State private var measure: RunningMeasureKind
@@ -17,6 +18,7 @@ struct ATHLTHIntervalRepetitionEditorView: View {
     @State private var targetSpeedKmh: Double
     @State private var recoverySpeedEnabled: Bool
     @State private var recoverySpeedKmh: Double
+    @State private var recoveryPaceSeconds: Int
     @State private var recoveryZoneEnabled: Bool
     @State private var recoveryZone: Int
     @State private var heartRateEnabled: Bool
@@ -31,9 +33,11 @@ struct ATHLTHIntervalRepetitionEditorView: View {
 
     init(block: RunningWorkoutBlock,
          repetition: Int,
+         environment: RunEnvironment = .outdoor,
          onSave: @escaping (RunningRepetitionOverride) -> Void) {
         self.repetition = repetition
         self.totalRepetitions = max(block.repetitions, 1)
+        self.environment = environment
         self.onSave = onSave
         let selected = block.override(for: repetition)
         let work = block.resolvedWork(at: repetition)
@@ -43,13 +47,14 @@ struct ATHLTHIntervalRepetitionEditorView: View {
         _workMeters = State(initialValue: max(100, Int(work.distanceMeters ?? 1000)))
         _paceEnabled = State(initialValue: work.intensity.paceMinSecondsPerKilometer != nil)
         _paceSeconds = State(initialValue: Int(work.intensity.paceMinSecondsPerKilometer ?? 300))
-        _paceAsSpeed = State(initialValue: work.intensity.paceMinSecondsPerKilometer != nil)
+        _paceAsSpeed = State(initialValue: environment == .treadmill)
         _targetSpeedKmh = State(initialValue:
             (3_600 / max(work.intensity.paceMinSecondsPerKilometer ?? 300, 1) * 10).rounded() / 10)
         let recoveryPace = recovery?.intensity.paceMinSecondsPerKilometer
         _recoverySpeedEnabled = State(initialValue: recoveryPace != nil)
         _recoverySpeedKmh = State(initialValue:
             (3_600 / max(recoveryPace ?? 600, 1) * 10).rounded() / 10)
+        _recoveryPaceSeconds = State(initialValue: Int(recoveryPace ?? 600))
         _recoveryZoneEnabled = State(initialValue: recovery?.intensity.heartRateZone != nil)
         _recoveryZone = State(initialValue: recovery?.intensity.heartRateZone ?? 2)
         _heartRateEnabled = State(initialValue: work.intensity.heartRateZone != nil)
@@ -132,10 +137,16 @@ struct ATHLTHIntervalRepetitionEditorView: View {
                             Toggle(tr("Target recovery speed", "Målhastighet i pausen"),
                                    isOn: $recoverySpeedEnabled)
                             if recoverySpeedEnabled {
-                                Stepper(
-                                    String(format: "%.1f km/t", recoverySpeedKmh),
-                                    value: $recoverySpeedKmh, in: 2...20, step: 0.1
-                                )
+                                if environment == .treadmill {
+                                    Stepper(
+                                        String(format: "%.1f km/t", recoverySpeedKmh),
+                                        value: $recoverySpeedKmh, in: 2...20, step: 0.1
+                                    )
+                                } else {
+                                    Stepper(paceLabel(recoveryPaceSeconds),
+                                            value: $recoveryPaceSeconds,
+                                            in: 180...1200, step: 5)
+                                }
                             }
                             Toggle(tr("Target recovery zone", "Målsone i pausen"),
                                    isOn: $recoveryZoneEnabled)
@@ -181,8 +192,10 @@ struct ATHLTHIntervalRepetitionEditorView: View {
                         let work = measure == .time
                             ? RunningStepTarget.time(Double(workSeconds), intensity: intensity)
                             : RunningStepTarget.distance(Double(workMeters), intensity: intensity)
-                        let recoveryPace = recoverySpeedEnabled
-                            ? 3_600 / max(recoverySpeedKmh, 0.1) : nil
+                        let recoveryPace: Double? = recoverySpeedEnabled
+                            ? (environment == .treadmill
+                                ? 3_600 / max(recoverySpeedKmh, 0.1)
+                                : Double(recoveryPaceSeconds)) : nil
                         let recoveryIntensity = RunningIntensityTarget(
                             kind: recoverySpeedEnabled ? .pace :
                                 (recoveryZoneEnabled ? .heartRateZone : .easy),
