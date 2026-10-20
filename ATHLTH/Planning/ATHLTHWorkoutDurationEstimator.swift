@@ -39,7 +39,10 @@ enum ATHLTHWorkoutDurationEstimator {
             case .rest:
                 seconds += max(block.durationSeconds ?? 0, 0)
             case .note:
-                break
+                if block.wellnessKind != nil, let time = block.durationSeconds, time > 0 {
+                    hasActivity = true
+                    seconds += time
+                }
             }
         }
 
