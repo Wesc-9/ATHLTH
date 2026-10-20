@@ -15,7 +15,9 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
     var isValid: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !blocks.isEmpty && blocks.count <= 200
-            && blocks.contains { $0.kind == .run || $0.kind == .exercise }
+            && blocks.contains { $0.kind == .run || $0.kind == .exercise
+                || ($0.kind == .note && $0.wellnessKind != nil
+                    && ($0.durationSeconds ?? 0) > 0) }
             && blocks.expandedForExecution().count <= 1_000
             && !Set(blocks.compactMap {
                 $0.groupKind == .superset ? $0.groupID : nil
@@ -106,6 +108,8 @@ struct ATHLTHPlanWeekDayEdit: Codable, Hashable {
     // Optional: existing persisted plans must continue decoding.
     var isRestDay: Bool? = nil
     var additionalDetailedWorkouts: [ATHLTHPlanStructuredWorkoutBlueprint]? = nil
+    /// Optional per-date location, independent of the plan's other dates.
+    var trainingPlace: ATHLTHTrainingPlace? = nil
 
     func scheduledSessions(from originals: [PlannedSession]) -> [PlannedSession] {
         if isRestDay == true { return [] }
@@ -113,7 +117,11 @@ struct ATHLTHPlanWeekDayEdit: Codable, Hashable {
         let extras = (additionalDetailedWorkouts ?? [])
             .filter(\.isValid)
             .map { $0.applying(to: nil) }
-        return [first] + Array(originals.dropFirst()) + extras
+        return ([first] + Array(originals.dropFirst()) + extras).map { workout in
+            var copy = workout
+            copy.plannedTrainingPlace = trainingPlace
+            return copy
+        }
     }
 
     func applying(to original: PlannedSession?) -> PlannedSession {
