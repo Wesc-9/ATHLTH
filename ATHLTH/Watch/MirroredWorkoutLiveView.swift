@@ -31,6 +31,26 @@ struct MirroredWorkoutLiveView: View {
                             .environmentObject(
                                 ghostRace
                             )
+
+                            Button {
+                                ghostRace.cancel()
+                                watchConnection.clearGhostRace()
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Turn off Ghost Race",
+                                        norwegian: "Slå av Ghost Race"
+                                    ),
+                                    systemImage: "eye.slash"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                            }
+                            .buttonStyle(.bordered)
+                            .accessibilityHint(ATHLTHLocalization.choose(
+                                english: "Stop Ghost comparisons but keep recording the run",
+                                norwegian: "Stopp Ghost-sammenligningen uten å avslutte løpeøkten"
+                            ))
                         } else if snapshot.kind ==
                                     .running,
                                   realtime
@@ -347,6 +367,11 @@ struct MirroredWorkoutLiveView: View {
                 .capturedAt
         ) {
             await syncLivePosition()
+        }
+        .onChange(of: mirroring.ghostDisableRequestGeneration) { _, _ in
+            if ghostRace.reference != nil {
+                ghostRace.cancel()
+            }
         }
         .onAppear {
             mirroring.liveViewDidAppear()
