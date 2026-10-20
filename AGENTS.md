@@ -1,6 +1,9 @@
 # ATHLTH development baseline
 
-- Active development version: **1.8.3** on `release/v1.8.3` (2026-10-18; build 89). This is the only branch for new development. Version transitions and TestFlight uploads require an explicit user request.
+- Active development version: **1.8.6** on `release/v1.8.6` (2026-10-20; build 93). This is the only branch for new development. Version transitions and TestFlight uploads require an explicit user request.
+- Version **1.8.5** is locked for further development. Frozen commit: `ecba7a4cc807b18a3188d481b63e9fb5d6d47a0d` (build 92; same-commit iOS build and backend regressions succeeded, GitHub TestFlight upload workflow run 39401632592 succeeded on attempt 3 on 2026-10-20). Preservation branch: `backup/v1.8.5-locked-before-v1.8.6-20261020`. Keep `release/v1.8.5` unchanged.
+- Version **1.8.4** is locked for further development. Preservation branch: `backup/v1.8.4-locked-before-v1.8.5-20261019`. Keep `release/v1.8.4` unchanged.
+- Version **1.8.3** is locked for further development. Preservation branch: `backup/v1.8.3-locked-before-v1.8.4-20261019`. Keep `release/v1.8.3` unchanged.
 - Version **1.8.2** is locked. Frozen commit: `37bd5364849e79d06068e5e2adeedfe39f986373` (build 88; Xcode build, backend regressions, and TestFlight upload succeeded on 2026-10-18). Preservation branch: `backup/v1.8.2-locked-before-v1.8.3-20261018`. Keep `release/v1.8.2` unchanged.
 - Version **1.8.1** is locked for new development. Preservation branch: `backup/v1.8.1-locked-before-v1.8.2-20261018`. Keep `release/v1.8.1` unchanged.
 - Version **1.8.0** is locked for new development. Frozen commit: `092e0bb59ada330cd7753b5033c4887e58a07b52` (build 86; Xcode build, backend regressions, and TestFlight upload succeeded 2026-10-18). Preservation branch: `backup/v1.8.0-locked-before-v1.8.1-20261018`. Keep `release/v1.8.0` unchanged.
