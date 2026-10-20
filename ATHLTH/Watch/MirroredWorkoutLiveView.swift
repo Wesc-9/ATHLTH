@@ -64,6 +64,9 @@ struct MirroredWorkoutLiveView: View {
                         if snapshot.kind == .running ||
                            snapshot.kind == .walking {
                             runningDashboard(snapshot)
+                            if snapshot.routeTitle != nil {
+                                mirroredRouteNextTurnCard(snapshot)
+                            }
                         } else {
                             if snapshot.kind == .strength {
                                 mirroredStrengthSummary(snapshot)
@@ -501,6 +504,61 @@ struct MirroredWorkoutLiveView: View {
                 scenePhase == .active,
             reason: "watch-mirrored-workout"
         )
+    }
+
+    private func mirroredRouteNextTurnCard(
+        _ snapshot: WatchWorkoutLiveSnapshot
+    ) -> some View {
+        let offRoute = snapshot.routeCueOffRoute == true
+        let cue = ATHLTHLocalization.isNorwegian
+            ? snapshot.routeCueNorwegian : snapshot.routeCueEnglish
+        let message = cue ?? ATHLTHLocalization.choose(
+            english: "Follow the highlighted route.",
+            norwegian: "Følg den markerte ruten videre."
+        )
+        let distance = snapshot.routeCueDistanceMeters.flatMap { meters in
+            meters.isFinite && meters >= 0 ? meters : nil
+        }
+        return ATHLTHUnifiedCard {
+            HStack(alignment: .center, spacing: 13) {
+                Image(systemName: snapshot.routeCueSymbol ?? "arrow.up")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(
+                        offRoute ? Color.orange : ATHLTHPlanDesign.accentInk
+                    )
+                    .frame(width: 48, height: 48)
+                    .background(
+                        ATHLTHPlanDesign.selectedSurface,
+                        in: RoundedRectangle(cornerRadius: 15)
+                    )
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(ATHLTHLocalization.choose(
+                        english: offRoute ? "BACK TO ROUTE" : "NEXT TURN",
+                        norwegian: offRoute ? "TILBAKE TIL RUTEN" : "NESTE SVING"
+                    ))
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.3)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    Text(message)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 3)
+                if let distance {
+                    Text(distance < 1000
+                        ? String(format: "%.0f m", distance)
+                        : String(format: "%.1f km", distance / 1000))
+                        .font(.subheadline.weight(.bold))
+                        .monospacedDigit()
+                        .foregroundStyle(
+                            offRoute ? Color.orange : ATHLTHPlanDesign.accentInk
+                        )
+                }
+            }
+            .padding(.vertical, 2)
+            .accessibilityElement(children: .combine)
+        }
     }
 
     @ViewBuilder
