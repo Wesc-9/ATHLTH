@@ -4466,7 +4466,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     ),
                     previousRouteMeters: routeProgressPercent.map {
                         $0 / 100 * plannedRouteGeometryMeters
-                    }
+                    },
+                    courseAnchorMeters: ghostRaceConfiguration != nil
+                        ? (ghostLastTrustedCourseMeters ?? 0) : nil,
+                    secondsSinceCourseAnchor: ghostRaceConfiguration != nil
+                        ? max(elapsedTime - (ghostLastTrustedCourseElapsed ?? 0), 0)
+                        : nil
                 )
         else {
             return
