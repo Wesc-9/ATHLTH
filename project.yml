@@ -304,6 +304,8 @@ targets:
       - path: ATHLTHWatchWidgets
         excludes:
           - Info.plist
+      # Reuse the same original ATHLTH pulse-A mark as the Watch home.
+      - path: Shared/ATHLTHBrandMark.swift
     info:
       path: ATHLTHWatchWidgets/Info.plist
       properties:
