@@ -16,6 +16,7 @@ enum ATHLTHRouteNavigationCue {
         let direction: Direction
         let distanceMeters: Double
         let offRoute: Bool
+        let pointIndex: Int?
 
         var symbol: String {
             switch direction {
@@ -85,7 +86,8 @@ enum ATHLTHRouteNavigationCue {
             return Instruction(
                 direction: angle > 0 ? .right : .left,
                 distanceMeters: distance,
-                offRoute: false
+                offRoute: false,
+                pointIndex: index
             )
         }
         return nil
@@ -105,7 +107,8 @@ enum ATHLTHRouteNavigationCue {
         guard let courseDegrees, courseDegrees.isFinite,
               courseDegrees >= 0, courseDegrees < 360 else {
             return Instruction(direction: .ahead,
-                               distanceMeters: deviationMeters, offRoute: true)
+                               distanceMeters: deviationMeters, offRoute: true,
+                               pointIndex: nil)
         }
         let angle = signedAngle(
             from: courseDegrees,
@@ -119,7 +122,8 @@ enum ATHLTHRouteNavigationCue {
         return Instruction(
             direction: direction,
             distanceMeters: deviationMeters,
-            offRoute: true
+            offRoute: true,
+            pointIndex: nil
         )
     }
 
