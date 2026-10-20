@@ -5803,7 +5803,7 @@ struct ATHLTHTrainView: View {
                             if let message = social.errorMessage {
                                 watchTransferError = message
                             }
-                                return
+                            return
                         }
                         do {
                             try await WorkoutLaunchCoordinator
@@ -5870,7 +5870,7 @@ struct ATHLTHTrainView: View {
                             if let message = social.errorMessage {
                                 watchTransferError = message
                             }
-                                return
+                            return
                         }
                         do {
                             try await WorkoutLaunchCoordinator
@@ -6015,7 +6015,7 @@ struct ATHLTHTrainView: View {
                             if let message = social.errorMessage {
                                 watchTransferError = message
                             }
-                                return
+                            return
                         }
                         do {
                             try await WorkoutLaunchCoordinator
@@ -6111,10 +6111,12 @@ struct ATHLTHTrainView: View {
                                 invitePayload: configuration.trainTogetherInvitePayload,
                                 creatorCaptureDevice: usesWatch
                                     ? .appleWatch : .iPhone
-                            ) else { if let message = social.errorMessage {
-     watchTransferError = message
- }
-                                return }
+                            ) else {
+                                if let message = social.errorMessage {
+                                    watchTransferError = message
+                                }
+                                return
+                            }
 
                             switch destination {
                             case .watch:
