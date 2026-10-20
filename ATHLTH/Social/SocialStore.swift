@@ -36,6 +36,10 @@ final class SocialStore: ObservableObject {
     // The one-shot handoff prevents planned workouts inheriting Quick Train friends.
     @Published var quickTrainFriendIDs: Set<UUID> = []
     private var preparedQuickTrainFriendIDs: Set<UUID>?
+    // Session-only profiles discovered using "Andre" in Quick Train.
+    // Keep their snapshots until the setup has handed off selected IDs.
+    private var quickTrainDiscoveredPartners: [UUID: SocialProfileCard] = [:]
+    private let quickTrainMessaging = SupabaseMessagingService()
 
     private let service: SupabaseSocialService
     private var lastHomeFeedRefreshAt: Date?
@@ -150,6 +154,40 @@ final class SocialStore: ObservableObject {
     /// Workout invitation RLS requires a mutual follow relationship.
     var trainingPartners: [SocialProfileCard] {
         mutualFollows
+    }
+
+    /// Return selected mutual friends and explicitly chosen search results.
+    /// Do not silently discard non-mutual athletes during a Quick Train launch.
+    func resolvedQuickTrainPartners(_ ids: Set<UUID>) -> [SocialProfileCard] {
+        ids.compactMap { id in
+            trainingPartners.first { $0.userID == id }
+                ?? quickTrainDiscoveredPartners[id]
+        }.sorted {
+            $0.resolvedName.localizedCaseInsensitiveCompare(
+                $1.resolvedName
+            ) == .orderedAscending
+        }
+    }
+
+    func rememberQuickTrainPartner(_ profile: SocialProfileCard) {
+        guard profile.userID != currentUserID,
+              !blockedUsers.contains(where: { $0.profile.userID == profile.userID })
+        else { return }
+        quickTrainDiscoveredPartners[profile.userID] = profile
+    }
+
+    func searchQuickTrainPartners(_ query: String) async -> [SocialProfileCard] {
+        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard term.count >= 2 else { return [] }
+        do {
+            let results = try await service.searchProfiles(term)
+            let blocked = Set(blockedUsers.map { $0.profile.userID })
+            return results.filter {
+                $0.userID != currentUserID && !blocked.contains($0.userID)
+            }
+        } catch {
+            return []
+        }
     }
 
     /// Prepare the chosen mutual friends for exactly one Quick Train launch.
@@ -1097,17 +1135,69 @@ final class SocialStore: ObservableObject {
 
         errorMessage = nil
 
+        // Lobby invitations currently require mutual follows (server RLS).
+        // New contacts receive a genuine message request with the workout
+        // attachment, rather than being silently omitted from the launch.
+        let lobbyFriends = friends.filter { isMutualFollow($0.userID) }
+        let messageRecipients = friends.filter { !isMutualFollow($0.userID) }
+
         // Existing invitations are pending plans, not workouts to cancel.
-        // Starting a new invitation only detaches a previous local wait.
         prepareForAnotherWorkout()
 
         do {
+            if !messageRecipients.isEmpty {
+                let snapshot = invitePayload?.recipientCopy() ??
+                    PlannedSession(
+                        id: UUID(),
+                        title: title,
+                        kind: kind,
+                        scheduledStart: nil,
+                        durationMinutes: nil,
+                        targetDistanceKilometers: nil,
+                        targetPaceSecondsPerKilometer: nil,
+                        routeID: nil,
+                        exercises: [],
+                        notes: nil
+                    )
+                let attachment = try MessageShareDraft(
+                    kind: .workout,
+                    title: snapshot.title,
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Invitation to train",
+                        norwegian: "Invitasjon til økt"
+                    ),
+                    snapshot: snapshot,
+                    sourceObjectID: snapshot.id,
+                    sourceOwnerID: service.currentUserID,
+                    shareVersion: 2
+                )
+                for recipient in messageRecipients {
+                    let conversationID = try await quickTrainMessaging
+                        .getOrCreateConversation(with: recipient.userID)
+                    try await quickTrainMessaging.sendMessage(
+                        conversationID: conversationID,
+                        to: recipient.userID,
+                        body: ATHLTHLocalization.choose(
+                            english: "Would you like to join my workout? Accept the invitation here.",
+                            norwegian: "Vil du bli med på økten min? Godta invitasjonen her."
+                        ),
+                        attachment: attachment
+                    )
+                }
+            }
+
+            guard !lobbyFriends.isEmpty else {
+                // New contacts must accept the message request first.
+                // A pending DM is never treated as an accepted live lobby.
+                return true
+            }
+
             let session = try await service.createWorkoutSession(
                 title: title,
                 workoutKind: kind,
                 creatorName: creatorName,
                 creatorUsername: creatorUsername,
-                friends: friends,
+                friends: lobbyFriends,
                 invitePayload: invitePayload
             )
 
@@ -3253,6 +3343,7 @@ final class SocialStore: ObservableObject {
     private func reset() {
         quickTrainFriendIDs = []
         preparedQuickTrainFriendIDs = nil
+        quickTrainDiscoveredPartners = [:]
         followerIDs = []
         followingIDs = []
         incomingRequests = []
