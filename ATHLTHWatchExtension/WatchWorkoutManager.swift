@@ -240,6 +240,22 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var plannedRouteGeometryMeters: Double = 0
     private var ghostRaceConfiguration:
         WatchGhostRaceTransfer?
+
+    /// Signed percentage along the course, not travelled workout kilometres.
+    /// Positive means runner ahead of the fixed Replay/Target Ghost.
+    var ghostRouteGapPercent: Double? {
+        guard let ghost = ghostRaceConfiguration,
+              let distanceDelta = ghostDistanceDeltaMeters else { return nil }
+        return ATHLTHGhostCourseProgressPolicy.ghostLeadPercent(
+            runnerCourseMeters: max(distanceDelta, 0),
+            ghostCourseMeters: max(-distanceDelta, 0),
+            routeLengthMeters: ghost.routeDistanceMeters
+        ).map { -$0 }
+    }
+
+    var ghostIsOffPlannedRoute: Bool {
+        ghostRaceConfiguration != nil && ghostOffRoute
+    }
     private var nextGhostDistanceAnnouncementMeters: Double?
     private var nextGhostTimeAnnouncementSeconds: TimeInterval?
     private var lastGhostAnnouncedLeadMeters: Double?
