@@ -179,495 +179,261 @@ struct GhostQuickStartDraft {
 }
 
 struct RunGuidanceSetupView: View {
-    @Binding var audioCoach:
-        AudioCoachDraft
-    @Binding var routeGuardian:
-        RouteGuardianDraft
-    @Binding var ghost:
-        GhostQuickStartDraft
+    @Binding var audioCoach: AudioCoachDraft
+    @Binding var routeGuardian: RouteGuardianDraft
+    @Binding var ghost: GhostQuickStartDraft
 
     let route: TrainingRoute?
-    let structuredWorkout:
-        RunningWorkoutTemplate?
+    let structuredWorkout: RunningWorkoutTemplate?
+
+    private var routeAvailable: Bool { route != nil }
+    private var enabledCount: Int {
+        (audioCoach.enabled ? 1 : 0) +
+        (routeAvailable && ghost.enabled ? 1 : 0) +
+        (routeAvailable && routeGuardian.enabled ? 1 : 0)
+    }
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 14) {
-                guidanceHero
+            VStack(alignment: .leading, spacing: 15) {
+                ATHLTHPlanSectionIntro(
+                    eyebrow: ATHLTHLocalization.choose(
+                        english: "YOUR RUN · ADVANCED",
+                        norwegian: "DIN LØPEØKT · AVANSERT"
+                    ),
+                    title: ATHLTHLocalization.choose(
+                        english: "Run tools", norwegian: "Løpsverktøy"
+                    ),
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Fine-tune this workout before you start.",
+                        norwegian: "Tilpass veiledningen til akkurat denne økten."
+                    ),
+                    icon: "waveform.and.person.filled"
+                )
 
-                NavigationLink {
-                    PerWorkoutAudioCoachView(
-                        draft:
-                            $audioCoach,
-                        showRouteOptions:
-                            route != nil ||
-                            structuredWorkout?
-                                .routeID != nil,
-                        showStructuredOptions:
-                            structuredWorkout != nil
-                    )
-                } label: {
-                    guidanceFeatureCard(
-                        title: "Audio Coach",
-                        subtitle:
-                            audioCoach.enabled
-                                ? ATHLTHLocalization.choose(
-                                    english:
-                                        "On · spoken pace, distance and workout cues",
-                                    norwegian:
-                                        "På · tempo, distanse og øktinstruksjoner"
-                                )
-                                : ATHLTHLocalization.choose(
-                                    english:
-                                        "Off · tap to configure spoken guidance",
-                                    norwegian:
-                                        "Av · trykk for å sette opp talestyring"
-                                ),
-                        icon:
-                            "waveform.and.person.filled",
-                        tint:
-                            ATHLTHTheme
-                                .premiumGold,
-                        enabled:
-                            audioCoach.enabled
-                    )
-                }
-                .buttonStyle(.plain)
+                ATHLTHPlanSurface(ghost: false, density: .comfortable) {
+                    HStack {
+                        Text(ATHLTHLocalization.choose(
+                            english: "WORKOUT GUIDANCE",
+                            norwegian: "ØKTENS VEILEDNING"
+                        ))
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(1.6)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        Spacer()
+                        Text(ATHLTHLocalization.format(
+                            english: "%d active",
+                            norwegian: "%d aktive",
+                            enabledCount
+                        ))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(ATHLTHPlanDesign.selectedSurface, in: Capsule())
+                    }
 
-                if route != nil {
                     NavigationLink {
-                        PerWorkoutGhostView(
-                            draft: $ghost,
-                            route: route
+                        PerWorkoutAudioCoachView(
+                            draft: $audioCoach,
+                            showRouteOptions:
+                                routeAvailable || structuredWorkout?.routeID != nil,
+                            showStructuredOptions: structuredWorkout != nil
                         )
                     } label: {
-                        guidanceFeatureCard(
-                            title: "Ghost",
-                            subtitle:
-                                ghost.enabled
+                        featureRow(
+                            icon: "waveform.and.person.filled",
+                            title: "Audio Coach",
+                            detail: audioCoach.enabled
+                                ? ATHLTHLocalization.choose(
+                                    english: "Spoken coaching · edit triggers, voice and volume",
+                                    norwegian: "Talecoach · juster varsler, stemme og lyd"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Configure voice guidance for your run",
+                                    norwegian: "Tilpass stemmeveiledningen for økten"
+                                ),
+                            enabled: audioCoach.enabled
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    Divider().overlay(ATHLTHPlanDesign.warmDivider)
+
+                    if routeAvailable {
+                        NavigationLink {
+                            PerWorkoutGhostView(draft: $ghost, route: route)
+                        } label: {
+                            featureRow(
+                                icon: "figure.run.circle",
+                                title: "Ghost Race",
+                                detail: ghost.enabled
                                     ? ATHLTHLocalization.format(
-                                        english:
-                                            "On · target %@ with live race updates",
-                                        norwegian:
-                                            "På · mål %@ med live sammenligning",
+                                        english: "Target %@ · timing and updates",
+                                        norwegian: "Mål %@ · tid og oppdateringer",
                                         ghost.targetTimeText
                                     )
                                     : ATHLTHLocalization.choose(
-                                        english:
-                                            "Race a target time on this route",
-                                        norwegian:
-                                            "Konkurrer mot en måltid på denne ruten"
+                                        english: "Choose a target time and Ghost updates",
+                                        norwegian: "Velg måltid og Ghost-oppdateringer"
                                     ),
-                            icon:
-                                "figure.run.circle.fill",
-                            tint:
-                                ATHLTHTheme
-                                    .accentDeep,
-                            enabled:
-                                ghost.enabled
-                        )
-                    }
-                    .buttonStyle(.plain)
+                                enabled: ghost.enabled
+                            )
+                        }
+                        .buttonStyle(.plain)
 
-                    NavigationLink {
-                        PerWorkoutRouteGuardianView(
-                            draft:
-                                $routeGuardian
-                        )
-                    } label: {
-                        guidanceFeatureCard(
-                            title:
-                                "Route Guardian",
-                            subtitle:
-                                routeGuardian.enabled
+                        Divider().overlay(ATHLTHPlanDesign.warmDivider)
+
+                        NavigationLink {
+                            PerWorkoutRouteGuardianView(draft: $routeGuardian)
+                        } label: {
+                            featureRow(
+                                icon: "point.topleft.down.curvedto.point.bottomright.up",
+                                title: ATHLTHLocalization.choose(
+                                    english: "Route Guardian",
+                                    norwegian: "Ruteveiledning"
+                                ),
+                                detail: routeGuardian.enabled
                                     ? ATHLTHLocalization.format(
-                                        english:
-                                            "On · alert after %.0f m off route",
-                                        norwegian:
-                                            "På · varsle etter %.0f m utenfor ruten",
-                                        routeGuardian
-                                            .deviationMeters
+                                        english: "Alerts when more than %.0f m off route",
+                                        norwegian: "Varsel ved mer enn %.0f m utenfor ruten",
+                                        routeGuardian.deviationMeters
                                     )
                                     : ATHLTHLocalization.choose(
-                                        english:
-                                            "Off · tap to configure route alerts",
-                                        norwegian:
-                                            "Av · trykk for å sette opp rutevarsler"
+                                        english: "Deviation, recovery and alert settings",
+                                        norwegian: "Avvik, retur til ruten og varsler"
                                     ),
-                            icon:
-                                "location.fill",
-                            tint:
-                                ATHLTHTheme
-                                    .vitality,
-                            enabled:
-                                routeGuardian
-                                    .enabled
-                        )
+                                enabled: routeGuardian.enabled
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        HStack(spacing: 10) {
+                            Image(systemName: "map")
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Select a route to set up Ghost Race and Route Guardian.",
+                                norwegian: "Velg en rute for å tilpasse Ghost Race og ruteveiledning."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 5)
+                    }
+                }
+
+                ATHLTHPlanSurface(ghost: false, density: .compact) {
+                    NavigationLink {
+                        ATHLTHWorkoutGuidanceSettingsView()
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                .frame(width: 39, height: 39)
+                                .background(
+                                    ATHLTHPlanDesign.selectedSurface,
+                                    in: RoundedRectangle(cornerRadius: 12)
+                                )
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Default guidance settings",
+                                    norwegian: "Standardinnstillinger for veiledning"
+                                ))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                                Text(ATHLTHLocalization.choose(
+                                    english: "For future workouts",
+                                    norwegian: "Gjelder kommende økter"
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                } else {
-                    ATHLTHCard {
-                        HStack(spacing: 12) {
-                            Image(
-                                systemName:
-                                    "map.circle"
-                            )
-                            .font(
-                                .system(
-                                    size: 20,
-                                    weight: .semibold
-                                )
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .mutedText
-                            )
-                            .frame(
-                                width: 44,
-                                height: 44
-                            )
-                            .background(
-                                Color.primary
-                                    .opacity(0.04),
-                                in:
-                                    RoundedRectangle(
-                                        cornerRadius: 13,
-                                        style: .continuous
-                                    )
-                            )
-
-                            VStack(
-                                alignment: .leading,
-                                spacing: 3
-                            ) {
-                                Text(
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "Ghost + Route Guardian",
-                                        norwegian:
-                                            "Ghost + Route Guardian"
-                                    )
-                                )
-                                .font(
-                                    .subheadline
-                                        .weight(.semibold)
-                                )
-
-                                Text(
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "Choose a route to unlock route-aware guidance.",
-                                        norwegian:
-                                            "Velg en rute for å aktivere ruteavhengig veiledning."
-                                    )
-                                )
-                                .font(.caption)
-                                .foregroundStyle(
-                                    .secondary
-                                )
-                            }
-                        }
-                    }
-                    .opacity(0.72)
                 }
 
-                NavigationLink {
-                    ATHLTHWorkoutGuidanceSettingsView()
-                } label: {
-                    HStack(spacing: 11) {
-                        Image(
-                            systemName:
-                                "gearshape.fill"
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .mutedText
-                        )
-
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Global Workout Guidance defaults",
-                                norwegian:
-                                    "Standardvalg for treningsveiledning"
-                            )
-                        )
-                        .font(
-                            .subheadline
-                                .weight(.semibold)
-                        )
-
-                        Spacer()
-
-                        Image(
-                            systemName:
-                                "chevron.right"
-                        )
-                        .font(.caption.bold())
-                        .foregroundStyle(
-                            .tertiary
-                        )
-                    }
-                    .padding(14)
-                    .background(
-                        Color.white
-                            .opacity(0.70),
-                        in:
-                            RoundedRectangle(
-                                cornerRadius: 18,
-                                style: .continuous
-                            )
-                    )
-                }
-                .buttonStyle(.plain)
+                Text(ATHLTHLocalization.choose(
+                    english: "Changes here apply to this workout only. They are ready when you return.",
+                    norwegian: "Endringer her gjelder bare denne økten, og lagres når du går tilbake."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .padding(.horizontal, 3)
             }
+            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+            .frame(maxWidth: .infinity)
             .padding(16)
         }
-        .background(
-            LinearGradient(
-                colors: [
-                    ATHLTHTheme.canvasTop,
-                    ATHLTHTheme.canvasBottom
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-        )
-        .navigationTitle(
-            ATHLTHLocalization.choose(
-                english:
-                    "Run Tools",
-                norwegian:
-                    "Løpsverktøy"
-            )
-        )
-        .navigationBarTitleDisplayMode(
-            .inline
-        )
+        .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+        .tint(ATHLTHPlanDesign.accentInk)
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Run tools", norwegian: "Løpsverktøy"
+        ))
+        .navigationBarTitleDisplayMode(.inline)
     }
 
-    private var guidanceHero:
-        some View {
-        ATHLTHCard {
-            VStack(
-                alignment: .leading,
-                spacing: 12
-            ) {
-                Text("RUN SMARTER")
-                    .font(
-                        .system(
-                            size: 10,
-                            weight: .bold
-                        )
-                    )
-                    .tracking(2.2)
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
-                    )
-
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Coach. Compare. Stay on route.",
-                        norwegian:
-                            "Coach. Sammenlign. Hold ruten."
-                    )
-                )
-                .font(
-                    .title3
-                        .weight(.bold)
-                )
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .primaryText
-                )
-
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "These tools run live on iPhone and Apple Watch and are configured for this workout only.",
-                        norwegian:
-                            "Disse verktøyene følger økten live på iPhone og Apple Watch, og gjelder kun denne økten."
-                    )
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    .secondary
-                )
-                .fixedSize(
-                    horizontal: false,
-                    vertical: true
-                )
-
-                HStack(spacing: 8) {
-                    heroPill(
-                        "Coach",
-                        icon:
-                            "waveform.and.mic"
-                    )
-                    heroPill(
-                        "Ghost",
-                        icon:
-                            "figure.run"
-                    )
-                    heroPill(
-                        ATHLTHLocalization.choose(
-                            english: "Alerts",
-                            norwegian: "Varsler"
-                        ),
-                        icon:
-                            "bell.badge"
-                    )
-                }
-            }
-        }
-    }
-
-    private func heroPill(
-        _ title: String,
-        icon: String
-    ) -> some View {
-        Label(
-            title,
-            systemImage: icon
-        )
-        .font(
-            .system(
-                size: 10,
-                weight: .semibold
-            )
-        )
-        .foregroundStyle(
-            ATHLTHTheme
-                .accentDeep
-        )
-        .padding(
-            .horizontal,
-            10
-        )
-        .frame(height: 30)
-        .background(
-            ATHLTHTheme
-                .accentSoft,
-            in: Capsule()
-        )
-    }
-
-    private func guidanceFeatureCard(
-        title: String,
-        subtitle: String,
+    private func featureRow(
         icon: String,
-        tint: Color,
+        title: String,
+        detail: String,
         enabled: Bool
     ) -> some View {
-        ATHLTHCard {
-            HStack(spacing: 13) {
-                Image(
-                    systemName: icon
-                )
-                .font(
-                    .system(
-                        size: 19,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(tint)
-                .frame(
-                    width: 46,
-                    height: 46
-                )
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .frame(width: 44, height: 44)
                 .background(
-                    tint.opacity(0.10),
-                    in:
-                        RoundedRectangle(
-                            cornerRadius: 14,
-                            style: .continuous
-                        )
+                    ATHLTHPlanDesign.selectedSurface,
+                    in: RoundedRectangle(cornerRadius: 14)
                 )
+                .accessibilityHidden(true)
 
-                VStack(
-                    alignment: .leading,
-                    spacing: 4
-                ) {
-                    HStack(spacing: 7) {
-                        Text(title)
-                            .font(
-                                .headline
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .primaryText
-                            )
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text(title)
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
 
-                        Text(
-                            enabled
-                                ? ATHLTHLocalization.choose(
-                                    english: "ON",
-                                    norwegian: "PÅ"
-                                )
-                                : ATHLTHLocalization.choose(
-                                    english: "OFF",
-                                    norwegian: "AV"
-                                )
-                        )
-                        .font(
-                            .system(
-                                size: 8,
-                                weight: .bold
-                            )
-                        )
-                        .foregroundStyle(
-                            enabled
-                                ? ATHLTHTheme
-                                    .vitality
-                                : ATHLTHTheme
-                                    .mutedText
-                        )
-                        .padding(
-                            .horizontal,
-                            6
-                        )
-                        .padding(
-                            .vertical,
-                            3
-                        )
-                        .background(
-                            (
-                                enabled
-                                    ? ATHLTHTheme
-                                        .vitalitySoft
-                                    : Color.primary
-                                        .opacity(0.04)
-                            ),
-                            in: Capsule()
-                        )
-                    }
-
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(
-                            .secondary
-                        )
-                        .fixedSize(
-                            horizontal: false,
-                            vertical: true
-                        )
+                    Text(enabled
+                        ? ATHLTHLocalization.choose(english: "On", norwegian: "På")
+                        : ATHLTHLocalization.choose(english: "Off", norwegian: "Av")
+                    )
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(enabled
+                        ? ATHLTHPlanDesign.accentInk
+                        : ATHLTHPlanDesign.secondaryInk)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(
+                        enabled
+                            ? ATHLTHPlanDesign.selectedSurface
+                            : ATHLTHPlanDesign.canvas,
+                        in: Capsule()
+                    )
                 }
-
-                Spacer()
-
-                Image(
-                    systemName:
-                        "chevron.right"
-                )
-                .font(.caption.bold())
-                .foregroundStyle(
-                    .tertiary
-                )
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            Spacer(minLength: 2)
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
         }
+        .frame(minHeight: 59)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
     }
 }
 
