@@ -895,6 +895,8 @@ struct ATHLTHHomeView: View {
                             )
                             if didStart {
                                 showingHomeStrengthWorkout = true
+                            } else if let error = social.errorMessage {
+                                homeWatchTransferError = error
                             }
                         } catch {
                             homeWatchTransferError =
@@ -1028,6 +1030,8 @@ struct ATHLTHHomeView: View {
                                         nil
                                     showingHomeStrengthWorkout =
                                         true
+                                } else if let error = social.errorMessage {
+                                    homeWatchTransferError = error
                                 }
                             } catch {
                                 homeWatchTransferError =
@@ -5755,6 +5759,8 @@ struct ATHLTHTrainView: View {
                             )
                             if didStart {
                                 showingStrengthWorkout = true
+                            } else if let error = social.errorMessage {
+                                watchTransferError = error
                             }
                         } catch {
                             watchTransferError =
@@ -5955,6 +5961,8 @@ struct ATHLTHTrainView: View {
                                     false
                                 showingStrengthWorkout =
                                     true
+                            } else if let error = social.errorMessage {
+                                watchTransferError = error
                             }
                         } catch {
                             watchTransferError =
