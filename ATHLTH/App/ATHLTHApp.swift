@@ -3897,7 +3897,9 @@ struct AppRootView: View {
             calendarEvents:
                 homeAssistantCalendarEvents(
                     from: plannedOccurrences
-                )
+                ),
+            trainingPlan:
+                homeAssistantActiveTrainingPlan()
         )
 
         await syncHomeAssistantPhoneWorkoutLiveState(
@@ -4163,6 +4165,41 @@ struct AppRootView: View {
         )
     }
 
+    private func homeAssistantActiveTrainingPlan()
+        -> HomeAssistantTrainingPlanPayload? {
+        guard let plan = appSession.activePlan else {
+            return nil
+        }
+        let title = plan.title.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !title.isEmpty else {
+            return nil
+        }
+
+        let totalWeeks = min(max(plan.weeks.count, 1), 520)
+        var currentWeek = 0
+        if let startsAt = plan.startDate {
+            let calendar = Calendar.current
+            let start = calendar.startOfDay(for: startsAt)
+            let today = calendar.startOfDay(for: Date())
+            let offset = calendar.dateComponents(
+                [.day], from: start, to: today
+            ).day ?? 0
+            if offset >= 0 {
+                currentWeek = min(max(offset / 7 + 1, 1), totalWeeks)
+            }
+        }
+
+        return HomeAssistantTrainingPlanPayload(
+            id: plan.id.uuidString,
+            title: title,
+            currentWeek: currentWeek,
+            totalWeeks: totalWeeks,
+            startsAt: plan.startDate
+        )
+    }
+
     private func homeAssistantCalendarEvents(
         from occurrences:
             [HomeAssistantPlannedOccurrence]
@@ -4181,7 +4218,17 @@ struct AppRootView: View {
                 to: now
             ) ?? now
 
+        let calendar = Calendar.current
+        // Each actual workout can complete only one matching planned session.
+        var unmatchedWorkouts = health.workouts.filter {
+            $0.startDate >= lowerBound && $0.startDate <= upperBound
+        }
+
         return occurrences
+            .sorted {
+                ($0.session.scheduledStart ?? .distantFuture) <
+                ($1.session.scheduledStart ?? .distantFuture)
+            }
             .compactMap { occurrence in
                 guard let start =
                         occurrence
@@ -4193,18 +4240,32 @@ struct AppRootView: View {
                     return nil
                 }
 
-                if let planID =
-                        occurrence.planID {
-                    if appSession
-                        .isPlanSessionSkipped(
-                            planID: planID,
-                            sessionID:
-                                occurrence
-                                    .session
-                                    .id
-                        ) {
-                        return nil
+                let status: String
+                if let planID = occurrence.planID,
+                   appSession.isPlanSessionSkipped(
+                       planID: planID,
+                       sessionID: occurrence.session.id
+                   ) {
+                    status = "skipped"
+                } else if let planID = occurrence.planID,
+                          appSession.isPlanSessionManuallyCompleted(
+                              planID: planID,
+                              sessionID: occurrence.session.id
+                          ) {
+                    status = "completed"
+                } else if let index = unmatchedWorkouts.firstIndex(
+                    where: {
+                        homeAssistantWorkout(
+                            $0,
+                            matches: occurrence.session,
+                            calendar: calendar
+                        )
                     }
+                ) {
+                    unmatchedWorkouts.remove(at: index)
+                    status = "completed"
+                } else {
+                    status = "planned"
                 }
 
                 let duration =
@@ -4241,7 +4302,9 @@ struct AppRootView: View {
                         occurrence
                             .session
                             .kind
-                            .rawValue
+                            .rawValue,
+                    status: status,
+                    planID: occurrence.planID?.uuidString
                 )
             }
             .sorted {
@@ -4347,11 +4410,12 @@ struct AppRootView: View {
             }
         }
 
-        completed += remainingActual.count
+        // Extra spontaneous workouts count toward total training metrics,
+        // not fulfillment of the planned program.
         let total = completed + unfinished
 
         guard total > 0 else {
-            return 0
+            return nil
         }
 
         return min(
