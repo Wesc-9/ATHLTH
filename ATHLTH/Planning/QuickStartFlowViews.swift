@@ -1306,6 +1306,10 @@ struct RunQuickStartSheet: View {
                 }
             }
             .task {
+                if let invited = social.takePreparedQuickTrainFriends() {
+                    selectedFriendIDs = invited
+                }
+
                 if !didResolveSetupMode {
                     isAdvancedSetup =
                         settings
@@ -3031,6 +3035,10 @@ struct WalkQuickStartSheet: View {
                 }
             }
             .task {
+                if let invited = social.takePreparedQuickTrainFriends() {
+                    selectedFriendIDs = invited
+                }
+
                 if !didLoadAudioCoachDefaults {
                     audioCoachDraft.load(from: settings)
                     didLoadAudioCoachDefaults = true
@@ -3108,6 +3116,7 @@ struct WalkQuickStartSheet: View {
 
 struct StrengthQuickStartSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var social: SocialStore
 
     let onChoose: (PlannedSession) -> Void
 
@@ -3138,6 +3147,7 @@ struct StrengthQuickStartSheet: View {
 
                     NavigationLink {
                         StrengthQuickBuilderView { workout in
+                            social.prepareQuickTrainFriendsForLaunch()
                             onChoose(workout)
                             dismiss()
                         }
@@ -3164,6 +3174,7 @@ struct StrengthQuickStartSheet: View {
                     .buttonStyle(.plain)
 
                     Button {
+                        social.prepareQuickTrainFriendsForLaunch()
                         onChoose(emptySession)
                         dismiss()
                     } label: {
