@@ -6043,9 +6043,9 @@ struct ATHLTHTrainView: View {
                         watchConnection.isReady ? .appleWatch : .none,
                     watchConnected: watchConnection.isVerifiedForLiveLaunch
                 ) { configuration, destination in
-                    let invitedFriends = social.trainingPartners.filter {
-                        configuration.selectedFriendIDs.contains($0.userID)
-                    }
+                    let invitedFriends = social.resolvedQuickTrainPartners(
+                        configuration.selectedFriendIDs
+                    )
 
                     if invitedFriends.isEmpty {
                         // Solo keeps the existing dismissal/launch behavior.
