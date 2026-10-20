@@ -288,7 +288,7 @@ struct RunGuidanceSetupView: View {
                             PerWorkoutRouteGuardianView(draft: $routeGuardian)
                         } label: {
                             featureRow(
-                                icon: "point.topleft.down.curvedto.point.bottomright.up",
+                                icon: "location.north.line",
                                 title: ATHLTHLocalization.choose(
                                     english: "Route Guardian",
                                     norwegian: "Ruteveiledning"
