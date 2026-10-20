@@ -1092,20 +1092,19 @@ struct RunQuickStartSheet: View {
         self.plannedSession = plannedSession
         self.onStart = onStart
 
-        let initialMode:
-            RunQuickStartMode =
-                initialWorkout != nil
-                    ? .structured
-                    : initialRoute != nil
-                        ? .route
-                        : .free
+        // A planned indoor workout must start without GPS. Keep its
+        // structured 4×4 steps, but do not let a saved route force outdoor mode.
+        let plannedIndoor = plannedSession?.workoutCategory == "treadmill" ||
+            plannedSession?.resolvedWorkoutBlocks.contains(where: {
+                $0.kind == .run && $0.isIndoor == true
+            }) == true
+        let initialMode: RunQuickStartMode =
+            initialWorkout != nil ? .structured :
+            (initialRoute != nil && !plannedIndoor ? .route : .free)
 
-        _mode = State(
-            initialValue: initialMode
-        )
-        _selectedRoute = State(
-            initialValue: initialRoute
-        )
+        _environment = State(initialValue: plannedIndoor ? .treadmill : .outdoor)
+        _mode = State(initialValue: initialMode)
+        _selectedRoute = State(initialValue: plannedIndoor ? nil : initialRoute)
         _selectedWorkout = State(
             initialValue: initialWorkout
         )
