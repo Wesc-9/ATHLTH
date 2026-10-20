@@ -361,7 +361,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
         // Keep the HealthKit workout running. Only navigation changes;
         // ghost progress on the original A–B course is no longer comparable.
-        configureGhostRace(nil)
+        disableGhostDuringWorkout()
         configurePlannedRoute(trip)
         returningToRouteStart = true
         lastSpokenRouteTurnIndex = nil
@@ -377,6 +377,16 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     func disableGhostDuringWorkout() {
         guard ghostRaceConfiguration != nil else { return }
         configureGhostRace(nil)
+        guard let workoutSession, let startedAt,
+              let payload = try? JSONEncoder().encode(
+                ATHLTHGhostDisableDuringWorkout(
+                    workoutStartedAt: startedAt,
+                    requestedAt: Date()
+                )
+              ) else { return }
+        Task { @MainActor in
+            try? await workoutSession.sendToRemoteWorkoutSession(data: payload)
+        }
     }
 
     func configurePlannedRoute(
