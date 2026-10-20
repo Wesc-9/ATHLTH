@@ -56,7 +56,7 @@ struct SavedRoutesView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
-    @ObservedObject private var health = HealthKitManager.shared
+    @EnvironmentObject private var health: HealthKitManager
     @StateObject private var locationStore = HomeLocationStore()
 
     let selectionTitle: String?
@@ -258,7 +258,7 @@ struct SavedRoutesView: View {
         }
         .onDisappear { locationStore.stop() }
         .sheet(isPresented: $showingCustomLength) { customLengthSheet }
-        .sheet(item: $previewRoute) { route in
+        .fullScreenCover(item: $previewRoute) { route in
             SavedRouteFullscreenMap(route: route)
         }
         .alert("ATHLTH", isPresented: Binding(
@@ -767,7 +767,6 @@ private struct SavedRouteOverviewMap: View {
                 }
             }
         }
-        .mapControlVisibility(.visible)
     }
 }
 
