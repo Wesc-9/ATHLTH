@@ -5941,6 +5941,7 @@ struct ATHLTHTrainView: View {
                     mode: launch.mode
                 )
                 .environmentObject(session)
+                .environmentObject(social)
             }
             .fullScreenCover(isPresented: $showingStrengthWorkout) {
                 ActiveStrengthWorkoutView()

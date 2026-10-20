@@ -16,6 +16,7 @@ struct CustomIPhoneQuickLaunch: Identifiable {
 struct CustomQuickIPhoneWorkoutView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var social: SocialStore
 
     let configuration: CustomQuickWorkoutConfiguration
     let mode: CustomIPhoneQuickWorkoutMode
@@ -134,6 +135,13 @@ struct CustomQuickIPhoneWorkoutView: View {
             .onAppear {
                 if isTimed && resumedAt == nil && savedRecord == nil {
                     resumedAt = Date()
+                    // Only confirm an invited session after the actual
+                    // iPhone recording timer has begun.
+                    if !configuration.selectedFriendIDs.isEmpty {
+                        Task {
+                            _ = await social.confirmCurrentJoinedWorkoutStarted()
+                        }
+                    }
                 }
             }
         }
