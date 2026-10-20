@@ -64,6 +64,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var selectingLibraryDay: WeekDayEditorSelection?
     @State private var pendingLibraryDay: WeekDayEditorSelection?
     @State private var pendingStudioDay: WeekDayEditorSelection?
+    @State private var pendingTrainingPlaceDay: WeekDayEditorSelection?
+    @State private var editingTrainingPlaceDay: WeekDayEditorSelection?
+    @State private var reopenDayAfterPlace: WeekDayEditorSelection?
+    @State private var quickStudioOption: QuickDayOption?
     @State private var addingExtraWorkout = false
     @State private var editingWorkoutIndex = 0
     @State private var expandedGuidedWorkoutRows: Set<Int> = []
@@ -74,6 +78,35 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     private struct WeekDayEditorSelection: Identifiable, Equatable {
         let id: Int
+    }
+
+    private enum QuickDayOption: String, CaseIterable, Identifiable {
+        case strength, run, walk, mobility, stretching, meditation, yoga
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .strength: return ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke")
+            case .run: return ATHLTHLocalization.choose(english: "Run", norwegian: "Løp")
+            case .walk: return ATHLTHLocalization.choose(english: "Walk", norwegian: "Gåtur")
+            case .mobility: return ATHLTHLocalization.choose(english: "Mobility", norwegian: "Mobilitet")
+            case .stretching: return ATHLTHLocalization.choose(english: "Stretching", norwegian: "Uttøying")
+            case .meditation: return ATHLTHLocalization.choose(english: "Meditation", norwegian: "Meditasjon")
+            case .yoga: return "Yoga"
+            }
+        }
+
+        var symbol: String {
+            switch self {
+            case .strength: return "dumbbell.fill"
+            case .run: return "figure.run"
+            case .walk: return "figure.walk"
+            case .mobility: return "figure.cooldown"
+            case .stretching: return "figure.flexibility"
+            case .meditation: return "sparkles"
+            case .yoga: return "figure.yoga"
+            }
+        }
     }
 
     @State private var equipment: EquipmentContext = .gym
@@ -570,7 +603,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             )
         }
         .sheet(item: $editingWeekDay, onDismiss: {
-            if let pendingStudioDay {
+            if let pendingTrainingPlaceDay {
+                self.pendingTrainingPlaceDay = nil
+                editingTrainingPlaceDay = pendingTrainingPlaceDay
+            } else if let pendingStudioDay {
                 self.pendingStudioDay = nil
                 composingAdvancedDay = pendingStudioDay
             } else if let pendingLibraryDay {
@@ -580,6 +616,22 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }) { selection in
             planDayActionsSheet(for: selection.id)
         }
+        .sheet(item: $editingTrainingPlaceDay, onDismiss: {
+            if let reopenDayAfterPlace {
+                self.reopenDayAfterPlace = nil
+                editingWeekDay = reopenDayAfterPlace
+            }
+        }) { selection in
+            ATHLTHPlanTrainingPlacePicker(
+                initial: weekDayEdits[weekDayKey(selection.id)]?.trainingPlace
+            ) { place in
+                updateWeekDay(selection.id) { edit in
+                    edit.trainingPlace = place
+                }
+                reopenDayAfterPlace = selection
+                editingTrainingPlaceDay = nil
+            }
+        }
         .sheet(item: $selectingLibraryDay) { selection in
             ATHLTHPlanWorkoutLibraryPicker { workout in
                 assignLibraryWorkout(workout, to: selection.id, asExtra: selectingExtraFromLibrary)
@@ -587,10 +639,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 selectingLibraryDay = nil
             }
         }
-        .sheet(item: $composingAdvancedDay) { selection in
+        .sheet(item: $composingAdvancedDay, onDismiss: {
+            quickStudioOption = nil
+            addingExtraWorkout = false
+        }) { selection in
             WorkoutTemplateBuilderView(
-                initialTitle: addingExtraWorkout ? "" : (selectedWorkoutForEditor(day: selection.id)?.title ?? ""),
-                initialBlocks: addingExtraWorkout ? [] : (selectedWorkoutForEditor(day: selection.id)?.blocks ?? []),
+                initialTitle: quickStudioOption?.title ??
+                    (addingExtraWorkout ? "" : (selectedWorkoutForEditor(day: selection.id)?.title ?? "")),
+                initialBlocks: quickStudioOption.map { quickDaySeed($0) } ??
+                    (addingExtraWorkout ? [] : (selectedWorkoutForEditor(day: selection.id)?.blocks ?? [])),
                 initialRouteID: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.routeID,
                 draftContext: "new-program-week-\(selectedPlanWeekIndex)-day-\(selection.id)-workout-\(addingExtraWorkout ? "new" : String(editingWorkoutIndex))",
                 plannedDate: dateForWeekDay(selection.id, weekIndex: selectedPlanWeekIndex),
@@ -4114,6 +4171,91 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         selectedPlanWeekIndex = min(guidedCurrentWeek, weekCount - 1)
     }
 
+    private func quickDaySeed(_ option: QuickDayOption) -> [WorkoutTemplateBlock] {
+        if option == .strength { return [] }
+        if option == .run || option == .walk {
+            var run = WorkoutTemplateBlock(
+                sequence: 1, kind: .run, title: option.title,
+                exerciseSlug: nil, distanceMeters: nil,
+                repetitions: nil,
+                durationSeconds: option == .run ? 1_200 : 1_800,
+                targetWeightKilograms: nil, loadNote: nil,
+                notes: nil, phase: .main
+            )
+            run.cardioActivity = option == .run ? .running : .walking
+            return [run]
+        }
+        let wellness: WorkoutWellnessKind = {
+            switch option {
+            case .meditation: return .meditation
+            case .stretching: return .stretching
+            case .yoga: return .yoga
+            default: return .mobility
+            }
+        }()
+        var block = WorkoutTemplateBlock(
+            sequence: 1, kind: .note, title: option.title,
+            exerciseSlug: nil, distanceMeters: nil, repetitions: nil,
+            durationSeconds: wellness == .meditation ? 300 :
+                wellness == .yoga ? 900 : 600,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: wellness == .meditation ? .recovery : .main
+        )
+        block.wellnessKind = wellness
+        return [block]
+    }
+
+    private func chooseQuickWorkout(_ option: QuickDayOption, on day: Int) {
+        quickStudioOption = option
+        addingExtraWorkout = false
+        editingWorkoutIndex = 0
+        pendingStudioDay = WeekDayEditorSelection(id: day)
+        editingWeekDay = nil
+    }
+
+    private func quickDayChoiceGrid(for day: Int) -> some View {
+        ATHLTHPlanSurface {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Quick choice", norwegian: "Hurtigvalg"))
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Text(ATHLTHLocalization.choose(
+                        english: "Edit freely afterwards", norwegian: "Rediger etterpå"))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3),
+                          spacing: 8) {
+                    ForEach(QuickDayOption.allCases) { option in
+                        Button {
+                            chooseQuickWorkout(option, on: day)
+                        } label: {
+                            VStack(spacing: 5) {
+                                Image(systemName: option.symbol)
+                                    .font(.system(size: 18, weight: .medium))
+                                Text(option.title)
+                                    .font(.caption2.weight(.semibold))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                            }
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            .frame(maxWidth: .infinity, minHeight: 61)
+                            .background(ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 12))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.8)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
     private func setRestDay(_ day: Int) {
         updateWeekDay(day) { edit in
             edit.isRestDay = true
@@ -4123,6 +4265,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             edit.durationMinutes = nil
             edit.removeTemplateDetail = true
             edit.additionalDetailedWorkouts = nil
+            edit.trainingPlace = nil
         }
     }
 
@@ -4134,6 +4277,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         if hasStrength && !runs.isEmpty || (hasRunning && hasWalking) { return .custom }
         if hasRunning { return .running }
         if hasWalking { return .walking }
+        let wellness = blocks.compactMap(\.wellnessKind)
+        if !wellness.isEmpty {
+            return wellness.allSatisfy { $0 == .meditation } ? .recovery : .mobility
+        }
         return .strength
     }
 
@@ -4190,42 +4337,75 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     }
-                    if weekPlanningApproach == .quick,
-                       weekDayEdits[weekDayKey(day)]?.detailedWorkout == nil {
+                    if weekDayEdits[weekDayKey(day)]?.detailedWorkout == nil {
+                        quickDayChoiceGrid(for: day)
+                    }
+                    ATHLTHPlanWeekApproachCard(
+                        icon: "mappin.and.ellipse",
+                        title: weekDayEdits[weekDayKey(day)]?.trainingPlace?.name ??
+                            ATHLTHLocalization.choose(
+                                english: "Training place (optional)",
+                                norwegian: "Treningssted (valgfritt)"),
+                        subtitle: weekDayEdits[weekDayKey(day)]?.trainingPlace?.address
+                            .isEmpty == false
+                            ? (weekDayEdits[weekDayKey(day)]?.trainingPlace?.address ?? "")
+                            : ATHLTHLocalization.choose(
+                                english: "Address, gym, hotel, sports ground or favorites.",
+                                norwegian: "Adresse, senter, hotell, idrettsanlegg eller favoritter.")
+                    ) {
+                        pendingTrainingPlaceDay = WeekDayEditorSelection(id: day)
+                        editingWeekDay = nil
+                    }
+                    if let dayEdit = weekDayEdits[weekDayKey(day)],
+                       dayEdit.isRestDay != true, let primary = dayEdit.detailedWorkout {
                         ATHLTHPlanSurface {
                             VStack(alignment: .leading, spacing: 12) {
                                 Text(ATHLTHLocalization.choose(
-                                    english: "Quick choice", norwegian: "Hurtigvalg"
-                                ))
-                                .font(.headline)
-                                Text(ATHLTHLocalization.choose(
-                                    english: "Select the workout type now, or build it in detail below.",
-                                    norwegian: "Velg treningsform nå, eller bygg en detaljert økt nedenfor."
-                                ))
-                                .font(.caption)
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                ForEach([WorkoutKind.strength, .running, .walking, .mobility], id: \.self) { kind in
+                                    english: "PLANNED WORKOUT", norwegian: "PLANLAGT ØKT"))
+                                    .font(.caption2.weight(.bold))
+                                    .tracking(1.2)
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                ForEach(Array(([primary] +
+                                    (dayEdit.additionalDetailedWorkouts ?? [])).enumerated()),
+                                        id: \.offset) { index, workout in
                                     Button {
-                                        updateWeekDay(day) { edit in
-                                            edit.kind = kind
-                                            edit.title = kind.title
-                                            edit.durationMinutes = resolvedWorkoutMinutes(for: day)
-                                            edit.detailedWorkout = nil
-                                            edit.additionalDetailedWorkouts = nil
-                                            edit.removeTemplateDetail = true
-                                            edit.isRestDay = false
-                                        }
+                                        editingWorkoutIndex = index
+                                        addingExtraWorkout = false
+                                        pendingStudioDay = WeekDayEditorSelection(id: day)
                                         editingWeekDay = nil
                                     } label: {
-                                        HStack {
-                                            Image(systemName: kind.systemImage)
-                                            Text(kind.title)
-                                            Spacer()
-                                            Image(systemName: "chevron.right")
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            HStack {
+                                                VStack(alignment: .leading, spacing: 3) {
+                                                    Text(workout.title)
+                                                        .font(.headline)
+                                                    Text("\(workout.durationMinutes) min · \(workout.blocks.count) " +
+                                                         ATHLTHLocalization.choose(
+                                                            english: "steps", norwegian: "steg"))
+                                                        .font(.caption)
+                                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                                }
+                                                Spacer()
+                                                Image(systemName: "square.and.pencil")
+                                            }
+                                            ForEach(WorkoutPhaseKind.allCases) { phase in
+                                                let count = workout.blocks.filter {
+                                                    $0.resolvedPhase == phase
+                                                }.count
+                                                if count > 0 {
+                                                    Label(phase.title + " · \(count)",
+                                                          systemImage: phase.symbol)
+                                                        .font(.caption)
+                                                }
+                                            }
+                                            Text(ATHLTHLocalization.choose(
+                                                english: "Tap to edit exercises, warm-up, intervals, pace and heart-rate zones.",
+                                                norwegian: "Trykk for å redigere øvelser, oppvarming, intervaller, tempo og pulssoner."))
+                                                .font(.caption2)
+                                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                                         }
-                                        .font(.subheadline.weight(.semibold))
                                         .foregroundStyle(ATHLTHPlanDesign.ink)
-                                        .frame(minHeight: 42)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
                                     }
                                     .buttonStyle(.plain)
                                 }
@@ -4509,83 +4689,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             if mode == .advanced {
                 builderPanel {
                     VStack(spacing: 13) {
-                        HStack {
-                            VStack(
-                                alignment: .leading,
-                                spacing: 2
-                            ) {
-                                Text(
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "Training environment",
-                                        norwegian:
-                                            "Hvor trener du?"
-                                    )
-                                )
-                                .font(.subheadline.weight(.semibold))
-
-                                Text(
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "Used for exercise choices later",
-                                        norwegian:
-                                            "Brukes til øvelsesvalg senere"
-                                    )
-                                )
-                                .font(.caption2)
-                                .foregroundStyle(
-                                    ATHLTHTheme.mutedText
-                                )
-                            }
-
-                            Spacer()
-                        }
-
-                        HStack(spacing: 7) {
-                            ForEach(
-                                EquipmentContext.allCases
-                            ) { item in
-                                Button {
-                                    equipment = item
-                                } label: {
-                                    VStack(spacing: 5) {
-                                        Image(
-                                            systemName:
-                                                item.icon
-                                        )
-                                        .font(.system(size: 14, weight: .semibold))
-
-                                        Text(item.title)
-                                            .font(.system(size: 9.5, weight: .semibold))
-                                            .lineLimit(1)
-                                            .minimumScaleFactor(0.75)
-                                    }
-                                    .foregroundStyle(
-                                        equipment == item
-                                            ? Color.white
-                                            : ATHLTHTheme.primaryText
-                                    )
-                                    .frame(
-                                        maxWidth: .infinity,
-                                        minHeight: 54
-                                    )
-                                    .background(
-                                        equipment == item
-                                            ? ATHLTHTheme.accentDeep
-                                            : ATHLTHTheme.accentSoft,
-                                        in:
-                                            RoundedRectangle(
-                                                cornerRadius: 13,
-                                                style: .continuous
-                                            )
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-
-                        Divider()
-
                         Stepper(
                             value:
                                 $weeklyTimeBudgetMinutes,
@@ -6321,17 +6424,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             sessionMinutes = 60
         }
 
-        let seededGymAccess: String?
-        if mode == .advanced {
-            switch equipment {
-            case .gym, .both:
-                seededGymAccess = "Yes"
-            case .home:
-                seededGymAccess = "No"
-            }
-        } else {
-            seededGymAccess = nil
-        }
+        // Location and equipment access are now chosen per day, not guessed
+        // from a plan-wide selector. Do not seed gym access as "Yes".
+        let seededGymAccess: String? = nil
 
         return AIProgramBuilderSeed(
             preferredTitle:
@@ -6430,7 +6525,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         : cleanLimitations,
                 priorityMuscles:
                     orderedPriorityMuscles,
-                equipmentContext: equipment.rawValue,
+                equipmentContext: nil,
                 weeklyTimeBudgetMinutes:
                     weeklyTimeBudgetMinutes,
                 simpleWorkoutKinds: mode == .basic ? orderedSimpleActivities : nil,
