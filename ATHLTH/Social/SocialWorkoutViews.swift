@@ -87,7 +87,7 @@ struct WorkoutFriendPicker: View {
             ))
 
             if isExpanded {
-            HStack(alignment: .top, spacing: 8) {
+                HStack(alignment: .top, spacing: 8) {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(alignment: .top, spacing: 9) {
                         Button {
@@ -189,7 +189,7 @@ struct WorkoutFriendPicker: View {
                 .font(.caption)
                 .foregroundStyle(ATHLTHTheme.mutedText)
             }
-            } // Only show the avatar list after choosing to expand.
+            }
         }
         .sheet(isPresented: $showingAllFriends) {
             NavigationStack {
@@ -257,7 +257,7 @@ struct WorkoutFriendPicker: View {
                         }
                     } header: {
                         Text(ATHLTHLocalization.choose(
-                            english: "Friends", norwegian: "Venner"
+                            english: "Athletes", norwegian: "Personer"
                         ))
                     } footer: {
                         Text(ATHLTHLocalization.choose(
@@ -289,7 +289,7 @@ struct WorkoutFriendPicker: View {
                 }
                 .navigationTitle(ATHLTHLocalization.choose(
                     english: "Choose training partners",
-                    norwegian: "Velg treningsvenner"
+                    norwegian: "Velg treningspartnere"
                 ))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
