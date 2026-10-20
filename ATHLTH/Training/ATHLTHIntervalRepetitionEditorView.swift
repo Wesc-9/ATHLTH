@@ -17,6 +17,8 @@ struct ATHLTHIntervalRepetitionEditorView: View {
     @State private var targetSpeedKmh: Double
     @State private var recoverySpeedEnabled: Bool
     @State private var recoverySpeedKmh: Double
+    @State private var recoveryZoneEnabled: Bool
+    @State private var recoveryZone: Int
     @State private var heartRateEnabled: Bool
     @State private var heartRateZone: Int
     @State private var recoveryEnabled: Bool
@@ -48,6 +50,8 @@ struct ATHLTHIntervalRepetitionEditorView: View {
         _recoverySpeedEnabled = State(initialValue: recoveryPace != nil)
         _recoverySpeedKmh = State(initialValue:
             (3_600 / max(recoveryPace ?? 600, 1) * 10).rounded() / 10)
+        _recoveryZoneEnabled = State(initialValue: recovery?.intensity.heartRateZone != nil)
+        _recoveryZone = State(initialValue: recovery?.intensity.heartRateZone ?? 2)
         _heartRateEnabled = State(initialValue: work.intensity.heartRateZone != nil)
         _heartRateZone = State(initialValue: work.intensity.heartRateZone ?? 4)
         _recoveryEnabled = State(initialValue: recovery != nil)
@@ -133,6 +137,12 @@ struct ATHLTHIntervalRepetitionEditorView: View {
                                     value: $recoverySpeedKmh, in: 2...20, step: 0.1
                                 )
                             }
+                            Toggle(tr("Target recovery zone", "Målsone i pausen"),
+                                   isOn: $recoveryZoneEnabled)
+                            if recoveryZoneEnabled {
+                                Stepper(tr("Zone", "Sone") + " (recoveryZone)",
+                                        value: $recoveryZone, in: 1...5)
+                            }
                         }
                     } header: {
                         Text(tr("Recovery after effort", "Pause etter drag") + " \(repetition)")
@@ -174,10 +184,12 @@ struct ATHLTHIntervalRepetitionEditorView: View {
                         let recoveryPace = recoverySpeedEnabled
                             ? 3_600 / max(recoverySpeedKmh, 0.1) : nil
                         let recoveryIntensity = RunningIntensityTarget(
-                            kind: recoverySpeedEnabled ? .pace : .easy,
+                            kind: recoverySpeedEnabled ? .pace :
+                                (recoveryZoneEnabled ? .heartRateZone : .easy),
                             paceMinSecondsPerKilometer: recoveryPace,
                             paceMaxSecondsPerKilometer: recoveryPace,
-                            heartRateZone: nil, rpe: nil
+                            heartRateZone: recoveryZoneEnabled ? recoveryZone : nil,
+                            rpe: nil
                         )
                         let recovery: RunningStepTarget? = recoveryEnabled &&
                             repetition < totalRepetitions
