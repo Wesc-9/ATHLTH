@@ -5020,6 +5020,146 @@ struct PlanMetadataEditorView: View {
     }
 }
 
+/// Uses exactly the mutual-follow set accepted by Train Together invitations.
+/// Search is local to this list; searching never invites a non-mutual account.
+private struct SessionTrainingPartnerSelectionSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var social: SocialStore
+
+    @Binding var selectedPartnerID: UUID?
+    @State private var searchText = ""
+
+    private var filteredPartners: [SocialProfileCard] {
+        let query = searchText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "@"))
+        guard !query.isEmpty else { return social.trainingPartners }
+        return social.trainingPartners.filter {
+            $0.resolvedName.localizedStandardContains(query) ||
+            ($0.username ?? "").localizedStandardContains(query)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Button {
+                        selectedPartnerID = nil
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 13) {
+                            Image(systemName: "person.fill")
+                                .font(.title3)
+                                .foregroundStyle(ATHLTHPlanDesign.accent)
+                                .frame(width: 46, height: 46)
+                                .background(
+                                    ATHLTHPlanDesign.selectedSurface,
+                                    in: Circle()
+                                )
+                            Text(ATHLTHLocalization.choose(
+                                english: "Just me",
+                                norwegian: "Bare meg"
+                            ))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Spacer(minLength: 0)
+                            if selectedPartnerID == nil {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(ATHLTHPlanDesign.accent)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Section {
+                    if filteredPartners.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "No matching friends",
+                                norwegian: "Ingen venner funnet"
+                            ))
+                            .font(.headline)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Only people who follow you back can be invited to a workout.",
+                                norwegian: "Kun personer dere følger gjensidig kan inviteres til en økt."
+                            ))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 12)
+                    } else {
+                        ForEach(filteredPartners) { friend in
+                            Button {
+                                selectedPartnerID = friend.userID
+                                dismiss()
+                            } label: {
+                                HStack(spacing: 13) {
+                                    ATHLTHSocialStatusAvatar(
+                                        profile: friend,
+                                        size: 46
+                                    )
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(friend.resolvedName)
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                                        if !friend.usernameLabel.isEmpty {
+                                            Text(friend.usernameLabel)
+                                                .font(.caption)
+                                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                        }
+                                    }
+                                    Spacer(minLength: 0)
+                                    if selectedPartnerID == friend.userID {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundStyle(ATHLTHPlanDesign.accent)
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                } header: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Friends",
+                        norwegian: "Venner"
+                    ))
+                }
+            }
+            .listStyle(.insetGrouped)
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Choose a training partner",
+                norwegian: "Velg treningspartner"
+            ))
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(
+                text: $searchText,
+                prompt: ATHLTHLocalization.choose(
+                    english: "Name or @username",
+                    norwegian: "Navn eller @brukernavn"
+                )
+            )
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Close",
+                        norwegian: "Lukk"
+                    )) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .task {
+            if social.trainingPartners.isEmpty {
+                await social.refresh()
+            }
+        }
+    }
+}
+
 private enum SessionEditorMode: String, CaseIterable, Identifiable {
     case basic
     case advanced
@@ -5133,6 +5273,7 @@ struct SessionEditorView: View {
     @State private var showingSavedWorkoutPicker = false
     @State private var showingRecoveryRestPlanner = false
     @State private var selectedPartnerID: UUID?
+    @State private var showingAllTrainingPartners = false
     @State private var allowInviteeExercises = false
     @State private var directPartnerID: UUID?
     @State private var physicalMeetup = true
@@ -5917,6 +6058,13 @@ struct SessionEditorView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(invitationError)
+            }
+            .sheet(isPresented: $showingAllTrainingPartners) {
+                SessionTrainingPartnerSelectionSheet(
+                    selectedPartnerID: $selectedPartnerID
+                )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $showingMeetingPointPicker) {
                 NavigationStack {
@@ -7059,6 +7207,165 @@ struct SessionEditorView: View {
         .environment(\.editMode, .constant(.active))
     }
 
+    /// Keep a chosen friend visible even when the full friend list is long.
+    /// All candidates must be mutual follows, as required by invitation RLS.
+    private var quickTrainingPartners: [SocialProfileCard] {
+        let all = social.trainingPartners
+        guard let selectedPartnerID,
+              let selected = all.first(where: { $0.userID == selectedPartnerID })
+        else {
+            return Array(all.prefix(5))
+        }
+        return [selected] + Array(all.filter {
+            $0.userID != selectedPartnerID
+        }.prefix(4))
+    }
+
+    private var trainingPartnerQuickPicker: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(ATHLTHLocalization.choose(
+                english: "Training partner",
+                norwegian: "Treningspartner"
+            ))
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+
+            HStack(alignment: .top, spacing: 8) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 9) {
+                        Button {
+                            selectedPartnerID = nil
+                        } label: {
+                            VStack(spacing: 6) {
+                                Image(systemName: "person.fill")
+                                    .font(.system(size: 19, weight: .medium))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                    .frame(width: 46, height: 46)
+                                    .background(
+                                        ATHLTHPlanDesign.selectedSurface,
+                                        in: Circle()
+                                    )
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Just me",
+                                    norwegian: "Bare meg"
+                                ))
+                                .font(.system(size: 11, weight: .medium))
+                                .lineLimit(1)
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                            }
+                            .frame(width: 77)
+                            .padding(.vertical, 7)
+                            .background(
+                                selectedPartnerID == nil
+                                    ? ATHLTHPlanDesign.selectedSurface
+                                    : Color.clear,
+                                in: RoundedRectangle(cornerRadius: 15)
+                            )
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 15)
+                                    .stroke(
+                                        selectedPartnerID == nil
+                                            ? ATHLTHPlanDesign.accent
+                                            : Color.clear,
+                                        lineWidth: 1.5
+                                    )
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(
+                            selectedPartnerID == nil ? [.isSelected] : []
+                        )
+
+                        ForEach(quickTrainingPartners) { friend in
+                            Button {
+                                selectedPartnerID = friend.userID
+                            } label: {
+                                VStack(spacing: 6) {
+                                    ATHLTHSocialStatusAvatar(
+                                        profile: friend,
+                                        size: 46
+                                    )
+                                    .frame(width: 54, height: 46)
+
+                                    Text(friend.resolvedName)
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.8)
+                                }
+                                .frame(width: 77)
+                                .padding(.vertical, 7)
+                                .background(
+                                    selectedPartnerID == friend.userID
+                                        ? ATHLTHPlanDesign.selectedSurface
+                                        : Color.clear,
+                                    in: RoundedRectangle(cornerRadius: 15)
+                                )
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 15)
+                                        .stroke(
+                                            selectedPartnerID == friend.userID
+                                                ? ATHLTHPlanDesign.accent
+                                                : Color.clear,
+                                            lineWidth: 1.5
+                                        )
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(
+                                friend.resolvedName + " " + friend.usernameLabel
+                            )
+                            .accessibilityAddTraits(
+                                selectedPartnerID == friend.userID
+                                    ? [.isSelected] : []
+                            )
+                        }
+                    }
+                    .padding(.vertical, 3)
+                }
+                .scrollClipDisabled()
+
+                Button {
+                    showingAllTrainingPartners = true
+                } label: {
+                    VStack(spacing: 6) {
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 19, weight: .medium))
+                            .foregroundStyle(ATHLTHPlanDesign.accent)
+                            .frame(width: 46, height: 46)
+                            .background(
+                                ATHLTHPlanDesign.selectedSurface,
+                                in: Circle()
+                            )
+                        Text(ATHLTHLocalization.choose(
+                            english: "Others",
+                            norwegian: "Andre"
+                        ))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                    }
+                    .frame(width: 66)
+                    .padding(.vertical, 10)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "View and search all friends",
+                    norwegian: "Vis og søk blant alle venner"
+                ))
+            }
+            .disabled(directPartnerID != nil)
+
+            if social.trainingPartners.isEmpty {
+                Text(ATHLTHLocalization.choose(
+                    english: "Mutual friends appear here. Tap Others to see the full list.",
+                    norwegian: "Venner dere følger gjensidig vises her. Trykk Andre for hele listen."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+        }
+    }
+
     private var partnerPlanningSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 14) {
@@ -7088,23 +7395,7 @@ struct SessionEditorView: View {
                     Spacer(minLength: 0)
                 }
 
-                Picker(
-                    ATHLTHLocalization.choose(
-                        english: "Training partner",
-                        norwegian: "Treningspartner"
-                    ),
-                    selection: $selectedPartnerID
-                ) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Just me",
-                        norwegian: "Bare meg"
-                    )).tag(nil as UUID?)
-
-                    ForEach(social.trainingPartners, id: \.userID) { friend in
-                        Text(friend.resolvedName).tag(friend.userID as UUID?)
-                    }
-                }
-                .disabled(directPartnerID != nil)
+                trainingPartnerQuickPicker
 
                 if selectedPartnerID != nil {
                     Picker(
