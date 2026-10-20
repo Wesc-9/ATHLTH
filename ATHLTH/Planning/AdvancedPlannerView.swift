@@ -5457,6 +5457,11 @@ struct SessionEditorView: View {
     @State private var editingRunningRepetition: SessionRunningRepetitionSelection?
     @State private var selectedRouteID: UUID?
 
+    private var selectedRoute: TrainingRoute? {
+        guard runEnvironment == .outdoor, let selectedRouteID else { return nil }
+        return session.savedRoutes.first { $0.id == selectedRouteID }
+    }
+
     @State private var scheduledTimeEnabled = false
     @State private var scheduledTime = Date()
 
@@ -6411,32 +6416,10 @@ struct SessionEditorView: View {
                 }
             }
             .sheet(item: $editingRunningPhase) { selection in
-                if let workout = selectedRunningWorkouts.first(where: { $0.id == selection.workoutID }),
-                   let block = workout.blocks.first(where: { $0.id == selection.blockID }),
-                   let target = selection.isRecovery ? block.recovery : block.work {
-                    ATHLTHPlannedRunningPhaseEditor(
-                        title: selection.isRecovery
-                            ? ATHLTHLocalization.choose(english: "Active recovery", norwegian: "Aktiv pause")
-                            : runningPhaseTitle(block.kind),
-                        target: target,
-                        environment: runEnvironment,
-                        fallbackPace: targetPaceEnabled
-                            ? Double(targetPaceMinutes * 60 + targetPaceSeconds) : 360
-                    ) { updated in
-                        updateRunningPhase(selection, target: updated)
-                    }
-                }
+                phaseEditor(for: selection)
             }
             .sheet(item: $editingRunningRepetition) { selection in
-                if let workout = selectedRunningWorkouts.first(where: { $0.id == selection.workoutID }),
-                   let block = workout.blocks.first(where: { $0.id == selection.blockID }) {
-                    ATHLTHIntervalRepetitionEditorView(
-                        block: block, repetition: selection.repetition,
-                        environment: runEnvironment
-                    ) { override in
-                        updateRunningRepetition(selection, override: override)
-                    }
-                }
+                repetitionEditor(for: selection)
             }
             .sheet(isPresented: $showingAudioCoachEditor) {
                 PlannedAudioCoachEditorView(
@@ -8525,6 +8508,44 @@ struct SessionEditorView: View {
             .vertical,
             2
         )
+    }
+
+    @ViewBuilder
+    private func phaseEditor(
+        for selection: SessionRunningPhaseSelection
+    ) -> some View {
+        if let workout = selectedRunningWorkouts.first(where: { $0.id == selection.workoutID }),
+           let block = workout.blocks.first(where: { $0.id == selection.blockID }) {
+            let target: RunningStepTarget? = selection.isRecovery ? block.recovery : block.work
+            if let target {
+                ATHLTHPlannedRunningPhaseEditor(
+                    title: selection.isRecovery
+                        ? ATHLTHLocalization.choose(english: "Active recovery", norwegian: "Aktiv pause")
+                        : runningPhaseTitle(block.kind),
+                    target: target,
+                    environment: runEnvironment,
+                    fallbackPace: targetPaceEnabled
+                        ? Double(targetPaceMinutes * 60 + targetPaceSeconds) : 360
+                ) { updated in
+                    updateRunningPhase(selection, target: updated)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func repetitionEditor(
+        for selection: SessionRunningRepetitionSelection
+    ) -> some View {
+        if let workout = selectedRunningWorkouts.first(where: { $0.id == selection.workoutID }),
+           let block = workout.blocks.first(where: { $0.id == selection.blockID }) {
+            ATHLTHIntervalRepetitionEditorView(
+                block: block, repetition: selection.repetition,
+                environment: runEnvironment
+            ) { override in
+                updateRunningRepetition(selection, override: override)
+            }
+        }
     }
 
     // The chosen workout is deliberately presented before "Legg til".
