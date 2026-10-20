@@ -1555,12 +1555,12 @@ async function refreshCell(
 (
   relation
     ["type"="route"]
-    ["route"~"^(hiking|foot)$"]
+    ["route"~"^(hiking|foot|running)$"]
     ["name"]
     (${bounds.south},${bounds.west},${bounds.north},${bounds.east});
   relation
     ["type"="route"]
-    ["route"~"^(hiking|foot)$"]
+    ["route"~"^(hiking|foot|running)$"]
     ["ref"]
     (${bounds.south},${bounds.west},${bounds.north},${bounds.east});
   way
@@ -1572,7 +1572,7 @@ async function refreshCell(
     ["ref"]
     (${bounds.south},${bounds.west},${bounds.north},${bounds.east});
 );
-out body geom qt 160;
+out body geom qt 480;
 `.trim();
 
   // In Norway, Turrutebasen is the authoritative route source and is
@@ -1670,6 +1670,12 @@ out body geom qt 160;
       return payload;
     };
 
+  // Concurrent with the official national source to keep cold searches
+  // responsive while still enriching footpaths from OpenStreetMap.
+  const prefetchedOverpass = overpassURLs.length > 0
+    ? tryOverpass(overpassURLs[0]).catch(() => null)
+    : Promise.resolve(null);
+
   try {
     const kartverketWrites =
       await kartverketPromise;
@@ -1683,24 +1689,20 @@ out body geom qt 160;
     // cache is fresh, but it no longer makes the user's first search wait.
     const shouldQueryOverpass =
       !useKartverketNow ||
-      kartverketWrites.length < 8;
+      kartverketWrites.length < 28;
 
     if (shouldQueryOverpass) {
-      for (
-        const overpassURL
-        of overpassURLs
-      ) {
+      // The first public endpoint starts while Kartverket is loading.
+      // If it fails, race only two fallback endpoints, rather than waiting
+      // through four sequential network timeouts.
+      payload = await prefetchedOverpass;
+      if (!payload && overpassURLs.length > 1) {
         try {
-          payload =
-            await tryOverpass(
-              overpassURL,
-            );
-          break;
+          payload = await Promise.any(
+            overpassURLs.slice(1, 3).map((url) => tryOverpass(url))
+          );
         } catch (error) {
-          lastFailure =
-            describeTrailError(
-              error,
-            );
+          lastFailure = describeTrailError(error);
         }
       }
     } else {
@@ -1764,6 +1766,8 @@ out body geom qt 160;
         String(
           tags.name ??
           tags.ref ??
+          tags.alt_name ??
+          tags.loc_name ??
           "",
         ).trim();
 
@@ -1771,7 +1775,7 @@ out body geom qt 160;
         element.type ===
           "relation"
           ? String(
-              tags.route ?? "",
+              tags.route === "running" ? "foot" : tags.route ?? "",
             )
           : "foot";
 
