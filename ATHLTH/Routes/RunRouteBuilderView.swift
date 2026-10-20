@@ -20,6 +20,7 @@ struct RunRouteBuilderView: View {
     @State private var viaPoints: [RunRouteViaPoint] = []
     @State private var showingViaSearch = false
     @State private var shapeRouteMode = false
+    @State private var returnOnSamePath = false
     @State private var alternatives: [RunRouteAlternative] = []
     @State private var selectedAlternativeID: UUID?
     @State private var mapPosition: MapCameraPosition = .automatic
@@ -32,7 +33,28 @@ struct RunRouteBuilderView: View {
     @State private var savedMessage: String?
 
     private var selectedAlternative: RunRouteAlternative? {
-        alternatives.first { $0.id == selectedAlternativeID }
+        guard let outbound = alternatives.first(where: { $0.id == selectedAlternativeID })
+        else { return nil }
+        guard returnOnSamePath, outbound.coordinates.count >= 2 else { return outbound }
+        // A → B → A: retrace the *same verified walking path*, rather than
+        // drawing an unvalidated straight line or inventing a new road.
+        return RunRouteAlternative(
+            name: outbound.name,
+            distanceMeters: outbound.distanceMeters * 2,
+            expectedTravelTime: outbound.expectedTravelTime * 2,
+            coordinates: outbound.coordinates +
+                Array(outbound.coordinates.dropLast().reversed()),
+            startCoordinate: outbound.startCoordinate,
+            endCoordinate: outbound.startCoordinate
+        )
+    }
+
+    private var canOfferReturn: Bool {
+        guard let start = startItem?.placemark.coordinate,
+              let finish = endItem?.placemark.coordinate else { return false }
+        return CLLocation(latitude: start.latitude, longitude: start.longitude)
+            .distance(from: CLLocation(latitude: finish.latitude,
+                                       longitude: finish.longitude)) > 50
     }
 
     var body: some View {
@@ -54,6 +76,9 @@ struct RunRouteBuilderView: View {
                 }
 
                 if !alternatives.isEmpty {
+                    if canOfferReturn {
+                        outAndBackChoice
+                    }
                     routeMap
                     alternativesCard
                     routeDetailsCard
@@ -164,7 +189,9 @@ struct RunRouteBuilderView: View {
 
         if startItem != nil,
            endItem != nil {
-            return "\(startDisplayName) → \(endDisplayName)"
+            return returnOnSamePath
+                ? "\(startDisplayName) → \(endDisplayName) → \(startDisplayName)"
+                : "\(startDisplayName) → \(endDisplayName)"
         }
 
         return ATHLTHLocalization.choose(
@@ -596,6 +623,40 @@ struct RunRouteBuilderView: View {
                             .padding(.bottom, 12)
                     }
                 }
+            }
+        }
+    }
+
+    private var outAndBackChoice: some View {
+        Toggle(isOn: $returnOnSamePath) {
+            HStack(spacing: 10) {
+                Image(systemName: "arrow.uturn.backward")
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(width: 35, height: 35)
+                    .background(
+                        ATHLTHPlanDesign.selectedSurface,
+                        in: RoundedRectangle(cornerRadius: 10)
+                    )
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Run back to start", norwegian: "Løp tilbake til start"
+                    ))
+                    .font(.subheadline.weight(.semibold))
+                    Text(ATHLTHLocalization.choose(
+                        english: "Retrace the same route after reaching B.",
+                        norwegian: "Følg den samme ruten tilbake etter punkt B."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+            }
+        }
+        .tint(ATHLTHPlanDesign.accentInk)
+        .padding(14)
+        .routeBuilderCard()
+        .onChange(of: returnOnSamePath) { _, _ in
+            if let selectedAlternative {
+                updateMapRegion(for: selectedAlternative)
             }
         }
     }
@@ -1144,9 +1205,10 @@ struct RunRouteBuilderView: View {
             importedFilename: nil,
             createdAt: Date(),
             startName: startDisplayName,
-            endName: endDisplayName,
+            endName: returnOnSamePath ? startDisplayName : endDisplayName,
             expectedTravelTimeSeconds: selectedAlternative.expectedTravelTime,
-            routeSource: "apple_maps_walking"
+            routeSource: returnOnSamePath
+                ? "apple_maps_walking_out_and_back" : "apple_maps_walking"
         )
 
         session.addImportedRoute(route)
