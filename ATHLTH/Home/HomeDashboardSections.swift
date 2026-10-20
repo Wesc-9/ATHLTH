@@ -4970,142 +4970,178 @@ private struct HomeWeeklyProgressDaySheet: View {
             .padding(.top, 4)
     }
 
-    private func plannedRow(
-        _ workout: PlannedSession
-    ) -> some View {
-        Button {
-            selectedPlannedWorkout = workout
-        } label: {
-            plannedRowContent(workout)
+    /// Only genuinely pending entries may be removed from the day sheet.
+    /// Real activity history and completed plan results must remain intact.
+    private func canRemovePlannedWorkout(_ workout: PlannedSession) -> Bool {
+        guard canPlanWorkout,
+              workout.trainTogetherMode == nil,
+              !selection.completedPlannedIDs.contains(workout.id)
+        else { return false }
+
+        if let planID = HomeWeeklyProgressCalendar.containingPlanID(
+            for: workout, in: plan
+        ) {
+            return !session.isPlanSessionSkipped(
+                planID: planID, sessionID: workout.id
+            ) && !session.isPlanSessionCompleted(
+                planID: planID, sessionID: workout.id,
+                healthWorkouts: recentWorkouts,
+                strengthHistory: strength.workoutHistory
+            )
         }
-        .buttonStyle(.plain)
-        .accessibilityHint(ATHLTHLocalization.choose(
-            english: "Open the planned workout card",
-            norwegian: "Åpne kortet for den planlagte økten"
-        ))
+        return session.standalonePlannedSessions.contains { $0.id == workout.id }
     }
 
-    private func plannedRowContent(
-        _ workout: PlannedSession
-    ) -> some View {
-        let completed =
-            !workout.isExplicitRestDay &&
+    private func removePlannedWorkout(_ workout: PlannedSession) {
+        guard canRemovePlannedWorkout(workout) else {
+            showingRemovalFailure = true
+            return
+        }
+
+        if session.standalonePlannedSessions.contains(where: { $0.id == workout.id }) {
+            session.removeStandalonePlannedSession(workout.id)
+            scheduleConfirmation = nil
+            return
+        }
+
+        // The current plan and its version, not the calendar's old selection,
+        // determine deletion. Plan Studio also blocks completed or skipped
+        // sessions and cancels the reminder without deleting history.
+        guard let planID = HomeWeeklyProgressCalendar.containingPlanID(
+            for: workout, in: plan
+        ),
+              let livePlan = session.trainingPlan(withID: planID),
+              let day = livePlan.weeks.flatMap(\.days).first(where: {
+                  $0.sessions.contains(where: { $0.id == workout.id })
+              }),
+              session.removePlanStudioWorkout(
+                  planID: planID,
+                  workoutID: workout.id,
+                  dayID: day.id,
+                  expectedVersion: livePlan.version,
+                  healthWorkouts: recentWorkouts,
+                  strengthHistory: strength.workoutHistory
+              )
+        else {
+            showingRemovalFailure = true
+            return
+        }
+        scheduleConfirmation = nil
+    }
+
+    private func plannedRow(_ workout: PlannedSession) -> some View {
+        HStack(spacing: 0) {
+            Button {
+                if workout.trainTogetherMode != nil {
+                    selectedInvitationLobby = workout
+                } else {
+                    selectedPlannedWorkout = workout
+                }
+            } label: {
+                plannedRowContent(workout)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(ATHLTHLocalization.choose(
+                english: "Open the planned workout",
+                norwegian: "Åpne den planlagte økten"
+            ))
+
+            if canRemovePlannedWorkout(workout) {
+                Button {
+                    workoutPendingRemoval = workout
+                    showingRemoveConfirmation = true
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(width: 44, height: 48)
+                        .background(ATHLTHPlanDesign.selectedSurface,
+                                    in: RoundedRectangle(cornerRadius: 13))
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 10)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Remove scheduled workout",
+                    norwegian: "Fjern planlagt økt"
+                ))
+                .accessibilityHint(ATHLTHLocalization.choose(
+                    english: "Requires confirmation. Completed workouts stay saved.",
+                    norwegian: "Krever bekreftelse. Fullførte økter blir beholdt."
+                ))
+            }
+        }
+        .background {
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .fill(LinearGradient(
+                    colors: [
+                        ATHLTHPlanDesign.surface,
+                        ATHLTHPlanDesign.warmSurface.opacity(0.38)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .strokeBorder(ATHLTHPlanDesign.warmDivider.opacity(0.7),
+                              lineWidth: 0.7)
+        }
+    }
+
+    private func plannedRowContent(_ workout: PlannedSession) -> some View {
+        let completed = !workout.isExplicitRestDay &&
             selection.completedPlannedIDs.contains(workout.id)
 
         return HStack(spacing: 11) {
-            Image(
-                systemName:
-                    completed
-                        ? "checkmark"
-                        : workout.isExplicitRestDay
-                            ? "moon.stars.fill"
-                            : workout.kind.systemImage
-            )
-            .font(
-                .system(
-                    size: 13,
-                    weight: .bold
-                )
-            )
-            .foregroundStyle(
-                completed
-                    ? .white
-                    : workout.isExplicitRestDay
-                        ? ATHLTHTheme.recoveryBlue
-                        : ATHLTHTheme.accentDeep
-            )
-            .frame(
-                width: 36,
-                height: 36
-            )
-            .background(
-                completed
-                    ? ATHLTHTheme
-                        .vitality
-                    : workout.isExplicitRestDay
-                        ? ATHLTHTheme.recoveryBlueSoft
-                        : ATHLTHTheme.accentSoft,
-                in: Circle()
-            )
+            Image(systemName:
+                completed ? "checkmark" :
+                workout.isExplicitRestDay ? "moon.stars.fill" :
+                workout.kind.systemImage)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(completed
+                    ? ATHLTHPlanDesign.surface
+                    : ATHLTHPlanDesign.accentInk)
+                .frame(width: 41, height: 41)
+                .background(completed ? ATHLTHTheme.vitality :
+                            ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 13))
 
-            VStack(
-                alignment: .leading,
-                spacing: 2
-            ) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(workout.title)
-                    .font(
-                        .subheadline
-                            .weight(.semibold)
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
-                    .lineLimit(1)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .lineLimit(2)
 
-                Text(
-                    plannedDetail(
-                        workout
-                    )
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-                .lineLimit(1)
+                Text(plannedDetail(workout))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .lineLimit(1)
 
                 if workout.trainTogetherMode != nil && !completed {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Friend invited · tap for lobby and status",
-                            norwegian: "Venn invitert · åpne lobby og status"
-                        ),
-                        systemImage: "person.crop.circle.badge.clock"
-                    )
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .lineLimit(1)
+                    Label(ATHLTHLocalization.choose(
+                        english: "Friend invited · open lobby",
+                        norwegian: "Venn invitert · åpne lobby"
+                    ), systemImage: "person.2")
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
                 }
             }
-
-            Spacer()
-
-            Text(
-                completed
-                    ? ATHLTHLocalization.choose(
-                        english:
-                            "Completed",
-                        norwegian:
-                            "Fullført"
-                    )
-                    : workout.isExplicitRestDay
-                        ? ATHLTHLocalization.choose(
-                            english: "Rest", norwegian: "Hvile"
-                        )
-                        : ATHLTHLocalization.choose(
-                            english: "Planned", norwegian: "Planlagt"
-                        )
-            )
-            .font(
-                .caption2.weight(
-                    .semibold
-                )
-            )
-            .foregroundStyle(
-                completed
-                    ? ATHLTHTheme
-                        .vitality
-                    : ATHLTHTheme
-                        .mutedText
-            )
+            Spacer(minLength: 4)
+            Text(completed
+                ? ATHLTHLocalization.choose(english: "Completed", norwegian: "Fullført")
+                : workout.isExplicitRestDay
+                    ? ATHLTHLocalization.choose(english: "Rest", norwegian: "Hvile")
+                    : ATHLTHLocalization.choose(english: "Planned", norwegian: "Planlagt"))
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(completed
+                    ? ATHLTHTheme.vitality
+                    : ATHLTHPlanDesign.secondaryInk)
         }
-        .padding(11)
-        .background(
-            Color.white.opacity(0.92),
-            in: RoundedRectangle(
-                cornerRadius: 16,
-                style: .continuous
-            )
-        )
+        .padding(.leading, 12)
+        .padding(.vertical, 12)
+        .padding(.trailing, 8)
     }
 
     private func communityEventRow(
