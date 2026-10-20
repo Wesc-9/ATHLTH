@@ -288,6 +288,7 @@ extension Array where Element == WorkoutTemplateBlock {
             )
             item.exerciseID = source.exerciseID
             item.exerciseSnapshot = source.exerciseSnapshot
+            item.wellnessKind = source.wellnessKind
             output.append(item)
         }
 
