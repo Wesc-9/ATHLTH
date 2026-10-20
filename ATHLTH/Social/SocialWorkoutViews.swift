@@ -3,151 +3,310 @@ import MapKit
 import SwiftUI
 import UIKit
 
+/// Reusable Quick Train partner row: identical interaction across running,
+/// walking, strength and other. The full list is always mutual follows only.
 struct WorkoutFriendPicker: View {
     @EnvironmentObject private var social: SocialStore
-
     @Binding var selectedFriendIDs: Set<UUID>
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label(
-                        ATHLTHLocalization.choose(
-                            english: "Train with someone",
-                            norwegian: "Trene med noen"
-                        ),
-                        systemImage: "person.2.fill"
-                    )
-                    .font(.headline)
+    @State private var showingAllFriends = false
+    @State private var searchText = ""
 
-                Spacer()
+    private let maximumPartners = 5
 
-                if !selectedFriendIDs.isEmpty {
-                    Text(ATHLTHLocalization.format(
-                            english: "%d selected",
-                            norwegian: "%d valgt",
-                            selectedFriendIDs.count
-                        ))
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accent)
-                }
-            }
+    private var highlightedPartners: [SocialProfileCard] {
+        let all = social.trainingPartners
+        let selected = all.filter { selectedFriendIDs.contains($0.userID) }
+        return selected + Array(all.filter {
+            !selectedFriendIDs.contains($0.userID)
+        }.prefix(maximumPartners - min(selected.count, maximumPartners)))
+    }
 
-            if social.trainingPartners.isEmpty {
-                HStack(spacing: 11) {
-                    Image(systemName: "person.badge.plus")
-                        .foregroundStyle(ATHLTHTheme.accent)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("No training partners available")
-                            .font(.subheadline.weight(.semibold))
-                        Text(
-                            social.following.isEmpty && social.followers.isEmpty
-                                ? "Follow athletes to connect. Workout invites become available when you follow each other."
-                                : "Workout invites are available when you and the other athlete follow each other."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.vertical, 4)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 13) {
-                        ForEach(social.trainingPartners) { friend in
-                            Button {
-                                if selectedFriendIDs.contains(friend.userID) {
-                                    selectedFriendIDs.remove(friend.userID)
-                                } else if selectedFriendIDs.count < 5 {
-                                    selectedFriendIDs.insert(friend.userID)
-                                }
-                            } label: {
-                                VStack(spacing: 7) {
-                                    ZStack(alignment: .bottomTrailing) {
-                                        SocialAvatar(profile: friend, size: 52)
-
-                                        Image(
-                                            systemName: selectedFriendIDs.contains(friend.userID)
-                                                ? "checkmark.circle.fill"
-                                                : "plus.circle.fill"
-                                        )
-                                        .font(.system(size: 18))
-                                        .foregroundStyle(
-                                            selectedFriendIDs.contains(friend.userID)
-                                                ? ATHLTHTheme.accent
-                                                : .secondary
-                                        )
-                                        .background(.white, in: Circle())
-                                    }
-
-                                    Text(friend.resolvedName)
-                                        .font(.caption2.weight(.semibold))
-                                        .foregroundStyle(.primary)
-                                        .lineLimit(1)
-                                        .frame(width: 74)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(
-                                selectedFriendIDs.count >= 5 &&
-                                !selectedFriendIDs
-                                    .contains(
-                                        friend.userID
-                                    )
-                            )
-                            .opacity(
-                                selectedFriendIDs.count >= 5 &&
-                                !selectedFriendIDs
-                                    .contains(
-                                        friend.userID
-                                    )
-                                    ? 0.48
-                                    : 1
-                            )
-                        }
-                    }
-                    .padding(.vertical, 2)
-                }
-            }
-
-            Text(
-                selectedFriendIDs.isEmpty
-                    ? ATHLTHLocalization.choose(
-                            english:
-                                "You can always start the workout solo.",
-                            norwegian:
-                                "Du kan alltid starte økten alene."
-                        )
-                    : ATHLTHLocalization.choose(
-                            english:
-                                "Selected training partners receive a private workout invite.",
-                            norwegian:
-                                "Valgte treningspartnere får en privat invitasjon til økten."
-                        )
-            )
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-
-            if selectedFriendIDs.count >= 5 {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Private social workouts support up to 6 athletes including you.",
-                        norwegian:
-                            "Private sosiale økter støtter opptil 6 utøvere inkludert deg."
-                    )
-                )
-                .font(.caption2)
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .vitality
-                )
-            }
+    private var searchablePartners: [SocialProfileCard] {
+        let query = searchText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "@"))
+        guard !query.isEmpty else { return social.trainingPartners }
+        return social.trainingPartners.filter {
+            $0.resolvedName.localizedStandardContains(query) ||
+            ($0.username ?? "").localizedStandardContains(query)
         }
     }
 
     var selectedFriends: [SocialProfileCard] {
-        social.trainingPartners.filter { selectedFriendIDs.contains($0.userID) }
+        social.trainingPartners.filter {
+            selectedFriendIDs.contains($0.userID)
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Train with someone",
+                        norwegian: "Trene med noen"
+                    ),
+                    systemImage: "person.2.fill"
+                )
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+
+                Spacer(minLength: 4)
+
+                if !selectedFriendIDs.isEmpty {
+                    Text(ATHLTHLocalization.format(
+                        english: "%d selected",
+                        norwegian: "%d valgt",
+                        selectedFriendIDs.count
+                    ))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+            }
+
+            HStack(alignment: .top, spacing: 6) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 7) {
+                        Button {
+                            selectedFriendIDs.removeAll()
+                        } label: {
+                            partnerTile(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Just me", norwegian: "Bare meg"
+                                ),
+                                systemImage: "person.fill",
+                                selected: selectedFriendIDs.isEmpty
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(
+                            selectedFriendIDs.isEmpty ? [.isSelected] : []
+                        )
+
+                        ForEach(highlightedPartners) { friend in
+                            Button {
+                                toggle(friend)
+                            } label: {
+                                VStack(spacing: 6) {
+                                    ATHLTHSocialStatusAvatar(
+                                        profile: friend,
+                                        size: 44
+                                    )
+                                    .frame(width: 48, height: 45)
+                                    Text(friend.resolvedName)
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(ATHLTHTheme.primaryText)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.8)
+                                }
+                                .frame(width: 73)
+                                .padding(.vertical, 7)
+                                .background(
+                                    selectedFriendIDs.contains(friend.userID)
+                                        ? ATHLTHTheme.accentSoft
+                                        : Color.clear,
+                                    in: RoundedRectangle(cornerRadius: 15)
+                                )
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 15)
+                                        .stroke(
+                                            selectedFriendIDs.contains(friend.userID)
+                                                ? ATHLTHTheme.accentDeep
+                                                : Color.clear,
+                                            lineWidth: 1.4
+                                        )
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(
+                                selectedFriendIDs.count >= maximumPartners &&
+                                !selectedFriendIDs.contains(friend.userID)
+                            )
+                            .accessibilityLabel(friend.resolvedName)
+                            .accessibilityAddTraits(
+                                selectedFriendIDs.contains(friend.userID)
+                                    ? [.isSelected] : []
+                            )
+                        }
+                    }
+                    .padding(.vertical, 3)
+                }
+                .scrollClipDisabled()
+
+                Button {
+                    showingAllFriends = true
+                } label: {
+                    partnerTile(
+                        title: ATHLTHLocalization.choose(
+                            english: "Others", norwegian: "Andre"
+                        ),
+                        systemImage: "person.2.fill",
+                        selected: false
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "View and search all friends",
+                    norwegian: "Vis og søk blant alle venner"
+                ))
+            }
+
+            if social.trainingPartners.isEmpty {
+                Text(ATHLTHLocalization.choose(
+                    english: "People who follow you back will appear here.",
+                    norwegian: "Venner dere følger gjensidig vises her."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            } else if !selectedFriendIDs.isEmpty {
+                Text(ATHLTHLocalization.choose(
+                    english: "Invited friends join in a private workout lobby.",
+                    norwegian: "Valgte venner inviteres til en privat treningslobby."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+        }
+        .sheet(isPresented: $showingAllFriends) {
+            NavigationStack {
+                List {
+                    Section {
+                        Button {
+                            selectedFriendIDs.removeAll()
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "person.fill")
+                                    .font(.title3)
+                                    .frame(width: 45, height: 45)
+                                    .background(ATHLTHTheme.accentSoft, in: Circle())
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Just me", norwegian: "Bare meg"
+                                ))
+                                .font(.subheadline.weight(.semibold))
+                                Spacer()
+                                if selectedFriendIDs.isEmpty {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                }
+                            }
+                        }
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                    }
+                    Section {
+                        if searchablePartners.isEmpty {
+                            Text(ATHLTHLocalization.choose(
+                                english: "No matching mutual friends.",
+                                norwegian: "Fant ingen venner dere følger gjensidig."
+                            ))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        ForEach(searchablePartners) { friend in
+                            Button {
+                                toggle(friend)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    ATHLTHSocialStatusAvatar(profile: friend, size: 44)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(friend.resolvedName)
+                                            .font(.subheadline.weight(.semibold))
+                                        if !friend.usernameLabel.isEmpty {
+                                            Text(friend.usernameLabel)
+                                                .font(.caption)
+                                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                        }
+                                    }
+                                    Spacer(minLength: 4)
+                                    Image(systemName:
+                                        selectedFriendIDs.contains(friend.userID)
+                                        ? "checkmark.circle.fill" : "circle"
+                                    )
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .disabled(
+                                selectedFriendIDs.count >= maximumPartners &&
+                                !selectedFriendIDs.contains(friend.userID)
+                            )
+                        }
+                    } header: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Friends", norwegian: "Venner"
+                        ))
+                    } footer: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Up to five friends can join you.",
+                            norwegian: "Du kan invitere opptil fem venner."
+                        ))
+                    }
+                }
+                .listStyle(.insetGrouped)
+                .searchable(
+                    text: $searchText,
+                    prompt: ATHLTHLocalization.choose(
+                        english: "Name or @username",
+                        norwegian: "Navn eller @brukernavn"
+                    )
+                )
+                .navigationTitle(ATHLTHLocalization.choose(
+                    english: "Choose training partners",
+                    norwegian: "Velg treningsvenner"
+                ))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Done", norwegian: "Ferdig"
+                        )) {
+                            showingAllFriends = false
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func partnerTile(
+        title: String, systemImage: String, selected: Bool
+    ) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: systemImage)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(width: 44, height: 45)
+                .background(ATHLTHTheme.accentSoft, in: Circle())
+            Text(title)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(1)
+        }
+        .frame(width: 73)
+        .padding(.vertical, 7)
+        .background(
+            selected ? ATHLTHTheme.accentSoft : Color.clear,
+            in: RoundedRectangle(cornerRadius: 15)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 15)
+                .stroke(
+                    selected ? ATHLTHTheme.accentDeep : Color.clear,
+                    lineWidth: 1.4
+                )
+        }
+    }
+
+    private func toggle(_ friend: SocialProfileCard) {
+        guard social.trainingPartners.contains(where: {
+            $0.userID == friend.userID
+        }) else { return }
+        if selectedFriendIDs.contains(friend.userID) {
+            selectedFriendIDs.remove(friend.userID)
+        } else if selectedFriendIDs.count < maximumPartners {
+            selectedFriendIDs.insert(friend.userID)
+        }
     }
 }
 
