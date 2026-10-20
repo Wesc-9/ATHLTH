@@ -115,12 +115,24 @@ enum ATHLTHSpokenAudioSession {
             )
         }
 
-        try session.setCategory(
-            .playback,
-            mode: .spokenAudio,
-            options: options
-        )
-        try session.setActive(true)
+        // Keep music attenuation consistent for local and Azure speech.
+        // Some AirPlay/Bluetooth routes reject spokenAudio mode during route
+        // handoff: retry default playback without dropping the duck options.
+        do {
+            try session.setCategory(
+                .playback,
+                mode: .spokenAudio,
+                options: options
+            )
+            try session.setActive(true)
+        } catch {
+            try session.setCategory(
+                .playback,
+                mode: .default,
+                options: options
+            )
+            try session.setActive(true)
+        }
     }
 
     static func deactivate() {
