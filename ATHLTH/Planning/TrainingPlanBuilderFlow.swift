@@ -4214,6 +4214,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             pendingStudioDay = WeekDayEditorSelection(id: day)
             editingWeekDay = nil
         } else {
+            selectedPlanWeekIndex = guidedCurrentWeek
             composingAdvancedDay = WeekDayEditorSelection(id: day)
         }
     }
