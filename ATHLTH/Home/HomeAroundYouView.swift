@@ -1589,7 +1589,7 @@ struct AroundYouExploreView: View {
             ))
 
             NavigationLink {
-                RunRouteBuilderView()
+                RunRouteBuilderView(initialSearchCenter: visibleRegion?.center)
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 20, weight: .semibold))
