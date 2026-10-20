@@ -66,6 +66,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var pendingStudioDay: WeekDayEditorSelection?
     @State private var addingExtraWorkout = false
     @State private var editingWorkoutIndex = 0
+    @State private var expandedGuidedWorkoutRows: Set<Int> = []
     @State private var previousGuidedEdits: [Int: ATHLTHPlanWeekDayEdit]?
     @State private var selectingExtraFromLibrary = false
 
@@ -3496,6 +3497,303 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
+    /// A genuine workout summary: phase-aware, grouped and editable through
+    /// the shared studio. The technical block sequence stays collapsed until
+    /// requested; nothing in the source workout is flattened or discarded.
+    private func guidedWorkoutSessionCard(
+        _ workout: ATHLTHPlanStructuredWorkoutBlueprint,
+        index: Int,
+        totalCount: Int
+    ) -> some View {
+        let isExpanded = expandedGuidedWorkoutRows.contains(index)
+        let groupedCount = Set(workout.blocks.compactMap(\.groupID)).count
+        let restCount = workout.blocks.filter { $0.kind == .rest }.count
+        let exerciseCount = workout.blocks.filter { $0.kind == .exercise }.count
+        let intervalCount = workout.blocks.filter { $0.kind == .run }.count
+
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 11) {
+                Image(systemName: workout.kind.systemImage)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        ATHLTHPlanDesign.selectedSurface,
+                        in: RoundedRectangle(cornerRadius: 14)
+                    )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "WORKOUT", norwegian: "ØKT"
+                    ) + " \(index + 1)")
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.3)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    Text(workout.title)
+                        .font(.system(size: 19, weight: .semibold, design: .serif))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Text("\(workout.durationMinutes) min · \(workout.blocks.count) " +
+                         ATHLTHLocalization.choose(
+                            english: "steps", norwegian: "trinn"
+                         ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                Spacer(minLength: 0)
+                Menu {
+                    Button {
+                        moveGuidedWorkout(from: index, by: -1)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Move up", norwegian: "Flytt opp"
+                        ), systemImage: "arrow.up")
+                    }
+                    .disabled(index == 0)
+                    Button {
+                        moveGuidedWorkout(from: index, by: 1)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Move down", norwegian: "Flytt ned"
+                        ), systemImage: "arrow.down")
+                    }
+                    .disabled(index >= totalCount - 1)
+                    Divider()
+                    ForEach(1...7, id: \.self) { day in
+                        if day != guidedCurrentWeekday {
+                            Button {
+                                moveGuidedWorkout(to: day, index: index)
+                            } label: {
+                                Label("\(fullDayName(day))", systemImage: "calendar")
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .frame(width: 34, height: 34)
+                        .background(
+                            ATHLTHPlanDesign.canvas,
+                            in: Circle()
+                        )
+                }
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Workout actions", norwegian: "Økthandlinger"
+                ))
+            }
+
+            HStack(spacing: 6) {
+                guidedWorkoutMetric(
+                    "\(exerciseCount) " + ATHLTHLocalization.choose(
+                        english: "exercises", norwegian: "øvelser"
+                    ),
+                    icon: "dumbbell"
+                )
+                if intervalCount > 0 {
+                    guidedWorkoutMetric(
+                        "\(intervalCount) " + ATHLTHLocalization.choose(
+                            english: "runs", norwegian: "løp"
+                        ),
+                        icon: "figure.run"
+                    )
+                }
+                if restCount > 0 {
+                    guidedWorkoutMetric(
+                        "\(restCount) " + ATHLTHLocalization.choose(
+                            english: "rests", norwegian: "pauser"
+                        ),
+                        icon: "pause.fill"
+                    )
+                }
+                if groupedCount > 0 {
+                    guidedWorkoutMetric(
+                        "\(groupedCount) " + ATHLTHLocalization.choose(
+                            english: "groups", norwegian: "grupper"
+                        ),
+                        icon: "square.stack.3d.up"
+                    )
+                }
+            }
+
+            HStack(spacing: 8) {
+                Menu {
+                    Button(ATHLTHLocalization.choose(
+                        english: "No fixed time", norwegian: "Uten fast tidspunkt"
+                    )) { setGuidedWorkoutStart(index: index, minute: nil) }
+                    ForEach(0..<48, id: \.self) { slot in
+                        let minute = slot * 30
+                        Button(String(format: "%02d:%02d", minute / 60, minute % 60)) {
+                            setGuidedWorkoutStart(index: index, minute: minute)
+                        }
+                    }
+                } label: {
+                    Label(
+                        workout.startMinuteOfDay.map {
+                            String(format: "%02d:%02d", $0 / 60, $0 % 60)
+                        } ?? ATHLTHLocalization.choose(
+                            english: "Start time", norwegian: "Starttid"
+                        ),
+                        systemImage: "clock"
+                    )
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .frame(minHeight: 39)
+                }
+
+                Spacer(minLength: 0)
+
+                Button {
+                    selectedPlanWeekIndex = guidedCurrentWeek
+                    editingWorkoutIndex = index
+                    addingExtraWorkout = false
+                    composingAdvancedDay = WeekDayEditorSelection(id: guidedCurrentWeekday)
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Edit workout", norwegian: "Rediger økt"
+                    ), systemImage: "slider.horizontal.3")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 13)
+                        .frame(minHeight: 39)
+                        .background(
+                            ATHLTHPlanDesign.ink,
+                            in: RoundedRectangle(cornerRadius: 11)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    if isExpanded {
+                        expandedGuidedWorkoutRows.remove(index)
+                    } else {
+                        expandedGuidedWorkoutRows.insert(index)
+                    }
+                }
+            } label: {
+                HStack {
+                    Label(
+                        isExpanded
+                            ? ATHLTHLocalization.choose(
+                                english: "Hide workout details",
+                                norwegian: "Skjul øktdetaljer"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Show phases, pace, rest and groups",
+                                norwegian: "Vis faser, tempo, pauser og grupper"
+                            ),
+                        systemImage: "list.bullet.rectangle"
+                    )
+                    .font(.caption.weight(.semibold))
+                    Spacer()
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.semibold))
+                }
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .frame(minHeight: 36)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(workout.blocks.enumerated()), id: \.offset) { blockIndex, block in
+                        if blockIndex == 0 ||
+                            workout.blocks[blockIndex - 1].resolvedPhase != block.resolvedPhase {
+                            Label(block.resolvedPhase.title, systemImage: block.resolvedPhase.symbol)
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                .padding(.top, blockIndex == 0 ? 2 : 8)
+                        }
+                        if let groupID = block.groupID,
+                           blockIndex == 0 || (blockIndex > 0 &&
+                                workout.blocks[blockIndex - 1].groupID != groupID) {
+                            Label(
+                                (block.groupKind?.title ??
+                                    ATHLTHLocalization.choose(
+                                        english: "Grouped steps",
+                                        norwegian: "Grupperte trinn"
+                                    )) +
+                                (block.groupRounds.map { " · \($0) " +
+                                    ATHLTHLocalization.choose(
+                                        english: "rounds", norwegian: "runder"
+                                    ) } ?? ""),
+                                systemImage: block.groupKind?.symbol ?? "link"
+                            )
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        }
+
+                        HStack(alignment: .top, spacing: 9) {
+                            Image(systemName: block.kind.systemImage)
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                .frame(width: 20)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(block.title)
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                if let target = block.targetText {
+                                    Text(target)
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                }
+                                if let rest = block.restBetweenSetsSeconds, rest > 0 {
+                                    Label(
+                                        "\(Int(rest)) " + ATHLTHLocalization.choose(
+                                            english: "sec between sets",
+                                            norwegian: "sek pause mellom sett"
+                                        ),
+                                        systemImage: "pause.circle"
+                                    )
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                            if block.groupID != nil {
+                                Image(systemName: "link")
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            }
+                        }
+                        .padding(.vertical, 5)
+                        .padding(.horizontal, 9)
+                        .background(
+                            ATHLTHPlanDesign.canvas.opacity(0.75),
+                            in: RoundedRectangle(cornerRadius: 10)
+                        )
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Color.white,
+            in: RoundedRectangle(cornerRadius: 18)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(ATHLTHPlanDesign.warmDivider, lineWidth: 1)
+        }
+    }
+
+    private func guidedWorkoutMetric(_ title: String, icon: String) -> some View {
+        Label(title, systemImage: icon)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .padding(.horizontal, 7)
+            .frame(minHeight: 27)
+            .background(
+                ATHLTHPlanDesign.selectedSurface,
+                in: Capsule()
+            )
+    }
+
     private var guidedCurrentDayCard: some View {
         VStack(alignment: .leading, spacing: 15) {
             HStack {
@@ -3581,148 +3879,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         }
                         ForEach(Array(([primary] + (day.additionalDetailedWorkouts ?? [])).enumerated()),
                                 id: \.offset) { index, workout in
-                            HStack(spacing: 12) {
-                                Text(String(format: "%02d", index + 1))
-                                    .font(.caption.monospacedDigit().weight(.bold))
-                                    .foregroundStyle(ATHLTHPlanDesign.accent)
-                                    .frame(width: 30)
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Button {
-                                        selectedPlanWeekIndex = guidedCurrentWeek
-                                        editingWorkoutIndex = index
-                                        addingExtraWorkout = false
-                                        composingAdvancedDay = WeekDayEditorSelection(id: guidedCurrentWeekday)
-                                    } label: {
-                                        Text(workout.title)
-                                            .font(.subheadline.weight(.semibold))
-                                    }
-                                    .buttonStyle(.plain)
-                                        .foregroundStyle(ATHLTHPlanDesign.ink)
-                                    Text("\(workout.durationMinutes) min · \(workout.blocks.count) " +
-                                         ATHLTHLocalization.choose(english: "blocks", norwegian: "blokker"))
-                                        .font(.caption)
-                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                    Menu {
-                                        Button(ATHLTHLocalization.choose(
-                                            english: "No fixed time", norwegian: "Uten fast tidspunkt")) {
-                                            setGuidedWorkoutStart(index: index, minute: nil)
-                                        }
-                                        ForEach(0..<48, id: \.self) { slot in
-                                            let minute = slot * 30
-                                            Button(String(format: "%02d:%02d", minute / 60, minute % 60)) {
-                                                setGuidedWorkoutStart(index: index, minute: minute)
-                                            }
-                                        }
-                                    } label: {
-                                        Label(
-                                            workout.startMinuteOfDay.map {
-                                                String(format: "%02d:%02d", $0 / 60, $0 % 60)
-                                            } ?? ATHLTHLocalization.choose(
-                                                english: "Set start time", norwegian: "Velg starttid"),
-                                            systemImage: "clock"
-                                        )
-                                        .font(.caption)
-                                    }
-                                    ForEach(Array(workout.blocks.enumerated()), id: \.offset) { blockIndex, block in
-                                        HStack(spacing: 6) {
-                                            Image(systemName: "line.3.horizontal")
-                                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text(block.title)
-                                                    .font(.caption.weight(.medium))
-                                                if let target = block.targetText {
-                                                    Text(target)
-                                                        .font(.caption2)
-                                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                                }
-                                            }
-                                            if block.groupID != nil {
-                                                Image(systemName: "link")
-                                                    .font(.caption2)
-                                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                            }
-                                        }
-                                        .contextMenu {
-                                            ForEach(1...7, id: \.self) { targetDay in
-                                                    let key = weekDayKey(targetDay, weekIndex: guidedCurrentWeek)
-                                                    if let target = weekDayEdits[key],
-                                                       let first = target.detailedWorkout {
-                                                        ForEach(Array(([first] + (target.additionalDetailedWorkouts ?? [])).enumerated()),
-                                                                id: \.offset) { targetIndex, targetWorkout in
-                                                            if targetDay != guidedCurrentWeekday || targetIndex != index {
-                                                                Button {
-                                                                    moveGuidedBlock(
-                                                                        from: index, blockIndex: blockIndex,
-                                                                        to: targetDay, workoutIndex: targetIndex
-                                                                    )
-                                                                } label: {
-                                                                    Label(
-                                                                        "\(targetDay) · \(targetWorkout.title)",
-                                                                        systemImage: "arrow.right"
-                                                                    )
-                                                                }
-                                                                Button {
-                                                                    moveGuidedBlock(
-                                                                        from: index, blockIndex: blockIndex,
-                                                                        copy: true,
-                                                                        to: targetDay, workoutIndex: targetIndex
-                                                                    )
-                                                                } label: {
-                                                                    Label(
-                                                                        ATHLTHLocalization.choose(
-                                                                            english: "Copy to", norwegian: "Kopier til"
-                                                                        ) + " \(targetDay) · \(targetWorkout.title)",
-                                                                        systemImage: "doc.on.doc"
-                                                                    )
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                        }
-                                    }
-                                }
-                                Spacer()
-                                HStack(spacing: 6) {
-                                    Button {
-                                        moveGuidedWorkout(from: index, by: -1)
-                                    } label: {
-                                        Image(systemName: "arrow.up")
-                                    }
-                                    .disabled(index == 0)
-                                    .accessibilityLabel(ATHLTHLocalization.choose(
-                                        english: "Move workout up", norwegian: "Flytt økten opp"))
-                                    Button {
-                                        moveGuidedWorkout(from: index, by: 1)
-                                    } label: {
-                                        Image(systemName: "arrow.down")
-                                    }
-                                    .disabled(index == (day.additionalDetailedWorkouts?.count ?? 0))
-                                    .accessibilityLabel(ATHLTHLocalization.choose(
-                                        english: "Move workout down", norwegian: "Flytt økten ned"))
-                                }
-                                .buttonStyle(.borderless)
-                                .foregroundStyle(ATHLTHPlanDesign.accent)
-                            }
-                            .contextMenu {
-                                ForEach(1...7, id: \.self) { destinationDay in
-                                    if destinationDay != guidedCurrentWeekday {
-                                        Button {
-                                            moveGuidedWorkout(to: destinationDay, index: index)
-                                        } label: {
-                                            Label(
-                                                ATHLTHLocalization.choose(
-                                                    english: "Move to day", norwegian: "Flytt til dag"
-                                                ) + " \(destinationDay)",
-                                                systemImage: "calendar.badge.clock"
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            if index < (day.additionalDetailedWorkouts?.count ?? 0) {
-                                Divider()
-                            }
+                            guidedWorkoutSessionCard(
+                                workout, index: index,
+                                totalCount: 1 + (day.additionalDetailedWorkouts?.count ?? 0)
+                            )
                         }
                     }
                 }
