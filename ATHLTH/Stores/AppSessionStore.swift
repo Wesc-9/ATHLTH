@@ -4405,6 +4405,21 @@ final class AppSessionStore: ObservableObject {
         sourcePlanID: UUID? = nil,
         sourceVersion: Int? = nil
     ) {
+        // Training locations can contain home and hotel addresses. They are
+        // per-athlete details, never part of a reusable shared plan.
+        let shareableWeeks = source.weeks.map { week -> TrainingPlanWeek in
+            var copy = week
+            copy.days = week.days.map { day -> TrainingPlanDay in
+                var safeDay = day
+                safeDay.sessions = day.sessions.map { workout -> PlannedSession in
+                    var safe = workout
+                    safe.plannedTrainingPlace = nil
+                    return safe
+                }
+                return safeDay
+            }
+            return copy
+        }
         var copy = TrainingPlan(
             id: UUID(),
             ownerID: profile.userID,
@@ -4412,7 +4427,7 @@ final class AppSessionStore: ObservableObject {
             summary: source.summary,
             visibility: .privateOnly,
             version: 1,
-            weeks: source.weeks,
+            weeks: shareableWeeks,
             tags: source.tags,
             spotifyPlaylist: source.spotifyPlaylist,
             spotifyAutoplayOnWorkoutStart: source.spotifyAutoplayOnWorkoutStart,
