@@ -2819,6 +2819,8 @@ struct HomeWeeklyProgressStrip:
     let workouts: [WorkoutSummary]
     let events:
         [HomeScheduledCommunityEvent]
+    var onStartStandaloneWorkout:
+        ((PlannedSession, WorkoutCaptureDevice) -> Void)? = nil
 
     @State private var weekOffset = 0
     @State private var selectedDay:
@@ -2964,6 +2966,7 @@ struct HomeWeeklyProgressStrip:
                 selection: selection,
                 plan: plan,
                 recentWorkouts: workouts,
+                onStartStandaloneWorkout: onStartStandaloneWorkout,
                 onOpenWorkout: {
                     daySheetDetent = .large
                 }
@@ -4006,6 +4009,8 @@ private struct HomeWeeklyProgressDaySheet: View {
     let selection: HomeWeeklyProgressDaySelection
     let plan: TrainingPlan?
     let recentWorkouts: [WorkoutSummary]
+    var onStartStandaloneWorkout:
+        ((PlannedSession, WorkoutCaptureDevice) -> Void)? = nil
     let onOpenWorkout: () -> Void
 
     @StateObject private var workoutCatalog = WorkoutTemplateCatalogStore()
@@ -4211,7 +4216,10 @@ private struct HomeWeeklyProgressDaySheet: View {
                     .presentationCornerRadius(28)
                 } else {
                     NavigationStack {
-                        HomeWeeklyStandaloneWorkoutDetailView(workout: workout)
+                        HomeWeeklyStandaloneWorkoutDetailView(
+                            workout: workout,
+                            onStartWorkout: onStartStandaloneWorkout
+                        )
                     }
                     // Start as a compact details sheet; expand only when needed
                     // for longer outlines, exercise lists or accessibility text.
