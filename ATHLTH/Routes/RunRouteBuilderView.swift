@@ -664,6 +664,63 @@ struct RunRouteBuilderView: View {
         return item
     }
 
+    /// A coordinate-only pin is still valid without network/geocoding access.
+    /// Never mislabel it as a real street address before lookup completes.
+    private func coordinateName(_ coordinate: CLLocationCoordinate2D) -> String {
+        String(format: "%.5f, %.5f", coordinate.latitude, coordinate.longitude)
+    }
+
+    /// Reverse geocoding is deliberately independent of route calculation.
+    /// A delayed response is applied only to the exact selected pin.
+    @MainActor
+    private func resolveMapPointAddress(
+        coordinate: CLLocationCoordinate2D,
+        role: RunRouteMapPointMode,
+        viaID: UUID? = nil
+    ) async {
+        let location = CLLocation(latitude: coordinate.latitude,
+                                  longitude: coordinate.longitude)
+        let geocoder = CLGeocoder()
+        guard let placemark = try? await geocoder.reverseGeocodeLocation(
+            location, preferredLocale: Locale(identifier: "nb_NO")
+        ).first else { return }
+
+        let street = [placemark.thoroughfare, placemark.subThoroughfare]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        let candidate = street.isEmpty ? (placemark.name ?? "") : street
+        let label = [candidate, placemark.locality ?? ""]
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .joined(separator: ", ")
+        guard !label.isEmpty else { return }
+
+        let item = MKMapItem(placemark: MKPlacemark(placemark: placemark))
+        item.name = label
+        let matches: (MKMapItem?) -> Bool = { selected in
+            guard let point = selected?.placemark.coordinate else { return false }
+            return CLLocation(latitude: point.latitude, longitude: point.longitude)
+                .distance(from: location) < 2
+        }
+
+        switch role {
+        case .start:
+            guard matches(startItem) else { return }
+            startItem = item
+        case .finish:
+            guard matches(endItem) else { return }
+            endItem = item
+        case .via:
+            guard let viaID,
+                  let index = viaPoints.firstIndex(where: { $0.id == viaID }),
+                  matches(viaPoints[index].item) else { return }
+            viaPoints[index] = RunRouteViaPoint(id: viaID, item: item)
+        case .automatic:
+            break
+        }
+        // The coordinates are unchanged; don't discard route alternatives.
+    }
+
     private func handleMapTap(at coordinate: CLLocationCoordinate2D) {
         let action = RunRouteMapPointMode.resolve(
             mode: mapPointMode, hasStart: startItem != nil, hasFinish: endItem != nil)
@@ -674,23 +731,29 @@ struct RunRouteBuilderView: View {
             return
         }
         rememberMapState()
+        var newViaID: UUID?
         switch action {
         case .start:
-            startItem = mapItem(coordinate, name:
-                ATHLTHLocalization.choose(english: "Map start", norwegian: "Start fra kart"))
+            startItem = mapItem(coordinate, name: coordinateName(coordinate))
             startSearch.clear()
         case .finish:
-            endItem = mapItem(coordinate, name:
-                ATHLTHLocalization.choose(english: "Map finish", norwegian: "Mål fra kart"))
+            endItem = mapItem(coordinate, name: coordinateName(coordinate))
             endSearch.clear()
         case .via:
-            viaPoints.append(RunRouteViaPoint(
-                item: mapItem(coordinate, name: "Via \(viaPoints.count + 1)")))
+            let point = RunRouteViaPoint(
+                item: mapItem(coordinate, name: coordinateName(coordinate)))
+            newViaID = point.id
+            viaPoints.append(point)
         case .automatic:
             break
         }
         invalidateCalculatedRoute()
-        Task { await calculateRoutesIfReady(force: true) }
+        Task {
+            async let address: Void = resolveMapPointAddress(
+                coordinate: coordinate, role: action, viaID: newViaID)
+            await calculateRoutesIfReady(force: true)
+            await address
+        }
     }
 
     private func undoMapEdit() {
@@ -1103,8 +1166,14 @@ struct RunRouteBuilderView: View {
             coordinate: coordinate
         )
         let item = MKMapItem(placemark: placemark)
-        item.name = "Map point \(viaPoints.count + 1)"
+        item.name = coordinateName(coordinate)
         addViaPoint(item)
+        if let id = viaPoints.last?.id {
+            Task {
+                await resolveMapPointAddress(
+                    coordinate: coordinate, role: .via, viaID: id)
+            }
+        }
     }
 
     private func removeViaPoint(
@@ -1741,8 +1810,13 @@ private struct RunRouteMapSnapshot {
 }
 
 private struct RunRouteViaPoint: Identifiable {
-    let id = UUID()
+    let id: UUID
     let item: MKMapItem
+
+    init(id: UUID = UUID(), item: MKMapItem) {
+        self.id = id
+        self.item = item
+    }
 }
 
 private struct RunRouteAlternative: Identifiable {
