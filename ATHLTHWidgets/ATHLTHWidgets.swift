@@ -565,6 +565,10 @@ struct ATHLTHWorkoutLiveActivity: Widget {
     private func strengthLightLockScreenContent(_ context: Context) -> some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 8) {
+                ATHLTHMarkShape()
+                    .fill(ATHLTHWidgetPalette.ink)
+                    .frame(width: 23, height: 18)
+                    .accessibilityHidden(true)
                 Text("ATHLTH")
                     .font(.system(size: 13, weight: .heavy, design: .rounded))
                     .tracking(2.0)
