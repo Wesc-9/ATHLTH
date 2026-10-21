@@ -89,23 +89,152 @@ struct ATHLTHEquipmentScanResponse: Decodable {
     }
 }
 
-private enum ATHLTHEquipmentScannerError: LocalizedError {
+enum ATHLTHEquipmentScannerError: LocalizedError, Equatable {
     case invalidPhoto
     case imageTooLarge
+    case providerPayloadTooLarge
+    case signInRequired
+    case premiumRequired
+    case rateLimited
+    case temporarilyUnavailable
+    case timedOut
+    case connectionFailed
+    case invalidResponse
 
     var errorDescription: String? {
         switch self {
         case .invalidPhoto:
             return ATHLTHLocalization.choose(
-                english: "Could not read the image. Take a new picture.",
+                english: "Could not read the image. Take another photo.",
                 norwegian: "Kunne ikke lese bildet. Ta et nytt bilde."
             )
         case .imageTooLarge:
             return ATHLTHLocalization.choose(
-                english: "The image is too large to analyze.",
-                norwegian: "Bildet er for stort til å analyseres."
+                english: "The image could not be reduced enough. Try a simpler photo.",
+                norwegian: "Bildet kunne ikke gjøres lite nok. Prøv et enklere bilde."
+            )
+        case .providerPayloadTooLarge:
+            return ATHLTHLocalization.choose(
+                english: "The image service rejected the photo size. Try another photo.",
+                norwegian: "Bildet ble avvist fordi filen er for stor. Prøv et nytt bilde."
+            )
+        case .signInRequired:
+            return ATHLTHLocalization.choose(
+                english: "Your session has expired. Sign in again to scan equipment.",
+                norwegian: "Innloggingen har utløpt. Logg inn på nytt for å skanne."
+            )
+        case .premiumRequired:
+            return ATHLTHLocalization.choose(
+                english: "The scanner requires an active ATHLTH+ subscription.",
+                norwegian: "Skanneren krever et aktivt ATHLTH+-abonnement."
+            )
+        case .rateLimited:
+            return ATHLTHLocalization.choose(
+                english: "The AI service is busy or you reached the scan limit. Try later.",
+                norwegian: "AI-tjenesten er opptatt eller skannegrensen er nådd. Prøv senere."
+            )
+        case .temporarilyUnavailable:
+            return ATHLTHLocalization.choose(
+                english: "Image analysis is temporarily unavailable. Try again later.",
+                norwegian: "Bildeanalysen er midlertidig utilgjengelig. Prøv igjen senere."
+            )
+        case .timedOut:
+            return ATHLTHLocalization.choose(
+                english: "The analysis took too long. Try again.",
+                norwegian: "Analysen tok for lang tid. Prøv igjen."
+            )
+        case .connectionFailed:
+            return ATHLTHLocalization.choose(
+                english: "Could not connect to the image service. Check your internet connection.",
+                norwegian: "Kunne ikke koble til bildetjenesten. Sjekk internettforbindelsen."
+            )
+        case .invalidResponse:
+            return ATHLTHLocalization.choose(
+                english: "The image service sent an unreadable answer. Try again.",
+                norwegian: "Bildetjenesten ga et ugyldig svar. Prøv igjen."
             )
         }
+    }
+
+    private struct ServiceFailure: Decodable {
+        let code: String?
+    }
+
+    static func from(_ error: Error) -> ATHLTHEquipmentScannerError {
+        if let known = error as? ATHLTHEquipmentScannerError { return known }
+        if let service = error as? FunctionsError {
+            switch service {
+            case .relayError:
+                return .connectionFailed
+            case let .httpError(status, data):
+                let code = (try? JSONDecoder().decode(ServiceFailure.self, from: data))?.code
+                switch code {
+                case "VISION_PAYLOAD_TOO_LARGE": return .providerPayloadTooLarge
+                case "VISION_TIMEOUT": return .timedOut
+                case "VISION_NETWORK_ERROR": return .connectionFailed
+                case "VISION_RATE_LIMIT", "AI_RATE_LIMIT": return .rateLimited
+                case "PREMIUM_REQUIRED": return .premiumRequired
+                case "VISION_INVALID_RESPONSE": return .invalidResponse
+                default: break
+                }
+                switch status {
+                case 401: return .signInRequired
+                case 403: return .premiumRequired
+                case 413: return .providerPayloadTooLarge
+                case 429: return .rateLimited
+                case 504: return .timedOut
+                default: return .temporarilyUnavailable
+                }
+            }
+        }
+        if let urlError = error as? URLError {
+            return urlError.code == .timedOut ? .timedOut : .connectionFailed
+        }
+        if error is DecodingError { return .invalidResponse }
+        return .temporarilyUnavailable
+    }
+}
+
+/// Generate a bounded JPEG with exactly 1 pixel per renderer point.
+/// The old default UIGraphicsImageRenderer used the iPhone's 3x display
+/// scale, silently increasing a nominally 1000px photo to 3000px and
+/// generating requests that Groq rejects with HTTP 413.
+@MainActor
+enum ATHLTHEquipmentPhotoEncoder {
+    static let maximumJPEGBytes = 240_000
+
+    static func jpegData(for image: UIImage) throws -> Data {
+        let original = image.size
+        guard original.width.isFinite, original.height.isFinite,
+              original.width > 0, original.height > 0 else {
+            throw ATHLTHEquipmentScannerError.invalidPhoto
+        }
+
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+
+        let options: [(side: CGFloat, quality: CGFloat)] = [
+            (800, 0.60), (680, 0.48), (540, 0.40)
+        ]
+        for option in options {
+            let factor = min(1, option.side / max(original.width, original.height))
+            let dimensions = CGSize(
+                width: max(1, (original.width * factor).rounded()),
+                height: max(1, (original.height * factor).rounded())
+            )
+            let renderer = UIGraphicsImageRenderer(size: dimensions, format: format)
+            let rendered = renderer.image { _ in
+                UIColor.white.setFill()
+                UIRectFill(CGRect(origin: .zero, size: dimensions))
+                image.draw(in: CGRect(origin: .zero, size: dimensions))
+            }
+            if let data = rendered.jpegData(compressionQuality: option.quality),
+               !data.isEmpty, data.count <= maximumJPEGBytes {
+                return data
+            }
+        }
+        throw ATHLTHEquipmentScannerError.imageTooLarge
     }
 }
 
@@ -117,41 +246,21 @@ final class ATHLTHEquipmentVisionService {
         image: UIImage,
         exercises: [ExerciseLibraryEntry]
     ) async throws -> ATHLTHEquipmentScanResponse {
-        let original = image.size
-        guard original.width > 0, original.height > 0 else {
-            throw ATHLTHEquipmentScannerError.invalidPhoto
-        }
-
-        // Remove original-resolution photo data and its metadata before any transfer.
-        let factor = min(1, 1000 / max(original.width, original.height))
-        let dimensions = CGSize(
-            width: max(1, (original.width * factor).rounded()),
-            height: max(1, (original.height * factor).rounded())
-        )
-        let renderer = UIGraphicsImageRenderer(size: dimensions)
-        let resized = renderer.image { _ in
-            image.draw(in: CGRect(origin: .zero, size: dimensions))
-        }
-        guard let compressed = resized.jpegData(compressionQuality: 0.67) else {
-            throw ATHLTHEquipmentScannerError.invalidPhoto
-        }
-        let data = compressed.count < 950_000
-            ? compressed
-            : resized.jpegData(compressionQuality: 0.40)
-        guard let data, !data.isEmpty, data.count < 1_000_000 else {
-            throw ATHLTHEquipmentScannerError.imageTooLarge
-        }
-
-        return try await client.functions.invoke(
-            "identify-gym-equipment",
-            options: FunctionInvokeOptions(
-                body: ATHLTHEquipmentScanRequest(
-                    imageBase64: data.base64EncodedString(),
-                    language: ATHLTHLocalization.isNorwegian ? "no" : "en",
-                    candidates: exercises.prefix(100).map(ATHLTHEquipmentScanCandidate.init)
+        let data = try ATHLTHEquipmentPhotoEncoder.jpegData(for: image)
+        do {
+            return try await client.functions.invoke(
+                "identify-gym-equipment",
+                options: FunctionInvokeOptions(
+                    body: ATHLTHEquipmentScanRequest(
+                        imageBase64: data.base64EncodedString(),
+                        language: ATHLTHLocalization.isNorwegian ? "no" : "en",
+                        candidates: exercises.prefix(100).map(ATHLTHEquipmentScanCandidate.init)
+                    )
                 )
             )
-        )
+        } catch {
+            throw ATHLTHEquipmentScannerError.from(error)
+        }
     }
 }
 
