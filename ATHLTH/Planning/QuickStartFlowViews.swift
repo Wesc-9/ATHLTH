@@ -1127,7 +1127,7 @@ private struct ATHLTHRunQuickStartPlanPreview: View {
                 .font(.caption2)
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
 
-                let phases = plannedSession.workoutBlocks
+                let phases = (plannedSession.workoutBlocks ?? [])
                     .filter { $0.kind != .note }
                 ForEach(Array(phases.prefix(5))) { block in
                     HStack(alignment: .top, spacing: 10) {
