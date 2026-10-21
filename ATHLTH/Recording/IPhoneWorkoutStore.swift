@@ -358,6 +358,7 @@ final class IPhoneWorkoutStore:
     private var livePresentationRetryTask: Task<Void, Never>?
     private let activeCheckpointInterval: TimeInterval = 5
     private var treadmillTickTask: Task<Void, Never>?
+    private var structuredTickTask: Task<Void, Never>?
     private let manager = CLLocationManager()
     private let healthStore = HKHealthStore()
 
@@ -724,6 +725,7 @@ final class IPhoneWorkoutStore:
             )
         }
         startTreadmillTicksIfNeeded()
+        startStructuredTicksIfNeeded()
         persistActiveCheckpoint(force: true)
         syncLiveActivity()
 
@@ -1329,6 +1331,7 @@ final class IPhoneWorkoutStore:
             )
         }
         startTreadmillTicksIfNeeded()
+        startStructuredTicksIfNeeded()
         persistActiveCheckpoint(force: true)
         syncLiveActivity()
 
@@ -1464,6 +1467,8 @@ final class IPhoneWorkoutStore:
         syncLiveActivity(workout: workout, state: .completed)
         treadmillTickTask?.cancel()
         treadmillTickTask = nil
+        structuredTickTask?.cancel()
+        structuredTickTask = nil
         history = completedHistory
         active = nil
         recoveredWorkoutLastCheckpoint = nil
@@ -2057,6 +2062,30 @@ final class IPhoneWorkoutStore:
         checkpoint()
     }
 
+    private func startStructuredTicksIfNeeded() {
+        guard active?.structuredRunningWorkout?.steps.isEmpty == false,
+              structuredTickTask == nil else { return }
+        structuredTickTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(200))
+                guard !Task.isCancelled, let self,
+                      let current = self.active,
+                      current.structuredRunningWorkout != nil else { return }
+                guard current.resumedAt != nil,
+                      current.structuredWorkoutComplete != true,
+                      let step = self.currentStructuredStep,
+                      step.measure == .time else { continue }
+                // Use the authoritative active elapsed time, not a second timer.
+                if (current.structuredRunningWorkout?.autoAdvanceTimedSteps ?? true),
+                   let duration = step.durationSeconds,
+                   current.elapsed(at: Date()) -
+                     (current.structuredStepStartElapsedTime ?? 0) >= duration {
+                    self.checkpoint(force: true)
+                }
+            }
+        }
+    }
+
     private func startTreadmillTicksIfNeeded() {
         guard active?.runEnvironment == .treadmill, treadmillTickTask == nil else { return }
         treadmillTickTask = Task { @MainActor [weak self] in
@@ -2087,6 +2116,17 @@ final class IPhoneWorkoutStore:
 
         active = workout
         persistActiveCheckpoint(force: force)
+        syncLiveActivity()
+    }
+
+    func advanceStructuredStepManually() {
+        guard var workout = active,
+              workout.resumedAt != nil,
+              workout.structuredWorkoutComplete != true,
+              currentStructuredStep != nil else { return }
+        evaluateStructuredWorkout(&workout, forceManualAdvance: true)
+        active = workout
+        persistActiveCheckpoint(force: true)
         syncLiveActivity()
     }
 
@@ -3599,7 +3639,9 @@ final class IPhoneWorkoutStore:
     }
 
     private func evaluateStructuredWorkout(
-        _ workout: inout PhoneWorkout
+        _ workout: inout PhoneWorkout,
+        forceManualAdvance: Bool = false,
+        at now: Date = Date()
     ) {
         guard workout.structuredWorkoutComplete != true,
               let plan =
@@ -3616,11 +3658,14 @@ final class IPhoneWorkoutStore:
                 workout.structuredStepIndex ?? 0
             ]
 
-        guard ATHLTHRunningStepEngine
+        if !forceManualAdvance,
+           step.measure == .time,
+           plan.autoAdvanceTimedSteps == false { return }
+        guard forceManualAdvance || ATHLTHRunningStepEngine
             .isCompleted(
                 step: step,
                 elapsedTime:
-                    workout.elapsed(at: Date()),
+                    workout.elapsed(at: now),
                 distanceMeters:
                     workout.distanceMeters,
                 stepStartElapsedTime:
@@ -3637,12 +3682,20 @@ final class IPhoneWorkoutStore:
         }
 
         let finishedIndex = workout.structuredStepIndex ?? 0
-        let endElapsed = workout.elapsed(at: Date())
-        let activeSeconds = endElapsed -
-            (workout.structuredStepStartElapsedTime ?? 0)
+        // Credit scheduled time boundaries exactly, not the timer's
+        // scheduling latency; the following phase receives the overshoot.
+        let endElapsed: TimeInterval = {
+            if !forceManualAdvance, step.measure == .time,
+               let target = step.durationSeconds, target > 0 {
+                return (workout.structuredStepStartElapsedTime ?? 0) + target
+            }
+            return workout.elapsed(at: now)
+        }()
+        let activeSeconds = max(0, endElapsed -
+            (workout.structuredStepStartElapsedTime ?? 0))
         let segmentMeters = workout.distanceMeters -
             (workout.structuredStepStartDistanceMeters ?? 0)
-        if activeSeconds >= 10, segmentMeters >= 0 {
+        if segmentMeters >= 0 {
             var recorded = workout.recordedRunningSteps ?? []
             // Each transition is recorded at most once; an interrupted
             // or retried session must not duplicate a result.
@@ -3690,8 +3743,7 @@ final class IPhoneWorkoutStore:
 
         workout.structuredStepIndex =
             nextIndex
-        workout.structuredStepStartElapsedTime =
-            workout.elapsed(at: Date())
+        workout.structuredStepStartElapsedTime = endElapsed
         workout.structuredStepStartDistanceMeters =
             workout.distanceMeters
 
