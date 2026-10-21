@@ -459,11 +459,6 @@ struct ActiveStrengthWorkoutView: View {
                     strength.checkpoint()
                 }
             }
-            .onChange(of: workoutMirroring.snapshot) { _, latest in
-                if let latest {
-                    strength.ingestWatchCardioSnapshot(latest)
-                }
-            }
             .onChange(
                 of:
                     workoutMirroring
