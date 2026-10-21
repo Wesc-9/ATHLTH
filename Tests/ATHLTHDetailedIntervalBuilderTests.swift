@@ -117,11 +117,11 @@ final class ATHLTHDetailedIntervalBuilderTests: XCTestCase {
         let steps = PlannedWorkoutWatchBuilder.runningTransfer(
             from: plan, routeAlerts: .standard
         ).steps
-        XCTAssertEqual(steps.first?.targetPaceSecondsPerKilometer, 420)
+        XCTAssertEqual(steps.first?.targetPaceMinSecondsPerKilometer, 420)
         XCTAssertEqual(steps.first?.targetHeartRateZone, 2)
-        XCTAssertEqual(steps[3].targetPaceSecondsPerKilometer, 265)
+        XCTAssertEqual(steps[3].targetPaceMinSecondsPerKilometer, 265)
         XCTAssertEqual(steps[3].targetHeartRateZone, 5)
-        XCTAssertEqual(steps.last?.targetPaceSecondsPerKilometer, 480)
+        XCTAssertEqual(steps.last?.targetPaceMinSecondsPerKilometer, 480)
         XCTAssertEqual(steps.last?.targetHeartRateZone, 1)
     }
 
