@@ -91,7 +91,9 @@ struct ATHLTHTrainPlanPremiumView: View {
     }
 
     var body: some View {
-        editingSheets
+        // Erase the deeply nested planner presentation type before SwiftUI
+        // decodes it when switching between Train, Community and Inbox.
+        AnyView(editingSheets)
     }
 
     private func beginMovingWorkout(_ workout: PlannedSession, day: TrainingPlanDay, plan: TrainingPlan) {
@@ -369,7 +371,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     }
 
     private var programSheets: some View {
-        planContent
+        AnyView(planContent)
         .alert(
             tr("Delete this draft?", "Slette dette utkastet?"),
             isPresented: $showingDeletePlanDraftConfirmation
@@ -428,7 +430,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     }
 
     private var insightsSheets: some View {
-        programSheets
+        AnyView(programSheets)
         .sheet(isPresented: $showingGoals) {
             if let plan {
                 ATHLTHTrainGoalHubView(planID: plan.id)
@@ -447,7 +449,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     }
 
     private var editingSheets: some View {
-        insightsSheets
+        AnyView(insightsSheets)
         .sheet(isPresented: $showingEditor) {
             if let plan {
                 ATHLTHTrainWeekBuilderView(
