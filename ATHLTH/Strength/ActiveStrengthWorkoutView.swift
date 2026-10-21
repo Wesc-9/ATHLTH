@@ -1831,7 +1831,44 @@ struct ActiveStrengthWorkoutView: View {
                             in: RoundedRectangle(cornerRadius: 17))
             }
 
-            if workoutComplete &&
+            if workoutComplete {
+                focusedBetweenExerciseRestCard(workout)
+            }
+
+            if strength.isFreeTrainingBetweenExercises {
+                ATHLTHPlanSurface(density: .compact) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Free strength training",
+                            norwegian: "Fri styrketrening"
+                        ),
+                        systemImage: "figure.strengthtraining.traditional"
+                    )
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Text(ATHLTHLocalization.choose(
+                        english: "The workout stays active. Add an exercise whenever you're ready.",
+                        norwegian: "Økten fortsetter uten valgt øvelse. Legg til en øvelse når du er klar."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    Button {
+                        showingExerciseLibrary = true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Add exercise",
+                                norwegian: "Legg til øvelse"
+                            ),
+                            systemImage: "plus"
+                        )
+                        .frame(maxWidth: .infinity, minHeight: 46)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHPlanDesign.accentInk)
+                }
+                WorkoutPlaceCheckInSection(workoutID: workout.id)
+            } else if workoutComplete &&
                 showingWorkoutReview {
                 focusedWorkoutCompletionHero(
                     workout
@@ -1856,6 +1893,23 @@ struct ActiveStrengthWorkoutView: View {
                 WorkoutPlaceCheckInSection(
                     workoutID: workout.id
                 )
+
+                Button {
+                    _ = strength.continueFreeTrainingBetweenExercises()
+                    showingWorkoutReview = false
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Continue strength training without an exercise",
+                            norwegian: "Fortsett styrketrening uten bestemt øvelse"
+                        ),
+                        systemImage: "figure.strengthtraining.traditional"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                }
+                .buttonStyle(.bordered)
+                .tint(ATHLTHPlanDesign.accentInk)
 
                 Button {
                     showingExerciseLibrary =
@@ -1994,6 +2048,40 @@ struct ActiveStrengthWorkoutView: View {
                     )
                 }
             }
+        }
+    }
+
+    /// Count the interval after the last completed exercise as rest, not as
+    /// an extension of its training time. Date anchors survive app suspension.
+    private func focusedBetweenExerciseRestCard(
+        _ workout: StrengthWorkoutLog
+    ) -> some View {
+        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+            let ended = workout.exercises.compactMap(\.completedAt).max()
+            let restStart = strength.restStartedAt ?? ended ?? timeline.date
+            let seconds = max(0, timeline.date.timeIntervalSince(restStart))
+            HStack(spacing: 10) {
+                Image(systemName: "pause.circle")
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .font(.title2)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Rest after planned exercises",
+                        norwegian: "Pause etter planlagte øvelser"
+                    ))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    Text(seconds.clockDuration)
+                        .font(.title2.weight(.bold).monospacedDigit())
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                }
+                Spacer()
+            }
+            .padding(14)
+            .background(
+                ATHLTHPlanDesign.warmSurface,
+                in: RoundedRectangle(cornerRadius: 17)
+            )
         }
     }
 
