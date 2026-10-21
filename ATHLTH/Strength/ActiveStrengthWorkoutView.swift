@@ -5435,6 +5435,13 @@ struct ActiveStrengthWorkoutView: View {
             let finished = countdown?.isFinished(at: context.date) == true
             let elapsed = countdown?.elapsedSeconds(at: context.date) ?? 0
             let overtime = countdown?.overtimeSeconds(at: context.date) ?? 0
+            // Once the target is reached, show the sum of this exercise's
+            // earlier completed timed sets and the current elapsed time.
+            let earlierTimedSeconds = strength.currentExercise?.sets
+                .filter { $0.isCompleted && $0.resolvedTargetKind == .time }
+                .compactMap(\.resolvedCompletedDurationSeconds)
+                .reduce(0, +) ?? 0
+            let exerciseElapsed = earlierTimedSeconds + elapsed
             let hasStarted = countdown != nil
 
             VStack(alignment: .leading, spacing: 13) {
@@ -5486,7 +5493,7 @@ struct ActiveStrengthWorkoutView: View {
 
                     Spacer(minLength: 0)
 
-                    Text(TimeInterval(finished ? elapsed : remaining).clockDuration)
+                    Text(TimeInterval(finished ? exerciseElapsed : remaining).clockDuration)
                         .font(.system(size: 37, weight: .bold, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(ATHLTHTheme.accentDeep)
@@ -5497,8 +5504,8 @@ struct ActiveStrengthWorkoutView: View {
 
                 if finished {
                     Text(ATHLTHLocalization.choose(
-                        english: "+\(TimeInterval(overtime).clockDuration) beyond planned time",
-                        norwegian: "+\(TimeInterval(overtime).clockDuration) over planlagt tid"
+                        english: "+\(TimeInterval(overtime).clockDuration) beyond this set's planned time",
+                        norwegian: "+\(TimeInterval(overtime).clockDuration) over planlagt tid for settet"
                     ))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
