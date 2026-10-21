@@ -126,4 +126,55 @@ final class StrengthWarmUpExerciseTests: XCTestCase {
         XCTAssertFalse(planned.isWarmUpExercise)
     }
 
+    @MainActor
+    func testSkippingRemainingSetsKeepsCompletedWorkAndRecordsOmissions() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil)
+        let exercise = Exercise(
+            id: UUID(), origin: .publicCatalog, ownerID: nil,
+            name: "Bench Press", instructions: ["Control each repetition."],
+            primaryMuscles: ["Chest"], secondaryMuscles: [],
+            equipment: ["Barbell"], imageURL: nil
+        )
+        store.appendExercise(exercise, sets: 3, reps: 8, restSeconds: 0)
+        store.completeCurrentDraftSet()
+        store.completeCurrentDraftSet()
+        XCTAssertEqual(store.activeWorkout?.exercises.first?.sets.count, 3)
+
+        XCTAssertTrue(store.omitRemainingSetsOfCurrentExercise())
+        let stored = try XCTUnwrap(store.activeWorkout?.exercises.first)
+        XCTAssertEqual(stored.sets.count, 2)
+        XCTAssertEqual(stored.sets.filter(\.isCompleted).count, 2)
+        XCTAssertEqual(stored.skippedPlannedSetCount, 1)
+        XCTAssertTrue(store.currentExerciseAllSetsCompleted)
+        XCTAssertFalse(store.omitRemainingSetsOfCurrentExercise())
+    }
+
+    @MainActor
+    func testManualTreadmillSpeedInclineAndEstimatedDistancePersistOnSet() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil)
+        let treadmill = Exercise(
+            id: UUID(), origin: .publicCatalog, ownerID: nil,
+            name: "Treadmill Running", instructions: ["Comfortable pace."],
+            primaryMuscles: ["Quadriceps"], secondaryMuscles: [],
+            equipment: ["Treadmill"], imageURL: nil
+        )
+        store.appendExercise(
+            treadmill, sets: 1, reps: nil, targetKind: .time,
+            targetDurationSeconds: 600, restSeconds: 0, warmUpSets: 1
+        )
+        store.setDraft(
+            treadmillSpeedKilometersPerHour: 9.0, treadmillInclinePercent: 2.5
+        )
+        store.completeCurrentDraftSet()
+        let set = try XCTUnwrap(store.activeWorkout?.exercises.first?.sets.first)
+        XCTAssertEqual(set.completedDurationSeconds, 600)
+        XCTAssertEqual(set.completedTreadmillSpeedKilometersPerHour, 9.0)
+        XCTAssertEqual(set.completedTreadmillInclinePercent, 2.5)
+        XCTAssertEqual(try XCTUnwrap(set.completedDistanceMeters), 1_500, accuracy: 0.01)
+        XCTAssertNil(set.completedWeightKilograms)
+        XCTAssertTrue(set.isWarmUp == true)
+    }
+
 }
