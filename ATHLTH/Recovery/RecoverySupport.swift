@@ -1988,6 +1988,7 @@ struct RecoveryDailyCheckInCard: View {
 }
 
 struct MuscleRecoveryCard: View {
+    @ObservedObject var checkInStore: RecoverySorenessStore
     let statuses: [MuscleRecoveryStatus]
     var unmappedExerciseNames: [String] = []
     var trendDays: [RecoveryTrendDay] = []
@@ -2055,52 +2056,61 @@ struct MuscleRecoveryCard: View {
                         missingMappingWarning
                     }
 
-                    HStack {
-                        Text(
-                            recoveryText(
-                                "Estimated from recorded training and soreness data.",
-                                "Estimert fra registrert trening og ømhetsdata."
-                            )
-                        )
-                        .font(
-                            .system(
-                                size: 8.5,
-                                weight: .regular
-                            )
-                        )
-                        .foregroundStyle(
-                            .tertiary
-                        )
-
-                        Spacer()
-
-                        Button {
-                            onLogSoreness()
-                        } label: {
-                            Label(
-                                recoveryText(
-                                    "Check in",
-                                    "Sjekk inn"
-                                ),
-                                systemImage:
-                                    "plus.circle.fill"
-                            )
-                            .font(
-                                .system(
-                                    size: 9,
-                                    weight:
-                                        .semibold
-                                )
-                            )
-                            .foregroundStyle(
-                                forest
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
+                    Text(recoveryText(
+                        "Estimated from recorded training and soreness data.",
+                        "Estimert fra registrert trening og ømhetsdata."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 }
+
+                integratedCheckInRow
             }
         }
+    }
+
+    /// The single entry point to subjective wellness in Insights.
+    /// Watch readiness and muscle estimates remain distinct measurements.
+    private var integratedCheckInRow: some View {
+        Button(action: onLogSoreness) {
+            HStack(alignment: .center, spacing: 11) {
+                Image(systemName: checkInStore.hasTodayCheckIn
+                    ? "checkmark.circle.fill" : "clipboard.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(width: 43, height: 43)
+                    .background(Color.white.opacity(0.75),
+                                in: RoundedRectangle(cornerRadius: 13))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(checkInStore.hasTodayCheckIn
+                        ? recoveryText("Today's check-in saved", "Dagens innsjekk registrert")
+                        : recoveryText("How are you feeling?", "Hvordan føler du deg?"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Text(checkInStore.hasTodayCheckIn
+                        ? recoveryText("Add more answers if you like.", "Du kan legge til flere svar.")
+                        : recoveryText(
+                            "Energy, stress and soreness · all optional",
+                            "Energi, stress og ømhet · alle felt er valgfrie"))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                Spacer(minLength: 3)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            }
+            .padding(12)
+            .background(ATHLTHPlanDesign.selectedSurface,
+                        in: RoundedRectangle(cornerRadius: 17))
+            .overlay {
+                RoundedRectangle(cornerRadius: 17)
+                    .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.8)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(recoveryText(
+            "Open today's optional check-in", "Åpne dagens valgfrie innsjekk"))
     }
 
     private var header:
