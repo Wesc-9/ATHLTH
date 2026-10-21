@@ -694,6 +694,12 @@ struct WorkoutHistoryDetailView: View {
                 Text(workout.title)
                     .font(.largeTitle.bold())
 
+                if let venue = workout.plannedTrainingPlaceName {
+                    Label(venue, systemImage: "mappin.and.ellipse")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.88))
+                }
+
                 Text(workout.startDate.formatted(date: .complete, time: .shortened))
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.72))
