@@ -19,8 +19,9 @@ from PIL import Image, ImageEnhance, ImageOps, ImageStat, UnidentifiedImageError
 
 SOURCE = (
     "https://c.pxhere.com/photos/33/7b/"
-    "athletic_field_stadium_playground_sunset-1038422.jpg!d"
+    "athletic_field_stadium_playground_sunset-1038422.jpg"
 )
+SOURCES = [SOURCE, SOURCE + "!d"]
 DEST = (
     Path(__file__).resolve().parent.parent /
     "ATHLTH/Assets.xcassets/ConversationStadiumHero.imageset/stadium.jpg"
@@ -30,24 +31,29 @@ TARGET_HEIGHT = 1620
 
 
 def main() -> None:
-    request = Request(SOURCE, headers={
-        "User-Agent": "ATHLTH-iOS-Asset-Bundler/1.0",
-        "Accept": "image/jpeg,image/*",
-    })
-    with urlopen(request, timeout=40) as response:
-        data = response.read(18 * 1024 * 1024 + 1)
-    if len(data) > 18 * 1024 * 1024:
-        raise ValueError("Stadium source is unexpectedly large")
-    if not data.startswith(b"\xff\xd8\xff"):
-        raise ValueError("Stadium source did not return a JPEG")
-
-    try:
-        with Image.open(BytesIO(data)) as source:
-            img = ImageOps.exif_transpose(source).convert("RGB")
-    except (UnidentifiedImageError, OSError) as exc:
-        raise ValueError("Stadium source is not a decodable photograph") from exc
-    if img.width < 2000 or img.height < 1000:
-        raise ValueError(f"Insufficient source resolution: {img.size}")
+    img = None
+    for url in SOURCES:
+        try:
+            request = Request(url, headers={
+                "User-Agent": "ATHLTH-iOS-Asset-Bundler/1.0",
+                "Accept": "image/jpeg,image/*",
+            })
+            with urlopen(request, timeout=40) as response:
+                data = response.read(18 * 1024 * 1024 + 1)
+            if len(data) > 18 * 1024 * 1024:
+                raise ValueError("Stadium source is unexpectedly large")
+            if not data.startswith(b"\xff\xd8\xff"):
+                raise ValueError("Stadium source did not return a JPEG")
+            with Image.open(BytesIO(data)) as source:
+                candidate = ImageOps.exif_transpose(source).convert("RGB")
+            print(f"Photo candidate: {candidate.size} from {url}", flush=True)
+            if candidate.width >= 2000 and candidate.height >= 1000:
+                img = candidate
+                break
+        except (OSError, ValueError, UnidentifiedImageError) as exc:
+            print(f"Source unavailable: {url}: {exc}", flush=True)
+    if img is None:
+        raise ValueError("None of the photo URLs provides full-resolution media")
 
     # A wide scenic stadium header matches ATHLTH's original layout.
     # Retain the real pixels; do not artificially upscale to claim more detail.
