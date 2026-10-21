@@ -3539,6 +3539,27 @@ struct ActiveStrengthWorkoutView: View {
 
                 focusedHeroDivider
 
+                if isCurrentStrengthTreadmill {
+                    focusedHeroMetric(
+                        value: String(
+                            format: "%.1f",
+                            strength.draftTreadmillSpeedKilometersPerHour
+                        ),
+                        label: "KM/T",
+                        icon: "speedometer"
+                    )
+                    focusedHeroDivider
+                    focusedHeroMetric(
+                        value: String(
+                            format: "%.1f%%",
+                            strength.draftTreadmillInclinePercent
+                        ),
+                        label: ATHLTHLocalization.choose(
+                            english: "INCLINE", norwegian: "STIGN."
+                        ),
+                        icon: "mountain.2"
+                    )
+                } else {
                 focusedHeroMetric(
                     value:
                         currentStrengthLoadKind ==
@@ -3578,11 +3599,10 @@ struct ActiveStrengthWorkoutView: View {
                         ),
                     icon: "timer"
                 )
+                }
             }
             .padding(.vertical, 12)
-            .background(
-                Color.white.opacity(0.90)
-            )
+            .background(ATHLTHPlanDesign.surface)
         }
         .clipShape(
             RoundedRectangle(
@@ -3596,8 +3616,8 @@ struct ActiveStrengthWorkoutView: View {
                 style: .continuous
             )
             .stroke(
-                ATHLTHTheme.border,
-                lineWidth: 1
+                ATHLTHPlanDesign.warmDivider,
+                lineWidth: 0.8
             )
         }
         .shadow(
