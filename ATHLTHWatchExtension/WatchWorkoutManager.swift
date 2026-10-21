@@ -1505,6 +1505,23 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     : " på \(formatted) kilo"
         }
 
+        // These values are athlete-reported settings, not measured Watch
+        // speed or a second running workout. Tell the user the source.
+        if let speed = snapshot.manualTreadmillSpeedKilometersPerHour,
+           speed.isFinite, speed > 0 {
+            let speedText = String(format: "%.1f", speed)
+            english += english.isEmpty ? "" : ". "
+            norwegian += norwegian.isEmpty ? "" : ". "
+            english += "Manually set speed \(speedText) kilometers per hour"
+            norwegian += "Manuelt innstilt fart \(speedText) kilometer i timen"
+            if let incline = snapshot.manualTreadmillInclinePercent,
+               incline.isFinite, (0...20).contains(incline) {
+                let inclineText = String(format: "%.1f", incline)
+                english += ", incline \(inclineText) percent"
+                norwegian += ", stigning \(inclineText) prosent"
+            }
+        }
+
         if !english.isEmpty {
             english += "."
             norwegian += "."
