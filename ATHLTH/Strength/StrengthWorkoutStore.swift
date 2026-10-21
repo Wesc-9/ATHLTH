@@ -1276,6 +1276,8 @@ final class StrengthWorkoutStore: ObservableObject {
             draftReps = 8
             draftDurationSeconds = 60
             draftWeightKilograms = 20
+            draftTreadmillSpeedKilometersPerHour = 0
+            draftTreadmillInclinePercent = 0
             draftResistanceLevel = 5
             draftRestSeconds = 90
             draftRPE = 8
@@ -1296,11 +1298,22 @@ final class StrengthWorkoutStore: ObservableObject {
             set.completedWeightKilograms ??
             set.plannedWeightKilograms ??
             max(draftWeightKilograms, 20)
-        if let speed = set.completedTreadmillSpeedKilometersPerHour {
-            draftTreadmillSpeedKilometersPerHour = speed
-        }
-        if let incline = set.completedTreadmillInclinePercent {
-            draftTreadmillInclinePercent = incline
+        // Keep treadmill values within the same exercise, but never inherit
+        // them from an unrelated strength exercise or a different treadmill
+        // entry. Completed set history provides the last confirmed manual
+        // setting when the athlete returns to the exercise.
+        if let exercise = currentExercise,
+           StrengthTreadmillWarmUpDefaults.isTreadmill(exercise.exercise.name) {
+            let priorSets = exercise.sets.prefix(currentSetIndex).reversed()
+            draftTreadmillSpeedKilometersPerHour =
+                set.completedTreadmillSpeedKilometersPerHour ??
+                priorSets.compactMap(\.completedTreadmillSpeedKilometersPerHour).first ?? 0
+            draftTreadmillInclinePercent =
+                set.completedTreadmillInclinePercent ??
+                priorSets.compactMap(\.completedTreadmillInclinePercent).first ?? 0
+        } else {
+            draftTreadmillSpeedKilometersPerHour = 0
+            draftTreadmillInclinePercent = 0
         }
         draftResistanceLevel =
             min(
