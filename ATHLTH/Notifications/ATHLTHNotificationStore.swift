@@ -260,6 +260,54 @@ final class ATHLTHNotificationStore: ObservableObject {
         }
     }
 
+    /// One transient in-app reminder per local day. This intentionally does
+    /// not schedule an iOS push/alert or repeatedly resurrect a dismissed
+    /// notification. Only the user can enable it in ATHLTH Settings.
+    func reconcileDailyCheckIn(
+        enabled: Bool,
+        accountID: UUID,
+        completed: Bool,
+        now: Date = Date(),
+        calendar: Calendar = .current,
+        defaults: UserDefaults = .standard
+    ) {
+        let prefix = "insights.daily-check-in."
+        let day = calendar.dateComponents([.year, .month, .day], from: now)
+        let dateKey = String(format: "%04d-%02d-%02d",
+            day.year ?? 0, day.month ?? 0, day.day ?? 0)
+        let eventKey = prefix + accountID.uuidString + "." + dateKey
+        // All old reminders are stale. Switching accounts or opting out also
+        // clears their unread badge, but leaves other notification types alone.
+        let previousCount = items.count
+        items.removeAll {
+            $0.kind == .dailyCheckIn &&
+                (!enabled || completed || $0.eventKey != eventKey)
+        }
+        if items.count != previousCount { persist() }
+        guard enabled, !completed else { return }
+        // Don't present a new-day reminder at midnight.
+        guard (calendar.component(.hour, from: now)) >= 8 else { return }
+
+        let issuedKey = "insights.daily-check-in.last-issued." + accountID.uuidString
+        guard defaults.string(forKey: issuedKey) != dateKey,
+              !items.contains(where: { $0.eventKey == eventKey }) else {
+            return
+        }
+
+        add(ATHLTHNotificationDraft(
+            eventKey: eventKey,
+            kind: .dailyCheckIn,
+            title: ATHLTHLocalization.choose(
+                english: "How are you feeling today?",
+                norwegian: "Hvordan føler du deg i dag?"),
+            message: ATHLTHLocalization.choose(
+                english: "A short, optional check-in helps personalize today's training advice.",
+                norwegian: "En kort, valgfri innsjekk gjør dagens treningsråd mer personlige."),
+            createdAt: now
+        ), deliverSystemAlert: false)
+        defaults.set(dateKey, forKey: issuedKey)
+    }
+
     func add(contentsOf drafts: [ATHLTHNotificationDraft]) {
         for draft in drafts {
             add(draft)
