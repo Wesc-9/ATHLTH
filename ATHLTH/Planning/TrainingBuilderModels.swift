@@ -636,6 +636,21 @@ enum StrengthTimedBodyweightDefaults {
     }
 }
 
+/// Cardio movements inside Strength use one Watch workout and preserve
+/// per-set cardio metrics. Do not start a separate HealthKit running workout.
+enum StrengthCardioExercisePolicy {
+    static func isCardio(_ name: String) -> Bool {
+        let value = name.folding(
+            options: [.diacriticInsensitive, .caseInsensitive],
+            locale: Locale(identifier: "nb_NO")
+        ).lowercased()
+        return StrengthTreadmillWarmUpDefaults.isTreadmill(value) ||
+            value.contains("rowing") || value.contains("rower") ||
+            value.contains("rowerg") || value.contains("romaskin") ||
+            value.contains("roing")
+    }
+}
+
 // Keep treadmill warm-ups consistent whether an exercise is added before
 // starting Strength or during an active Strength workout. A new choice must
 // always show its editable setup; these are only the initial values.
