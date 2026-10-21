@@ -1,3 +1,5 @@
+import Supabase
+import UIKit
 import XCTest
 @testable import ATHLTH
 
@@ -66,6 +68,45 @@ final class EquipmentScannerTests: XCTestCase {
         XCTAssertFalse(
             analysis.matchedExercises(in: candidates)
                 .contains(where: { $0.id == candidates[1].id })
+        )
+    }
+
+    @MainActor
+    func testScannerJPEGHasPredictablePixelDimensionsAndRequestSize() throws {
+        // On a 3x iPhone, an 800pt renderer must NOT become 2400 pixels.
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let source = UIGraphicsImageRenderer(
+            size: CGSize(width: 1600, height: 1200), format: format
+        ).image { context in
+            UIColor.systemGray4.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 1600, height: 1200))
+            UIColor.systemBlue.setFill()
+            context.fill(CGRect(x: 150, y: 250, width: 600, height: 180))
+            UIColor.black.setFill()
+            context.fill(CGRect(x: 500, y: 200, width: 65, height: 900))
+        }
+
+        let data = try ATHLTHEquipmentPhotoEncoder.jpegData(for: source)
+        XCTAssertLessThanOrEqual(
+            data.count, ATHLTHEquipmentPhotoEncoder.maximumJPEGBytes
+        )
+        let pixelImage = try XCTUnwrap(UIImage(data: data)?.cgImage)
+        XCTAssertLessThanOrEqual(max(pixelImage.width, pixelImage.height), 800)
+        XCTAssertGreaterThan(min(pixelImage.width, pixelImage.height), 0)
+        // Includes base64 overhead, leaving room for exercise candidates.
+        XCTAssertLessThan(data.base64EncodedString().count, 330_000)
+    }
+
+    @MainActor
+    func testScanProvider413ReturnsSpecificFailureNotGenericPhotoError() {
+        let payload = Data(
+            #"{"error":"Payload too large","code":"VISION_PAYLOAD_TOO_LARGE"}"#.utf8
+        )
+        let error = FunctionsError.httpError(code: 413, data: payload)
+        XCTAssertEqual(
+            ATHLTHEquipmentScannerError.from(error),
+            .providerPayloadTooLarge
         )
     }
 
