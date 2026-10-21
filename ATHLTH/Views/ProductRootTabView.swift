@@ -6586,6 +6586,57 @@ struct ATHLTHTrainView: View {
                     isHealthCompleted: healthCompleted
                 )
             },
+            onAcceptAlternative: { planned, suggestion in
+                guard !hasOngoingTrainWorkout,
+                      let plan = session.activePlan,
+                      let current = plan.weeks.flatMap(\.days)
+                        .flatMap(\.sessions)
+                        .first(where: { $0.id == planned.id }),
+                      !current.isExplicitRestDay,
+                      current.dailyAlternativeOriginal == nil,
+                      !session.isPlanSessionSkipped(
+                        planID: plan.id, sessionID: current.id),
+                      !session.isPlanSessionCompleted(
+                        planID: plan.id, sessionID: current.id,
+                        healthWorkouts: health.workouts,
+                        strengthHistory: strengthWorkout.workoutHistory
+                      )
+                else { return }
+                let checkIn = RecoverySorenessStore()
+                let freshSignals = ATHLTHDailyWorkoutAlternativeAdvisor.Signals(
+                    energy: checkIn.todayEnergy,
+                    stress: checkIn.todayStress,
+                    overallSoreness: checkIn.todayOverallSoreness,
+                    muscleRatings: checkIn.todayRatings,
+                    readiness: readiness
+                )
+                guard ATHLTHDailyWorkoutAlternativeAdvisor.suggestions(
+                    for: current, signals: freshSignals
+                ).contains(where: {
+                    $0.choice == suggestion.choice &&
+                    $0.distanceKilometers == suggestion.distanceKilometers
+                }) else { return }
+                let alternative = ATHLTHDailyWorkoutAlternativeAdvisor.replacing(
+                    current, with: suggestion)
+                session.updateSession(alternative, inPlan: plan.id)
+            },
+            onUndoAlternative: { planned in
+                guard !hasOngoingTrainWorkout,
+                      let plan = session.activePlan,
+                      let current = plan.weeks.flatMap(\.days)
+                        .flatMap(\.sessions)
+                        .first(where: { $0.id == planned.id }),
+                      let original = current.dailyAlternativeOriginal,
+                      !session.isPlanSessionSkipped(
+                        planID: plan.id, sessionID: current.id),
+                      !session.isPlanSessionCompleted(
+                        planID: plan.id, sessionID: current.id,
+                        healthWorkouts: health.workouts,
+                        strengthHistory: strengthWorkout.workoutHistory
+                      )
+                else { return }
+                session.updateSession(original.restoring(current), inPlan: plan.id)
+            },
             onQuickTrain: { kind in handleQuickStart(kind) },
             onGhostRace: { showingGhostHub = true }
         )
