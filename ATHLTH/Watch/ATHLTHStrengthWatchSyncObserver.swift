@@ -8,6 +8,7 @@ struct ATHLTHStrengthWatchSyncObserver: View {
     @EnvironmentObject private var appSession: AppSessionStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
 
     @State private var pendingDraftSnapshotTask: Task<Void, Never>?
     @State private var lastStrengthMutationAtByWorkout:
@@ -20,6 +21,14 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             .task {
                 drainPendingCommands()
                 sendSnapshotNow()
+                if let latest = workoutMirroring.snapshot {
+                    strengthWorkout.ingestWatchCardioSnapshot(latest)
+                }
+            }
+            .onChange(of: workoutMirroring.snapshot) { _, latest in
+                if let latest {
+                    strengthWorkout.ingestWatchCardioSnapshot(latest)
+                }
             }
             .onDisappear {
                 pendingDraftSnapshotTask?.cancel()
