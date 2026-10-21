@@ -55,6 +55,8 @@ final class StrengthWorkoutStore: ObservableObject {
     @Published private(set) var draftReps = 8 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var draftDurationSeconds = 60 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var draftWeightKilograms = 20.0 { didSet { scheduleCheckpointPersist() } }
+    @Published private(set) var draftTreadmillSpeedKilometersPerHour = 0.0 { didSet { scheduleCheckpointPersist() } }
+    @Published private(set) var draftTreadmillInclinePercent = 0.0 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var draftResistanceLevel = 5 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var draftRestSeconds = 90 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var draftRPE = 8.0 { didSet { scheduleCheckpointPersist() } }
@@ -110,6 +112,8 @@ final class StrengthWorkoutStore: ObservableObject {
         var reps: Int
         var durationSeconds: Int? = nil
         var weight: Double
+        var treadmillSpeedKilometersPerHour: Double? = nil
+        var treadmillInclinePercent: Double? = nil
         var resistanceLevel: Int? = nil
         var rest: Int
         var rpe: Double
@@ -178,6 +182,8 @@ final class StrengthWorkoutStore: ObservableObject {
         draftDurationSeconds =
             checkpoint?.durationSeconds ?? 60
         draftWeightKilograms = checkpoint?.weight ?? 20
+        draftTreadmillSpeedKilometersPerHour = checkpoint?.treadmillSpeedKilometersPerHour ?? 0
+        draftTreadmillInclinePercent = checkpoint?.treadmillInclinePercent ?? 0
         draftResistanceLevel =
             min(
                 max(
@@ -233,6 +239,8 @@ final class StrengthWorkoutStore: ObservableObject {
                 reps: draftReps,
                 durationSeconds: draftDurationSeconds,
                 weight: draftWeightKilograms,
+                treadmillSpeedKilometersPerHour: draftTreadmillSpeedKilometersPerHour,
+                treadmillInclinePercent: draftTreadmillInclinePercent,
                 resistanceLevel: draftResistanceLevel,
                 rest: draftRestSeconds,
                 rpe: draftRPE,
@@ -1192,6 +1200,8 @@ final class StrengthWorkoutStore: ObservableObject {
         rpe: Double? = nil,
         rir: Double? = nil,
         warmUp: Bool? = nil,
+        treadmillSpeedKilometersPerHour: Double? = nil,
+        treadmillInclinePercent: Double? = nil,
         origin:
             StrengthDraftMutationOrigin =
                 .iPhone
@@ -1211,6 +1221,14 @@ final class StrengthWorkoutStore: ObservableObject {
 
         if let weightKilograms {
             draftWeightKilograms = max(weightKilograms, 0)
+        }
+        if let treadmillSpeedKilometersPerHour {
+            draftTreadmillSpeedKilometersPerHour =
+                min(max(treadmillSpeedKilometersPerHour, 0), 30)
+        }
+        if let treadmillInclinePercent {
+            draftTreadmillInclinePercent =
+                min(max(treadmillInclinePercent, 0), 20)
         }
 
         if let resistanceLevel {
@@ -1278,6 +1296,12 @@ final class StrengthWorkoutStore: ObservableObject {
             set.completedWeightKilograms ??
             set.plannedWeightKilograms ??
             max(draftWeightKilograms, 20)
+        if let speed = set.completedTreadmillSpeedKilometersPerHour {
+            draftTreadmillSpeedKilometersPerHour = speed
+        }
+        if let incline = set.completedTreadmillInclinePercent {
+            draftTreadmillInclinePercent = incline
+        }
         draftResistanceLevel =
             min(
                 max(
@@ -2166,6 +2190,27 @@ final class StrengthWorkoutStore: ObservableObject {
         if let restSeconds {
             set.restSeconds = max(restSeconds, 0)
         }
+        if StrengthTreadmillWarmUpDefaults.isTreadmill(
+            workout.exercises[currentExerciseIndex].exercise.name
+        ) {
+            set.completedTreadmillSpeedKilometersPerHour =
+                draftTreadmillSpeedKilometersPerHour > 0
+                    ? draftTreadmillSpeedKilometersPerHour : nil
+            set.completedTreadmillInclinePercent = draftTreadmillInclinePercent
+            if let elapsed = set.completedDurationSeconds {
+                set.completedDistanceMeters =
+                    ATHLTHRunningPace.manuallyEstimatedTreadmillDistance(
+                        speedKilometersPerHour: draftTreadmillSpeedKilometersPerHour,
+                        durationSeconds: Double(elapsed)
+                    )
+                set.effortSegments = [
+                    StrengthSetEffortSegment(
+                        durationSeconds: elapsed,
+                        distanceMeters: set.completedDistanceMeters
+                    )
+                ]
+            }
+        }
         set.completedAt = Date()
 
         workout.exercises[currentExerciseIndex].sets[currentSetIndex] = set
@@ -2296,6 +2341,9 @@ final class StrengthWorkoutStore: ObservableObject {
         let loadKind =
             currentSet?.resolvedLoadKind ??
             .weightKilograms
+        let treadmill = currentExercise.map {
+            StrengthTreadmillWarmUpDefaults.isTreadmill($0.exercise.name)
+        } ?? false
 
         completeCurrentSet(
             reps:
@@ -2307,7 +2355,7 @@ final class StrengthWorkoutStore: ObservableObject {
                     ? (currentTimedSetCountdown?.elapsedSeconds() ?? draftDurationSeconds)
                     : nil,
             weightKilograms:
-                loadKind == .weightKilograms
+                loadKind == .weightKilograms && !treadmill
                     ? draftWeightKilograms
                     : nil,
             resistanceLevel:
@@ -3514,6 +3562,8 @@ final class StrengthWorkoutStore: ObservableObject {
         draftReps = 8
         draftDurationSeconds = 60
         draftWeightKilograms = 20
+        draftTreadmillSpeedKilometersPerHour = 0
+        draftTreadmillInclinePercent = 0
         draftResistanceLevel = 5
         draftRestSeconds = 90
         draftRPE = 8
@@ -3551,6 +3601,8 @@ final class StrengthWorkoutStore: ObservableObject {
         draftReps = 8
         draftDurationSeconds = 60
         draftWeightKilograms = 20
+        draftTreadmillSpeedKilometersPerHour = 0
+        draftTreadmillInclinePercent = 0
         draftResistanceLevel = 5
         draftRestSeconds = 90
         draftRPE = 8
