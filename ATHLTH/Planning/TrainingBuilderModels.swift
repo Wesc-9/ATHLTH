@@ -644,10 +644,19 @@ enum StrengthCardioExercisePolicy {
             options: [.diacriticInsensitive, .caseInsensitive],
             locale: Locale(identifier: "nb_NO")
         ).lowercased()
+        // A rowing *machine* is cardio, but resistance rows such as
+        // "Dumbbell Rowing" and "Seated Cable Row" remain strength.
+        // Broad substring "rowing" previously misclassified them and
+        // excluded real lifting volume / personal records.
         return StrengthTreadmillWarmUpDefaults.isTreadmill(value) ||
-            value.contains("rowing") || value.contains("rower") ||
+            value == "rowing" || value == "roing" ||
+            value.contains("rowing machine") || value.contains("row machine") ||
+            value.contains("rowing erg") || value.contains("row erg") ||
             value.contains("rowerg") || value.contains("romaskin") ||
-            value.contains("roing")
+            value.contains("roapparat") ||
+            value.contains("rowing cardio") ||
+            value == "rower" || value.contains("concept2") ||
+            value.contains("concept 2")
     }
 }
 
