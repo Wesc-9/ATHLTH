@@ -43,16 +43,69 @@ final class ATHLTHDailyWorkoutAlternativeAdvisorTests: XCTestCase {
         XCTAssertTrue(suggestions.isEmpty)
     }
 
-    func testLowEnergyMakesCrossTrainingVisibleBeforeShorterRun() {
+    func testLowEnergyPresentsFiveKilometersAndRestWithoutAnotherTap() {
         let suggestions = ATHLTHDailyWorkoutAlternativeAdvisor.suggestions(
             for: runningSession(), signals: signals(energy: 2))
-        XCTAssertEqual(suggestions.first?.choice, .gentleWalk)
-        XCTAssertTrue(suggestions.contains(where: { $0.choice == .mobility }))
-        XCTAssertTrue(suggestions.contains(where: { $0.choice == .rest }))
-        XCTAssertTrue(suggestions.contains(where: { $0.choice == .shorterRun }))
-        XCTAssertEqual(suggestions.first(where: {
-            $0.choice == .shorterRun
-        })?.distanceKilometers, 5)
+        XCTAssertEqual(Array(suggestions.prefix(2)).map(\.choice),
+                       [.shorterRun, .rest])
+        XCTAssertEqual(suggestions.first?.distanceKilometers, 5)
+        XCTAssertTrue(suggestions.contains { $0.choice == .mobility })
+    }
+
+    func testFiveKilometerAlternativeIsExplicitlyEasyAndReversible() throws {
+        let original = runningSession()
+        let option = try XCTUnwrap(
+            ATHLTHDailyWorkoutAlternativeAdvisor.suggestions(
+                for: original, signals: signals(energy: 2)).first)
+        let changed = ATHLTHDailyWorkoutAlternativeAdvisor.replacing(
+            original, with: option)
+        XCTAssertEqual(changed.id, original.id)
+        XCTAssertEqual(changed.targetDistanceKilometers, 5)
+        XCTAssertEqual(changed.workoutBlocks?.first?.distanceMeters, 5_000)
+        XCTAssertEqual(changed.workoutBlocks?.first?.targetHeartRateZone, 2)
+        XCTAssertNil(changed.runningWorkout)
+        XCTAssertNil(changed.routeID)
+        XCTAssertEqual(changed.dailyAlternativeOriginal?.restoring(changed).id,
+                       original.id)
+        XCTAssertEqual(changed.dailyAlternativeOriginal?.restoring(changed)
+            .targetDistanceKilometers, 15)
+    }
+
+    func testLighterStrengthIsVisibleWithoutHeavySoreness() throws {
+        let exercise = PlannedExercise(
+            id: UUID(), exerciseID: nil,
+            embeddedExercise: ExerciseSnapshot(
+                name: "Squat", instructions: [],
+                primaryMuscles: ["quads"], secondaryMuscles: [],
+                equipment: ["Barbell"], imageURL: nil),
+            sets: 4, reps: 8, targetWeightKilograms: 80,
+            targetRPE: nil, restSeconds: 120, notes: nil
+        )
+        var original = runningSession()
+        original.kind = .strength
+        original.exercises = [exercise]
+        original.targetDistanceKilometers = nil
+        let choices = ATHLTHDailyWorkoutAlternativeAdvisor.suggestions(
+            for: original, signals: signals(energy: 2))
+        XCTAssertEqual(Array(choices.prefix(2)).map(\.choice),
+                       [.lighterStrength, .rest])
+        let adapted = ATHLTHDailyWorkoutAlternativeAdvisor.replacing(
+            original, with: try XCTUnwrap(choices.first))
+        XCTAssertEqual(adapted.kind, .strength)
+        XCTAssertLessThan(adapted.exercises[0].sets, exercise.sets)
+        XCTAssertNotNil(adapted.dailyAlternativeOriginal)
+    }
+
+    func testHighSorenessDoesNotOfferAHeavyStrengthOrImpactAlternative() {
+        var workout = runningSession()
+        workout.kind = .strength
+        let tired = ATHLTHDailyWorkoutAlternativeAdvisor.Signals(
+            energy: 2, stress: nil, overallSoreness: 5,
+            muscleRatings: ["Quads": .high], readiness: nil)
+        let recommendations = ATHLTHDailyWorkoutAlternativeAdvisor.suggestions(
+            for: workout, signals: tired)
+        XCTAssertEqual(Array(recommendations.prefix(2)).map(\.choice),
+                       [.mobility, .rest])
     }
 
     func testApprovedMobilitySwapCanBeUndoneWithoutLosingIntervalsOrRoute() throws {
