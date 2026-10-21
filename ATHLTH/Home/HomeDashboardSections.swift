@@ -4992,11 +4992,11 @@ private struct HomeWeeklyProgressDaySheet: View {
             .padding(.top, 4)
     }
 
-    /// Only genuinely pending entries may be removed from the day sheet.
+    /// Allow removing unfinished workouts from any calendar day, including
+    /// dates in the past. Scheduling new workouts still requires a future day.
     /// Real activity history and completed plan results must remain intact.
     private func canRemovePlannedWorkout(_ workout: PlannedSession) -> Bool {
-        guard canPlanWorkout,
-              workout.trainTogetherMode == nil,
+        guard workout.trainTogetherMode == nil,
               !selection.completedPlannedIDs.contains(workout.id)
         else { return false }
 
