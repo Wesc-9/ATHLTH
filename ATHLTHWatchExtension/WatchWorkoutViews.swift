@@ -237,6 +237,20 @@ struct WatchActiveWorkoutView: View {
             .ignoresSafeArea()
         )
         .interactiveDismissDisabled(workoutManager.state != .completed)
+        .onAppear {
+            // A resumed Watch screen may have an older cached queue after
+            // the iPhone adds exercises. Ask for the authoritative state.
+            if workoutManager.kind == .strength {
+                workoutManager.requestStrengthSnapshot()
+            }
+        }
+        .onChange(of: workoutManager.strengthSession?.exerciseCount) { previous, current in
+            if workoutManager.kind == .strength, let current,
+               current != previous {
+                // Return to the active set / rest card for newly added work.
+                selectedNonRunningPage = 0
+            }
+        }
         .onChange(of: workoutManager.strengthSession?.isResting) { previous, current in
             // A new rest period is a meaningful phase change: show the
             // countdown, but never advance the set automatically.
