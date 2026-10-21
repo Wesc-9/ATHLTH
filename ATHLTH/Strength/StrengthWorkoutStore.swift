@@ -1032,7 +1032,8 @@ final class StrengthWorkoutStore: ObservableObject {
               let set = currentSet,
               !set.isCompleted,
               set.resolvedTargetKind == .time,
-              currentTimedSetCountdown?.isRunning == true,
+              let countdown = currentTimedSetCountdown,
+              countdown.isRunning,
               !isResting,
               snapshot.kind == .strength || snapshot.kind == .functional
         else { return }
@@ -1040,6 +1041,7 @@ final class StrengthWorkoutStore: ObservableObject {
               let watchStartedAt = snapshot.startedAt,
               abs(watchStartedAt.timeIntervalSince(workout.startedAt)) <= 180,
               snapshot.capturedAt >= workout.startedAt,
+              snapshot.capturedAt >= (countdown.resumedAt ?? workout.startedAt),
               snapshot.elapsedTime.isFinite, snapshot.distanceMeters.isFinite,
               snapshot.elapsedTime >= 0, snapshot.distanceMeters >= 0
         else { return }
