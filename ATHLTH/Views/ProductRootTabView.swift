@@ -2497,7 +2497,10 @@ struct ATHLTHHomeView: View {
             } else {
                 HStack(spacing: 7) {
                     homeCalendarQuickStartButton(
-                        title: "Run",
+                        title: ATHLTHLocalization.choose(
+                            english: "Run",
+                            norwegian: "Løp"
+                        ),
                         icon: "figure.run",
                         tint:
                             ATHLTHTheme
@@ -2508,7 +2511,10 @@ struct ATHLTHHomeView: View {
                     }
 
                     homeCalendarQuickStartButton(
-                        title: "Strength",
+                        title: ATHLTHLocalization.choose(
+                            english: "Strength",
+                            norwegian: "Styrke"
+                        ),
                         icon:
                             "dumbbell.fill",
                         tint:
