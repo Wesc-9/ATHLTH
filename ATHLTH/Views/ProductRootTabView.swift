@@ -12915,7 +12915,8 @@ struct ATHLTHRecoveryView: View {
         }
 
         guard shouldShowWearableRecoveryContent ||
-                !muscleRecoveryStatuses.isEmpty else {
+                !muscleRecoveryStatuses.isEmpty ||
+                sorenessStore.hasTodayCheckIn else {
             return insightText("Check manually", "Sjekk manuelt")
         }
 
@@ -12943,7 +12944,10 @@ struct ATHLTHRecoveryView: View {
             return 0
         }
 
-        if health.recovery.state == .recover {
+        if health.recovery.state == .recover ||
+            sorenessStore.todayOverallSoreness.map({ $0 >= 4 }) == true ||
+            sorenessStore.todayEnergy.map({ $0 <= 2 }) == true ||
+            sorenessStore.highestTodayLevel == .high {
             return 2
         }
 
@@ -12959,7 +12963,9 @@ struct ATHLTHRecoveryView: View {
             return 2
         }
 
-        if health.recovery.state == .takeItEasy ||
+        if sorenessStore.todayStress.map({ $0 >= 4 }) == true ||
+            sorenessStore.todayMotivation.map({ $0 <= 2 }) == true ||
+            health.recovery.state == .takeItEasy ||
             recoverySnapshot.trainingLoad.ratio.map({
                 $0 >= 1.50
             }) ?? false {
@@ -12980,6 +12986,26 @@ struct ATHLTHRecoveryView: View {
     ) -> String {
         guard let first = recoveryTodaySessions.first else {
             return ""
+        }
+
+        if sorenessStore.todayOverallSoreness.map({ $0 >= 4 }) == true ||
+            sorenessStore.highestTodayLevel == .high {
+            return insightText(
+                "Your check-in reports pronounced soreness. Consider an easier version of \(first.title), another muscle group or rest. Nothing will be changed automatically.",
+                "Innsjekken viser tydelig ømhet. Vurder en roligere variant av \(first.title), en annen muskelgruppe eller hvile. Ingenting endres automatisk."
+            )
+        }
+        if sorenessStore.todayEnergy.map({ $0 <= 2 }) == true {
+            return insightText(
+                "Your Watch signals and perceived energy can differ. You reported low energy, so consider reducing volume or intensity in \(first.title), and reassess after warming up.",
+                "Klokkemålingene og opplevd energi kan være forskjellige. Du rapporterer lav energi. Vurder redusert volum eller intensitet i \(first.title), og kjenn etter etter oppvarmingen."
+            )
+        }
+        if sorenessStore.todayStress.map({ $0 >= 4 }) == true {
+            return insightText(
+                "You reported elevated stress. A shorter or easier \(first.title) may suit today. The planned workout remains unchanged.",
+                "Du rapporterer høyere stress. En kortere eller roligere \(first.title) kan passe i dag. Den planlagte økten endres ikke."
+            )
         }
 
         if health.recovery.state == .recover {
