@@ -40,6 +40,32 @@ final class StrengthTimedSetCountdownTests: XCTestCase {
         XCTAssertEqual(timer.secondsCompleted(at: base.addingTimeInterval(550)), 175)
     }
 
+    func testTimedSetContinuesTrackingOvertimeBeyondTarget() {
+        let timer = countdown(started: base)
+        let elapsed = base.addingTimeInterval(425)
+        XCTAssertEqual(timer.secondsRemaining(at: elapsed), 0)
+        XCTAssertEqual(timer.elapsedSeconds(at: elapsed), 425)
+        XCTAssertEqual(timer.overtimeSeconds(at: elapsed), 125)
+        // Existing bounded progress semantics stay unchanged.
+        XCTAssertEqual(timer.secondsCompleted(at: elapsed), 300)
+    }
+
+    func testPausingAndResumingOvertimeDoesNotEraseExtraTime() {
+        var timer = countdown(started: base)
+        let stoppedAt = base.addingTimeInterval(340)
+        timer.secondsAtPause -= 340
+        timer.resumedAt = nil
+        XCTAssertEqual(timer.elapsedSeconds(at: stoppedAt), 340)
+        XCTAssertEqual(timer.overtimeSeconds(at: stoppedAt), 40)
+        timer.resumedAt = stoppedAt.addingTimeInterval(100)
+        XCTAssertEqual(
+            timer.elapsedSeconds(at: stoppedAt.addingTimeInterval(130)), 370
+        )
+        XCTAssertEqual(
+            timer.overtimeSeconds(at: stoppedAt.addingTimeInterval(130)), 70
+        )
+    }
+
     func testCountdownSurvivesCheckpointRoundTripWithAbsoluteStart() throws {
         let timer = countdown(started: base)
         let restored = try JSONDecoder().decode(
