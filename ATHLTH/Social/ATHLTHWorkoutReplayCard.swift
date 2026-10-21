@@ -101,7 +101,10 @@ struct ATHLTHWorkoutReplayCard: View {
                             )
                             replayMetric(
                                 title: isStrength
-                                    ? ATHLTHLocalization.choose(english: "Volume", norwegian: "Volum")
+                                    ? (workout.strengthTotalVolumeKilograms == nil &&
+                                       workout.strengthCardioDurationSeconds != nil
+                                       ? ATHLTHLocalization.choose(english: "Cardio", norwegian: "Kondisjon")
+                                       : ATHLTHLocalization.choose(english: "Volume", norwegian: "Volum"))
                                     : ATHLTHLocalization.choose(english: "Avg pace", norwegian: "Snitt-tempo"),
                                 value: replaySecondMetric,
                                 icon: isStrength ? "scalemass.fill" : "speedometer"
@@ -128,6 +131,75 @@ struct ATHLTHWorkoutReplayCard: View {
             if showingMoments {
                 Divider()
                     .padding(.top, 12)
+                if isStrength,
+                   let seconds = workout.strengthCardioDurationSeconds,
+                   seconds > 0 {
+                    VStack(alignment: .leading, spacing: 9) {
+                        HStack {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Cardio within strength",
+                                    norwegian: "Kondisjon i styrkeøkten"
+                                ),
+                                systemImage: "figure.run"
+                            )
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Spacer()
+                            Text(durationText(Double(seconds)))
+                                .font(.subheadline.weight(.bold).monospacedDigit())
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        }
+                        if let measured = workout.strengthCardioMeasuredMeters, measured > 0 {
+                            Label(
+                                String(format: "%.2f km · ", measured / 1000) +
+                                ATHLTHLocalization.choose(
+                                    english: "measured by Apple Watch",
+                                    norwegian: "målt med Apple Watch"
+                                ),
+                                systemImage: "applewatch"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                        }
+                        if let estimate = workout.strengthCardioEstimatedMeters, estimate > 0 {
+                            Label(
+                                String(format: "%.2f km · ", estimate / 1000) +
+                                ATHLTHLocalization.choose(
+                                    english: "estimated from manually entered speed",
+                                    norwegian: "estimert fra manuelt oppgitt fart"
+                                ),
+                                systemImage: "speedometer"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        if let pulse = workout.strengthWorkoutAverageHeartRateBPM,
+                           pulse.isFinite, pulse > 0 {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Full workout average heart rate",
+                                    norwegian: "Snittpuls for hele økten"
+                                ) + String(format: " · %.0f bpm", pulse),
+                                systemImage: "heart"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        Text(ATHLTHLocalization.choose(
+                            english: "Cardio warm-ups are not included in strength volume or personal records.",
+                            norwegian: "Kondisjonsoppvarming teller ikke som styrkevolum eller personlig rekord."
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        ATHLTHPlanDesign.warmSurface,
+                        in: RoundedRectangle(cornerRadius: 14)
+                    )
+                }
                 if isStrength,
                    let performed = workout.strengthPerformedExerciseSummaries,
                    !performed.isEmpty {
@@ -261,11 +333,16 @@ struct ATHLTHWorkoutReplayCard: View {
 
     private var replaySecondMetric: String {
         if isStrength {
-            guard let volume = workout.strengthTotalVolumeKilograms,
-                  volume.isFinite, volume > 0 else { return "—" }
-            return volume >= 1_000
-                ? String(format: "%.1f t", volume / 1_000)
-                : String(format: "%.0f kg", volume)
+            if let volume = workout.strengthTotalVolumeKilograms,
+               volume.isFinite, volume > 0 {
+                return volume >= 1_000
+                    ? String(format: "%.1f t", volume / 1_000)
+                    : String(format: "%.0f kg", volume)
+            }
+            if let seconds = workout.strengthCardioDurationSeconds {
+                return durationText(Double(seconds))
+            }
+            return "—"
         }
         guard let meters = workout.distanceMeters,
               meters > 0 && workout.duration > 0 else { return "—" }
