@@ -11726,6 +11726,7 @@ struct ATHLTHRecoveryView: View {
     @State private var insightAIConsentAccountID: UUID?
     @State private var showingInsightAIConsentSheet = false
     @State private var showingSorenessLog = false
+    @State private var hasAutoOpenedDailyCheckIn = false
     @State private var showingRecoveryInfo = false
     @State private var showingRecoveryCoach = false
     @State private var selectedRecoveryTool: RecoveryTool?
@@ -11965,7 +11966,8 @@ struct ATHLTHRecoveryView: View {
             }
             .onAppear {
                 ATHLTHPerformance.event("InsightAppear")
-                if openCheckInOnAppear {
+                if openCheckInOnAppear && !hasAutoOpenedDailyCheckIn {
+                    hasAutoOpenedDailyCheckIn = true
                     showingSorenessLog = true
                 }
             }
