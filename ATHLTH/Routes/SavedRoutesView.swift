@@ -68,7 +68,19 @@ struct SavedRoutesView: View {
     @AppStorage("athlth.routes.picker.minLength.v1") private var minLength = 0.0
     @AppStorage("athlth.routes.picker.maxLength.v1") private var maxLength = 20.0
     @AppStorage("athlth.routes.picker.runPace.v1") private var manualRunSecondsPerKm = 0
-    @AppStorage("athlth.routes.picker.showMap.v1") private var showMap = false
+    @AppStorage("athlth.routes.browse.viewMode.v1")
+    private var savedViewMode = ATHLTHRouteBrowseMode.cards.rawValue
+
+    private var viewMode: ATHLTHRouteBrowseMode {
+        ATHLTHRouteBrowseMode(rawValue: savedViewMode) ?? .cards
+    }
+
+    private var viewModeBinding: Binding<ATHLTHRouteBrowseMode> {
+        Binding(
+            get: { viewMode },
+            set: { savedViewMode = $0.rawValue }
+        )
+    }
 
     @State private var search = ""
     @State private var showingCustomLength = false
@@ -227,7 +239,7 @@ struct SavedRoutesView: View {
                     searchAndFilters
                     if sort == .nearest && !hasLocation { locationExplanation }
                     resultsHeader
-                    if showMap && !visibleRoutes.isEmpty { overviewMap }
+                    if viewMode == .map && !visibleRoutes.isEmpty { overviewMap }
                 }
 
                 if session.savedRoutes.isEmpty {
@@ -236,7 +248,11 @@ struct SavedRoutesView: View {
                     filteredEmptyState
                 } else {
                     ForEach(visibleRoutes, id: \.route.id) { entry in
-                        routeCard(entry)
+                        if viewMode == .cards {
+                            routeCard(entry)
+                        } else {
+                            compactRouteRow(entry)
+                        }
                     }
                 }
             }
@@ -448,19 +464,61 @@ struct SavedRoutesView: View {
     }
 
     private var resultsHeader: some View {
-        HStack {
+        VStack(alignment: .leading, spacing: 9) {
             Text(tr("\(visibleRoutes.count) routes", "\(visibleRoutes.count) ruter"))
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(ATHLTHPlanDesign.ink)
-            Spacer()
-            Button { showMap.toggle() } label: {
-                Label(showMap ? tr("List", "Liste") : tr("Map", "Kart"),
-                      systemImage: showMap ? "list.bullet" : "map")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-            }
+
+            ATHLTHRouteBrowseModePicker(selection: viewModeBinding)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 3)
+    }
+
+    private func compactRouteRow(_ entry: PositionedSavedRoute) -> some View {
+        let route = entry.route
+        return HStack(spacing: 12) {
+            NavigationLink {
+                RouteDetailView(route: route)
+            } label: {
+                HStack(spacing: 12) {
+                    RouteMapSnapshotThumbnail(route: route, height: 82)
+                        .frame(width: 104, height: 82)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(route.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            .lineLimit(2)
+                        Text(String(format: "%.1f km", route.distanceKilometers))
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        if let start = route.startName, !start.isEmpty {
+                            Text(start)
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                .lineLimit(1)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+            }
+            .buttonStyle(.plain)
+
+            LibraryFavoriteButton(
+                kind: .route, itemID: route.id.uuidString,
+                title: route.title,
+                subtitle: String(format: "%.1f km", route.distanceKilometers),
+                icon: "map.fill"
+            )
+        }
+        .padding(11)
+        .athlthPlanCard()
     }
 
     private var overviewMap: some View {
@@ -751,7 +809,7 @@ struct SavedRoutesView: View {
 
 // The map/list toggle only draws a bounded number of routes at once so a
 // growing library doesn't incur hundreds of MapKit overlays in one frame.
-private struct SavedRouteOverviewMap: View {
+struct SavedRouteOverviewMap: View {
     let routes: [TrainingRoute]
     let onOpen: (TrainingRoute) -> Void
 
