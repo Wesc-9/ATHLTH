@@ -307,4 +307,25 @@ final class StrengthWarmUpExerciseTests: XCTestCase {
         XCTAssertTrue(summary[0].contains("Bench Press"))
     }
 
+    @MainActor
+    func testWatchAcceptsNewExerciseAfterPreviousFinalSet() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil)
+        store.appendExercise(catalogExercise(named: "Row Machine"), sets: 1, reps: 10)
+        store.completeCurrentDraftSet()
+        let completed = try XCTUnwrap(store.watchSnapshot)
+        XCTAssertTrue(completed.allExercisesComplete)
+
+        store.appendExercise(catalogExercise(named: "Bench Press"), sets: 3, reps: 8)
+        let expanded = try XCTUnwrap(store.watchSnapshot)
+        XCTAssertFalse(expanded.allExercisesComplete)
+        XCTAssertEqual(expanded.exerciseCount, 2)
+        XCTAssertTrue(ATHLTHStrengthWatchSnapshotAcceptance.shouldApply(
+            incoming: expanded, after: completed
+        ))
+        XCTAssertFalse(ATHLTHStrengthWatchSnapshotAcceptance.shouldApply(
+            incoming: completed, after: expanded
+        ))
+    }
+
 }
