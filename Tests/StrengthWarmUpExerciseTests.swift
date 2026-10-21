@@ -87,4 +87,43 @@ final class StrengthWarmUpExerciseTests: XCTestCase {
         second.plannedSetType = .work
         XCTAssertTrue(second.countsTowardTrainingLoad)
     }
+    private func catalogExercise(named name: String) -> Exercise {
+        Exercise(
+            id: UUID(), origin: .publicCatalog, ownerID: nil,
+            name: name, instructions: ["Warm up at a comfortable pace."],
+            primaryMuscles: ["Quadriceps"], secondaryMuscles: [],
+            equipment: ["Treadmill"], imageURL: nil
+        )
+    }
+
+    func testTreadmillWarmUpStartsWithOneTenMinuteTimedSet() {
+        let planned = StrengthTreadmillWarmUpDefaults.plannedExercise(
+            for: catalogExercise(named: "Treadmill Running")
+        )
+        XCTAssertEqual(planned.sets, 1)
+        XCTAssertEqual(planned.resolvedTargetKind, .time)
+        XCTAssertEqual(planned.resolvedTargetDurationSeconds, 600)
+        XCTAssertEqual(planned.resolvedSetTargets.count, 1)
+        XCTAssertEqual(planned.resolvedSetTargets.first?.durationSeconds, 600)
+        XCTAssertTrue(planned.isWarmUpExercise)
+    }
+
+    func testNorwegianTreadmillWarmUpGetsSameDefaults() {
+        let planned = StrengthTreadmillWarmUpDefaults.plannedExercise(
+            for: catalogExercise(named: "Tredemølle Running")
+        )
+        XCTAssertEqual(planned.sets, 1)
+        XCTAssertEqual(planned.resolvedTargetDurationSeconds, 600)
+        XCTAssertTrue(planned.isWarmUpExercise)
+    }
+
+    func testStandardStrengthExerciseKeepsOriginalDefaults() {
+        let planned = StrengthTreadmillWarmUpDefaults.plannedExercise(
+            for: catalogExercise(named: "Dumbbell Curl")
+        )
+        XCTAssertEqual(planned.sets, 3)
+        XCTAssertEqual(planned.reps, 8)
+        XCTAssertFalse(planned.isWarmUpExercise)
+    }
+
 }
