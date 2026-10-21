@@ -406,6 +406,56 @@ final class ATHLTHTrainPlanStudioIntegrationTests: XCTestCase {
     }
 
     @MainActor
+    func testPastUnfinishedWorkoutCanBeRemovedWithoutTouchingCompletedOrSkipped() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let yesterday = try XCTUnwrap(Calendar.current.date(
+            byAdding: .day, value: -1,
+            to: Calendar.current.startOfDay(for: Date())
+        ))
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Yesterday's plan", summary: "",
+            weekCount: 1, startDate: yesterday
+        ))
+        let dayID = plan.weeks[0].days[0].id
+        let unfinished = workout(name: "Unfinished workout")
+        let completed = workout(name: "Completed workout")
+        let skipped = workout(name: "Skipped workout")
+        for item in [unfinished, completed, skipped] {
+            store.addSession(item, toDay: dayID, inPlan: plan.id)
+        }
+        let before = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        store.setPlanSessionManuallyCompleted(
+            planID: plan.id, sessionID: completed.id, completed: true
+        )
+        store.setPlanSessionSkipped(
+            planID: plan.id, sessionID: skipped.id, skipped: true
+        )
+
+        XCTAssertTrue(store.removePlanStudioWorkout(
+            planID: plan.id, workoutID: unfinished.id, dayID: dayID,
+            expectedVersion: before.version,
+            healthWorkouts: [], strengthHistory: []
+        ))
+        let after = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertEqual(after.version, before.version + 1)
+        XCTAssertEqual(
+            Set(after.weeks[0].days[0].sessions.map(\.id)),
+            Set([completed.id, skipped.id])
+        )
+        XCTAssertFalse(store.removePlanStudioWorkout(
+            planID: plan.id, workoutID: completed.id, dayID: dayID,
+            expectedVersion: after.version,
+            healthWorkouts: [], strengthHistory: []
+        ))
+        XCTAssertFalse(store.removePlanStudioWorkout(
+            planID: plan.id, workoutID: skipped.id, dayID: dayID,
+            expectedVersion: after.version,
+            healthWorkouts: [], strengthHistory: []
+        ))
+    }
+
+    @MainActor
     func testMovingToSameDayDoesNotChangePlanOrVersion() throws {
         let (store, defaults, suite) = makeStore()
         defer { defaults.removePersistentDomain(forName: suite) }
