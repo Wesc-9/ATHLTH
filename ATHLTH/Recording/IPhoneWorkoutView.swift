@@ -1556,6 +1556,36 @@ struct IPhoneWorkoutView: View {
                                     )
                                 )
 
+                                if let recorded = workout.recordedRunningSteps,
+                                   !recorded.isEmpty {
+                                    DisclosureGroup(
+                                        ATHLTHLocalization.choose(
+                                            english: "Time per workout phase",
+                                            norwegian: "Tid per øktdel"
+                                        )
+                                    ) {
+                                        VStack(alignment: .leading, spacing: 10) {
+                                            ForEach(recorded.sorted {
+                                                $0.index < $1.index
+                                            }, id: \.index) { phase in
+                                                HStack(alignment: .firstTextBaseline) {
+                                                    Text(phase.title)
+                                                        .font(.subheadline)
+                                                    Spacer(minLength: 8)
+                                                    Text(ATHLTHRunStepCountdown.display(
+                                                        phase.activeSeconds
+                                                    ))
+                                                    .font(.subheadline.monospacedDigit())
+                                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                                }
+                                            }
+                                        }
+                                        .padding(.top, 9)
+                                    }
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                }
+
                                 if workout.runEnvironment ==
                                     .treadmill {
                                     if workout.treadmillSpeedKilometersPerHour != nil {
