@@ -3530,13 +3530,13 @@ struct DirectMessageThreadView: View {
                 Divider()
 
                 if let photoCreditURL = URL(string:
-                    "https://commons.wikimedia.org/wiki/File:Sunset_at_Lake_Fairway_Athletics_Track.JPG"
+                    "https://www.pexels.com/photo/stands-by-running-track-at-stadium-19753619/"
                 ) {
                     Link(destination: photoCreditURL) {
                         Label(
                             ATHLTHLocalization.choose(
-                                english: "Stadium photo · Editor5807 (CC BY 3.0)",
-                                norwegian: "Stadionfoto · Editor5807 (CC BY 3.0)"
+                                english: "Stadium photo · Heber Vazquez (Pexels)",
+                                norwegian: "Stadionfoto · Heber Vazquez (Pexels)"
                             ),
                             systemImage: "photo"
                         )
