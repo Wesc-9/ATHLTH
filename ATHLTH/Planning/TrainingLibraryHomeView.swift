@@ -2401,106 +2401,157 @@ struct TrainingPlanCatalogDetailView: View {
         )
     }
 
-    private func previewWeekCard(
-        _ week: Int
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
+    private func previewWeekCard(_ week: Int) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(ATHLTHLocalization.format(
-                                english: "Week %d",
-                                norwegian: "Uke %d",
-                                week
-                            ))
-                    .font(.subheadline.weight(.bold))
+                    english: "Week %d", norwegian: "Uke %d", week
+                ))
+                .font(.headline.weight(.bold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
 
                 Spacer()
 
-                if week.isMultiple(of: 4) &&
-                    week < entry.durationWeeks {
-                    Text("DELOAD")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(Color.orange)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(
-                            Color.orange.opacity(0.09),
-                            in: Capsule()
-                        )
-                } else if entry.durationWeeks >= 12 &&
-                            week >= entry.durationWeeks - 1 {
-                    Text("TAPER")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(
-                            ATHLTHTheme.vitality
-                        )
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(
-                            ATHLTHTheme.vitality.opacity(0.09),
-                            in: Capsule()
-                        )
+                if week.isMultiple(of: 4) && week < entry.durationWeeks {
+                    Text(ATHLTHLocalization.choose(
+                        english: "RECOVERY WEEK", norwegian: "ROLIG UKE"
+                    ))
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(ATHLTHPlanDesign.selectedSurface, in: Capsule())
+                } else if entry.usesCompetitionTaper &&
+                            week >= max(entry.durationWeeks - 1, 1) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "TAPER", norwegian: "NEDTRAPPING"
+                    ))
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(ATHLTHPlanDesign.selectedSurface, in: Capsule())
                 }
             }
 
             ForEach(
-                Array(
-                    entry.sessionBlueprints
-                        .prefix(entry.sessionsPerWeek)
-                        .enumerated()
-                ),
+                Array(entry.sessionBlueprints
+                    .prefix(entry.sessionsPerWeek)
+                    .enumerated()),
                 id: \.offset
-            ) { _, blueprint in
-                let actualWorkout = ATHLTHCatalogPlanSessionFactory.session(
+            ) { index, blueprint in
+                let workout = ATHLTHCatalogPlanSessionFactory.session(
                     entry: entry, blueprint: blueprint, week: week
                 )
-                HStack(spacing: 10) {
-                    Image(
-                        systemName:
-                            actualWorkout.kind.systemImage
-                    )
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(detailAccent)
-                    .frame(width: 30, height: 30)
-                    .background(
-                        detailAccent.opacity(0.08),
-                        in: RoundedRectangle(
-                            cornerRadius: 9
-                        )
-                    )
+                let key = "\(week):\(index)"
+                VStack(alignment: .leading, spacing: 0) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            if !expandedSessionKeys.insert(key).inserted {
+                                expandedSessionKeys.remove(key)
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: workout.kind.systemImage)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                .frame(width: 35, height: 35)
+                                .background(ATHLTHPlanDesign.selectedSurface,
+                                            in: RoundedRectangle(cornerRadius: 10))
 
-                    Text(actualWorkout.title)
-                        .font(.caption.weight(.semibold))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(workout.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                Text(ATHLTHLocalization.choose(
+                                    english: "See exercises and targets",
+                                    norwegian: "Se øvelser, sett og mål"
+                                ))
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+                            Spacer(minLength: 5)
+                            Text("\(workout.durationMinutes ?? 0) min")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            Image(systemName: expandedSessionKeys.contains(key)
+                                  ? "chevron.up" : "chevron.down")
+                                .font(.caption.bold())
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        }
+                        .contentShape(Rectangle())
+                        .padding(11)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(ATHLTHLocalization.choose(
+                        english: "Show or hide the programmed workout steps",
+                        norwegian: "Vis eller skjul øvelsene i økten"
+                    ))
 
-                    Spacer()
-
-                    Text(
-                        "\(actualWorkout.durationMinutes ?? 0) min"
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
+                    if expandedSessionKeys.contains(key) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            let blocks = workout.workoutBlocks
+                                .filter { $0.kind != .note }
+                            if blocks.isEmpty {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "No exercise steps available for this session.",
+                                    norwegian: "Ingen øvelsessteg er lagt til denne økten."
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                .padding(12)
+                            } else {
+                                ForEach(blocks) { block in
+                                    previewWorkoutBlock(block)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.bottom, 10)
+                    }
                 }
+                .background(ATHLTHPlanDesign.warmSurface,
+                            in: RoundedRectangle(cornerRadius: 14))
             }
         }
-        .padding(13)
-        .background(
-            .regularMaterial,
-            in: RoundedRectangle(
-                cornerRadius: 17,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 17,
-                style: .continuous
-            )
-            .stroke(
-                Color.black.opacity(0.035),
-                lineWidth: 0.7
-            )
+        .padding(14)
+        .athlthPlanCard()
+    }
+
+    private func previewWorkoutBlock(_ block: WorkoutTemplateBlock) -> some View {
+        HStack(alignment: .top, spacing: 9) {
+            Image(systemName: block.kind.systemImage)
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .frame(width: 19)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(block.title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let target = block.targetText {
+                    Text(target)
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if block.kind == .exercise,
+                   let rest = block.restBetweenSetsSeconds, rest > 0 {
+                    Text(ATHLTHLocalization.format(
+                        english: "%d sec rest between sets",
+                        norwegian: "%d sek pause mellom sett",
+                        Int(rest)
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+            }
+            Spacer(minLength: 2)
         }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 6)
     }
 
     private func detailMetric(
