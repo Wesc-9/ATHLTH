@@ -328,4 +328,134 @@ final class StrengthWarmUpExerciseTests: XCTestCase {
         ))
     }
 
+    private func cardioWatchSample(
+        startedAt: Date, capturedAt: Date,
+        elapsed: Double, meters: Double, pulse: Double = 132,
+        freshPulse: Bool = true
+    ) -> WatchWorkoutLiveSnapshot {
+        WatchWorkoutLiveSnapshot(
+            kind: .strength,
+            state: .running,
+            startedAt: startedAt,
+            capturedAt: capturedAt,
+            elapsedTime: elapsed,
+            heartRate: pulse,
+            activeCalories: 15,
+            distanceMeters: meters,
+            averageHeartRate: nil,
+            maxHeartRate: nil,
+            routePointCount: 0,
+            coachHeartRateSampleAt: freshPulse ? capturedAt : nil
+        )
+    }
+
+    func testWatchCardioCaptureDoesNotConvertEstimatesIntoMeasurements() {
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let first = cardioWatchSample(
+            startedAt: start,
+            capturedAt: start.addingTimeInterval(5),
+            elapsed: 5, meters: 100, pulse: 130
+        )
+        var capture = StrengthWatchCardioCapture(
+            watchWorkoutStartedAt: start,
+            lastCapturedAt: first.capturedAt,
+            lastElapsedTime: first.elapsedTime,
+            lastDistanceMeters: first.distanceMeters
+        )
+        capture.recordHeartRate(from: first)
+        let second = cardioWatchSample(
+            startedAt: start,
+            capturedAt: start.addingTimeInterval(10),
+            elapsed: 10, meters: 125, pulse: 140
+        )
+        capture.ingest(second)
+        capture.ingest(second)
+        XCTAssertEqual(capture.measuredDistanceMeters, 25, accuracy: 0.001)
+        XCTAssertEqual(capture.capturedActiveDuration, 5, accuracy: 0.001)
+        XCTAssertEqual(capture.averageHeartRate ?? 0, 135, accuracy: 0.001)
+        XCTAssertEqual(capture.heartRateSampleCount, 2)
+
+        // A delayed or disconnected Watch sample must not inflate metrics.
+        capture.ingest(cardioWatchSample(
+            startedAt: start, capturedAt: start.addingTimeInterval(80),
+            elapsed: 80, meters: 300, pulse: 160, freshPulse: false
+        ))
+        XCTAssertEqual(capture.measuredDistanceMeters, 25, accuracy: 0.001)
+        XCTAssertEqual(capture.capturedActiveDuration, 5, accuracy: 0.001)
+        XCTAssertEqual(capture.heartRateSampleCount, 2)
+    }
+
+    @MainActor
+    func testWatchMetricsAttachOnlyToCardioSetAndKeepManualProvenance() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(
+            watchSessionID: UUID(), captureDevice: .appleWatch
+        )
+        store.appendExercise(
+            catalogExercise(named: "Treadmill Running"),
+            sets: 1, reps: nil, targetKind: .time,
+            targetDurationSeconds: 600, restSeconds: 0, warmUpSets: 1
+        )
+        store.setDraft(treadmillSpeedKilometersPerHour: 9.0,
+                       treadmillInclinePercent: 2)
+        store.startOrResumeTimedSet()
+        let started = try XCTUnwrap(store.activeWorkout?.startedAt)
+        store.ingestWatchCardioSnapshot(cardioWatchSample(
+            startedAt: started,
+            capturedAt: started.addingTimeInterval(3), elapsed: 3,
+            meters: 100, pulse: 130
+        ))
+        store.ingestWatchCardioSnapshot(cardioWatchSample(
+            startedAt: started,
+            capturedAt: started.addingTimeInterval(8), elapsed: 8,
+            meters: 127, pulse: 140
+        ))
+        store.completeCurrentSet(
+            reps: nil, durationSeconds: 60, weightKilograms: nil, rpe: nil,
+            isWarmUp: true
+        )
+        let set = try XCTUnwrap(store.activeWorkout?.exercises.first?.sets.first)
+        XCTAssertEqual(set.watchMeasuredDistanceMeters ?? 0, 27, accuracy: 0.001)
+        XCTAssertEqual(set.watchActiveDurationSeconds ?? 0, 5, accuracy: 0.001)
+        XCTAssertEqual(set.watchAverageHeartRateBPM ?? 0, 135, accuracy: 0.001)
+        XCTAssertEqual(set.completedTreadmillSpeedKilometersPerHour, 9.0)
+        XCTAssertEqual(set.completedTreadmillInclinePercent, 2)
+        XCTAssertEqual(set.completedDistanceMeters ?? 0, 27, accuracy: 0.001)
+        XCTAssertNotNil(set.manuallyEstimatedTreadmillDistanceMeters)
+        XCTAssertEqual(store.activeWorkout?.totalVolumeKilograms, 0)
+        XCTAssertEqual(store.workoutHistory.count, 0) // No duplicate workout.
+    }
+
+    @MainActor
+    func testCombinedReplayKeepsWarmUpSeparateFromLiftingVolume() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil)
+        store.appendExercise(
+            catalogExercise(named: "Bench Press"), sets: 2, reps: 8,
+            targetWeightKilograms: 100, restSeconds: 0, warmUpSets: 1
+        )
+        store.setDraft(weightKilograms: 100)
+        store.completeCurrentDraftSet()
+        store.setDraft(weightKilograms: 100)
+        store.completeCurrentDraftSet()
+        store.appendExercise(
+            catalogExercise(named: "Treadmill Running"), sets: 1,
+            reps: nil, targetKind: .time, targetDurationSeconds: 600,
+            restSeconds: 0, warmUpSets: 1
+        )
+        store.setDraft(treadmillSpeedKilometersPerHour: 9,
+                       treadmillInclinePercent: 1.5)
+        store.completeCurrentDraftSet()
+        let workout = try XCTUnwrap(store.activeWorkout)
+        let replay = SocialPublishableWorkout(strengthWorkout: workout)
+        XCTAssertEqual(replay.strengthTotalVolumeKilograms ?? 0, 800, accuracy: 0.001)
+        XCTAssertEqual(replay.strengthHeaviestWeightKilograms ?? 0, 100)
+        XCTAssertEqual(replay.strengthCardioDurationSeconds, 600)
+        XCTAssertEqual(replay.strengthCardioExerciseCount, 1)
+        XCTAssertNil(replay.strengthCardioMeasuredMeters)
+        XCTAssertNotNil(replay.strengthCardioEstimatedMeters)
+        XCTAssertEqual(replay.strengthPerformedExerciseSummaries?.count, 2)
+    }
+
+
 }
