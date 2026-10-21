@@ -101,6 +101,8 @@ struct RouteLibraryListView: View {
     @State private var sort: RouteLibrarySort = .newest
     @State private var lengthFilter = 0
     @State private var publicFilter: PublicRouteBrowseFilter = .all
+    // Retained only for the legacy, non-rendered mine helpers below.
+    @State private var favoritesOnly = false
     @AppStorage("athlth.routes.picker.runPace.v1")
     private var manualRunSecondsPerKm = 0
     @State private var watchMessage: String?
