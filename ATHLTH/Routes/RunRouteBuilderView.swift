@@ -65,6 +65,10 @@ struct RunRouteBuilderView: View {
             VStack(spacing: 16) {
                 hero
                 routeNameCard
+                // Put the live summary where it is useful while editing points.
+                if selectedAlternative != nil {
+                    routeDetailsCard
+                }
                 endpointsCard
                 // Map-first planning must work with no address selection.
                 routeMap
@@ -87,7 +91,6 @@ struct RunRouteBuilderView: View {
                     if alternatives.count > 1 {
                         alternativesCard
                     }
-                    routeDetailsCard
                 }
             }
             .padding()
@@ -888,14 +891,14 @@ struct RunRouteBuilderView: View {
     }
 
     private var routeDetailsCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(ATHLTHLocalization.choose(
                 english: "Route overview", norwegian: "Ruteoversikt"))
                 .font(.headline)
                 .foregroundStyle(ATHLTHPlanDesign.ink)
 
             if let route = selectedAlternative {
-                HStack(spacing: 8) {
+                HStack(spacing: 7) {
                     routeMetric(
                         icon: "point.topleft.down.to.point.bottomright.curvepath",
                         value: String(format: "%.2f km",
@@ -919,24 +922,24 @@ struct RunRouteBuilderView: View {
                     english: "Running time at 6:00 min/km; Apple Maps uses walkable paths.",
                     norwegian: "Løpetid ved 6:00 min/km. Apple Maps beregner gangbare traséer."),
                     systemImage: "info.circle")
-                    .font(.caption2)
+                    .font(.system(size: 10.5))
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(15)
+        .padding(12)
         .routeBuilderCard()
     }
 
     private func routeMetric(
         icon: String, value: String, label: String
     ) -> some View {
-        VStack(spacing: 5) {
+        VStack(spacing: 3) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(ATHLTHPlanDesign.accentInk)
             Text(value)
-                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .font(.system(size: 14, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
@@ -945,10 +948,10 @@ struct RunRouteBuilderView: View {
                 .font(.caption2)
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
         }
-        .frame(maxWidth: .infinity, minHeight: 76)
-        .padding(.vertical, 5)
+        .frame(maxWidth: .infinity, minHeight: 58)
+        .padding(.vertical, 3)
         .background(ATHLTHPlanDesign.selectedSurface,
-                    in: RoundedRectangle(cornerRadius: 14))
+                    in: RoundedRectangle(cornerRadius: 12))
     }
 
     private var saveRouteFooter: some View {
@@ -1587,8 +1590,13 @@ final class RunRouteLocationSearchModel:
 {
     @Published var query = "" {
         didSet {
+            // SwiftUI may write the same value again when keyboard focus moves.
+            // Such a write must not remove the already calculated distances.
+            guard oldValue != query else { return }
             distanceTask?.cancel()
+            suggestions = []
             suggestionDistances = [:]
+            distanceRefreshKeys = []
             completer.queryFragment = query
         }
     }
@@ -1600,6 +1608,9 @@ final class RunRouteLocationSearchModel:
     private let completer = MKLocalSearchCompleter()
     private var referenceCoordinate: CLLocationCoordinate2D?
     private var distanceTask: Task<Void, Never>?
+    // A stable result set should not restart all six MapKit geocodes on
+    // focus changes or duplicate completer callbacks.
+    private var distanceRefreshKeys: [String] = []
 
     func setReferenceCoordinate(_ coordinate: CLLocationCoordinate2D?) {
         if let coordinate, let current = referenceCoordinate {
@@ -1610,7 +1621,7 @@ final class RunRouteLocationSearchModel:
             return
         }
         referenceCoordinate = coordinate
-        refreshSuggestionDistances()
+        refreshSuggestionDistances(force: true)
     }
 
     func distanceLabel(for suggestion: RunRouteLocationSuggestion) -> String? {
@@ -1621,13 +1632,17 @@ final class RunRouteLocationSearchModel:
         return String(format: "%.1f km", meters / 1_000)
     }
 
-    private func refreshSuggestionDistances() {
-        distanceTask?.cancel()
-        suggestionDistances = [:]
-        guard let referenceCoordinate else { return }
+    private func refreshSuggestionDistances(force: Bool = false) {
+        guard !query.isEmpty, let referenceCoordinate else { return }
         let results = Array(suggestions.prefix(6))
-        guard !results.isEmpty else { return }
+        let keys = results.map(\.distanceKey)
+        guard !keys.isEmpty else { return }
+        guard force || keys != distanceRefreshKeys else { return }
+        distanceRefreshKeys = keys
+        distanceTask?.cancel()
 
+        // Keep existing values visible until fresher ones are available.
+        // Only an actual query change or a deliberate clear removes them.
         distanceTask = Task { @MainActor [weak self] in
             let origin = CLLocation(
                 latitude: referenceCoordinate.latitude,
@@ -1637,6 +1652,9 @@ final class RunRouteLocationSearchModel:
                 guard !Task.isCancelled, let self else { return }
                 // These are straight-line distances to geocoded MapKit places,
                 // not walking-route lengths or estimates from a text label.
+                if !force, self.suggestionDistances[suggestion.distanceKey] != nil {
+                    continue
+                }
                 guard let place = await self.resolve(suggestion),
                       !Task.isCancelled else { continue }
                 let point = place.placemark.coordinate
@@ -1670,8 +1688,18 @@ final class RunRouteLocationSearchModel:
             }
 
         Task { @MainActor [weak self] in
-            self?.suggestions = mapped
-            self?.refreshSuggestionDistances()
+            guard let self, !self.query.isEmpty else { return }
+            // MapKit can send an empty or repeated batch when the keyboard
+            // dismisses. Retain the visible choices and distance labels.
+            let currentKeys = self.suggestions.map(\.distanceKey)
+            let incomingKeys = mapped.map(\.distanceKey)
+            guard RunRouteSearchSuggestionPolicy.shouldReplaceResults(
+                query: self.query,
+                currentKeys: currentKeys,
+                incomingKeys: incomingKeys
+            ) else { return }
+            self.suggestions = mapped
+            self.refreshSuggestionDistances()
         }
     }
 
@@ -1680,9 +1708,10 @@ final class RunRouteLocationSearchModel:
         didFailWithError error: Error
     ) {
         Task { @MainActor [weak self] in
+            // A transient MapKit lookup failure should not erase the last
+            // useful results while the user is still choosing an address.
             self?.distanceTask?.cancel()
-            self?.suggestions = []
-            self?.suggestionDistances = [:]
+            self?.distanceRefreshKeys = []
         }
     }
 
@@ -1691,6 +1720,7 @@ final class RunRouteLocationSearchModel:
         query = ""
         suggestions = []
         suggestionDistances = [:]
+        distanceRefreshKeys = []
     }
 
     func resolve(
@@ -1804,6 +1834,18 @@ final class RunRouteLocationSearchModel:
         ]
         .compactMap { $0 }
         .joined(separator: ", ")
+    }
+}
+
+/// Keep an active search stable through keyboard dismissal and repeated
+/// MapKit completion callbacks, but never retain a different query's results.
+enum RunRouteSearchSuggestionPolicy {
+    static func shouldReplaceResults(
+        query: String, currentKeys: [String], incomingKeys: [String]
+    ) -> Bool {
+        !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !incomingKeys.isEmpty
+            && incomingKeys != currentKeys
     }
 }
 
