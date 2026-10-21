@@ -274,6 +274,64 @@ struct StrengthSetEffortSegment: Identifiable, Codable, Hashable {
     }
 }
 
+/// Incremental device readings belong to an individual timed cardio set in
+/// a strength workout. Distances are only carried over from actual Watch
+/// readings, never from manually chosen treadmill speed.
+struct StrengthWatchCardioCapture: Codable, Hashable {
+    var watchWorkoutStartedAt: Date
+    var lastCapturedAt: Date
+    var lastElapsedTime: TimeInterval
+    var lastDistanceMeters: Double
+    var capturedActiveDuration: TimeInterval = 0
+    var measuredDistanceMeters: Double = 0
+    var heartRateSum: Double = 0
+    var heartRateSampleCount: Int = 0
+    var peakHeartRateBPM: Double? = nil
+    var lastHeartRateSampleAt: Date? = nil
+
+    mutating func ingest(_ sample: WatchWorkoutLiveSnapshot) {
+        guard sample.startedAt == watchWorkoutStartedAt,
+              sample.capturedAt > lastCapturedAt,
+              sample.elapsedTime.isFinite, sample.distanceMeters.isFinite
+        else { return }
+
+        let gap = sample.capturedAt.timeIntervalSince(lastCapturedAt)
+        let timeDelta = sample.elapsedTime - lastElapsedTime
+        let distanceDelta = sample.distanceMeters - lastDistanceMeters
+        // On reconnection or after changing exercises, do not assign
+        // time/distance from the intervening exercise to this set.
+        if gap > 0, gap <= 30, sample.state == .running,
+           timeDelta >= 0, timeDelta <= gap + 5 {
+            capturedActiveDuration += timeDelta
+            if distanceDelta > 0, distanceDelta <= gap * 10 {
+                measuredDistanceMeters += distanceDelta
+            }
+        }
+
+        lastCapturedAt = sample.capturedAt
+        lastElapsedTime = sample.elapsedTime
+        lastDistanceMeters = sample.distanceMeters
+        recordHeartRate(from: sample)
+    }
+
+    mutating func recordHeartRate(from sample: WatchWorkoutLiveSnapshot) {
+        guard let sampledAt = sample.coachHeartRateSampleAt,
+              abs(sample.capturedAt.timeIntervalSince(sampledAt)) <= 20,
+              sampledAt > (lastHeartRateSampleAt ?? .distantPast),
+              sample.heartRate.isFinite,
+              (35...240).contains(sample.heartRate)
+        else { return }
+        heartRateSum += sample.heartRate
+        heartRateSampleCount += 1
+        peakHeartRateBPM = max(peakHeartRateBPM ?? sample.heartRate, sample.heartRate)
+        lastHeartRateSampleAt = sampledAt
+    }
+
+    var averageHeartRate: Double? {
+        heartRateSampleCount > 0 ? heartRateSum / Double(heartRateSampleCount) : nil
+    }
+}
+
 struct StrengthSetLog: Identifiable, Codable, Hashable {
     let id: UUID
     var setNumber: Int
@@ -317,6 +375,13 @@ struct StrengthSetLog: Identifiable, Codable, Hashable {
     // Kept separate from actual/verified workout distance, since entered
     // treadmill speed is not a device-measured distance.
     var manuallyEstimatedTreadmillDistanceMeters: Double? = nil
+    // Measurements from the active Watch strength workout only. These
+    // never replace manual speed/incline, nor claim an estimated distance
+    // was measured. Nil means no qualifying Watch sample was received.
+    var watchMeasuredDistanceMeters: Double? = nil
+    var watchActiveDurationSeconds: TimeInterval? = nil
+    var watchAverageHeartRateBPM: Double? = nil
+    var watchMaximumHeartRateBPM: Double? = nil
 
     // A completed set can contain multiple effort segments. Example:
     // 8 reps @ 10 kg + 2 reps @ 8 kg in the same planned 10-rep set.
