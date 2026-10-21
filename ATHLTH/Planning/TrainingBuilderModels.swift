@@ -617,3 +617,46 @@ extension PlannedExercise {
         }
     }
 }
+
+
+// Keep treadmill warm-ups consistent whether an exercise is added before
+// starting Strength or during an active Strength workout. A new choice must
+// always show its editable setup; these are only the initial values.
+enum StrengthTreadmillWarmUpDefaults {
+    static let sets = 1
+    static let durationSeconds = 10 * 60
+
+    static func isTreadmill(_ name: String) -> Bool {
+        let normalized = name.folding(
+            options: [.diacriticInsensitive, .caseInsensitive],
+            locale: Locale(identifier: "nb_NO")
+        ).lowercased()
+        return normalized.contains("treadmill") ||
+            normalized.contains("tredemolle")
+    }
+
+    static func plannedExercise(for exercise: Exercise) -> PlannedExercise {
+        let treadmill = isTreadmill(exercise.snapshot.name) ||
+            isTreadmill(exercise.snapshot.displayName)
+        var planned = PlannedExercise(
+            id: UUID(),
+            exerciseID: exercise.id,
+            embeddedExercise: exercise.snapshot,
+            sets: treadmill ? sets : 3,
+            reps: treadmill ? nil : 8,
+            targetWeightKilograms: nil,
+            targetRPE: nil,
+            restSeconds: treadmill ? 0 : 90,
+            notes: nil,
+            targetRIR: nil,
+            supersetGroupID: nil,
+            progression: StrengthProgressionRule.none
+        )
+        if treadmill {
+            planned.targetKind = .time
+            planned.targetDurationSeconds = durationSeconds
+            planned.setEntireExerciseWarmUp(true)
+        }
+        return planned
+    }
+}
