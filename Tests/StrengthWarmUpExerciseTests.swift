@@ -172,7 +172,11 @@ final class StrengthWarmUpExerciseTests: XCTestCase {
         XCTAssertEqual(set.completedDurationSeconds, 600)
         XCTAssertEqual(set.completedTreadmillSpeedKilometersPerHour, 9.0)
         XCTAssertEqual(set.completedTreadmillInclinePercent, 2.5)
-        XCTAssertEqual(try XCTUnwrap(set.completedDistanceMeters), 1_500, accuracy: 0.01)
+        XCTAssertEqual(
+            try XCTUnwrap(set.manuallyEstimatedTreadmillDistanceMeters),
+            1_500, accuracy: 0.01
+        )
+        XCTAssertNil(set.completedDistanceMeters)
         XCTAssertNil(set.completedWeightKilograms)
         XCTAssertTrue(set.isWarmUp == true)
     }
