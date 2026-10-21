@@ -104,6 +104,9 @@ final class StrengthWorkoutStore: ObservableObject {
     private var accountID: UUID?
     private var loadingAccount = false
     private var checkpointSaveTask: Task<Void, Never>?
+    private var cardioWatchCaptures: [UUID: StrengthWatchCardioCapture] = [:]
+    private var watchCaptureNeedsBaseline = Set<UUID>()
+    private var lastCardioWatchCheckpointAt: Date = .distantPast
     @Published private(set) var hasLegacyHistory = false
 
     private struct Checkpoint: Codable {
@@ -124,6 +127,7 @@ final class StrengthWorkoutStore: ObservableObject {
         var rir: Double? = nil
         var warmUp: Bool? = nil
         var timedSetCountdown: StrengthTimedSetCountdown? = nil
+        var cardioWatchCaptures: [UUID: StrengthWatchCardioCapture]? = nil
         var savedAt: Date? = nil
     }
 
@@ -136,6 +140,8 @@ final class StrengthWorkoutStore: ObservableObject {
         loadingAccount = true
         defer { loadingAccount = false }
         accountID = userID
+        cardioWatchCaptures = [:]
+        watchCaptureNeedsBaseline = []
         completedWorkout = nil
         completionSaveError = nil
         workoutHistory =
@@ -163,6 +169,7 @@ final class StrengthWorkoutStore: ObservableObject {
         }
         let checkpoint = userID.flatMap { AccountLocalStorage.read(Checkpoint.self, name: "strengthActive", userID: $0) }
         activeWorkout = checkpoint?.workout
+        cardioWatchCaptures = checkpoint?.cardioWatchCaptures ?? [:]
         if let workout = activeWorkout,
            workout.endedAt != nil ||
             workoutHistory.contains(
@@ -254,6 +261,7 @@ final class StrengthWorkoutStore: ObservableObject {
                 rir: draftRIR,
                 warmUp: draftWarmUp,
                 timedSetCountdown: timedSetCountdown,
+                cardioWatchCaptures: cardioWatchCaptures,
                 savedAt: Date()
             ),
             name: "strengthActive",
@@ -1014,6 +1022,58 @@ final class StrengthWorkoutStore: ObservableObject {
         return exercise.sets[currentSetIndex]
     }
 
+    /// Per-set readings from the existing Watch strength workout only.
+    /// This does not create another HealthKit workout or replace manual speed.
+    func ingestWatchCardioSnapshot(_ snapshot: WatchWorkoutLiveSnapshot) {
+        guard let workout = activeWorkout,
+              workout.captureDevice == .appleWatch,
+              let exercise = currentExercise,
+              StrengthCardioExercisePolicy.isCardio(exercise.exercise.name),
+              let set = currentSet,
+              !set.isCompleted,
+              set.resolvedTargetKind == .time,
+              currentTimedSetCountdown?.isRunning == true,
+              !isResting,
+              snapshot.kind == .strength || snapshot.kind == .functional
+        else { return }
+        guard snapshot.state == .running,
+              let watchStartedAt = snapshot.startedAt,
+              abs(watchStartedAt.timeIntervalSince(workout.startedAt)) <= 180,
+              snapshot.capturedAt >= workout.startedAt,
+              snapshot.elapsedTime.isFinite, snapshot.distanceMeters.isFinite,
+              snapshot.elapsedTime >= 0, snapshot.distanceMeters >= 0
+        else { return }
+
+        let id = set.id
+        if var capture = cardioWatchCaptures[id],
+           capture.watchWorkoutStartedAt == watchStartedAt {
+            if watchCaptureNeedsBaseline.remove(id) != nil {
+                // When returning to a postponed set, skip intervening work.
+                capture.lastCapturedAt = snapshot.capturedAt
+                capture.lastElapsedTime = snapshot.elapsedTime
+                capture.lastDistanceMeters = snapshot.distanceMeters
+                capture.recordHeartRate(from: snapshot)
+            } else {
+                capture.ingest(snapshot)
+            }
+            cardioWatchCaptures[id] = capture
+        } else {
+            var capture = StrengthWatchCardioCapture(
+                watchWorkoutStartedAt: watchStartedAt,
+                lastCapturedAt: snapshot.capturedAt,
+                lastElapsedTime: snapshot.elapsedTime,
+                lastDistanceMeters: snapshot.distanceMeters
+            )
+            capture.recordHeartRate(from: snapshot)
+            cardioWatchCaptures[id] = capture
+            watchCaptureNeedsBaseline.remove(id)
+        }
+        if snapshot.capturedAt.timeIntervalSince(lastCardioWatchCheckpointAt) >= 15 {
+            lastCardioWatchCheckpointAt = snapshot.capturedAt
+            scheduleCheckpointPersist()
+        }
+    }
+
     var currentSetRecordsWeight: Bool {
         guard let set = currentSet else { return true }
         if let explicit = set.recordsWeight { return explicit }
@@ -1113,6 +1173,9 @@ final class StrengthWorkoutStore: ObservableObject {
         currentSetIndex = workout.exercises[target].sets
             .firstIndex(where: { !$0.isCompleted }) ?? 0
         activeWorkout = workout
+        if let id = currentSet?.id {
+            watchCaptureNeedsBaseline.insert(id)
+        }
         reloadDraftFromCurrentSet()
         // Moving to a timed running/treadmill exercise starts its set immediately.
         // Re-selecting the current exercise does not reset its clock.
@@ -1148,6 +1211,9 @@ final class StrengthWorkoutStore: ObservableObject {
         currentExerciseIndex = exerciseIndex
         currentSetIndex = setIndex
         isFreeTrainingBetweenExercises = false
+        if let id = currentSet?.id {
+            watchCaptureNeedsBaseline.insert(id)
+        }
         reloadDraftFromCurrentSet()
         if currentSet?.resolvedTargetKind == .time {
             startOrResumeTimedSet()
@@ -1960,6 +2026,8 @@ final class StrengthWorkoutStore: ObservableObject {
             StrengthAdvancedConfiguration? = nil
     ) {
         recoveredCheckpointSavedAt = nil
+        cardioWatchCaptures = [:]
+        watchCaptureNeedsBaseline = []
         activeWorkout = StrengthWorkoutLog(
             id: UUID(),
             plannedSessionID: nil,
@@ -2148,6 +2216,8 @@ final class StrengthWorkoutStore: ObservableObject {
             StrengthAdvancedConfiguration? = nil
     ) {
         recoveredCheckpointSavedAt = nil
+        cardioWatchCaptures = [:]
+        watchCaptureNeedsBaseline = []
         let exerciseLogs = session.exercises.map { planned in
             let setTargets =
                 planned.resolvedSetTargets
@@ -2339,6 +2409,28 @@ final class StrengthWorkoutStore: ObservableObject {
                     StrengthSetEffortSegment(durationSeconds: elapsed)
                 ]
             }
+        }
+        if let capture = cardioWatchCaptures.removeValue(forKey: set.id),
+           StrengthCardioExercisePolicy.isCardio(
+               workout.exercises[currentExerciseIndex].exercise.name
+           ) {
+            set.watchAverageHeartRateBPM = capture.averageHeartRate
+            set.watchMaximumHeartRateBPM = capture.peakHeartRateBPM
+            if capture.capturedActiveDuration > 0 {
+                set.watchActiveDurationSeconds = capture.capturedActiveDuration
+            }
+            if capture.measuredDistanceMeters > 0 {
+                let measured = capture.measuredDistanceMeters
+                set.watchMeasuredDistanceMeters = measured
+                set.completedDistanceMeters = measured
+                set.effortSegments = [
+                    StrengthSetEffortSegment(
+                        durationSeconds: set.completedDurationSeconds,
+                        distanceMeters: measured
+                    )
+                ]
+            }
+            watchCaptureNeedsBaseline.remove(set.id)
         }
         set.completedAt = Date()
 
@@ -3716,6 +3808,8 @@ final class StrengthWorkoutStore: ObservableObject {
         }
 
         completedWorkout = workout
+        cardioWatchCaptures = [:]
+        watchCaptureNeedsBaseline = []
         workoutHistory = updatedHistory
         ATHLTHTrainingDataChangeSignal.post(userID: accountID)
         activeWorkout = nil
