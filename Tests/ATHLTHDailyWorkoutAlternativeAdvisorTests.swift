@@ -61,9 +61,11 @@ final class ATHLTHDailyWorkoutAlternativeAdvisorTests: XCTestCase {
             original, with: option)
         XCTAssertEqual(changed.id, original.id)
         XCTAssertEqual(changed.targetDistanceKilometers, 5)
-        XCTAssertEqual(changed.workoutBlocks?.first?.distanceMeters, 5_000)
-        XCTAssertEqual(changed.workoutBlocks?.first?.targetHeartRateZone, 2)
-        XCTAssertNil(changed.runningWorkout)
+        XCTAssertFalse(changed.isStructuredWorkout,
+            "The replacement must retain the normal iPhone/Watch run launch")
+        XCTAssertEqual(changed.runningWorkout?.blocks.first?.work.distanceMeters, 5_000)
+        XCTAssertEqual(changed.runningWorkout?.blocks.first?.work.intensity.heartRateZone, 2)
+        XCTAssertNil(changed.routeID)
         XCTAssertNil(changed.routeID)
         XCTAssertEqual(changed.dailyAlternativeOriginal?.restoring(changed).id,
                        original.id)
