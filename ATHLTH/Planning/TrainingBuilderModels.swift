@@ -619,6 +619,23 @@ extension PlannedExercise {
 }
 
 
+/// Static bodyweight holds are measured in seconds, not repetitions.
+enum StrengthTimedBodyweightDefaults {
+    static let durationSeconds = 30
+
+    static func isBodyweightHold(_ name: String) -> Bool {
+        let normalized = name.folding(
+            options: [.diacriticInsensitive, .caseInsensitive],
+            locale: Locale(identifier: "nb_NO")
+        ).lowercased().replacingOccurrences(of: "-", with: " ")
+        return normalized.contains("hanging l sit") ||
+            normalized.contains("l sit hold") ||
+            normalized.contains("l sit") ||
+            normalized.contains("plank") ||
+            normalized.contains("hollow hold")
+    }
+}
+
 // Keep treadmill warm-ups consistent whether an exercise is added before
 // starting Strength or during an active Strength workout. A new choice must
 // always show its editable setup; these are only the initial values.
@@ -639,12 +656,15 @@ enum StrengthTreadmillWarmUpDefaults {
     static func plannedExercise(for exercise: Exercise) -> PlannedExercise {
         let treadmill = isTreadmill(exercise.snapshot.name) ||
             isTreadmill(exercise.snapshot.displayName)
+        let bodyweightHold =
+            StrengthTimedBodyweightDefaults.isBodyweightHold(exercise.snapshot.name) ||
+            StrengthTimedBodyweightDefaults.isBodyweightHold(exercise.snapshot.displayName)
         var planned = PlannedExercise(
             id: UUID(),
             exerciseID: exercise.id,
             embeddedExercise: exercise.snapshot,
             sets: treadmill ? sets : 3,
-            reps: treadmill ? nil : 8,
+            reps: treadmill || bodyweightHold ? nil : 8,
             targetWeightKilograms: nil,
             targetRPE: nil,
             restSeconds: treadmill ? 0 : 90,
@@ -653,10 +673,13 @@ enum StrengthTreadmillWarmUpDefaults {
             supersetGroupID: nil,
             progression: StrengthProgressionRule.none
         )
-        if treadmill {
+        if treadmill || bodyweightHold {
             planned.targetKind = .time
-            planned.targetDurationSeconds = durationSeconds
-            planned.setEntireExerciseWarmUp(true)
+            planned.targetDurationSeconds = treadmill
+                ? durationSeconds : StrengthTimedBodyweightDefaults.durationSeconds
+            if treadmill {
+                planned.setEntireExerciseWarmUp(true)
+            }
         }
         return planned
     }
