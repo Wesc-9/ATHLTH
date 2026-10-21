@@ -398,6 +398,16 @@ final class StrengthWarmUpExerciseTests: XCTestCase {
         )
         store.setDraft(treadmillSpeedKilometersPerHour: 9.0,
                        treadmillInclinePercent: 2)
+        let mirrored = try XCTUnwrap(store.watchSnapshot)
+        XCTAssertEqual(mirrored.manualTreadmillSpeedKilometersPerHour, 9.0)
+        XCTAssertEqual(mirrored.manualTreadmillInclinePercent, 2)
+        // Wire values travel with the already active Watch strength session.
+        let encoded = try JSONEncoder().encode(mirrored)
+        let decoded = try JSONDecoder().decode(
+            WatchStrengthSessionSnapshot.self, from: encoded
+        )
+        XCTAssertEqual(decoded.manualTreadmillSpeedKilometersPerHour, 9.0)
+        XCTAssertEqual(decoded.manualTreadmillInclinePercent, 2)
         store.startOrResumeTimedSet()
         let started = try XCTUnwrap(store.activeWorkout?.startedAt)
         store.ingestWatchCardioSnapshot(cardioWatchSample(
