@@ -8,7 +8,7 @@ enum RouteLibrarySource {
 
 // Shared visual language with My Routes, with public-only content in Routes.
 // Friends means mutually followed route owners, never friends-only visibility.
-private enum PublicRouteBrowseFilter: String, CaseIterable, Identifiable {
+enum PublicRouteBrowseFilter: String, CaseIterable, Identifiable {
     case all, favorites, friends
     var id: String { rawValue }
 
@@ -42,7 +42,7 @@ private enum RouteLibrarySort: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-private struct RouteLibraryEntry: Decodable, Identifiable {
+struct RouteLibraryEntry: Decodable, Identifiable {
     let id: UUID
     let ownerID: UUID
     let title: String
@@ -129,7 +129,9 @@ struct RouteLibraryListView: View {
     }
 
     private var catalogKey: String {
-        [query, sort.rawValue, String(lengthFilter), String(minLength), String(maxLength),
+        [query, sort.rawValue, String(lengthFilter),
+         lengthFilter == 6 ? String(minLength) : "",
+         lengthFilter == 6 ? String(maxLength) : "",
          String(publicFilter == .friends),
          String(locationStore.location?.coordinate.latitude ?? 0),
          String(locationStore.location?.coordinate.longitude ?? 0)].joined(separator: "|")
@@ -1605,7 +1607,7 @@ private struct RouteLibraryGhostSurfaceModifier:
     }
 }
 
-private struct RouteCatalogSearchParameters: Encodable {
+struct RouteCatalogSearchParameters: Encodable {
     let p_query: String
     let p_sort: String
     let p_length: Int
