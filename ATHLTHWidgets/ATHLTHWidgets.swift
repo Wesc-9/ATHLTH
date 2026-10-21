@@ -496,15 +496,20 @@ struct ATHLTHWorkoutLiveActivity: Widget {
         ActivityConfiguration(
             for: ATHLTHWorkoutActivityAttributes.self
         ) { context in
-            lockScreenContent(context)
-                .padding()
-                .activityBackgroundTint(
-                    Color.black.opacity(0.90)
-                )
-                .activitySystemActionForegroundColor(
-                    .white
-                )
-                .foregroundStyle(.white)
+            Group {
+                if context.state.workoutKindRaw == "strength" {
+                    strengthLightLockScreenContent(context)
+                        .foregroundStyle(ATHLTHWidgetPalette.ink)
+                        .activityBackgroundTint(ATHLTHWidgetPalette.canvas)
+                        .activitySystemActionForegroundColor(ATHLTHWidgetPalette.ink)
+                } else {
+                    lockScreenContent(context)
+                        .foregroundStyle(.white)
+                        .activityBackgroundTint(Color.black.opacity(0.90))
+                        .activitySystemActionForegroundColor(.white)
+                }
+            }
+            .padding()
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -553,6 +558,103 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                     .foregroundStyle(focusTint(context))
             }
         }
+    }
+
+    /// A standalone light ATHLTH strength layout; keeps the existing dark
+    /// running/live-activity experience untouched.
+    private func strengthLightLockScreenContent(_ context: Context) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 8) {
+                Text("ATHLTH")
+                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+                    .tracking(2.0)
+                    .foregroundStyle(ATHLTHWidgetPalette.ink)
+                Spacer()
+                Label(
+                    context.state.strengthRestEndsAt == nil
+                        ? localized("TRAINING", "TRENING")
+                        : localized("REST", "PAUSE"),
+                    systemImage: context.state.strengthRestEndsAt == nil
+                        ? "figure.strengthtraining.traditional" : "pause.circle.fill"
+                )
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(ATHLTHWidgetPalette.muted)
+            }
+            Rectangle()
+                .fill(Color(red: 0.71, green: 0.55, blue: 0.31).opacity(0.40))
+                .frame(height: 1)
+            Text(context.state.strengthExerciseName ??
+                localized("Strength training", "Styrketrening"))
+                .font(.headline.weight(.bold))
+                .lineLimit(2)
+
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                if let current = context.state.strengthSetIndex,
+                   let total = context.state.strengthSetCount, total > 0 {
+                    Label("\(current)/\(total)", systemImage: "list.number")
+                }
+                if let target = context.state.strengthTimedSetTargetSeconds,
+                   target > 0 {
+                    Label(duration(Double(target)), systemImage: "timer")
+                } else if let weight = context.state.strengthWeightKilograms,
+                          weight > 0 {
+                    Label(String(format: "%.1f kg", weight),
+                          systemImage: "scalemass")
+                } else if let reps = context.state.strengthReps, reps > 0 {
+                    Label("\(reps) reps", systemImage: "repeat")
+                }
+                Spacer(minLength: 0)
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(ATHLTHWidgetPalette.ink)
+
+            if let rest = context.state.strengthRestEndsAt {
+                HStack(spacing: 8) {
+                    Label(localized("Rest", "Pause"), systemImage: "pause.fill")
+                        .font(.caption.weight(.semibold))
+                    Text(rest, style: .timer)
+                        .font(.headline.weight(.bold))
+                        .monospacedDigit()
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(ATHLTHWidgetPalette.vitality)
+                if let next = context.state.strengthNextExerciseName {
+                    Text(localized("Next: ", "Neste: ") + next)
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                        .foregroundStyle(ATHLTHWidgetPalette.muted)
+                }
+            } else if let next = context.state.strengthNextExerciseName {
+                Text(localized("Next: ", "Neste: ") + next)
+                    .font(.caption2)
+                    .lineLimit(1)
+                    .foregroundStyle(ATHLTHWidgetPalette.muted)
+            }
+
+            HStack(spacing: 12) {
+                Label {
+                    if context.state.phase == "paused" {
+                        Text(duration(context.state.elapsedTime))
+                    } else if let started = context.attributes.startedAt {
+                        Text(started, style: .timer)
+                    } else {
+                        Text(duration(context.state.elapsedTime))
+                    }
+                } icon: {
+                    Image(systemName: "clock")
+                }
+                if context.state.heartRate > 0 {
+                    Label(
+                        "\(Int(context.state.heartRate.rounded())) bpm",
+                        systemImage: "heart.fill"
+                    )
+                }
+                Spacer(minLength: 0)
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(ATHLTHWidgetPalette.muted)
+        }
+        .padding(.vertical, 2)
     }
 
     @ViewBuilder
