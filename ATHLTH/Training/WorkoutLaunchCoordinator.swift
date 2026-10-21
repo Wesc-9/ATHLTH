@@ -83,7 +83,9 @@ struct PlannedWorkoutWatchBuilder {
                     workout.targetAlertConfiguration,
                 autoPauseEnabled:
                     autoPauseEnabled ??
-                    workout.autoPauseEnabled
+                    workout.autoPauseEnabled,
+                autoAdvanceTimedSteps:
+                    structured.allSatisfy { $0.autoAdvanceTimedSteps != false }
             )
         }
 
@@ -158,7 +160,8 @@ struct PlannedWorkoutWatchBuilder {
             title: workout.title,
             steps: runningSteps(from: workout),
             routeAlerts: routeAlerts,
-            autoPauseEnabled: autoPauseEnabled
+            autoPauseEnabled: autoPauseEnabled,
+            autoAdvanceTimedSteps: workout.autoAdvanceTimedSteps
         )
     }
 
