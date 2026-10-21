@@ -44,6 +44,9 @@ struct ATHLTHTrainIntervalComposerView: View {
     }
     @State private var editingBlockID: UUID?
     @State private var isComposerExpanded = false
+    @State private var pauseAfterWarmupEnabled: Bool
+    @State private var pauseAfterWarmupSeconds: Int
+    @State private var autoAdvanceTimedSteps: Bool
 
     private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
     private let muted = Color(red: 0.46, green: 0.44, blue: 0.43)
@@ -56,7 +59,20 @@ struct ATHLTHTrainIntervalComposerView: View {
         self.initial = initial
         self.onSave = onSave
         _name = State(initialValue: initial?.title ?? "")
-        _blocks = State(initialValue: initial?.blocks ?? [])
+        let initialBlocks = initial?.blocks ?? []
+        let warmupPause = initialBlocks.first {
+            $0.kind == .recovery &&
+            ($0.title == "Pause før hoveddel" ||
+             $0.title == "Recovery after warm-up")
+        }
+        _blocks = State(initialValue: initialBlocks.filter {
+            $0.id != warmupPause?.id
+        })
+        _pauseAfterWarmupEnabled = State(initialValue: warmupPause != nil)
+        _pauseAfterWarmupSeconds = State(initialValue:
+            max(15, Int(warmupPause?.work.durationSeconds ?? 90)))
+        _autoAdvanceTimedSteps = State(initialValue:
+            initial?.autoAdvanceTimedSteps ?? true)
         _activityName = State(initialValue: "")
         _ghostEnabled = State(initialValue: initial?.intervalGhostPaceSecondsPerKilometer != nil)
         _ghostPaceSeconds = State(initialValue: Int(initial?.intervalGhostPaceSecondsPerKilometer ?? 300))
@@ -522,6 +538,33 @@ struct ATHLTHTrainIntervalComposerView: View {
                 .tracking(1.4)
                 .foregroundStyle(bronze)
 
+            Toggle(tr("Automatically advance timed phases", "Automatisk neste ved tidsstyrte deler"),
+                   isOn: $autoAdvanceTimedSteps)
+                .tint(ATHLTHPlanDesign.accentInk)
+            Text(tr(
+                "A timed interval ends at its scheduled second and the next recovery starts automatically. Turn off to use Done / Next manually.",
+                "Et tidsstyrt drag avsluttes på riktig sekund og neste pause starter automatisk. Slå av for å bruke Ferdig / Neste."
+            ))
+            .font(.caption)
+            .foregroundStyle(muted)
+
+            if blocks.contains(where: { $0.kind == .warmup }) {
+                Toggle(tr("Pause between warm-up and main set",
+                          "Pause mellom oppvarming og hoveddel"),
+                       isOn: $pauseAfterWarmupEnabled)
+                    .tint(ATHLTHPlanDesign.accentInk)
+                if pauseAfterWarmupEnabled {
+                    Stepper(tr("Pause", "Pause") + " · \(pauseAfterWarmupSeconds) s",
+                            value: $pauseAfterWarmupSeconds, in: 15...900, step: 15)
+                    Text(tr(
+                        "The recovery is an independent, timed step before the main set.",
+                        "Pausen blir et eget tidsstyrt øktsteg før hoveddelen."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(muted)
+                }
+            }
+
             Toggle(tr("Virtual Ghost on work efforts", "Virtuell Ghost på drag"),
                    isOn: $ghostEnabled)
                 .tint(bronze)
@@ -715,18 +758,28 @@ struct ATHLTHTrainIntervalComposerView: View {
 
     private func save() {
         let now = Date()
+        var savedBlocks = blocks
+        if pauseAfterWarmupEnabled,
+           let warmupIndex = savedBlocks.firstIndex(where: { $0.kind == .warmup }) {
+            savedBlocks.insert(RunningWorkoutBlock(
+                kind: .recovery,
+                title: tr("Recovery after warm-up", "Pause før hoveddel"),
+                work: .time(Double(pauseAfterWarmupSeconds), intensity: .easy)
+            ), at: warmupIndex + 1)
+        }
         var result = RunningWorkoutTemplate(
             id: initial?.isBuiltIn == false ? (initial?.id ?? UUID()) : UUID(),
             title: name.trimmingCharacters(in: .whitespacesAndNewlines),
             type: initial?.type ?? .intervals,
             summary: tr("Advanced structured running session",
                         "Detaljert strukturert løpeøkt"),
-            blocks: blocks,
+            blocks: savedBlocks,
             routeID: initial?.routeID,
             isBuiltIn: false,
             createdAt: initial?.createdAt ?? now,
             updatedAt: now
         )
+        result.autoAdvanceTimedSteps = autoAdvanceTimedSteps
         result.intervalGhostPaceSecondsPerKilometer =
             ghostEnabled ? Double(ghostPaceSeconds) : nil
         result.intervalGhostFollowRecovery = ghostEnabled && ghostFollowRecovery
