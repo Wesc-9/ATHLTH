@@ -1066,34 +1066,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     ) {
         let previous = strengthSession
 
-        if let previous, previous.workoutID == snapshot.workoutID {
-            // The iPhone owns the authoritative exercise queue. When a user
-            // adds an exercise after the final planned set, completion must
-            // legitimately move from true back to false. Reject older queue
-            // shapes, but never reject the expanded iPhone plan merely
-            // because Watch thought the session had finished.
-            let expanded = snapshot.exerciseCount > previous.exerciseCount ||
-                snapshot.totalSets > previous.totalSets
-            if snapshot.completedSets < previous.completedSets {
-                return
-            }
-            if snapshot.exerciseCount < previous.exerciseCount {
-                return
-            }
-            if !expanded {
-                if previous.allExercisesComplete &&
-                    !snapshot.allExercisesComplete &&
-                    snapshot.completedSets == previous.completedSets &&
-                    snapshot.exerciseCount == previous.exerciseCount &&
-                    snapshot.exerciseQueue == previous.exerciseQueue {
-                    return
-                }
-                if snapshot.completedSets == previous.completedSets,
-                   snapshot.updatedAt.addingTimeInterval(0.75) < previous.updatedAt {
-                    return
-                }
-            }
-        }
+        guard ATHLTHStrengthWatchSnapshotAcceptance.shouldApply(
+            incoming: snapshot, after: previous
+        ) else { return }
 
         publish {
             self.strengthSession = snapshot
