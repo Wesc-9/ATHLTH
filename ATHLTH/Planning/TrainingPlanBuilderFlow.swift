@@ -784,6 +784,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         case mine
     }
 
+    // Keep each step behind a stable type boundary. The TestFlight 1.8.7
+    // crash symbolicates to a giant wizardScroll<ConditionalContent<...>>
+    // instantiation; even when a wizard is not visible, SwiftUI can request
+    // its generic metadata during unrelated tab layout updates.
     @ViewBuilder
     private var content: some View {
         switch step {
@@ -792,54 +796,49 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         case .source:
             AnyView(sourceChoice)
         case .basics:
-            AnyView(wizardScroll {
-                AnyView(Group {
+            AnyView(wizardScroll(AnyView(
+                Group {
                     if mode == .basic {
-                        simpleBasicsStep
+                        AnyView(simpleBasicsStep)
                     } else {
-                        basicsStep
+                        AnyView(basicsStep)
                     }
-                })
-            })
+                }
+            )))
         case .profile:
-            AnyView(wizardScroll {
-                AnyView(profileStep)
-            })
+            AnyView(wizardScroll(AnyView(profileStep)))
         case .week:
-            AnyView(wizardScroll {
-                AnyView(Group {
+            AnyView(wizardScroll(AnyView(
+                Group {
                     if mode == .advanced {
                         switch weekPlanningApproach {
                         case .none:
-                            chooseWeekPlanningApproach
+                            AnyView(chooseWeekPlanningApproach)
                         case .some(.quick):
-                            weekStep
+                            AnyView(weekStep)
                         case .some(.guided):
-                            guidedWeekStep
+                            AnyView(guidedWeekStep)
                         }
                     } else {
-                        weekStep
+                        AnyView(weekStep)
                     }
-                })
-            })
+                }
+            )))
         case .review:
-            AnyView(wizardScroll {
-                AnyView(reviewStep)
-            })
+            AnyView(wizardScroll(AnyView(reviewStep)))
         }
     }
 
-    private func wizardScroll<Content: View>(
-        @ViewBuilder content:
-            () -> Content
-    ) -> some View {
+    // This must NOT be generic. A generic ScrollView over nested wizard
+    // steps recreates the deeply mangled runtime metadata from build 94.
+    private func wizardScroll(_ page: AnyView) -> some View {
         ScrollView {
             LazyVStack(
                 alignment: .leading,
                 spacing: 16
             ) {
                 AnyView(progressHeader)
-                AnyView(content())
+                page
             }
             .padding(.horizontal, 18)
             .padding(.top, 14)
