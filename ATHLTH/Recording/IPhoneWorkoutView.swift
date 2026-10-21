@@ -1140,15 +1140,13 @@ struct IPhoneWorkoutView: View {
                         alignment: .leading,
                         spacing: 13
                     ) {
-                        premiumWorkoutHeader(
-                            workout
-                        )
+                        premiumWorkoutHeader(workout)
+
+                        if let step = recorder.currentStructuredStep {
+                            IPhoneStructuredStepCard(workout: workout, step: step)
+                        }
 
                         TrainTogetherStatusStrip()
-
-                    if let step = recorder.currentStructuredStep {
-                        IPhoneStructuredStepCard(workout: workout, step: step)
-                    }
 
                         IPhoneWorkoutLiveMetricsPanel(
                             workout: workout,
