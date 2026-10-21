@@ -10926,6 +10926,7 @@ private struct StrengthActiveExerciseQueueView: View {
                     List {
                         Section {
                             ForEach(workout.exercises) { exercise in
+                                VStack(alignment: .leading, spacing: 9) {
                                 HStack(spacing: 10) {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(exercise.exercise.displayName)
@@ -10985,6 +10986,56 @@ private struct StrengthActiveExerciseQueueView: View {
                                         .buttonStyle(.bordered)
                                         .controlSize(.small)
                                     }
+                                }
+                                DisclosureGroup(
+                                    ATHLTHLocalization.choose(
+                                        english: "View planned sets",
+                                        norwegian: "Vis planlagte sett"
+                                    )
+                                ) {
+                                    VStack(spacing: 0) {
+                                        ForEach(exercise.sets) { set in
+                                            HStack(spacing: 9) {
+                                                Image(systemName: set.isCompleted
+                                                    ? "checkmark.circle.fill"
+                                                    : "circle")
+                                                    .foregroundStyle(set.isCompleted
+                                                        ? ATHLTHPlanDesign.accentInk
+                                                        : ATHLTHPlanDesign.secondaryInk)
+                                                Text("Sett \(set.setNumber)")
+                                                    .fontWeight(.semibold)
+                                                Spacer()
+                                                Text(
+                                                    set.resolvedTargetKind == .time
+                                                        ? TimeInterval(set.plannedDurationSeconds ?? 0).clockDuration
+                                                        : "\(set.plannedReps ?? 0) reps"
+                                                )
+                                                .monospacedDigit()
+                                                if let weight = set.plannedWeightKilograms {
+                                                    Text(String(format: "· %.1f kg", weight))
+                                                }
+                                            }
+                                            .font(.caption)
+                                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                                            .padding(.vertical, 8)
+                                            if set.id != exercise.sets.last?.id {
+                                                Divider()
+                                            }
+                                        }
+                                        if let skipped = exercise.skippedPlannedSetCount,
+                                           skipped > 0 {
+                                            Text(ATHLTHLocalization.choose(
+                                                english: "\(skipped) planned sets skipped",
+                                                norwegian: "\(skipped) planlagte sett hoppet over"
+                                            ))
+                                            .font(.caption2)
+                                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                        }
+                                    }
+                                    .padding(.top, 8)
+                                }
+                                .font(.caption.weight(.semibold))
+                                .tint(ATHLTHPlanDesign.accentInk)
                                 }
                                 .padding(.vertical, 5)
                             }
