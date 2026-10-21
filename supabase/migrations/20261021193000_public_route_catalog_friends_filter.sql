@@ -8,7 +8,9 @@ create or replace function public.search_public_route_catalog(
   p_latitude double precision default null,
   p_longitude double precision default null,
   p_offset integer default 0,
-  p_friends_only boolean default false
+  p_friends_only boolean default false,
+  p_min_length double precision default 0,
+  p_max_length double precision default 20
 )
 returns table (
   id uuid, owner_id uuid, title text, distance_kilometers double precision,
@@ -43,10 +45,14 @@ as $function$
       lower(r.title || ' ' || coalesce(r.start_name, '') || ' ' || coalesce(r.end_name, '')),
       lower(left(p_query, 200))) > 0)
     and case p_length
-      when 1 then r.distance_kilometers < 5
-      when 2 then r.distance_kilometers >= 5 and r.distance_kilometers < 10
-      when 3 then r.distance_kilometers >= 10 and r.distance_kilometers < 21.1
-      when 4 then r.distance_kilometers >= 21.1
+      when 1 then r.distance_kilometers < 3
+      when 2 then r.distance_kilometers >= 3 and r.distance_kilometers < 5
+      when 3 then r.distance_kilometers >= 5 and r.distance_kilometers < 10
+      when 4 then r.distance_kilometers >= 10 and r.distance_kilometers < 20
+      when 5 then r.distance_kilometers >= 20
+      when 6 then r.distance_kilometers between
+        greatest(0, least(coalesce(p_min_length, 0), coalesce(p_max_length, 20))) and
+        greatest(coalesce(p_min_length, 0), coalesce(p_max_length, 20))
       else true end
   order by
     case when p_sort = 'Nearest' and p_latitude between -90 and 90 and p_longitude between -180 and 180 then
@@ -64,8 +70,10 @@ as $function$
 $function$;
 
 revoke all on function public.search_public_route_catalog(
-  text, text, integer, double precision, double precision, integer, boolean
+  text, text, integer, double precision, double precision, integer, boolean,
+  double precision, double precision
 ) from public, anon;
 grant execute on function public.search_public_route_catalog(
-  text, text, integer, double precision, double precision, integer, boolean
+  text, text, integer, double precision, double precision, integer, boolean,
+  double precision, double precision
 ) to authenticated;
