@@ -665,9 +665,27 @@ struct RouteLibraryListView: View {
 
     @MainActor
     private func loadMapRouteGeometry() async {
-        for entry in entries.prefix(20) {
+        // One RLS-protected batch instead of twenty sequential round-trips.
+        // The catalogue RPC returns metadata only; detailed polylines are
+        // fetched on demand for the visible map and capped for MapKit memory.
+        guard viewMode == .map, !Task.isCancelled else { return }
+        let ids = entries.prefix(20).map(\.id)
+            .filter { hydratedRoutes[$0] == nil }
+        guard !ids.isEmpty else { return }
+        do {
+            let records: [CommunityRouteRecord] = try await SupabaseEnvironment.client
+                .from("community_routes")
+                .select()
+                .in("id", values: ids.map(\.uuidString))
+                .execute().value
             guard !Task.isCancelled, viewMode == .map else { return }
-            await loadRouteDetail(entry.id)
+            let requested = Set(ids)
+            for record in records where requested.contains(record.id) {
+                hydratedRoutes[record.id] = record.trainingRoute
+            }
+        } catch {
+            // Server permission or transient failure: all rows remain
+            // navigable through RouteLibraryDetailLoader.
         }
     }
 
