@@ -607,6 +607,8 @@ struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
     // True only when the athlete explicitly starts a no-plan strength
     // workout. Optional preserves older workout-history decoding.
     var allowsLiveExerciseBuilding: Bool? = nil
+    // Optional for backward-compatible saved strength sessions.
+    var liveHeartRateTargetZone: Int? = nil
 
     var totalCompletedSets: Int {
         exercises
