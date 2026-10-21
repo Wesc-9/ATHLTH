@@ -349,7 +349,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     var body: some View {
-        planPresentations
+        // Bound metadata decoding for the full plan wizard; an unbounded
+        // SwiftUI generic chain exhausted the iPhone main-thread stack.
+        AnyView(planPresentations)
     }
 
     private var planNavigation: some View {
@@ -364,7 +366,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 .opacity(0.28)
                 )
 
-                content
+                AnyView(content)
             }
             .navigationTitle(
                 ATHLTHLocalization.choose(
@@ -396,11 +398,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             .safeAreaInset(edge: .bottom) {
                 if !showingCreatedPlan {
                     if step == .mode {
-                        modeContinueBar
+                        AnyView(modeContinueBar)
                     } else if step == .source {
-                        sourceContinueBar
+                        AnyView(sourceContinueBar)
                     } else {
-                        bottomActionBar
+                        AnyView(bottomActionBar)
                     }
                 }
             }
@@ -425,7 +427,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private var planLifecycle: some View {
-        planNavigation
+        AnyView(planNavigation)
         .onAppear {
             draftStore.setEditing(true, userID: session.profile.userID, draftID: draftID)
             guard !didApplySuggestedStartDate
@@ -495,7 +497,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private var planPrimaryObservers: some View {
-        planLifecycle
+        AnyView(planLifecycle)
         .onChange(of: title) { _, _ in saveResumableDraft() }
         .onChange(of: weekCount) { _, _ in saveResumableDraft() }
         .onChange(of: startDate) { _, _ in saveResumableDraft() }
@@ -515,7 +517,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private var planSecondaryObservers: some View {
-        planPrimaryObservers
+        AnyView(planPrimaryObservers)
         .onChange(of: weekCount) { _, value in
             selectedPlanWeekIndex = min(selectedPlanWeekIndex, max(0, value - 1))
             weekDayEdits = weekDayEdits.filter { $0.key <= value * 7 }
@@ -560,7 +562,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private var planPresentations: some View {
-        planSecondaryObservers
+        AnyView(planSecondaryObservers)
         .alert(
             ATHLTHLocalization.choose(
                 english: "Could not create plan",
@@ -786,40 +788,44 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private var content: some View {
         switch step {
         case .mode:
-            modeChoice
+            AnyView(modeChoice)
         case .source:
-            sourceChoice
+            AnyView(sourceChoice)
         case .basics:
-            wizardScroll {
-                if mode == .basic {
-                    simpleBasicsStep
-                } else {
-                    basicsStep
-                }
-            }
-        case .profile:
-            wizardScroll {
-                profileStep
-            }
-        case .week:
-            wizardScroll {
-                if mode == .advanced {
-                    switch weekPlanningApproach {
-                    case .none:
-                        chooseWeekPlanningApproach
-                    case .some(.quick):
-                        weekStep
-                    case .some(.guided):
-                        guidedWeekStep
+            AnyView(wizardScroll {
+                AnyView(Group {
+                    if mode == .basic {
+                        simpleBasicsStep
+                    } else {
+                        basicsStep
                     }
-                } else {
-                    weekStep
-                }
-            }
+                })
+            })
+        case .profile:
+            AnyView(wizardScroll {
+                AnyView(profileStep)
+            })
+        case .week:
+            AnyView(wizardScroll {
+                AnyView(Group {
+                    if mode == .advanced {
+                        switch weekPlanningApproach {
+                        case .none:
+                            chooseWeekPlanningApproach
+                        case .some(.quick):
+                            weekStep
+                        case .some(.guided):
+                            guidedWeekStep
+                        }
+                    } else {
+                        weekStep
+                    }
+                })
+            })
         case .review:
-            wizardScroll {
-                reviewStep
-            }
+            AnyView(wizardScroll {
+                AnyView(reviewStep)
+            })
         }
     }
 
@@ -832,8 +838,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 alignment: .leading,
                 spacing: 16
             ) {
-                progressHeader
-                content()
+                AnyView(progressHeader)
+                AnyView(content())
             }
             .padding(.horizontal, 18)
             .padding(.top, 14)
