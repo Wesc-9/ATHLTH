@@ -1433,7 +1433,7 @@ final class StrengthWorkoutStore: ObservableObject {
             completedSets: workout.totalCompletedSets,
             totalSets: totalSets,
             draftReps: draftReps,
-            draftWeightKilograms: draftWeightKilograms,
+            draftWeightKilograms: currentSetRecordsWeight ? draftWeightKilograms : 0,
             draftRestSeconds: draftRestSeconds,
             draftDurationSeconds: draftDurationSeconds,
             draftResistanceLevel: draftResistanceLevel,
