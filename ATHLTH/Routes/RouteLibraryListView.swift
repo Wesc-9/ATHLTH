@@ -280,7 +280,11 @@ struct RouteLibraryListView: View {
         .onChange(of: sort) { _, value in
             if value == .nearest { locationStore.refresh() }
         }
-        .task(id: viewMode == .map ? catalogKey + "|map" : "") {
+        .task(id: viewMode == .map
+              ? catalogKey + "|map|" + entries.prefix(20)
+                  .map { $0.id.uuidString }.joined(separator: ",")
+                  + "|favorites:\(favoritesOnly)"
+              : "") {
             if viewMode == .map { await loadMapRouteGeometry() }
         }
         .onChange(of: favoritesOnly) { _, _ in
@@ -290,8 +294,8 @@ struct RouteLibraryListView: View {
             }
         }
         .onDisappear { locationStore.stop() }
-        .sheet(item: $showingMapRoute) { route in
-            NavigationStack { RouteDetailView(route: route) }
+        .fullScreenCover(item: $showingMapRoute) { route in
+            SavedRouteFullscreenMap(route: route)
         }
     }
 
@@ -453,12 +457,22 @@ struct RouteLibraryListView: View {
         VStack(alignment: .leading, spacing: 12) {
             Group {
                 if let route = hydratedRoutes[entry.id] {
-                    NavigationLink {
-                        RouteDetailView(route: route)
+                    Button {
+                        showingMapRoute = route
                     } label: {
-                        RouteMapSnapshotThumbnail(route: route, height: 173)
-                            .frame(maxWidth: .infinity)
-                            .clipShape(RoundedRectangle(cornerRadius: 17))
+                        ZStack(alignment: .bottomTrailing) {
+                            RouteMapSnapshotThumbnail(route: route, height: 173)
+                                .frame(maxWidth: .infinity)
+                                .clipShape(RoundedRectangle(cornerRadius: 17))
+                            Label(tr("Explore", "Utforsk"),
+                                  systemImage: "arrow.up.left.and.arrow.down.right")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 7)
+                                .background(.regularMaterial, in: Capsule())
+                                .padding(10)
+                        }
                     }
                     .buttonStyle(.plain)
                 } else {
@@ -534,11 +548,13 @@ struct RouteLibraryListView: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.plain)
-                NavigationLink {
-                    RouteLibraryDetailLoader(routeID: entry.id)
+                Button {
+                    if let route = hydratedRoutes[entry.id] {
+                        showingMapRoute = route
+                    }
                 } label: {
-                    Label(tr("Open route", "Åpne rute"),
-                          systemImage: "arrow.right.circle.fill")
+                    Label(tr("Explore map", "Utforsk kart"),
+                          systemImage: "map.fill")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, minHeight: 45)
@@ -546,6 +562,8 @@ struct RouteLibraryListView: View {
                                     in: RoundedRectangle(cornerRadius: 13))
                 }
                 .buttonStyle(.plain)
+                .disabled(hydratedRoutes[entry.id] == nil)
+                .opacity(hydratedRoutes[entry.id] == nil ? 0.45 : 1)
             }
             .simultaneousGesture(TapGesture().onEnded { markRecent(entry) })
         }
