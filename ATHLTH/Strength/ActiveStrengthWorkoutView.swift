@@ -2792,9 +2792,18 @@ struct ActiveStrengthWorkoutView: View {
                         )
                     )
                     .font(.caption2)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    if let skipped = exercise.skippedPlannedSetCount, skipped > 0 {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "\(skipped) planned set(s) skipped",
+                                norwegian: "\(skipped) planlagte sett hoppet over"
+                            ),
+                            systemImage: "forward.end"
+                        )
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    }
                 }
 
                 Spacer()
