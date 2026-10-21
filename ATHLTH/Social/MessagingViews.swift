@@ -3527,6 +3527,22 @@ struct DirectMessageThreadView: View {
                     }
                 }
 
+                Divider()
+
+                if let photoCreditURL = URL(string:
+                    "https://commons.wikimedia.org/wiki/File:Sunset_at_Lake_Fairway_Athletics_Track.JPG"
+                ) {
+                    Link(destination: photoCreditURL) {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Stadium photo · Editor5807 (CC BY 3.0)",
+                                norwegian: "Stadionfoto · Editor5807 (CC BY 3.0)"
+                            ),
+                            systemImage: "photo"
+                        )
+                    }
+                }
+
                 Button(
                     ATHLTHLocalization.choose(
                         english: "Block",
