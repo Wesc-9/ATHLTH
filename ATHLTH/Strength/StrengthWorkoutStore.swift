@@ -1014,6 +1014,27 @@ final class StrengthWorkoutStore: ObservableObject {
         return exercise.sets[currentSetIndex]
     }
 
+    var currentSetRecordsWeight: Bool {
+        guard let set = currentSet else { return true }
+        if let explicit = set.recordsWeight { return explicit }
+        return !(set.resolvedTargetKind == .time &&
+            currentExercise.map {
+                StrengthTreadmillWarmUpDefaults.isTreadmill($0.exercise.name) ||
+                StrengthTimedBodyweightDefaults.isBodyweightHold($0.exercise.name)
+            } == true)
+    }
+
+    func setCurrentSetRecordsWeight(_ enabled: Bool) {
+        guard var workout = activeWorkout,
+              workout.exercises.indices.contains(currentExerciseIndex),
+              workout.exercises[currentExerciseIndex].sets.indices.contains(currentSetIndex),
+              !workout.exercises[currentExerciseIndex].sets[currentSetIndex].isCompleted
+        else { return }
+        workout.exercises[currentExerciseIndex].sets[currentSetIndex].recordsWeight = enabled
+        activeWorkout = workout
+        persistCheckpointNow()
+    }
+
     var isResting: Bool {
         // Rest is a manual gate, not just a countdown. Once a rest period
         // starts it stays active until the athlete explicitly continues,
@@ -2006,24 +2027,27 @@ final class StrengthWorkoutStore: ObservableObject {
         targetWeightKilograms: Double? = nil,
         targetResistanceLevel: Int? = nil,
         restSeconds: Int? = 90,
-        warmUpSets: Int = 0
+        warmUpSets: Int = 0,
+        recordsWeight: Bool? = nil
     ) {
         finalizeActualRestIfNeeded()
         guard var workout = activeWorkout else { return }
         isFreeTrainingBetweenExercises = false
 
+        let isHold = StrengthTimedBodyweightDefaults.isBodyweightHold(
+            exercise.snapshot.name
+        )
         let resolvedTargetKind =
-            targetKind ??
-            exercise
-                .snapshot
-                .defaultStrengthTargetKind
+            targetKind ?? (isHold
+                ? .time
+                : exercise.snapshot.defaultStrengthTargetKind)
         let resolvedLoadKind =
             loadKind ??
             exercise
                 .snapshot
                 .defaultStrengthLoadKind
         let setCount = max(sets, 1)
-        let log = StrengthExerciseLog(
+        var log = StrengthExerciseLog(
             id: UUID(),
             plannedExerciseID: nil,
             exercise: exercise.snapshot,
@@ -2081,6 +2105,12 @@ final class StrengthWorkoutStore: ObservableObject {
             completedAt: nil
         )
 
+        for index in log.sets.indices {
+            log.sets[index].recordsWeight = recordsWeight ??
+                !(isHold || StrengthTreadmillWarmUpDefaults.isTreadmill(
+                    exercise.snapshot.name
+                ))
+        }
         let wasEmpty =
             workout.exercises.isEmpty
         let previousExercisesComplete =
@@ -2456,7 +2486,7 @@ final class StrengthWorkoutStore: ObservableObject {
                     ? (currentTimedSetCountdown?.elapsedSeconds() ?? draftDurationSeconds)
                     : nil,
             weightKilograms:
-                loadKind == .weightKilograms && !treadmill
+                loadKind == .weightKilograms && !treadmill && currentSetRecordsWeight
                     ? draftWeightKilograms
                     : nil,
             resistanceLevel:
