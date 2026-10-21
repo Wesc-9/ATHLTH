@@ -897,8 +897,9 @@ struct IPhoneWorkoutView: View {
 
                         TrainTogetherStatusStrip()
 
-                    if let step =
-                        recorder.currentStructuredStep {
+                    if recorder.currentStructuredStep != nil {
+                        VStack(alignment: .leading, spacing: 0) {
+                            if let step = recorder.currentStructuredStep {
                         VStack(alignment: .leading, spacing: 12) {
                             Text(ATHLTHLocalization.choose(
                                 english: "WORKOUT STEP", norwegian: "ØKTSTEG"
@@ -1065,8 +1066,10 @@ struct IPhoneWorkoutView: View {
                             }
                         }
                     }
+                        }
                         .padding(17)
                         .athlthPlanCard(radius: 21)
+                    }
 
                         IPhoneWorkoutLiveMetricsPanel(
                             workout: workout,
