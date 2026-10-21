@@ -6,6 +6,31 @@ enum RouteLibrarySource {
     case database, mine
 }
 
+// Shared visual language with My Routes, with public-only content in Routes.
+// Friends means mutually followed route owners, never friends-only visibility.
+private enum PublicRouteBrowseFilter: String, CaseIterable, Identifiable {
+    case all, favorites, friends
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all:
+            return ATHLTHLocalization.choose(english: "All", norwegian: "Alle")
+        case .favorites:
+            return ATHLTHLocalization.choose(english: "Favorites", norwegian: "Favoritter")
+        case .friends:
+            return ATHLTHLocalization.choose(english: "Friends", norwegian: "Venner")
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .all: return "square.grid.2x2"
+        case .favorites: return "star.fill"
+        case .friends: return "person.2.fill"
+        }
+    }
+}
+
 private enum RouteLibrarySort: String, CaseIterable, Identifiable {
     case newest = "Newest"
     case nearest = "Nearest"
@@ -19,6 +44,7 @@ private enum RouteLibrarySort: String, CaseIterable, Identifiable {
 
 private struct RouteLibraryEntry: Decodable, Identifiable {
     let id: UUID
+    let ownerID: UUID
     let title: String
     let distanceKilometers: Double
     let elevationGainMeters: Double?
@@ -30,6 +56,7 @@ private struct RouteLibraryEntry: Decodable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case id, title
+        case ownerID = "owner_id"
         case distanceKilometers = "distance_kilometers"
         case elevationGainMeters = "elevation_gain_meters"
         case startName = "start_name"
@@ -41,6 +68,7 @@ private struct RouteLibraryEntry: Decodable, Identifiable {
 
     init(route: TrainingRoute) {
         id = route.id
+        ownerID = route.ownerID
         title = route.title
         distanceKilometers = route.distanceKilometers
         elevationGainMeters = route.elevationGainMeters
@@ -60,6 +88,9 @@ private struct RouteLibraryEntry: Decodable, Identifiable {
 struct RouteLibraryListView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
     @EnvironmentObject private var recents: LibraryRecentsStore
     @StateObject private var locationStore = HomeLocationStore()
@@ -69,7 +100,11 @@ struct RouteLibraryListView: View {
     @State private var query = ""
     @State private var sort: RouteLibrarySort = .newest
     @State private var lengthFilter = 0
-    @State private var favoritesOnly = false
+    @State private var publicFilter: PublicRouteBrowseFilter = .all
+    @AppStorage("athlth.routes.picker.runPace.v1")
+    private var manualRunSecondsPerKm = 0
+    @State private var watchMessage: String?
+    @State private var watchError: String?
     @State private var loading = false
     @State private var errorMessage: String?
     @State private var hasMore = false
@@ -89,14 +124,14 @@ struct RouteLibraryListView: View {
     }
 
     private var catalogKey: String {
-        [query, sort.rawValue, String(lengthFilter),
+        [query, sort.rawValue, String(lengthFilter), String(publicFilter == .friends),
          String(locationStore.location?.coordinate.latitude ?? 0),
          String(locationStore.location?.coordinate.longitude ?? 0)].joined(separator: "|")
     }
 
     private var entries: [RouteLibraryEntry] {
         if source == .database {
-            return favoritesOnly
+            return publicFilter == .favorites
                 ? catalog.filter {
                     favorites.isFavorite(
                         .route,
@@ -283,11 +318,11 @@ struct RouteLibraryListView: View {
         .task(id: viewMode == .map
               ? catalogKey + "|map|" + entries.prefix(20)
                   .map { $0.id.uuidString }.joined(separator: ",")
-                  + "|favorites:\(favoritesOnly)"
+                  + "|filter:\(publicFilter.rawValue)"
               : "") {
             if viewMode == .map { await loadMapRouteGeometry() }
         }
-        .onChange(of: favoritesOnly) { _, _ in
+        .onChange(of: publicFilter) { _, _ in
             // Favorites filter is local; server sorting and pagination persist.
             if viewMode == .map {
                 Task { await loadMapRouteGeometry() }
@@ -296,6 +331,17 @@ struct RouteLibraryListView: View {
         .onDisappear { locationStore.stop() }
         .fullScreenCover(item: $showingMapRoute) { route in
             SavedRouteFullscreenMap(route: route)
+        }
+        .alert("ATHLTH", isPresented: Binding(
+            get: { watchMessage != nil || watchError != nil },
+            set: { if !$0 { watchMessage = nil; watchError = nil } }
+        )) {
+            Button("OK", role: .cancel) {
+                watchMessage = nil
+                watchError = nil
+            }
+        } message: {
+            Text(watchError ?? watchMessage ?? "")
         }
     }
 
@@ -1231,10 +1277,11 @@ struct RouteLibraryListView: View {
                 p_length: lengthFilter,
                 p_latitude: locationStore.location?.coordinate.latitude,
                 p_longitude: locationStore.location?.coordinate.longitude,
-                p_offset: offset
+                p_offset: offset,
+                p_friends_only: publicFilter == .friends
             )
             let page: [RouteLibraryEntry] = try await SupabaseEnvironment.client
-                .rpc("search_route_catalog", params: params).execute().value
+                .rpc("search_public_route_catalog", params: params).execute().value
             try Task.checkCancellation()
             guard catalogRequestID == requestID else { return }
             catalog += page
@@ -1327,4 +1374,5 @@ private struct RouteCatalogSearchParameters: Encodable {
     let p_latitude: Double?
     let p_longitude: Double?
     let p_offset: Int
+    let p_friends_only: Bool
 }
