@@ -875,6 +875,8 @@ struct ATHLTHHomeView: View {
             // other root tabs. Only the scrolling sheet moves behind it; the
             // system tab bar itself remains unchanged.
             .ignoresSafeArea(.container, edges: .bottom)
+            // Erase the large Home content before attaching modal sheets.
+            .athlthStablePresentationBoundary()
             .sheet(
                 isPresented:
                     $showingGettingStartedPopup
@@ -928,7 +930,11 @@ struct ATHLTHHomeView: View {
                     }
                 }
             }
+            .athlthStablePresentationBoundary()
             .sheet(item: $pendingHomeQuickStartKind) { kind in
+                // Stable type regardless of running, walking or other kind.
+                AnyView(
+                    Group {
                 if kind == .running {
                     RunQuickStartSheet(
                         trainingDeviceProvider:
@@ -1115,7 +1121,10 @@ struct ATHLTHHomeView: View {
                         }
                     }
                 }
+                    }
+                )
             }
+            .athlthStablePresentationBoundary()
             .fullScreenCover(item: $selectedHomeStructuredWorkout) { workout in
                 // Newer workout builders store their ordered sets in blocks,
                 // not legacy session.exercises. Reuse the real timeline
@@ -1153,6 +1162,7 @@ struct ATHLTHHomeView: View {
                     ""
                 )
             }
+            .athlthStablePresentationBoundary()
             .refreshable {
                 async let communityRefresh: Void = community.refresh()
                 async let groupRefresh: Void =
@@ -1194,6 +1204,7 @@ struct ATHLTHHomeView: View {
             }
             // Present search outside Home's refreshable environment so its
             // scroll view never inherits Home's pull-to-refresh action.
+            .athlthStablePresentationBoundary()
             .sheet(isPresented: $showingGlobalSearch) {
                 ATHLTHGlobalSearchView()
                     .presentationDetents([.large])
@@ -1224,6 +1235,7 @@ struct ATHLTHHomeView: View {
                     .presentationDragIndicator(.visible)
                     .presentationCornerRadius(28)
             }
+            .athlthStablePresentationBoundary()
             .onAppear {
                 syncHomeTodayWorkoutToWatch()
 
@@ -5714,6 +5726,7 @@ struct ATHLTHTrainView: View {
                     )
                     .navigationBarTitleDisplayMode(.inline)
             }
+            .athlthStablePresentationBoundary()
             .sheet(isPresented: $showingTrainAllPlans) {
                 AllTrainingPlansView()
             }
@@ -5796,6 +5809,7 @@ struct ATHLTHTrainView: View {
                     }
                 }
             }
+            .athlthStablePresentationBoundary()
             .sheet(isPresented: $showingRunQuickStart, onDismiss: {
                 pendingPlannedEnduranceWorkout = nil
             }) {
@@ -6083,6 +6097,7 @@ struct ATHLTHTrainView: View {
                     }
                 }
             }
+            .athlthStablePresentationBoundary()
             .sheet(isPresented: $showingCustomQuickStart, onDismiss: {
                 // Never compete with the setup sheet's dismissal animation.
                 if let launch = pendingCustomIPhoneQuick {
@@ -6183,6 +6198,7 @@ struct ATHLTHTrainView: View {
                 )
                 .environmentObject(session)
             }
+            .athlthStablePresentationBoundary()
             .task {
                 session.refreshActivePlanForToday()
                 session.reconcilePlanLinkedPhoneWorkouts(
@@ -18848,5 +18864,14 @@ private struct ProfileHexagonBadgeShape:
 
         path.closeSubpath()
         return path
+    }
+}
+
+// SwiftUI's metadata can be deeply nested when a tab contains many distinct
+// sheet and full-screen destinations. Break up the nested type tree before
+// UIKit asks Swift to demangle it during presentation.
+private extension View {
+    func athlthStablePresentationBoundary() -> AnyView {
+        AnyView(self)
     }
 }
