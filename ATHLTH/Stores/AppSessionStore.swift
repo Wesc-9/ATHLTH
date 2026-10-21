@@ -3781,8 +3781,9 @@ final class AppSessionStore: ObservableObject {
         )
     }
 
-    /// Only an uncompleted, unskipped, future planned workout can be
-    /// removed from Plan Studio; no recorded results are deleted.
+    /// An uncompleted, unskipped planned workout may be removed even after
+    /// its date has passed. The exact plan version is still checked and
+    /// recorded workout results are never deleted.
     @discardableResult
     func removePlanStudioWorkout(
         planID: UUID,
@@ -3795,7 +3796,6 @@ final class AppSessionStore: ObservableObject {
         guard var plan = trainingPlan(withID: planID),
               plan.version == expectedVersion,
               let location = planStudioDayLocation(in: plan, dayID: dayID),
-              location.date >= Calendar.current.startOfDay(for: Date()),
               let workoutIndex = plan.weeks[location.week].days[location.day]
                   .sessions.firstIndex(where: { $0.id == workoutID }),
               !isPlanSessionSkipped(planID: planID, sessionID: workoutID),
