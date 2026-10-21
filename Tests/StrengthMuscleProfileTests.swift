@@ -207,6 +207,34 @@ final class StrengthMuscleProfileTests: XCTestCase {
         XCTAssertFalse(profile.secondaryRegions.contains(.quads))
     }
 
+    func testExerciseGalleryAtlasHighlightsSameMusclesAsExerciseDetails() {
+        let profile = ExerciseMuscleProfileFactory.profile(
+            primary: ["Quadriceps", "Gluteus Maximus"],
+            secondary: ["Hamstrings", "Gastrocnemius"]
+        )
+
+        XCTAssertEqual(profile.highlightRole(for: .quads), .primary)
+        XCTAssertEqual(profile.highlightRole(for: .glutes), .primary)
+        XCTAssertEqual(profile.highlightRole(for: .hamstrings), .secondary)
+        XCTAssertEqual(profile.highlightRole(for: .calves), .secondary)
+        XCTAssertGreaterThan(profile.intensity(for: .quads),
+                             profile.intensity(for: .calves))
+        XCTAssertTrue(ATHLTHPremiumMuscleAtlas.coveredRegions(
+            isFront: true).contains(.quads))
+        XCTAssertTrue(ATHLTHPremiumMuscleAtlas.coveredRegions(
+            isFront: false).contains(.glutes))
+    }
+
+    func testExerciseGalleryPreventsSecondaryFromOverwritingPrimary() {
+        let profile = ExerciseMuscleProfileFactory.profile(
+            primary: ["Quadriceps"],
+            secondary: ["Quadriceps", "Hamstrings"]
+        )
+        XCTAssertEqual(profile.highlightRole(for: .quads), .primary)
+        XCTAssertFalse(profile.secondaryRegions.contains(.quads))
+        XCTAssertEqual(profile.highlightRole(for: .hamstrings), .secondary)
+    }
+
     func testPremiumVectorAtlasCoversWorkoutMusclesOnBothSides() {
         let front = ATHLTHPremiumMuscleAtlas.coveredRegions(isFront: true)
         let back = ATHLTHPremiumMuscleAtlas.coveredRegions(isFront: false)
