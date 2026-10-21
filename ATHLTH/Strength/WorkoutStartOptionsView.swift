@@ -48,6 +48,8 @@ struct WorkoutStartOptionsView: View {
     @State private var exerciseBeingEdited:
         PlannedExercise?
     @State private var pendingTreadmillSetup: PlannedExercise?
+    @State private var selectedTrainingPlace: ATHLTHTrainingPlace?
+    @State private var showingTrainingPlacePicker = false
 
     @State private var showingSpotifyPicker = false
     @State private var didLoadSpotifySelection = false
@@ -87,6 +89,7 @@ struct WorkoutStartOptionsView: View {
         _configuredExercises = State(
             initialValue: session.exercises
         )
+        _selectedTrainingPlace = State(initialValue: session.plannedTrainingPlace)
         _selectedSpotifyPlaylist = State(
             initialValue:
                 session.spotifyPlaylist ??
@@ -142,6 +145,35 @@ struct WorkoutStartOptionsView: View {
                     // Advanced should add optional workout controls, not hide the
                     // core ability to build the strength session before starting.
                     exerciseSelectionCard
+                    ATHLTHPlanSurface(density: .compact) {
+                        Button {
+                            showingTrainingPlacePicker = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "mappin.and.ellipse")
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Training place",
+                                        norwegian: "Treningssted"
+                                    ))
+                                    .font(.subheadline.weight(.semibold))
+                                    Text(selectedTrainingPlace?.name ??
+                                        ATHLTHLocalization.choose(
+                                            english: "Optional · choose a venue",
+                                            norwegian: "Valgfritt · velg sted"
+                                        ))
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                            }
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            .frame(minHeight: 44)
+                        }
+                        .buttonStyle(.plain)
+                    }
 
                     // Same immediate avatar row as Quick Run and Quick Walk.
                     ATHLTHPlanSurface(ghost: false, density: .compact) {
@@ -344,6 +376,12 @@ struct WorkoutStartOptionsView: View {
                                 additions
                         )
                 }
+            }
+            .sheet(isPresented: $showingTrainingPlacePicker) {
+                ATHLTHPlanTrainingPlacePicker(initial: selectedTrainingPlace) {
+                    selectedTrainingPlace = $0
+                }
+                .environmentObject(appSession)
             }
             .sheet(item: $pendingTreadmillSetup) { exercise in
                 PlannedExerciseEditorView(
@@ -651,8 +689,8 @@ struct WorkoutStartOptionsView: View {
     private var configuredSession:
         PlannedSession {
         var configured = session
-        configured.exercises =
-            configuredExercises
+        configured.exercises = configuredExercises
+        configured.plannedTrainingPlace = selectedTrainingPlace
         return configured
     }
 
