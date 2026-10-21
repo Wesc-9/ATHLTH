@@ -167,6 +167,15 @@ Deno.serve(async (request) => {
         code: "VISION_RATE_LIMIT",
       }, 429);
     }
+    if (ai.status === 413) {
+      // A provider-size rejection is not an unrecognizable machine.
+      // Preserve its reason so updated clients can show an actionable
+      // localized message. Never echo provider payload or photo data.
+      return json({
+        error: "The photo was too large for the image service. Try a smaller image.",
+        code: "VISION_PAYLOAD_TOO_LARGE",
+      }, 413);
+    }
     if ([400, 401, 403, 404].includes(ai.status)) {
       return json({
         error: "Image analysis is temporarily unavailable. Please try again later.",
