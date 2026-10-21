@@ -1862,6 +1862,13 @@ final class StrengthWorkoutStore: ObservableObject {
         persistCheckpointNow()
     }
 
+    func setWorkoutTrainingPlace(_ place: ATHLTHTrainingPlace?) {
+        guard var workout = activeWorkout else { return }
+        workout.plannedTrainingPlace = place
+        activeWorkout = workout
+        persistCheckpointNow()
+    }
+
     /// Live pulse-zone target is stored on this workout, not global settings.
     func setLiveHeartRateTargetZone(_ zone: Int?) {
         guard var workout = activeWorkout else { return }
@@ -2139,7 +2146,7 @@ final class StrengthWorkoutStore: ObservableObject {
             )
         }
 
-        activeWorkout = StrengthWorkoutLog(
+        var launchedWorkout = StrengthWorkoutLog(
             id: UUID(),
             plannedSessionID: session.id,
             watchSessionID: watchSessionID,
@@ -2162,6 +2169,10 @@ final class StrengthWorkoutStore: ObservableObject {
                 false
         )
 
+        launchedWorkout.plannedTrainingPlace = session.plannedTrainingPlace
+        launchedWorkout.liveHeartRateTargetZone =
+            session.targetAlertConfiguration?.heartRateZone
+        activeWorkout = launchedWorkout
         currentExerciseIndex = 0
         currentSetIndex = 0
         restEndsAt = nil
