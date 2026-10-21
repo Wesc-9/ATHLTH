@@ -40,6 +40,8 @@ struct ActiveStrengthWorkoutView: View {
     @State private var showingExerciseInstructions = false
     @State private var showingWorkoutReview = false
     @State private var showingExerciseQueue = false
+    @State private var showingNextExerciseDetails = false
+    @State private var showingOmitRemainingSetsConfirmation = false
 
     var body: some View {
         NavigationStack {
@@ -1705,6 +1707,62 @@ struct ActiveStrengthWorkoutView: View {
                 )
             }
             .buttonStyle(.plain)
+
+            if !strength.currentExerciseAllSetsCompleted,
+               let upcoming = strength.nextPendingExercise {
+                DisclosureGroup(
+                    isExpanded: $showingNextExerciseDetails
+                ) {
+                    VStack(alignment: .leading, spacing: 9) {
+                        Text(upcoming.exercise.displayName)
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                        Text(ATHLTHLocalization.choose(
+                            english: "\(upcoming.sets.count) planned sets · \(upcoming.sets.first?.plannedDurationSeconds.map { "\($0 / 60) min" } ?? "\(upcoming.sets.first?.plannedReps ?? 0) reps")",
+                            norwegian: "\(upcoming.sets.count) planlagte sett · \(upcoming.sets.first?.plannedDurationSeconds.map { "\($0 / 60) min" } ?? "\(upcoming.sets.first?.plannedReps ?? 0) reps")"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        Text(ATHLTHLocalization.choose(
+                            english: "You can open the next exercise without marking this one complete.",
+                            norwegian: "Du kan åpne neste øvelse uten å fullføre denne."
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        Button {
+                            if strength.selectExerciseForNow(upcoming.id) {
+                                showingNextExerciseDetails = false
+                            }
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Open exercise",
+                                    norwegian: "Åpne øvelsen"
+                                ),
+                                systemImage: "arrow.right"
+                            )
+                            .frame(maxWidth: .infinity, minHeight: 42)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(ATHLTHPlanDesign.accentInk)
+                    }
+                    .padding(.top, 10)
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Next exercise",
+                            norwegian: "Neste øvelse"
+                        ) + ": " + upcoming.exercise.displayName,
+                        systemImage: "arrow.turn.down.right"
+                    )
+                    .lineLimit(1)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                }
+                .padding(14)
+                .background(ATHLTHPlanDesign.warmSurface,
+                            in: RoundedRectangle(cornerRadius: 17))
+            }
 
             if workoutComplete &&
                 showingWorkoutReview {
@@ -4739,6 +4797,36 @@ struct ActiveStrengthWorkoutView: View {
                     }
                 }
 
+                if isCurrentStrengthTreadmill {
+                    HStack(spacing: 10) {
+                        focusedNumberField(
+                            title: ATHLTHLocalization.choose(
+                                english: "Speed", norwegian: "Fart"
+                            ),
+                            value: treadmillSpeedBinding,
+                            suffix: "km/t"
+                        )
+                        focusedNumberField(
+                            title: ATHLTHLocalization.choose(
+                                english: "Incline", norwegian: "Stigning"
+                            ),
+                            value: treadmillInclineBinding,
+                            suffix: "%"
+                        )
+                    }
+                    focusedDurationField
+                    if strength.draftTreadmillSpeedKilometersPerHour > 0,
+                       let pace = ATHLTHRunningPace.paceForManualTreadmillSpeed(
+                           kilometersPerHour: strength.draftTreadmillSpeedKilometersPerHour
+                       ) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Manual speed · estimated pace ",
+                            norwegian: "Manuell fart · estimert tempo "
+                        ) + pace.clockDuration + " min/km")
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    }
+                } else {
                 HStack(spacing: 10) {
                     if currentStrengthLoadKind ==
                         .resistanceLevel {
@@ -4778,6 +4866,8 @@ struct ActiveStrengthWorkoutView: View {
                                 draftRepsBinding
                         )
                     }
+                }
+
                 }
 
                 if currentStrengthTargetKind == .time {
@@ -4874,6 +4964,45 @@ struct ActiveStrengthWorkoutView: View {
                     .controlSize(.small)
                 }
 
+                if exercise.sets.contains(where: { $0.isCompleted }) &&
+                   exercise.sets.contains(where: { !$0.isCompleted }) {
+                    Button {
+                        showingOmitRemainingSetsConfirmation = true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Skip remaining planned sets",
+                                norwegian: "Hopp over resterende sett"
+                            ),
+                            systemImage: "forward.end"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(ATHLTHPlanDesign.accentInk)
+                    .confirmationDialog(
+                        ATHLTHLocalization.choose(
+                            english: "End this exercise without the remaining sets?",
+                            norwegian: "Avslutte øvelsen uten de resterende settene?"
+                        ),
+                        isPresented: $showingOmitRemainingSetsConfirmation,
+                        titleVisibility: .visible
+                    ) {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Skip remaining sets",
+                            norwegian: "Hopp over resterende sett"
+                        )) {
+                            _ = strength.omitRemainingSetsOfCurrentExercise()
+                        }
+                    } message: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Completed sets are kept. The remaining sets are recorded as omitted, not completed.",
+                            norwegian: "Fullførte sett beholdes. Resten registreres som hoppet over, ikke fullført."
+                        ))
+                    }
+                }
+
                 Button {
                     strength
                         .completeCurrentDraftSet()
@@ -4899,18 +5028,10 @@ struct ActiveStrengthWorkoutView: View {
                 .buttonStyle(
                     .borderedProminent
                 )
-                .tint(
-                    ATHLTHTheme
-                        .accentDeep
-                )
-                .clipShape(
-                    Capsule()
-                )
+                .tint(ATHLTHPlanDesign.accentInk)
+                .clipShape(Capsule())
                 .shadow(
-                    color:
-                        ATHLTHTheme
-                            .accentDeep
-                            .opacity(0.16),
+                    color: ATHLTHPlanDesign.accentInk.opacity(0.12),
                     radius: 14,
                     x: 0,
                     y: 7
@@ -5147,6 +5268,26 @@ struct ActiveStrengthWorkoutView: View {
             radius: 12,
             x: 0,
             y: 6
+        )
+    }
+
+    private var isCurrentStrengthTreadmill: Bool {
+        strength.currentExercise.map {
+            StrengthTreadmillWarmUpDefaults.isTreadmill($0.exercise.name)
+        } ?? false
+    }
+
+    private var treadmillSpeedBinding: Binding<Double> {
+        Binding(
+            get: { strength.draftTreadmillSpeedKilometersPerHour },
+            set: { strength.setDraft(treadmillSpeedKilometersPerHour: $0) }
+        )
+    }
+
+    private var treadmillInclineBinding: Binding<Double> {
+        Binding(
+            get: { strength.draftTreadmillInclinePercent },
+            set: { strength.setDraft(treadmillInclinePercent: $0) }
         )
     }
 
