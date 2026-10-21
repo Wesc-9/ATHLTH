@@ -1479,10 +1479,24 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
         let cardioSets = cardioExercises.flatMap(\.sets).filter(\.isCompleted)
         let cardioSeconds = cardioSets.compactMap(\.resolvedCompletedDurationSeconds)
             .reduce(0, +)
-        let watchedMeters = cardioSets.compactMap(\.watchMeasuredDistanceMeters)
-            .reduce(0, +)
-        let estimatedMeters = cardioSets.compactMap(\.manuallyEstimatedTreadmillDistanceMeters)
-            .reduce(0, +)
+        // Keep manual estimates on the individual set for transparency, but
+        // never add a manual estimate and a Watch reading for the *same* set.
+        // When only some sets have device measurements, expose both evidence
+        // categories separately so the summary does not double count them.
+        let watchedMeters = cardioSets.compactMap { set in
+            guard let measured = set.watchMeasuredDistanceMeters,
+                  measured.isFinite, measured > 0 else { return nil as Double? }
+            return measured
+        }.reduce(0, +)
+        let estimatedMeters = cardioSets.compactMap { set in
+            if let measured = set.watchMeasuredDistanceMeters,
+               measured.isFinite, measured > 0 {
+                return nil as Double?
+            }
+            guard let estimate = set.manuallyEstimatedTreadmillDistanceMeters,
+                  estimate.isFinite, estimate > 0 else { return nil as Double? }
+            return estimate
+        }.reduce(0, +)
         strengthCardioExerciseCount = cardioExercises.isEmpty ? nil : cardioExercises.count
         strengthCardioDurationSeconds = cardioSeconds > 0 ? cardioSeconds : nil
         strengthCardioMeasuredMeters = watchedMeters > 0 ? watchedMeters : nil
