@@ -1528,6 +1528,7 @@ struct TrainingPlanLibraryView: View {
     @State private var selectedMuscle: ExerciseMuscleGroup?
     @State private var favoritesOnly = false
     @State private var sessionsPerWeekFilter: Int?
+    @State private var weeklySortAscending: Bool?
 
     private var sessionsPerWeekOptions: [Int] {
         Array(Set(catalog.entries.map(\.sessionsPerWeek))).sorted()
@@ -1544,7 +1545,7 @@ struct TrainingPlanLibraryView: View {
             in: .whitespacesAndNewlines
         )
 
-        return catalog.entries.filter { entry in
+        let results = catalog.entries.filter { entry in
             let categoryMatches =
                 selectedCategory == "All" ||
                 entry.categoryTitle == selectedCategory
@@ -1569,6 +1570,17 @@ struct TrainingPlanLibraryView: View {
                 (sessionsPerWeekFilter == nil ||
                     entry.sessionsPerWeek == sessionsPerWeekFilter) &&
                 searchMatches
+        }
+        guard let weeklySortAscending else { return results }
+        return results.sorted { left, right in
+            if left.sessionsPerWeek != right.sessionsPerWeek {
+                return weeklySortAscending
+                    ? left.sessionsPerWeek < right.sessionsPerWeek
+                    : left.sessionsPerWeek > right.sessionsPerWeek
+            }
+            return left.sortOrder == right.sortOrder
+                ? left.slug < right.slug
+                : left.sortOrder < right.sortOrder
         }
     }
 
@@ -1716,6 +1728,45 @@ struct TrainingPlanLibraryView: View {
                                 }
                             }
                         }
+                        Divider()
+                        Button {
+                            weeklySortAscending = true
+                        } label: {
+                            if weeklySortAscending == true {
+                                Label(ATHLTHLocalization.choose(
+                                    english: "Fewest sessions first",
+                                    norwegian: "Færrest økter først"
+                                ), systemImage: "checkmark")
+                            } else {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Fewest sessions first",
+                                    norwegian: "Færrest økter først"
+                                ))
+                            }
+                        }
+                        Button {
+                            weeklySortAscending = false
+                        } label: {
+                            if weeklySortAscending == false {
+                                Label(ATHLTHLocalization.choose(
+                                    english: "Most sessions first",
+                                    norwegian: "Flest økter først"
+                                ), systemImage: "checkmark")
+                            } else {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Most sessions first",
+                                    norwegian: "Flest økter først"
+                                ))
+                            }
+                        }
+                        Button {
+                            weeklySortAscending = nil
+                        } label: {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Recommended order",
+                                norwegian: "Anbefalt rekkefølge"
+                            ))
+                        }
                     } label: {
                         HStack(spacing: 7) {
                             Image(systemName: "calendar")
@@ -1724,9 +1775,17 @@ struct TrainingPlanLibraryView: View {
                                 ATHLTHLocalization.format(
                                     english: "%d/week", norwegian: "%d/uke", $0
                                 )
-                            } ?? ATHLTHLocalization.choose(
-                                english: "Per week", norwegian: "Per uke"
-                            ))
+                            } ?? (weeklySortAscending == true
+                                ? ATHLTHLocalization.choose(
+                                    english: "Fewest first", norwegian: "Færrest først"
+                                  )
+                                : weeklySortAscending == false
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Most first", norwegian: "Flest først"
+                                      )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Per week", norwegian: "Per uke"
+                                      )))
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(ATHLTHPlanDesign.ink)
                             Image(systemName: "chevron.down")
