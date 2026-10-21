@@ -98,8 +98,11 @@ struct RouteLibraryListView: View {
 
     @State private var catalog: [RouteLibraryEntry] = []
     @State private var query = ""
-    @State private var sort: RouteLibrarySort = .newest
+    @State private var sort: RouteLibrarySort = .nearest
     @State private var lengthFilter = 0
+    @State private var showingCustomLength = false
+    @AppStorage("athlth.routes.picker.minLength.v1") private var minLength = 0.0
+    @AppStorage("athlth.routes.picker.maxLength.v1") private var maxLength = 20.0
     @State private var publicFilter: PublicRouteBrowseFilter = .all
     // Retained only for the legacy, non-rendered mine helpers below.
     @State private var favoritesOnly = false
@@ -126,7 +129,8 @@ struct RouteLibraryListView: View {
     }
 
     private var catalogKey: String {
-        [query, sort.rawValue, String(lengthFilter), String(publicFilter == .friends),
+        [query, sort.rawValue, String(lengthFilter), String(minLength), String(maxLength),
+         String(publicFilter == .friends),
          String(locationStore.location?.coordinate.latitude ?? 0),
          String(locationStore.location?.coordinate.longitude ?? 0)].joined(separator: "|")
     }
@@ -310,6 +314,7 @@ struct RouteLibraryListView: View {
         .refreshable { await loadCatalog() }
         .task(id: catalogKey) {
             recents.refresh()
+            if sort == .nearest { locationStore.start() }
             async let favoriteRefresh: Void = favorites.refresh()
             await loadCatalog()
             _ = await favoriteRefresh
@@ -331,6 +336,7 @@ struct RouteLibraryListView: View {
             }
         }
         .onDisappear { locationStore.stop() }
+        .sheet(isPresented: $showingCustomLength) { publicCustomLengthSheet }
         .fullScreenCover(item: $showingMapRoute) { route in
             SavedRouteFullscreenMap(route: route)
         }
@@ -354,11 +360,11 @@ struct RouteLibraryListView: View {
                     .font(.system(size: 10, weight: .bold))
                     .tracking(2)
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                Text(tr("Explore routes", "Utforsk ruter"))
+                Text(tr("Find new routes", "Finn nye ruter"))
                     .font(.system(size: 27, weight: .semibold, design: .serif))
                     .foregroundStyle(ATHLTHPlanDesign.ink)
-                Text(tr("Discover routes shared with the community",
-                        "Oppdag ruter som er delt med fellesskapet"))
+                Text(tr("Public routes from ATHLTH members",
+                        "Offentlige ruter fra ATHLTH-fellesskapet"))
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
@@ -369,9 +375,9 @@ struct RouteLibraryListView: View {
                 Image(systemName: "plus")
                     .font(.system(size: 19, weight: .medium))
                     .foregroundStyle(.white)
-                    .frame(width: 47, height: 47)
+                    .frame(width: 48, height: 48)
                     .background(ATHLTHTheme.accentDeep,
-                                in: RoundedRectangle(cornerRadius: 15))
+                                in: RoundedRectangle(cornerRadius: 16))
             }
             .accessibilityLabel(tr("Create route", "Opprett rute"))
         }
@@ -379,7 +385,7 @@ struct RouteLibraryListView: View {
     }
 
     private var databaseFilters: some View {
-        VStack(alignment: .leading, spacing: 13) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -396,32 +402,35 @@ struct RouteLibraryListView: View {
                     .accessibilityLabel(tr("Clear search", "Tøm søk"))
                 }
             }
-            .padding(13)
+            .padding(14)
             .background(ATHLTHPlanDesign.surface,
                         in: RoundedRectangle(cornerRadius: 15))
-            .overlay(RoundedRectangle(cornerRadius: 15)
-                .strokeBorder(ATHLTHPlanDesign.outline))
+            .overlay {
+                RoundedRectangle(cornerRadius: 15)
+                    .stroke(ATHLTHPlanDesign.outline)
+            }
 
-            HStack(spacing: 9) {
-                ForEach([false, true], id: \.self) { onlyFavorites in
-                    Button { favoritesOnly = onlyFavorites } label: {
-                        Label(onlyFavorites ? tr("Favorites", "Favoritter") :
-                              tr("All", "Alle"),
-                              systemImage: onlyFavorites ? "star.fill" :
-                              "square.grid.2x2")
-                            .font(.caption.weight(.semibold))
-                            .padding(.horizontal, 14)
-                            .frame(height: 35)
-                            .foregroundStyle(favoritesOnly == onlyFavorites
-                                ? Color.white : ATHLTHPlanDesign.ink)
-                            .background(favoritesOnly == onlyFavorites
-                                ? ATHLTHTheme.accentDeep : ATHLTHPlanDesign.warmSurface,
-                                in: Capsule())
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(PublicRouteBrowseFilter.allCases) { option in
+                        Button {
+                            publicFilter = option
+                        } label: {
+                            Label(option.title, systemImage: option.symbol)
+                                .font(.caption.weight(.semibold))
+                                .padding(.horizontal, 13)
+                                .frame(height: 36)
+                                .foregroundStyle(publicFilter == option
+                                                 ? .white : ATHLTHPlanDesign.ink)
+                                .background(publicFilter == option
+                                            ? ATHLTHTheme.accentDeep
+                                            : ATHLTHPlanDesign.warmSurface,
+                                            in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(publicFilter == option ? [.isSelected] : [])
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(favoritesOnly == onlyFavorites ? [.isSelected] : [])
                 }
-                Spacer(minLength: 0)
             }
 
             HStack(spacing: 10) {
@@ -441,26 +450,49 @@ struct RouteLibraryListView: View {
                     catalogFilterChip(routeSortLabel(sort), icon: "arrow.up.arrow.down")
                 }
                 Menu {
-                    ForEach(0...4, id: \.self) { choice in
-                        Button {
-                            lengthFilter = choice
-                        } label: {
-                            if lengthFilter == choice {
-                                Label(catalogLengthLabel(choice),
-                                      systemImage: "checkmark")
+                    ForEach(0..<6, id: \.self) { option in
+                        Button { lengthFilter = option } label: {
+                            if lengthFilter == option {
+                                Label(catalogLengthLabel(option), systemImage: "checkmark")
                             } else {
-                                Text(catalogLengthLabel(choice))
+                                Text(catalogLengthLabel(option))
                             }
                         }
                     }
+                    Divider()
+                    Button {
+                        showingCustomLength = true
+                    } label: {
+                        Label(tr("Custom range", "Egendefinert lengde"),
+                              systemImage: "slider.horizontal.3")
+                    }
                 } label: {
-                    catalogFilterChip(catalogLengthLabel(lengthFilter),
-                                      icon: "ruler")
+                    catalogFilterChip(catalogLengthLabel(lengthFilter), icon: "ruler")
                 }
                 Spacer(minLength: 0)
+                Menu {
+                    Text(tr("Running pace", "Løpetempo"))
+                    Button(tr("Automatic / my workouts", "Automatisk / mine økter")) {
+                        manualRunSecondsPerKm = 0
+                    }
+                    ForEach([300, 360, 420, 480], id: \.self) { seconds in
+                        Button("\(seconds / 60):00 min/km") {
+                            manualRunSecondsPerKm = seconds
+                        }
+                    }
+                } label: {
+                    Image(systemName: "figure.run.circle")
+                        .font(.system(size: 21))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(width: 42, height: 40)
+                        .background(ATHLTHPlanDesign.warmSurface,
+                                    in: RoundedRectangle(cornerRadius: 12))
+                }
+                .accessibilityLabel(tr("Change estimated running pace",
+                                       "Endre estimert løpetempo"))
             }
         }
-        .padding(15)
+        .padding(16)
         .athlthPlanCard()
     }
 
@@ -481,10 +513,12 @@ struct RouteLibraryListView: View {
 
     private func catalogLengthLabel(_ option: Int) -> String {
         switch option {
-        case 1: return tr("Under 5 km", "Under 5 km")
-        case 2: return "5–10 km"
-        case 3: return "10–21,1 km"
-        case 4: return "21,1+ km"
+        case 1: return "< 3 km"
+        case 2: return "3–5 km"
+        case 3: return "5–10 km"
+        case 4: return "10–20 km"
+        case 5: return "20+ km"
+        case 6: return String(format: "%.0f–%.0f km", minLength, maxLength)
         default: return tr("All lengths", "Alle lengder")
         }
     }
@@ -492,12 +526,138 @@ struct RouteLibraryListView: View {
     private func routeSortLabel(_ value: RouteLibrarySort) -> String {
         switch value {
         case .newest: return tr("Newest", "Nyeste")
-        case .nearest: return tr("Nearest", "Nærmest")
+        case .nearest: return tr("Nearest route", "Nærmest rute")
         case .shortest: return tr("Shortest", "Korteste")
         case .longest: return tr("Longest", "Lengste")
         case .leastClimbing: return tr("Least climbing", "Minst stigning")
         case .mostClimbing: return tr("Most climbing", "Mest stigning")
         case .name: return "A–Å"
+        }
+    }
+
+    private var publicCustomLengthSheet: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 20) {
+                Text(tr("Route length", "Rutelengde"))
+                    .font(.system(size: 25, weight: .semibold, design: .serif))
+                Text(tr("Choose the range of distances you want to see.",
+                        "Velg lengdeintervallet for rutene du vil se."))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(tr("From \(Int(minLength)) km", "Fra \(Int(minLength)) km"))
+                    Slider(value: $minLength, in: 0...100, step: 1)
+                        .tint(ATHLTHPlanDesign.accentInk)
+                        .onChange(of: minLength) { _, value in
+                            if value > maxLength { maxLength = value }
+                        }
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(tr("To \(Int(maxLength)) km", "Til \(Int(maxLength)) km"))
+                    Slider(value: $maxLength, in: 0...100, step: 1)
+                        .tint(ATHLTHPlanDesign.accentInk)
+                        .onChange(of: maxLength) { _, value in
+                            if value < minLength { minLength = value }
+                        }
+                }
+                Spacer()
+                Button(tr("Show routes", "Vis ruter")) {
+                    if maxLength < minLength { maxLength = minLength }
+                    lengthFilter = 6
+                    showingCustomLength = false
+                }
+                .font(.headline)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .foregroundStyle(.white)
+                .background(ATHLTHTheme.accentDeep,
+                            in: RoundedRectangle(cornerRadius: 15))
+            }
+            .padding(22)
+            .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
+            .navigationTitle(tr("Filter", "Filter"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(tr("Done", "Ferdig")) {
+                        if maxLength < minLength { maxLength = minLength }
+                        lengthFilter = 6
+                        showingCustomLength = false
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func recentPace(for activity: WorkoutActivity, fallback: Double) -> Double {
+        let paces = health.workouts
+            .filter { $0.activity == activity && ($0.distanceMeters ?? 0) >= 1_000 }
+            .sorted { $0.startDate > $1.startDate }
+            .prefix(10)
+            .compactMap { $0.paceMinutesPerKilometer }
+            .filter { pace in
+                activity == .running ? (pace >= 3 && pace <= 12) : (pace >= 8 && pace <= 22)
+            }
+            .sorted()
+        return paces.count >= 3 ? paces[paces.count / 2] : fallback
+    }
+
+    private var walkPaceMinutes: Double { recentPace(for: .walking, fallback: 12) }
+    private var runPaceMinutes: Double {
+        manualRunSecondsPerKm > 0
+            ? Double(manualRunSecondsPerKm) / 60
+            : recentPace(for: .running, fallback: 6)
+    }
+
+    private func estimatedDuration(kilometers: Double, paceMinutes: Double) -> String {
+        let minutes = max(1, Int((kilometers * paceMinutes).rounded()))
+        if minutes >= 60 {
+            let hours = minutes / 60
+            let remainder = minutes % 60
+            return remainder == 0 ? "\(hours) t" : "\(hours) t \(remainder) min"
+        }
+        return "\(minutes) min"
+    }
+
+    private func publicRouteMetric(value: String, caption: String, icon: String) -> some View {
+        VStack(spacing: 5) {
+            Label(caption, systemImage: icon)
+                .font(.system(size: 9, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .lineLimit(1)
+            Text(value)
+                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func publicStartDistance(for route: TrainingRoute) -> Double? {
+        guard let current = locationStore.location,
+              let start = route.coordinates.min(by: { $0.sequence < $1.sequence })?.coordinate
+        else { return nil }
+        return current.distance(
+            from: CLLocation(latitude: start.latitude, longitude: start.longitude)
+        ) / 1_000
+    }
+
+    private func authorLabel(for entry: RouteLibraryEntry) -> String {
+        if let friend = social.mutualFollows.first(where: { $0.userID == entry.ownerID }) {
+            return friend.displayName
+        }
+        return tr("Public", "Offentlig")
+    }
+
+    private func sendPublicRouteToWatch(_ route: TrainingRoute) {
+        guard watchConnection.isReady else { return }
+        do {
+            try watchConnection.sendRoute(route)
+            watchMessage = tr("Route sent to Apple Watch.", "Ruten er sendt til Apple Watch.")
+        } catch {
+            watchError = error.localizedDescription
         }
     }
 
@@ -1280,7 +1440,9 @@ struct RouteLibraryListView: View {
                 p_latitude: locationStore.location?.coordinate.latitude,
                 p_longitude: locationStore.location?.coordinate.longitude,
                 p_offset: offset,
-                p_friends_only: publicFilter == .friends
+                p_friends_only: publicFilter == .friends,
+                p_min_length: minLength,
+                p_max_length: maxLength
             )
             let page: [RouteLibraryEntry] = try await SupabaseEnvironment.client
                 .rpc("search_public_route_catalog", params: params).execute().value
@@ -1377,4 +1539,6 @@ private struct RouteCatalogSearchParameters: Encodable {
     let p_longitude: Double?
     let p_offset: Int
     let p_friends_only: Bool
+    let p_min_length: Double
+    let p_max_length: Double
 }
