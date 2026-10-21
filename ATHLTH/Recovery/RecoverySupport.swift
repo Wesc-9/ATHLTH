@@ -2065,8 +2065,61 @@ struct MuscleRecoveryCard: View {
                 }
 
                 integratedCheckInRow
+                checkInWeeklySummary
             }
         }
+    }
+
+    /// A compact, factual history based only on days and answers actually
+    /// saved. This is not a second recovery score.
+    @ViewBuilder
+    private var checkInWeeklySummary: some View {
+        let calendar = Calendar.current
+        let since = calendar.date(
+            byAdding: .day, value: -6,
+            to: calendar.startOfDay(for: Date())
+        ) ?? Date().addingTimeInterval(-6 * 86_400)
+        let days = checkInStore.entries.filter {
+            $0.date >= since && $0.date <= Date() && (
+                $0.energy != nil || $0.stress != nil ||
+                $0.overallSoreness != nil || $0.motivation != nil ||
+                !$0.ratings.isEmpty
+            )
+        }
+        if days.count >= 3 {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Label(recoveryText(
+                        "Your last 7 days", "Dine siste 7 dager"),
+                        systemImage: "chart.bar.xaxis")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Spacer()
+                    Text("\(days.count)/7")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                HStack(spacing: 14) {
+                    if let avg = averageResponse(days.compactMap(\.energy)) {
+                        Text(recoveryText("Energy", "Energi") +
+                             " \(avg.formatted(.number.precision(.fractionLength(1))))/5")
+                    }
+                    if let avg = averageResponse(days.compactMap(\.stress)) {
+                        Text(recoveryText("Stress", "Stress") +
+                             " \(avg.formatted(.number.precision(.fractionLength(1))))/5")
+                    }
+                }
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+            .padding(.horizontal, 4)
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    private func averageResponse(_ answers: [Int]) -> Double? {
+        guard !answers.isEmpty else { return nil }
+        return Double(answers.reduce(0, +)) / Double(answers.count)
     }
 
     /// The single entry point to subjective wellness in Insights.
