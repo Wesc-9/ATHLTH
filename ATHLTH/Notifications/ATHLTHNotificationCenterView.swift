@@ -39,6 +39,8 @@ private enum ATHLTHNotificationScope: String, CaseIterable, Identifiable {
 
 struct ATHLTHNotificationCenterView: View {
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
+    @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var challenges: ChallengeStore
@@ -118,6 +120,11 @@ struct ATHLTHNotificationCenterView: View {
             value: permissionBannerDismissed
         )
         .task {
+            notifications.reconcileDailyCheckIn(
+                enabled: settings.dailyCheckInRemindersEnabled,
+                accountID: session.profile.userID,
+                completed: RecoverySorenessStore().hasTodayCheckIn
+            )
             async let notificationStatus: Void =
                 notifications.refreshAuthorizationStatus()
             async let workoutImports: Bool =
@@ -1298,7 +1305,8 @@ struct ATHLTHNotificationCenterView: View {
                     item.kind == .milestoneReached ||
                     item.kind == .goalCompleted ||
                     item.kind == .achievement ||
-                    item.kind == .system
+                    item.kind == .system ||
+                    item.kind == .dailyCheckIn
 
             case .social:
                 return item.kind == .social &&
@@ -1923,6 +1931,9 @@ struct ATHLTHNotificationCenterView: View {
             )
         case .system:
             return "ATHLTH"
+        case .dailyCheckIn:
+            return ATHLTHLocalization.choose(
+                english: "WELLNESS", norwegian: "DAGSFORM")
         case .challenge:
             return ATHLTHLocalization.choose(
                 english: "CHALLENGE",
@@ -2038,6 +2049,10 @@ struct ATHLTHNotificationCenterView: View {
     private func destinationActionTitle(
         _ item: ATHLTHNotificationItem
     ) -> String {
+        if item.kind == .dailyCheckIn {
+            return ATHLTHLocalization.choose(
+                english: "Check in", norwegian: "Sjekk inn")
+        }
         if item.socialEntityType?.lowercased() == "arena_series" {
             return ATHLTHLocalization.choose(
                 english: "Open Arena", norwegian: "Åpne Arena"
@@ -2154,6 +2169,7 @@ struct ATHLTHNotificationCenterView: View {
     private func hasDestination(
         _ item: ATHLTHNotificationItem
     ) -> Bool {
+        if item.kind == .dailyCheckIn { return true }
         if item.socialEntityType?.lowercased() == "arena_series" &&
             item.socialEntityID != nil {
             return true
@@ -2203,7 +2219,9 @@ struct ATHLTHNotificationCenterView: View {
     private func notificationDestination(
         _ item: ATHLTHNotificationItem
     ) -> some View {
-        if item.socialEntityType?.lowercased() == "arena_series",
+        if item.kind == .dailyCheckIn {
+            ATHLTHRecoveryView(openCheckInOnAppear: true)
+        } else if item.socialEntityType?.lowercased() == "arena_series",
            let seriesID = item.socialEntityID {
             ATHLTHArenaNotificationDestination(seriesID: seriesID)
         } else if let challengeID = item.challengeID {
@@ -2404,6 +2422,8 @@ struct ATHLTHNotificationCenterView: View {
             return .blue
         case .system:
             return .secondary
+        case .dailyCheckIn:
+            return ATHLTHTheme.accentDeep
         }
     }
 }
