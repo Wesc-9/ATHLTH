@@ -1873,124 +1873,79 @@ struct TrainingPlanLibraryView: View {
     private func catalogCard(
         _ entry: TrainingPlanCatalogEntry
     ) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 13) {
-                Image(
-                    systemName:
-                        entry.category == "strength"
-                            ? "dumbbell.fill"
-                            : entry.category == "hybrid"
-                                ? "figure.run.square.stack.fill"
-                                : "figure.run"
-                )
-                .font(.system(size: 21, weight: .semibold))
-                .foregroundStyle(planAccent(entry))
-                .frame(width: 50, height: 50)
-                .background(
-                    planAccent(entry).opacity(0.10),
-                    in: RoundedRectangle(
-                        cornerRadius: 16,
-                        style: .continuous
-                    )
-                )
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: entry.trainingTypeIcon)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(width: 48, height: 48)
+                    .background(ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 14))
 
                 VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: 6) {
-                        Text(entry.categoryTitle.uppercased())
-                            .font(.caption2.weight(.bold))
-                            .tracking(1.3)
-                            .foregroundStyle(planAccent(entry))
-
-                        Text(ATHLTHLocalization.choose(
-                            english: "CURATED", norwegian: "UTVALGT"
-                        ))
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(
-                                Color.black.opacity(0.035),
-                                in: Capsule()
-                            )
-                    }
+                    Text(entry.trainingTypeTitle.uppercased())
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.2)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
 
                     Text(entry.title)
                         .font(.title3.weight(.bold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                        .padding(.trailing, 42)
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     Text(entry.goal)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(
-                            ATHLTHTheme.primaryText.opacity(0.70)
-                        )
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        .lineLimit(2)
                 }
-
+                // Leave room for the independent favorite control.
+                .padding(.trailing, 35)
                 Spacer(minLength: 0)
             }
 
             Text(entry.summary)
                 .font(.subheadline)
-                .foregroundStyle(ATHLTHTheme.mutedText)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .lineLimit(3)
                 .multilineTextAlignment(.leading)
-                .lineSpacing(2)
+
+            HStack(spacing: 8) {
+                Image(systemName: "list.bullet.rectangle")
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Text(entry.sessionOutline)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .lineLimit(2)
+                Spacer(minLength: 2)
+            }
+            .padding(11)
+            .background(ATHLTHPlanDesign.warmSurface,
+                        in: RoundedRectangle(cornerRadius: 12))
 
             HStack(spacing: 7) {
                 planMetric(
-                    "\(entry.durationWeeks) wk",
-                    icon: "calendar"
+                    ATHLTHLocalization.format(
+                        english: "%d weeks", norwegian: "%d uker",
+                        entry.durationWeeks
+                    ), icon: "calendar"
                 )
                 planMetric(
-                    "\(entry.sessionsPerWeek)/wk",
-                    icon: "repeat"
+                    ATHLTHLocalization.format(
+                        english: "%d/week", norwegian: "%d/uke",
+                        entry.sessionsPerWeek
+                    ), icon: "repeat"
                 )
-                planMetric(
-                    entry.level,
-                    icon: "speedometer"
-                )
-
-                Spacer()
-
-                Image(systemName: "arrow.right")
+                planMetric(entry.level, icon: "speedometer")
+                Spacer(minLength: 3)
+                Image(systemName: "arrow.up.right")
                     .font(.caption.bold())
-                    .foregroundStyle(planAccent(entry))
-                    .frame(width: 30, height: 30)
-                    .background(
-                        planAccent(entry).opacity(0.08),
-                        in: Circle()
-                    )
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(width: 32, height: 32)
+                    .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
             }
         }
-        .padding(17)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(0.97),
-                    planAccent(entry).opacity(0.035)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(
-                cornerRadius: 25,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 25,
-                style: .continuous
-            )
-            .stroke(
-                Color.white.opacity(0.96),
-                lineWidth: 1
-            )
-        }
-        .shadow(
-            color: ATHLTHTheme.accentDeep.opacity(0.035),
-            radius: 14,
-            y: 7
-        )
+        .padding(16)
+        .athlthPlanCard()
     }
 
     private func planMetric(
