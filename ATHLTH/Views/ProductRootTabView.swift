@@ -247,6 +247,9 @@ struct ProductRootTabView: View {
         .toolbarBackground(.ultraThinMaterial, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
         .toolbarColorScheme(.light, for: .tabBar)
+        // TabView is already a complex generic container. Erase its type
+        // before attaching global notifications, overlays and state hooks.
+        .athlthStablePresentationBoundary()
         // Render the actual challenge detail above the root tabs. The
         // singleton retains the route if iOS delivers the tap before this
         // view is created (cold launch).
@@ -5654,7 +5657,7 @@ struct ATHLTHTrainView: View {
 
                     switch selectedSection {
                     case 1:
-                        ATHLTHTrainPlanPremiumView(
+                        AnyView(ATHLTHTrainPlanPremiumView(
                             highlightedPlanID: highlightedTrainPlanID,
                             onStartWorkout: { planID, workout in
                                 openTodayPrimaryWorkout(
@@ -5663,15 +5666,15 @@ struct ATHLTHTrainView: View {
                                     isHealthCompleted: false
                                 )
                             }
-                        )
+                        ))
                     case 2:
-                        ATHLTHTrainProgressPremiumView {
+                        AnyView(ATHLTHTrainProgressPremiumView {
                             selectedSection = 1
-                        }
+                        })
                     default:
                         unfinishedWorkoutRecoveryCards
                         activeTrainWorkoutCard
-                        premiumTodayScreen
+                        AnyView(premiumTodayScreen)
                     }
                 }
                 .padding(.horizontal, 17)
@@ -5692,6 +5695,9 @@ struct ATHLTHTrainView: View {
                 ATHLTHPlanDesign.warmCanvas
                     .ignoresSafeArea()
             )
+            // Keep root Train navigation metadata small regardless of which
+            // Today/Plan/Progress section is selected.
+            .athlthStablePresentationBoundary()
             .navigationDestination(
                 isPresented: $showingLibrary
             ) {
