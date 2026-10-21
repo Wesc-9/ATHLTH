@@ -2372,16 +2372,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         _ snapshot:
             WatchStrengthSessionSnapshot
     ) {
-        guard let queue =
-                snapshot.exerciseQueue,
-              let next =
-                queue
-                    .first(
-                        where: {
-                            $0.index >
-                            snapshot.exerciseIndex
-                        }
-                    )
+        guard let queue = snapshot.exerciseQueue else { return }
+        let later = queue.first {
+            $0.index > snapshot.exerciseIndex && $0.isCompleted != true
+        }
+        let earlier = queue.first {
+            $0.index < snapshot.exerciseIndex && $0.isCompleted != true
+        }
+        guard let next = later ?? earlier
         else {
             publish {
                 self.strengthActionPending =
@@ -2398,27 +2396,21 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             next.name
         updated.primaryMuscles =
             next.primaryMuscles
-        updated.setIndex = 0
-        updated.setCount =
-            next.setCount
-        updated.setNumber =
-            next.setCount > 0
-                ? 1
-                : nil
+        updated.setIndex = next.firstPendingSetIndex ?? 0
+        updated.setCount = next.setCount
+        updated.setNumber = next.setCount > 0
+            ? updated.setIndex + 1 : nil
         updated.currentExerciseComplete =
             next.setCount == 0
         updated.hasNextExercise =
-            queue.contains {
-                $0.index >
-                next.index
-            }
+            queue.contains { $0.index != next.index && $0.isCompleted != true }
         updated.allExercisesComplete =
             false
         applyStrengthPlanDefaults(
             to: &updated,
             exerciseIndex:
                 next.index,
-            setIndex: 0
+            setIndex: updated.setIndex
         )
         updated.isResting = false
         updated.restEndsAt = nil
