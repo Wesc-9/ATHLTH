@@ -5102,6 +5102,21 @@ struct ActiveStrengthWorkoutView: View {
                     }
                 }
 
+                if currentStrengthLoadKind == .weightKilograms && !isCurrentStrengthTreadmill {
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Record weight for this set",
+                            norwegian: "Registrer vekt på dette settet"
+                        ),
+                        isOn: Binding(
+                            get: { strength.currentSetRecordsWeight },
+                            set: { strength.setCurrentSetRecordsWeight($0) }
+                        )
+                    )
+                    .tint(ATHLTHPlanDesign.accent)
+                    .font(.subheadline.weight(.medium))
+                }
+
                 if isCurrentStrengthTreadmill {
                     HStack(spacing: 10) {
                         focusedNumberField(
@@ -5144,7 +5159,7 @@ struct ActiveStrengthWorkoutView: View {
                             value:
                                 draftResistanceBinding
                         )
-                    } else {
+                    } else if strength.currentSetRecordsWeight {
                         focusedNumberField(
                             title:
                                 ATHLTHLocalization.choose(
@@ -8464,8 +8479,10 @@ private struct FreestyleExercisePrescriptionView: View {
         let isTreadmill =
             StrengthTreadmillWarmUpDefaults.isTreadmill(snapshot.name) ||
             StrengthTreadmillWarmUpDefaults.isTreadmill(snapshot.displayName)
+        let bodyweightHold = StrengthTimedBodyweightDefaults.isBodyweightHold(snapshot.name) ||
+            StrengthTimedBodyweightDefaults.isBodyweightHold(snapshot.displayName)
         let initialTarget: StrengthExerciseTargetKind =
-            isTreadmill ? .time : snapshot.defaultStrengthTargetKind
+            isTreadmill || bodyweightHold ? .time : snapshot.defaultStrengthTargetKind
         let initialLoad = snapshot.defaultStrengthLoadKind
 
         // Each newly added treadmill warm-up has an editable prescription.
@@ -8479,11 +8496,14 @@ private struct FreestyleExercisePrescriptionView: View {
         _durationSeconds = State(
             initialValue: isTreadmill
                 ? StrengthTreadmillWarmUpDefaults.durationSeconds
-                : snapshot.defaultStrengthTargetDurationSeconds
+                : bodyweightHold
+                    ? StrengthTimedBodyweightDefaults.durationSeconds
+                    : snapshot.defaultStrengthTargetDurationSeconds
         )
         _loadKind = State(initialValue: initialLoad)
         _useLoadTarget = State(
-            initialValue: isTreadmill ? false : initialLoad == .resistanceLevel
+            initialValue: (isTreadmill || bodyweightHold)
+                ? false : initialLoad == .resistanceLevel
         )
         _restSeconds = State(initialValue: isTreadmill ? 0 : 90)
     }
