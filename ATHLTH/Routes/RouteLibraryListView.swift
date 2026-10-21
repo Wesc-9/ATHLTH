@@ -228,8 +228,8 @@ struct RouteLibraryListView: View {
                         Image(systemName: "location.slash")
                             .foregroundStyle(ATHLTHPlanDesign.accentInk)
                         Text(tr(
-                            "Location unavailable. Showing routes by name. Distance is measured to the route's centre, not driving distance.",
-                            "Posisjon er ikke tilgjengelig. Viser ruter etter navn. Avstand måles til rutens midtpunkt i luftlinje."))
+                            "Location unavailable. Showing routes by name until distance can be calculated.",
+                            "Posisjon er ikke tilgjengelig. Viser ruter etter navn til avstand kan beregnes."))
                             .font(.caption)
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     }
@@ -274,6 +274,17 @@ struct RouteLibraryListView: View {
                                 : "Prøv et annet søk eller juster filtrene."))
                     )
                     .padding(.vertical, 20)
+                    if publicFilter != .all || lengthFilter != 0 || !query.isEmpty {
+                        Button(tr("Clear filters", "Nullstill filtre")) {
+                            query = ""
+                            lengthFilter = 0
+                            publicFilter = .all
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .athlthPlanCard()
+                    }
                 } else {
                     if viewMode == .map {
                         databaseMap
