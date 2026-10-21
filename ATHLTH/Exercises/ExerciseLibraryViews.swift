@@ -669,8 +669,10 @@ struct ExerciseLibraryView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(scannerAnalysis?.equipmentName ??
                     ATHLTHLocalization.choose(
-                        english: "Analyzing equipment",
-                        norwegian: "Analyserer apparatet"
+                        english: scannerMessage == nil
+                            ? "Analyzing equipment" : "Analysis failed",
+                        norwegian: scannerMessage == nil
+                            ? "Analyserer apparatet" : "Analyse mislyktes"
                     ))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHPlanDesign.ink)
@@ -844,10 +846,10 @@ struct ExerciseLibraryView: View {
                 guard !Task.isCancelled, scanIdentity == identity else {
                     return
                 }
-                scannerMessage = ATHLTHLocalization.choose(
-                    english: "Could not analyze this photo. Try scanning again.",
-                    norwegian: "Bildet kunne ikke analyseres. Prøv å skanne på nytt."
-                )
+                // Keep the service's safe, localized failure reason
+                // instead of disguising every provider error as a bad photo.
+                scannerMessage = ATHLTHEquipmentScannerError.from(error)
+                    .localizedDescription
                 scannerIsAnalyzing = false
             }
         }
