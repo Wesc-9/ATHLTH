@@ -47,6 +47,32 @@ final class RunRouteMapPointModeTests: XCTestCase {
             street: "", fallbackName: nil, locality: "Fauske"), "Fauske")
     }
 
+    func testSearchRetainsDistancesWhenKeyboardDismissalSendsEmptyResults() {
+        XCTAssertFalse(RunRouteSearchSuggestionPolicy.shouldReplaceResults(
+            query: "Esso",
+            currentKeys: ["Esso|Storgaten 57, Fauske"],
+            incomingKeys: []
+        ))
+    }
+
+    func testSearchAvoidsResettingDistancesForIdenticalResults() {
+        let keys = ["Esso|Storgaten 57, Fauske", "Esso|Melilli, Italia"]
+        XCTAssertFalse(RunRouteSearchSuggestionPolicy.shouldReplaceResults(
+            query: "Esso", currentKeys: keys, incomingKeys: keys
+        ))
+    }
+
+    func testSearchReplacesResultsForNewAddressesButNotEmptyQuery() {
+        XCTAssertTrue(RunRouteSearchSuggestionPolicy.shouldReplaceResults(
+            query: "Esso",
+            currentKeys: ["Esso|Storgaten 57, Fauske"],
+            incomingKeys: ["Esso|Storgaten 57, Fauske", "Esso|Melilli, Italia"]
+        ))
+        XCTAssertFalse(RunRouteSearchSuggestionPolicy.shouldReplaceResults(
+            query: " ", currentKeys: [], incomingKeys: ["Esso|Melilli, Italia"]
+        ))
+    }
+
     func testSelectedPointModeOverridesAutomaticOrder() {
         XCTAssertEqual(
             RunRouteMapPointMode.resolve(mode: .start, hasStart: true, hasFinish: true),
