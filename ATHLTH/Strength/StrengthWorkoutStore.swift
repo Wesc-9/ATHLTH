@@ -1333,9 +1333,9 @@ final class StrengthWorkoutStore: ObservableObject {
         let exercise = currentExercise
         let set = currentSet
         let totalSets =
-            workout.exercises
-                .flatMap(\.sets)
-                .count
+            workout.exercises.reduce(0) {
+                $0 + $1.sets.count + ($1.skippedPlannedSetCount ?? 0)
+            }
         let allExercisesComplete =
             !workout.exercises.isEmpty &&
             workout.exercises.allSatisfy(\.isCompleted)
