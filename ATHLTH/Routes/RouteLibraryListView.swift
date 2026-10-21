@@ -74,6 +74,19 @@ struct RouteLibraryListView: View {
     @State private var errorMessage: String?
     @State private var hasMore = false
     @State private var catalogRequestID = UUID()
+    @AppStorage("athlth.routes.browse.viewMode.v1")
+    private var savedViewMode = ATHLTHRouteBrowseMode.cards.rawValue
+    @State private var hydratedRoutes: [UUID: TrainingRoute] = [:]
+    @State private var loadingDetails: Set<UUID> = []
+    @State private var showingMapRoute: TrainingRoute?
+
+    private var viewMode: ATHLTHRouteBrowseMode {
+        ATHLTHRouteBrowseMode(rawValue: savedViewMode) ?? .cards
+    }
+
+    private var viewModeBinding: Binding<ATHLTHRouteBrowseMode> {
+        Binding(get: { viewMode }, set: { savedViewMode = $0.rawValue })
+    }
 
     private var catalogKey: String {
         [query, sort.rawValue, String(lengthFilter),
@@ -146,147 +159,498 @@ struct RouteLibraryListView: View {
         }
     }
 
+    @ViewBuilder
     var body: some View {
-        List {
-            if source == .mine {
-                mineFilterCard
-                    .listRowInsets(
-                        EdgeInsets(
-                            top: 8,
-                            leading: 16,
-                            bottom: 8,
-                            trailing: 16
-                        )
-                    )
-                    .listRowBackground(
-                        Color.clear
-                    )
-                    .listRowSeparator(
-                        .hidden
-                    )
-            } else {
-                Section {
-                    Picker("Sort by", selection: $sort) {
-                        ForEach(RouteLibrarySort.allCases) { option in
-                            Text(option.rawValue).tag(option)
-                        }
-                    }
-                    Picker("Route length", selection: $lengthFilter) {
-                        Text("Any length").tag(0)
-                        Text("Under 5 km").tag(1)
-                        Text("5–10 km").tag(2)
-                        Text("10–21.1 km").tag(3)
-                        Text("21.1 km and more").tag(4)
-                    }
+        if source == .mine {
+            // My Routes and Choose Route now use exactly the same browsing
+            // component and underlying saved-route store, not a duplicate UI.
+            SavedRoutesView()
+        } else {
+            databaseBrowseView
+        }
+    }
 
-                    Toggle(isOn: $favoritesOnly) {
-                        Label(
-                            "Favorites only",
-                            systemImage: "star.fill"
-                        )
-                    }
-                    .tint(ATHLTHTheme.accent)
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
 
-                    if sort == .nearest {
-                        if locationStore.isUpdating {
-                            ProgressView("Finding your location…")
-                        } else if locationStore.location == nil {
-                            Text("Location is unavailable. Routes are shown by name until your position is available.")
-                                .font(.caption).foregroundStyle(.secondary)
-                            Button("Use my location") { locationStore.refresh() }
-                        }
-                        Text("Nearest is the straight-line distance to the route's centre, not travel distance to its start.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-            }
+    private var databaseBrowseView: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 15) {
+                databaseHeader
+                databaseFilters
 
-            if let errorMessage {
-                Section {
-                    Text(errorMessage).font(.caption).foregroundStyle(.red)
-                    if source == .database {
-                        Button("Retry") { Task { await loadCatalog() } }
+                if sort == .nearest && locationStore.location == nil {
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "location.slash")
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        Text(tr(
+                            "Location unavailable. Showing routes by name. Distance is measured to the route's centre, not driving distance.",
+                            "Posisjon er ikke tilgjengelig. Viser ruter etter navn. Avstand måles til rutens midtpunkt i luftlinje."))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     }
+                    .padding(12)
+                    .athlthPlanCard()
                 }
-            }
-            if loading {
-                ProgressView("Loading routes…")
-            }
-            Section(
-                hasMore
-                    ? ATHLTHLocalization.format(
-                        "%d routes loaded",
-                        entries.count
-                    )
-                    : ATHLTHLocalization.format(
-                        "%d routes",
-                        entries.count
-                    )
-            ) {
-                ForEach(entries) { entry in
-                    routeRow(entry)
+
+                if let errorMessage {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                    Button(tr("Try again", "Prøv igjen")) {
+                        Task { await loadCatalog() }
+                    }
+                    .font(.subheadline.weight(.semibold))
                 }
-                if source == .database && hasMore {
-                    Button("Load more routes") { Task { await loadCatalog(reset: false) } }
-                        .disabled(loading)
+
+                HStack(alignment: .center, spacing: 12) {
+                    Text(hasMore
+                         ? tr("\(entries.count) routes loaded", "\(entries.count) ruter lastet inn")
+                         : tr("\(entries.count) routes", "\(entries.count) ruter"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Spacer(minLength: 0)
                 }
-                if entries.isEmpty && !loading && errorMessage == nil {
+
+                ATHLTHRouteBrowseModePicker(selection: viewModeBinding)
+
+                if loading && catalog.isEmpty {
+                    ProgressView(tr("Loading routes…", "Henter ruter …"))
+                        .frame(maxWidth: .infinity, minHeight: 120)
+                } else if entries.isEmpty && errorMessage == nil {
                     ContentUnavailableView(
-                        "No routes found", systemImage: "map",
-                        description: Text(
-                            source == .mine
-                                ? ATHLTHLocalization.string(
-                                    "Create or save a route, or try another search or filter."
-                                )
-                                : ATHLTHLocalization.string(
-                                    "Try another search or filter. Public routes appear here when shared."
-                                )
-                        )
+                        tr("No matching routes", "Ingen ruter matcher"),
+                        systemImage: "map",
+                        description: Text(tr(
+                            "Try a different search or adjust your filters.",
+                            "Prøv et annet søk eller juster filtrene."))
                     )
-                }
-            }
-        }
-        .modifier(
-            RouteLibraryGhostSurfaceModifier(
-                enabled:
-                    source == .mine
-            )
-        )
-        .navigationTitle(
-            source == .mine
-                ? ATHLTHLocalization.string(
-                    "My Routes"
-                )
-                : ATHLTHLocalization.string(
-                    "Route Database"
-                )
-        )
-        .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $query, prompt: "Search route or place")
-        .toolbar {
-            if source == .mine {
-                ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink {
-                        RunRouteBuilderView()
-                    } label: {
-                        Label("Create route", systemImage: "plus")
+                    .padding(.vertical, 20)
+                } else {
+                    if viewMode == .map {
+                        databaseMap
+                    }
+
+                    ForEach(entries) { entry in
+                        if viewMode == .cards {
+                            databasePremiumCard(entry)
+                        } else {
+                            databaseCompactRow(entry)
+                        }
                     }
                 }
+
+                if hasMore {
+                    Button {
+                        Task { await loadCatalog(reset: false) }
+                    } label: {
+                        HStack {
+                            Spacer()
+                            if loading { ProgressView().tint(ATHLTHPlanDesign.accentInk) }
+                            Text(tr("Load more routes", "Last flere ruter"))
+                            Image(systemName: "arrow.down.circle")
+                            Spacer()
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(minHeight: 48)
+                        .athlthPlanCard()
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(loading)
+                }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+            .padding(.bottom, 76)
+            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+            .frame(maxWidth: .infinity)
         }
+        .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
+        .navigationTitle(tr("Route database", "Rutedatabase"))
+        .navigationBarTitleDisplayMode(.inline)
+        .refreshable { await loadCatalog() }
         .task(id: catalogKey) {
             recents.refresh()
             async let favoriteRefresh: Void = favorites.refresh()
-            if source == .database {
-                await loadCatalog()
-            }
+            await loadCatalog()
             _ = await favoriteRefresh
         }
-        .refreshable { if source == .database { await loadCatalog() } }
         .onChange(of: sort) { _, value in
             if value == .nearest { locationStore.refresh() }
         }
+        .task(id: viewMode == .map ? catalogKey + "|map" : "") {
+            if viewMode == .map { await loadMapRouteGeometry() }
+        }
+        .onChange(of: favoritesOnly) { _, _ in
+            // Favorites filter is local; server sorting and pagination persist.
+            if viewMode == .map {
+                Task { await loadMapRouteGeometry() }
+            }
+        }
         .onDisappear { locationStore.stop() }
+        .sheet(item: $showingMapRoute) { route in
+            NavigationStack { RouteDetailView(route: route) }
+        }
+    }
+
+    private var databaseHeader: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("ATHLTH  /  " + tr("ROUTES", "RUTER"))
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(2)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Text(tr("Explore routes", "Utforsk ruter"))
+                    .font(.system(size: 27, weight: .semibold, design: .serif))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                Text(tr("Discover routes shared with the community",
+                        "Oppdag ruter som er delt med fellesskapet"))
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+            Spacer(minLength: 4)
+            NavigationLink {
+                RunRouteBuilderView()
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 19, weight: .medium))
+                    .foregroundStyle(.white)
+                    .frame(width: 47, height: 47)
+                    .background(ATHLTHTheme.accentDeep,
+                                in: RoundedRectangle(cornerRadius: 15))
+            }
+            .accessibilityLabel(tr("Create route", "Opprett rute"))
+        }
+        .padding(.vertical, 8)
+    }
+
+    private var databaseFilters: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                TextField(tr("Search routes or places", "Søk etter ruter eller steder"),
+                          text: $query)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .font(.subheadline)
+                if !query.isEmpty {
+                    Button { query = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    .accessibilityLabel(tr("Clear search", "Tøm søk"))
+                }
+            }
+            .padding(13)
+            .background(ATHLTHPlanDesign.surface,
+                        in: RoundedRectangle(cornerRadius: 15))
+            .overlay(RoundedRectangle(cornerRadius: 15)
+                .strokeBorder(ATHLTHPlanDesign.outline))
+
+            HStack(spacing: 9) {
+                ForEach([false, true], id: \.self) { onlyFavorites in
+                    Button { favoritesOnly = onlyFavorites } label: {
+                        Label(onlyFavorites ? tr("Favorites", "Favoritter") :
+                              tr("All", "Alle"),
+                              systemImage: onlyFavorites ? "star.fill" :
+                              "square.grid.2x2")
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 14)
+                            .frame(height: 35)
+                            .foregroundStyle(favoritesOnly == onlyFavorites
+                                ? Color.white : ATHLTHPlanDesign.ink)
+                            .background(favoritesOnly == onlyFavorites
+                                ? ATHLTHTheme.accentDeep : ATHLTHPlanDesign.warmSurface,
+                                in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(favoritesOnly == onlyFavorites ? [.isSelected] : [])
+                }
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 10) {
+                Menu {
+                    ForEach(RouteLibrarySort.allCases) { option in
+                        Button {
+                            sort = option
+                        } label: {
+                            if sort == option {
+                                Label(routeSortLabel(option), systemImage: "checkmark")
+                            } else {
+                                Text(routeSortLabel(option))
+                            }
+                        }
+                    }
+                } label: {
+                    catalogFilterChip(routeSortLabel(sort), icon: "arrow.up.arrow.down")
+                }
+                Menu {
+                    ForEach(0...4, id: \.self) { choice in
+                        Button {
+                            lengthFilter = choice
+                        } label: {
+                            if lengthFilter == choice {
+                                Label(catalogLengthLabel(choice),
+                                      systemImage: "checkmark")
+                            } else {
+                                Text(catalogLengthLabel(choice))
+                            }
+                        }
+                    }
+                } label: {
+                    catalogFilterChip(catalogLengthLabel(lengthFilter),
+                                      icon: "ruler")
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(15)
+        .athlthPlanCard()
+    }
+
+    private func catalogFilterChip(_ title: String, icon: String) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: icon)
+            Text(title).lineLimit(1)
+            Image(systemName: "chevron.down")
+                .font(.system(size: 9, weight: .semibold))
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(ATHLTHPlanDesign.ink)
+        .padding(.horizontal, 10)
+        .frame(height: 39)
+        .background(ATHLTHPlanDesign.warmSurface,
+                    in: RoundedRectangle(cornerRadius: 11))
+    }
+
+    private func catalogLengthLabel(_ option: Int) -> String {
+        switch option {
+        case 1: return tr("Under 5 km", "Under 5 km")
+        case 2: return "5–10 km"
+        case 3: return "10–21,1 km"
+        case 4: return "21,1+ km"
+        default: return tr("All lengths", "Alle lengder")
+        }
+    }
+
+    private func routeSortLabel(_ value: RouteLibrarySort) -> String {
+        switch value {
+        case .newest: return tr("Newest", "Nyeste")
+        case .nearest: return tr("Nearest", "Nærmest")
+        case .shortest: return tr("Shortest", "Korteste")
+        case .longest: return tr("Longest", "Lengste")
+        case .leastClimbing: return tr("Least climbing", "Minst stigning")
+        case .mostClimbing: return tr("Most climbing", "Mest stigning")
+        case .name: return "A–Å"
+        }
+    }
+
+    private func databasePremiumCard(_ entry: RouteLibraryEntry) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Group {
+                if let route = hydratedRoutes[entry.id] {
+                    NavigationLink {
+                        RouteDetailView(route: route)
+                    } label: {
+                        RouteMapSnapshotThumbnail(route: route, height: 173)
+                            .frame(maxWidth: .infinity)
+                            .clipShape(RoundedRectangle(cornerRadius: 17))
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 17)
+                            .fill(ATHLTHPlanDesign.selectedSurface)
+                        VStack(spacing: 6) {
+                            Image(systemName: "map")
+                                .font(.title2)
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            Text(tr("Loading route preview", "Henter rutekart"))
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                    }
+                    .frame(height: 173)
+                }
+            }
+            .task(id: entry.id) { await loadRouteDetail(entry.id) }
+
+            HStack(alignment: .top, spacing: 10) {
+                NavigationLink {
+                    RouteLibraryDetailLoader(routeID: entry.id)
+                } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(entry.title)
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            .multilineTextAlignment(.leading)
+                        let endpoints = [entry.startName, entry.endName]
+                            .compactMap { $0 }
+                            .filter { !$0.isEmpty }
+                        if !endpoints.isEmpty {
+                            Text(endpoints.joined(separator: " → "))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                .lineLimit(2)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                LibraryFavoriteButton(
+                    kind: .route, itemID: entry.id.uuidString,
+                    title: entry.title,
+                    subtitle: String(format: "%.1f km", entry.distanceKilometers),
+                    icon: "map.fill")
+            }
+
+            HStack(spacing: 10) {
+                Label(String(format: "%.1f km", entry.distanceKilometers),
+                      systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                if let climb = entry.elevationGainMeters {
+                    Label("\(Int(climb.rounded())) hm", systemImage: "mountain.2")
+                }
+                if let distance = entry.distance(from: locationStore.location) {
+                    Label(String(format: "%.1f km", distance),
+                          systemImage: "location")
+                }
+            }
+            .font(.caption.weight(.medium))
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
+
+            HStack(spacing: 12) {
+                NavigationLink {
+                    RouteLibraryDetailLoader(routeID: entry.id)
+                } label: {
+                    Label(tr("Details", "Detaljer"), systemImage: "arrow.up.right")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                NavigationLink {
+                    RouteLibraryDetailLoader(routeID: entry.id)
+                } label: {
+                    Label(tr("Open route", "Åpne rute"),
+                          systemImage: "arrow.right.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 45)
+                        .background(ATHLTHTheme.accentDeep,
+                                    in: RoundedRectangle(cornerRadius: 13))
+                }
+                .buttonStyle(.plain)
+            }
+            .simultaneousGesture(TapGesture().onEnded { markRecent(entry) })
+        }
+        .padding(14)
+        .athlthPlanCard()
+    }
+
+    private func databaseCompactRow(_ entry: RouteLibraryEntry) -> some View {
+        HStack(spacing: 10) {
+            NavigationLink {
+                RouteLibraryDetailLoader(routeID: entry.id)
+            } label: {
+                HStack(spacing: 10) {
+                    if let route = hydratedRoutes[entry.id] {
+                        RouteMapSnapshotThumbnail(route: route, height: 80)
+                            .frame(width: 100, height: 80)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    } else {
+                        Image(systemName: "map")
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            .frame(width: 100, height: 80)
+                            .background(ATHLTHPlanDesign.selectedSurface,
+                                        in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(entry.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            .lineLimit(2)
+                        Text(String(format: "%.1f km", entry.distanceKilometers))
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        if let start = entry.startName, !start.isEmpty {
+                            Text(start)
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                .lineLimit(1)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+            }
+            .buttonStyle(.plain)
+            LibraryFavoriteButton(
+                kind: .route, itemID: entry.id.uuidString,
+                title: entry.title,
+                subtitle: String(format: "%.1f km", entry.distanceKilometers),
+                icon: "map.fill"
+            )
+        }
+        .padding(11)
+        .athlthPlanCard()
+    }
+
+    private var databaseMap: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            let routes = entries.prefix(20).compactMap { hydratedRoutes[$0.id] }
+            if routes.isEmpty {
+                ProgressView(tr("Loading route map…", "Henter rutekart …"))
+                    .frame(maxWidth: .infinity, minHeight: 250)
+                    .background(ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 17))
+            } else {
+                SavedRouteOverviewMap(routes: routes) { route in
+                    showingMapRoute = route
+                }
+                .frame(height: 310)
+                .clipShape(RoundedRectangle(cornerRadius: 19))
+            }
+            Text(tr(
+                "Map displays up to 20 currently loaded routes. The list below shows every filtered result.",
+                "Kartet viser inntil 20 innlastede ruter. Listen under viser alle filtrerte treff."))
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+        }
+    }
+
+    @MainActor
+    private func loadRouteDetail(_ id: UUID) async {
+        guard hydratedRoutes[id] == nil, !loadingDetails.contains(id) else { return }
+        loadingDetails.insert(id)
+        defer { loadingDetails.remove(id) }
+        do {
+            let record: CommunityRouteRecord = try await SupabaseEnvironment.client
+                .from("community_routes")
+                .select()
+                .eq("id", value: id)
+                .single()
+                .execute().value
+            guard !Task.isCancelled else { return }
+            hydratedRoutes[id] = record.trainingRoute
+        } catch {
+            // A route may be removed or made private while the list is open.
+            // The metadata card remains usable via its normal details loader.
+        }
+    }
+
+    @MainActor
+    private func loadMapRouteGeometry() async {
+        for entry in entries.prefix(20) {
+            guard !Task.isCancelled, viewMode == .map else { return }
+            await loadRouteDetail(entry.id)
+        }
     }
 
     private var mineFilterCard: some View {
