@@ -3557,172 +3557,299 @@ struct RecoveryToolsCard: View {
     }
 }
 
+/// A true partial entry: all fields start nil, even if an earlier check-in
+/// exists. Only explicitly chosen answers are written on Save. Untouched
+/// answers in a previous check-in are preserved, not reset to neutral values.
+struct RecoveryPartialCheckInDraft {
+    var energy: Int?
+    var stress: Int?
+    var overallSoreness: Int?
+    var motivation: Int?
+    var muscles: [String: RecoverySorenessLevel] = [:]
+
+    var hasAnswers: Bool {
+        energy != nil || stress != nil || overallSoreness != nil ||
+            motivation != nil || !muscles.isEmpty
+    }
+
+    func apply(to store: RecoverySorenessStore) {
+        if let energy { store.setEnergy(energy) }
+        if let stress { store.setStress(stress) }
+        if let overallSoreness { store.setOverallSoreness(overallSoreness) }
+        if let motivation { store.setMotivation(motivation) }
+        for (muscle, level) in muscles {
+            store.set(level, for: muscle)
+        }
+    }
+}
+
 struct RecoverySorenessLogView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @ObservedObject var store: RecoverySorenessStore
+
+    @State private var draft = RecoveryPartialCheckInDraft()
+    @State private var showMuscleDetail = false
+    @State private var showMotivation = false
 
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    Text(
-                        recoveryText("Your check-in can influence Today's Guidance and muscle-recovery suggestions. It never changes the wearable Readiness score.", "Innsjekken kan påvirke dagens anbefaling og forslag til muskelrestitusjon. Den endrer aldri dagsformscoren fra klokken.")
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: "sparkles")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            .frame(width: 48, height: 48)
+                            .background(ATHLTHPlanDesign.selectedSurface,
+                                        in: RoundedRectangle(cornerRadius: 16))
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(recoveryText(
+                                "How are you feeling today?",
+                                "Hvordan føler du deg i dag?"))
+                                .font(.system(size: 23, weight: .semibold,
+                                              design: .serif))
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Text(recoveryText(
+                                "Only answer what feels relevant. Nothing is preselected.",
+                                "Svar bare på det du ønsker. Ingenting er forhåndsvalgt."))
+                                .font(.subheadline)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                    }
 
-                Section(recoveryText("How you feel", "Hvordan du føler deg")) {
-                    checkInScale(
-                        title: recoveryText("Energy", "Energi"),
-                        subtitle: recoveryText("Low → high", "Lav → høy"),
-                        icon: "bolt.fill",
-                        value: store.todayEnergy,
-                        onSelect: store.setEnergy
-                    )
+                    ATHLTHPlanSurface {
+                        VStack(alignment: .leading, spacing: 16) {
+                            ratingRow(
+                                title: recoveryText("Energy", "Energi"),
+                                hint: recoveryText("Low → high", "Lav → høy"),
+                                symbol: "bolt.fill",
+                                value: draft.energy
+                            ) { draft.energy = $0 }
 
-                    checkInScale(
-                        title: recoveryText("Stress", "Stress"),
-                        subtitle: recoveryText("Low → high", "Lav → høy"),
-                        icon: "waveform.path.ecg",
-                        value: store.todayStress,
-                        onSelect: store.setStress
-                    )
+                            Divider().opacity(0.55)
 
-                    checkInScale(
-                        title: recoveryText("Overall soreness", "Generell ømhet"),
-                        subtitle: recoveryText("None → very sore", "Ingen → svært øm"),
-                        icon: "figure.walk.motion",
-                        value: store.todayOverallSoreness,
-                        onSelect: store.setOverallSoreness
-                    )
+                            ratingRow(
+                                title: recoveryText("Stress", "Stress"),
+                                hint: recoveryText("Low → high", "Lav → høy"),
+                                symbol: "waveform.path.ecg",
+                                value: draft.stress
+                            ) { draft.stress = $0 }
 
-                    checkInScale(
-                        title: recoveryText("Motivation", "Motivasjon"),
-                        subtitle: recoveryText("Low → high", "Lav → høy"),
-                        icon: "flame.fill",
-                        value: store.todayMotivation,
-                        onSelect: store.setMotivation
-                    )
-                }
+                            Divider().opacity(0.55)
 
-                Section(recoveryText("Muscle soreness", "Muskelømhet")) {
-                    ForEach(
-                        RecoverySorenessStore.muscleGroups,
-                        id: \.self
-                    ) { group in
-                        VStack(alignment: .leading, spacing: 9) {
-                            Text(group)
-                                .font(.headline)
+                            ratingRow(
+                                title: recoveryText("Overall soreness", "Generell ømhet"),
+                                hint: recoveryText("None → high", "Ingen → høy"),
+                                symbol: "figure.cooldown",
+                                value: draft.overallSoreness
+                            ) { draft.overallSoreness = $0 }
+                        }
+                    }
 
-                            HStack(spacing: 6) {
-                                ForEach(
-                                    RecoverySorenessLevel.allCases
-                                ) { level in
-                                    Button {
-                                        store.set(
-                                            level,
-                                            for: group
-                                        )
-                                    } label: {
-                                        Text(level.title)
-                                            .font(
-                                                .caption2
-                                                    .weight(.semibold)
-                                            )
-                                            .frame(
-                                                maxWidth: .infinity
-                                            )
-                                            .padding(.vertical, 8)
-                                            .foregroundStyle(
-                                                store.level(
-                                                    for: group
-                                                ) == level
-                                                    ? Color.white
-                                                    : ATHLTHTheme.primaryText
-                                            )
-                                            .background(
-                                                store.level(
-                                                    for: group
-                                                ) == level
-                                                    ? ATHLTHTheme.accent
-                                                    : Color.primary
-                                                        .opacity(0.05),
-                                                in: RoundedRectangle(
-                                                    cornerRadius: 10
-                                                )
-                                            )
+                    ATHLTHPlanSurface {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    showMuscleDetail.toggle()
+                                }
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "figure.strengthtraining.traditional")
+                                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(recoveryText(
+                                            "Specific muscle soreness",
+                                            "Støl i bestemte muskler?"))
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                                        Text(recoveryText(
+                                            "Optional · only mark affected muscles",
+                                            "Valgfritt · marker kun berørte muskler"))
+                                            .font(.caption2)
+                                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                                     }
-                                    .buttonStyle(.plain)
+                                    Spacer()
+                                    Image(systemName: showMuscleDetail ?
+                                          "chevron.up" : "chevron.down")
+                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            if showMuscleDetail {
+                                ForEach(RecoverySorenessStore.muscleGroups,
+                                        id: \.self) { muscle in
+                                    VStack(alignment: .leading, spacing: 7) {
+                                        Text(muscle)
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                                        HStack(spacing: 6) {
+                                            ForEach(RecoverySorenessLevel.allCases) { level in
+                                                Button {
+                                                    // Selecting again deselects it, preserving
+                                                    // the distinction between no answer and none.
+                                                    if draft.muscles[muscle] == level {
+                                                        draft.muscles.removeValue(forKey: muscle)
+                                                    } else {
+                                                        draft.muscles[muscle] = level
+                                                    }
+                                                } label: {
+                                                    Text(level.title)
+                                                        .font(.system(size: 10, weight: .semibold))
+                                                        .lineLimit(1)
+                                                        .minimumScaleFactor(0.8)
+                                                        .frame(maxWidth: .infinity, minHeight: 36)
+                                                        .foregroundStyle(
+                                                            draft.muscles[muscle] == level
+                                                                ? .white : ATHLTHPlanDesign.ink)
+                                                        .background(
+                                                            draft.muscles[muscle] == level
+                                                                ? ATHLTHPlanDesign.accentInk
+                                                                : ATHLTHPlanDesign.selectedSurface,
+                                                            in: RoundedRectangle(cornerRadius: 10))
+                                                }
+                                                .buttonStyle(.plain)
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
-                        .padding(.vertical, 4)
                     }
+
+                    ATHLTHPlanSurface {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    showMotivation.toggle()
+                                }
+                            } label: {
+                                HStack {
+                                    Label(recoveryText(
+                                        "Motivation (optional)",
+                                        "Motivasjon (valgfritt)"),
+                                        systemImage: "flame.fill")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                                    Spacer()
+                                    Image(systemName: showMotivation ?
+                                          "chevron.up" : "chevron.down")
+                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            if showMotivation {
+                                ratingRow(
+                                    title: recoveryText("Motivation", "Motivasjon"),
+                                    hint: recoveryText("Low → high", "Lav → høy"),
+                                    symbol: "flame.fill",
+                                    value: draft.motivation
+                                ) { draft.motivation = $0 }
+                            }
+                        }
+                    }
+
+                    Label(recoveryText(
+                        "Your answers personalize training advice and muscle recovery. Apple Watch readiness is never rewritten.",
+                        "Svarene kan tilpasse treningsråd og muskelrestitusjon. Dagsform fra Apple Watch endres aldri."),
+                        systemImage: "info.circle")
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                .padding(17)
             }
-            .navigationTitle(recoveryText("Daily Check-in", "Daglig innsjekk"))
+            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+            .navigationTitle(recoveryText("Daily check-in", "Daglig innsjekk"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(recoveryText("Done", "Ferdig")) {
-                        dismiss()
-                    }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(recoveryText("Cancel", "Avbryt")) { dismiss() }
                 }
+            }
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    draft.apply(to: store)
+                    notifications.reconcileDailyCheckIn(
+                        enabled: settings.dailyCheckInRemindersEnabled,
+                        accountID: session.profile.userID,
+                        completed: true
+                    )
+                    dismiss()
+                } label: {
+                    Label(recoveryText("Save check-in", "Lagre innsjekk"),
+                          systemImage: "checkmark.circle.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, minHeight: 51)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
+                .background(
+                    draft.hasAnswers
+                        ? ATHLTHPlanDesign.accentInk
+                        : ATHLTHPlanDesign.secondaryInk.opacity(0.40),
+                    in: RoundedRectangle(cornerRadius: 17))
+                .disabled(!draft.hasAnswers)
+                .padding(.horizontal, 17)
+                .padding(.top, 10)
+                .padding(.bottom, 9)
+                .background(ATHLTHPlanDesign.canvas)
+            }
+            .onAppear {
+                draft = RecoveryPartialCheckInDraft()
+                showMuscleDetail = false
+                showMotivation = false
             }
         }
     }
 
-    private func checkInScale(
-        title: String,
-        subtitle: String,
-        icon: String,
-        value: Int?,
-        onSelect: @escaping (Int) -> Void
+    private func ratingRow(
+        title: String, hint: String, symbol: String,
+        value: Int?, onSelect: @escaping (Int) -> Void
     ) -> some View {
         VStack(alignment: .leading, spacing: 9) {
-            HStack {
-                Label(title, systemImage: icon)
+            HStack(spacing: 8) {
+                Image(systemName: symbol)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Text(title)
                     .font(.subheadline.weight(.semibold))
-
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
                 Spacer()
-
-                Text(subtitle)
+                Text(hint)
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
-
-            HStack(spacing: 7) {
+            HStack(spacing: 8) {
                 ForEach(1...5, id: \.self) { score in
                     Button {
                         onSelect(score)
                     } label: {
                         Text("\(score)")
-                            .font(.caption.weight(.bold))
-                            .frame(
-                                maxWidth: .infinity,
-                                minHeight: 34
-                            )
-                            .foregroundStyle(
-                                value == score
-                                    ? Color.white
-                                    : ATHLTHTheme.primaryText
-                            )
-                            .background(
-                                value == score
-                                    ? ATHLTHTheme.accent
-                                    : Color.primary.opacity(0.05),
-                                in: RoundedRectangle(
-                                    cornerRadius: 10,
-                                    style: .continuous
-                                )
-                            )
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(value == score
+                                ? .white : ATHLTHPlanDesign.ink)
+                            .frame(maxWidth: .infinity, minHeight: 42)
+                            .background(value == score
+                                ? ATHLTHPlanDesign.accentInk
+                                : ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 12))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .strokeBorder(
+                                        value == score
+                                            ? Color.clear
+                                            : ATHLTHPlanDesign.outline,
+                                        lineWidth: 0.7)
+                            }
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("\(title), \(score) av 5")
                 }
             }
         }
-        .padding(.vertical, 4)
     }
 }
 
