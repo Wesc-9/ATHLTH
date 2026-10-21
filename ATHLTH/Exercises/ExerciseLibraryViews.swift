@@ -129,15 +129,9 @@ struct ExerciseLibraryView: View {
                 .filter { regularResults.contains($0.id) }
         }
 
-        let trimmedQuery =
-            query.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-
-        guard trimmedQuery.isEmpty else {
-            return results
-        }
-
+        // The same A–Å ordering and right-hand alphabet index are used
+        // whether opened from the training plan, Quick Train or live Strength.
+        // Keep the scanner's ranked matching separate from ordinary search.
         return results.sorted {
             library.localizedExerciseName($0).localizedStandardCompare(
                 library.localizedExerciseName($1)
@@ -541,12 +535,7 @@ struct ExerciseLibraryView: View {
                         alignment: .trailing
                     ) {
                         if !scannerResultsActive &&
-                           query
-                            .trimmingCharacters(
-                                in:
-                                    .whitespacesAndNewlines
-                            )
-                            .isEmpty {
+                           entries.count > 8 {
                             exerciseAlphabetIndex(
                                 proxy: proxy,
                                 entries: entries
