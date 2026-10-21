@@ -80,17 +80,9 @@ struct ATHLTHTrainTodayPremiumView: View {
                             .allSatisfy({ completedIDs.contains($0.id) }) {
                     completedTodayCard(plan)
                 } else if let workout = primaryWorkout {
+                    // Recommendations and the reversible change live inside
+                    // the same planned-workout card, directly under Start.
                     workoutCard(workout, plan: plan)
-                    if workout.dailyAlternativeOriginal != nil {
-                        undoAlternativeRow(workout)
-                    } else if !completedIDs.contains(workout.id) &&
-                              !hasActiveWorkout,
-                              let suggested = ATHLTHDailyWorkoutAlternativeAdvisor
-                                .suggestions(for: workout,
-                                             signals: selfReportedSignals).first {
-                        alternativeRecommendationCard(
-                            for: workout, suggestion: suggested)
-                    }
                 } else {
                     openDayOverview(hasPlan: true)
                 }
@@ -153,105 +145,89 @@ struct ATHLTHTrainTodayPremiumView: View {
     /// Show an actual alternative and its reason immediately after the
     /// workout. The athlete never has to open a generic 'Adjust' tile to
     /// discover the recommendation.
+    /// All actionable alternatives are visible without an intermediary tile,
+    /// dropdown or navigation. The two safest choices for each signal are
+    /// shown directly beneath the primary workout action.
     private func alternativeRecommendationCard(
         for workout: PlannedSession,
         suggestion: ATHLTHDailyWorkoutAlternativeAdvisor.Suggestion
     ) -> some View {
-        let alternatives = ATHLTHDailyWorkoutAlternativeAdvisor.suggestions(
-            for: workout, signals: selfReportedSignals)
-        return VStack(alignment: .leading, spacing: 10) {
+        let alternatives = Array(ATHLTHDailyWorkoutAlternativeAdvisor.suggestions(
+            for: workout, signals: selfReportedSignals).prefix(2))
+
+        return VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 7) {
                 Image(systemName: "sparkles")
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                Text(tr("ATHLTH HAS AN ALTERNATIVE",
-                        "ATHLTH FORESLÅR ET ALTERNATIV"))
-                    .font(.caption2.weight(.bold))
+                Text(tr("ATHLTH SUGGESTS", "ATHLTH FORESLÅR"))
+                    .font(.system(size: 10, weight: .bold))
                     .tracking(0.9)
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
                 Spacer()
             }
+
             Text(suggestion.reason)
                 .font(.caption)
                 .foregroundStyle(ink)
+                .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
 
-            HStack(spacing: 10) {
-                Image(systemName: suggestion.choice.symbol)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    .frame(width: 36, height: 36)
-                    .background(.white.opacity(0.88),
-                                in: RoundedRectangle(cornerRadius: 11))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(suggestion.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ink)
-                    Text(tr("Less of the planned load",
-                            "Mindre av den planlagte belastningen"))
-                        .font(.caption2)
-                        .foregroundStyle(muted)
-                }
-                Spacer(minLength: 0)
-            }
-
-            HStack(spacing: 9) {
-                Button {
-                    pendingSwap = PendingSwap(
-                        workout: workout, suggestion: suggestion)
-                } label: {
-                    HStack(spacing: 7) {
-                        Text(tr("Swap to this", "Bytt til denne"))
-                        Image(systemName: "arrow.left.arrow.right")
-                    }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity, minHeight: 41)
-                    .background(ATHLTHPlanDesign.accentInk,
-                                in: RoundedRectangle(cornerRadius: 12))
-                }
-                .buttonStyle(.plain)
-
-                if alternatives.count > 1 {
-                    Menu {
-                        ForEach(Array(alternatives.dropFirst())) { option in
-                            Button {
-                                pendingSwap = PendingSwap(
-                                    workout: workout, suggestion: option)
-                            } label: {
-                                Label(option.title, systemImage: option.choice.symbol)
-                            }
-                        }
+            HStack(spacing: 8) {
+                ForEach(alternatives) { option in
+                    Button {
+                        pendingSwap = PendingSwap(
+                            workout: workout, suggestion: option)
                     } label: {
                         HStack(spacing: 5) {
-                            Text(tr("Others", "Andre"))
-                            Image(systemName: "chevron.down")
+                            Image(systemName: option.choice.symbol)
+                                .font(.caption.weight(.semibold))
+                            Text(option.title)
+                                .font(.caption.weight(.semibold))
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.85)
                         }
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ink)
-                        .frame(minWidth: 83, minHeight: 41)
-                        .padding(.horizontal, 5)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 12))
+                        .frame(maxWidth: .infinity, minHeight: 45)
+                        .foregroundStyle(
+                            option.id == suggestion.id
+                                ? Color.white : ATHLTHPlanDesign.accentInk)
+                        .background(
+                            option.id == suggestion.id
+                                ? ATHLTHPlanDesign.accentInk
+                                : Color.white.opacity(0.90),
+                            in: RoundedRectangle(cornerRadius: 12)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 12)
+                                .strokeBorder(
+                                    option.id == suggestion.id
+                                        ? Color.clear : ATHLTHPlanDesign.outline,
+                                    lineWidth: 0.8)
+                        }
+                        .contentShape(RoundedRectangle(cornerRadius: 12))
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(tr(
+                        "Review a replacement for today's workout",
+                        "Bekreft et alternativ til dagens økt"))
                 }
             }
-            Text(tr(
-                "Suggestion only. Nothing changes until you confirm.",
-                "Kun et forslag. Ingenting endres før du godkjenner."
-            ))
+
+            Text(tr("Your plan changes only after confirmation.",
+                    "Planen endres først når du bekrefter."))
                 .font(.system(size: 10))
                 .foregroundStyle(muted)
         }
-        .padding(14)
+        .padding(12)
         .background(
             LinearGradient(
                 colors: [ATHLTHPlanDesign.selectedSurface,
                          ATHLTHPlanDesign.warmSurface],
                 startPoint: .topLeading, endPoint: .bottomTrailing
             ),
-            in: RoundedRectangle(cornerRadius: 17)
+            in: RoundedRectangle(cornerRadius: 15)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 17)
+            RoundedRectangle(cornerRadius: 15)
                 .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.7)
         }
     }
@@ -463,6 +439,15 @@ struct ATHLTHTrainTodayPremiumView: View {
                     .background(ink, in: RoundedRectangle(cornerRadius: 11))
                 }
                 .buttonStyle(.plain)
+
+                if workout.dailyAlternativeOriginal != nil {
+                    undoAlternativeRow(workout)
+                } else if !finished && !hasActiveWorkout,
+                          let suggested = ATHLTHDailyWorkoutAlternativeAdvisor
+                            .suggestions(for: workout, signals: selfReportedSignals).first {
+                    alternativeRecommendationCard(
+                        for: workout, suggestion: suggested)
+                }
 
                 if sessions.count > 1 {
                     VStack(alignment: .leading, spacing: 8) {
