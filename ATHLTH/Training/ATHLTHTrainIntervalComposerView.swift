@@ -43,6 +43,7 @@ struct ATHLTHTrainIntervalComposerView: View {
         var id: String { blockID.uuidString + "-\(repetition)" }
     }
     @State private var editingBlockID: UUID?
+    @State private var isComposerExpanded = false
 
     private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
     private let muted = Color(red: 0.46, green: 0.44, blue: 0.43)
@@ -67,18 +68,30 @@ struct ATHLTHTrainIntervalComposerView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
-                        titleArea
-                        blockList
-                        blockComposer
-                        sessionGuidance
+                ScrollViewReader { scroll in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 18) {
+                            titleArea
+                            blockList
+                            blockComposer.id("phaseComposer")
+                            sessionGuidance
+                        }
+                        .frame(maxWidth: 720, alignment: .leading)
+                        .frame(maxWidth: .infinity)
+                        .padding(18)
                     }
-                    .frame(maxWidth: 720, alignment: .leading)
-                    .frame(maxWidth: .infinity)
-                    .padding(18)
+                    .scrollIndicators(.hidden)
+                    .onChange(of: editingBlockID) { _, selected in
+                        guard selected != nil else { return }
+                        isComposerExpanded = true
+                        Task { @MainActor in
+                            await Task.yield()
+                            withAnimation(.easeInOut(duration: 0.22)) {
+                                scroll.scrollTo("phaseComposer", anchor: .top)
+                            }
+                        }
+                    }
                 }
-                .scrollIndicators(.hidden)
                 Button(action: save) {
                     HStack {
                         Spacer()
@@ -131,6 +144,7 @@ struct ATHLTHTrainIntervalComposerView: View {
                     selectionTitle: tr("Choose exercise", "Velg øvelse")
                 ) { exercise in
                     activityName = exercise.name
+                    isComposerExpanded = true
                     showingExercisePicker = false
                 }
             }
@@ -336,15 +350,38 @@ struct ATHLTHTrainIntervalComposerView: View {
     }
 
     private var blockComposer: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            Text(editingBlockID == nil
-                ? tr("PIN A NEW PHASE", "FEST EN NY DEL")
-                : tr("EDIT PINNED PHASE", "REDIGER VALGT DEL"))
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(1.4)
-                .foregroundStyle(bronze)
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    if isComposerExpanded {
+                        editingBlockID = nil
+                        isComposerExpanded = false
+                    } else {
+                        isComposerExpanded = true
+                    }
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: editingBlockID == nil
+                          ? "plus.circle" : "square.and.pencil")
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    Text(editingBlockID == nil
+                         ? tr("ADD A NEW PHASE", "LEGG TIL NY DEL")
+                         : tr("EDIT SELECTED PHASE", "REDIGER VALGT DEL"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Spacer()
+                    Image(systemName: isComposerExpanded ? "chevron.up" : "chevron.down")
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                .frame(minHeight: 50)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
 
-            Picker(tr("Block", "Blokk"), selection: $kind) {
+            if isComposerExpanded {
+                VStack(alignment: .leading, spacing: 13) {
+                    Picker(tr("Block", "Blokk"), selection: $kind) {
                 ForEach(RunningBlockKind.allCases) { option in
                     Text(option.title).tag(option)
                 }
@@ -482,13 +519,12 @@ struct ATHLTHTrainIntervalComposerView: View {
                 .background(paper, in: RoundedRectangle(cornerRadius: 11))
             }
             .buttonStyle(.plain)
+                }
+                .padding(.top, 12)
+            }
         }
         .padding(16)
-        .background(.white, in: RoundedRectangle(cornerRadius: 15))
-        .overlay {
-            RoundedRectangle(cornerRadius: 15)
-                .stroke(border, lineWidth: 0.7)
-        }
+        .athlthPlanCard(radius: 20)
     }
 
     private var sessionGuidance: some View {
@@ -562,10 +598,12 @@ struct ATHLTHTrainIntervalComposerView: View {
                                 work: .time(600, intensity: relaxed))
         ]
         editingBlockID = nil
+        isComposerExpanded = false
     }
 
     private func edit(_ block: RunningWorkoutBlock) {
         editingBlockID = block.id
+        isComposerExpanded = true
         kind = block.kind
         activityName = block.title
         targetEffort = block.work.intensity.kind
@@ -632,6 +670,7 @@ struct ATHLTHTrainIntervalComposerView: View {
             blocks.append(entry)
         }
         editingBlockID = nil
+        isComposerExpanded = false
         notes = ""
         activityName = ""
     }
