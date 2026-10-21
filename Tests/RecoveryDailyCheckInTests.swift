@@ -3,6 +3,33 @@ import XCTest
 @testable import ATHLTH
 
 final class RecoveryDailyCheckInTests: XCTestCase {
+    func testDailyReminderIsDisabledWhenSwitchedOffOrCompleted() {
+        let calendar = Calendar(identifier: .gregorian)
+        let date = calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 21, hour: 9))!
+        XCTAssertTrue(ATHLTHDailyCheckInReminderPolicy.shouldShow(
+            enabled: true, completed: false, issuedToday: false,
+            now: date, calendar: calendar))
+        XCTAssertFalse(ATHLTHDailyCheckInReminderPolicy.shouldShow(
+            enabled: false, completed: false, issuedToday: false,
+            now: date, calendar: calendar))
+        XCTAssertFalse(ATHLTHDailyCheckInReminderPolicy.shouldShow(
+            enabled: true, completed: true, issuedToday: false,
+            now: date, calendar: calendar))
+        XCTAssertFalse(ATHLTHDailyCheckInReminderPolicy.shouldShow(
+            enabled: true, completed: false, issuedToday: true,
+            now: date, calendar: calendar))
+    }
+
+    func testReminderDoesNotAppearAtMidnight() {
+        let calendar = Calendar(identifier: .gregorian)
+        let date = calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 21, hour: 0))!
+        XCTAssertFalse(ATHLTHDailyCheckInReminderPolicy.shouldShow(
+            enabled: true, completed: false, issuedToday: false,
+            now: date, calendar: calendar))
+    }
+
     func testNewCheckInHasNoPreselectedFields() {
         let draft = RecoveryPartialCheckInDraft()
         XCTAssertNil(draft.energy)
