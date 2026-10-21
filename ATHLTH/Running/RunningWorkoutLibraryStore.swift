@@ -100,6 +100,7 @@ final class RunningWorkoutLibraryStore: ObservableObject {
             createdAt: Date(),
             updatedAt: Date()
         )
+        copy.autoAdvanceTimedSteps = source.autoAdvanceTimedSteps
         copy.intervalGhostPaceSecondsPerKilometer =
             source.intervalGhostPaceSecondsPerKilometer
         copy.coachBrief = source.coachBrief
@@ -140,6 +141,7 @@ final class RunningWorkoutLibraryStore: ObservableObject {
         )
 
         var editable = duplicate
+        editable.autoAdvanceTimedSteps = source.autoAdvanceTimedSteps
         editable.intervalGhostPaceSecondsPerKilometer =
             source.intervalGhostPaceSecondsPerKilometer
         editable.coachBrief = source.coachBrief
