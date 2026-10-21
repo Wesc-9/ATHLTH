@@ -185,7 +185,8 @@ final class RecoverySorenessStore: ObservableObject {
         "Lower Back",
         "Adductors",
         "Hip Flexors",
-        "Shins"
+        "Shins",
+        "Feet"
     ]
 
     init(defaults: UserDefaults = .standard) {
@@ -312,6 +313,12 @@ final class RecoverySorenessStore: ObservableObject {
         }
 
         trimAndPersistIfNeeded()
+        // Make Train's visible recommendation react to a just-saved
+        // Insights check-in without reloading the full training plan.
+        NotificationCenter.default.post(
+            name: Notification.Name("athlth.dailyCheckInDidUpdate"),
+            object: nil
+        )
     }
 
     private static func normalizedCheckInValue(
