@@ -510,6 +510,30 @@ struct SavedRoutesView: View {
             }
             .buttonStyle(.plain)
 
+            if let onSelect {
+                Button {
+                    onSelect(route)
+                } label: {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 38, height: 42)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(tr("Use route", "Bruk rute"))
+            } else if settings.trainingDeviceProvider == .appleWatch {
+                Button {
+                    sendToWatch(route)
+                } label: {
+                    Image(systemName: "applewatch")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(width: 32, height: 42)
+                }
+                .buttonStyle(.plain)
+                .disabled(!watchConnection.isReady)
+                .accessibilityLabel(tr("Send to Apple Watch", "Send til Apple Watch"))
+            }
             LibraryFavoriteButton(
                 kind: .route, itemID: route.id.uuidString,
                 title: route.title,
