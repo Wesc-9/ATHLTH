@@ -88,11 +88,23 @@ final class StrengthWarmUpExerciseTests: XCTestCase {
         XCTAssertTrue(second.countsTowardTrainingLoad)
     }
     private func catalogExercise(named name: String) -> Exercise {
-        Exercise(
+        let equipment: [String]
+        if StrengthTreadmillWarmUpDefaults.isTreadmill(name) {
+            equipment = ["Treadmill"]
+        } else if StrengthCardioExercisePolicy.isCardio(name) {
+            equipment = ["Rowing machine"]
+        } else if name.localizedCaseInsensitiveContains("dumbbell") {
+            equipment = ["Dumbbell"]
+        } else if name.localizedCaseInsensitiveContains("bench press") {
+            equipment = ["Barbell"]
+        } else {
+            equipment = ["Bodyweight"]
+        }
+        return Exercise(
             id: UUID(), origin: .publicCatalog, ownerID: nil,
             name: name, instructions: ["Warm up at a comfortable pace."],
             primaryMuscles: ["Quadriceps"], secondaryMuscles: [],
-            equipment: ["Treadmill"], imageURL: nil,
+            equipment: equipment, imageURL: nil,
             isVisibleOutsideOwnerLibrary: true
         )
     }
