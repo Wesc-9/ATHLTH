@@ -3635,6 +3635,7 @@ final class StrengthWorkoutStore: ObservableObject {
         workoutHistory = updatedHistory
         ATHLTHTrainingDataChangeSignal.post(userID: accountID)
         activeWorkout = nil
+        isFreeTrainingBetweenExercises = false
         recoveredCheckpointSavedAt = nil
         restEndsAt = nil
         restStartedAt = nil
@@ -3674,6 +3675,7 @@ final class StrengthWorkoutStore: ObservableObject {
         checkpointSaveTask?.cancel()
         checkpointSaveTask = nil
         activeWorkout = nil
+        isFreeTrainingBetweenExercises = false
         recoveredCheckpointSavedAt = nil
         currentExerciseIndex = 0
         currentSetIndex = 0
