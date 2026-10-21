@@ -155,7 +155,7 @@ struct ATHLTHMetalMedalArtwork: View {
                         x: 0, y: size * 0.022)
 
             ATHLTHMedalHexagon()
-                .strokeBorder(
+                .stroke(
                     LinearGradient(
                         colors: [Color.white.opacity(0.76), metal.shadow.opacity(0.36), Color.white.opacity(0.28)],
                         startPoint: .topLeading, endPoint: .bottomTrailing
