@@ -897,6 +897,177 @@ struct IPhoneWorkoutView: View {
 
                         TrainTogetherStatusStrip()
 
+                    if let step =
+                        recorder.currentStructuredStep {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "WORKOUT STEP", norwegian: "ØKTSTEG"
+                            ))
+                            .font(.caption.weight(.bold))
+                            .tracking(1.4)
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            TimelineView(
+                                .periodic(
+                                    from: .now,
+                                    by: 1
+                                )
+                            ) { context in
+                                let progress =
+                                    recorder
+                                        .currentStructuredStepProgress(
+                                            at:
+                                                context.date
+                                        )
+
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 8
+                                ) {
+                                    HStack {
+                                        Text(step.title)
+                                            .font(
+                                                .headline
+                                            )
+
+                                        Spacer()
+
+                                        if let active =
+                                            recorder.active,
+                                           let plan =
+                                            active
+                                                .structuredRunningWorkout {
+                                            Text(
+                                                "Step \((active.structuredStepIndex ?? 0) + 1) / \(plan.steps.count)"
+                                            )
+                                            .font(
+                                                .caption
+                                                    .weight(
+                                                        .semibold
+                                                    )
+                                            )
+                                            .foregroundStyle(
+                                                .secondary
+                                            )
+                                        }
+                                    }
+
+                                    ProgressView(
+                                        value: progress
+                                    )
+                                    .tint(
+                                        ATHLTHTheme.accent
+                                    )
+
+                                    Text(
+                                        structuredRemainingText(
+                                            step: step,
+                                            workout: workout,
+                                            date: context.date
+                                        )
+                                    )
+                                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                                    .monospacedDigit()
+
+                                    HStack(spacing: 12) {
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(ATHLTHLocalization.choose(
+                                                english: "PACE", norwegian: "TEMPO"
+                                            ))
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                            if let pace = workout.currentPaceSecondsPerKilometer,
+                                               pace.isFinite, pace > 0 {
+                                                Text(String(format: "%d:%02d /km",
+                                                    Int(pace) / 60, Int(pace) % 60))
+                                                .font(.headline.monospacedDigit())
+                                            } else {
+                                                Text("—").font(.headline)
+                                            }
+                                        }
+                                        if let zone = step.targetHeartRateZone {
+                                            VStack(alignment: .leading, spacing: 3) {
+                                                Text(ATHLTHLocalization.choose(
+                                                    english: "TARGET ZONE", norwegian: "MÅLSONE"
+                                                ))
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                                Text("\(zone)")
+                                                    .font(.headline.monospacedDigit())
+                                            }
+                                        }
+                                        Spacer()
+                                    }
+
+                                    let effortSeconds = max(
+                                        workout.elapsed(at: context.date) -
+                                            (workout.structuredStepStartElapsedTime ?? 0), 0
+                                    )
+                                    let effortMeters = max(
+                                        workout.distanceMeters -
+                                            (workout.structuredStepStartDistanceMeters ?? 0), 0
+                                    )
+                                    if let ghostLead = ATHLTHIntervalGhostPacer.leadMeters(
+                                        step: step,
+                                        elapsedSeconds: effortSeconds,
+                                        distanceMeters: effortMeters
+                                    ) {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Interval Ghost",
+                                                norwegian: "Intervall-Ghost"
+                                            ) + " · \(Int(abs(ghostLead).rounded())) m " +
+                                            ATHLTHLocalization.choose(
+                                                english: ghostLead >= 0 ? "ahead" : "behind",
+                                                norwegian: ghostLead >= 0 ? "foran" : "bak"
+                                            ),
+                                            systemImage: "figure.run.circle"
+                                        )
+                                        .font(.subheadline.weight(.semibold))
+                                    }
+
+                                    if let next =
+                                        recorder
+                                            .nextStructuredStep {
+                                        HStack(spacing: 12) {
+                                            Label(
+                                                ATHLTHLocalization.choose(
+                                                    english: "Next", norwegian: "Neste"
+                                                ) + ": \(next.title)",
+                                                systemImage: "arrow.right.circle.fill"
+                                            )
+                                            .font(.caption.weight(.semibold))
+                                            .lineLimit(2)
+                                            Spacer(minLength: 6)
+                                            Button {
+                                                recorder.advanceStructuredStepManually()
+                                            } label: {
+                                                Text(ATHLTHLocalization.choose(
+                                                    english: "Done / Next",
+                                                    norwegian: "Ferdig / Neste"
+                                                ))
+                                                .font(.caption.weight(.bold))
+                                                .padding(.horizontal, 11)
+                                                .frame(minHeight: 40)
+                                                .foregroundStyle(.white)
+                                                .background(ATHLTHTheme.accentDeep,
+                                                            in: Capsule())
+                                            }
+                                            .buttonStyle(.plain)
+                                            .accessibilityLabel(
+                                                ATHLTHLocalization.choose(
+                                                    english: "Finish current phase and start the next",
+                                                    norwegian: "Fullfør denne delen og start neste"
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                        .padding(17)
+                        .athlthPlanCard(radius: 21)
+
                         IPhoneWorkoutLiveMetricsPanel(
                             workout: workout,
                             isMetric:
@@ -1206,148 +1377,6 @@ struct IPhoneWorkoutView: View {
                                         systemImage:
                                             "arrow.triangle.turn.up.right.diamond.fill"
                                     )
-                                }
-                            }
-                        }
-                    }
-
-                    if let step =
-                        recorder.currentStructuredStep {
-                        Section("Workout step") {
-                            TimelineView(
-                                .periodic(
-                                    from: .now,
-                                    by: 1
-                                )
-                            ) { context in
-                                let progress =
-                                    recorder
-                                        .currentStructuredStepProgress(
-                                            at:
-                                                context.date
-                                        )
-
-                                VStack(
-                                    alignment: .leading,
-                                    spacing: 8
-                                ) {
-                                    HStack {
-                                        Text(step.title)
-                                            .font(
-                                                .headline
-                                            )
-
-                                        Spacer()
-
-                                        if let active =
-                                            recorder.active,
-                                           let plan =
-                                            active
-                                                .structuredRunningWorkout {
-                                            Text(
-                                                "Step \((active.structuredStepIndex ?? 0) + 1) / \(plan.steps.count)"
-                                            )
-                                            .font(
-                                                .caption
-                                                    .weight(
-                                                        .semibold
-                                                    )
-                                            )
-                                            .foregroundStyle(
-                                                .secondary
-                                            )
-                                        }
-                                    }
-
-                                    ProgressView(
-                                        value: progress
-                                    )
-                                    .tint(
-                                        ATHLTHTheme.accent
-                                    )
-
-                                    Text(
-                                        structuredRemainingText(
-                                            step: step,
-                                            workout: workout,
-                                            date: context.date
-                                        )
-                                    )
-                                    .font(.system(size: 28, weight: .bold, design: .rounded))
-                                    .monospacedDigit()
-
-                                    HStack(spacing: 12) {
-                                        VStack(alignment: .leading, spacing: 3) {
-                                            Text(ATHLTHLocalization.choose(
-                                                english: "PACE", norwegian: "TEMPO"
-                                            ))
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                            if let pace = workout.currentPaceSecondsPerKilometer,
-                                               pace.isFinite, pace > 0 {
-                                                Text(String(format: "%d:%02d /km",
-                                                    Int(pace) / 60, Int(pace) % 60))
-                                                .font(.headline.monospacedDigit())
-                                            } else {
-                                                Text("—").font(.headline)
-                                            }
-                                        }
-                                        if let zone = step.targetHeartRateZone {
-                                            VStack(alignment: .leading, spacing: 3) {
-                                                Text(ATHLTHLocalization.choose(
-                                                    english: "TARGET ZONE", norwegian: "MÅLSONE"
-                                                ))
-                                                .font(.caption2)
-                                                .foregroundStyle(.secondary)
-                                                Text("\(zone)")
-                                                    .font(.headline.monospacedDigit())
-                                            }
-                                        }
-                                        Spacer()
-                                    }
-
-                                    let effortSeconds = max(
-                                        workout.elapsed(at: context.date) -
-                                            (workout.structuredStepStartElapsedTime ?? 0), 0
-                                    )
-                                    let effortMeters = max(
-                                        workout.distanceMeters -
-                                            (workout.structuredStepStartDistanceMeters ?? 0), 0
-                                    )
-                                    if let ghostLead = ATHLTHIntervalGhostPacer.leadMeters(
-                                        step: step,
-                                        elapsedSeconds: effortSeconds,
-                                        distanceMeters: effortMeters
-                                    ) {
-                                        Label(
-                                            ATHLTHLocalization.choose(
-                                                english: "Interval Ghost",
-                                                norwegian: "Intervall-Ghost"
-                                            ) + " · \(Int(abs(ghostLead).rounded())) m " +
-                                            ATHLTHLocalization.choose(
-                                                english: ghostLead >= 0 ? "ahead" : "behind",
-                                                norwegian: ghostLead >= 0 ? "foran" : "bak"
-                                            ),
-                                            systemImage: "figure.run.circle"
-                                        )
-                                        .font(.subheadline.weight(.semibold))
-                                    }
-
-                                    if let next =
-                                        recorder
-                                            .nextStructuredStep {
-                                        Label(
-                                            "Next: \(next.title)",
-                                            systemImage:
-                                                "arrow.right.circle.fill"
-                                        )
-                                        .font(
-                                            .caption
-                                                .weight(
-                                                    .semibold
-                                                )
-                                        )
-                                    }
                                 }
                             }
                         }
@@ -2115,40 +2144,6 @@ struct IPhoneWorkoutView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
 
-            Button {
-                showingAIConversation = true
-            } label: {
-                HStack(spacing: 11) {
-                    Image(systemName: "mic.circle.fill")
-                        .font(.system(size: 25))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Talk to the coach",
-                            norwegian: "Snakk med coachen"
-                        ))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                        Text(ATHLTHLocalization.choose(
-                            english: "Optional AI conversation · recording continues",
-                            norwegian: "Valgfri AI-samtale · treningen fortsetter"
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                    }
-                    Spacer()
-                    Image(systemName: "arrow.up.right")
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 11)
-                .background(
-                    ATHLTHTheme.canvasBottom,
-                    in: RoundedRectangle(cornerRadius: 17)
-                )
-            }
-            .buttonStyle(.plain)
-
             HStack(spacing: 7) {
                 Image(
                     systemName:
@@ -2868,7 +2863,7 @@ struct IPhoneWorkoutView: View {
                 max(target - used, 0)
 
             return
-                "\(Int(remaining.rounded())) sec remaining"
+                ATHLTHRunStepCountdown.display(remaining)
 
         case .distance:
             guard let target =
