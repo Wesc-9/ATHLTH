@@ -2573,7 +2573,7 @@ struct TrainingPlanCatalogDetailView: View {
 
     @ViewBuilder
     private func previewSessionSteps(_ workout: PlannedSession) -> some View {
-        let blocks = workout.workoutBlocks.filter { $0.kind != .note }
+        let blocks = (workout.workoutBlocks ?? []).filter { $0.kind != .note }
         VStack(alignment: .leading, spacing: 0) {
             if blocks.isEmpty {
                 Text(ATHLTHLocalization.choose(
