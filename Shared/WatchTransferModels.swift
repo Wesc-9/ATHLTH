@@ -1012,6 +1012,8 @@ struct WatchRunningWorkoutTransfer: Codable, Hashable {
     // Optional keeps payloads from older builds decodable. The sender resolves
     // app default vs per-workout override before launch.
     var autoPauseEnabled: Bool? = nil
+    /// Automatic timed-step progression is the existing default for old plans.
+    var autoAdvanceTimedSteps: Bool? = nil
 }
 
 
