@@ -1257,6 +1257,45 @@ struct TrainingPlanCatalogEntry: Identifiable, Codable, Hashable {
         sessionBlueprints.map(\.kind)
     }
 
+    /// Derive the plan type from the actual programmed sessions.
+    var trainingTypeTitle: String {
+        let kinds = Set(workoutKinds)
+        let cardio = kinds.contains(.running) || kinds.contains(.walking)
+        let strength = kinds.contains(.strength)
+        if category == "hybrid" || kinds.contains(.custom) || (cardio && strength) {
+            return ATHLTHLocalization.choose(english: "Running + strength", norwegian: "Løping og styrke")
+        }
+        if strength {
+            return ATHLTHLocalization.choose(english: "Strength plan", norwegian: "Styrkeplan")
+        }
+        if kinds.contains(.running) {
+            return ATHLTHLocalization.choose(english: "Running plan", norwegian: "Løpeplan")
+        }
+        if kinds.contains(.walking) {
+            return ATHLTHLocalization.choose(english: "Walking plan", norwegian: "Gåplan")
+        }
+        return ATHLTHLocalization.choose(english: "Training plan", norwegian: "Treningsplan")
+    }
+
+    var trainingTypeIcon: String {
+        let kinds = Set(workoutKinds)
+        if category == "hybrid" || kinds.contains(.custom) ||
+           (kinds.contains(.strength) &&
+            (kinds.contains(.running) || kinds.contains(.walking))) {
+            return "figure.run.square.stack.fill"
+        }
+        if kinds.contains(.strength) { return "dumbbell.fill" }
+        if kinds.contains(.walking) && !kinds.contains(.running) {
+            return "figure.walk"
+        }
+        return "figure.run"
+    }
+
+    var sessionOutline: String {
+        let titles = sessionBlueprints.prefix(sessionsPerWeek).map(\.title)
+        return titles.isEmpty ? goal : titles.prefix(3).joined(separator: " · ")
+    }
+
     /// A muscle filter means the plan explicitly names that muscle as a focus
     /// in its editorial tags, title or programmed session names. Do not
     /// advertise generic strength plans as specialized muscle plans.
@@ -1488,6 +1527,11 @@ struct TrainingPlanLibraryView: View {
     @State private var selectedCategory = "All"
     @State private var selectedMuscle: ExerciseMuscleGroup?
     @State private var favoritesOnly = false
+    @State private var sessionsPerWeekFilter: Int?
+
+    private var sessionsPerWeekOptions: [Int] {
+        Array(Set(catalog.entries.map(\.sessionsPerWeek))).sorted()
+    }
 
     private var categories: [String] {
         ["All"] +
@@ -1522,6 +1566,8 @@ struct TrainingPlanLibraryView: View {
             return categoryMatches &&
                 muscleMatches &&
                 favoriteMatches &&
+                (sessionsPerWeekFilter == nil ||
+                    entry.sessionsPerWeek == sessionsPerWeekFilter) &&
                 searchMatches
         }
     }
@@ -1530,24 +1576,24 @@ struct TrainingPlanLibraryView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
                 LibraryPremiumIntro(
-                    eyebrow: ATHLTHLocalization.choose(english: "PLAN LIBRARY", norwegian: "TRENINGSMALER"),
+                    eyebrow: ATHLTHLocalization.choose(english: "TRAINING PLANS", norwegian: "TRENINGSPLANER"),
                     title: ATHLTHLocalization.choose(english: "Train with a clear direction", norwegian: "Finn en plan som passer deg"),
                     subtitle:
                         ATHLTHLocalization.choose(english: "Choose a plan, set its start date, then adapt your workouts.", norwegian: "Velg en plan og startdato. Etterpå kan du tilpasse dagene og øktene."),
-                    icon: "sparkles.rectangle.stack.fill",
-                    accent: Color.orange
+                    icon: "calendar.badge.clock",
+                    accent: ATHLTHPlanDesign.accentInk
                 ) {
                     HStack(spacing: 8) {
                         LibraryStatPill(
                             value: "\(catalog.entries.count)",
-                            label: "plans",
+                            label: ATHLTHLocalization.choose(english: "plans", norwegian: "planer"),
                             icon: "square.stack.3d.up.fill",
-                            tint: Color.orange
+                            tint: ATHLTHPlanDesign.accentInk
                         )
 
                         LibraryStatPill(
                             value: "\(favorites.count(for: .plan))",
-                            label: "saved",
+                            label: ATHLTHLocalization.choose(english: "saved", norwegian: "lagret"),
                             icon: "star.fill",
                             tint: ATHLTHTheme.premiumGold
                         )
@@ -1696,11 +1742,9 @@ struct TrainingPlanLibraryView: View {
             .frame(maxWidth: .infinity)
         }
         .background(
-            ATHLTHPremiumCanvas(
-                accent: Color.orange.opacity(0.20)
-            )
+            ATHLTHPlanDesign.warmCanvas
         )
-        .navigationTitle(ATHLTHLocalization.choose(english: "Training templates", norwegian: "Treningsmaler"))
+        .navigationTitle(ATHLTHLocalization.choose(english: "Training plans", norwegian: "Treningsplaner"))
         .navigationBarTitleDisplayMode(.inline)
         .searchable(
             text: $query,
