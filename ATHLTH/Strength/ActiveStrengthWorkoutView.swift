@@ -3121,7 +3121,9 @@ struct ActiveStrengthWorkoutView: View {
         TimelineView(.periodic(from: .now, by: 1)) { timeline in
             let timer = strength.currentTimedSetCountdown
             let totalSets = max(
-                workout.exercises.reduce(0) { $0 + $1.sets.count }, 1
+                workout.exercises.reduce(0) {
+                    $0 + $1.sets.count + ($1.skippedPlannedSetCount ?? 0)
+                }, 1
             )
             let completed = min(max(workout.totalCompletedSets, 0), totalSets)
             let phase = ATHLTHPhoneStrengthPhaseResolver.resolve(
@@ -3176,8 +3178,19 @@ struct ActiveStrengthWorkoutView: View {
                             totalSets
                         ))
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
                         .monospacedDigit()
+                        let skipped = workout.exercises.reduce(0) {
+                            $0 + ($1.skippedPlannedSetCount ?? 0)
+                        }
+                        if skipped > 0 {
+                            Text(ATHLTHLocalization.choose(
+                                english: "\(skipped) skipped",
+                                norwegian: "\(skipped) hoppet over"
+                            ))
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        }
                     }
                 }
 
