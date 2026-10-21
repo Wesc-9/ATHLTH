@@ -151,7 +151,7 @@ struct ATHLTHIntervalRepetitionEditorView: View {
                             Toggle(tr("Target recovery zone", "Målsone i pausen"),
                                    isOn: $recoveryZoneEnabled)
                             if recoveryZoneEnabled {
-                                Stepper(tr("Zone", "Sone") + " (recoveryZone)",
+                                Stepper(tr("Zone", "Sone") + " \(recoveryZone)",
                                         value: $recoveryZone, in: 1...5)
                             }
                         }
