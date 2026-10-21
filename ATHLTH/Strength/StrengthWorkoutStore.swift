@@ -1086,6 +1086,11 @@ final class StrengthWorkoutStore: ObservableObject {
             .firstIndex(where: { !$0.isCompleted }) ?? 0
         activeWorkout = workout
         reloadDraftFromCurrentSet()
+        // Moving to a timed running/treadmill exercise starts its set immediately.
+        // Re-selecting the current exercise does not reset its clock.
+        if currentSet?.resolvedTargetKind == .time {
+            startOrResumeTimedSet()
+        }
         persistCheckpointNow()
         return true
     }
@@ -3522,6 +3527,9 @@ final class StrengthWorkoutStore: ObservableObject {
         restEndsAt = nil
         activeWorkout = workout
         reloadDraftFromCurrentSet()
+        if currentSet?.resolvedTargetKind == .time {
+            startOrResumeTimedSet()
+        }
         persistCheckpointNow()
     }
 
