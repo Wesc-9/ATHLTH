@@ -522,7 +522,7 @@ struct TrophyUnlockRecord: Identifiable, Codable, Hashable {
 enum TrophyCatalog {
     static let workoutMomentum = TrophySeriesDefinition(
         id: "consistency.workout-momentum",
-        title: "Built to Move",
+        title: ATHLTHLocalization.choose(english: "Built to Move", norwegian: "Trening i gang"),
         subtitle: "Keep showing up. Every recorded workout strengthens the Core.",
         category: .consistency,
         verificationSource: .appleHealth,
@@ -538,7 +538,7 @@ enum TrophyCatalog {
 
     static let walkingDistance = TrophySeriesDefinition(
         id: "walking.total-distance",
-        title: "Pathfinder",
+        title: ATHLTHLocalization.choose(english: "Pathfinder", norwegian: "På nye stier"),
         subtitle: "Every recorded walking workout adds distance to this evolving trophy.",
         category: .walking,
         verificationSource: .appleHealth,
@@ -553,7 +553,7 @@ enum TrophyCatalog {
 
     static let walkingSessions = TrophySeriesDefinition(
         id: "walking.sessions",
-        title: "Keep Walking",
+        title: ATHLTHLocalization.choose(english: "Keep Walking", norwegian: "Steg for steg"),
         subtitle: "Build a walking habit one recorded session at a time.",
         category: .walking,
         verificationSource: .appleHealth,
@@ -568,7 +568,7 @@ enum TrophyCatalog {
 
     static let runningDistance = TrophySeriesDefinition(
         id: "endurance.running-distance",
-        title: "Distance Engine",
+        title: ATHLTHLocalization.choose(english: "Distance Engine", norwegian: "Kilometersamleren"),
         subtitle: "A single evolving trophy for the running distance you accumulate.",
         category: .endurance,
         verificationSource: .appleHealth,
@@ -583,7 +583,7 @@ enum TrophyCatalog {
 
     static let streak = TrophySeriesDefinition(
         id: "consistency.training-streak",
-        title: "Unbroken",
+        title: ATHLTHLocalization.choose(english: "Unbroken", norwegian: "Uavbrutt"),
         subtitle: "Consecutive calendar days with at least one recorded workout.",
         category: .consistency,
         verificationSource: .appleHealth,
@@ -654,7 +654,7 @@ enum TrophyCatalog {
 
     static let workoutWeekDensity = TrophySeriesDefinition(
         id: "consistency.workouts-in-week",
-        title: "Packed Week",
+        title: ATHLTHLocalization.choose(english: "Packed Week", norwegian: "Full treningsuke"),
         subtitle: "Stack a high number of recorded workouts inside one calendar week.",
         category: .consistency,
         verificationSource: .appleHealth,
@@ -668,7 +668,7 @@ enum TrophyCatalog {
 
     static let strengthSessions = TrophySeriesDefinition(
         id: "strength.sessions",
-        title: "Built Under Load",
+        title: ATHLTHLocalization.choose(english: "Built Under Load", norwegian: "Sterkere for hver økt"),
         subtitle: "Strength sessions logged with ATHLTH advanced or simple tracking.",
         category: .strength,
         verificationSource: .athlth,
@@ -683,7 +683,7 @@ enum TrophyCatalog {
 
     static let strengthVolume = TrophySeriesDefinition(
         id: "strength.total-volume",
-        title: "Iron Ledger",
+        title: ATHLTHLocalization.choose(english: "Iron Ledger", norwegian: "Løft for løft"),
         subtitle: "Cumulative lifted volume from completed ATHLTH strength sets.",
         category: .strength,
         verificationSource: .athlth,
@@ -698,7 +698,7 @@ enum TrophyCatalog {
 
     static let recoveryNights = TrophySeriesDefinition(
         id: "recovery.restored-nights",
-        title: "Restored",
+        title: ATHLTHLocalization.choose(english: "Restored", norwegian: "Godt restituert"),
         subtitle: "Nights with at least seven hours of sleep recorded in Apple Health.",
         category: .recovery,
         verificationSource: .appleHealth,
@@ -713,7 +713,7 @@ enum TrophyCatalog {
 
     static let completedGoals = TrophySeriesDefinition(
         id: "goals.completed",
-        title: "Purpose",
+        title: ATHLTHLocalization.choose(english: "Purpose", norwegian: "Målrettet"),
         subtitle: "Complete goals you deliberately chose to pursue.",
         category: .goals,
         verificationSource: .goal,
@@ -728,7 +728,7 @@ enum TrophyCatalog {
 
     static let challengeParticipation = TrophySeriesDefinition(
         id: "challenges.participation",
-        title: "Head to Head",
+        title: ATHLTHLocalization.choose(english: "Head to Head", norwegian: "Duellen"),
         subtitle: "Take part in ATHLTH Challenges with friends.",
         category: .challenges,
         verificationSource: .challenge,
@@ -743,7 +743,7 @@ enum TrophyCatalog {
 
     static let challengeWins = TrophySeriesDefinition(
         id: "challenges.wins",
-        title: "On Top",
+        title: ATHLTHLocalization.choose(english: "On Top", norwegian: "På topp"),
         subtitle: "Finish ATHLTH Challenges at the top of the leaderboard.",
         category: .challenges,
         verificationSource: .challenge,
@@ -759,7 +759,7 @@ enum TrophyCatalog {
 
     static let friendsChallenged = TrophySeriesDefinition(
         id: "challenges.friends-invited",
-        title: "Call Them Out",
+        title: ATHLTHLocalization.choose(english: "Call Them Out", norwegian: "Utfordreren"),
         subtitle: "Invite different friends into your ATHLTH Challenges.",
         category: .challenges,
         verificationSource: .challenge,
