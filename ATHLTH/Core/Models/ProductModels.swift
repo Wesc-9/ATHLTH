@@ -1104,6 +1104,9 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     var recoveryOriginalExercises: [PlannedExercise]? = nil
     var recoveryAdjustedExercises: [PlannedExercise]? = nil
     var recoveryAdjustedAt: Date? = nil
+    /// The entire planned workout before an athlete-approved one-day swap.
+    /// Optional, so historic plans keep decoding without migration.
+    var dailyAlternativeOriginal: ATHLTHOriginalPlannedWorkout? = nil
 
 
     var resolvedRunningWorkouts: [RunningWorkoutTemplate] {
