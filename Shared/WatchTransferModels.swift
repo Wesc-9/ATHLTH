@@ -1257,6 +1257,38 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
 
 }
 
+/// The iPhone owns exercise scheduling while a paired Watch records the
+/// workout. Adding work after the last set must reopen the Watch session;
+/// delayed stale snapshots must not return it to an older queue.
+enum ATHLTHStrengthWatchSnapshotAcceptance {
+    static func shouldApply(
+        incoming: WatchStrengthSessionSnapshot,
+        after previous: WatchStrengthSessionSnapshot?
+    ) -> Bool {
+        guard let previous, previous.workoutID == incoming.workoutID else {
+            return true
+        }
+        if incoming.completedSets < previous.completedSets ||
+           incoming.exerciseCount < previous.exerciseCount {
+            return false
+        }
+        let expanded = incoming.exerciseCount > previous.exerciseCount ||
+            incoming.totalSets > previous.totalSets
+        if !expanded {
+            if previous.allExercisesComplete && !incoming.allExercisesComplete,
+               incoming.completedSets == previous.completedSets,
+               incoming.exerciseQueue == previous.exerciseQueue {
+                return false
+            }
+            if incoming.completedSets == previous.completedSets &&
+               incoming.updatedAt.addingTimeInterval(0.75) < previous.updatedAt {
+                return false
+            }
+        }
+        return true
+    }
+}
+
 enum WatchStrengthCommandKind: String, Codable, Hashable {
     case updateDraft
     case completeSet
