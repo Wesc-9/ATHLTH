@@ -47,6 +47,7 @@ struct WorkoutStartOptionsView: View {
     @State private var showingAIExercisePlanner = false
     @State private var exerciseBeingEdited:
         PlannedExercise?
+    @State private var pendingTreadmillSetup: PlannedExercise?
 
     @State private var showingSpotifyPicker = false
     @State private var didLoadSpotifySelection = false
@@ -342,6 +343,15 @@ struct WorkoutStartOptionsView: View {
                             contentsOf:
                                 additions
                         )
+                }
+            }
+            .sheet(item: $pendingTreadmillSetup) { exercise in
+                PlannedExerciseEditorView(
+                    exercise: exercise,
+                    advancedMode: trackingMode == .advanced
+                ) { updated in
+                    configuredExercises.append(updated)
+                    pendingTreadmillSetup = nil
                 }
             }
             .sheet(item: $exerciseBeingEdited) { exercise in
@@ -988,30 +998,18 @@ struct WorkoutStartOptionsView: View {
         }
     }
 
-    private func addExercise(
-        _ exercise: Exercise
-    ) {
-        configuredExercises.append(
-            PlannedExercise(
-                id: UUID(),
-                exerciseID:
-                    exercise.id,
-                embeddedExercise:
-                    exercise.snapshot,
-                sets: 3,
-                reps: 8,
-                targetWeightKilograms:
-                    nil,
-                targetRPE: nil,
-                restSeconds: 90,
-                notes: nil,
-                targetRIR: nil,
-                supersetGroupID: nil,
-                progression:
-                    StrengthProgressionRule
-                        .none
-            )
+    private func addExercise(_ exercise: Exercise) {
+        let draft = StrengthTreadmillWarmUpDefaults.plannedExercise(
+            for: exercise
         )
+        if StrengthTreadmillWarmUpDefaults.isTreadmill(exercise.snapshot.name) ||
+            StrengthTreadmillWarmUpDefaults.isTreadmill(exercise.snapshot.displayName) {
+            // A treadmill warm-up is not silently committed as 3 × 5 min.
+            // Confirm (or customize) the one-set, ten-minute suggestion.
+            pendingTreadmillSetup = draft
+        } else {
+            configuredExercises.append(draft)
+        }
     }
 
     private func exerciseSummary(
