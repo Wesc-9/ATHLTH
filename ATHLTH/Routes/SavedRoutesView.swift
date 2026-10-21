@@ -838,7 +838,7 @@ struct SavedRouteOverviewMap: View {
     }
 }
 
-private struct SavedRouteFullscreenMap: View {
+struct SavedRouteFullscreenMap: View {
     @Environment(\.dismiss) private var dismiss
     let route: TrainingRoute
 
