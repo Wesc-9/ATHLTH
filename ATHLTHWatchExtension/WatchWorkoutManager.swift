@@ -4077,6 +4077,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
+        // The athlete may opt to advance timed intervals manually.
+        if step.measure == .time,
+           structuredRunningWorkout?.autoAdvanceTimedSteps == false {
+            return
+        }
         guard ATHLTHRunningStepEngine
             .isCompleted(
                 step: step,
@@ -4094,15 +4099,32 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         advanceStructuredRunningWorkout()
     }
 
-    private func advanceStructuredRunningWorkout() {
+    func advanceStructuredRunningWorkoutManually() {
+        guard state == .running,
+              currentStructuredRunningStep != nil,
+              !structuredWorkoutComplete else { return }
+        advanceStructuredRunningWorkout(manually: true)
+    }
+
+    private func advanceStructuredRunningWorkout(manually: Bool = false) {
         guard let workout = structuredRunningWorkout else {
             return
         }
 
         let finishedIndex = structuredStepIndex
-        let seconds = elapsedTime - structuredStepStartElapsedTime
+        let finishedStep = workout.steps.indices.contains(finishedIndex)
+            ? workout.steps[finishedIndex] : nil
+        // Book the precise scheduled end for automatic timed steps.
+        let endElapsed: TimeInterval = {
+            if !manually, finishedStep?.measure == .time,
+               let seconds = finishedStep?.durationSeconds, seconds > 0 {
+                return structuredStepStartElapsedTime + seconds
+            }
+            return elapsedTime
+        }()
+        let seconds = max(0, endElapsed - structuredStepStartElapsedTime)
         let meters = distanceMeters - structuredStepStartDistanceMeters
-        if seconds >= 10, meters >= 0,
+        if seconds >= 0, meters >= 0,
            workout.steps.indices.contains(finishedIndex),
            !recordedStructuredRunSteps.contains(where: { $0.index == finishedIndex }) {
             let finishedStep = workout.steps[finishedIndex]
@@ -4139,7 +4161,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
-        structuredStepStartElapsedTime = elapsedTime
+        structuredStepStartElapsedTime = endElapsed
         structuredStepStartDistanceMeters = distanceMeters
 
         targetViolationStartedAt = nil
