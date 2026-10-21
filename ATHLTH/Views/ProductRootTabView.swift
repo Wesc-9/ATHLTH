@@ -12001,6 +12001,13 @@ struct ATHLTHRecoveryView: View {
                 guard isActive else {
                     return
                 }
+                // Notification check-in is the first interaction. Avoid
+                // HealthKit trend, muscle and AI work behind its presentation.
+                // One refresh will run after the sheet is dismissed.
+                if openCheckInOnAppear &&
+                   (!hasAutoOpenedDailyCheckIn || showingSorenessLog) {
+                    return
+                }
                 reloadInsightAIConsent()
 
                 let performanceID =
@@ -12036,7 +12043,9 @@ struct ATHLTHRecoveryView: View {
                     .$entries
                     .dropFirst()
             ) { _ in
-                guard isActive else {
+                // A check-in can update several answers. Do not perform
+                // expensive Insight recomputation beneath an open sheet.
+                guard isActive && !showingSorenessLog else {
                     return
                 }
                 Task { @MainActor in
@@ -12050,6 +12059,23 @@ struct ATHLTHRecoveryView: View {
                     showingSorenessLog = true
                 }
             }
+            .onChange(of: showingSorenessLog) { _, isPresented in
+                guard !isPresented && isActive else { return }
+                // A single post-dismiss refresh updates the recommendation
+                // without competing with scrolling or rating interactions.
+                Task { @MainActor in
+                    if openCheckInOnAppear {
+                        reloadInsightAIConsent()
+                        recoverySnapshot = await health.recoveryTrendSnapshot()
+                    }
+                    await refreshRecoveryDerivedSnapshot()
+                    if openCheckInOnAppear {
+                        await loadRecoveryAIIfNeeded()
+                    }
+                }
+            }
+            // Separate the very large Insights view metadata from its sheets.
+            .athlthStablePresentationBoundary()
             .sheet(isPresented: $showingInsightAIConsentSheet) {
                 insightAIConsentSheet
             }
