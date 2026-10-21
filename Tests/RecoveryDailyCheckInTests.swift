@@ -68,6 +68,51 @@ final class RecoveryDailyCheckInTests: XCTestCase {
         XCTAssertNil(store.todayMotivation)
     }
 
+    func testSimplifiedMuscleRegionsCoverOriginalDetailedMuscles() {
+        let keys = RecoveryCheckInMuscleRegion.allCases.flatMap(\.muscleKeys)
+        XCTAssertEqual(keys.count, Set(keys).count, "Regions must not overlap")
+        XCTAssertEqual(
+            Set(keys).union(["Feet"]),
+            Set(RecoverySorenessStore.muscleGroups),
+            "Keep the canonical muscle keys used by historical recovery data"
+        )
+        XCTAssertEqual(RecoveryCheckInMuscleRegion.allCases.count, 8)
+    }
+
+    func testMuscleRegionSelectionCanBeClearedWithoutImpliedAnswers() {
+        var ratings: [String: RecoverySorenessLevel] = [:]
+        let region = RecoveryCheckInMuscleRegion.thighs
+        XCTAssertNil(region.level(in: ratings))
+        region.set(.moderate, in: &ratings)
+        XCTAssertEqual(region.level(in: ratings), .moderate)
+        XCTAssertEqual(ratings["Quads"], .moderate)
+        XCTAssertEqual(ratings["Hamstrings"], .moderate)
+        XCTAssertEqual(ratings["Adductors"], .moderate)
+        region.set(nil, in: &ratings)
+        XCTAssertNil(region.level(in: ratings))
+        XCTAssertTrue(ratings.isEmpty)
+    }
+
+    func testBatchCheckInPersistsAllFieldsWhileKeepingPriorValues() {
+        let defaults = UserDefaults(
+            suiteName: "athlth.test.checkin.\(UUID().uuidString)")!
+        let store = RecoverySorenessStore(defaults: defaults)
+        store.setStress(2)
+
+        var draft = RecoveryPartialCheckInDraft()
+        draft.energy = 5
+        draft.motivation = 4
+        RecoveryCheckInMuscleRegion.back.set(.mild, in: &draft.muscles)
+        draft.apply(to: store)
+
+        XCTAssertEqual(store.todayEnergy, 5)
+        XCTAssertEqual(store.todayStress, 2)
+        XCTAssertEqual(store.todayMotivation, 4)
+        XCTAssertNil(store.todayOverallSoreness)
+        XCTAssertEqual(store.todayRatings["Back"], .mild)
+        XCTAssertEqual(store.todayRatings["Lower Back"], .mild)
+    }
+
     func testSorenessOnlyCheckInWithoutEnergyIsValid() {
         let defaults = UserDefaults(
             suiteName: "athlth.test.checkin.\(UUID().uuidString)")!
