@@ -1398,28 +1398,55 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
     let source: String
     var plannedTrainingPlaceName: String? = nil
     var strengthPerformedExerciseSummaries: [String]? = nil
+    // Cardio metrics from completed movements within this strength workout.
+    // Measured Watch distance and manually estimated distance are separate.
+    var strengthCardioDurationSeconds: Int? = nil
+    var strengthCardioMeasuredMeters: Double? = nil
+    var strengthCardioEstimatedMeters: Double? = nil
+    var strengthCardioExerciseCount: Int? = nil
+    var strengthWorkoutAverageHeartRateBPM: Double? = nil
 
     /// The same completed-set breakdown is used in Replay whether the
     /// workout came from the local strength journal or a linked Health entry.
     static func performedStrengthExerciseSummaries(
         _ workout: StrengthWorkoutLog
     ) -> [String] {
-        workout.exercises.compactMap { item in
-            let sets = item.sets.filter(\.isCompleted)
+        workout.exercises.compactMap { exercise in
+            let sets = exercise.sets.filter(\.isCompleted)
             guard !sets.isEmpty else { return nil }
-            let durations = sets.compactMap(\.resolvedCompletedDurationSeconds)
+            let totalSeconds = sets.compactMap(\.resolvedCompletedDurationSeconds)
                 .reduce(0, +)
-            let prefix = "\(item.exercise.displayName) · \(sets.count) sett"
-            if durations > 0 {
-                let minutes = durations / 60
-                let seconds = durations % 60
-                return prefix + String(format: " · %d:%02d", minutes, seconds)
+            let name = exercise.exercise.displayName
+            var details = ["\(name) · \(sets.count) sett"]
+            if totalSeconds > 0 {
+                details.append(String(
+                    format: "%d:%02d min", totalSeconds / 60, totalSeconds % 60
+                ))
             }
-            if let weight = sets.compactMap(\.completedWeightKilograms).max(),
-               weight > 0 {
-                return prefix + String(format: " · opptil %.1f kg", weight)
+            if StrengthCardioExercisePolicy.isCardio(exercise.exercise.name) {
+                let measured = sets.compactMap(\.watchMeasuredDistanceMeters)
+                    .reduce(0, +)
+                let estimated = sets.compactMap(\.manuallyEstimatedTreadmillDistanceMeters)
+                    .reduce(0, +)
+                if measured > 0 {
+                    details.append(String(format: "%.2f km (målt med Watch)", measured / 1000))
+                } else if estimated > 0 {
+                    details.append(String(format: "%.2f km (estimert)", estimated / 1000))
+                }
+                if sets.count == 1, let speed = sets[0].completedTreadmillSpeedKilometersPerHour {
+                    details.append(String(format: "%.1f km/t manuelt", speed))
+                    if let incline = sets[0].completedTreadmillInclinePercent {
+                        details.append(String(format: "%.1f %% stigning", incline))
+                    }
+                }
+                if sets.count == 1, let heartRate = sets[0].watchAverageHeartRateBPM {
+                    details.append(String(format: "Øktpuls %.0f bpm (Watch)", heartRate))
+                }
+            } else if let weight = sets.filter(\.countsTowardTrainingLoad)
+                .compactMap(\.completedWeightKilograms).max(), weight > 0 {
+                details.append(String(format: "opptil %.1f kg", weight))
             }
-            return prefix
+            return details.joined(separator: " · ")
         }
     }
 
@@ -1445,6 +1472,22 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
         strengthPerformedExerciseSummaries =
             Self.performedStrengthExerciseSummaries(strengthWorkout)
         plannedTrainingPlaceName = strengthWorkout.plannedTrainingPlace?.name
+        let cardioExercises = strengthWorkout.exercises.filter {
+            StrengthCardioExercisePolicy.isCardio($0.exercise.name) &&
+                $0.sets.contains(where: \.isCompleted)
+        }
+        let cardioSets = cardioExercises.flatMap(\.sets).filter(\.isCompleted)
+        let cardioSeconds = cardioSets.compactMap(\.resolvedCompletedDurationSeconds)
+            .reduce(0, +)
+        let watchedMeters = cardioSets.compactMap(\.watchMeasuredDistanceMeters)
+            .reduce(0, +)
+        let estimatedMeters = cardioSets.compactMap(\.manuallyEstimatedTreadmillDistanceMeters)
+            .reduce(0, +)
+        strengthCardioExerciseCount = cardioExercises.isEmpty ? nil : cardioExercises.count
+        strengthCardioDurationSeconds = cardioSeconds > 0 ? cardioSeconds : nil
+        strengthCardioMeasuredMeters = watchedMeters > 0 ? watchedMeters : nil
+        strengthCardioEstimatedMeters = estimatedMeters > 0 ? estimatedMeters : nil
+        strengthWorkoutAverageHeartRateBPM = strengthWorkout.healthMetrics.averageHeartRate
         id = strengthWorkout.healthMetrics.healthKitWorkoutUUID ?? strengthWorkout.id
         title = strengthWorkout.title
         activity = .strength
@@ -1483,30 +1526,21 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
                 set.completedWeightKilograms != nil
             }
 
-        let totalVolume = completedSets.reduce(0.0) {
-            partial,
-            set in
-
-            guard
-                let reps = set.completedReps,
-                let weight =
-                    set.completedWeightKilograms
-            else {
-                return partial
-            }
-
-            return partial +
-                Double(reps) * weight
+        // Warm-up and cardio sets never contribute to strength training
+        // volume or heaviest-lift statistics (or personal records).
+        let workingSets = performedExercises.flatMap { exercise in
+            StrengthCardioExercisePolicy.isCardio(exercise.exercise.name)
+                ? [] : exercise.sets.filter(\.countsTowardTrainingLoad)
         }
-
-        let heaviest = completedSets
-            .compactMap(
-                \.completedWeightKilograms
-            )
+        let totalVolume = workingSets.reduce(0.0) {
+            $0 + $1.volumeKilograms
+        }
+        let heaviest = workingSets
+            .compactMap(\.completedWeightKilograms)
+            .filter { $0 > 0 }
             .max()
-
-        let totalReps = completedSets
-            .compactMap(\.completedReps)
+        let totalReps = workingSets
+            .compactMap(\.resolvedCompletedReps)
             .reduce(0, +)
 
         strengthTotalVolumeKilograms =
