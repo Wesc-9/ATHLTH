@@ -4414,6 +4414,9 @@ final class AppSessionStore: ObservableObject {
                 safeDay.sessions = day.sessions.map { workout -> PlannedSession in
                     var safe = workout
                     safe.plannedTrainingPlace = nil
+                    // The user's previous unswapped workout remains private
+                    // and must not travel inside shared training plans.
+                    safe.dailyAlternativeOriginal = nil
                     return safe
                 }
                 return safeDay
