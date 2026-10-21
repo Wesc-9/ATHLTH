@@ -92,6 +92,39 @@ final class ATHLTHDetailedIntervalBuilderTests: XCTestCase {
         ) ?? -1, 50, accuracy: 0.001)
     }
 
+    func testWarmupCooldownAndIndividualEffortTargetsReachWatch() {
+        let warm = RunningIntensityTarget(
+            kind: .pace, paceMinSecondsPerKilometer: 420,
+            paceMaxSecondsPerKilometer: 420, heartRateZone: 2, rpe: nil
+        )
+        let cooldown = RunningIntensityTarget(
+            kind: .pace, paceMinSecondsPerKilometer: 480,
+            paceMaxSecondsPerKilometer: 480, heartRateZone: 1, rpe: nil
+        )
+        let second = RunningIntensityTarget(
+            kind: .pace, paceMinSecondsPerKilometer: 265,
+            paceMaxSecondsPerKilometer: 265, heartRateZone: 5, rpe: nil
+        )
+        var plan = template()
+        plan.blocks[0].work = .time(600, intensity: warm)
+        plan.blocks[2].work = .time(480, intensity: cooldown)
+        var overrides = plan.blocks[1].repetitionOverrides ?? []
+        overrides.append(RunningRepetitionOverride(
+            repetition: 2, work: .time(240, intensity: second)
+        ))
+        plan.blocks[1].repetitionOverrides = overrides
+
+        let steps = PlannedWorkoutWatchBuilder.runningTransfer(
+            from: plan, routeAlerts: .standard
+        ).steps
+        XCTAssertEqual(steps.first?.targetPaceSecondsPerKilometer, 420)
+        XCTAssertEqual(steps.first?.targetHeartRateZone, 2)
+        XCTAssertEqual(steps[3].targetPaceSecondsPerKilometer, 265)
+        XCTAssertEqual(steps[3].targetHeartRateZone, 5)
+        XCTAssertEqual(steps.last?.targetPaceSecondsPerKilometer, 480)
+        XCTAssertEqual(steps.last?.targetHeartRateZone, 1)
+    }
+
     func testOldWorkoutDefaultsStayValid() throws {
         let existing = RunningWorkoutBlock(
             kind: .work, title: "Legacy",
