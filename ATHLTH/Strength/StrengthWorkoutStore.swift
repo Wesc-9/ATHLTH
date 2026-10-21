@@ -27,6 +27,17 @@ struct StrengthTimedSetCountdown: Codable, Equatable {
         min(max(targetSeconds - secondsRemaining(at: date), 0), targetSeconds)
     }
 
+    /// Actual duration continues after the target reaches zero. A paused
+    /// countdown retains negative secondsAtPause so overtime is not lost.
+    func elapsedSeconds(at date: Date = Date()) -> Int {
+        let activeElapsed = resumedAt.map { max(date.timeIntervalSince($0), 0) } ?? 0
+        return max(Int((Double(targetSeconds) - secondsAtPause + activeElapsed).rounded(.down)), 0)
+    }
+
+    func overtimeSeconds(at date: Date = Date()) -> Int {
+        max(elapsedSeconds(at: date) - targetSeconds, 0)
+    }
+
     func isFinished(at date: Date = Date()) -> Bool {
         remaining(at: date) <= 0
     }
@@ -1138,7 +1149,7 @@ final class StrengthWorkoutStore: ObservableObject {
 
         let now = Date()
         if var countdown = currentTimedSetCountdown {
-            guard !countdown.isRunning && !countdown.isFinished(at: now) else { return }
+            guard !countdown.isRunning else { return }
             countdown.resumedAt = now
             timedSetCountdown = countdown
         } else {
@@ -1159,7 +1170,8 @@ final class StrengthWorkoutStore: ObservableObject {
         guard var countdown = currentTimedSetCountdown,
               countdown.isRunning else { return }
         let now = Date()
-        countdown.secondsAtPause = countdown.remaining(at: now)
+        countdown.secondsAtPause =
+            countdown.secondsAtPause - max(now.timeIntervalSince(countdown.resumedAt ?? now), 0)
         countdown.resumedAt = nil
         timedSetCountdown = countdown
         persistCheckpointNow()
@@ -2292,7 +2304,7 @@ final class StrengthWorkoutStore: ObservableObject {
                     : nil,
             durationSeconds:
                 targetKind == .time
-                    ? (currentTimedSetCountdown?.secondsCompleted() ?? draftDurationSeconds)
+                    ? (currentTimedSetCountdown?.elapsedSeconds() ?? draftDurationSeconds)
                     : nil,
             weightKilograms:
                 loadKind == .weightKilograms
