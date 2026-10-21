@@ -1862,6 +1862,16 @@ final class StrengthWorkoutStore: ObservableObject {
         persistCheckpointNow()
     }
 
+    /// Live pulse-zone target is stored on this workout, not global settings.
+    func setLiveHeartRateTargetZone(_ zone: Int?) {
+        guard var workout = activeWorkout else { return }
+        workout.liveHeartRateTargetZone = zone.flatMap {
+            (1...5).contains($0) ? $0 : nil
+        }
+        activeWorkout = workout
+        persistCheckpointNow()
+    }
+
     /// Continue the same workout while no specific exercise is selected.
     /// Waiting time is tracked as rest and finalized on the next movement
     /// or when the workout is saved. Does not fabricate any completed sets.
