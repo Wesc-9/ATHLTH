@@ -5225,11 +5225,13 @@ struct ActiveStrengthWorkoutView: View {
             let remaining = countdown?.secondsRemaining(at: context.date) ?? target
             let isRunning = countdown?.isRunning == true
             let finished = countdown?.isFinished(at: context.date) == true
+            let elapsed = countdown?.elapsedSeconds(at: context.date) ?? 0
+            let overtime = countdown?.overtimeSeconds(at: context.date) ?? 0
             let hasStarted = countdown != nil
 
             VStack(alignment: .leading, spacing: 13) {
                 HStack(spacing: 12) {
-                    Image(systemName: finished ? "checkmark.circle.fill" : "timer")
+                    Image(systemName: finished ? "stopwatch.fill" : "timer")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(ATHLTHTheme.premiumGold)
                         .frame(width: 40, height: 40)
@@ -5252,8 +5254,8 @@ struct ActiveStrengthWorkoutView: View {
                         Text(
                             finished
                                 ? ATHLTHLocalization.choose(
-                                    english: "Time complete",
-                                    norwegian: "Tiden er ute"
+                                    english: "Target reached · time continues",
+                                    norwegian: "Målet nådd · tiden fortsetter"
                                 )
                                 : isRunning
                                     ? ATHLTHLocalization.choose(
@@ -5276,7 +5278,7 @@ struct ActiveStrengthWorkoutView: View {
 
                     Spacer(minLength: 0)
 
-                    Text(TimeInterval(remaining).clockDuration)
+                    Text(TimeInterval(finished ? elapsed : remaining).clockDuration)
                         .font(.system(size: 37, weight: .bold, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(ATHLTHTheme.accentDeep)
@@ -5285,14 +5287,34 @@ struct ActiveStrengthWorkoutView: View {
                         .lineLimit(1)
                 }
 
+                if finished {
+                    HStack {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Total exercise time",
+                            norwegian: "Total tid på øvelsen"
+                        ))
+                        Spacer()
+                        Text(TimeInterval(elapsed).clockDuration)
+                            .monospacedDigit()
+                            .fontWeight(.semibold)
+                    }
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Text(ATHLTHLocalization.choose(
+                        english: "+\(TimeInterval(overtime).clockDuration) beyond planned time",
+                        norwegian: "+\(TimeInterval(overtime).clockDuration) over planlagt tid"
+                    ))
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                }
                 ProgressView(
-                    value: Double(max(target - remaining, 0)),
+                    value: Double(min(max(target - remaining, 0), target)),
                     total: Double(max(target, 1))
                 )
-                .tint(ATHLTHTheme.premiumGold)
+                .tint(ATHLTHPlanDesign.accent)
 
                 HStack(spacing: 10) {
-                    if !finished {
+                    if !finished || hasStarted {
                         Button {
                             if isRunning {
                                 strength.pauseTimedSet()
@@ -5321,7 +5343,7 @@ struct ActiveStrengthWorkoutView: View {
                             .frame(maxWidth: .infinity, minHeight: 42)
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(ATHLTHTheme.accentDeep)
+                        .tint(ATHLTHPlanDesign.accentInk)
                     } else {
                         Label(
                             ATHLTHLocalization.choose(
@@ -5344,7 +5366,7 @@ struct ActiveStrengthWorkoutView: View {
                                 .frame(width: 42, height: 42)
                         }
                         .buttonStyle(.bordered)
-                        .tint(ATHLTHTheme.accentDeep)
+                        .tint(ATHLTHPlanDesign.accentInk)
                         .accessibilityLabel(
                             ATHLTHLocalization.choose(
                                 english: "Reset countdown",
@@ -5369,7 +5391,7 @@ struct ActiveStrengthWorkoutView: View {
             .background(
                 LinearGradient(
                     colors: [
-                        ATHLTHTheme.cardWarm,
+                        ATHLTHPlanDesign.warmSurface,
                         ATHLTHTheme.card.opacity(0.92)
                     ],
                     startPoint: .topLeading,
