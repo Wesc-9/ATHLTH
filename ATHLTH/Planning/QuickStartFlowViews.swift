@@ -3329,6 +3329,7 @@ struct StrengthQuickBuilderView: View {
     @State private var exercises: [PlannedExercise] = []
     @State private var showingExerciseLibrary = false
     @State private var exerciseBeingEdited: PlannedExercise?
+    @State private var pendingTreadmillSetup: PlannedExercise?
 
     var body: some View {
         Form {
@@ -3496,6 +3497,15 @@ struct StrengthQuickBuilderView: View {
                 }
             }
         }
+        .sheet(item: $pendingTreadmillSetup) { exercise in
+            PlannedExerciseEditorView(
+                exercise: exercise,
+                advancedMode: false
+            ) { updated in
+                exercises.append(updated)
+                pendingTreadmillSetup = nil
+            }
+        }
         .sheet(item: $exerciseBeingEdited) { exercise in
             PlannedExerciseEditorView(
                 exercise: exercise,
@@ -3533,26 +3543,16 @@ struct StrengthQuickBuilderView: View {
         )
     }
 
-    private func addExercise(
-        _ exercise: Exercise
-    ) {
-        exercises.append(
-            PlannedExercise(
-                id: UUID(),
-                exerciseID: exercise.id,
-                embeddedExercise: exercise.snapshot,
-                sets: 3,
-                reps: 8,
-                targetWeightKilograms: nil,
-                targetRPE: nil,
-                restSeconds: 90,
-                notes: nil,
-                targetRIR: nil,
-                supersetGroupID: nil,
-                progression:
-                    StrengthProgressionRule.none
-            )
+    private func addExercise(_ exercise: Exercise) {
+        let draft = StrengthTreadmillWarmUpDefaults.plannedExercise(
+            for: exercise
         )
+        if StrengthTreadmillWarmUpDefaults.isTreadmill(exercise.snapshot.name) ||
+            StrengthTreadmillWarmUpDefaults.isTreadmill(exercise.snapshot.displayName) {
+            pendingTreadmillSetup = draft
+        } else {
+            exercises.append(draft)
+        }
     }
 
     private func exerciseSummary(
