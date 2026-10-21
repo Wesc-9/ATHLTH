@@ -1,3 +1,5 @@
+import Foundation
+
 /// Always present structured timed-step countdowns in hours:minutes:seconds.
 /// Ceil keeps a positive remaining fraction from being shown as zero.
 enum ATHLTHRunStepCountdown {
@@ -8,8 +10,6 @@ enum ATHLTHRunStepCountdown {
                       count / 3600, (count / 60) % 60, count % 60)
     }
 }
-
-import Foundation
 
 /// UI-only run interval metrics. Countdown is derived from the Watch workout
 /// engine's current-step elapsed time or distance, never a second timer.
