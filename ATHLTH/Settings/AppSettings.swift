@@ -560,6 +560,7 @@ final class AppSettingsStore: ObservableObject {
     @Published var ghostRaceFinalPhaseStartMeters: Double { didSet { persist() } }
     @Published var ghostRaceLiveConnectionAlerts: Bool { didSet { persist() } }
 
+    @Published var dailyCheckInRemindersEnabled: Bool { didSet { persist() } }
     @Published var workoutRemindersEnabled: Bool { didSet { persist() } }
     @Published var friendActivityNotificationsEnabled: Bool { didSet { persist() } }
     @Published var challengeNotificationsEnabled: Bool { didSet { persist() } }
@@ -1002,6 +1003,8 @@ final class AppSettingsStore: ObservableObject {
                     "settings.ghostRace.audio.liveConnectionAlerts"
             ) as? Bool ?? true
 
+        dailyCheckInRemindersEnabled = defaults.object(
+            forKey: "settings.dailyCheckInReminders") as? Bool ?? true
         workoutRemindersEnabled = defaults.object(forKey: "settings.workoutReminders") as? Bool ?? true
         friendActivityNotificationsEnabled = defaults.object(forKey: "settings.friendActivityNotifications") as? Bool ?? true
         challengeNotificationsEnabled = defaults.object(forKey: "settings.challengeNotifications") as? Bool ?? true
@@ -1304,6 +1307,8 @@ final class AppSettingsStore: ObservableObject {
                 "settings.ghostRace.audio.liveConnectionAlerts"
         )
 
+        defaults.set(dailyCheckInRemindersEnabled,
+                     forKey: "settings.dailyCheckInReminders")
         defaults.set(workoutRemindersEnabled, forKey: "settings.workoutReminders")
         defaults.set(friendActivityNotificationsEnabled, forKey: "settings.friendActivityNotifications")
         defaults.set(challengeNotificationsEnabled, forKey: "settings.challengeNotifications")
