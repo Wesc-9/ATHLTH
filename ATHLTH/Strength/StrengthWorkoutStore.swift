@@ -52,6 +52,9 @@ final class StrengthWorkoutStore: ObservableObject {
     @Published private(set) var currentSetIndex = 0 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var restEndsAt: Date? { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var restStartedAt: Date? { didSet { scheduleCheckpointPersist() } }
+    @Published private(set) var isFreeTrainingBetweenExercises = false {
+        didSet { scheduleCheckpointPersist() }
+    }
     @Published private(set) var draftReps = 8 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var draftDurationSeconds = 60 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var draftWeightKilograms = 20.0 { didSet { scheduleCheckpointPersist() } }
@@ -109,6 +112,7 @@ final class StrengthWorkoutStore: ObservableObject {
         var setIndex: Int
         var restEndsAt: Date?
         var restStartedAt: Date? = nil
+        var isFreeTrainingBetweenExercises: Bool? = nil
         var reps: Int
         var durationSeconds: Int? = nil
         var weight: Double
@@ -178,6 +182,8 @@ final class StrengthWorkoutStore: ObservableObject {
         restEndsAt = checkpoint?.restEndsAt
         restStartedAt =
             checkpoint?.restStartedAt
+        isFreeTrainingBetweenExercises =
+            checkpoint?.isFreeTrainingBetweenExercises ?? false
         draftReps = checkpoint?.reps ?? 8
         draftDurationSeconds =
             checkpoint?.durationSeconds ?? 60
@@ -236,6 +242,7 @@ final class StrengthWorkoutStore: ObservableObject {
                 restEndsAt: restEndsAt,
                 restStartedAt:
                     restStartedAt,
+                isFreeTrainingBetweenExercises: isFreeTrainingBetweenExercises,
                 reps: draftReps,
                 durationSeconds: draftDurationSeconds,
                 weight: draftWeightKilograms,
@@ -1855,6 +1862,25 @@ final class StrengthWorkoutStore: ObservableObject {
         persistCheckpointNow()
     }
 
+    /// Continue the same workout while no specific exercise is selected.
+    /// Waiting time is tracked as rest and finalized on the next movement
+    /// or when the workout is saved. Does not fabricate any completed sets.
+    @discardableResult
+    func continueFreeTrainingBetweenExercises() -> Bool {
+        guard let workout = activeWorkout,
+              !workout.exercises.isEmpty,
+              workout.exercises.allSatisfy(\.isCompleted)
+        else { return false }
+        if restStartedAt == nil {
+            restStartedAt = workout.exercises
+                .compactMap(\.completedAt).max() ?? Date()
+        }
+        restEndsAt = nil
+        isFreeTrainingBetweenExercises = true
+        persistCheckpointNow()
+        return true
+    }
+
     func startFreestyle(
         watchSessionID: UUID?,
         trackingMode: StrengthTrackingMode = .advanced,
@@ -1890,6 +1916,7 @@ final class StrengthWorkoutStore: ObservableObject {
         currentSetIndex = 0
         restEndsAt = nil
         restStartedAt = nil
+        isFreeTrainingBetweenExercises = false
         reloadDraftFromCurrentSet()
         persistCheckpointNow()
     }
@@ -1931,7 +1958,9 @@ final class StrengthWorkoutStore: ObservableObject {
         restSeconds: Int? = 90,
         warmUpSets: Int = 0
     ) {
+        finalizeActualRestIfNeeded()
         guard var workout = activeWorkout else { return }
+        isFreeTrainingBetweenExercises = false
 
         let resolvedTargetKind =
             targetKind ??
@@ -2127,6 +2156,7 @@ final class StrengthWorkoutStore: ObservableObject {
         currentSetIndex = 0
         restEndsAt = nil
         restStartedAt = nil
+        isFreeTrainingBetweenExercises = false
         reloadDraftFromCurrentSet()
         persistCheckpointNow()
     }
@@ -2310,7 +2340,9 @@ final class StrengthWorkoutStore: ObservableObject {
                             )
                         )
             } else {
-                restStartedAt = nil
+                // After the final exercise, keep counting idle time as rest
+                // until the next exercise is added or the workout is saved.
+                restStartedAt = Date()
                 restEndsAt = nil
             }
         } else {
@@ -3450,7 +3482,10 @@ final class StrengthWorkoutStore: ObservableObject {
         workout.exercises[currentExerciseIndex] = exercise
         currentSetIndex = max(completed.count - 1, 0)
         timedSetCountdown = nil
-        restStartedAt = nil
+        let hasOtherPending = workout.exercises.contains {
+            !$0.isCompleted
+        }
+        restStartedAt = hasOtherPending ? nil : Date()
         restEndsAt = nil
         activeWorkout = workout
         reloadDraftFromCurrentSet()
