@@ -11827,17 +11827,12 @@ struct ATHLTHRecoveryView: View {
                         }
 
                         MuscleRecoveryCard(
+                            checkInStore: sorenessStore,
                             statuses: muscleRecoveryStatuses,
                             unmappedExerciseNames:
                                 unmappedMuscleExercises,
                             trendDays:
                                 recoverySnapshot.days
-                        ) {
-                            showingSorenessLog = true
-                        }
-
-                        RecoveryDailyCheckInCard(
-                            store: sorenessStore
                         ) {
                             showingSorenessLog = true
                         }
@@ -11867,6 +11862,7 @@ struct ATHLTHRecoveryView: View {
                         recoveryUnavailableCard
 
                         MuscleRecoveryCard(
+                            checkInStore: sorenessStore,
                             statuses: muscleRecoveryStatuses,
                             unmappedExerciseNames:
                                 unmappedMuscleExercises,
@@ -11877,12 +11873,6 @@ struct ATHLTHRecoveryView: View {
                         }
 
                         plannedWorkoutInsightCard
-
-                        RecoveryDailyCheckInCard(
-                            store: sorenessStore
-                        ) {
-                            showingSorenessLog = true
-                        }
 
                         RecoveryToolsCard { tool in
                             selectedRecoveryTool = tool
