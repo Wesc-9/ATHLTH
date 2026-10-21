@@ -413,38 +413,26 @@ extension ExerciseSnapshot {
             .lowercased()
     }
 
-    var defaultStrengthLoadKind: StrengthExerciseLoadKind {
-        let resistanceKeywords = [
-            "rowing",
-            "rowerg",
-            "rower",
-            "rowing machine",
-            "concept2 row",
-            "ski erg",
-            "skierg"
-        ]
+    /// Resistance row exercises still use kilograms. Only cardio ergs
+    /// expose a machine resistance level and the distance-result field.
+    private var isCardioResistanceMachine: Bool {
+        let value = normalizedStrengthEquipmentText
+        let isSkiErg = value.contains("ski erg") ||
+            value.contains("skierg")
+        let isRowingErg = StrengthCardioExercisePolicy.isCardio(name) &&
+            (value.contains("rowing") || value.contains("rower") ||
+             value.contains("rowerg") || value.contains("concept2") ||
+             value.contains("romaskin") || value.contains("roapparat") ||
+             value.contains("row machine") || value.contains("roing"))
+        return isSkiErg || isRowingErg
+    }
 
-        return resistanceKeywords.contains {
-            normalizedStrengthEquipmentText.contains($0)
-        }
-            ? .resistanceLevel
-            : .weightKilograms
+    var defaultStrengthLoadKind: StrengthExerciseLoadKind {
+        isCardioResistanceMachine ? .resistanceLevel : .weightKilograms
     }
 
     var supportsStrengthDistanceResult: Bool {
-        let distanceKeywords = [
-            "rowing",
-            "rowerg",
-            "rower",
-            "rowing machine",
-            "concept2 row",
-            "ski erg",
-            "skierg"
-        ]
-
-        return distanceKeywords.contains {
-            normalizedStrengthEquipmentText.contains($0)
-        }
+        isCardioResistanceMachine
     }
 
     var defaultStrengthTargetKind: StrengthExerciseTargetKind {
