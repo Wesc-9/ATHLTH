@@ -2013,13 +2013,16 @@ struct TrainingPlanCatalogDetailView: View {
     @State private var createEditableCopy = false
     @State private var showingPersonalizePlan = false
     @State private var showAllWeeks = false
+    // One session is open by default so users see actual exercises and
+    // targets immediately, without rendering every session for 16 weeks.
+    @State private var expandedSessionKeys: Set<String> = ["1:0"]
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack(alignment: .top, spacing: 13) {
-                        Image(systemName: detailIcon)
+                        Image(systemName: entry.trainingTypeIcon)
                             .font(.system(size: 23, weight: .semibold))
                             .foregroundStyle(detailAccent)
                             .frame(width: 54, height: 54)
@@ -2032,7 +2035,7 @@ struct TrainingPlanCatalogDetailView: View {
                             )
 
                         VStack(alignment: .leading, spacing: 5) {
-                            Text(entry.categoryTitle.uppercased())
+                            Text(entry.trainingTypeTitle.uppercased())
                                 .font(.caption2.weight(.bold))
                                 .tracking(2.1)
                                 .foregroundStyle(detailAccent)
@@ -2075,45 +2078,22 @@ struct TrainingPlanCatalogDetailView: View {
                     .lineLimit(1)
                 }
                 .padding(18)
-                .background(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.86),
-                            detailAccent.opacity(0.085)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    in: RoundedRectangle(
-                        cornerRadius: 28,
-                        style: .continuous
-                    )
-                )
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: 28,
-                        style: .continuous
-                    )
-                    .stroke(
-                        Color.white.opacity(0.95),
-                        lineWidth: 1
-                    )
-                }
+                .athlthPlanCard()
 
                 HStack(spacing: 10) {
                     detailMetric(
                         "\(entry.durationWeeks)",
-                        label: "weeks",
+                        label: ATHLTHLocalization.choose(english: "weeks", norwegian: "uker"),
                         icon: "calendar"
                     )
                     detailMetric(
                         "\(entry.sessionsPerWeek)",
-                        label: "sessions / week",
+                        label: ATHLTHLocalization.choose(english: "sessions / week", norwegian: "økter / uke"),
                         icon: "repeat"
                     )
                     detailMetric(
                         entry.level,
-                        label: "level",
+                        label: ATHLTHLocalization.choose(english: "level", norwegian: "nivå"),
                         icon: "speedometer"
                     )
                 }
@@ -2162,9 +2142,10 @@ struct TrainingPlanCatalogDetailView: View {
                             }
                         }
 
-                        Text(
-                            "ATHLTH spreads these sessions across the week. Once saved, every day, workout, exercise and target can be changed."
-                        )
+                        Text(ATHLTHLocalization.choose(
+                            english: "Each session below includes its actual exercises and targets. Tap a session to expand it. You can edit all workouts after selecting a start date.",
+                            norwegian: "Hver økt nedenfor viser faktiske øvelser og mål. Trykk på en økt for detaljer. Alt kan redigeres etter at du velger startdato."
+                        ))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     }
@@ -2179,9 +2160,10 @@ struct TrainingPlanCatalogDetailView: View {
                             .font(.headline)
                         Text(entry.goal)
                             .font(.title3.weight(.semibold))
-                        Text(
-                            "This is a reusable starting structure, not a fixed prescription. Adapt volume and intensity to your current training history."
-                        )
+                        Text(ATHLTHLocalization.choose(
+                            english: "Adapt sets, reps and volume to your training history.",
+                            norwegian: "Tilpass sett, repetisjoner og mengde til treningshistorikken din."
+                        ))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     }
@@ -2254,9 +2236,7 @@ struct TrainingPlanCatalogDetailView: View {
             .frame(maxWidth: .infinity)
         }
         .background(
-            ATHLTHPremiumCanvas(
-                accent: ATHLTHTheme.accent.opacity(0.32)
-            )
+            ATHLTHPlanDesign.warmCanvas
         )
         .safeAreaInset(edge: .bottom) {
             Button {
@@ -2568,14 +2548,7 @@ struct TrainingPlanCatalogDetailView: View {
     }
 
     private var detailAccent: Color {
-        switch entry.category {
-        case "strength":
-            return Color.indigo
-        case "hybrid":
-            return ATHLTHTheme.premiumGold
-        default:
-            return ATHLTHTheme.vitality
-        }
+        ATHLTHPlanDesign.accentInk
     }
 
     private var detailIcon: String {
