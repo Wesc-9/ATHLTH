@@ -328,6 +328,10 @@ private final class ATHLTHLiveActivityController {
                     snapshot.strengthWeightKilograms,
                 strengthRestEndsAt:
                     snapshot.strengthRestEndsAt,
+                strengthNextExerciseName:
+                    snapshot.strengthNextExerciseName,
+                strengthTimedSetTargetSeconds:
+                    snapshot.strengthTimedSetTargetSeconds,
                 strengthTimedSetSecondsAtSnapshot:
                     snapshot.strengthTimedSetSecondsAtSnapshot,
                 strengthTimedSetResumedAt:
