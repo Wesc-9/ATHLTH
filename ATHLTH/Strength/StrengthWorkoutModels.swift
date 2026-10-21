@@ -302,6 +302,8 @@ struct StrengthSetLog: Identifiable, Codable, Hashable {
     var targetKind: StrengthExerciseTargetKind? = nil
     var plannedDurationSeconds: Int? = nil
     var completedDurationSeconds: Int? = nil
+    // An explicit bodyweight/no-load choice; nil preserves legacy sessions.
+    var recordsWeight: Bool? = nil
 
     // Optional machine/result metadata keeps older workout history decodable.
     var loadKind: StrengthExerciseLoadKind? = nil
