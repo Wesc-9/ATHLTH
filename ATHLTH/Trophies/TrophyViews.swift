@@ -84,15 +84,15 @@ struct TrophyCabinetSection: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(
                         ATHLTHLocalization.choose(
-                            english: "Trophy shelf",
-                            norwegian: "Trofehylle"
+                            english: "Trophy cabinet",
+                            norwegian: "Troféskap"
                         )
                     )
                         .font(.title3.weight(.bold))
                     Text(
                         ATHLTHLocalization.choose(
-                            english: "Show your favorite achievements and hardest-earned trophies.",
-                            norwegian: "Vis favoritt-achievements og pokalene du har jobbet hardest for."
+                            english: "Display your favourite medals and most prestigious gold cups.",
+                            norwegian: "Vis favorittmedaljene dine og de største gullpokalene."
                         )
                     )
                         .font(.caption)
@@ -127,18 +127,18 @@ struct TrophyCabinetSection: View {
                         Text(
                             ATHLTHLocalization.choose(
                                 english:
-                                    "Your trophy shelf is waiting",
+                                    "Your trophy cabinet is waiting",
                                 norwegian:
-                                    "Trofehyllen din venter"
+                                    "Troféskapet ditt venter"
                             )
                         )
                             .font(.subheadline.weight(.semibold))
                         Text(
                             ATHLTHLocalization.choose(
                                 english:
-                                    "Unlock achievements or earn gold trophies, then choose up to four for your profile.",
+                                    "Earn medals or a gold prestige cup, then choose up to four for your profile.",
                                 norwegian:
-                                    "Lås opp achievements eller tjen gullpokaler, og velg opptil fire til profilen."
+                                    "Tjen medaljer eller prestisjepokaler i gull, og velg opptil fire til profilen."
                             )
                         )
                             .font(.caption)
@@ -202,18 +202,18 @@ struct TrophyProgressCard: View {
                     Text(
                         ATHLTHLocalization.choose(
                             english:
-                                "Achievement Progress",
+                                "Medal progress",
                             norwegian:
-                                "Achievement-fremdrift"
+                                "Medaljefremdrift"
                         )
                     )
                         .font(.headline)
                     Text(
                         ATHLTHLocalization.choose(
                             english:
-                                "Progress from Core to Rare, Epic and Signature.",
+                                "Advance from bronze through silver to gold.",
                             norwegian:
-                                "Fremdrift fra Core til Rare, Epic og Signature."
+                                "Gå fra bronse via sølv til gull."
                         )
                     )
                         .font(.caption2)
@@ -235,9 +235,9 @@ struct TrophyProgressCard: View {
                 Text(
                     ATHLTHLocalization.choose(
                         english:
-                            "Achievement progress appears here as ATHLTH reads verified activity.",
+                            "Medal progress appears here as ATHLTH reads verified activity.",
                         norwegian:
-                            "Achievement-fremdrift vises her når ATHLTH leser verifisert aktivitet."
+                            "Medaljefremdrift vises her når ATHLTH leser verifisert aktivitet."
                     )
                 )
                     .font(.caption)
@@ -426,9 +426,9 @@ struct TrophyCollectionView: View {
         .navigationTitle(
             ATHLTHLocalization.choose(
                 english:
-                    "Achievements & Trophies",
+                    "Medals & Trophies",
                 norwegian:
-                    "Achievements & pokaler"
+                    "Medaljer og pokaler"
             )
         )
         .navigationBarTitleDisplayMode(
@@ -489,11 +489,11 @@ struct TrophyCollectionView: View {
                             ATHLTHLocalization.choose(
                                 english:
                                     replacementTrophyID == nil
-                                        ? "Achievements and trophies are shown together, rarest first."
+                                        ? "Medals and gold cups are shown together, highest tier first."
                                         : "Choose an unlocked award to replace the selected trophy in the same shelf position.",
                                 norwegian:
                                     replacementTrophyID == nil
-                                        ? "Achievements og pokaler vises samlet, fra sjeldnest til vanligst."
+                                        ? "Medaljer og gullpokaler vises samlet, fra høyeste nivå."
                                         : "Velg en opplåst utmerkelse som skal erstatte troféet i samme plass på hyllen."
                             )
                         )
@@ -518,9 +518,9 @@ struct TrophyCollectionView: View {
                             description: Text(
                                 ATHLTHLocalization.choose(
                                     english:
-                                        "Unlock another achievement or trophy to add it here.",
+                                        "Unlock another medal or gold cup to add it here.",
                                     norwegian:
-                                        "Lås opp en ny achievement eller pokal for å legge den til her."
+                                        "Lås opp en ny medalje eller gullpokal for å legge den til her."
                                 )
                             )
                         )
@@ -1542,7 +1542,7 @@ struct TrophyCollectionView: View {
                     english:
                         "Double tap to choose an unlocked achievement or trophy.",
                     norwegian:
-                        "Dobbelttrykk for å velge en opplåst achievement eller pokal."
+                        "Dobbelttrykk for å velge en opplåst medalje eller gullpokal."
                 )
             )
         }
@@ -2152,7 +2152,7 @@ private enum TrophyHubTab:
         case .collection:
             return ATHLTHLocalization.choose(
                 english: "Achievements",
-                norwegian: "Achievements"
+                norwegian: "Medaljer"
             )
         case .trophies:
             return ATHLTHLocalization.choose(
@@ -2162,7 +2162,7 @@ private enum TrophyHubTab:
         case .shelf:
             return ATHLTHLocalization.choose(
                 english: "Shelf",
-                norwegian: "Trofehylle"
+                norwegian: "Troféskap"
             )
         }
     }
@@ -2351,7 +2351,7 @@ struct TrophyDetailView: View {
                                 Text(
                                     ATHLTHLocalization.choose(
                                         english: "Your trophy shelf can display up to four achievements or trophies.",
-                                        norwegian: "Trofehyllen kan vise opptil fire achievements eller pokaler."
+                                        norwegian: "Troféskapet kan vise opptil fire medaljer eller gullpokaler."
                                     )
                                 )
                                     .font(.caption)
@@ -2370,7 +2370,7 @@ struct TrophyDetailView: View {
                         )
                         : ATHLTHLocalization.choose(
                             english: "Achievement",
-                            norwegian: "Achievement"
+                            norwegian: "Medalje"
                         )
                 )
                 .navigationBarTitleDisplayMode(.inline)
