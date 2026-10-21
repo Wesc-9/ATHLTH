@@ -181,4 +181,75 @@ final class StrengthWarmUpExerciseTests: XCTestCase {
         XCTAssertTrue(set.isWarmUp == true)
     }
 
+    @MainActor
+    func testAdvancingFromRestStartsTimedTreadmillExerciseImmediately() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil)
+        store.appendExercise(
+            catalogExercise(named: "Bench Press"),
+            sets: 1, reps: 8, restSeconds: 0
+        )
+        store.appendExercise(
+            catalogExercise(named: "Treadmill Running"),
+            sets: 1, reps: nil, targetKind: .time,
+            targetDurationSeconds: 600, restSeconds: 0
+        )
+        XCTAssertNil(store.currentTimedSetCountdown)
+        store.completeCurrentDraftSet()
+        XCTAssertNotNil(store.nextPendingExercise)
+        store.moveToNextExercise()
+        XCTAssertEqual(store.currentSet?.plannedDurationSeconds, 600)
+        XCTAssertNotNil(store.currentTimedSetCountdown)
+        XCTAssertTrue(store.currentTimedSetCountdown?.isRunning == true)
+    }
+
+    @MainActor
+    func testFinalExerciseWaitIsRestAndFreeTrainingDoesNotFakeSets() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil)
+        store.appendExercise(
+            catalogExercise(named: "Bench Press"),
+            sets: 1, reps: 8, restSeconds: 0
+        )
+        store.completeCurrentDraftSet()
+        XCTAssertNotNil(store.restStartedAt)
+        XCTAssertTrue(store.continueFreeTrainingBetweenExercises())
+        XCTAssertTrue(store.isFreeTrainingBetweenExercises)
+        XCTAssertEqual(store.activeWorkout?.totalCompletedSets, 1)
+        store.appendExercise(
+            catalogExercise(named: "Dumbbell Curl"),
+            sets: 1, reps: 8, restSeconds: 0
+        )
+        XCTAssertFalse(store.isFreeTrainingBetweenExercises)
+        XCTAssertEqual(store.activeWorkout?.totalCompletedSets, 1)
+        XCTAssertNotNil(
+            store.activeWorkout?.exercises.first?.sets.first?.actualRestAfterSeconds
+        )
+    }
+
+    func testPlanHeartRateZoneRangesAreSharedWithLiveView() {
+        XCTAssertEqual(
+            ATHLTHHeartRateZones.range(for: 2, maximumBPM: 200),
+            120...140
+        )
+        XCTAssertNil(ATHLTHHeartRateZones.range(for: 0, maximumBPM: 200))
+        XCTAssertNil(ATHLTHHeartRateZones.range(for: 5, maximumBPM: nil))
+    }
+
+    @MainActor
+    func testSelectedVenueAndZoneRemainAttachedToLiveWorkout() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil)
+        let place = ATHLTHTrainingPlace(
+            kind: .gym, name: "Treningssenter", address: "Treningsveien 1"
+        )
+        store.setWorkoutTrainingPlace(place)
+        store.setLiveHeartRateTargetZone(3)
+        XCTAssertEqual(store.activeWorkout?.plannedTrainingPlace, place)
+        XCTAssertEqual(store.activeWorkout?.liveHeartRateTargetZone, 3)
+        store.setLiveHeartRateTargetZone(nil)
+        XCTAssertNil(store.activeWorkout?.liveHeartRateTargetZone)
+        XCTAssertEqual(store.activeWorkout?.plannedTrainingPlace, place)
+    }
+
 }
