@@ -430,71 +430,23 @@ struct ATHLTHTrainIntervalComposerView: View {
                 .font(.subheadline)
             }
 
-            if kind == .work || kind == .steady || kind == .warmup || kind == .cooldown || kind == .recovery {
-                if kind != .work {
-                    Picker(tr("Intensity", "Intensitet"), selection: $targetEffort) {
-                        Text(tr("Easy", "Rolig")).tag(RunningIntensityKind.easy)
-                        Text(tr("Target pace", "Måltempo")).tag(RunningIntensityKind.pace)
-                        Text(tr("HR zone", "Pulssone")).tag(RunningIntensityKind.heartRateZone)
-                        Text(tr("No target", "Uten mål")).tag(RunningIntensityKind.none)
-                    }
-                    if targetEffort == .pace {
-                        Toggle(tr("Enter target as speed", "Bruk hastighet (km/t)"),
-                               isOn: $speedInputEnabled)
-                            .tint(bronze)
-                        if speedInputEnabled {
-                            Stepper(String(format: "%.1f km/t", speedKilometersPerHour),
-                                    value: $speedKilometersPerHour,
-                                    in: 3...25, step: 0.1)
-                        } else {
-                            Stepper(paceLabel(paceSeconds),
-                                    value: $paceSeconds,
-                                    in: 150...1200, step: 5)
-                        }
-                    }
-                }
-            }
-
             if kind == .work {
                 Stepper("\(repetitions) " + tr("repetitions", "drag"),
-                        value: $repetitions,
-                        in: 1...40)
-                    .font(.subheadline)
+                        value: $repetitions, in: 1...40)
                 Toggle(tr("Rest between efforts", "Pause mellom drag"),
                        isOn: $pauseEnabled)
-                    .tint(bronze)
+                    .tint(ATHLTHPlanDesign.accentInk)
                 if pauseEnabled && repetitions > 1 {
                     Stepper("\(pauseSeconds) s " + tr("recovery", "pause"),
-                            value: $pauseSeconds,
-                            in: 15...900,
-                            step: 15)
-                        .font(.subheadline)
+                            value: $pauseSeconds, in: 15...900, step: 15)
                 }
-                Toggle(tr("Target pace", "Måltempo"), isOn: $paceEnabled)
-                    .tint(bronze)
-                if paceEnabled {
-                    Toggle(tr("Enter target as speed", "Bruk hastighet (km/t)"),
-                           isOn: $speedInputEnabled)
-                        .tint(bronze)
-                    if speedInputEnabled {
-                        Stepper(String(format: "%.1f km/t", speedKilometersPerHour),
-                                value: $speedKilometersPerHour,
-                                in: 3...25, step: 0.5)
-                    } else {
-                        Stepper(paceLabel(paceSeconds),
-                                value: $paceSeconds,
-                                in: 150...1200, step: 5)
-                    }
-                }
-                Toggle(tr("Heart-rate zone target", "Målsone for puls"),
-                       isOn: $heartRateTargetEnabled)
-                    .tint(bronze)
-                if heartRateTargetEnabled {
-                    Stepper(tr("Zone", "Sone") + " \(heartRateZone)",
-                            value: $heartRateZone, in: 1...5)
-                        .font(.subheadline)
-                }
+                Text(tr("Edit speed and pulse zone for each effort or recovery above.",
+                        "Tilpass hastighet og pulssone for hvert drag eller hver pause over."))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
+
+            phaseTargetControls
 
             TextField(tr("Optional instructions", "Valgfri beskrivelse"),
                       text: $notes,
@@ -525,6 +477,42 @@ struct ATHLTHTrainIntervalComposerView: View {
         }
         .padding(16)
         .athlthPlanCard(radius: 20)
+    }
+
+    /// Every phase supports both speed and a pulse zone. This includes
+    /// warm-up, cooldown, steady running and interval repetitions.
+    private var phaseTargetControls: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(tr("TARGETS FOR THIS PHASE", "MÅL FOR DENNE DELEN"))
+                .font(.caption2.weight(.bold))
+                .tracking(1)
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+
+            Toggle(tr("Target speed / pace", "Målhastighet / tempo"),
+                   isOn: $paceEnabled)
+                .tint(ATHLTHPlanDesign.accentInk)
+            if paceEnabled {
+                Picker(tr("Enter as", "Angi som"), selection: $speedInputEnabled) {
+                    Text(tr("Speed km/h", "Hastighet km/t")).tag(true)
+                    Text(tr("Pace min/km", "Tempo min/km")).tag(false)
+                }
+                .pickerStyle(.segmented)
+                if speedInputEnabled {
+                    Stepper(String(format: "%.1f km/t", speedKilometersPerHour),
+                            value: $speedKilometersPerHour, in: 3...25, step: 0.1)
+                } else {
+                    Stepper(paceLabel(paceSeconds), value: $paceSeconds,
+                            in: 150...1200, step: 5)
+                }
+            }
+
+            Toggle(tr("Heart-rate zone", "Pulssone"), isOn: $heartRateTargetEnabled)
+                .tint(ATHLTHPlanDesign.accentInk)
+            if heartRateTargetEnabled {
+                Stepper(tr("Zone", "Sone") + " \(heartRateZone)",
+                        value: $heartRateZone, in: 1...5)
+            }
+        }
     }
 
     private var sessionGuidance: some View {
@@ -634,12 +622,12 @@ struct ATHLTHTrainIntervalComposerView: View {
     private func addBlock() {
         let resolvedPace = speedInputEnabled
             ? 3_600 / max(speedKilometersPerHour, 0.5) : Double(paceSeconds)
-        let wantsPace = kind == .work ? paceEnabled : targetEffort == .pace
         let intensity = RunningIntensityTarget(
-            kind: wantsPace ? .pace :
-                  heartRateTargetEnabled ? .heartRateZone : targetEffort,
-            paceMinSecondsPerKilometer: wantsPace ? resolvedPace : nil,
-            paceMaxSecondsPerKilometer: wantsPace ? resolvedPace : nil,
+            kind: paceEnabled ? .pace :
+                  heartRateTargetEnabled ? .heartRateZone :
+                  (targetEffort == .none ? .none : .easy),
+            paceMinSecondsPerKilometer: paceEnabled ? resolvedPace : nil,
+            paceMaxSecondsPerKilometer: paceEnabled ? resolvedPace : nil,
             heartRateZone: heartRateTargetEnabled ? heartRateZone : nil,
             rpe: nil
         )
@@ -686,13 +674,24 @@ struct ATHLTHTrainIntervalComposerView: View {
     }
 
     private func stepSummary(_ step: RunningStepTarget) -> String {
+        let length: String
         switch step.measure {
-        case .distance: return "\(Int(step.distanceMeters ?? 0)) m"
+        case .distance:
+            length = "\(Int(step.distanceMeters ?? 0)) m"
         case .time:
             let seconds = Int(step.durationSeconds ?? 0)
-            return "\(seconds / 60):\(String(format: "%02d", seconds % 60))"
-        case .open: return tr("Open", "Åpent")
+            length = "\(seconds / 60):\(String(format: "%02d", seconds % 60))"
+        case .open:
+            length = tr("Open", "Åpent")
         }
+        var parts = [length]
+        if let pace = step.intensity.paceMinSecondsPerKilometer, pace > 0 {
+            parts.append(String(format: "%.1f km/t", 3_600 / pace))
+        }
+        if let zone = step.intensity.heartRateZone {
+            parts.append(tr("HR zone", "Pulssone") + " \(zone)")
+        }
+        return parts.joined(separator: " · ")
     }
 
     private func summary(_ block: RunningWorkoutBlock) -> String {
@@ -706,11 +705,12 @@ struct ATHLTHTrainIntervalComposerView: View {
             value = tr("Open effort", "Åpent drag")
         }
         let effort = block.repetitions > 1 ? "\(block.repetitions) × \(value)" : value
+        let extra = stepSummary(block.work).split(separator: " · ").dropFirst()
+        var description = ([effort] + extra.map(String.init)).joined(separator: " · ")
         if let recovery = block.recovery {
-            return effort + " · \(Int(recovery.durationSeconds ?? 0)) s "
-                + tr("recovery", "pause")
+            description += " · " + tr("Recovery", "Pause") + " " + stepSummary(recovery)
         }
-        return effort
+        return description
     }
 
     private func save() {
