@@ -56,6 +56,7 @@ struct SavedRoutesView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
+    @EnvironmentObject private var recents: LibraryRecentsStore
     @EnvironmentObject private var health: HealthKitManager
     @StateObject private var locationStore = HomeLocationStore()
 
@@ -219,6 +220,16 @@ struct SavedRoutesView: View {
         manualRunSecondsPerKm > 0
             ? Double(manualRunSecondsPerKm) / 60
             : recentPace(for: .running, fallback: 6)
+    }
+
+    private func markRecent(_ route: TrainingRoute) {
+        recents.markUsed(
+            .route,
+            itemID: route.id.uuidString,
+            title: route.title,
+            subtitle: String(format: "%.1f km", route.distanceKilometers),
+            icon: "map.fill"
+        )
     }
 
     private func durationText(kilometers: Double, paceMinutes: Double) -> String {
@@ -509,9 +520,13 @@ struct SavedRoutesView: View {
                 }
             }
             .buttonStyle(.plain)
+            .simultaneousGesture(TapGesture().onEnded {
+                markRecent(route)
+            })
 
             if let onSelect {
                 Button {
+                    markRecent(route)
                     onSelect(route)
                 } label: {
                     Image(systemName: "checkmark.circle.fill")
@@ -523,6 +538,7 @@ struct SavedRoutesView: View {
                 .accessibilityLabel(tr("Use route", "Bruk rute"))
             } else if settings.trainingDeviceProvider == .appleWatch {
                 Button {
+                    markRecent(route)
                     sendToWatch(route)
                 } label: {
                     Image(systemName: "applewatch")
@@ -617,7 +633,10 @@ struct SavedRoutesView: View {
     private func routeCard(_ entry: PositionedSavedRoute) -> some View {
         let route = entry.route
         return VStack(alignment: .leading, spacing: 13) {
-            Button { previewRoute = route } label: {
+            Button {
+                markRecent(route)
+                previewRoute = route
+            } label: {
                 ZStack(alignment: .bottomTrailing) {
                     RouteMapSnapshotThumbnail(route: route, height: 174)
                     Label(tr("Explore", "Utforsk"), systemImage: "arrow.up.left.and.arrow.down.right")
@@ -710,9 +729,15 @@ struct SavedRoutesView: View {
                         .foregroundStyle(ATHLTHPlanDesign.accentInk)
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
+                .simultaneousGesture(TapGesture().onEnded {
+                    markRecent(route)
+                })
 
                 if let onSelect {
-                    Button { onSelect(route) } label: {
+                    Button {
+                        markRecent(route)
+                        onSelect(route)
+                    } label: {
                         Label(tr("Use route", "Bruk rute"), systemImage: "checkmark.circle.fill")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.white)
@@ -721,7 +746,10 @@ struct SavedRoutesView: View {
                     }
                     .buttonStyle(.plain)
                 } else if settings.trainingDeviceProvider == .appleWatch {
-                    Button { sendToWatch(route) } label: {
+                    Button {
+                        markRecent(route)
+                        sendToWatch(route)
+                    } label: {
                         Label(tr("Send to Watch", "Send til Watch"), systemImage: "applewatch")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.white)
