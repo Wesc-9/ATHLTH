@@ -514,7 +514,7 @@ struct StrengthSetLog: Identifiable, Codable, Hashable {
     }
 
     var countsTowardTrainingLoad: Bool {
-        isCompleted && isWarmUp != true
+        isCompleted && isWarmUp != true && plannedSetType != .warmUp
     }
 }
 
