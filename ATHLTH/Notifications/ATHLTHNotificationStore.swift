@@ -80,6 +80,18 @@ enum ATHLTHChallengeReminderText {
     }
 }
 
+/// Pure policy for low-noise, once-daily in-app reminders.
+enum ATHLTHDailyCheckInReminderPolicy {
+    static func shouldShow(
+        enabled: Bool, completed: Bool,
+        issuedToday: Bool, now: Date,
+        calendar: Calendar = .current
+    ) -> Bool {
+        enabled && !completed && !issuedToday &&
+            calendar.component(.hour, from: now) >= 8
+    }
+}
+
 @MainActor
 final class ATHLTHNotificationStore: ObservableObject {
     @Published private(set) var items: [ATHLTHNotificationItem] = []
@@ -284,15 +296,13 @@ final class ATHLTHNotificationStore: ObservableObject {
                 (!enabled || completed || $0.eventKey != eventKey)
         }
         if items.count != previousCount { persist() }
-        guard enabled, !completed else { return }
-        // Don't present a new-day reminder at midnight.
-        guard (calendar.component(.hour, from: now)) >= 8 else { return }
-
         let issuedKey = "insights.daily-check-in.last-issued." + accountID.uuidString
-        guard defaults.string(forKey: issuedKey) != dateKey,
-              !items.contains(where: { $0.eventKey == eventKey }) else {
-            return
-        }
+        guard ATHLTHDailyCheckInReminderPolicy.shouldShow(
+            enabled: enabled, completed: completed,
+            issuedToday: defaults.string(forKey: issuedKey) == dateKey ||
+                items.contains(where: { $0.eventKey == eventKey }),
+            now: now, calendar: calendar
+        ) else { return }
 
         add(ATHLTHNotificationDraft(
             eventKey: eventKey,
