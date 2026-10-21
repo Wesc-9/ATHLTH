@@ -1102,6 +1102,39 @@ final class StrengthWorkoutStore: ObservableObject {
         return true
     }
 
+    /// Jump directly to an unfinished set, even within a different exercise.
+    /// A completed set can be reviewed but is never implicitly repeated.
+    @discardableResult
+    func selectSetForNow(exerciseID: UUID, setID: UUID) -> Bool {
+        guard let workout = activeWorkout,
+              let exerciseIndex = workout.exercises.firstIndex(where: {
+                  $0.id == exerciseID
+              }),
+              let setIndex = workout.exercises[exerciseIndex].sets.firstIndex(
+                  where: { $0.id == setID && !$0.isCompleted }
+              )
+        else { return false }
+
+        if currentExerciseIndex == exerciseIndex && currentSetIndex == setIndex {
+            return true
+        }
+
+        finalizeActualRestIfNeeded()
+        // Never carry the timer or draft weight from the previously selected set.
+        timedSetCountdown = nil
+        restStartedAt = nil
+        restEndsAt = nil
+        currentExerciseIndex = exerciseIndex
+        currentSetIndex = setIndex
+        isFreeTrainingBetweenExercises = false
+        reloadDraftFromCurrentSet()
+        if currentSet?.resolvedTargetKind == .time {
+            startOrResumeTimedSet()
+        }
+        persistCheckpointNow()
+        return true
+    }
+
     func reorderActiveExercises(
         fromOffsets: IndexSet,
         toOffset: Int
