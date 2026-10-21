@@ -92,7 +92,8 @@ final class StrengthWarmUpExerciseTests: XCTestCase {
             id: UUID(), origin: .publicCatalog, ownerID: nil,
             name: name, instructions: ["Warm up at a comfortable pace."],
             primaryMuscles: ["Quadriceps"], secondaryMuscles: [],
-            equipment: ["Treadmill"], imageURL: nil
+            equipment: ["Treadmill"], imageURL: nil,
+            isVisibleOutsideOwnerLibrary: true
         )
     }
 
@@ -134,7 +135,8 @@ final class StrengthWarmUpExerciseTests: XCTestCase {
             id: UUID(), origin: .publicCatalog, ownerID: nil,
             name: "Bench Press", instructions: ["Control each repetition."],
             primaryMuscles: ["Chest"], secondaryMuscles: [],
-            equipment: ["Barbell"], imageURL: nil
+            equipment: ["Barbell"], imageURL: nil,
+            isVisibleOutsideOwnerLibrary: true
         )
         store.appendExercise(exercise, sets: 3, reps: 8, restSeconds: 0)
         store.completeCurrentDraftSet()
@@ -158,7 +160,8 @@ final class StrengthWarmUpExerciseTests: XCTestCase {
             id: UUID(), origin: .publicCatalog, ownerID: nil,
             name: "Treadmill Running", instructions: ["Comfortable pace."],
             primaryMuscles: ["Quadriceps"], secondaryMuscles: [],
-            equipment: ["Treadmill"], imageURL: nil
+            equipment: ["Treadmill"], imageURL: nil,
+            isVisibleOutsideOwnerLibrary: true
         )
         store.appendExercise(
             treadmill, sets: 1, reps: nil, targetKind: .time,
