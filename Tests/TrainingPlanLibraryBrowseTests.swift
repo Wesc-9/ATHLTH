@@ -37,7 +37,7 @@ final class TrainingPlanLibraryBrowseTests: XCTestCase {
         let workout = ATHLTHCatalogPlanSessionFactory.session(
             entry: plan, blueprint: first, week: 1
         )
-        let exercises = workout.workoutBlocks.filter { $0.kind == .exercise }
+        let exercises = (workout.workoutBlocks ?? []).filter { $0.kind == .exercise }
         XCTAssertFalse(exercises.isEmpty)
         XCTAssertTrue(exercises.contains {
             ($0.setCount ?? 0) > 0 && ($0.repetitions ?? 0) > 0
@@ -57,8 +57,8 @@ final class TrainingPlanLibraryBrowseTests: XCTestCase {
         let recovery = ATHLTHCatalogPlanSessionFactory.session(
             entry: plan, blueprint: blueprint, week: 4
         )
-        let regularSets = regular.workoutBlocks.compactMap(\.setCount).reduce(0, +)
-        let recoverySets = recovery.workoutBlocks.compactMap(\.setCount).reduce(0, +)
+        let regularSets = (regular.workoutBlocks ?? []).compactMap(\.setCount).reduce(0, +)
+        let recoverySets = (recovery.workoutBlocks ?? []).compactMap(\.setCount).reduce(0, +)
         XCTAssertGreaterThan(regularSets, recoverySets)
     }
 }
