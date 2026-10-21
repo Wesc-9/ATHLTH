@@ -861,45 +861,14 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
     }
 }
 
-struct IPhoneWorkoutView: View {
+/// Isolated live interval card keeps the heavyweight SwiftUI timeline
+/// metadata out of the already-large iPhone workout screen view tree.
+private struct IPhoneStructuredStepCard: View {
     @EnvironmentObject private var recorder: IPhoneWorkoutStore
-    @EnvironmentObject private var health: HealthKitManager
-    @EnvironmentObject private var settings: AppSettingsStore
-    @EnvironmentObject private var social: SocialStore
-    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.scenePhase) private var scenePhase
-    @StateObject private var socialCompanion =
-        SocialWorkoutCompanionStore()
-    @State private var confirmFinish = false
-    @State private var followMe = true
-    @State private var showingTreadmillInclineEditor = false
-    @State private var showingLiveAudioCoach = false
-    @State private var showingAIConversation = false
-    @State private var showingTreadmillSpeedEditor = false
-    @State private var treadmillInclineDraft = 0.0
-    @State private var treadmillInclineEditingWorkoutID:
-        UUID?
-    @State private var routeCamera:
-        MapCameraPosition = .automatic
+    let workout: PhoneWorkout
+    let step: WatchRunningWorkoutStep
 
     var body: some View {
-        NavigationStack {
-            List {
-                if let workout = recorder.active {
-                    VStack(
-                        alignment: .leading,
-                        spacing: 13
-                    ) {
-                        premiumWorkoutHeader(
-                            workout
-                        )
-
-                        TrainTogetherStatusStrip()
-
-                    if recorder.currentStructuredStep != nil {
-                        VStack(alignment: .leading, spacing: 0) {
-                            if let step = recorder.currentStructuredStep {
                         VStack(alignment: .leading, spacing: 12) {
                             Text(ATHLTHLocalization.choose(
                                 english: "WORKOUT STEP", norwegian: "ØKTSTEG"
@@ -1065,10 +1034,120 @@ struct IPhoneWorkoutView: View {
                                 }
                             }
                         }
-                    }
-                        }
-                        .padding(17)
-                        .athlthPlanCard(radius: 21)
+        .padding(17)
+        .athlthPlanCard(radius: 21)
+    }
+
+    private func routeDistanceText(
+        _ meters: Double
+    ) -> String {
+        if meters >= 1_000 {
+            return String(
+                format: "%.1f km",
+                meters / 1_000
+            )
+        }
+
+        return "\(Int(meters.rounded())) m"
+    }
+
+    private func structuredRemainingText(
+        step: WatchRunningWorkoutStep,
+        workout: PhoneWorkout,
+        date: Date
+    ) -> String {
+        switch step.measure {
+        case .time:
+            guard let target =
+                step.durationSeconds
+            else {
+                return "Open step"
+            }
+
+            let used =
+                max(
+                    workout.elapsed(at: date) -
+                        (
+                            workout
+                                .structuredStepStartElapsedTime ??
+                            0
+                        ),
+                    0
+                )
+            let remaining =
+                max(target - used, 0)
+
+            return
+                ATHLTHRunStepCountdown.display(remaining)
+
+        case .distance:
+            guard let target =
+                step.distanceMeters
+            else {
+                return "Open step"
+            }
+
+            let used =
+                max(
+                    workout.distanceMeters -
+                        (
+                            workout
+                                .structuredStepStartDistanceMeters ??
+                            0
+                        ),
+                    0
+                )
+
+            return routeDistanceText(
+                max(target - used, 0)
+            ) + " remaining"
+
+        case .open:
+            return "Open step · advance by finishing the workout"
+        }
+    }
+
+
+}
+
+struct IPhoneWorkoutView: View {
+    @EnvironmentObject private var recorder: IPhoneWorkoutStore
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var socialCompanion =
+        SocialWorkoutCompanionStore()
+    @State private var confirmFinish = false
+    @State private var followMe = true
+    @State private var showingTreadmillInclineEditor = false
+    @State private var showingLiveAudioCoach = false
+    @State private var showingAIConversation = false
+    @State private var showingTreadmillSpeedEditor = false
+    @State private var treadmillInclineDraft = 0.0
+    @State private var treadmillInclineEditingWorkoutID:
+        UUID?
+    @State private var routeCamera:
+        MapCameraPosition = .automatic
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if let workout = recorder.active {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 13
+                    ) {
+                        premiumWorkoutHeader(
+                            workout
+                        )
+
+                        TrainTogetherStatusStrip()
+
+                    if let step = recorder.currentStructuredStep {
+                        IPhoneStructuredStepCard(workout: workout, step: step)
                     }
 
                         IPhoneWorkoutLiveMetricsPanel(
