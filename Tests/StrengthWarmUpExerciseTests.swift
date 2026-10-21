@@ -458,4 +458,70 @@ final class StrengthWarmUpExerciseTests: XCTestCase {
     }
 
 
+    func testRowingMachineIsCardioButResistanceRowsRemainStrength() {
+        XCTAssertTrue(StrengthCardioExercisePolicy.isCardio("Row Machine"))
+        XCTAssertTrue(StrengthCardioExercisePolicy.isCardio("Rowing machine"))
+        XCTAssertTrue(StrengthCardioExercisePolicy.isCardio("Romaskin"))
+        XCTAssertTrue(StrengthCardioExercisePolicy.isCardio("Tredemølle"))
+        XCTAssertFalse(StrengthCardioExercisePolicy.isCardio("Dumbbell Rowing"))
+        XCTAssertFalse(StrengthCardioExercisePolicy.isCardio("Bent Over Rowing"))
+        XCTAssertFalse(StrengthCardioExercisePolicy.isCardio("Seated Cable Row"))
+    }
+
+    @MainActor
+    func testResistanceRowStillCountsTowardLiftingVolume() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil)
+        store.appendExercise(
+            catalogExercise(named: "Dumbbell Rowing"),
+            sets: 1, reps: 8, targetWeightKilograms: 40, restSeconds: 0
+        )
+        store.setDraft(weightKilograms: 40)
+        store.completeCurrentDraftSet()
+        let workout = try XCTUnwrap(store.activeWorkout)
+        let replay = SocialPublishableWorkout(strengthWorkout: workout)
+        XCTAssertEqual(replay.strengthTotalVolumeKilograms ?? 0, 320, accuracy: 0.001)
+        XCTAssertNil(replay.strengthCardioExerciseCount)
+    }
+
+    @MainActor
+    func testMixedWatchAndManualDistanceOnlyCountsEachSetOnce() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: UUID(), captureDevice: .appleWatch)
+        store.appendExercise(
+            catalogExercise(named: "Treadmill Running"),
+            sets: 2, reps: nil, targetKind: .time,
+            targetDurationSeconds: 60, restSeconds: 0, warmUpSets: 2
+        )
+        store.setDraft(treadmillSpeedKilometersPerHour: 9, treadmillInclinePercent: 2)
+        store.startOrResumeTimedSet()
+        let started = try XCTUnwrap(store.activeWorkout?.startedAt)
+        store.ingestWatchCardioSnapshot(cardioWatchSample(
+            startedAt: started, capturedAt: started.addingTimeInterval(4),
+            elapsed: 4, meters: 100, pulse: 130
+        ))
+        store.ingestWatchCardioSnapshot(cardioWatchSample(
+            startedAt: started, capturedAt: started.addingTimeInterval(9),
+            elapsed: 9, meters: 127, pulse: 140
+        ))
+        store.completeCurrentSet(
+            reps: nil, durationSeconds: 60, weightKilograms: nil,
+            rpe: nil, isWarmUp: true
+        )
+
+        store.setDraft(treadmillSpeedKilometersPerHour: 9, treadmillInclinePercent: 2)
+        store.completeCurrentSet(
+            reps: nil, durationSeconds: 60, weightKilograms: nil,
+            rpe: nil, isWarmUp: true
+        )
+        let workout = try XCTUnwrap(store.activeWorkout)
+        let replay = SocialPublishableWorkout(strengthWorkout: workout)
+        XCTAssertEqual(replay.strengthCardioMeasuredMeters ?? 0, 27, accuracy: 0.001)
+        // Only the second set falls back to 9 km/h × 60 sec = 150 m.
+        XCTAssertEqual(replay.strengthCardioEstimatedMeters ?? 0, 150, accuracy: 0.001)
+        XCTAssertEqual(replay.strengthCardioDurationSeconds, 120)
+        XCTAssertEqual(workout.totalVolumeKilograms, 0)
+        XCTAssertTrue(workout.exercises[0].sets[0].manuallyEstimatedTreadmillDistanceMeters != nil)
+    }
+
 }
