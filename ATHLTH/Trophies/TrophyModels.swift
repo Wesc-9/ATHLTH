@@ -14,22 +14,22 @@ enum TrophyCategory: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .signature: return ATHLTHLocalization.string( "Signature")
+        case .signature:
+            return ATHLTHLocalization.choose(english: "ATHLTH", norwegian: "ATHLTH")
         case .walking:
-            return ATHLTHLocalization.choose(
-                english: "Walking",
-                norwegian: "Gåing"
-            )
-        case .endurance: return ATHLTHLocalization.string( "Endurance")
-        case .strength: return ATHLTHLocalization.string( "Strength")
-        case .consistency: return ATHLTHLocalization.string( "Consistency")
-        case .goals: return ATHLTHLocalization.string( "Goals")
+            return ATHLTHLocalization.choose(english: "Walking & outdoors", norwegian: "Gåing og friluftsliv")
+        case .endurance:
+            return ATHLTHLocalization.choose(english: "Running", norwegian: "Løping")
+        case .strength:
+            return ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke")
+        case .consistency:
+            return ATHLTHLocalization.choose(english: "Consistency", norwegian: "Treningsrutine")
+        case .goals:
+            return ATHLTHLocalization.choose(english: "Goals", norwegian: "Mål")
         case .recovery:
-            return ATHLTHLocalization.choose(
-                english: "Health & Recovery",
-                norwegian: "Helse & restitusjon"
-            )
-        case .challenges: return ATHLTHLocalization.string( "Challenges")
+            return ATHLTHLocalization.choose(english: "Health & recovery", norwegian: "Helse og restitusjon")
+        case .challenges:
+            return ATHLTHLocalization.choose(english: "Challenges", norwegian: "Utfordringer")
         }
     }
 
@@ -59,10 +59,12 @@ enum TrophyRarity: Int, CaseIterable, Codable, Hashable, Comparable {
 
     var title: String {
         switch self {
-        case .core: return ATHLTHLocalization.string( "Core")
-        case .rare: return ATHLTHLocalization.string( "Rare")
-        case .epic: return ATHLTHLocalization.string( "Epic")
-        case .signature: return ATHLTHLocalization.string( "Signature")
+        case .core:
+            return ATHLTHLocalization.choose(english: "Bronze", norwegian: "Bronse")
+        case .rare:
+            return ATHLTHLocalization.choose(english: "Silver", norwegian: "Sølv")
+        case .epic, .signature:
+            return ATHLTHLocalization.choose(english: "Gold", norwegian: "Gull")
         }
     }
 }
@@ -75,8 +77,8 @@ enum ATHLTHAwardClass: String, Codable, Hashable {
         switch self {
         case .achievement:
             return ATHLTHLocalization.choose(
-                english: "Achievement",
-                norwegian: "Achievement"
+                english: "Medal",
+                norwegian: "Medalje"
             )
         case .trophy:
             return ATHLTHLocalization.choose(
