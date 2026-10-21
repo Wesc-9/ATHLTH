@@ -110,7 +110,15 @@ struct WorkoutHistoryPreviewSection: View {
         let healthItems: [SocialPublishableWorkout]
         if health.hasRequestedAuthorization,
            let summaries = try? await health.workoutHistory() {
-            healthItems = summaries.map(SocialPublishableWorkout.init)
+            healthItems = summaries.map { summary in
+                var item = SocialPublishableWorkout(summary: summary)
+                // HealthKit's workout ID is linked to our strength log.
+                // Prefer the same athlete-selected venue for both histories.
+                item.plannedTrainingPlaceName = strength.workoutHistory.first {
+                    $0.healthMetrics.healthKitWorkoutUUID == summary.id
+                }?.plannedTrainingPlace?.name
+                return item
+            }
         } else {
             healthItems = []
         }
@@ -229,7 +237,15 @@ struct WorkoutHistoryView: View {
         let healthItems: [SocialPublishableWorkout]
         if health.hasRequestedAuthorization,
            let summaries = try? await health.workoutHistory() {
-            healthItems = summaries.map(SocialPublishableWorkout.init)
+            healthItems = summaries.map { summary in
+                var item = SocialPublishableWorkout(summary: summary)
+                // HealthKit's workout ID is linked to our strength log.
+                // Prefer the same athlete-selected venue for both histories.
+                item.plannedTrainingPlaceName = strength.workoutHistory.first {
+                    $0.healthMetrics.healthKitWorkoutUUID == summary.id
+                }?.plannedTrainingPlace?.name
+                return item
+            }
         } else {
             healthItems = []
         }
