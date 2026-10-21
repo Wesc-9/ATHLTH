@@ -1,0 +1,62 @@
+name: Bundle ATHLTH conversation stadium hero
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release/v1.8.7
+    paths:
+      - ".github/workflows/bundle-conversation-stadium-hero.yml"
+      - "scripts/prepare_conversation_stadium_hero.py"
+
+permissions:
+  contents: write
+
+jobs:
+  bundle-stadium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout active ATHLTH baseline
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install Pillow for image quality verification
+        run: |
+          python3 -m venv .chat-asset-venv
+          .chat-asset-venv/bin/python -m pip install --quiet 'Pillow>=11,<13'
+
+      - name: Download licensed photo and optimize for Retina
+        run: .chat-asset-venv/bin/python scripts/prepare_conversation_stadium_hero.py
+
+      - name: Verify photo is high resolution and asset is registered
+        run: |
+          .chat-asset-venv/bin/python - <<'PY'
+          from PIL import Image
+          from pathlib import Path
+          import json
+          assets = Path('ATHLTH/Assets.xcassets/ConversationStadiumHero.imageset')
+          item = json.loads((assets / 'Contents.json').read_text())
+          target = assets / item['images'][0]['filename']
+          with Image.open(target) as image:
+              w, h = image.size
+              assert w >= 1800 and h >= 900, (w, h)
+              print(f'Conversation stadium image validated: {w}x{h}')
+          PY
+
+      - name: Commit bundled offline stadium image
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add ATHLTH/Assets.xcassets/ConversationStadiumHero.imageset/stadium.jpg
+          if git diff --cached --quiet; then
+            echo "Stadium image is already current."
+            exit 0
+          fi
+          git config user.name "ATHLTH Assets Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "Bundle high resolution licensed stadium photo for ATHLTH chat"
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"
