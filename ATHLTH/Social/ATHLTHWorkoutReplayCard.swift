@@ -211,6 +211,13 @@ struct ATHLTHWorkoutReplayCard: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(Color.white.opacity(0.95), lineWidth: 0.9)
         }
+        .onAppear {
+            // After a strength workout, the actual completed exercise list
+            // should be immediately visible rather than hidden behind Replay.
+            if isStrength, !(workout.strengthPerformedExerciseSummaries ?? []).isEmpty {
+                showingMoments = true
+            }
+        }
     }
 
     private func replayMetric(title: String, value: String, icon: String) -> some View {
