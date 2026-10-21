@@ -125,6 +125,34 @@ final class ATHLTHDetailedIntervalBuilderTests: XCTestCase {
         XCTAssertEqual(steps.last?.targetHeartRateZone, 1)
     }
 
+    func testPauseAfterWarmupIsIndependentTimedPhaseForPhoneAndWatch() {
+        var plan = template()
+        plan.blocks.insert(RunningWorkoutBlock(
+            kind: .recovery,
+            title: "Pause før hoveddel",
+            work: .time(90, intensity: .easy)
+        ), at: 1)
+        plan.autoAdvanceTimedSteps = false
+        let transfer = PlannedWorkoutWatchBuilder.runningTransfer(
+            from: plan, routeAlerts: .standard
+        )
+        XCTAssertEqual(transfer.autoAdvanceTimedSteps, false)
+        XCTAssertEqual(transfer.steps[0].phase, "warmup")
+        XCTAssertEqual(transfer.steps[1].phase, "recovery")
+        XCTAssertEqual(transfer.steps[1].durationSeconds, 90)
+        XCTAssertEqual(transfer.steps[2].phase, "work")
+    }
+
+    func testOldIntervalPlansStillAdvanceTimedPhasesAutomatically() {
+        let legacy = template()
+        XCTAssertNil(legacy.autoAdvanceTimedSteps)
+        let transfer = PlannedWorkoutWatchBuilder.runningTransfer(
+            from: legacy, routeAlerts: .standard
+        )
+        XCTAssertNil(transfer.autoAdvanceTimedSteps)
+        XCTAssertEqual(transfer.autoAdvanceTimedSteps ?? true, true)
+    }
+
     func testOldWorkoutDefaultsStayValid() throws {
         let existing = RunningWorkoutBlock(
             kind: .work, title: "Legacy",
