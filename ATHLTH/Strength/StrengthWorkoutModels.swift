@@ -463,6 +463,9 @@ struct StrengthExerciseLog: Identifiable, Codable, Hashable {
     // explicitly confirms that they are ready to start the next exercise.
     // Optional keeps older workout history fully decodable.
     var transitionToNextExerciseSeconds: TimeInterval? = nil
+    // Preserves an explicit decision to omit planned sets in a live workout.
+    // Saved training plan and completed set IDs remain unchanged.
+    var skippedPlannedSetCount: Int? = nil
 
     var isCompleted: Bool {
         completedAt != nil
