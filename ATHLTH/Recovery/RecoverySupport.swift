@@ -250,6 +250,30 @@ final class RecoverySorenessStore: ObservableObject {
         todayRatings[muscleGroup] ?? .none
     }
 
+    /// Persist a whole check-in as one change. Individual field writes caused
+    /// repeated JSON serialization, publishes and expensive Insights refreshes.
+    /// Nil fields remain untouched so a partial check-in never resets prior data.
+    func applyCheckIn(_ draft: RecoveryPartialCheckInDraft) {
+        guard draft.hasAnswers else { return }
+        updateTodayEntry { entry in
+            if let energy = draft.energy {
+                entry.energy = Self.normalizedCheckInValue(energy)
+            }
+            if let stress = draft.stress {
+                entry.stress = Self.normalizedCheckInValue(stress)
+            }
+            if let soreness = draft.overallSoreness {
+                entry.overallSoreness = Self.normalizedCheckInValue(soreness)
+            }
+            if let motivation = draft.motivation {
+                entry.motivation = Self.normalizedCheckInValue(motivation)
+            }
+            for (muscle, level) in draft.muscles {
+                entry.ratings[muscle] = level
+            }
+        }
+    }
+
     func setEnergy(_ value: Int) {
         updateTodayEntry {
             $0.energy = Self.normalizedCheckInValue(value)
@@ -3633,12 +3657,61 @@ struct RecoveryPartialCheckInDraft {
     }
 
     func apply(to store: RecoverySorenessStore) {
-        if let energy { store.setEnergy(energy) }
-        if let stress { store.setStress(stress) }
-        if let overallSoreness { store.setOverallSoreness(overallSoreness) }
-        if let motivation { store.setMotivation(motivation) }
-        for (muscle, level) in muscles {
-            store.set(level, for: muscle)
+        store.applyCheckIn(self)
+    }
+}
+
+/// Fewer choices in the daily form, backed by the original detailed
+/// canonical muscle keys so old check-ins and recovery calculations still work.
+/// A chosen level intentionally applies to the whole named region.
+enum RecoveryCheckInMuscleRegion: String, CaseIterable, Identifiable {
+    case chest, back, shoulders, arms, core, hips, thighs, lowerLegs
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .chest: return recoveryText("Chest", "Bryst")
+        case .back: return recoveryText("Back", "Rygg")
+        case .shoulders: return recoveryText("Shoulders", "Skuldre")
+        case .arms: return recoveryText("Arms", "Armer")
+        case .core: return recoveryText("Core", "Mage og kjerne")
+        case .hips: return recoveryText("Hips and glutes", "Hofter og sete")
+        case .thighs: return recoveryText("Thighs", "Lår")
+        case .lowerLegs: return recoveryText("Lower legs", "Legger")
+        }
+    }
+
+    var muscleKeys: [String] {
+        switch self {
+        case .chest: return ["Chest"]
+        case .back: return ["Back", "Lower Back"]
+        case .shoulders: return ["Shoulders"]
+        case .arms: return ["Arms"]
+        case .core: return ["Core"]
+        case .hips: return ["Glutes", "Hip Flexors"]
+        case .thighs: return ["Quads", "Hamstrings", "Adductors"]
+        case .lowerLegs: return ["Calves", "Shins"]
+        }
+    }
+
+    func level(in ratings: [String: RecoverySorenessLevel]) -> RecoverySorenessLevel? {
+        let values = muscleKeys.compactMap { ratings[$0] }
+        guard !values.isEmpty else { return nil }
+        // Historical detailed readings can differ; do not invent a consensus.
+        return values.allSatisfy { $0 == values[0] } ? values[0] : nil
+    }
+
+    func set(
+        _ value: RecoverySorenessLevel?,
+        in ratings: inout [String: RecoverySorenessLevel]
+    ) {
+        for key in muscleKeys {
+            if let value {
+                ratings[key] = value
+            } else {
+                ratings.removeValue(forKey: key)
+            }
         }
     }
 }
@@ -3652,36 +3725,30 @@ struct RecoverySorenessLogView: View {
 
     @State private var draft = RecoveryPartialCheckInDraft()
     @State private var showMuscleDetail = false
-    @State private var showMotivation = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(alignment: .top, spacing: 12) {
-                        Image(systemName: "sparkles")
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                            .frame(width: 48, height: 48)
-                            .background(ATHLTHPlanDesign.selectedSurface,
-                                        in: RoundedRectangle(cornerRadius: 16))
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(recoveryText(
-                                "How are you feeling today?",
-                                "Hvordan føler du deg i dag?"))
-                                .font(.system(size: 23, weight: .semibold,
-                                              design: .serif))
-                                .foregroundStyle(ATHLTHPlanDesign.ink)
-                            Text(recoveryText(
-                                "Only answer what feels relevant. Nothing is preselected.",
-                                "Svar bare på det du ønsker. Ingenting er forhåndsvalgt."))
-                                .font(.subheadline)
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        }
-                    }
+                LazyVStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(recoveryText(
+                            "How are you feeling today?",
+                            "Hvordan føler du deg i dag?"
+                        ))
+                        .font(.system(size: 23, weight: .semibold, design: .serif))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
 
-                    ATHLTHPlanSurface {
-                        VStack(alignment: .leading, spacing: 16) {
+                        Text(recoveryText(
+                            "Answer what matters today. All answers are optional.",
+                            "Svar på det som er relevant i dag. Alt er valgfritt."
+                        ))
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    .padding(.horizontal, 2)
+
+                    ATHLTHPlanSurface(ghost: false, density: .compact) {
+                        VStack(alignment: .leading, spacing: 13) {
                             ratingRow(
                                 title: recoveryText("Energy", "Energi"),
                                 hint: recoveryText("Low → high", "Lav → høy"),
@@ -3689,7 +3756,7 @@ struct RecoverySorenessLogView: View {
                                 value: draft.energy
                             ) { draft.energy = $0 }
 
-                            Divider().opacity(0.55)
+                            Divider().opacity(0.45)
 
                             ratingRow(
                                 title: recoveryText("Stress", "Stress"),
@@ -3698,7 +3765,7 @@ struct RecoverySorenessLogView: View {
                                 value: draft.stress
                             ) { draft.stress = $0 }
 
-                            Divider().opacity(0.55)
+                            Divider().opacity(0.45)
 
                             ratingRow(
                                 title: recoveryText("Overall soreness", "Generell ømhet"),
@@ -3707,165 +3774,101 @@ struct RecoverySorenessLogView: View {
                                 value: draft.overallSoreness
                             ) { draft.overallSoreness = $0 }
 
-                            Divider().opacity(0.55)
+                            Divider().opacity(0.45)
 
-                            VStack(alignment: .leading, spacing: 8) {
-                                Label(recoveryText(
-                                    "Tired or sore feet? (optional)",
-                                    "Slitne eller ømme føtter? (valgfritt)"
-                                ), systemImage: "figure.walk")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                                HStack(spacing: 7) {
-                                    ForEach(RecoverySorenessLevel.allCases) { level in
-                                        Button {
-                                            if draft.muscles["Feet"] == level {
-                                                draft.muscles.removeValue(forKey: "Feet")
-                                            } else {
-                                                draft.muscles["Feet"] = level
-                                            }
-                                        } label: {
-                                            Text(level.title)
-                                                .font(.caption2.weight(.semibold))
-                                                .lineLimit(1)
-                                                .minimumScaleFactor(0.7)
-                                                .foregroundStyle(
-                                                    draft.muscles["Feet"] == level
-                                                        ? .white
-                                                        : ATHLTHPlanDesign.ink
-                                                )
-                                                .frame(maxWidth: .infinity, minHeight: 37)
-                                                .background(
-                                                    draft.muscles["Feet"] == level
-                                                        ? ATHLTHPlanDesign.accentInk
-                                                        : ATHLTHPlanDesign.selectedSurface,
-                                                    in: RoundedRectangle(cornerRadius: 11)
-                                                )
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-                                Text(recoveryText(
-                                    "Used to suggest lower-impact alternatives to running.",
-                                    "Brukes for å foreslå mer skånsomme alternativer til løping."
-                                ))
-                                    .font(.caption2)
-                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                            }
+                            ratingRow(
+                                title: recoveryText("Motivation", "Motivasjon"),
+                                hint: recoveryText("Low → high", "Lav → høy"),
+                                symbol: "flame.fill",
+                                value: draft.motivation
+                            ) { draft.motivation = $0 }
                         }
                     }
 
-                    ATHLTHPlanSurface {
+                    ATHLTHPlanSurface(ghost: false, density: .compact) {
                         VStack(alignment: .leading, spacing: 12) {
                             Button {
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    showMuscleDetail.toggle()
-                                }
+                                // No full-form expansion animation while the
+                                // user is interacting with a heavy Insights tab.
+                                showMuscleDetail.toggle()
                             } label: {
-                                HStack(spacing: 12) {
+                                HStack(spacing: 10) {
                                     Image(systemName: "figure.strengthtraining.traditional")
                                         .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                                    VStack(alignment: .leading, spacing: 2) {
+                                    VStack(alignment: .leading, spacing: 3) {
                                         Text(recoveryText(
-                                            "Specific muscle soreness",
-                                            "Støl i bestemte muskler?"))
-                                            .font(.subheadline.weight(.semibold))
-                                            .foregroundStyle(ATHLTHPlanDesign.ink)
-                                        Text(recoveryText(
-                                            "Optional · only mark affected muscles",
-                                            "Valgfritt · marker kun berørte muskler"))
-                                            .font(.caption2)
-                                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                    }
-                                    Spacer()
-                                    Image(systemName: showMuscleDetail ?
-                                          "chevron.up" : "chevron.down")
-                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            if showMuscleDetail {
-                                ForEach(RecoverySorenessStore.muscleGroups.filter {
-                                            $0 != "Feet"
-                                        }, id: \.self) { muscle in
-                                    VStack(alignment: .leading, spacing: 7) {
-                                        Text(muscle)
-                                            .font(.caption.weight(.semibold))
-                                            .foregroundStyle(ATHLTHPlanDesign.ink)
-                                        HStack(spacing: 6) {
-                                            ForEach(RecoverySorenessLevel.allCases) { level in
-                                                Button {
-                                                    // Selecting again deselects it, preserving
-                                                    // the distinction between no answer and none.
-                                                    if draft.muscles[muscle] == level {
-                                                        draft.muscles.removeValue(forKey: muscle)
-                                                    } else {
-                                                        draft.muscles[muscle] = level
-                                                    }
-                                                } label: {
-                                                    Text(level.title)
-                                                        .font(.system(size: 10, weight: .semibold))
-                                                        .lineLimit(1)
-                                                        .minimumScaleFactor(0.8)
-                                                        .frame(maxWidth: .infinity, minHeight: 36)
-                                                        .foregroundStyle(
-                                                            draft.muscles[muscle] == level
-                                                                ? .white : ATHLTHPlanDesign.ink)
-                                                        .background(
-                                                            draft.muscles[muscle] == level
-                                                                ? ATHLTHPlanDesign.accentInk
-                                                                : ATHLTHPlanDesign.selectedSurface,
-                                                            in: RoundedRectangle(cornerRadius: 10))
-                                                }
-                                                .buttonStyle(.plain)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    ATHLTHPlanSurface {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Button {
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    showMotivation.toggle()
-                                }
-                            } label: {
-                                HStack {
-                                    Label(recoveryText(
-                                        "Motivation (optional)",
-                                        "Motivasjon (valgfritt)"),
-                                        systemImage: "flame.fill")
+                                            "Sore muscles or feet?",
+                                            "Støl i muskler eller føtter?"
+                                        ))
                                         .font(.subheadline.weight(.semibold))
                                         .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                                        Text(recoveryText(
+                                            "Optional · 8 areas and feet",
+                                            "Valgfritt · 8 områder og føtter"
+                                        ))
+                                        .font(.caption2)
+                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                    }
                                     Spacer()
-                                    Image(systemName: showMotivation ?
-                                          "chevron.up" : "chevron.down")
+                                    Image(systemName: showMuscleDetail ? "chevron.up" : "chevron.down")
                                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                                 }
+                                .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            if showMotivation {
-                                ratingRow(
-                                    title: recoveryText("Motivation", "Motivasjon"),
-                                    hint: recoveryText("Low → high", "Lav → høy"),
-                                    symbol: "flame.fill",
-                                    value: draft.motivation
-                                ) { draft.motivation = $0 }
+                            .accessibilityHint(recoveryText(
+                                "Show or hide muscle and foot ratings",
+                                "Vis eller skjul vurdering av muskler og føtter"
+                            ))
+
+                            if showMuscleDetail {
+                                LazyVStack(alignment: .leading, spacing: 12) {
+                                    Text(recoveryText(
+                                        "A selected rating applies to the entire area. Leave unaffected areas unanswered.",
+                                        "Vurderingen gjelder hele området. La andre områder stå ubesvart."
+                                    ))
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+                                    ForEach(RecoveryCheckInMuscleRegion.allCases) { region in
+                                        sorenessRow(
+                                            title: region.title,
+                                            selected: region.level(in: draft.muscles)
+                                        ) { level in
+                                            region.set(level, in: &draft.muscles)
+                                        }
+                                    }
+
+                                    sorenessRow(
+                                        title: recoveryText("Feet", "Føtter"),
+                                        selected: draft.muscles["Feet"]
+                                    ) { level in
+                                        if let level {
+                                            draft.muscles["Feet"] = level
+                                        } else {
+                                            draft.muscles.removeValue(forKey: "Feet")
+                                        }
+                                    }
+
+                                    Text(recoveryText(
+                                        "Foot soreness helps suggest lower-impact running alternatives.",
+                                        "Ømme føtter kan gi forslag til mer skånsom løpetrening."
+                                    ))
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                }
                             }
                         }
                     }
 
                     Label(recoveryText(
-                        "Your answers personalize training advice and muscle recovery. Apple Watch readiness is never rewritten.",
-                        "Svarene kan tilpasse treningsråd og muskelrestitusjon. Dagsform fra Apple Watch endres aldri."),
-                        systemImage: "info.circle")
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        .fixedSize(horizontal: false, vertical: true)
+                        "Responses may adapt training advice and muscle recovery. Apple Watch readiness is not changed.",
+                        "Svarene kan tilpasse treningsråd og muskelrestitusjon. Dagsform fra Apple Watch endres ikke."
+                    ), systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(17)
             }
@@ -3908,7 +3911,44 @@ struct RecoverySorenessLogView: View {
             .onAppear {
                 draft = RecoveryPartialCheckInDraft()
                 showMuscleDetail = false
-                showMotivation = false
+            }
+        }
+    }
+
+    private func sorenessRow(
+        title: String,
+        selected: RecoverySorenessLevel?,
+        onSelect: @escaping (RecoverySorenessLevel?) -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+
+            HStack(spacing: 6) {
+                ForEach(RecoverySorenessLevel.allCases) { level in
+                    Button {
+                        onSelect(selected == level ? nil : level)
+                    } label: {
+                        Text(level.title)
+                            .font(.system(size: 11, weight: .semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+                            .foregroundStyle(
+                                selected == level ? .white : ATHLTHPlanDesign.ink
+                            )
+                            .frame(maxWidth: .infinity, minHeight: 40)
+                            .background(
+                                selected == level
+                                    ? ATHLTHPlanDesign.accentInk
+                                    : ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 11)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(title), \(level.title)")
+                    .accessibilityAddTraits(selected == level ? [.isSelected] : [])
+                }
             }
         }
     }
@@ -3917,44 +3957,45 @@ struct RecoverySorenessLogView: View {
         title: String, hint: String, symbol: String,
         value: Int?, onSelect: @escaping (Int?) -> Void
     ) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Image(systemName: symbol)
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
                 Text(title)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHPlanDesign.ink)
-                Spacer()
+                Spacer(minLength: 3)
                 Text(hint)
                     .font(.caption2)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
-            HStack(spacing: 8) {
+
+            HStack(spacing: 7) {
                 ForEach(1...5, id: \.self) { score in
                     Button {
-                        // Tapping the selected answer again clears it.
                         onSelect(value == score ? nil : score)
                     } label: {
                         Text("\(score)")
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(value == score
-                                ? .white : ATHLTHPlanDesign.ink)
+                            .foregroundStyle(value == score ? .white : ATHLTHPlanDesign.ink)
                             .frame(maxWidth: .infinity, minHeight: 42)
-                            .background(value == score
-                                ? ATHLTHPlanDesign.accentInk
-                                : ATHLTHPlanDesign.selectedSurface,
-                                in: RoundedRectangle(cornerRadius: 12))
+                            .background(
+                                value == score
+                                    ? ATHLTHPlanDesign.accentInk
+                                    : ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 12)
+                            )
                             .overlay {
                                 RoundedRectangle(cornerRadius: 12)
                                     .strokeBorder(
-                                        value == score
-                                            ? Color.clear
-                                            : ATHLTHPlanDesign.outline,
-                                        lineWidth: 0.7)
+                                        value == score ? Color.clear : ATHLTHPlanDesign.outline,
+                                        lineWidth: 0.7
+                                    )
                             }
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("\(title), \(score) av 5")
+                    .accessibilityAddTraits(value == score ? [.isSelected] : [])
                 }
             }
         }
