@@ -3,7 +3,7 @@ import SwiftUI
 /// ATHLTH's unified metal award language.
 /// Bronze, silver and gold are material tiers, not category colours.
 /// Prestige awards use a separate sculpted gold cup.
-enum ATHLTHMedalMetal: CaseIterable, Equatable {
+enum ATHLTHMedalMetal: CaseIterable, Hashable {
     case bronze
     case silver
     case gold
