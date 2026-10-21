@@ -274,22 +274,39 @@ enum ATHLTHDailyWorkoutAlternativeAdvisor {
             proposed.durationMinutes = nil
             proposed.targetDistanceKilometers = suggestion.distanceKilometers
             proposed.workoutCategory = "running"
-            // Explicit low-intensity target: don't carry interval intensity
-            // from the longer session into the replacement.
+            // Use the existing iPhone/Watch running-template pipeline,
+            // NOT workoutBlocks: the latter would launch the phone-only
+            // structured-session view instead of the normal Watch run flow.
+            // The original interval targets, route and ghost are not carried
+            // into this low-intensity substitute.
             if let distance = suggestion.distanceKilometers {
-                var easyBlock = WorkoutTemplateBlock(
-                    sequence: 1, kind: .run,
-                    title: ATHLTHLocalization.choose(
-                        english: "Easy running · zone 2",
-                        norwegian: "Rolig løping · sone 2"),
-                    exerciseSlug: nil, distanceMeters: distance * 1_000,
-                    repetitions: nil, durationSeconds: nil,
-                    targetWeightKilograms: nil, loadNote: nil,
-                    notes: nil, phase: .main,
-                    targetHeartRateZone: 2
+                let easyName = ATHLTHLocalization.choose(
+                    english: "Easy running · zone 2",
+                    norwegian: "Rolig løping · sone 2")
+                let zoneTwo = RunningIntensityTarget(
+                    kind: .heartRateZone,
+                    paceMinSecondsPerKilometer: nil,
+                    paceMaxSecondsPerKilometer: nil,
+                    heartRateZone: 2,
+                    rpe: nil
                 )
-                easyBlock.cardioActivity = .running
-                proposed.workoutBlocks = [easyBlock]
+                var template = RunningWorkoutTemplate(
+                    id: UUID(), title: easyName, type: .recovery,
+                    summary: ATHLTHLocalization.choose(
+                        english: "Reduced easy run in heart-rate zone 2",
+                        norwegian: "Kortere, rolig løp i pulssone 2"),
+                    blocks: [RunningWorkoutBlock(
+                        kind: .steady, title: easyName,
+                        work: .distance(distance * 1_000, intensity: zoneTwo)
+                    )],
+                    routeID: nil, isBuiltIn: false,
+                    createdAt: Date(), updatedAt: Date()
+                )
+                template.coachBrief = ATHLTHLocalization.choose(
+                    english: "Keep an easy conversational effort in zone 2.",
+                    norwegian: "Hold en rolig pratetempo-intensitet i pulssone 2."
+                )
+                proposed.runningWorkout = template
             }
         case .lighterStrength:
             proposed.kind = .strength
