@@ -128,6 +128,40 @@ struct ATHLTHWorkoutReplayCard: View {
             if showingMoments {
                 Divider()
                     .padding(.top, 12)
+                if isStrength,
+                   let performed = workout.strengthPerformedExerciseSummaries,
+                   !performed.isEmpty {
+                    VStack(alignment: .leading, spacing: 9) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Exercises performed",
+                            norwegian: "Gjennomførte øvelser"
+                        ))
+                        .font(.headline)
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        ForEach(Array(performed.enumerated()), id: \.offset) { index, detail in
+                            HStack(alignment: .top, spacing: 10) {
+                                Text("\(index + 1)")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                    .frame(width: 23, height: 23)
+                                    .background(
+                                        ATHLTHPlanDesign.selectedSurface,
+                                        in: Circle()
+                                    )
+                                Text(detail)
+                                    .font(.subheadline)
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(
+                        ATHLTHPlanDesign.warmSurface,
+                        in: RoundedRectangle(cornerRadius: 14)
+                    )
+                }
                 VStack(spacing: 0) {
                     ForEach(Array(replayMoments.enumerated()), id: \.offset) { index, moment in
                         HStack(alignment: .top, spacing: 11) {
