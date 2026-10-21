@@ -1397,6 +1397,31 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
     let strengthTotalReps: Int?
     let source: String
     var plannedTrainingPlaceName: String? = nil
+    var strengthPerformedExerciseSummaries: [String]? = nil
+
+    /// The same completed-set breakdown is used in Replay whether the
+    /// workout came from the local strength journal or a linked Health entry.
+    static func performedStrengthExerciseSummaries(
+        _ workout: StrengthWorkoutLog
+    ) -> [String] {
+        workout.exercises.compactMap { item in
+            let sets = item.sets.filter(\.isCompleted)
+            guard !sets.isEmpty else { return nil }
+            let durations = sets.compactMap(\.resolvedCompletedDurationSeconds)
+                .reduce(0, +)
+            let prefix = "\(item.exercise.displayName) · \(sets.count) sett"
+            if durations > 0 {
+                let minutes = durations / 60
+                let seconds = durations % 60
+                return prefix + String(format: " · %d:%02d", minutes, seconds)
+            }
+            if let weight = sets.compactMap(\.completedWeightKilograms).max(),
+               weight > 0 {
+                return prefix + String(format: " · opptil %.1f kg", weight)
+            }
+            return prefix
+        }
+    }
 
     init(summary: WorkoutSummary) {
         id = summary.id
@@ -1417,6 +1442,8 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
     }
 
     init(strengthWorkout: StrengthWorkoutLog) {
+        strengthPerformedExerciseSummaries =
+            Self.performedStrengthExerciseSummaries(strengthWorkout)
         plannedTrainingPlaceName = strengthWorkout.plannedTrainingPlace?.name
         id = strengthWorkout.healthMetrics.healthKitWorkoutUUID ?? strengthWorkout.id
         title = strengthWorkout.title
