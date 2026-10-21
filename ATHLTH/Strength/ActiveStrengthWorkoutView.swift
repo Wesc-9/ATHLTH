@@ -11041,7 +11041,6 @@ private struct StrengthActiveExerciseQueueView: View {
                                                 if let weight = set.plannedWeightKilograms {
                                                     Text(String(format: "· %.1f kg", weight))
                                                 }
-                                            }
                                                 if !set.isCompleted {
                                                     Image(systemName: "arrow.right.circle.fill")
                                                         .foregroundStyle(ATHLTHPlanDesign.accentInk)
