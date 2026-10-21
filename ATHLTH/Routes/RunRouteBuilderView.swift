@@ -1707,12 +1707,9 @@ final class RunRouteLocationSearchModel:
         _ completer: MKLocalSearchCompleter,
         didFailWithError error: Error
     ) {
-        Task { @MainActor [weak self] in
-            // A transient MapKit lookup failure should not erase the last
-            // useful results while the user is still choosing an address.
-            self?.distanceTask?.cancel()
-            self?.distanceRefreshKeys = []
-        }
+        // Preserve the last valid suggestions and the independent distance
+        // lookups when MapKit temporarily fails or keyboard focus changes.
+        // The next nonempty completion batch can refresh them.
     }
 
     func clear() {
