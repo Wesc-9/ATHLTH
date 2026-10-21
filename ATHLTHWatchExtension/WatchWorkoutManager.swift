@@ -6840,6 +6840,16 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 strengthSession?.draftWeightKilograms,
             strengthRestEndsAt:
                 strengthSession?.restEndsAt,
+            strengthNextExerciseName:
+                strengthSession.flatMap { snapshot in
+                    snapshot.exerciseQueue?
+                        .first(where: {
+                            $0.index > snapshot.exerciseIndex &&
+                            $0.isCompleted != true
+                        })?.name
+                },
+            strengthTimedSetTargetSeconds:
+                strengthSession?.draftDurationSeconds,
             strengthTimedSetSecondsAtSnapshot:
                 strengthSession?.timedSetCountdown?.remaining(at: now),
             strengthTimedSetResumedAt:
