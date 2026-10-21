@@ -646,7 +646,7 @@ struct RouteLibraryListView: View {
 
     private func authorLabel(for entry: RouteLibraryEntry) -> String {
         if let friend = social.mutualFollows.first(where: { $0.userID == entry.ownerID }) {
-            return friend.displayName
+            return friend.resolvedName
         }
         return tr("Public", "Offentlig")
     }
