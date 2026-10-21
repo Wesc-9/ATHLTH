@@ -1062,6 +1062,140 @@ private struct PlannedQuickStartContextCard: View {
     }
 }
 
+/// Compact execution preview for the workout actually selected for a
+/// Quick Run (or a planned workout launched directly from the calendar).
+/// It does not infer targets or use a different workout as a fallback.
+private struct ATHLTHRunQuickStartPlanPreview: View {
+    let workout: RunningWorkoutTemplate?
+    let plannedSession: PlannedSession?
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
+    var body: some View {
+        if let workout {
+            ATHLTHPlanSurface(density: .compact) {
+                header(title: workout.title)
+                HStack(spacing: 11) {
+                    Label("\(workout.blocks.count) " + tr("phases", "deler"),
+                          systemImage: "list.number")
+                    if let seconds = workout.estimatedDurationSeconds {
+                        Label("~\(Int((seconds / 60).rounded(.up))) min",
+                              systemImage: "clock")
+                    }
+                    if let distance = workout.estimatedDistanceMeters {
+                        Label(String(format: "~%.1f km", distance / 1_000),
+                              systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                    }
+                }
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+                ForEach(Array(workout.blocks.prefix(5))) { block in
+                    HStack(alignment: .top, spacing: 9) {
+                        Image(systemName: block.kind == .work ? "figure.run" : "clock")
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            .frame(width: 19)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(block.title)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Text(blockDescription(block))
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, 5)
+                }
+                if workout.blocks.count > 5 {
+                    Text(tr("Additional phases follow during the run.",
+                            "Flere deler følger under økten."))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+            }
+        } else if let plannedSession {
+            ATHLTHPlanSurface(density: .compact) {
+                header(title: plannedSession.title)
+                HStack(spacing: 12) {
+                    Label("\(plannedSession.durationMinutes ?? 0) min",
+                          systemImage: "clock")
+                    Text(tr("From your training plan", "Fra treningsplanen"))
+                }
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+                let phases = plannedSession.workoutBlocks
+                    .filter { $0.kind != .note }
+                ForEach(Array(phases.prefix(5))) { block in
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: block.kind.systemImage)
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            .frame(width: 20)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(block.title)
+                                .font(.caption.weight(.semibold))
+                            if let target = block.targetText {
+                                Text(target)
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+                        }
+                        Spacer()
+                    }
+                    .padding(.vertical, 5)
+                }
+                if phases.count > 5 {
+                    Text(tr("More exercises in the full session.",
+                            "Flere øvelser i den fullstendige økten."))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+            }
+        }
+    }
+
+    private func header(title: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(tr("YOUR SESSION", "DETTE SKAL DU GJØRE"))
+                .font(.system(size: 10, weight: .bold))
+                .tracking(1.2)
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+        }
+    }
+
+    private func blockDescription(_ block: RunningWorkoutBlock) -> String {
+        let step = block.work
+        let length: String
+        switch step.measure {
+        case .distance:
+            length = "\(Int(step.distanceMeters ?? 0)) m"
+        case .time:
+            length = "\(Int((step.durationSeconds ?? 0) / 60)) min"
+        case .open:
+            length = tr("Open", "Åpent")
+        }
+        var details = [block.repetitions > 1
+                       ? "\(block.repetitions) × \(length)" : length]
+        if let pace = step.intensity.paceMinSecondsPerKilometer, pace > 0 {
+            details.append(String(format: "%.1f km/t", 3_600 / pace))
+        }
+        if let zone = step.intensity.heartRateZone {
+            details.append(tr("HR zone", "Pulssone") + " \(zone)")
+        }
+        if let recovery = block.recovery {
+            let pause = recovery.durationSeconds ?? 0
+            details.append("\(Int(pause)) s " + tr("rest", "pause"))
+        }
+        return details.joined(separator: " · ")
+    }
+}
+
 struct RunQuickStartSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
@@ -1153,6 +1287,9 @@ struct RunQuickStartSheet: View {
                     introCard
                     if let plannedSession {
                         PlannedQuickStartContextCard(workout: plannedSession)
+                        ATHLTHRunQuickStartPlanPreview(
+                            workout: nil, plannedSession: plannedSession
+                        )
                     }
                     modeCard
                     runEnvironmentCard
@@ -2014,6 +2151,9 @@ struct RunQuickStartSheet: View {
                 .padding(.top, 9)
 
                 if let workout = selectedWorkout {
+                    ATHLTHRunQuickStartPlanPreview(
+                        workout: workout, plannedSession: nil
+                    )
                     Label(
                         ATHLTHLocalization.counted(
                                 workout.blocks.count,
