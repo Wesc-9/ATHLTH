@@ -3846,7 +3846,8 @@ struct ActiveStrengthWorkoutView: View {
                     )
                 } else {
                 focusedHeroMetric(
-                    value:
+                    value: currentStrengthLoadKind == .weightKilograms &&
+                            !strength.currentSetRecordsWeight ? "—" :
                         currentStrengthLoadKind ==
                             .resistanceLevel
                             ? "\(strength.draftResistanceLevel)"
@@ -3855,8 +3856,12 @@ struct ActiveStrengthWorkoutView: View {
                                     .draftWeightKilograms
                             ) + " kg",
                     label:
-                        currentStrengthLoadKind ==
-                            .resistanceLevel
+                        currentStrengthLoadKind == .weightKilograms &&
+                            !strength.currentSetRecordsWeight
+                            ? ATHLTHLocalization.choose(
+                                english: "NO WEIGHT", norwegian: "UTEN VEKT"
+                            )
+                            : currentStrengthLoadKind == .resistanceLevel
                             ? ATHLTHLocalization.choose(
                                 english: "RESIST.",
                                 norwegian: "MOTST."
