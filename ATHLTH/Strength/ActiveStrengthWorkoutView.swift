@@ -1723,6 +1723,31 @@ struct ActiveStrengthWorkoutView: View {
                         ))
                         .font(.caption)
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        if !upcoming.exercise.primaryMuscles.isEmpty {
+                            Label(
+                                upcoming.exercise.primaryMuscles.joined(separator: " · "),
+                                systemImage: "figure.strengthtraining.traditional"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        if let rest = upcoming.sets.first?.restSeconds {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Planned rest: \(rest)s",
+                                    norwegian: "Planlagt pause: \(rest)s"
+                                ),
+                                systemImage: "timer"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        if let note = upcoming.exercise.instructions?.first, !note.isEmpty {
+                            Text(note)
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                .lineLimit(3)
+                        }
                         Text(ATHLTHLocalization.choose(
                             english: "You can open the next exercise without marking this one complete.",
                             norwegian: "Du kan åpne neste øvelse uten å fullføre denne."
@@ -5404,8 +5429,8 @@ struct ActiveStrengthWorkoutView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(
                             ATHLTHLocalization.choose(
-                                english: "SET COUNTDOWN",
-                                norwegian: "NEDTELLING FOR SETT"
+                                english: finished ? "TOTAL ELAPSED TIME" : "SET COUNTDOWN",
+                                norwegian: finished ? "TOTAL MEDGÅTT TID" : "NEDTELLING FOR SETT"
                             )
                         )
                         .font(.system(size: 10, weight: .bold, design: .rounded))
@@ -5415,8 +5440,8 @@ struct ActiveStrengthWorkoutView: View {
                         Text(
                             finished
                                 ? ATHLTHLocalization.choose(
-                                    english: "Target reached · time continues",
-                                    norwegian: "Målet nådd · tiden fortsetter"
+                                    english: isRunning ? "Target reached · time continues" : "Target reached · paused",
+                                    norwegian: isRunning ? "Målet nådd · tiden fortsetter" : "Målet nådd · på pause"
                                 )
                                 : isRunning
                                     ? ATHLTHLocalization.choose(
@@ -5449,23 +5474,11 @@ struct ActiveStrengthWorkoutView: View {
                 }
 
                 if finished {
-                    HStack {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Total exercise time",
-                            norwegian: "Total tid på øvelsen"
-                        ))
-                        Spacer()
-                        Text(TimeInterval(elapsed).clockDuration)
-                            .monospacedDigit()
-                            .fontWeight(.semibold)
-                    }
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
                     Text(ATHLTHLocalization.choose(
                         english: "+\(TimeInterval(overtime).clockDuration) beyond planned time",
                         norwegian: "+\(TimeInterval(overtime).clockDuration) over planlagt tid"
                     ))
-                    .font(.caption2.weight(.semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
                 }
                 ProgressView(
