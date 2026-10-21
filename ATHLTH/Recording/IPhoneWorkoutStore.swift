@@ -378,6 +378,8 @@ final class IPhoneWorkoutStore:
         pause()
         treadmillTickTask?.cancel()
         treadmillTickTask = nil
+        structuredTickTask?.cancel()
+        structuredTickTask = nil
         manager.stopUpdatingLocation()
         accountID = userID
         pendingWalking = nil
@@ -821,6 +823,8 @@ final class IPhoneWorkoutStore:
         manager.distanceFilter = 5
         treadmillTickTask?.cancel()
         treadmillTickTask = nil
+        structuredTickTask?.cancel()
+        structuredTickTask = nil
         active = nil
         recoveredWorkoutLastCheckpoint = nil
         showingWorkout = false
@@ -1432,6 +1436,33 @@ final class IPhoneWorkoutStore:
                 recoveryEnd ?? Date(),
                 workout.start
             )
+        // Keep the final in-progress phase in the durable result as a
+        // partial step. A fully completed structured workout already records
+        // its last phase at the transition.
+        if let plan = workout.structuredRunningWorkout,
+           workout.structuredWorkoutComplete != true,
+           let index = workout.structuredStepIndex,
+           plan.steps.indices.contains(index),
+           !(workout.recordedRunningSteps ?? []).contains(where: { $0.index == index }) {
+            let step = plan.steps[index]
+            let endElapsed = workout.elapsed(at: workout.end ?? Date())
+            let seconds = max(0, endElapsed -
+                (workout.structuredStepStartElapsedTime ?? 0))
+            let meters = max(0, workout.distanceMeters -
+                (workout.structuredStepStartDistanceMeters ?? 0))
+            if seconds > 0 {
+                workout.recordedRunningSteps = (workout.recordedRunningSteps ?? []) + [
+                    ATHLTHRecordedRunningStep(
+                        index: index, title: step.title, phase: step.phase,
+                        activeSeconds: seconds, distanceMeters: meters,
+                        isUserReported: workout.runEnvironment == .treadmill,
+                        targetPaceSecondsPerKilometer:
+                            step.targetPaceMinSecondsPerKilometer
+                    )
+                ]
+            }
+        }
+
         let completion =
             routeCompletionSummary(
                 for: workout
