@@ -4,10 +4,9 @@
 A photo is bundled in Assets.xcassets (never the entire conversation mockup).
 The image source below is CC0; no on-device download or account data needed.
 
-Preferred source: https://commons.wikimedia.org/wiki/File:Sunset_at_Lake_Fairway_Athletics_Track.JPG
-License: Creative Commons Attribution 3.0 Unported (CC BY 3.0), Editor5807.
-Credit and crop disclosure: docs/conversation-stadium-artwork.md
-Alternate source: https://pxhere.com/en/photo/1038422 (CC0 Public Domain).
+Source: https://www.pexels.com/photo/stands-by-running-track-at-stadium-19753619/
+License: Free under the Pexels License (https://www.pexels.com/license/).
+Original high-res media is downloaded as a standalone image (no personal data).
 """
 
 from __future__ import annotations
@@ -19,15 +18,13 @@ from urllib.request import Request, urlopen
 from PIL import Image, ImageEnhance, ImageOps, ImageStat, UnidentifiedImageError
 
 SOURCE = (
-    "https://c.pxhere.com/photos/33/7b/"
-    "athletic_field_stadium_playground_sunset-1038422.jpg"
+    "https://images.pexels.com/photos/19753619/"
+    "pexels-photo-19753619.jpeg?auto=compress&cs=tinysrgb&w=3000"
 )
 SOURCES = [
-    # Full 4592 x 3056 photograph, credited under CC BY 3.0.
-    "https://upload.wikimedia.org/wikipedia/commons/c/c8/"
-    "Sunset_at_Lake_Fairway_Athletics_Track.JPG",
-    # Full-size PxHere original (CC0), if its upstream permits access.
     SOURCE,
+    "https://images.pexels.com/photos/28943346/"
+    "pexels-photo-28943346.jpeg?auto=compress&cs=tinysrgb&w=3000",
 ]
 DEST = (
     Path(__file__).resolve().parent.parent /
