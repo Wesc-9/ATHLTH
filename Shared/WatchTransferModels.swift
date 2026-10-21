@@ -1228,6 +1228,9 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
     // that only knew reps + kilograms.
     var draftDurationSeconds: Int? = nil
     var draftResistanceLevel: Int? = nil
+    // Explicit user-entered treadmill settings, never measured Watch speed.
+    var manualTreadmillSpeedKilometersPerHour: Double? = nil
+    var manualTreadmillInclinePercent: Double? = nil
     var targetKindRaw: String? = nil
     var loadKindRaw: String? = nil
     var isResting: Bool
