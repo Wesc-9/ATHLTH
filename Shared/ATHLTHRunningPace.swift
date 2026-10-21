@@ -17,6 +17,26 @@ enum ATHLTHRunningPace {
         return pace.isFinite && pace > 0 ? pace : nil
     }
 
+    /// A treadmill speed entered by the athlete is an estimate, not Watch
+    /// distance or outdoor GPS. Reuse the running unit conversion in Strength.
+    static func manuallyEstimatedTreadmillDistance(
+        speedKilometersPerHour: Double,
+        durationSeconds: TimeInterval
+    ) -> Double? {
+        guard speedKilometersPerHour.isFinite,
+              (0.1...30).contains(speedKilometersPerHour),
+              durationSeconds.isFinite,
+              durationSeconds > 0 else { return nil }
+        return speedKilometersPerHour * durationSeconds / 3.6
+    }
+
+    static func paceForManualTreadmillSpeed(
+        kilometersPerHour: Double
+    ) -> TimeInterval? {
+        guard kilometersPerHour.isFinite, kilometersPerHour > 0 else { return nil }
+        return 3_600 / kilometersPerHour
+    }
+
     /// GPS speed is valid for outdoor workouts only. Indoor pace must use
     /// Watch distance, or a deliberately entered treadmill measurement.
     static func outdoorGPS(
