@@ -1678,10 +1678,75 @@ struct TrainingPlanLibraryView: View {
                                 .stroke(ATHLTHPlanDesign.warmDivider, lineWidth: 1)
                         }
                     }
-                    Spacer()
-                    if selectedMuscle != nil {
+                    Menu {
+                        Button {
+                            sessionsPerWeekFilter = nil
+                        } label: {
+                            if sessionsPerWeekFilter == nil {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "All weekly frequencies",
+                                        norwegian: "Alle antall økter"
+                                    ), systemImage: "checkmark"
+                                )
+                            } else {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "All weekly frequencies",
+                                    norwegian: "Alle antall økter"
+                                ))
+                            }
+                        }
+                        Divider()
+                        ForEach(sessionsPerWeekOptions, id: \.self) { count in
+                            Button {
+                                sessionsPerWeekFilter = count
+                            } label: {
+                                if sessionsPerWeekFilter == count {
+                                    Label(
+                                        ATHLTHLocalization.format(
+                                            english: "%d sessions/week",
+                                            norwegian: "%d økter/uke", count
+                                        ), systemImage: "checkmark"
+                                    )
+                                } else {
+                                    Text(ATHLTHLocalization.format(
+                                        english: "%d sessions/week",
+                                        norwegian: "%d økter/uke", count
+                                    ))
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 7) {
+                            Image(systemName: "calendar")
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            Text(sessionsPerWeekFilter.map {
+                                ATHLTHLocalization.format(
+                                    english: "%d/week", norwegian: "%d/uke", $0
+                                )
+                            } ?? ATHLTHLocalization.choose(
+                                english: "Per week", norwegian: "Per uke"
+                            ))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Image(systemName: "chevron.down")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 42)
+                        .background(ATHLTHPlanDesign.selectedSurface,
+                                    in: RoundedRectangle(cornerRadius: 13))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 13)
+                                .stroke(ATHLTHPlanDesign.warmDivider, lineWidth: 1)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                    if selectedMuscle != nil || sessionsPerWeekFilter != nil {
                         Button {
                             selectedMuscle = nil
+                            sessionsPerWeekFilter = nil
                         } label: {
                             Text(ATHLTHLocalization.choose(
                                 english: "Clear", norwegian: "Nullstill"
