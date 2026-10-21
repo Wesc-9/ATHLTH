@@ -648,15 +648,22 @@ enum StrengthCardioExercisePolicy {
         // "Dumbbell Rowing" and "Seated Cable Row" remain strength.
         // Broad substring "rowing" previously misclassified them and
         // excluded real lifting volume / personal records.
+        let resistanceRow = [
+            "cable", "seated", "bench", "chest supported", "dumbbell",
+            "barbell", "landmine", "low row", "single arm", "one arm"
+        ].contains(where: value.contains)
+        // A seated cable/weight-stack "row machine" is resistance training,
+        // whereas an ergometer is cardio. Generic "rowing" alone is only
+        // cardio when it is the whole exercise label.
+        if resistanceRow { return false }
         return StrengthTreadmillWarmUpDefaults.isTreadmill(value) ||
             value == "rowing" || value == "roing" ||
-            value.contains("rowing machine") || value.contains("row machine") ||
+            value == "rower" || value == "row machine" ||
+            value.hasPrefix("rowing machine") ||
             value.contains("rowing erg") || value.contains("row erg") ||
             value.contains("rowerg") || value.contains("romaskin") ||
-            value.contains("roapparat") ||
-            value.contains("rowing cardio") ||
-            value == "rower" || value.contains("concept2") ||
-            value.contains("concept 2")
+            value.contains("roapparat") || value.contains("rowing cardio") ||
+            value.contains("concept2") || value.contains("concept 2")
     }
 }
 
