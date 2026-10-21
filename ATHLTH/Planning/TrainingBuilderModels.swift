@@ -632,6 +632,7 @@ enum StrengthTreadmillWarmUpDefaults {
             locale: Locale(identifier: "nb_NO")
         ).lowercased()
         return normalized.contains("treadmill") ||
+            normalized.contains("tredemølle") ||
             normalized.contains("tredemolle")
     }
 
