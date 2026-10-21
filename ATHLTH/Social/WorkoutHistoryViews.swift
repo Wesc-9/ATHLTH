@@ -114,9 +114,17 @@ struct WorkoutHistoryPreviewSection: View {
                 var item = SocialPublishableWorkout(summary: summary)
                 // HealthKit's workout ID is linked to our strength log.
                 // Prefer the same athlete-selected venue for both histories.
-                item.plannedTrainingPlaceName = strength.workoutHistory.first {
+                let linkedStrength = strength.workoutHistory.first {
                     $0.healthMetrics.healthKitWorkoutUUID == summary.id
-                }?.plannedTrainingPlace?.name
+                }
+                item.plannedTrainingPlaceName =
+                    linkedStrength?.plannedTrainingPlace?.name
+                if let linkedStrength {
+                    item.strengthPerformedExerciseSummaries =
+                        SocialPublishableWorkout.performedStrengthExerciseSummaries(
+                            linkedStrength
+                        )
+                }
                 return item
             }
         } else {
@@ -241,9 +249,17 @@ struct WorkoutHistoryView: View {
                 var item = SocialPublishableWorkout(summary: summary)
                 // HealthKit's workout ID is linked to our strength log.
                 // Prefer the same athlete-selected venue for both histories.
-                item.plannedTrainingPlaceName = strength.workoutHistory.first {
+                let linkedStrength = strength.workoutHistory.first {
                     $0.healthMetrics.healthKitWorkoutUUID == summary.id
-                }?.plannedTrainingPlace?.name
+                }
+                item.plannedTrainingPlaceName =
+                    linkedStrength?.plannedTrainingPlace?.name
+                if let linkedStrength {
+                    item.strengthPerformedExerciseSummaries =
+                        SocialPublishableWorkout.performedStrengthExerciseSummaries(
+                            linkedStrength
+                        )
+                }
                 return item
             }
         } else {
