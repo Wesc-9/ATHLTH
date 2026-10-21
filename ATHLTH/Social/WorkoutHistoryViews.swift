@@ -111,21 +111,15 @@ struct WorkoutHistoryPreviewSection: View {
         if health.hasRequestedAuthorization,
            let summaries = try? await health.workoutHistory() {
             healthItems = summaries.map { summary in
-                var item = SocialPublishableWorkout(summary: summary)
-                // HealthKit's workout ID is linked to our strength log.
-                // Prefer the same athlete-selected venue for both histories.
-                let linkedStrength = strength.workoutHistory.first {
+                // The same single Watch workout owns the linked strength log,
+                // including timed cardio sets and their measurement provenance.
+                // Never show it a second time as an independent running entry.
+                if let linkedStrength = strength.workoutHistory.first(where: {
                     $0.healthMetrics.healthKitWorkoutUUID == summary.id
+                }) {
+                    return SocialPublishableWorkout(strengthWorkout: linkedStrength)
                 }
-                item.plannedTrainingPlaceName =
-                    linkedStrength?.plannedTrainingPlace?.name
-                if let linkedStrength {
-                    item.strengthPerformedExerciseSummaries =
-                        SocialPublishableWorkout.performedStrengthExerciseSummaries(
-                            linkedStrength
-                        )
-                }
-                return item
+                return SocialPublishableWorkout(summary: summary)
             }
         } else {
             healthItems = []
@@ -246,21 +240,15 @@ struct WorkoutHistoryView: View {
         if health.hasRequestedAuthorization,
            let summaries = try? await health.workoutHistory() {
             healthItems = summaries.map { summary in
-                var item = SocialPublishableWorkout(summary: summary)
-                // HealthKit's workout ID is linked to our strength log.
-                // Prefer the same athlete-selected venue for both histories.
-                let linkedStrength = strength.workoutHistory.first {
+                // The same single Watch workout owns the linked strength log,
+                // including timed cardio sets and their measurement provenance.
+                // Never show it a second time as an independent running entry.
+                if let linkedStrength = strength.workoutHistory.first(where: {
                     $0.healthMetrics.healthKitWorkoutUUID == summary.id
+                }) {
+                    return SocialPublishableWorkout(strengthWorkout: linkedStrength)
                 }
-                item.plannedTrainingPlaceName =
-                    linkedStrength?.plannedTrainingPlace?.name
-                if let linkedStrength {
-                    item.strengthPerformedExerciseSummaries =
-                        SocialPublishableWorkout.performedStrengthExerciseSummaries(
-                            linkedStrength
-                        )
-                }
-                return item
+                return SocialPublishableWorkout(summary: summary)
             }
         } else {
             healthItems = []
