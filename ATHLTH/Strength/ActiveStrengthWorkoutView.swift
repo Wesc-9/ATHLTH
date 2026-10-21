@@ -7997,28 +7997,32 @@ private struct FreestyleExercisePrescriptionView: View {
         self.entry = entry
         self.onAdd = onAdd
 
-        let snapshot =
-            entry.exercise.snapshot
-        let initialTarget =
-            snapshot.defaultStrengthTargetKind
-        let initialLoad =
-            snapshot.defaultStrengthLoadKind
+        let snapshot = entry.exercise.snapshot
+        let isTreadmill =
+            StrengthTreadmillWarmUpDefaults.isTreadmill(snapshot.name) ||
+            StrengthTreadmillWarmUpDefaults.isTreadmill(snapshot.displayName)
+        let initialTarget: StrengthExerciseTargetKind =
+            isTreadmill ? .time : snapshot.defaultStrengthTargetKind
+        let initialLoad = snapshot.defaultStrengthLoadKind
 
-        _targetKind = State(
-            initialValue: initialTarget
+        // Each newly added treadmill warm-up has an editable prescription.
+        // Start at 1 × 10 minutes, not three five-minute sets.
+        _sets = State(
+            initialValue: isTreadmill
+                ? StrengthTreadmillWarmUpDefaults.sets : 3
         )
+        _warmUpSets = State(initialValue: isTreadmill ? 1 : 0)
+        _targetKind = State(initialValue: initialTarget)
         _durationSeconds = State(
-            initialValue:
-                snapshot
-                    .defaultStrengthTargetDurationSeconds
+            initialValue: isTreadmill
+                ? StrengthTreadmillWarmUpDefaults.durationSeconds
+                : snapshot.defaultStrengthTargetDurationSeconds
         )
-        _loadKind = State(
-            initialValue: initialLoad
-        )
+        _loadKind = State(initialValue: initialLoad)
         _useLoadTarget = State(
-            initialValue:
-                initialLoad == .resistanceLevel
+            initialValue: isTreadmill ? false : initialLoad == .resistanceLevel
         )
+        _restSeconds = State(initialValue: isTreadmill ? 0 : 90)
     }
 
     var body: some View {
