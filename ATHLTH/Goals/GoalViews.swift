@@ -1485,29 +1485,13 @@ struct GoalCreationView: View {
     @State private var newMilestoneTitle = ""
     @State private var newMilestoneDetail = ""
 
-    private var goalFlowBlue: Color {
-        Color(
-            red: 0.16,
-            green: 0.55,
-            blue: 0.98
-        )
-    }
+    // Share the same warm-gold palette as Training Plan instead of
+    // introducing a separate blue onboarding accent.
+    private var goalFlowGold: Color { ATHLTHPlanDesign.accent }
 
-    private var goalFlowBlueSoft: Color {
-        Color(
-            red: 0.92,
-            green: 0.965,
-            blue: 1.0
-        )
-    }
+    private var goalFlowGoldSoft: Color { ATHLTHPlanDesign.selectedSurface }
 
-    private var goalFlowCanvas: Color {
-        Color(
-            red: 0.965,
-            green: 0.970,
-            blue: 0.985
-        )
-    }
+    private var goalFlowCanvas: Color { ATHLTHPlanDesign.canvas }
 
     var body: some View {
         NavigationStack {
@@ -1560,7 +1544,7 @@ struct GoalCreationView: View {
 
     private var goalTypeScreen: some View {
         ZStack(alignment: .top) {
-            goalStaticHeroBackdrop(height: 326)
+            goalStaticHeroBackdrop(height: 252)
 
             ZStack(alignment: .bottom) {
                 ScrollView {
@@ -1570,8 +1554,8 @@ struct GoalCreationView: View {
                         VStack(spacing: 0) {
                             categoryStep
                                 .padding(.horizontal, 16)
-                                .padding(.top, 22)
-                                .padding(.bottom, 122)
+                                .padding(.top, 12)
+                                .padding(.bottom, 90)
                         }
                         .frame(maxWidth: .infinity)
                         .background(
@@ -1584,7 +1568,7 @@ struct GoalCreationView: View {
                                 style: .continuous
                             )
                         )
-                        .offset(y: -28)
+                        .offset(y: -22)
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -1728,8 +1712,8 @@ struct GoalCreationView: View {
                         Capsule()
                             .fill(
                                 index <= step
-                                    ? goalFlowBlue
-                                    : Color(red: 0.86, green: 0.90, blue: 0.96)
+                                    ? goalFlowGold
+                                    : ATHLTHPlanDesign.warmDivider.opacity(0.8)
                             )
                             .frame(maxWidth: .infinity)
                             .frame(height: 4)
@@ -1757,7 +1741,7 @@ struct GoalCreationView: View {
             LinearGradient(
                 colors: [
                     Color.white,
-                    Color(red: 0.953, green: 0.971, blue: 0.997)
+                    ATHLTHPlanDesign.warmSurface
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -1998,7 +1982,7 @@ struct GoalCreationView: View {
                                 )
 
                             Capsule()
-                                .fill(goalFlowBlue)
+                                .fill(goalFlowGold)
                                 .frame(
                                     width:
                                         barProxy.size.width
@@ -2288,7 +2272,7 @@ struct GoalCreationView: View {
                         goalCloseButton(onHero: true)
                     }
 
-                    Spacer(minLength: 22)
+                    Spacer(minLength: 10)
 
                     HStack {
                         Text(
@@ -2325,7 +2309,7 @@ struct GoalCreationView: View {
                                 )
 
                             Capsule()
-                                .fill(goalFlowBlue)
+                                .fill(goalFlowGold)
                                 .frame(
                                     width:
                                         barProxy.size.width
@@ -2333,9 +2317,9 @@ struct GoalCreationView: View {
                                 )
                         }
                     }
-                    .frame(height: 5)
-                    .padding(.top, 9)
-                    .padding(.bottom, 22)
+                    .frame(height: 4)
+                    .padding(.top, 6)
+                    .padding(.bottom, 12)
 
                     Text(
                         ATHLTHLocalization.format(
@@ -2347,7 +2331,7 @@ struct GoalCreationView: View {
                     )
                     .font(
                         .system(
-                            size: 34,
+                            size: 30,
                             weight: .bold,
                             design: .rounded
                         )
@@ -2366,7 +2350,7 @@ struct GoalCreationView: View {
                     )
                     .font(
                         .system(
-                            size: 15,
+                            size: 13.5,
                             weight: .medium
                         )
                     )
@@ -2379,9 +2363,9 @@ struct GoalCreationView: View {
                     )
                     .padding(.top, 6)
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 52)
-                .padding(.bottom, 42)
+                .padding(.horizontal, 22)
+                .padding(.top, 40)
+                .padding(.bottom, 18)
                 .shadow(
                     color: Color.black.opacity(0.24),
                     radius: 10,
@@ -2390,11 +2374,11 @@ struct GoalCreationView: View {
             }
             .frame(
                 width: proxy.size.width,
-                height: 326
+                height: 252
             )
             .clipped()
         }
-        .frame(height: 326)
+        .frame(height: 252)
         .clipped()
     }
 
@@ -2517,7 +2501,7 @@ struct GoalCreationView: View {
                 value: Double(step + 1),
                 total: 5
             )
-            .tint(ATHLTHTheme.accentDeep)
+            .tint(goalFlowGold)
             .scaleEffect(
                 x: 1,
                 y: 0.72,
@@ -2531,7 +2515,7 @@ struct GoalCreationView: View {
     private var categoryStep: some View {
         VStack(
             alignment: .leading,
-            spacing: 12
+            spacing: 8
         ) {
             ForEach(
                 [
@@ -2556,44 +2540,44 @@ struct GoalCreationView: View {
                         category = option
                     }
                 } label: {
-                    HStack(spacing: 14) {
+                    HStack(spacing: 12) {
                         Image(
                             systemName:
                                 option.systemImage
                         )
                         .font(
                             .system(
-                                size: 20,
+                                size: 18,
                                 weight: .semibold
                             )
                         )
                         .foregroundStyle(
                             isSelected
-                                ? .white
+                                ? ATHLTHPlanDesign.ink
                                 : tint
                         )
                         .frame(
-                            width: 50,
-                            height: 50
+                            width: 42,
+                            height: 42
                         )
                         .background(
                             isSelected
-                                ? goalFlowBlue
+                                ? goalFlowGold
                                 : tint.opacity(0.11),
                             in: RoundedRectangle(
-                                cornerRadius: 15,
+                                cornerRadius: 13,
                                 style: .continuous
                             )
                         )
 
                         VStack(
                             alignment: .leading,
-                            spacing: 4
+                            spacing: 2
                         ) {
                             Text(option.title)
                                 .font(
                                     .system(
-                                        size: 17,
+                                        size: 16,
                                         weight: .bold
                                     )
                                 )
@@ -2606,7 +2590,7 @@ struct GoalCreationView: View {
                             Text(option.subtitle)
                                 .font(
                                     .system(
-                                        size: 13.2,
+                                        size: 12.5,
                                         weight: .regular
                                     )
                                 )
@@ -2619,13 +2603,13 @@ struct GoalCreationView: View {
                                 )
                         }
 
-                        Spacer(minLength: 8)
+                        Spacer(minLength: 4)
 
                         ZStack {
                             Circle()
                                 .stroke(
                                     isSelected
-                                        ? goalFlowBlue
+                                        ? goalFlowGold
                                         : Color.black.opacity(0.16),
                                     lineWidth:
                                         isSelected
@@ -2633,18 +2617,18 @@ struct GoalCreationView: View {
                                             : 1.2
                                 )
                                 .frame(
-                                    width: 29,
-                                    height: 29
+                                    width: 26,
+                                    height: 26
                                 )
 
                             if isSelected {
                                 Circle()
                                     .fill(
-                                        goalFlowBlue
+                                        goalFlowGold
                                     )
                                     .frame(
-                                        width: 29,
-                                        height: 29
+                                        width: 26,
+                                        height: 26
                                     )
 
                                 Image(
@@ -2658,21 +2642,21 @@ struct GoalCreationView: View {
                                     )
                                 )
                                 .foregroundStyle(
-                                    .white
+                                    ATHLTHPlanDesign.ink
                                 )
                             }
                         }
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 9)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
                     .frame(
                         maxWidth: .infinity,
-                        minHeight: 70
+                        minHeight: 60
                     )
                     .background(
                         isSelected
-                            ? goalFlowBlueSoft
-                            : Color.white.opacity(0.98),
+                            ? ATHLTHPlanDesign.warmSurface
+                            : ATHLTHPlanDesign.surface,
                         in: RoundedRectangle(
                             cornerRadius: 19,
                             style: .continuous
@@ -2685,11 +2669,11 @@ struct GoalCreationView: View {
                         )
                         .stroke(
                             isSelected
-                                ? goalFlowBlue
-                                : Color.black.opacity(0.055),
+                                ? goalFlowGold.opacity(0.90)
+                                : ATHLTHPlanDesign.warmDivider.opacity(0.60),
                             lineWidth:
                                 isSelected
-                                    ? 1.55
+                                    ? 1.35
                                     : 0.8
                         )
                     }
@@ -2911,13 +2895,9 @@ struct GoalCreationView: View {
     ) -> Color {
         switch category {
         case .event:
-            return Color(
-                red: 0.18,
-                green: 0.39,
-                blue: 0.67
-            )
+            return ATHLTHPlanDesign.accentInk
         case .endurance:
-            return goalFlowBlue
+            return ATHLTHPlanDesign.accentInk
         case .strength:
             return Color(
                 red: 0.13,
@@ -2937,11 +2917,7 @@ struct GoalCreationView: View {
                 blue: 0.74
             )
         case .recovery:
-            return Color(
-                red: 0.24,
-                green: 0.36,
-                blue: 0.68
-            )
+            return ATHLTHPlanDesign.accentInk
         case .custom:
             return Color(
                 red: 0.28,
@@ -3131,7 +3107,7 @@ struct GoalCreationView: View {
                             .padding(.horizontal, 12)
                             .frame(height: 52)
                             .background(
-                                goalFlowBlueSoft.opacity(
+                                goalFlowGoldSoft.opacity(
                                     0.72
                                 ),
                                 in: RoundedRectangle(
@@ -3581,7 +3557,7 @@ struct GoalCreationView: View {
                                             )
                                             .stroke(
                                                 isSelected
-                                                    ? goalFlowBlue
+                                                    ? goalFlowGold
                                                     : Color.black
                                                         .opacity(
                                                             0.06
@@ -4942,30 +4918,21 @@ struct GoalCreationView: View {
                     )
                 )
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(
+                canContinue ? ATHLTHPlanDesign.ink : ATHLTHTheme.mutedText
+            )
             .frame(
                 maxWidth: .infinity,
-                minHeight: 58
+                minHeight: 54
             )
             .background(
                 LinearGradient(
                     colors:
                         canContinue
-                            ? [
-                                Color(
-                                    red: 0.20,
-                                    green: 0.60,
-                                    blue: 1.0
-                                ),
-                                Color(
-                                    red: 0.10,
-                                    green: 0.46,
-                                    blue: 0.95
-                                )
-                            ]
+                            ? [ATHLTHPlanDesign.accent, ATHLTHTheme.champagne]
                             : [
-                                Color.secondary.opacity(0.28),
-                                Color.secondary.opacity(0.28)
+                                Color.secondary.opacity(0.18),
+                                Color.secondary.opacity(0.18)
                             ],
                     startPoint: .leading,
                     endPoint: .trailing
@@ -4978,7 +4945,7 @@ struct GoalCreationView: View {
             .shadow(
                 color:
                     canContinue
-                        ? goalFlowBlue.opacity(0.24)
+                        ? goalFlowGold.opacity(0.24)
                         : Color.clear,
                 radius: 16,
                 y: 6
@@ -4987,10 +4954,10 @@ struct GoalCreationView: View {
         .buttonStyle(.plain)
         .disabled(!canContinue)
         .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 12)
+        .padding(.top, 9)
+        .padding(.bottom, 9)
         .background(
-            Color.white.opacity(0.97)
+            ATHLTHPlanDesign.surface.opacity(0.98)
         )
         .overlay(alignment: .top) {
             Rectangle()
