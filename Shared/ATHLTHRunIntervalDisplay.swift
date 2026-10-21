@@ -1,3 +1,14 @@
+/// Always present structured timed-step countdowns in hours:minutes:seconds.
+/// Ceil keeps a positive remaining fraction from being shown as zero.
+enum ATHLTHRunStepCountdown {
+    static func display(_ seconds: TimeInterval) -> String {
+        let bounded = seconds.isFinite ? max(0, min(seconds, 359_999)) : 0
+        let count = Int(ceil(bounded))
+        return String(format: "%02d:%02d:%02d",
+                      count / 3600, (count / 60) % 60, count % 60)
+    }
+}
+
 import Foundation
 
 /// UI-only run interval metrics. Countdown is derived from the Watch workout
