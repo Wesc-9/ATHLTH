@@ -3706,6 +3706,52 @@ struct RecoverySorenessLogView: View {
                                 symbol: "figure.cooldown",
                                 value: draft.overallSoreness
                             ) { draft.overallSoreness = $0 }
+
+                            Divider().opacity(0.55)
+
+                            VStack(alignment: .leading, spacing: 8) {
+                                Label(recoveryText(
+                                    "Tired or sore feet? (optional)",
+                                    "Slitne eller ømme føtter? (valgfritt)"
+                                ), systemImage: "figure.walk")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                HStack(spacing: 7) {
+                                    ForEach(RecoverySorenessLevel.allCases) { level in
+                                        Button {
+                                            if draft.muscles["Feet"] == level {
+                                                draft.muscles.removeValue(forKey: "Feet")
+                                            } else {
+                                                draft.muscles["Feet"] = level
+                                            }
+                                        } label: {
+                                            Text(level.title)
+                                                .font(.caption2.weight(.semibold))
+                                                .lineLimit(1)
+                                                .minimumScaleFactor(0.7)
+                                                .foregroundStyle(
+                                                    draft.muscles["Feet"] == level
+                                                        ? .white
+                                                        : ATHLTHPlanDesign.ink
+                                                )
+                                                .frame(maxWidth: .infinity, minHeight: 37)
+                                                .background(
+                                                    draft.muscles["Feet"] == level
+                                                        ? ATHLTHPlanDesign.accentInk
+                                                        : ATHLTHPlanDesign.selectedSurface,
+                                                    in: RoundedRectangle(cornerRadius: 11)
+                                                )
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                                Text(recoveryText(
+                                    "Used to suggest lower-impact alternatives to running.",
+                                    "Brukes for å foreslå mer skånsomme alternativer til løping."
+                                ))
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
                         }
                     }
 
@@ -3740,8 +3786,9 @@ struct RecoverySorenessLogView: View {
                             .buttonStyle(.plain)
 
                             if showMuscleDetail {
-                                ForEach(RecoverySorenessStore.muscleGroups,
-                                        id: \.self) { muscle in
+                                ForEach(RecoverySorenessStore.muscleGroups.filter {
+                                            $0 != "Feet"
+                                        }, id: \.self) { muscle in
                                     VStack(alignment: .leading, spacing: 7) {
                                         Text(muscle)
                                             .font(.caption.weight(.semibold))
