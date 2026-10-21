@@ -1227,17 +1227,9 @@ struct RunQuickStartSheet: View {
                 }
                 .padding()
             }
-            .background(
-                LinearGradient(
-                    colors: [
-                        ATHLTHTheme.canvasTop,
-                        ATHLTHTheme.canvasBottom
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-            )
+            // Use the exact canvas from Training Plan, not the legacy
+            // Quick Train gradient.
+            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
             .safeAreaInset(
                 edge: .bottom,
                 spacing: 0
@@ -1426,16 +1418,20 @@ struct RunQuickStartSheet: View {
     }
 
     private var introCard: some View {
-        QuickTrainingHeroCard(
-            imageName: "GoalRunning",
-            title:
-                ATHLTHLocalization.choose(
-                    english: "Start Run",
-                    norwegian: "Start løpeøkt"
-                ),
-            subtitle: nil,
-            icon: "figure.run",
-            height: 172
+        // Reuse the same editorial intro component as the Training Plan
+        // builder instead of maintaining a separate photo-card treatment.
+        ATHLTHPlanSectionIntro(
+            eyebrow: ATHLTHLocalization.choose(
+                english: "QUICK TRAIN", norwegian: "HURTIGTRENING"
+            ),
+            title: ATHLTHLocalization.choose(
+                english: "Start run", norwegian: "Start løpeøkt"
+            ),
+            subtitle: ATHLTHLocalization.choose(
+                english: "Choose the workout and where to run. Then start on iPhone or Apple Watch.",
+                norwegian: "Velg løpetype og hvor du vil løpe. Start deretter med iPhone eller Apple Watch."
+            ),
+            icon: "figure.run"
         )
     }
 
@@ -1470,7 +1466,9 @@ struct RunQuickStartSheet: View {
                             english: "Advanced",
                             norwegian: "Avansert"
                         )
-                        : "Basic"
+                        : ATHLTHLocalization.choose(
+                            english: "Basic", norwegian: "Enkel"
+                        )
                 )
                 .font(
                     .caption
@@ -1478,28 +1476,19 @@ struct RunQuickStartSheet: View {
                 )
             }
             .foregroundStyle(
-                isAdvancedSetup
-                    ? Color.white
-                    : ATHLTHTheme.primaryText
+                isAdvancedSetup ? Color.white : ATHLTHPlanDesign.ink
             )
             .padding(.horizontal, 11)
-            .frame(height: 34)
+            .frame(minHeight: 36)
             .background(
                 isAdvancedSetup
-                    ? ATHLTHTheme.vitality
-                    : Color.primary.opacity(
-                        0.055
-                    ),
+                    ? ATHLTHTheme.accentDeep
+                    : ATHLTHPlanDesign.selectedSurface,
                 in: Capsule()
             )
             .overlay {
                 Capsule()
-                    .stroke(
-                        Color.black.opacity(
-                            0.045
-                        ),
-                        lineWidth: 0.7
-                    )
+                    .stroke(ATHLTHPlanDesign.outline, lineWidth: 0.8)
             }
         }
         .buttonStyle(.plain)
@@ -1548,64 +1537,25 @@ struct RunQuickStartSheet: View {
     }
 
     private var runEnvironmentCard: some View {
-        ATHLTHPlanSurface(density: .compact) {
-            ATHLTHSectionHeader(
-                title:
-                    ATHLTHLocalization.choose(
-                        english: "Where are you running?",
-                        norwegian: "Hvor løper du?"
-                    ),
-                actionTitle: nil
-            )
+        VStack(alignment: .leading, spacing: 12) {
+            Text(ATHLTHLocalization.choose(
+                english: "Where are you running?", norwegian: "Hvor løper du?"
+            ))
+            .font(.headline)
+            .foregroundStyle(ATHLTHPlanDesign.ink)
 
-            HStack(spacing: 10) {
-                ForEach(RunEnvironment.allCases) { option in
-                    Button {
-                        environment = option
-                    } label: {
-                        VStack(spacing: 8) {
-                            Image(systemName: option.systemImage)
-                                .font(
-                                    .system(
-                                        size: 22,
-                                        weight: .semibold
-                                    )
-                                )
-
-                            Text(option.title)
-                                .font(
-                                    .subheadline
-                                        .weight(.semibold)
-                                )
-
-                            Text(option.subtitle)
-                                .font(.caption2)
-                                .multilineTextAlignment(.center)
-                                .lineLimit(2)
-                        }
-                        .foregroundStyle(
-                            environment == option
-                                ? Color.white
-                                : ATHLTHTheme.primaryText
-                        )
-                        .frame(
-                            maxWidth: .infinity,
-                            minHeight: 112
-                        )
-                        .background(
-                            environment == option
-                                ? ATHLTHTheme.accentDeep
-                                : Color.primary.opacity(0.025),
-                            in: RoundedRectangle(
-                                cornerRadius: 18,
-                                style: .continuous
-                            )
-                        )
-                    }
-                    .buttonStyle(.plain)
+            // The Training Plan selection cards are shared verbatim.
+            ForEach(RunEnvironment.allCases) { option in
+                ATHLTHPlanSelectionCard(
+                    title: option.title,
+                    subtitle: option.subtitle,
+                    symbol: option.systemImage,
+                    selected: environment == option,
+                    accent: ATHLTHPlanDesign.accentInk
+                ) {
+                    environment = option
                 }
             }
-            .padding(.top, 10)
 
             if environment == .treadmill,
                let prior = phoneWorkout.lastTreadmillSpeedReference {
@@ -1623,94 +1573,48 @@ struct RunQuickStartSheet: View {
                             norwegian: "Kun historikk. Registrer faktisk møllehastighet under økten."
                         ))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     }
                 }
-                .foregroundStyle(ATHLTHTheme.accentDeep)
-                .padding(.top, 10)
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .padding(14)
+                .athlthPlanCard(radius: 18)
             }
-
         }
     }
 
     private var modeCard: some View {
-        ATHLTHPlanSurface(density: .compact) {
-            ATHLTHSectionHeader(
-                title: ATHLTHLocalization.choose(
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(ATHLTHLocalization.choose(
                     english: "Run type", norwegian: "Løpetype"
-                ),
-                actionTitle: ATHLTHLocalization.choose(
+                ))
+                .font(.headline)
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                Spacer()
+                Text(ATHLTHLocalization.choose(
                     english: "Choose one", norwegian: "Velg én"
-                )
-            )
-
-            VStack(spacing: 8) {
-                ForEach(RunQuickStartMode.allCases) { option in
-                    let disabled =
-                        environment == .treadmill &&
-                        option == .route
-
-                    Button {
-                        guard !disabled else { return }
-                        mode = option
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: option.icon)
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(
-                                    mode == option
-                                        ? Color.white
-                                        : ATHLTHTheme.accent
-                                )
-                                .frame(width: 40, height: 40)
-                                .background(
-                                    mode == option
-                                        ? ATHLTHTheme.accent
-                                        : ATHLTHTheme.accentSoft,
-                                    in: RoundedRectangle(cornerRadius: 12)
-                                )
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(option.title)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(
-                                        ATHLTHTheme.primaryText
-                                    )
-
-                                Text(option.subtitle)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .multilineTextAlignment(.leading)
-                            }
-
-                            Spacer()
-
-                            Image(
-                                systemName:
-                                    mode == option
-                                        ? "checkmark.circle.fill"
-                                        : "circle"
-                            )
-                            .foregroundStyle(
-                                mode == option
-                                    ? ATHLTHTheme.accent
-                                    : Color.secondary
-                            )
-                        }
-                        .padding(10)
-                        .background(
-                            mode == option
-                                ? ATHLTHTheme.accentSoft.opacity(0.55)
-                                : Color.primary.opacity(0.02),
-                            in: RoundedRectangle(cornerRadius: 15)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(disabled)
-                    .opacity(disabled ? 0.48 : 1)
-                }
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
-            .padding(.top, 10)
+
+            ForEach(RunQuickStartMode.allCases) { option in
+                let unavailable = environment == .treadmill && option == .route
+
+                ATHLTHPlanSelectionCard(
+                    title: option.title,
+                    subtitle: option.subtitle,
+                    symbol: option.icon,
+                    selected: mode == option,
+                    accent: ATHLTHPlanDesign.accentInk
+                ) {
+                    guard !unavailable else { return }
+                    mode = option
+                }
+                .disabled(unavailable)
+                .opacity(unavailable ? 0.48 : 1)
+            }
         }
     }
 
