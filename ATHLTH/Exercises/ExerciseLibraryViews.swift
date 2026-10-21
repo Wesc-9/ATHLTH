@@ -1379,14 +1379,14 @@ struct ExerciseDetailView: View {
 
                 if !currentEntry.exercise.primaryMuscles.isEmpty ||
                     !currentEntry.exercise.secondaryMuscles.isEmpty {
-                    detailCard(ATHLTHLocalization.choose(
-                        english: "Muscles used", norwegian: "Muskler i bruk"
-                    )) {
-                        ExerciseMuscleOverview(
-                            primaryMuscles: currentEntry.exercise.primaryMuscles,
-                            secondaryMuscles: currentEntry.exercise.secondaryMuscles
-                        )
-                    }
+                    // The anatomy diagram is now the gallery's third image;
+                    // keep the muscle names as lightweight, accessible details.
+                    ExerciseMuscleOverview(
+                        primaryMuscles: currentEntry.exercise.primaryMuscles,
+                        secondaryMuscles: currentEntry.exercise.secondaryMuscles,
+                        showsAnatomy: false
+                    )
+                    .padding(.horizontal, 4)
                 }
 
                 if ATHLTHLocalization.isNorwegian,
@@ -1626,74 +1626,99 @@ struct ExerciseDetailView: View {
     }
 
     private var artwork: some View {
-        HStack(spacing: 10) {
-            ExerciseArtwork(entry: currentEntry, size: 160)
+        let hasMuscleArtwork = !currentEntry.exercise.primaryMuscles.isEmpty ||
+            !currentEntry.exercise.secondaryMuscles.isEmpty
 
-            if let peakURL = currentEntry.imagePeakURL,
-               peakURL != currentEntry.imageStartURL {
-                Group {
-                    if peakURL.isFileURL,
-                       let image = UIImage(contentsOfFile: peakURL.path) {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFit()
-                    } else {
-                        ATHLTHStorageImage(url: peakURL) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .scaledToFit()
-                            default:
-                                Color(.secondarySystemGroupedBackground)
-                            }
-                        }
+        return VStack(spacing: 7) {
+            // Preserve the first two 160-point exercise images. The atlas is
+            // a third equally sized, swipeable tile rather than shrinking all
+            // three into unreadable thumbnails on smaller iPhones.
+            ScrollView(.horizontal) {
+                HStack(spacing: 10) {
+                    ExerciseArtwork(entry: currentEntry, size: 160)
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Exercise starting position",
+                            norwegian: "Øvelsens startposisjon"
+                        ))
+
+                    if let peakURL = currentEntry.imagePeakURL,
+                       peakURL != currentEntry.imageStartURL {
+                        peakExerciseArtwork(peakURL)
+                    }
+
+                    if hasMuscleArtwork {
+                        ExerciseMuscleGalleryTile(
+                            primaryMuscles: currentEntry.exercise.primaryMuscles,
+                            secondaryMuscles: currentEntry.exercise.secondaryMuscles,
+                            size: 160
+                        )
                     }
                 }
-                .frame(maxWidth: .infinity)
-                .frame(height: 160)
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: 20,
-                        style: .continuous
-                    )
+                .padding(10)
+            }
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
+
+            if hasMuscleArtwork {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Swipe to see muscles used",
+                        norwegian: "Sveip for å se muskler i bruk"
+                    ),
+                    systemImage: "hand.draw"
                 )
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 7)
             }
         }
-        .padding(10)
         .background(
             LinearGradient(
                 colors: [
                     ATHLTHTheme.card,
-                    ATHLTHTheme.cardWarm
-                        .opacity(0.52)
+                    ATHLTHTheme.cardWarm.opacity(0.52)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             ),
-            in: RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
+            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
         )
         .overlay {
-            RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-            .stroke(
-                Color.white.opacity(0.72),
-                lineWidth: 0.8
-            )
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(Color.white.opacity(0.72), lineWidth: 0.8)
         }
         .shadow(
-            color:
-                ATHLTHTheme.accentDeep
-                    .opacity(0.06),
-            radius: 12,
-            x: 0,
-            y: 6
+            color: ATHLTHTheme.accentDeep.opacity(0.06),
+            radius: 12, x: 0, y: 6
         )
+    }
+
+    private func peakExerciseArtwork(_ url: URL) -> some View {
+        Group {
+            if url.isFileURL, let image = UIImage(contentsOfFile: url.path) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                ATHLTHStorageImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable().scaledToFit()
+                    default:
+                        Color.clear
+                    }
+                }
+            }
+        }
+        .frame(width: 160, height: 160)
+        .background(ExerciseMuscleGalleryTile.skyBlue)
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .accessibilityLabel(ATHLTHLocalization.choose(
+            english: "Exercise movement position",
+            norwegian: "Øvelsens bevegelsesposisjon"
+        ))
     }
 
     private func detailCard<Content: View>(
@@ -2547,11 +2572,96 @@ struct ExerciseArtwork: View {
 
 /// Compact anatomy summary shared by the library and workout planning.
 /// Renders the existing vector atlas; never downloads extra muscle imagery.
+/// A third exercise-gallery image, using the same native vector muscle atlas
+/// and activation data as the former full-width muscle diagram. It requires
+/// no image download and remains crisp on Retina and larger displays.
+struct ExerciseMuscleGalleryTile: View {
+    let primaryMuscles: [String]
+    let secondaryMuscles: [String]
+    let size: CGFloat
+
+    // Matches the pale blue exercise-illustration photography without
+    // tinting the anatomy atlas or changing primary/secondary highlights.
+    static let skyBlue = Color(red: 0.84, green: 0.945, blue: 0.985)
+
+    private var profile: StrengthMuscleProfile {
+        ExerciseMuscleProfileFactory.profile(
+            primary: primaryMuscles, secondary: secondaryMuscles
+        )
+    }
+
+    var body: some View {
+        VStack(spacing: 5) {
+            Text(ATHLTHLocalization.choose(
+                english: "Muscles used", norwegian: "Muskler i bruk"
+            ))
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+            .lineLimit(1)
+
+            HStack(alignment: .bottom, spacing: 6) {
+                ForEach([true, false], id: \.self) { front in
+                    VStack(spacing: 3) {
+                        ATHLTHPremiumMuscleFigure(
+                            profile: profile,
+                            isFront: front,
+                            activationTint: ATHLTHPlanDesign.accent
+                        )
+                        .frame(width: 57, height: 110)
+                        Text(ATHLTHLocalization.choose(
+                            english: front ? "Front" : "Back",
+                            norwegian: front ? "Forside" : "Bakside"
+                        ))
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .padding(9)
+        .frame(width: size, height: size)
+        .background(Self.skyBlue,
+                    in: RoundedRectangle(cornerRadius: 20))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(ATHLTHLocalization.choose(
+            english: "Muscles used: front and back. Primary: " +
+                primaryMuscles.joined(separator: ", ") + ". Secondary: " +
+                secondaryMuscles.joined(separator: ", "),
+            norwegian: "Muskler i bruk, forside og bakside. Primære: " +
+                primaryMuscles.joined(separator: ", ") + ". Sekundære: " +
+                secondaryMuscles.joined(separator: ", ")
+        ))
+    }
+}
+
+/// Shared mapping for the full atlas and the compact gallery illustration.
+/// A secondary region overlapping a primary muscle must remain primary.
+enum ExerciseMuscleProfileFactory {
+    static func profile(
+        primary: [String], secondary: [String]
+    ) -> StrengthMuscleProfile {
+        let main = Set(primary.flatMap { StrengthMuscleResolver.regions(for: $0) })
+        let assist = Set(secondary.flatMap { StrengthMuscleResolver.regions(for: $0) })
+            .subtracting(main)
+        return StrengthMuscleProfile(
+            activations: main.union(assist).map {
+                StrengthMuscleActivation(
+                    region: $0, score: main.contains($0) ? 1 : 0.45
+                )
+            },
+            primaryRegions: main,
+            secondaryRegions: assist
+        )
+    }
+}
+
 struct ExerciseMuscleOverview: View {
     @EnvironmentObject private var library: ExerciseLibraryStore
 
     let primaryMuscles: [String]
     let secondaryMuscles: [String]
+    var showsAnatomy: Bool = true
 
     private var primaryRegions: Set<StrengthMuscleRegion> {
         Set(primaryMuscles.flatMap { StrengthMuscleResolver.regions(for: $0) })
@@ -2563,21 +2673,15 @@ struct ExerciseMuscleOverview: View {
     }
 
     private var profile: StrengthMuscleProfile {
-        let regions = primaryRegions.union(secondaryRegions)
-        return StrengthMuscleProfile(
-            activations: regions.map {
-                StrengthMuscleActivation(
-                    region: $0, score: primaryRegions.contains($0) ? 1 : 0.45
-                )
-            },
-            primaryRegions: primaryRegions,
-            secondaryRegions: secondaryRegions
+        ExerciseMuscleProfileFactory.profile(
+            primary: primaryMuscles, secondary: secondaryMuscles
         )
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if !primaryRegions.isEmpty || !secondaryRegions.isEmpty {
+            if showsAnatomy &&
+                (!primaryRegions.isEmpty || !secondaryRegions.isEmpty) {
                 HStack(spacing: 18) {
                     ForEach([true, false], id: \.self) { isFront in
                         VStack(spacing: 5) {
