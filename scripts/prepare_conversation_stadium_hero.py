@@ -4,9 +4,10 @@
 A photo is bundled in Assets.xcassets (never the entire conversation mockup).
 The image source below is CC0; no on-device download or account data needed.
 
-Source: https://pxhere.com/en/photo/1038422
-Direct: https://c.pxhere.com/photos/33/7b/athletic_field_stadium_playground_sunset-1038422.jpg!d
-License: CC0 Public Domain, commercial use permitted.
+Preferred source: https://commons.wikimedia.org/wiki/File:Sunset_at_Lake_Fairway_Athletics_Track.JPG
+License: Creative Commons Attribution 3.0 Unported (CC BY 3.0), Editor5807.
+Credit and crop disclosure: docs/conversation-stadium-artwork.md
+Alternate source: https://pxhere.com/en/photo/1038422 (CC0 Public Domain).
 """
 
 from __future__ import annotations
@@ -21,7 +22,13 @@ SOURCE = (
     "https://c.pxhere.com/photos/33/7b/"
     "athletic_field_stadium_playground_sunset-1038422.jpg"
 )
-SOURCES = [SOURCE, SOURCE + "!d"]
+SOURCES = [
+    # Full 4592 x 3056 photograph, credited under CC BY 3.0.
+    "https://upload.wikimedia.org/wikipedia/commons/c/c8/"
+    "Sunset_at_Lake_Fairway_Athletics_Track.JPG",
+    # Full-size PxHere original (CC0), if its upstream permits access.
+    SOURCE,
+]
 DEST = (
     Path(__file__).resolve().parent.parent /
     "ATHLTH/Assets.xcassets/ConversationStadiumHero.imageset/stadium.jpg"
