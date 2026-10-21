@@ -1066,29 +1066,32 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     ) {
         let previous = strengthSession
 
-        if let previous,
-           previous.workoutID ==
-                snapshot.workoutID {
-            // Never let a delayed applicationContext/userInfo payload roll
-            // completed strength work backwards. Draft-only changes get a
-            // small clock-skew tolerance because iPhone and Watch timestamps
-            // come from different devices.
-            if snapshot.completedSets <
-                previous.completedSets {
+        if let previous, previous.workoutID == snapshot.workoutID {
+            // The iPhone owns the authoritative exercise queue. When a user
+            // adds an exercise after the final planned set, completion must
+            // legitimately move from true back to false. Reject older queue
+            // shapes, but never reject the expanded iPhone plan merely
+            // because Watch thought the session had finished.
+            let expanded = snapshot.exerciseCount > previous.exerciseCount ||
+                snapshot.totalSets > previous.totalSets
+            if snapshot.completedSets < previous.completedSets {
                 return
             }
-
-            if previous.allExercisesComplete &&
-                !snapshot.allExercisesComplete {
+            if snapshot.exerciseCount < previous.exerciseCount {
                 return
             }
-
-            if snapshot.completedSets ==
-                    previous.completedSets,
-               snapshot.updatedAt
-                    .addingTimeInterval(0.75) <
-                    previous.updatedAt {
-                return
+            if !expanded {
+                if previous.allExercisesComplete &&
+                    !snapshot.allExercisesComplete &&
+                    snapshot.completedSets == previous.completedSets &&
+                    snapshot.exerciseCount == previous.exerciseCount &&
+                    snapshot.exerciseQueue == previous.exerciseQueue {
+                    return
+                }
+                if snapshot.completedSets == previous.completedSets,
+                   snapshot.updatedAt.addingTimeInterval(0.75) < previous.updatedAt {
+                    return
+                }
             }
         }
 
