@@ -42,6 +42,7 @@ struct ActiveStrengthWorkoutView: View {
     @State private var showingExerciseQueue = false
     @State private var showingNextExerciseDetails = false
     @State private var showingOmitRemainingSetsConfirmation = false
+    @State private var showingTrainingPlacePicker = false
 
     var body: some View {
         NavigationStack {
@@ -169,6 +170,14 @@ struct ActiveStrengthWorkoutView: View {
                         finishInProgress
                     )
                 }
+            }
+            .sheet(isPresented: $showingTrainingPlacePicker) {
+                ATHLTHPlanTrainingPlacePicker(
+                    initial: strength.activeWorkout?.plannedTrainingPlace
+                ) { place in
+                    strength.setWorkoutTrainingPlace(place)
+                }
+                .environmentObject(appSession)
             }
             .sheet(isPresented: $showingExerciseQueue) {
                 StrengthActiveExerciseQueueView()
@@ -1831,6 +1840,38 @@ struct ActiveStrengthWorkoutView: View {
                             in: RoundedRectangle(cornerRadius: 17))
             }
 
+            if workoutComplete || workout.plannedTrainingPlace != nil {
+                Button {
+                    showingTrainingPlacePicker = true
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "mappin.and.ellipse")
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Training place",
+                                norwegian: "Treningssted"
+                            ))
+                            .font(.caption.weight(.semibold))
+                            Text(workout.plannedTrainingPlace?.name ??
+                                ATHLTHLocalization.choose(
+                                    english: "Choose a training place",
+                                    norwegian: "Velg treningssted"
+                                ))
+                            .font(.subheadline.weight(.semibold))
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                    }
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .padding(14)
+                    .background(
+                        ATHLTHPlanDesign.warmSurface,
+                        in: RoundedRectangle(cornerRadius: 17)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
             if workoutComplete {
                 focusedBetweenExerciseRestCard(workout)
             }
