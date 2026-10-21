@@ -778,25 +778,22 @@ struct TrophyCollectionView: View {
                 spacing: 16
             ) {
                 ZStack {
-                    ATHLTHTrophyPlateShape()
+                    ATHLTHMedalHexagon()
                         .fill(
                             LinearGradient(
-                                colors: [
-                                    Color.black,
-                                    ATHLTHTheme
-                                        .premiumGold,
-                                    Color(
-                                        red: 0.16,
-                                        green: 0.14,
-                                        blue: 0.10
-                                    )
-                                ],
-                                startPoint:
-                                    .topLeading,
-                                endPoint:
-                                    .bottomTrailing
+                                colors: ATHLTHMedalMetal.gold.highlights,
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
                         )
+                        .overlay {
+                            ATHLTHMedalHexagon()
+                                .stroke(
+                                    Color.white.opacity(0.56),
+                                    lineWidth: 1
+                                )
+                                .padding(5)
+                        }
 
                     ATHLTHMarkShape()
                         .fill(.white)
