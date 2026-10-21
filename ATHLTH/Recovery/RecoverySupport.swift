@@ -3861,7 +3861,7 @@ struct RecoverySorenessLogView: View {
 
     private func ratingRow(
         title: String, hint: String, symbol: String,
-        value: Int?, onSelect: @escaping (Int) -> Void
+        value: Int?, onSelect: @escaping (Int?) -> Void
     ) -> some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 8) {
@@ -3878,7 +3878,8 @@ struct RecoverySorenessLogView: View {
             HStack(spacing: 8) {
                 ForEach(1...5, id: \.self) { score in
                     Button {
-                        onSelect(score)
+                        // Tapping the selected answer again clears it.
+                        onSelect(value == score ? nil : score)
                     } label: {
                         Text("\(score)")
                             .font(.subheadline.weight(.semibold))
