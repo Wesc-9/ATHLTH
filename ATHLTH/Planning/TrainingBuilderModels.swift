@@ -341,6 +341,9 @@ struct RunningWorkoutTemplate: Identifiable, Codable, Hashable {
     var intervalGhostRecoverySlowdownPercent: Int? = nil
     /// Optional instructions set before the workout for Audio Coach.
     var coachBrief: String? = nil
+    /// Nil preserves automatic progression for existing workout templates.
+    /// When false, timed running phases advance via the athlete's Next action.
+    var autoAdvanceTimedSteps: Bool? = nil
 
     /// Recalculates from every resolved drag and pause, including overrides.
     private var estimateSteps: [RunningStepTarget] {
