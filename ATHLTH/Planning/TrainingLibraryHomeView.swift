@@ -2462,114 +2462,133 @@ struct TrainingPlanCatalogDetailView: View {
                 ))
                 .font(.headline.weight(.bold))
                 .foregroundStyle(ATHLTHPlanDesign.ink)
-
                 Spacer()
-
                 if week.isMultiple(of: 4) && week < entry.durationWeeks {
-                    Text(ATHLTHLocalization.choose(
-                        english: "RECOVERY WEEK", norwegian: "ROLIG UKE"
-                    ))
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(ATHLTHPlanDesign.selectedSurface, in: Capsule())
+                    weekPhaseLabel(
+                        ATHLTHLocalization.choose(
+                            english: "RECOVERY WEEK", norwegian: "ROLIG UKE"
+                        )
+                    )
                 } else if entry.usesCompetitionTaper &&
-                            week >= max(entry.durationWeeks - 1, 1) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "TAPER", norwegian: "NEDTRAPPING"
-                    ))
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(ATHLTHPlanDesign.selectedSurface, in: Capsule())
+                          week >= max(entry.durationWeeks - 1, 1) {
+                    weekPhaseLabel(
+                        ATHLTHLocalization.choose(
+                            english: "TAPER", norwegian: "NEDTRAPPING"
+                        )
+                    )
                 }
             }
-
             ForEach(
                 Array(entry.sessionBlueprints
-                    .prefix(entry.sessionsPerWeek)
-                    .enumerated()),
+                    .prefix(entry.sessionsPerWeek).enumerated()),
                 id: \.offset
             ) { index, blueprint in
-                let workout = ATHLTHCatalogPlanSessionFactory.session(
-                    entry: entry, blueprint: blueprint, week: week
-                )
-                let key = "\(week):\(index)"
-                VStack(alignment: .leading, spacing: 0) {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.18)) {
-                            if !expandedSessionKeys.insert(key).inserted {
-                                expandedSessionKeys.remove(key)
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: workout.kind.systemImage)
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                                .frame(width: 35, height: 35)
-                                .background(ATHLTHPlanDesign.selectedSurface,
-                                            in: RoundedRectangle(cornerRadius: 10))
-
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(workout.title)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                                Text(ATHLTHLocalization.choose(
-                                    english: "See exercises and targets",
-                                    norwegian: "Se øvelser, sett og mål"
-                                ))
-                                .font(.caption2)
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                            }
-                            Spacer(minLength: 5)
-                            Text("\(workout.durationMinutes ?? 0) min")
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                            Image(systemName: expandedSessionKeys.contains(key)
-                                  ? "chevron.up" : "chevron.down")
-                                .font(.caption.bold())
-                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                        }
-                        .contentShape(Rectangle())
-                        .padding(11)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityHint(ATHLTHLocalization.choose(
-                        english: "Show or hide the programmed workout steps",
-                        norwegian: "Vis eller skjul øvelsene i økten"
-                    ))
-
-                    if expandedSessionKeys.contains(key) {
-                        VStack(alignment: .leading, spacing: 0) {
-                            let blocks = workout.workoutBlocks
-                                .filter { $0.kind != .note }
-                            if blocks.isEmpty {
-                                Text(ATHLTHLocalization.choose(
-                                    english: "No exercise steps available for this session.",
-                                    norwegian: "Ingen øvelsessteg er lagt til denne økten."
-                                ))
-                                .font(.caption)
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                .padding(12)
-                            } else {
-                                ForEach(blocks) { block in
-                                    previewWorkoutBlock(block)
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.bottom, 10)
-                    }
-                }
-                .background(ATHLTHPlanDesign.warmSurface,
-                            in: RoundedRectangle(cornerRadius: 14))
+                previewWeekSessionRow(blueprint, week: week, index: index)
             }
         }
         .padding(14)
         .athlthPlanCard()
+    }
+
+    private func weekPhaseLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 9, weight: .bold))
+            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(ATHLTHPlanDesign.selectedSurface, in: Capsule())
+    }
+
+    // Split the session header and its blocks from the week view. The old
+    // nested result-builder was too complex for Xcode to type-check and
+    // prevented iOS builds even before the Quick Train redesign.
+    private func previewWeekSessionRow(
+        _ blueprint: TrainingPlanCatalogSessionBlueprint,
+        week: Int,
+        index: Int
+    ) -> some View {
+        let workout = ATHLTHCatalogPlanSessionFactory.session(
+            entry: entry, blueprint: blueprint, week: week
+        )
+        let key = "\(week):\(index)"
+        return VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    if !expandedSessionKeys.insert(key).inserted {
+                        expandedSessionKeys.remove(key)
+                    }
+                }
+            } label: {
+                previewSessionHeading(workout, isExpanded: expandedSessionKeys.contains(key))
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(ATHLTHLocalization.choose(
+                english: "Show or hide the programmed workout steps",
+                norwegian: "Vis eller skjul øvelsene i økten"
+            ))
+
+            if expandedSessionKeys.contains(key) {
+                previewSessionSteps(workout)
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 10)
+            }
+        }
+        .background(ATHLTHPlanDesign.warmSurface,
+                    in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func previewSessionHeading(
+        _ workout: PlannedSession,
+        isExpanded: Bool
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: workout.kind.systemImage)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .frame(width: 35, height: 35)
+                .background(ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 10))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(workout.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                Text(ATHLTHLocalization.choose(
+                    english: "See exercises and targets",
+                    norwegian: "Se øvelser, sett og mål"
+                ))
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+            Spacer(minLength: 5)
+            Text("\(workout.durationMinutes ?? 0) min")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                .font(.caption.bold())
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+        }
+        .contentShape(Rectangle())
+        .padding(11)
+    }
+
+    @ViewBuilder
+    private func previewSessionSteps(_ workout: PlannedSession) -> some View {
+        let blocks = workout.workoutBlocks.filter { $0.kind != .note }
+        VStack(alignment: .leading, spacing: 0) {
+            if blocks.isEmpty {
+                Text(ATHLTHLocalization.choose(
+                    english: "No exercise steps available for this session.",
+                    norwegian: "Ingen øvelsessteg er lagt til denne økten."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .padding(12)
+            } else {
+                ForEach(blocks) { block in
+                    previewWorkoutBlock(block)
+                }
+            }
+        }
     }
 
     private func previewWorkoutBlock(_ block: WorkoutTemplateBlock) -> some View {
