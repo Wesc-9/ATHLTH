@@ -3875,6 +3875,22 @@ private struct ATHLTHNotificationSettingsView: View {
                 }
             }
 
+            Section(ATHLTHLocalization.choose(
+                english: "Daily Insights check-in", norwegian: "Daglig innsjekk")) {
+                Toggle(isOn: $settings.dailyCheckInRemindersEnabled) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Daily check-in reminder",
+                            norwegian: "Daglig påminnelse om innsjekk"))
+                        Text(ATHLTHLocalization.choose(
+                            english: "At most one reminder per day in the Home notification center. No push alert.",
+                            norwegian: "Høyst én påminnelse per dag i varslingssenteret på Hjem. Ingen push-varsel."))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
             Section("ATHLTH alerts") {
                 Toggle("Workout updates", isOn: $settings.workoutRemindersEnabled)
                 Toggle("Friend activity", isOn: $settings.friendActivityNotificationsEnabled)
