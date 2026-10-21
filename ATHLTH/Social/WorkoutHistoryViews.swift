@@ -1006,6 +1006,9 @@ struct PostWorkoutReviewView: View {
                 VStack(spacing: 14) {
                     summaryCard
                     resultStrip
+                    if let recorded = completedPhoneStepResults, !recorded.isEmpty {
+                        recordedIntervalsReviewCard(recorded)
+                    }
 
                     if let result =
                             relevantGhostResult,
@@ -1240,6 +1243,63 @@ struct PostWorkoutReviewView: View {
                 }
             }
         }
+    }
+
+    private var completedPhoneStepResults: [ATHLTHRecordedRunningStep]? {
+        guard let completed = phoneWorkout.lastCompletedWorkout,
+              completed.id == workout.id || completed.healthID == workout.id else {
+            return nil
+        }
+        return (completed.recordedRunningSteps ?? [])
+            .sorted { $0.index < $1.index }
+    }
+
+    private func recordedIntervalsReviewCard(
+        _ steps: [ATHLTHRecordedRunningStep]
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack {
+                Image(systemName: "timer")
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Text(ATHLTHLocalization.choose(
+                    english: "TIME PER WORKOUT PHASE",
+                    norwegian: "TID PER ØKTDEL"
+                ))
+                .font(.caption.weight(.bold))
+                .tracking(1)
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+            }
+            Text(ATHLTHLocalization.choose(
+                english: "Actual active time recorded for each part of the workout.",
+                norwegian: "Registrert aktiv tid på oppvarming, drag, pauser og nedjogging."
+            ))
+            .font(.caption)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+            ForEach(steps, id: \.index) { step in
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(step.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                        if let speed = step.actualSpeedKilometersPerHour {
+                            Text(String(format: "%.1f km/t", speed))
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                    }
+                    Spacer()
+                    Text(ATHLTHRunStepCountdown.display(step.activeSeconds))
+                        .font(.subheadline.weight(.bold).monospacedDigit())
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                }
+                if step.index != steps.last?.index {
+                    Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                }
+            }
+        }
+        .padding(17)
+        .athlthPlanCard(radius: 19)
     }
 
     private var summaryCard: some View {
