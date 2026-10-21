@@ -3433,6 +3433,7 @@ struct DirectMessageThreadView: View {
                 friend.resolvedName,
             subtitle:
                 threadStatusText,
+            backgroundAsset: ATHLTHConversationArtwork.directMessageHeader,
             onBack: {
                 dismiss()
             },
@@ -4821,7 +4822,8 @@ struct DirectMessageThreadView: View {
                     }
                 }
                 .background(
-                    ATHLTHTheme.vitality,
+                    // Match the conversation's outgoing message bubble.
+                    ATHLTHPlanDesign.outgoingMessage,
                     in: Circle()
                 )
                 .buttonStyle(.plain)
