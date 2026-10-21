@@ -18,6 +18,28 @@ final class ATHLTHRunIntervalReadoutTests: XCTestCase {
         )
     }
 
+    func testStructuredRunCountdownAlwaysShowsHoursMinutesSeconds() {
+        XCTAssertEqual(ATHLTHRunStepCountdown.display(582), "00:09:42")
+        XCTAssertEqual(ATHLTHRunStepCountdown.display(3_723), "01:02:03")
+        XCTAssertEqual(ATHLTHRunStepCountdown.display(0), "00:00:00")
+        XCTAssertEqual(ATHLTHRunStepCountdown.display(0.25), "00:00:01")
+        XCTAssertEqual(ATHLTHRunStepCountdown.display(-2), "00:00:00")
+    }
+
+    func testTimedStepEndsAtExactTargetNotOneSecondAfter() {
+        let effort = step(measure: .time, durationSeconds: 240)
+        XCTAssertFalse(ATHLTHRunningStepEngine.isCompleted(
+            step: effort, elapsedTime: 239.999,
+            distanceMeters: 0, stepStartElapsedTime: 0,
+            stepStartDistanceMeters: 0
+        ))
+        XCTAssertTrue(ATHLTHRunningStepEngine.isCompleted(
+            step: effort, elapsedTime: 240,
+            distanceMeters: 0, stepStartElapsedTime: 0,
+            stepStartDistanceMeters: 0
+        ))
+    }
+
     func testTimedIntervalShowsRemainingNotElapsed() {
         let readout = ATHLTHRunIntervalReadout.resolve(
             step: step(measure: .time, durationSeconds: 120),
