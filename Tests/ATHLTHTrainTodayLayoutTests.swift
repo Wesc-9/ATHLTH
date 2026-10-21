@@ -246,6 +246,8 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
                     onOpenLibrary: {},
                     onStartWorkout: { _, _ in },
                     onWorkoutDetails: { _, _ in },
+                    onAcceptAlternative: { _, _ in },
+                    onUndoAlternative: { _ in },
                     onQuickTrain: { _ in },
                     onGhostRace: {}
                 )
