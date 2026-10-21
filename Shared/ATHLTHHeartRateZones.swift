@@ -10,7 +10,8 @@ enum ATHLTHHeartRateZones {
         else { return nil }
         let lower = 0.50 + 0.10 * Double(zone - 1)
         let upper = min(lower + 0.10, 1)
-        return Int((maximumBPM * lower).rounded())...
-            Int((maximumBPM * upper).rounded())
+        let lowerBPM = Int((maximumBPM * lower).rounded())
+        let upperBPM = Int((maximumBPM * upper).rounded())
+        return lowerBPM...upperBPM
     }
 }
