@@ -1080,6 +1080,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             to: snapshot
         )
         persistWorkoutRecoveryState()
+        if kind == .strength && mirroringActive {
+            // Reflect iPhone-initiated exercise and rest changes immediately
+            // on the lock screen rather than waiting for the next HR tick.
+            Task { await sendLiveSnapshot(force: true) }
+        }
     }
 
     private func handleStrengthCoachTransition(
