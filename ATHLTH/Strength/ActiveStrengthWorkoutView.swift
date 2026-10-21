@@ -10995,6 +10995,13 @@ private struct StrengthActiveExerciseQueueView: View {
                                 ) {
                                     VStack(spacing: 0) {
                                         ForEach(exercise.sets) { set in
+                                            Button {
+                                                if strength.selectSetForNow(
+                                                    exerciseID: exercise.id, setID: set.id
+                                                ) {
+                                                    dismiss()
+                                                }
+                                            } label: {
                                             HStack(spacing: 9) {
                                                 Image(systemName: set.isCompleted
                                                     ? "checkmark.circle.fill"
@@ -11015,9 +11022,17 @@ private struct StrengthActiveExerciseQueueView: View {
                                                     Text(String(format: "· %.1f kg", weight))
                                                 }
                                             }
+                                                if !set.isCompleted {
+                                                    Image(systemName: "arrow.right.circle.fill")
+                                                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                                }
+                                            }
                                             .font(.caption)
                                             .foregroundStyle(ATHLTHPlanDesign.ink)
-                                            .padding(.vertical, 8)
+                                            .padding(.vertical, 10)
+                                            }
+                                            .buttonStyle(.plain)
+                                            .disabled(set.isCompleted)
                                             if set.id != exercise.sets.last?.id {
                                                 Divider()
                                             }
