@@ -2451,13 +2451,7 @@ struct TrainingPlanCatalogDetailView: View {
             }
         }
         .padding(16)
-        .background(
-            Color.white.opacity(0.84),
-            in: RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-        )
+        .athlthPlanCard()
     }
 
     private func previewWeekCard(_ week: Int) -> some View {
@@ -2631,29 +2625,11 @@ struct TrainingPlanCatalogDetailView: View {
         }
         .padding(13)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(0.78),
-                    detailAccent.opacity(0.065)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(
-                cornerRadius: 18,
-                style: .continuous
-            )
-        )
+        .background(ATHLTHPlanDesign.warmSurface,
+                    in: RoundedRectangle(cornerRadius: 14))
         .overlay {
-            RoundedRectangle(
-                cornerRadius: 18,
-                style: .continuous
-            )
-            .stroke(
-                Color.black.opacity(0.035),
-                lineWidth: 0.7
-            )
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(ATHLTHPlanDesign.warmDivider, lineWidth: 1)
         }
     }
 
