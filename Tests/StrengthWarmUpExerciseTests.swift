@@ -252,4 +252,59 @@ final class StrengthWarmUpExerciseTests: XCTestCase {
         XCTAssertEqual(store.activeWorkout?.plannedTrainingPlace, place)
     }
 
+    @MainActor
+    func testTimedHangingLSitUsesSecondsAndCanDisableWeight() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil)
+        let hold = catalogExercise(named: "Hanging L-Sit")
+        store.appendExercise(hold, sets: 1, reps: nil)
+        XCTAssertEqual(store.currentSet?.resolvedTargetKind, .time)
+        XCTAssertFalse(store.currentSetRecordsWeight)
+        store.setCurrentSetRecordsWeight(true)
+        XCTAssertTrue(store.currentSetRecordsWeight)
+        store.setCurrentSetRecordsWeight(false)
+        store.completeCurrentDraftSet()
+        let performed = try XCTUnwrap(store.activeWorkout?.exercises.first?.sets.first)
+        XCTAssertNil(performed.completedWeightKilograms)
+        XCTAssertNotNil(performed.completedDurationSeconds)
+        XCTAssertTrue(performed.isCompleted)
+    }
+
+    @MainActor
+    func testCanMoveBetweenUnfinishedSetsInDifferentExercisesWithoutCompletingOthers() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil)
+        store.appendExercise(catalogExercise(named: "Bench Press"), sets: 2, reps: 8)
+        store.appendExercise(catalogExercise(named: "Dumbbell Row"), sets: 2, reps: 12)
+        let logs = try XCTUnwrap(store.activeWorkout?.exercises)
+        XCTAssertTrue(store.selectSetForNow(
+            exerciseID: logs[1].id, setID: logs[1].sets[0].id
+        ))
+        store.completeCurrentDraftSet()
+        XCTAssertTrue(store.selectSetForNow(
+            exerciseID: logs[0].id, setID: logs[0].sets[1].id
+        ))
+        XCTAssertEqual(store.currentSet?.id, logs[0].sets[1].id)
+        let currentLogs = try XCTUnwrap(store.activeWorkout?.exercises)
+        XCTAssertTrue(currentLogs[1].sets[0].isCompleted)
+        XCTAssertFalse(currentLogs[0].sets[0].isCompleted)
+        XCTAssertFalse(currentLogs[0].sets[1].isCompleted)
+        XCTAssertFalse(store.selectSetForNow(
+            exerciseID: logs[1].id, setID: logs[1].sets[0].id
+        ))
+    }
+
+    @MainActor
+    func testReplayOnlyListsExercisesWithPerformedSets() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil)
+        store.appendExercise(catalogExercise(named: "Bench Press"), sets: 1, reps: 8)
+        store.appendExercise(catalogExercise(named: "Row Machine"), sets: 1, reps: 8)
+        store.completeCurrentDraftSet()
+        let workout = try XCTUnwrap(store.activeWorkout)
+        let summary = SocialPublishableWorkout.performedStrengthExerciseSummaries(workout)
+        XCTAssertEqual(summary.count, 1)
+        XCTAssertTrue(summary[0].contains("Bench Press"))
+    }
+
 }
