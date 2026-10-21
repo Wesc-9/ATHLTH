@@ -1731,6 +1731,48 @@ struct ActiveStrengthWorkoutView: View {
                             .font(.caption)
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         }
+                        VStack(spacing: 0) {
+                            ForEach(Array(upcoming.sets.prefix(6))) { plannedSet in
+                                HStack(spacing: 8) {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Set \(plannedSet.setNumber)",
+                                        norwegian: "Sett \(plannedSet.setNumber)"
+                                    ))
+                                    .fontWeight(.semibold)
+                                    Spacer(minLength: 4)
+                                    Text(
+                                        plannedSet.resolvedTargetKind == .time
+                                            ? TimeInterval(plannedSet.plannedDurationSeconds ?? 0).clockDuration
+                                            : "\(plannedSet.plannedReps ?? 0) reps"
+                                    )
+                                    .monospacedDigit()
+                                    if let weight = plannedSet.plannedWeightKilograms {
+                                        Text(String(format: "· %.1f kg", weight))
+                                    } else if let level = plannedSet.plannedResistanceLevel {
+                                        Text("· L\(level)")
+                                    }
+                                }
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 10)
+                                if plannedSet.id != upcoming.sets.prefix(6).last?.id {
+                                    Divider().padding(.horizontal, 10)
+                                }
+                            }
+                        }
+                        .background(
+                            ATHLTHPlanDesign.surface,
+                            in: RoundedRectangle(cornerRadius: 12)
+                        )
+                        if upcoming.sets.count > 6 {
+                            Text(ATHLTHLocalization.choose(
+                                english: "+\(upcoming.sets.count - 6) additional sets available when you open the exercise",
+                                norwegian: "+\(upcoming.sets.count - 6) flere sett vises når du åpner øvelsen"
+                            ))
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
                         if let rest = upcoming.sets.first?.restSeconds {
                             Label(
                                 ATHLTHLocalization.choose(
@@ -3212,7 +3254,7 @@ struct ActiveStrengthWorkoutView: View {
                     .foregroundStyle(
                         phase == .resting || phase == .restReady
                             ? ATHLTHTheme.premiumGold
-                            : ATHLTHTheme.accentDeep
+                            : ATHLTHPlanDesign.accentInk
                     )
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
@@ -3223,7 +3265,7 @@ struct ActiveStrengthWorkoutView: View {
                     value: Double(completed),
                     total: Double(totalSets)
                 )
-                .tint(ATHLTHTheme.accentDeep)
+                .tint(ATHLTHPlanDesign.accentInk)
                 .accessibilityLabel(
                     ATHLTHLocalization.choose(
                         english: "Completed sets",
@@ -5496,7 +5538,7 @@ struct ActiveStrengthWorkoutView: View {
                     Text(TimeInterval(finished ? exerciseElapsed : remaining).clockDuration)
                         .font(.system(size: 37, weight: .bold, design: .rounded))
                         .monospacedDigit()
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
                         .contentTransition(.numericText(countsDown: true))
                         .minimumScaleFactor(0.8)
                         .lineLimit(1)
@@ -5556,7 +5598,7 @@ struct ActiveStrengthWorkoutView: View {
                             systemImage: "checkmark.circle.fill"
                         )
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
