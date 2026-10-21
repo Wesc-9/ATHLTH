@@ -1,5 +1,11 @@
 import SwiftUI
 
+/// Native artwork asset. Only the photographic stadium background is bundled;
+/// all identity, messaging, buttons and text remain native SwiftUI.
+enum ATHLTHConversationArtwork {
+    static let directMessageHeader = "ConversationStadiumHero"
+}
+
 struct ATHLTHConversationHero<
     Avatar: View,
     Trailing: View
@@ -45,7 +51,8 @@ struct ATHLTHConversationHero<
                 alignment: .top
             ) {
                 if let backgroundAsset {
-                    // Explicit custom artwork remains available for special threads.
+                    // Preserve photographic resolution: aspect-fill at the
+                    // view's exact display size, no thumbnail or screenshots.
                     Image(backgroundAsset)
                         .resizable()
                         .interpolation(.high)
