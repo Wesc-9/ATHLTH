@@ -3840,7 +3840,10 @@ struct ATHLTHHomeView: View {
 
                 HStack(spacing: 10) {
                     homeQuickStartButton(
-                        title: "Run",
+                        title: ATHLTHLocalization.choose(
+                            english: "Run",
+                            norwegian: "Løp"
+                        ),
                         icon: "figure.run",
                         tint: .green
                     ) {
@@ -3848,7 +3851,10 @@ struct ATHLTHHomeView: View {
                     }
 
                     homeQuickStartButton(
-                        title: "Strength",
+                        title: ATHLTHLocalization.choose(
+                            english: "Strength",
+                            norwegian: "Styrke"
+                        ),
                         icon: "dumbbell.fill",
                         tint: .purple
                     ) {
