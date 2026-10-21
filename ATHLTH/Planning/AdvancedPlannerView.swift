@@ -6965,39 +6965,11 @@ struct SessionEditorView: View {
     private func estimatedHeartRateRange(
         for zone: Int
     ) -> (lower: Int, upper: Int)? {
-        guard let maximum =
-                resolvedMaximumHeartRate
-        else {
-            return nil
-        }
-
-        let bounds: (Double, Double)
-
-        switch min(max(zone, 1), 5) {
-        case 1:
-            bounds = (0.50, 0.60)
-        case 2:
-            bounds = (0.60, 0.70)
-        case 3:
-            bounds = (0.70, 0.80)
-        case 4:
-            bounds = (0.80, 0.90)
-        default:
-            bounds = (0.90, 1.00)
-        }
-
-        return (
-            lower:
-                Int(
-                    (maximum * bounds.0)
-                        .rounded()
-                ),
-            upper:
-                Int(
-                    (maximum * bounds.1)
-                        .rounded()
-                )
-        )
+        guard let range = ATHLTHHeartRateZones.range(
+            for: zone,
+            maximumBPM: resolvedMaximumHeartRate
+        ) else { return nil }
+        return (lower: range.lowerBound, upper: range.upperBound)
     }
 
     private func heartRateRange(
