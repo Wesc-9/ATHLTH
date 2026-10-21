@@ -3415,6 +3415,34 @@ final class StrengthWorkoutStore: ObservableObject {
         activeWorkout = workout
     }
 
+    /// End a partially completed exercise without inventing completed
+    /// repetitions or touching the scheduled plan. Only pending sets vanish
+    /// from this active execution and their count remains auditable.
+    @discardableResult
+    func omitRemainingSetsOfCurrentExercise() -> Bool {
+        guard var workout = activeWorkout,
+              workout.exercises.indices.contains(currentExerciseIndex)
+        else { return false }
+
+        var exercise = workout.exercises[currentExerciseIndex]
+        let completed = exercise.sets.filter { $0.isCompleted }
+        let omitted = exercise.sets.count - completed.count
+        guard !completed.isEmpty, omitted > 0 else { return false }
+
+        exercise.sets = completed
+        exercise.skippedPlannedSetCount = (exercise.skippedPlannedSetCount ?? 0) + omitted
+        exercise.completedAt = Date()
+        workout.exercises[currentExerciseIndex] = exercise
+        currentSetIndex = max(completed.count - 1, 0)
+        timedSetCountdown = nil
+        restStartedAt = nil
+        restEndsAt = nil
+        activeWorkout = workout
+        reloadDraftFromCurrentSet()
+        persistCheckpointNow()
+        return true
+    }
+
     func moveToNextExercise() {
         finalizeActualRestIfNeeded()
         restStartedAt = nil
