@@ -1505,6 +1505,15 @@ final class StrengthWorkoutStore: ObservableObject {
             draftRestSeconds: draftRestSeconds,
             draftDurationSeconds: draftDurationSeconds,
             draftResistanceLevel: draftResistanceLevel,
+            manualTreadmillSpeedKilometersPerHour:
+                exercise.map {
+                    StrengthTreadmillWarmUpDefaults.isTreadmill($0.exercise.name)
+                } == true && draftTreadmillSpeedKilometersPerHour > 0
+                    ? draftTreadmillSpeedKilometersPerHour : nil,
+            manualTreadmillInclinePercent:
+                exercise.map {
+                    StrengthTreadmillWarmUpDefaults.isTreadmill($0.exercise.name)
+                } == true ? draftTreadmillInclinePercent : nil,
             targetKindRaw:
                 set?.resolvedTargetKind.rawValue,
             loadKindRaw:
