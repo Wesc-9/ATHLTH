@@ -609,6 +609,9 @@ struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
     var allowsLiveExerciseBuilding: Bool? = nil
     // Optional for backward-compatible saved strength sessions.
     var liveHeartRateTargetZone: Int? = nil
+    /// The same optional planned venue can be shown in preparation, live
+    /// training and the saved strength summary, without claiming GPS check-in.
+    var plannedTrainingPlace: ATHLTHTrainingPlace? = nil
 
     var totalCompletedSets: Int {
         exercises
