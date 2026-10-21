@@ -466,6 +466,7 @@ final class StrengthWarmUpExerciseTests: XCTestCase {
         XCTAssertFalse(StrengthCardioExercisePolicy.isCardio("Dumbbell Rowing"))
         XCTAssertFalse(StrengthCardioExercisePolicy.isCardio("Bent Over Rowing"))
         XCTAssertFalse(StrengthCardioExercisePolicy.isCardio("Seated Cable Row"))
+        XCTAssertFalse(StrengthCardioExercisePolicy.isCardio("Seated Row Machine"))
     }
 
     @MainActor
