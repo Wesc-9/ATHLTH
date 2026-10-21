@@ -1396,6 +1396,7 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
     let strengthHeaviestWeightKilograms: Double?
     let strengthTotalReps: Int?
     let source: String
+    var plannedTrainingPlaceName: String? = nil
 
     init(summary: WorkoutSummary) {
         id = summary.id
@@ -1416,6 +1417,7 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
     }
 
     init(strengthWorkout: StrengthWorkoutLog) {
+        plannedTrainingPlaceName = strengthWorkout.plannedTrainingPlace?.name
         id = strengthWorkout.healthMetrics.healthKitWorkoutUUID ?? strengthWorkout.id
         title = strengthWorkout.title
         activity = .strength
