@@ -2198,16 +2198,13 @@ final class StrengthWorkoutStore: ObservableObject {
                     ? draftTreadmillSpeedKilometersPerHour : nil
             set.completedTreadmillInclinePercent = draftTreadmillInclinePercent
             if let elapsed = set.completedDurationSeconds {
-                set.completedDistanceMeters =
+                set.manuallyEstimatedTreadmillDistanceMeters =
                     ATHLTHRunningPace.manuallyEstimatedTreadmillDistance(
                         speedKilometersPerHour: draftTreadmillSpeedKilometersPerHour,
                         durationSeconds: Double(elapsed)
                     )
                 set.effortSegments = [
-                    StrengthSetEffortSegment(
-                        durationSeconds: elapsed,
-                        distanceMeters: set.completedDistanceMeters
-                    )
+                    StrengthSetEffortSegment(durationSeconds: elapsed)
                 ]
             }
         }
