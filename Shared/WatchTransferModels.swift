@@ -1444,6 +1444,8 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var strengthReps: Int? = nil
     var strengthWeightKilograms: Double? = nil
     var strengthRestEndsAt: Date? = nil
+    var strengthNextExerciseName: String? = nil
+    var strengthTimedSetTargetSeconds: Int? = nil
     var strengthTimedSetSecondsAtSnapshot: TimeInterval? = nil
     var strengthTimedSetResumedAt: Date? = nil
 
