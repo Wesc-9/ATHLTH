@@ -6842,11 +6842,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 strengthSession?.restEndsAt,
             strengthNextExerciseName:
                 strengthSession.flatMap { snapshot in
-                    snapshot.exerciseQueue?
-                        .first(where: {
-                            $0.index > snapshot.exerciseIndex &&
-                            $0.isCompleted != true
-                        })?.name
+                    guard let pending = snapshot.exerciseQueue?.filter({
+                        $0.index != snapshot.exerciseIndex &&
+                        $0.isCompleted != true
+                    }) else { return nil }
+                    return (pending.first(where: {
+                        $0.index > snapshot.exerciseIndex
+                    }) ?? pending.first)?.name
                 },
             strengthTimedSetTargetSeconds:
                 strengthSession?.draftDurationSeconds,
