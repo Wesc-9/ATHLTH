@@ -3333,6 +3333,8 @@ struct ActiveStrengthWorkoutView: View {
                     }
                 }
 
+                liveHeartRateAndZoneRow(workout)
+
                 HStack(spacing: 7) {
                     Label(
                         strengthPhaseTitle(phase),
@@ -3435,6 +3437,71 @@ struct ActiveStrengthWorkoutView: View {
         case .workingSet:
             return "dumbbell.fill"
         }
+    }
+
+    private func liveHeartRateAndZoneRow(_ workout: StrengthWorkoutLog) -> some View {
+        let measuredPulse = strengthWatchSnapshot?.heartRate
+        let maximum = appSession.onboardingProfile?.maximumHeartRateBPM
+        let target = workout.liveHeartRateTargetZone
+        let range = target.flatMap {
+            ATHLTHHeartRateZones.range(for: $0, maximumBPM: maximum.map(Double.init))
+        }
+        return HStack(spacing: 10) {
+            HStack(spacing: 5) {
+                Image(systemName: "heart.fill")
+                    .foregroundStyle(.red)
+                Text(
+                    (measuredPulse ?? 0) > 0
+                        ? "\(Int((measuredPulse ?? 0).rounded())) bpm"
+                        : ATHLTHLocalization.choose(
+                            english: "No live pulse", norwegian: "Ingen live puls"
+                        )
+                )
+                .monospacedDigit()
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+            Spacer(minLength: 6)
+            Menu {
+                Button(ATHLTHLocalization.choose(
+                    english: "No zone target", norwegian: "Ingen pulssone"
+                )) {
+                    strength.setLiveHeartRateTargetZone(nil)
+                }
+                ForEach(1...5, id: \.self) { zone in
+                    Button("Sone \(zone)") {
+                        strength.setLiveHeartRateTargetZone(zone)
+                    }
+                }
+            } label: {
+                Label(
+                    target.map { zone in
+                        if let range {
+                            return "Sone \(zone) · \(range.lowerBound)–\(range.upperBound)"
+                        }
+                        return "Sone \(zone)"
+                    } ?? ATHLTHLocalization.choose(
+                        english: "Select zone", norwegian: "Velg pulssone"
+                    ),
+                    systemImage: "heart.text.square"
+                )
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            }
+            .accessibilityHint(
+                ATHLTHLocalization.choose(
+                    english: "Select the training target. Pulse only appears when measured by Apple Watch.",
+                    norwegian: "Velg treningsmål. Pulsen vises bare når Apple Watch måler den."
+                )
+            )
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            ATHLTHPlanDesign.warmSurface,
+            in: RoundedRectangle(cornerRadius: 12)
+        )
     }
 
     private func focusedExerciseHero(
