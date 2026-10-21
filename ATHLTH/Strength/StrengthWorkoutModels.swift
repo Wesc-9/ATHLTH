@@ -312,6 +312,9 @@ struct StrengthSetLog: Identifiable, Codable, Hashable {
     // and distinct from verified Watch speed/distance measurements.
     var completedTreadmillSpeedKilometersPerHour: Double? = nil
     var completedTreadmillInclinePercent: Double? = nil
+    // Kept separate from actual/verified workout distance, since entered
+    // treadmill speed is not a device-measured distance.
+    var manuallyEstimatedTreadmillDistanceMeters: Double? = nil
 
     // A completed set can contain multiple effort segments. Example:
     // 8 reps @ 10 kg + 2 reps @ 8 kg in the same planned 10-rep set.
