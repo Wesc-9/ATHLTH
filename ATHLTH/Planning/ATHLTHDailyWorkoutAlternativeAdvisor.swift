@@ -57,7 +57,7 @@ struct ATHLTHOriginalPlannedWorkout: Codable, Hashable {
 /// from self-reported discomfort. Never invent pain, injury or a diagnosis.
 enum ATHLTHDailyWorkoutAlternativeAdvisor {
     enum Choice: String, CaseIterable, Identifiable {
-        case mobility, rest, gentleWalk, shorterRun
+        case mobility, rest, gentleWalk, shorterRun, lighterStrength
         var id: String { rawValue }
         var symbol: String {
             switch self {
@@ -65,6 +65,7 @@ enum ATHLTHDailyWorkoutAlternativeAdvisor {
             case .rest: return "moon.stars.fill"
             case .gentleWalk: return "figure.walk"
             case .shorterRun: return "figure.run"
+            case .lighterStrength: return "dumbbell.fill"
             }
         }
         var title: String {
@@ -82,6 +83,9 @@ enum ATHLTHDailyWorkoutAlternativeAdvisor {
             case .shorterRun:
                 return ATHLTHLocalization.choose(
                     english: "Shorter easy run", norwegian: "Kortere rolig løp")
+            case .lighterStrength:
+                return ATHLTHLocalization.choose(
+                    english: "Lighter strength session", norwegian: "Lettere styrkeøkt")
             }
         }
     }
@@ -167,19 +171,28 @@ enum ATHLTHDailyWorkoutAlternativeAdvisor {
         let reason = signals.reason
         let legFatigue = signals.lowerLimbFatigue ||
             (signals.overallSoreness.map { $0 >= 4 } ?? false)
+        let significantMuscleSoreness =
+            signals.muscleRatings.values.contains { $0 == .high } ||
+            (signals.overallSoreness.map { $0 >= 4 } ?? false)
         var choices: [Choice]
         switch original.kind {
         case .running:
-            // Cross-training FIRST for sore feet/legs, not just a 15->5 km
-            // reduction. A shorter run may not relieve lower-limb loading.
+            // When legs or feet are sore, don't recommend another impact
+            // session. Otherwise show the actual reduced-distance suggestion
+            // first; it must not be hidden behind another menu.
             choices = legFatigue
                 ? [.mobility, .rest]
-                : [.gentleWalk, .mobility, .rest, .shorterRun]
+                : [.shorterRun, .rest, .gentleWalk, .mobility]
         case .walking:
             choices = [.mobility, .rest]
         case .strength:
-            choices = [.mobility, .rest, .gentleWalk]
-            if legFatigue { choices.removeAll { $0 == .gentleWalk } }
+            // We cannot safely infer an alternative exercise from generic
+            // soreness without an exercise-to-muscle assessment. Offer a
+            // lighter version of the existing plan only when muscles are not
+            // explicitly marked highly sore and set targets can be reduced.
+            choices = significantMuscleSoreness || signals.lowerLimbFatigue
+                ? [.mobility, .rest]
+                : [.lighterStrength, .rest, .mobility]
         case .mobility, .recovery, .custom:
             return []
         }
@@ -187,7 +200,14 @@ enum ATHLTHDailyWorkoutAlternativeAdvisor {
             max(1.0, (min($0 * 0.4, 5.0) * 2).rounded() / 2)
         }
         return choices.compactMap { choice in
-            if choice == .shorterRun && reducedDistance == nil {
+            if choice == .shorterRun {
+                guard let reducedDistance,
+                      reducedDistance < (original.targetDistanceKilometers ?? 0)
+                else { return nil }
+            }
+            if choice == .lighterStrength &&
+                (!(original.workoutBlocks ?? []).isEmpty ||
+                 ATHLTHTrainRecoveryAdvisor.lighterStrengthSession(original) == nil) {
                 return nil
             }
             return Suggestion(
@@ -254,6 +274,30 @@ enum ATHLTHDailyWorkoutAlternativeAdvisor {
             proposed.durationMinutes = nil
             proposed.targetDistanceKilometers = suggestion.distanceKilometers
             proposed.workoutCategory = "running"
+            // Explicit low-intensity target: don't carry interval intensity
+            // from the longer session into the replacement.
+            if let distance = suggestion.distanceKilometers {
+                var easyBlock = WorkoutTemplateBlock(
+                    sequence: 1, kind: .run,
+                    title: ATHLTHLocalization.choose(
+                        english: "Easy running · zone 2",
+                        norwegian: "Rolig løping · sone 2"),
+                    exerciseSlug: nil, distanceMeters: distance * 1_000,
+                    repetitions: nil, durationSeconds: nil,
+                    targetWeightKilograms: nil, loadNote: nil,
+                    notes: nil, phase: .main,
+                    targetHeartRateZone: 2
+                )
+                easyBlock.cardioActivity = .running
+                proposed.workoutBlocks = [easyBlock]
+            }
+        case .lighterStrength:
+            proposed.kind = .strength
+            proposed.workoutCategory = "strength"
+            if let reduced = ATHLTHTrainRecoveryAdvisor
+                .lighterStrengthSession(original) {
+                proposed.exercises = reduced.exercises
+            }
         }
         return proposed
     }
