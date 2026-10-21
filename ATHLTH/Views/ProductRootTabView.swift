@@ -94,6 +94,8 @@ struct ATHLTHMinimizedWorkoutReturnPill: View {
 
 struct ProductRootTabView: View {
     @ObservedObject private var pushManager = APNsPushManager.shared
+    @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @EnvironmentObject private var notifications:
@@ -108,6 +110,15 @@ struct ProductRootTabView: View {
     @State private var selectedTab: Int
     @State private var trainNavigationRequest:
         ATHLTHTrainNavigationRequest?
+
+    private func updateDailyCheckInReminder() {
+        let store = RecoverySorenessStore()
+        notifications.reconcileDailyCheckIn(
+            enabled: settings.dailyCheckInRemindersEnabled,
+            accountID: session.profile.userID,
+            completed: store.hasTodayCheckIn
+        )
+    }
 
     private var visibleAppBadgeCount: Int {
         let inboxCount =
@@ -292,7 +303,18 @@ struct ProductRootTabView: View {
             }
         }
         .task {
+            updateDailyCheckInReminder()
             await syncApplicationIconBadge()
+        }
+        .onChange(of: selectedTab) { _, _ in
+            // Completing a check-in on Insights clears its Home reminder.
+            updateDailyCheckInReminder()
+        }
+        .onChange(of: settings.dailyCheckInRemindersEnabled) { _, _ in
+            updateDailyCheckInReminder()
+        }
+        .onChange(of: session.profile.userID) { _, _ in
+            updateDailyCheckInReminder()
         }
         .onChange(
             of: visibleAppBadgeCount
@@ -309,6 +331,7 @@ struct ProductRootTabView: View {
                 return
             }
 
+            updateDailyCheckInReminder()
             Task {
                 await syncApplicationIconBadge()
             }
@@ -11685,6 +11708,7 @@ struct ATHLTHTrainView: View {
 
 struct ATHLTHRecoveryView: View {
     var isActive: Bool = true
+    var openCheckInOnAppear: Bool = false
     var onSelectTab: (Int) -> Void = { _ in }
 
     @EnvironmentObject private var health: HealthKitManager
@@ -11950,9 +11974,10 @@ struct ATHLTHRecoveryView: View {
                 }
             }
             .onAppear {
-                ATHLTHPerformance.event(
-                    "InsightAppear"
-                )
+                ATHLTHPerformance.event("InsightAppear")
+                if openCheckInOnAppear {
+                    showingSorenessLog = true
+                }
             }
             .sheet(isPresented: $showingInsightAIConsentSheet) {
                 insightAIConsentSheet
