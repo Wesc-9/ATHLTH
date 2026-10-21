@@ -264,8 +264,12 @@ struct RouteLibraryListView: View {
                         tr("No matching routes", "Ingen ruter matcher"),
                         systemImage: "map",
                         description: Text(tr(
-                            "Try a different search or adjust your filters.",
-                            "Prøv et annet søk eller juster filtrene."))
+                            publicFilter == .friends
+                                ? "Only public routes shared by mutual friends appear here."
+                                : "Try a different search or adjust your filters.",
+                            publicFilter == .friends
+                                ? "Her vises bare offentlige ruter fra venner som følger hverandre."
+                                : "Prøv et annet søk eller juster filtrene."))
                     )
                     .padding(.vertical, 20)
                 } else {
@@ -309,7 +313,7 @@ struct RouteLibraryListView: View {
             .frame(maxWidth: .infinity)
         }
         .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
-        .navigationTitle(tr("Route database", "Rutedatabase"))
+        .navigationTitle(tr("Routes", "Ruter"))
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await loadCatalog() }
         .task(id: catalogKey) {
@@ -662,14 +666,15 @@ struct RouteLibraryListView: View {
     }
 
     private func databasePremiumCard(_ entry: RouteLibraryEntry) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 13) {
             Group {
                 if let route = hydratedRoutes[entry.id] {
                     Button {
+                        markRecent(entry)
                         showingMapRoute = route
                     } label: {
                         ZStack(alignment: .bottomTrailing) {
-                            RouteMapSnapshotThumbnail(route: route, height: 173)
+                            RouteMapSnapshotThumbnail(route: route, height: 174)
                                 .frame(maxWidth: .infinity)
                                 .clipShape(RoundedRectangle(cornerRadius: 17))
                             Label(tr("Explore", "Utforsk"),
@@ -683,6 +688,8 @@ struct RouteLibraryListView: View {
                         }
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(tr("Explore map for \(entry.title)",
+                                           "Utforsk kart for \(entry.title)"))
                 } else {
                     ZStack {
                         RoundedRectangle(cornerRadius: 17)
@@ -696,7 +703,7 @@ struct RouteLibraryListView: View {
                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         }
                     }
-                    .frame(height: 173)
+                    .frame(height: 174)
                 }
             }
             .task(id: entry.id) { await loadRouteDetail(entry.id) }
@@ -705,11 +712,11 @@ struct RouteLibraryListView: View {
                 NavigationLink {
                     RouteLibraryDetailLoader(routeID: entry.id)
                 } label: {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 5) {
                         Text(entry.title)
-                            .font(.headline)
+                            .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(ATHLTHPlanDesign.ink)
-                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
                         let endpoints = [entry.startName, entry.endName]
                             .compactMap { $0 }
                             .filter { !$0.isEmpty }
@@ -723,28 +730,91 @@ struct RouteLibraryListView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.plain)
+
                 LibraryFavoriteButton(
-                    kind: .route, itemID: entry.id.uuidString,
+                    kind: .route,
+                    itemID: entry.id.uuidString,
                     title: entry.title,
                     subtitle: String(format: "%.1f km", entry.distanceKilometers),
-                    icon: "map.fill")
+                    icon: "map.fill"
+                )
+                Menu {
+                    if settings.trainingDeviceProvider == .appleWatch {
+                        Button {
+                            if let route = hydratedRoutes[entry.id] {
+                                sendPublicRouteToWatch(route)
+                            }
+                        } label: {
+                            Label(tr("Send to Apple Watch", "Send til Apple Watch"),
+                                  systemImage: "applewatch")
+                        }
+                        .disabled(!watchConnection.isReady || hydratedRoutes[entry.id] == nil)
+                    }
+                    if hydratedRoutes[entry.id] != nil {
+                        NavigationLink {
+                            ChallengeCreationView(preselectedRouteID: entry.id)
+                        } label: {
+                            Label(tr("Create challenge", "Opprett utfordring"),
+                                  systemImage: "trophy.fill")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.headline)
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .frame(width: 36, height: 36)
+                        .background(ATHLTHPlanDesign.warmSurface, in: Circle())
+                }
             }
 
-            HStack(spacing: 10) {
-                Label(String(format: "%.1f km", entry.distanceKilometers),
-                      systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+            HStack(spacing: 7) {
+                Label(authorLabel(for: entry),
+                      systemImage: publicFilter == .friends
+                          ? "person.2.fill" : "globe.europe.africa.fill")
+                if let route = hydratedRoutes[entry.id],
+                   let proximity = publicStartDistance(for: route) {
+                    Label(String(format: "%.1f km %@", proximity,
+                                 tr("to start", "til start")),
+                          systemImage: "location")
+                }
                 if let climb = entry.elevationGainMeters {
                     Label("\(Int(climb.rounded())) hm", systemImage: "mountain.2")
                 }
-                if let distance = entry.distance(from: locationStore.location) {
-                    Label(String(format: "%.1f km", distance),
-                          systemImage: "location")
-                }
             }
-            .font(.caption.weight(.medium))
+            .font(.caption2.weight(.medium))
             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             .lineLimit(1)
-            .minimumScaleFactor(0.78)
+            .minimumScaleFactor(0.8)
+
+            HStack(spacing: 0) {
+                publicRouteMetric(
+                    value: String(format: "%.1f km", entry.distanceKilometers),
+                    caption: tr("DISTANCE", "DISTANSE"),
+                    icon: "point.topleft.down.to.point.bottomright.curvepath"
+                )
+                Divider().frame(height: 35)
+                publicRouteMetric(
+                    value: estimatedDuration(kilometers: entry.distanceKilometers,
+                                             paceMinutes: walkPaceMinutes),
+                    caption: tr("EST. WALK", "EST. GANGE"),
+                    icon: "figure.walk"
+                )
+                Divider().frame(height: 35)
+                publicRouteMetric(
+                    value: estimatedDuration(kilometers: entry.distanceKilometers,
+                                             paceMinutes: runPaceMinutes),
+                    caption: tr("EST. RUN", "EST. LØPING"),
+                    icon: "figure.run"
+                )
+            }
+            .padding(.vertical, 12)
+            .background(ATHLTHPlanDesign.warmSurface.opacity(0.7),
+                        in: RoundedRectangle(cornerRadius: 14))
+
+            Text(tr("Time estimates use your recent workouts or a standard pace; elevation and stops may affect actual time.",
+                    "Tidsanslagene bruker dine siste økter eller standardtempo. Stigning og stopp kan endre faktisk tid."))
+                .font(.system(size: 10))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
 
             HStack(spacing: 12) {
                 NavigationLink {
@@ -755,25 +825,29 @@ struct RouteLibraryListView: View {
                         .foregroundStyle(ATHLTHPlanDesign.accentInk)
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .buttonStyle(.plain)
-                Button {
-                    if let route = hydratedRoutes[entry.id] {
-                        showingMapRoute = route
+                .simultaneousGesture(TapGesture().onEnded {
+                    markRecent(entry)
+                })
+                if settings.trainingDeviceProvider == .appleWatch {
+                    Button {
+                        if let route = hydratedRoutes[entry.id] {
+                            markRecent(entry)
+                            sendPublicRouteToWatch(route)
+                        }
+                    } label: {
+                        Label(tr("Send to Watch", "Send til Watch"),
+                              systemImage: "applewatch")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity, minHeight: 46)
+                            .background(ATHLTHTheme.accentDeep,
+                                        in: RoundedRectangle(cornerRadius: 13))
                     }
-                } label: {
-                    Label(tr("Explore map", "Utforsk kart"),
-                          systemImage: "map.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity, minHeight: 45)
-                        .background(ATHLTHTheme.accentDeep,
-                                    in: RoundedRectangle(cornerRadius: 13))
+                    .buttonStyle(.plain)
+                    .disabled(!watchConnection.isReady || hydratedRoutes[entry.id] == nil)
+                    .opacity(!watchConnection.isReady || hydratedRoutes[entry.id] == nil ? 0.45 : 1)
                 }
-                .buttonStyle(.plain)
-                .disabled(hydratedRoutes[entry.id] == nil)
-                .opacity(hydratedRoutes[entry.id] == nil ? 0.45 : 1)
             }
-            .simultaneousGesture(TapGesture().onEnded { markRecent(entry) })
         }
         .padding(14)
         .athlthPlanCard()
