@@ -4,7 +4,7 @@ import Combine
 
 /// MapKit result types are not Sendable. Transfer only these immutable strings
 /// from the delegate to the SwiftUI main actor.
-private struct ATHLTHTrainingPlaceSuggestion: Sendable {
+struct ATHLTHTrainingPlaceSuggestion: Sendable {
     let title: String
     let subtitle: String
 }
