@@ -196,6 +196,23 @@ struct WatchRunIntervalFocusPage: View {
                         .watchSurface(radius: 15)
                     }
 
+                    if let workoutPlan = workout.structuredRunningWorkout,
+                       workoutPlan.autoAdvanceTimedSteps == false,
+                       workout.state == .running,
+                       workout.nextStructuredRunningStep != nil {
+                        Button {
+                            workout.advanceStructuredRunningWorkoutManually()
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Done / Next", norwegian: "Ferdig / Neste"
+                            ), systemImage: "arrow.right.circle.fill")
+                                .font(.system(size: 13, weight: .bold))
+                                .frame(maxWidth: .infinity, minHeight: 42)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(WatchTheme.liveAction)
+                    }
+
                     if workout.state == .paused || workout.automaticPauseActive {
                         Label(
                             ATHLTHLocalization.choose(
