@@ -651,7 +651,7 @@ enum StrengthCardioExercisePolicy {
         let resistanceRow = [
             "cable", "seated", "bench", "chest supported", "dumbbell",
             "barbell", "landmine", "low row", "single arm", "one arm"
-        ].contains(where: value.contains)
+        ].contains { token in value.contains(token) }
         // A seated cable/weight-stack "row machine" is resistance training,
         // whereas an ergometer is cardio. Generic "rowing" alone is only
         // cardio when it is the whole exercise label.
