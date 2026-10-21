@@ -24,6 +24,36 @@ struct ATHLTHTrainTodayPremiumView: View {
     let onOpenLibrary: () -> Void
     let onStartWorkout: (PlannedSession, Bool) -> Void
     let onWorkoutDetails: (PlannedSession, Bool) -> Void
+    /// Changes only the selected unfinished workout after explicit approval.
+    let onAcceptAlternative: (
+        PlannedSession, ATHLTHDailyWorkoutAlternativeAdvisor.Suggestion
+    ) -> Void
+    let onUndoAlternative: (PlannedSession) -> Void
+
+    @State private var reportedEnergy: Int?
+    @State private var reportedStress: Int?
+    @State private var reportedSoreness: Int?
+    @State private var reportedMuscles: [String: RecoverySorenessLevel] = [:]
+    @State private var pendingSwap: PendingSwap?
+
+    private struct PendingSwap {
+        let workout: PlannedSession
+        let suggestion: ATHLTHDailyWorkoutAlternativeAdvisor.Suggestion
+    }
+
+    private var selfReportedSignals: ATHLTHDailyWorkoutAlternativeAdvisor.Signals {
+        .init(energy: reportedEnergy, stress: reportedStress,
+              overallSoreness: reportedSoreness,
+              muscleRatings: reportedMuscles, readiness: todaysReadiness)
+    }
+
+    private func reloadCheckIn() {
+        let current = RecoverySorenessStore()
+        reportedEnergy = current.todayEnergy
+        reportedStress = current.todayStress
+        reportedSoreness = current.todayOverallSoreness
+        reportedMuscles = current.todayRatings
+    }
     let onQuickTrain: (WorkoutKind) -> Void
     let onGhostRace: () -> Void
 
@@ -40,12 +70,27 @@ struct ATHLTHTrainTodayPremiumView: View {
                 if sessions.contains(where: { $0.isExplicitRestDay }) &&
                    !sessions.contains(where: { !$0.isExplicitRestDay }) {
                     restDayCard
+                    if let swapped = sessions.first(where: {
+                        $0.isExplicitRestDay && $0.dailyAlternativeOriginal != nil
+                    }) {
+                        undoAlternativeRow(swapped)
+                    }
                 } else if sessions.contains(where: { !$0.isExplicitRestDay }) &&
                           sessions.filter({ !$0.isExplicitRestDay })
                             .allSatisfy({ completedIDs.contains($0.id) }) {
                     completedTodayCard(plan)
                 } else if let workout = primaryWorkout {
                     workoutCard(workout, plan: plan)
+                    if workout.dailyAlternativeOriginal != nil {
+                        undoAlternativeRow(workout)
+                    } else if !completedIDs.contains(workout.id) &&
+                              !hasActiveWorkout,
+                              let suggested = ATHLTHDailyWorkoutAlternativeAdvisor
+                                .suggestions(for: workout,
+                                             signals: selfReportedSignals).first {
+                        alternativeRecommendationCard(
+                            for: workout, suggestion: suggested)
+                    }
                 } else {
                     openDayOverview(hasPlan: true)
                 }
@@ -66,13 +111,169 @@ struct ATHLTHTrainTodayPremiumView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .task {
+            reloadCheckIn()
             await workoutCatalog.refresh()
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: Notification.Name("athlth.dailyCheckInDidUpdate")
+        )) { _ in
+            reloadCheckIn()
+        }
+        .confirmationDialog(
+            tr("Swap today's workout?", "Bytte dagens økt?"),
+            isPresented: Binding(
+                get: { pendingSwap != nil },
+                set: { if !$0 { pendingSwap = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let pendingSwap {
+                Button(tr("Use", "Bruk") + " " + pendingSwap.suggestion.title) {
+                    onAcceptAlternative(
+                        pendingSwap.workout, pendingSwap.suggestion)
+                    self.pendingSwap = nil
+                }
+            }
+            Button(tr("Cancel", "Avbryt"), role: .cancel) {
+                pendingSwap = nil
+            }
+        } message: {
+            Text(tr(
+                "Only this unfinished workout changes. The original stays available to restore.",
+                "Kun denne ufullførte økten endres. Du kan når som helst gjenopprette den opprinnelige økten."
+            ))
         }
     }
 
     private var primaryWorkout: PlannedSession? {
         let workouts = sessions.filter { !$0.isExplicitRestDay }
         return workouts.first { !completedIDs.contains($0.id) } ?? workouts.first
+    }
+
+    /// Show an actual alternative and its reason immediately after the
+    /// workout. The athlete never has to open a generic 'Adjust' tile to
+    /// discover the recommendation.
+    private func alternativeRecommendationCard(
+        for workout: PlannedSession,
+        suggestion: ATHLTHDailyWorkoutAlternativeAdvisor.Suggestion
+    ) -> some View {
+        let alternatives = ATHLTHDailyWorkoutAlternativeAdvisor.suggestions(
+            for: workout, signals: selfReportedSignals)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 7) {
+                Image(systemName: "sparkles")
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Text(tr("ATHLTH HAS AN ALTERNATIVE",
+                        "ATHLTH FORESLÅR ET ALTERNATIV"))
+                    .font(.caption2.weight(.bold))
+                    .tracking(0.9)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Spacer()
+            }
+            Text(suggestion.reason)
+                .font(.caption)
+                .foregroundStyle(ink)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 10) {
+                Image(systemName: suggestion.choice.symbol)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(width: 36, height: 36)
+                    .background(.white.opacity(0.88),
+                                in: RoundedRectangle(cornerRadius: 11))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(suggestion.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ink)
+                    Text(tr("Less of the planned load",
+                            "Mindre av den planlagte belastningen"))
+                        .font(.caption2)
+                        .foregroundStyle(muted)
+                }
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 9) {
+                Button {
+                    pendingSwap = PendingSwap(
+                        workout: workout, suggestion: suggestion)
+                } label: {
+                    HStack(spacing: 7) {
+                        Text(tr("Swap to this", "Bytt til denne"))
+                        Image(systemName: "arrow.left.arrow.right")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 41)
+                    .background(ATHLTHPlanDesign.accentInk,
+                                in: RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+
+                if alternatives.count > 1 {
+                    Menu {
+                        ForEach(Array(alternatives.dropFirst())) { option in
+                            Button {
+                                pendingSwap = PendingSwap(
+                                    workout: workout, suggestion: option)
+                            } label: {
+                                Label(option.title, systemImage: option.choice.symbol)
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text(tr("Others", "Andre"))
+                            Image(systemName: "chevron.down")
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ink)
+                        .frame(minWidth: 83, minHeight: 41)
+                        .padding(.horizontal, 5)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                }
+            }
+            Text(tr(
+                "Suggestion only. Nothing changes until you confirm.",
+                "Kun et forslag. Ingenting endres før du godkjenner."
+            ))
+                .font(.system(size: 10))
+                .foregroundStyle(muted)
+        }
+        .padding(14)
+        .background(
+            LinearGradient(
+                colors: [ATHLTHPlanDesign.selectedSurface,
+                         ATHLTHPlanDesign.warmSurface],
+                startPoint: .topLeading, endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 17)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 17)
+                .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.7)
+        }
+    }
+
+    private func undoAlternativeRow(_ workout: PlannedSession) -> some View {
+        HStack(spacing: 9) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            Text(tr("Today's alternative selected",
+                    "Dagens alternative økt er valgt"))
+                .font(.caption.weight(.medium))
+                .foregroundStyle(ink)
+            Spacer()
+            Button(tr("Undo", "Angre")) {
+                onUndoAlternative(workout)
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+        }
+        .padding(12)
+        .background(ATHLTHPlanDesign.selectedSurface,
+                    in: RoundedRectangle(cornerRadius: 13))
     }
 
     private var restDayCard: some View {
