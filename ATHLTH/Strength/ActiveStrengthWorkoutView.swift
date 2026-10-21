@@ -1793,7 +1793,7 @@ struct ActiveStrengthWorkoutView: View {
                             .font(.caption)
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         }
-                        if let note = upcoming.exercise.instructions?.first, !note.isEmpty {
+                        if let note = upcoming.exercise.instructions.first, !note.isEmpty {
                             Text(note)
                                 .font(.caption2)
                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
