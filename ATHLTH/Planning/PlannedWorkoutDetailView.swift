@@ -18,6 +18,7 @@ struct PlannedWorkoutDetailView: View {
     var onStartWorkout: ((UUID, PlannedSession) -> Void)? = nil
 
     @State private var showingEditor = false
+    @State private var showingTrainingPlacePicker = false
     @State private var showingStructuredWorkout = false
     @State private var selectedLegacyExercise: WorkoutTemplateBlock?
     @State private var showingHealthLinkPicker = false
@@ -266,6 +267,16 @@ struct PlannedWorkoutDetailView: View {
                     }
                 }
             }
+            .sheet(isPresented: $showingTrainingPlacePicker) {
+                ATHLTHPlanTrainingPlacePicker(
+                    initial: currentWorkout.plannedTrainingPlace
+                ) { place in
+                    var updated = currentWorkout
+                    updated.plannedTrainingPlace = place
+                    session.updateSession(updated, inPlan: planID)
+                }
+                .environmentObject(session)
+            }
             .sheet(isPresented: $showingEditor) {
                 SessionEditorView(
                     planID: planID,
@@ -461,6 +472,35 @@ struct PlannedWorkoutDetailView: View {
                         }
                     }
                 }
+
+                Button {
+                    showingTrainingPlacePicker = true
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "mappin.and.ellipse")
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Training place",
+                                norwegian: "Treningssted"
+                            ))
+                            .font(.caption.weight(.semibold))
+                            Text(currentWorkout.plannedTrainingPlace?.name ??
+                                 ATHLTHLocalization.choose(
+                                     english: "Choose place",
+                                     norwegian: "Velg treningssted"
+                                 ))
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                    }
+                    .padding(.vertical, 7)
+                }
+                .buttonStyle(.plain)
+                .disabled(isCompleted || currentWorkout.isExplicitRestDay)
 
                 if let minutes = currentWorkout.reminderMinutesBefore,
                    minutes > 0 {
