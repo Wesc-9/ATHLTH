@@ -2102,7 +2102,7 @@ final class IPhoneWorkoutStore:
         guard active?.structuredRunningWorkout?.steps.isEmpty == false,
               structuredTickTask == nil else { return }
         structuredTickTask = Task { @MainActor [weak self] in
-            var lastMinuteCheckpoint = -1
+            var lastMinuteCheckpointKey: String?
             var lastCoachTickSecond = -1
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(200))
@@ -2114,14 +2114,17 @@ final class IPhoneWorkoutStore:
                       let step = self.currentStructuredStep else { continue }
                 // Write a sample at each active minute even without GPS movement.
                 let elapsed = current.elapsed(at: Date())
-                let minute = Int(elapsed / 60)
+                let elapsedInStep = max(elapsed -
+                    (current.structuredStepStartElapsedTime ?? 0), 0)
+                let minute = Int(elapsedInStep / 60)
+                let minuteKey = "\(step.id):\(minute)"
                 let coachSecond = Int(elapsed)
                 if coachSecond != lastCoachTickSecond {
                     lastCoachTickSecond = coachSecond
                     self.announceStructuredIntervalCues(current, elapsed: elapsed)
                 }
-                if minute > 0 && minute != lastMinuteCheckpoint {
-                    lastMinuteCheckpoint = minute
+                if minute > 0 && minuteKey != lastMinuteCheckpointKey {
+                    lastMinuteCheckpointKey = minuteKey
                     self.checkpoint(force: true)
                 }
                 if step.phase == "warmup" || step.phase == "cooldown" { continue }
