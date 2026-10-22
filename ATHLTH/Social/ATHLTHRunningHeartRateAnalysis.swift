@@ -28,6 +28,34 @@ enum ATHLTHRunningHeartRateAnalysis {
         .sorted { $0.date < $1.date }
     }
 
+    /// Use HealthKit samples for individual completed intervals only when
+    /// the recorded active phase timeline aligns with wall-clock workout
+    /// time. Paused sessions cannot safely assign a pulse to a phase from
+    /// active time alone, so fall back to indexed Watch checkpoints.
+    static func phasePoints(
+        _ samples: [ATHLTHRunningHeartRatePoint],
+        phaseIndex: Int,
+        steps: [ATHLTHRecordedRunningStep],
+        startedAt: Date,
+        endedAt: Date
+    ) -> [ATHLTHRunningHeartRatePoint] {
+        let ordered = steps.sorted { $0.index < $1.index }
+        guard let phase = ordered.first(where: { $0.index == phaseIndex }),
+              !samples.isEmpty, endedAt > startedAt,
+              ordered.allSatisfy({ $0.activeSeconds.isFinite &&
+                                  $0.activeSeconds >= 0 }) else { return [] }
+        let recordedTime = ordered.reduce(0.0) { $0 + $1.activeSeconds }
+        let clockTime = endedAt.timeIntervalSince(startedAt)
+        guard recordedTime > 0,
+              abs(recordedTime - clockTime) <= max(20, clockTime * 0.025)
+        else { return [] }
+        let earlierSeconds = ordered.filter { $0.index < phaseIndex }
+            .reduce(0.0) { $0 + $1.activeSeconds }
+        let from = startedAt.addingTimeInterval(earlierSeconds)
+        let through = from.addingTimeInterval(phase.activeSeconds)
+        return validPoints(samples, from: from, through: through)
+    }
+
     /// Bounded sample windows only. The denominator is covered sensor time,
     /// not the full workout duration, when the watch had missing data.
     static func zoneDurations(
