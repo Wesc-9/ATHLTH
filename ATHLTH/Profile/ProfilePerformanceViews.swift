@@ -5303,17 +5303,14 @@ struct PerformanceStatsView: View {
     private var passportHero: some View {
         GeometryReader { proxy in
             ZStack(alignment: .bottomLeading) {
-                Image("ProgressHero")
-                    .resizable()
-                    .interpolation(.high)
-                    .antialiased(true)
-                    .scaledToFill()
-                    .frame(
-                        width: proxy.size.width,
-                        height: proxy.size.height
-                    )
-                    .clipped()
-                    .accessibilityHidden(true)
+                LinearGradient(
+                    colors: [
+                        ATHLTHTheme.accentDeep,
+                        Color(red: 0.38, green: 0.38, blue: 0.44)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
 
                 LinearGradient(
                     stops: [
