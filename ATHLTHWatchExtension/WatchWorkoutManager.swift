@@ -236,6 +236,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var structuredStepStartDistanceMeters: Double = 0
     private var structuredWorkoutComplete = false
     private var recordedStructuredRunSteps: [ATHLTHRecordedRunningStep] = []
+    private var recordedStructuredRunMinutes: [ATHLTHRecordedRunningMinute] = []
     private var lastIntervalProgressCueKey: String?
     private var lastIntervalWarningCueKey: String?
     private var plannedRouteLocations: [CLLocation] = []
@@ -574,6 +575,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         structuredStepStartDistanceMeters = distanceMeters
         structuredWorkoutComplete = false
         recordedStructuredRunSteps = []
+        recordedStructuredRunMinutes = []
         lastIntervalProgressCueKey = nil
         lastIntervalWarningCueKey = nil
         offRouteStartedAt = nil
@@ -3938,6 +3940,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                         0
                     )
 
+                self.recordRunningMinuteIfDue()
                 self.evaluateStructuredRunningWorkout()
                 self.evaluateWorkoutTargetAlerts()
                 self.evaluateFuelAudioCoach()
@@ -4128,6 +4131,42 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
     }
 
+    /// Sample once per 60 seconds of active step time, plus any residual
+    /// seconds when the user advances. Do not substitute target speed for
+    /// measured Watch distance or mark manually set incline as measured.
+    private func recordRunningMinuteIfDue(force: Bool = false) {
+        guard state == .running,
+              let step = currentStructuredRunningStep,
+              (kind == .running || kind == .walking) else { return }
+
+        let stepIndex = structuredStepIndex
+        let samples = recordedStructuredRunMinutes.filter { $0.stepIndex == stepIndex }
+        let previousEnd = samples.last?.stepElapsedAtEndSeconds ?? 0
+        let currentEnd = currentStructuredStepElapsedTime
+        let sliceSeconds = max(currentEnd - previousEnd, 0)
+        guard (force && sliceSeconds >= 2) ||
+              (!force && sliceSeconds >= 60) else { return }
+
+        let previouslySampledDistance = samples.reduce(0.0) {
+            $0 + $1.watchDistanceMeters
+        }
+        let newDistance = max(0,
+            currentStructuredStepDistanceMeters - previouslySampledDistance)
+        recordedStructuredRunMinutes.append(ATHLTHRecordedRunningMinute(
+            stepIndex: stepIndex,
+            stepElapsedAtEndSeconds: currentEnd,
+            activeSeconds: sliceSeconds,
+            watchDistanceMeters: newDistance,
+            watchHeartRateBPM: hasFreshHeartRate ? heartRate : nil,
+            targetPaceSecondsPerKilometer:
+                step.targetPaceMinSecondsPerKilometer,
+            targetTreadmillInclinePercent:
+                step.targetTreadmillInclinePercent,
+            manuallyEnteredTreadmillInclinePercent:
+                treadmillInclinePercent
+        ))
+    }
+
     private func evaluateStructuredRunningWorkout() {
         guard state == .running,
               (kind == .running || kind == .walking),
@@ -4238,6 +4277,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             }
             return elapsedTime
         }()
+        recordRunningMinuteIfDue(force: true)
         let seconds = max(0, endElapsed - structuredStepStartElapsedTime)
         let meters = distanceMeters - structuredStepStartDistanceMeters
         if seconds >= 0, meters >= 0,
@@ -6601,6 +6641,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         workout: HKWorkout,
         endDate: Date
     ) {
+        recordRunningMinuteIfDue(force: true)
         let start =
             startedAt ?? workout.startDate
         let routeCompletion =
@@ -6659,6 +6700,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             result.structuredWorkoutSourceID = structured.sourceWorkoutID
             result.structuredWorkoutTitle = structured.title
             result.recordedRunningSteps = recordedStructuredRunSteps
+            result.recordedRunningMinutes = recordedStructuredRunMinutes
         }
 
         if kind == .strength {
