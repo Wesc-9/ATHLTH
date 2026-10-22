@@ -754,6 +754,28 @@ struct ATHLTHArenaAllCompetitionsView: View {
     }
 }
 
+
+/// Dedicated destination so a seasons quick tile really opens standings,
+/// rather than expanding an offscreen disclosure group.
+private struct ATHLTHArenaSeasonsDestination: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                ATHLTHArenaSeasonsSection()
+            }
+            .padding(17)
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
+        }
+        .background(ATHLTHArenaLightStyle.canvasBackground)
+        .environment(\.colorScheme, .light)
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Seasons", norwegian: "Sesonger"
+        ))
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
 struct ATHLTHArenaHomeView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
@@ -776,16 +798,18 @@ struct ATHLTHArenaHomeView: View {
                         .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
-                // Actions that require a response come before browsing.
-                // Do not show a blank "all caught up" card on the landing page.
+                ATHLTHArenaVisibleActivityPodium()
+                quickAccess
+
+                // Response-required invitations retain their original actions.
                 ATHLTHArenaNextStepsSection(showEmptyState: false)
 
                 if !drafts.isEmpty {
                     draftsSection
                 }
 
-                // Keep one competition overview rather than multiple
-                // competing quick-start dashboards.
+                // Server-backed competitions and challenge records remain the
+                // authority for status, acceptance, results and scoring.
                 ATHLTHArenaOnlineSection(compact: true)
                     .id(remoteRevision)
                 ATHLTHArenaChallengeOverviewSection(
@@ -793,8 +817,9 @@ struct ATHLTHArenaHomeView: View {
                     showInvitations: false
                 )
 
-                // Live activity stays prominent; inactive marketing and
-                // deeper tools are available through the secondary area.
+                // Photographic entry cards are real creation actions, never
+                // invented live contests or fabricated competitor scores.
+                competitionStarters
                 ATHLTHArenaLiveDuelsSection(hideWhenInactive: true)
                 moreArenaSection
             }
@@ -1039,122 +1064,318 @@ struct ATHLTHArenaHomeView: View {
         }
     }
 
-    // A single editorial entry area: one direct competition action,
-    // one direct challenge action, with more formats only when requested.
+    /// Selected ATHLTH Arena concept: athlete photography above a stadium
+    /// feature card. Buttons are native SwiftUI and retain existing creators.
     private var introduction: some View {
-        VStack(alignment: .leading, spacing: 17) {
-            HStack(alignment: .top, spacing: 14) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("ATHLTH · ARENA")
-                        .font(ATHLTHArenaLightStyle.eyebrow)
-                        .tracking(2.2)
-                        .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
-
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 0) {
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack(spacing: 7) {
+                        ATHLTHMarkShape()
+                            .fill(ATHLTHArenaLightStyle.warmGold)
+                            .frame(width: 26, height: 18)
+                        Text("ATHLTH")
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(3.1)
+                            .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
+                    }
                     Text("Arena")
-                        .font(ATHLTHArenaLightStyle.editorialTitle(37))
+                        .font(ATHLTHArenaLightStyle.editorialTitle(41))
                         .foregroundStyle(ATHLTHArenaLightStyle.ink)
-
                     Text(ATHLTHLocalization.choose(
-                        english: "Challenge a friend or compete across several rounds.",
-                        norwegian: "Utfordre en venn, eller konkurrer gjennom flere runder."
+                        english: "Your competition overview.",
+                        norwegian: "Din konkurransearena."
                     ))
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHArenaLightStyle.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .zIndex(1)
 
-                Spacer(minLength: 0)
-
-                Image(systemName: "trophy")
-                    .font(.system(size: 24, weight: .ultraLight))
-                    .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
-                    .frame(width: 57, height: 57)
-                    .background(ATHLTHArenaLightStyle.soft, in: Circle())
+                ATHLTHArenaEditorialPhoto(scene: .athlete)
+                    .frame(width: 153, height: 148)
+                    .clipped()
+                    .mask {
+                        LinearGradient(
+                            colors: [.clear, .white.opacity(0.78), .white],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    }
+                    .padding(.leading, -18)
                     .accessibilityHidden(true)
             }
+            .frame(height: 148)
 
-            VStack(spacing: 9) {
-                Button {
-                    creationMode = .series
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "trophy.fill")
-                        Text(ATHLTHLocalization.choose(
-                            english: "Create competition",
-                            norwegian: "Opprett konkurranse"
-                        ))
-                        Spacer(minLength: 4)
-                        Image(systemName: "arrow.right")
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 17)
-                    .frame(maxWidth: .infinity, minHeight: 51)
-                    .background(
-                        ATHLTHArenaLightStyle.ink,
-                        in: RoundedRectangle(cornerRadius: 15, style: .continuous)
-                    )
-                }
-                .buttonStyle(.plain)
+            ZStack(alignment: .topLeading) {
+                ATHLTHArenaEditorialPhoto(scene: .stadium)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
 
-                Button {
-                    creationMode = .challenge
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "flag.checkered")
-                            .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
-                        Text(ATHLTHLocalization.choose(
-                            english: "Challenge someone",
-                            norwegian: "Utfordre en venn"
-                        ))
-                        Spacer(minLength: 4)
-                        Image(systemName: "arrow.up.right")
-                            .foregroundStyle(ATHLTHArenaLightStyle.secondary)
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHArenaLightStyle.ink)
-                    .padding(.horizontal, 17)
-                    .frame(maxWidth: .infinity, minHeight: 49)
-                    .background(
-                        ATHLTHArenaLightStyle.soft,
-                        in: RoundedRectangle(cornerRadius: 15, style: .continuous)
-                    )
-                }
-                .buttonStyle(.plain)
-            }
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(0.93),
+                        Color.black.opacity(0.74),
+                        Color.black.opacity(0.10)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .allowsHitTesting(false)
 
-            Button {
-                withAnimation(.easeInOut(duration: 0.24)) {
-                    showingCreateOptions.toggle()
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: showingCreateOptions ? "chevron.up" : "square.grid.2x2")
+                LinearGradient(
+                    colors: [.clear, Color.black.opacity(0.50)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .allowsHitTesting(false)
+
+                VStack(alignment: .leading, spacing: 9) {
+                    Text("ATHLTH ARENA")
+                        .font(.system(size: 10, weight: .heavy))
+                        .tracking(2.4)
+                        .foregroundStyle(ATHLTHTheme.champagneSoft)
+
                     Text(ATHLTHLocalization.choose(
-                        english: "More competition formats",
-                        norwegian: "Flere konkurranseformer"
+                        english: "Compete.\nImprove. Belong.",
+                        norwegian: "Konkurrer.\nUtvikle deg. Sammen."
                     ))
-                    Spacer()
-                    Image(systemName: "chevron.right")
+                    .font(ATHLTHArenaLightStyle.editorialTitle(30))
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(3)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Real athletes. Real challenges.",
+                        norwegian: "Ekte utøvere. Ekte utfordringer."
+                    ))
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.88))
+
+                    Spacer(minLength: 4)
+
+                    HStack(spacing: 9) {
+                        Button {
+                            creationMode = .challenge
+                        } label: {
+                            HStack(spacing: 6) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "New duel", norwegian: "Ny duell"
+                                ))
+                                Spacer(minLength: 1)
+                                Image(systemName: "arrow.right")
+                            }
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(ATHLTHArenaLightStyle.ink)
+                            .padding(.horizontal, 13)
+                            .frame(minHeight: 47)
+                            .background(
+                                LinearGradient(
+                                    colors: [
+                                        ATHLTHTheme.champagneSoft,
+                                        ATHLTHTheme.premiumGold
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                in: Capsule()
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        NavigationLink {
+                            ATHLTHArenaAllCompetitionsView()
+                        } label: {
+                            HStack(spacing: 5) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Competitions",
+                                    norwegian: "Konkurranser"
+                                ))
+                                Spacer(minLength: 0)
+                                Image(systemName: "arrow.up.right")
+                            }
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 47)
+                            .background(.white.opacity(0.13), in: Capsule())
+                            .overlay {
+                                Capsule().stroke(.white.opacity(0.35), lineWidth: 1)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ATHLTHArenaLightStyle.secondary)
-                .frame(minHeight: 42)
-                .contentShape(Rectangle())
+                .padding(19)
+            }
+            .frame(height: 253)
+            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .stroke(ATHLTHTheme.premiumGold.opacity(0.48), lineWidth: 0.8)
+            }
+            .shadow(color: ATHLTHArenaLightStyle.ink.opacity(0.13),
+                    radius: 18, y: 9)
+        }
+    }
+
+    private var quickAccess: some View {
+        HStack(spacing: 8) {
+            NavigationLink {
+                GhostFriendRaceHubView()
+            } label: {
+                quickTile("Live Ghost", symbol: "bolt.fill")
             }
             .buttonStyle(.plain)
-            .accessibilityValue(
-                showingCreateOptions
-                    ? ATHLTHLocalization.choose(
-                        english: "Expanded", norwegian: "Utvidet"
-                    )
-                    : ATHLTHLocalization.choose(
-                        english: "Collapsed", norwegian: "Sammenslått"
-                    )
+            NavigationLink {
+                ATHLTHArenaSingleChallengesView()
+            } label: {
+                quickTile(
+                    ATHLTHLocalization.choose(
+                        english: "Challenges", norwegian: "Dueller"
+                    ),
+                    symbol: "flag.checkered"
+                )
+            }
+            .buttonStyle(.plain)
+            NavigationLink {
+                ATHLTHArenaSeasonsDestination()
+            } label: {
+                quickTile(
+                    ATHLTHLocalization.choose(
+                        english: "Seasons", norwegian: "Sesonger"
+                    ),
+                    symbol: "chart.bar.fill"
+                )
+            }
+            .buttonStyle(.plain)
+            Button {
+                creationMode = .teamRelay
+            } label: {
+                quickTile(
+                    ATHLTHLocalization.choose(
+                        english: "Team Arena", norwegian: "Lag Arena"
+                    ),
+                    symbol: "person.3.fill"
+                )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func quickTile(_ title: String, symbol: String) -> some View {
+        VStack(spacing: 9) {
+            Image(systemName: symbol)
+                .font(.system(size: 21, weight: .medium))
+                .foregroundStyle(ATHLTHArenaLightStyle.warmGold)
+                .frame(height: 29)
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(ATHLTHArenaLightStyle.ink)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, minHeight: 87)
+        .padding(.horizontal, 4)
+        .background(ATHLTHArenaLightStyle.card(17))
+        .accessibilityElement(children: .combine)
+    }
+
+    private var competitionStarters: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack {
+                Text(ATHLTHLocalization.choose(
+                    english: "Create a competition",
+                    norwegian: "Start en konkurranse"
+                ))
+                .font(ATHLTHArenaLightStyle.editorialTitle(23))
+                .foregroundStyle(ATHLTHArenaLightStyle.ink)
+                Spacer()
+            }
+            starterRow(
+                scene: .running,
+                title: ATHLTHLocalization.choose(
+                    english: "Running duel", norwegian: "Løpeduell"
+                ),
+                subtitle: ATHLTHLocalization.choose(
+                    english: "Pick a route and challenge a friend",
+                    norwegian: "Velg en rute og utfordre en venn"
+                ),
+                symbol: "figure.run",
+                action: { creationMode = .route }
+            )
+            starterRow(
+                scene: .strength,
+                title: ATHLTHLocalization.choose(
+                    english: "Strength duel", norwegian: "Styrkeduell"
+                ),
+                subtitle: ATHLTHLocalization.choose(
+                    english: "Compete in your chosen exercise",
+                    norwegian: "Konkurrer i en øvelse du velger"
+                ),
+                symbol: "dumbbell.fill",
+                action: { creationMode = .strength }
             )
         }
-        .padding(19)
-        .background(ATHLTHArenaLightStyle.card(25))
+    }
+
+    private func starterRow(
+        scene: ATHLTHArenaEditorialScene,
+        title: String,
+        subtitle: String,
+        symbol: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: 0) {
+            ATHLTHArenaEditorialPhoto(scene: scene)
+                .frame(width: 119, height: 132)
+                .clipped()
+                .overlay(alignment: .topLeading) {
+                    Image(systemName: symbol)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHArenaLightStyle.ink)
+                        .padding(8)
+                        .background(.regularMaterial, in: Capsule())
+                        .padding(8)
+                }
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(title)
+                    .font(ATHLTHArenaLightStyle.editorialTitle(20))
+                    .foregroundStyle(ATHLTHArenaLightStyle.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.77)
+                Text(subtitle)
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHArenaLightStyle.secondary)
+                    .lineLimit(2)
+
+                Spacer(minLength: 4)
+
+                Button(action: action) {
+                    HStack(spacing: 5) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Create duel", norwegian: "Opprett duell"
+                        ))
+                        Image(systemName: "arrow.right")
+                    }
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(ATHLTHArenaLightStyle.ink)
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 34)
+                    .background(ATHLTHTheme.champagneSoft, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 11)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(height: 132)
+        .background(ATHLTHArenaLightStyle.card(19))
+        .clipShape(RoundedRectangle(cornerRadius: 19, style: .continuous))
     }
 
     private var createOptions: some View {
