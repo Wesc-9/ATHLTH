@@ -82,4 +82,30 @@ enum ATHLTHLiveActivityDisplayPolicy {
         }
         return max(secondsAtSnapshot - elapsed, 0)
     }
+
+    /// Compact Island values must remain short when Now Playing is active
+    /// alongside the workout Live Activity.
+    static func compactRepetitions(_ reps: Int?) -> String {
+        guard let reps, reps >= 0 else { return "—" }
+        return "\(reps)×"
+    }
+
+    static func compactDistance(_ meters: Double) -> String {
+        guard meters.isFinite, meters >= 0 else { return "—" }
+        if meters < 1_000 {
+            return "\(Int(meters.rounded()))m"
+        }
+        return String(format: "%.1fk", meters / 1_000)
+    }
+
+    static func compactDuration(_ seconds: TimeInterval) -> String {
+        guard seconds.isFinite, seconds >= 0,
+              seconds < Double(Int.max) else { return "—" }
+        let total = Int(seconds)
+        if total >= 3_600 {
+            return String(format: "%dh%02d", total / 3_600,
+                          (total % 3_600) / 60)
+        }
+        return String(format: "%d:%02d", total / 60, total % 60)
+    }
 }
