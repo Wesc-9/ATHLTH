@@ -146,6 +146,7 @@ struct HomeAssistantInboundCommand: Codable, Hashable, Identifiable {
 
 private struct HomeAssistantWebhookResponse: Decodable {
     let commands: [HomeAssistantInboundCommand]?
+    let features: [String]?
 }
 
 private struct HomeAssistantWebhookHTTPResult {
@@ -292,6 +293,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     @Published private(set) var connectedInstanceURL: URL?
     @Published private(set) var lastErrorMessage: String?
     @Published private(set) var pendingDeliveryCount: Int = 0
+    @Published private(set) var supportsAthleteSnapshot = false
 
     @Published var shareWorkoutState: Bool {
         didSet {
@@ -851,6 +853,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         discoveredInstances = []
         lastErrorMessage = nil
         connectionState = .disconnected
+        supportsAthleteSnapshot = false
     }
 
     func send(
@@ -979,8 +982,19 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 try? JSONDecoder().decode(
                     HomeAssistantWebhookResponse.self,
                     from: data
-                ),
-              let commands = response.commands,
+                )
+        else {
+            return
+        }
+
+        let supports = response.features?.contains(
+            "profile_performance_snapshot_v1"
+        ) == true
+        if supportsAthleteSnapshot != supports {
+            supportsAthleteSnapshot = supports
+        }
+
+        guard let commands = response.commands,
               !commands.isEmpty
         else {
             return
@@ -2321,6 +2335,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 )
                 : .array([])
 
+        if supportsAthleteSnapshot {
         state["athlete_display_name"] =
             shareAthleteProfile
                 ? (
@@ -2368,6 +2383,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                     }
                 )
                 : .array([])
+
+        }
 
         state["pending_delivery_count"] =
             .int(pendingDeliveryCount)
