@@ -1114,6 +1114,7 @@ struct IPhoneWorkoutView: View {
     @EnvironmentObject private var recorder: IPhoneWorkoutStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
     @Environment(\.dismiss) private var dismiss
@@ -1126,6 +1127,7 @@ struct IPhoneWorkoutView: View {
     @State private var showingLiveAudioCoach = false
     @State private var showingAIConversation = false
     @State private var showingTreadmillSpeedEditor = false
+    @State private var showingAddRunningWorkout = false
     @State private var treadmillInclineDraft = 0.0
     @State private var treadmillInclineEditingWorkoutID:
         UUID?
@@ -1816,6 +1818,17 @@ struct IPhoneWorkoutView: View {
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
             }
+            .sheet(isPresented: $showingAddRunningWorkout) {
+                ActiveHybridWorkoutPicker { session, startNow in
+                    guard let template = session.runningWorkout else {
+                        return false
+                    }
+                    return recorder.appendRunningIntervalsDuringWorkout(
+                        template, startNow: startNow
+                    )
+                }
+                .environmentObject(runningLibrary)
+            }
             .sheet(isPresented: $showingTreadmillSpeedEditor) {
                 TreadmillSpeedEditorView(
                     initialValue:
@@ -2206,7 +2219,25 @@ struct IPhoneWorkoutView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                ATHLTHAudioRouteControl()
+                Button {
+                    showingAddRunningWorkout = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 43, height: 43)
+                        .background(Color.white.opacity(0.90), in: Circle())
+                        .overlay {
+                            Circle().stroke(
+                                Color.black.opacity(0.045), lineWidth: 0.8
+                            )
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Add interval workout",
+                    norwegian: "Legg til intervalløkt"
+                ))
             }
 
             if workout.runEnvironment == .treadmill {
