@@ -560,10 +560,11 @@ struct ATHLTHIntervalResultSummaryCard: View {
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
             if !incline.isEmpty {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(tr("Entered incline by time", "Oppgitt stigning per tidspunkt"))
-                        .font(.caption2.weight(.semibold))
-                    ForEach(Array(incline.enumerated()), id: \.offset) { _, sample in
+                DisclosureGroup(
+                    tr("Entered incline by time", "Oppgitt stigning per tidspunkt")
+                ) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        ForEach(Array(incline.enumerated()), id: \.offset) { _, sample in
                         let from = max(0, sample.stepElapsedAtEndSeconds -
                                         sample.activeSeconds)
                         HStack(spacing: 6) {
@@ -573,10 +574,13 @@ struct ATHLTHIntervalResultSummaryCard: View {
                             Text(String(format: "%.1f %%", 
                                 sample.manuallyEnteredTreadmillInclinePercent ?? 0))
                         }
-                        .font(.caption2)
-                        .monospacedDigit()
+                            .font(.caption2)
+                            .monospacedDigit()
+                        }
                     }
+                    .padding(.top, 7)
                 }
+                .font(.caption2.weight(.semibold))
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 .padding(9)
                 .background(ATHLTHPlanDesign.selectedSurface,
