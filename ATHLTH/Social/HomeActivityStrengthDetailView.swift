@@ -1222,22 +1222,6 @@ struct HomeActivityStrengthDetailView: View {
                     title:
                         ATHLTHLocalization.choose(
                             english:
-                                "Total rest",
-                            norwegian:
-                                "Total pause"
-                        ),
-                    value:
-                        compactStrengthDuration(
-                            totalRestSeconds
-                        ),
-                    icon:
-                        "pause.circle.fill"
-                )
-
-                restMetricTile(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english:
                                 "Average rest",
                             norwegian:
                                 "Snittpause"
@@ -1266,7 +1250,9 @@ struct HomeActivityStrengthDetailView: View {
                         "hourglass"
                 )
 
-                restMetricTile(
+            }
+
+            restMetricTile(
                     title:
                         ATHLTHLocalization.choose(
                             english:
@@ -1284,7 +1270,7 @@ struct HomeActivityStrengthDetailView: View {
                     icon:
                         "arrow.left.arrow.right"
                 )
-            }
+
 
             if !restTimeline.isEmpty {
                 Divider()
