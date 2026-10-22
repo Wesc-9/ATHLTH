@@ -18,6 +18,7 @@ final class MirroredWorkoutAudioCoach:
         ATHLTHGuidancePriorityGate()
     private var eventLedger = ATHLTHCoachEventLedger()
     private var cueQueue = ATHLTHCoachCueQueue()
+    private var localSpeechWatchdog: Task<Void, Never>?
     private var coachReplayMemory = ATHLTHCoachReplayMemory()
     var onLastSpokenCoachMessage: ((String?) -> Void)?
 
@@ -260,6 +261,8 @@ final class MirroredWorkoutAudioCoach:
     /// Stop audio immediately on expired ownership without discarding
     /// workout progress or queued configuration.
     func suspendForWatchFallback() {
+        localSpeechWatchdog?.cancel()
+        localSpeechWatchdog = nil
         azureCoachSpeech.stop()
         synthesizer.stopSpeaking(at: .immediate)
         ATHLTHSpokenAudioSession.deactivate(owner: audioOwner)
@@ -268,6 +271,8 @@ final class MirroredWorkoutAudioCoach:
     }
 
     func stop() {
+        localSpeechWatchdog?.cancel()
+        localSpeechWatchdog = nil
         azureCoachSpeech.stop()
         synthesizer.stopSpeaking(
             at: .immediate
@@ -782,6 +787,7 @@ final class MirroredWorkoutAudioCoach:
                     owner: self.audioOwner
                 )
                 self.synthesizer.speak(utterance)
+                self.watchLocalSpeech(utterance)
             },
             onFinished: { [weak self] in
                 guard let self else { return }
@@ -795,6 +801,7 @@ final class MirroredWorkoutAudioCoach:
                 owner: audioOwner
             )
             synthesizer.speak(utterance)
+            watchLocalSpeech(utterance)
         }
         if rememberForReplay,
            ATHLTHCoachReplayMemory.mayRemember(priority: priority) {
@@ -804,6 +811,34 @@ final class MirroredWorkoutAudioCoach:
         if let event,
            let workoutStartedAt {
             onSpokenEventAttempt?(event, workoutStartedAt)
+        }
+    }
+
+    /// The local synthesizer occasionally loses its finish callback during a
+    /// Bluetooth handoff. A bounded watchdog always releases our own lease.
+    private func watchLocalSpeech(_ utterance: AVSpeechUtterance) {
+        localSpeechWatchdog?.cancel()
+        let seconds = max(60, min(150, Double(utterance.speechString.count) / 3 + 20))
+        localSpeechWatchdog = Task { @MainActor [weak self] in
+            for _ in 0..<Int(ceil(seconds / 2)) {
+                do { try await Task.sleep(for: .seconds(2)) }
+                catch { return }
+                guard !Task.isCancelled, let self else { return }
+                if !self.synthesizer.isSpeaking && !self.azureCoachSpeech.isBusy {
+                    self.localSpeechWatchdog = nil
+                    ATHLTHSpokenAudioSession.deactivate(owner: self.audioOwner)
+                    self.guidanceGate.voiceDidFinish()
+                    self.deliverNextQueuedCue()
+                    return
+                }
+            }
+            guard !Task.isCancelled, let self,
+                  !self.azureCoachSpeech.isBusy else { return }
+            self.synthesizer.stopSpeaking(at: .immediate)
+            self.localSpeechWatchdog = nil
+            ATHLTHSpokenAudioSession.deactivate(owner: self.audioOwner)
+            self.guidanceGate.voiceDidFinish()
+            self.deliverNextQueuedCue()
         }
     }
 
@@ -840,6 +875,8 @@ final class MirroredWorkoutAudioCoach:
             // A cancelled system utterance can finish its delegate callback
             // after an Azure replacement has already started. Never release
             // the ducking audio session while a second coach voice is active.
+            self.localSpeechWatchdog?.cancel()
+            self.localSpeechWatchdog = nil
             ATHLTHSpokenAudioSession.deactivate(owner: audioOwner)
             self.deliverNextQueuedCue()
         }
@@ -866,6 +903,8 @@ final class MirroredWorkoutAudioCoach:
             // A cancelled system utterance can finish its delegate callback
             // after an Azure replacement has already started. Never release
             // the ducking audio session while a second coach voice is active.
+            self.localSpeechWatchdog?.cancel()
+            self.localSpeechWatchdog = nil
             ATHLTHSpokenAudioSession.deactivate(owner: audioOwner)
             self.deliverNextQueuedCue()
         }
