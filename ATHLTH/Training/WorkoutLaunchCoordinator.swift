@@ -161,6 +161,7 @@ struct PlannedWorkoutWatchBuilder {
         WatchRunningWorkoutTransfer(
             title: workout.title,
             steps: runningSteps(from: workout),
+            sourceWorkoutID: workout.id,
             routeAlerts: routeAlerts,
             autoPauseEnabled: autoPauseEnabled,
             autoAdvanceTimedSteps: workout.autoAdvanceTimedSteps,
