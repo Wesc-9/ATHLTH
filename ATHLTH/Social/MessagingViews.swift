@@ -1031,7 +1031,7 @@ struct MessageInboxView: View {
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
                     .background(
-                        ATHLTHTheme.vitalitySoft,
+                        ATHLTHTheme.premiumGoldSoft,
                         in: Capsule()
                     )
             }
@@ -1115,7 +1115,7 @@ struct MessageInboxView: View {
                 .font(.system(size: 28, weight: .medium))
                 .foregroundStyle(ATHLTHTheme.accentDeep)
                 .frame(width: 66, height: 66)
-                .background(ATHLTHTheme.vitalitySoft, in: Circle())
+                .background(ATHLTHTheme.premiumGoldSoft, in: Circle())
 
             VStack(spacing: 5) {
                 Text(inboxEmptyTitle)
@@ -2219,7 +2219,7 @@ private struct MessagePersonRow: View {
                                 )
                                 .foregroundStyle(
                                     ATHLTHTheme
-                                        .vitality
+                                        .premiumGold
                                 )
                                 .padding(
                                     .horizontal,
@@ -2231,7 +2231,7 @@ private struct MessagePersonRow: View {
                                 )
                                 .background(
                                     ATHLTHTheme
-                                        .vitalitySoft,
+                                        .premiumGoldSoft,
                                     in: Capsule()
                                 )
                         }
@@ -2727,10 +2727,10 @@ private struct MessageRequestRow: View {
 
                 Text(direction == .incoming ? "Request" : "Pending")
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.vitality)
+                    .foregroundStyle(ATHLTHTheme.premiumGold)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 5)
-                    .background(ATHLTHTheme.vitalitySoft, in: Capsule())
+                    .background(ATHLTHTheme.premiumGoldSoft, in: Capsule())
             }
 
             if let body = message?.body, !body.isEmpty {
@@ -2744,7 +2744,7 @@ private struct MessageRequestRow: View {
                 HStack(spacing: 8) {
                     Button("Accept", action: onAccept)
                         .buttonStyle(.borderedProminent)
-                        .tint(ATHLTHTheme.vitality)
+                        .tint(ATHLTHTheme.premiumGold)
 
                     Button("Decline", action: onDecline)
                         .buttonStyle(.bordered)
@@ -2809,7 +2809,7 @@ private struct MessageConversationRow: View {
 
                 if unreadCount > 0 {
                     Circle()
-                        .fill(ATHLTHTheme.vitality)
+                        .fill(ATHLTHTheme.premiumGold)
                         .frame(width: 11, height: 11)
                         .overlay {
                             Circle()
@@ -2882,7 +2882,7 @@ private struct MessageConversationRow: View {
                             .padding(.horizontal, 7)
                             .padding(.vertical, 4)
                             .background(
-                                ATHLTHTheme.vitalitySoft,
+                                ATHLTHTheme.premiumGoldSoft,
                                 in: Capsule()
                             )
                     }
@@ -2901,7 +2901,7 @@ private struct MessageConversationRow: View {
                             .padding(.horizontal, 7)
                             .padding(.vertical, 4)
                             .background(
-                                ATHLTHTheme.vitalitySoft,
+                                ATHLTHTheme.premiumGoldSoft,
                                 in: Capsule()
                             )
                     }
@@ -3023,7 +3023,7 @@ private struct MessageConversationRow: View {
                     .foregroundStyle(ATHLTHTheme.accentDeep)
                     .frame(width: 25, height: 25)
                     .background(
-                        ATHLTHTheme.vitalitySoft,
+                        ATHLTHTheme.premiumGoldSoft,
                         in: Circle()
                     )
 
@@ -3059,7 +3059,7 @@ private struct MessageConversationRow: View {
                     .foregroundStyle(ATHLTHTheme.accentDeep)
                     .frame(width: 27, height: 27)
                     .background(
-                        ATHLTHTheme.vitalitySoft,
+                        ATHLTHTheme.premiumGoldSoft,
                         in: RoundedRectangle(
                             cornerRadius: 8,
                             style: .continuous
@@ -3242,7 +3242,7 @@ struct DirectMessageThreadView: View {
             ATHLTHPremiumCanvas(
                 accent:
                     ATHLTHTheme
-                        .vitality
+                        .premiumGold
                         .opacity(0.12)
             )
 
@@ -3528,20 +3528,6 @@ struct DirectMessageThreadView: View {
                 }
 
                 Divider()
-
-                if let photoCreditURL = URL(string:
-                    "https://www.pexels.com/photo/stands-by-running-track-at-stadium-19753619/"
-                ) {
-                    Link(destination: photoCreditURL) {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Stadium photo · Heber Vazquez (Pexels)",
-                                norwegian: "Stadionfoto · Heber Vazquez (Pexels)"
-                            ),
-                            systemImage: "photo"
-                        )
-                    }
-                }
 
                 Button(
                     ATHLTHLocalization.choose(
@@ -4165,7 +4151,7 @@ struct DirectMessageThreadView: View {
                     )
                     .fill(
                         ATHLTHTheme
-                            .vitalitySoft
+                            .premiumGoldSoft
                     )
 
                     Image(
@@ -4180,7 +4166,7 @@ struct DirectMessageThreadView: View {
                     )
                     .foregroundStyle(
                         ATHLTHTheme
-                            .vitality
+                            .premiumGold
                     )
                 }
                 .frame(
@@ -4361,7 +4347,7 @@ struct DirectMessageThreadView: View {
                         )
                     }
                     .foregroundStyle(
-                        .white
+                        ATHLTHTheme.primaryText
                     )
                     .frame(
                         maxWidth: .infinity
@@ -4371,9 +4357,9 @@ struct DirectMessageThreadView: View {
                         LinearGradient(
                             colors: [
                                 ATHLTHTheme
-                                    .vitality,
+                                    .champagne,
                                 ATHLTHTheme
-                                    .accentDeep
+                                    .premiumGold
                             ],
                             startPoint:
                                 .topLeading,
@@ -4385,7 +4371,7 @@ struct DirectMessageThreadView: View {
                     .shadow(
                         color:
                             ATHLTHTheme
-                                .vitality
+                                .premiumGold
                                 .opacity(0.20),
                         radius: 10,
                         y: 5
@@ -4604,7 +4590,7 @@ struct DirectMessageThreadView: View {
             )
             .foregroundStyle(
                 ATHLTHTheme
-                    .vitality
+                    .premiumGold
             )
             .frame(
                 width: 38,
@@ -4612,7 +4598,7 @@ struct DirectMessageThreadView: View {
             )
             .background(
                 ATHLTHTheme
-                    .vitalitySoft,
+                    .premiumGoldSoft,
                 in: RoundedRectangle(
                     cornerRadius: 12,
                     style: .continuous
@@ -4691,9 +4677,9 @@ struct DirectMessageThreadView: View {
             if let selectedShare {
                 HStack(spacing: 10) {
                     Image(systemName: selectedShare.kind.systemImage)
-                        .foregroundStyle(ATHLTHTheme.vitality)
+                        .foregroundStyle(ATHLTHTheme.premiumGold)
                         .frame(width: 34, height: 34)
-                        .background(ATHLTHTheme.vitalitySoft, in: RoundedRectangle(cornerRadius: 10))
+                        .background(ATHLTHTheme.premiumGoldSoft, in: RoundedRectangle(cornerRadius: 10))
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(selectedShare.title)
@@ -5849,7 +5835,7 @@ private struct ThreadChallengeLifecycleEventRow: View {
             )
             .foregroundStyle(
                 ATHLTHTheme
-                    .vitality
+                    .premiumGold
             )
             .frame(
                 width: 30,
@@ -6530,7 +6516,7 @@ private struct ThreadChallengeInvitationBubble: View {
                     Image(systemName: "arrow.up.right")
                 }
                 .font(.caption.weight(.bold))
-                .foregroundStyle(ATHLTHTheme.vitality)
+                .foregroundStyle(ATHLTHTheme.premiumGold)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)
@@ -6957,7 +6943,7 @@ private struct MessageBubble: View {
                     VStack(alignment: .leading, spacing: 9) {
                         HStack(spacing: 8) {
                             Image(systemName: attachmentKind.systemImage)
-                                .foregroundStyle(ATHLTHTheme.vitality)
+                                .foregroundStyle(ATHLTHTheme.premiumGold)
                             Text(isPlannedInvitation
                                  ? ATHLTHLocalization.choose(
                                      english: "WORKOUT INVITATION",
@@ -7072,7 +7058,7 @@ private struct MessageBubble: View {
                                         onRespondToInvite(true)
                                     }
                                     .buttonStyle(.borderedProminent)
-                                    .tint(ATHLTHTheme.vitality)
+                                    .tint(ATHLTHTheme.premiumGold)
                                 }
                                 .disabled(respondingToInvite)
                             }
@@ -7123,7 +7109,7 @@ private struct MessageBubble: View {
                                     }
                                 }
                             }
-                            .tint(ATHLTHTheme.vitality)
+                            .tint(ATHLTHTheme.premiumGold)
                         }
                     }
                     .padding(13)
