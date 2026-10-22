@@ -1145,10 +1145,61 @@ struct MirroredWorkoutLiveView: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
 
+                        if let remaining = snapshot.runningStepRemainingSeconds,
+                           remaining.isFinite {
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Text(durationText(remaining))
+                                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                                    .monospacedDigit()
+                                Text(ATHLTHLocalization.choose(
+                                    english: "remaining", norwegian: "igjen"
+                                ))
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                        }
+
                         if let progress = snapshot.runningStepProgress,
                            progress.isFinite {
+                            Text(ATHLTHLocalization.choose(
+                                english: "CURRENT PHASE", norwegian: "AKTIV DEL"
+                            ))
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.mutedText)
                             ProgressView(value: min(max(progress, 0), 1))
                                 .tint(ATHLTHTheme.accent)
+                        }
+                        if let overall = snapshot.runningOverallProgress,
+                           overall.isFinite {
+                            Text(ATHLTHLocalization.choose(
+                                english: "FULL WORKOUT", norwegian: "HELE ØKTEN"
+                            ))
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            ProgressView(value: min(max(overall, 0), 1))
+                                .tint(ATHLTHTheme.accentDeep)
+                        }
+                        if let target = snapshot.runningStepTargetPaceSecondsPerKilometer,
+                           target.isFinite, target > 0 {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Target pace", norwegian: "Måltempo"
+                                ) + " · " + durationText(target) + "/km",
+                                systemImage: "speedometer"
+                            )
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                        }
+                        if let incline = snapshot.runningStepTargetTreadmillInclinePercent,
+                           incline.isFinite {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Planned incline", norwegian: "Planlagt stigning"
+                                ) + " · " + String(format: "%.1f %%", incline),
+                                systemImage: "mountain.2"
+                            )
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.mutedText)
                         }
                     }
 
@@ -1345,6 +1396,51 @@ struct MirroredWorkoutLiveView: View {
                         )
                     )
                 }
+            }
+
+            if let zone = snapshot.runningStepTargetHeartRateZone,
+               (1...5).contains(zone) {
+                HStack(spacing: 7) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "TARGET HEART RATE", norwegian: "PULSMÅL"
+                    ) + " · " + ATHLTHLocalization.choose(
+                        english: "Zone", norwegian: "Sone"
+                    ) + " \(zone)")
+                        .font(.caption.weight(.semibold))
+                    Spacer()
+                    ForEach(1...5, id: \.self) { number in
+                        Capsule()
+                            .fill(number == zone
+                                  ? ATHLTHTheme.accent : ATHLTHTheme.divider)
+                            .frame(width: 15, height: 7)
+                    }
+                }
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+
+            if snapshot.runningManualAdvanceRequired == true,
+               snapshot.state == .running,
+               let stepIndex = snapshot.runningStepIndex {
+                Button {
+                    mirroring.advanceRunningStep(
+                        expectedIndex: stepIndex, startedAt: snapshot.startedAt
+                    )
+                } label: {
+                    Label(
+                        snapshot.runningNextStepTitle == nil
+                            ? ATHLTHLocalization.choose(
+                                english: "Finish phase", norwegian: "Avslutt del"
+                              )
+                            : ATHLTHLocalization.choose(
+                                english: "Next phase", norwegian: "Neste del"
+                              ),
+                        systemImage: "arrow.right.circle.fill"
+                    )
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accentDeep)
             }
 
             if let next = snapshot.runningNextStepTitle, !next.isEmpty {
