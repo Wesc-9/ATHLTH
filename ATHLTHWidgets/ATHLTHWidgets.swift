@@ -550,6 +550,7 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                 }
             } compactLeading: {
                 Image(systemName: primarySymbol(context))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(focusTint(context))
             } compactTrailing: {
                 compactTrainingValue(context)
@@ -878,17 +879,74 @@ struct ATHLTHWorkoutLiveActivity: Widget {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// The compact Island must coexist with music and other system
+    /// activities. Expanded and Lock Screen views keep full descriptions.
+    private func compactIslandValue(_ context: Context) -> String {
+        switch workoutFocus(context) {
+        case .paused:
+            return "PAUSE"
+        case .strengthRest:
+            return localized("REST", "PAUSE")
+        case .strengthTimedSet:
+            return localized("TIME", "TID")
+        case .strengthSet:
+            if let reps = context.state.strengthReps {
+                return ATHLTHLiveActivityDisplayPolicy.compactRepetitions(reps)
+            }
+            if let set = context.state.strengthSetIndex,
+               let count = context.state.strengthSetCount, count > 0 {
+                return "\(min(max(set, 1), count))/\(count)"
+            }
+            return "—"
+        case .runningInterval:
+            if let seconds = context.state.runningStepRemainingSeconds,
+               seconds.isFinite {
+                return ATHLTHLiveActivityDisplayPolicy
+                    .compactDuration(ceil(max(seconds, 0)))
+            }
+            if let meters = context.state.runningStepRemainingMeters {
+                return ATHLTHLiveActivityDisplayPolicy.compactDistance(meters)
+            }
+            if let progress = ATHLTHLiveActivityDisplayPolicy.safeProgress(
+                context.state.runningStepProgress
+            ) {
+                return "\(Int((progress * 100).rounded()))%"
+            }
+            return "INT"
+        case .running:
+            return validPace(context.state.currentPaceSecondsPerKilometer)
+        case .walking, .cycling:
+            return ATHLTHLiveActivityDisplayPolicy.compactDistance(
+                context.state.distanceMeters
+            )
+        case .elapsed:
+            return ATHLTHLiveActivityDisplayPolicy.compactDuration(
+                context.state.elapsedTime
+            )
+        }
+    }
+
+    private func compactIslandText(_ value: String) -> some View {
+        Text(value)
+            .font(.system(size: 12, weight: .bold, design: .rounded))
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .frame(maxWidth: 42)
+    }
+
     @ViewBuilder
     private func compactTrainingValue(_ context: Context) -> some View {
         if workoutFocus(context) == .strengthRest,
            let ends = context.state.strengthRestEndsAt {
             TimelineView(.periodic(from: .now, by: 5)) { timeline in
-                Text(ends > timeline.date
-                    ? duration(ceil(ends.timeIntervalSince(timeline.date)))
-                    : localized("READY", "KLAR"))
-                    .font(.caption2.weight(.bold))
-                    .monospacedDigit()
-                    .lineLimit(1)
+                compactIslandText(
+                    ends > timeline.date
+                        ? ATHLTHLiveActivityDisplayPolicy.compactDuration(
+                            ceil(ends.timeIntervalSince(timeline.date))
+                        )
+                        : localized("READY", "KLAR")
+                )
             }
         } else if workoutFocus(context) == .strengthTimedSet {
             TimelineView(.periodic(from: .now, by: 5)) { timeline in
@@ -898,28 +956,26 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                     resumedAt: context.state.strengthTimedSetResumedAt,
                     now: timeline.date
                 )
-                Text(left.map { $0 > 0
-                    ? duration(ceil($0))
-                    : localized("READY", "KLAR")
-                } ?? "—")
-                    .font(.caption2.weight(.bold))
-                    .monospacedDigit()
-                    .lineLimit(1)
+                compactIslandText(
+                    left.map { $0 > 0
+                        ? ATHLTHLiveActivityDisplayPolicy.compactDuration(
+                            ceil($0)
+                        )
+                        : localized("READY", "KLAR")
+                    } ?? "—"
+                )
             }
         } else {
             TimelineView(.periodic(from: .now, by: 15)) { tick in
-                Text(
+                compactIslandText(
                     workoutFocus(context) == .paused ||
                     ATHLTHLiveActivityDisplayPolicy.isRecent(
                         updatedAt: context.state.updatedAt,
                         now: tick.date
                     )
-                    ? compactValue(context)
+                    ? compactIslandValue(context)
                     : "—"
                 )
-                .font(.caption2.weight(.bold))
-                .monospacedDigit()
-                .lineLimit(1)
             }
         }
     }
