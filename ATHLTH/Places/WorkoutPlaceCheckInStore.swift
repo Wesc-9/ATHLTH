@@ -58,6 +58,21 @@ struct WorkoutPlacePresentation:
     let name: String
     let coordinate: CLLocationCoordinate2D
     let distanceMeters: Double?
+    let placeKind: String
+
+    init(
+        id: String,
+        name: String,
+        coordinate: CLLocationCoordinate2D,
+        distanceMeters: Double?,
+        placeKind: String = "fitness_center"
+    ) {
+        self.id = id
+        self.name = name
+        self.coordinate = coordinate
+        self.distanceMeters = distanceMeters
+        self.placeKind = placeKind
+    }
 
     static func == (
         lhs: WorkoutPlacePresentation,
@@ -70,7 +85,8 @@ struct WorkoutPlacePresentation:
         lhs.coordinate.longitude ==
             rhs.coordinate.longitude &&
         lhs.distanceMeters ==
-            rhs.distanceMeters
+            rhs.distanceMeters &&
+        lhs.placeKind == rhs.placeKind
     }
 
     func hash(into hasher: inout Hasher) {
@@ -79,6 +95,7 @@ struct WorkoutPlacePresentation:
         hasher.combine(coordinate.latitude)
         hasher.combine(coordinate.longitude)
         hasher.combine(distanceMeters)
+        hasher.combine(placeKind)
     }
 }
 
@@ -118,6 +135,7 @@ final class SupabaseWorkoutPlaceCheckInService {
         userID: UUID,
         workoutID: UUID,
         applePlaceID: String,
+        placeKind: String,
         distanceMeters: Double
     ) async throws {
         let payload =
@@ -125,7 +143,7 @@ final class SupabaseWorkoutPlaceCheckInService {
                 userID: userID,
                 workoutID: workoutID,
                 applePlaceID: applePlaceID,
-                placeKind: "fitness_center",
+                placeKind: placeKind,
                 checkedInAt: Date(),
                 distanceMeters:
                     max(
@@ -255,7 +273,10 @@ final class WorkoutPlaceCheckInStore:
               distance <= 150
         else {
             errorMessage =
-                "You need to be within 150 m of the fitness center to check in."
+                ATHLTHLocalization.choose(
+                    english: "You must be within 150 m of the training venue to check in.",
+                    norwegian: "Du må være innenfor 150 meter fra treningsstedet for å sjekke inn."
+                )
             return false
         }
 
@@ -264,6 +285,7 @@ final class WorkoutPlaceCheckInStore:
                 userID: userID,
                 workoutID: workoutID,
                 applePlaceID: place.id,
+                placeKind: place.placeKind,
                 distanceMeters: distance
             )
 
@@ -438,7 +460,9 @@ final class WorkoutPlaceCheckInStore:
         request.pointOfInterestFilter =
             MKPointOfInterestFilter(
                 including: [
-                    .fitnessCenter
+                    .fitnessCenter,
+                    .hotel,
+                    .stadium
                 ]
             )
 
@@ -499,7 +523,13 @@ final class WorkoutPlaceCheckInStore:
                             coordinate:
                                 coordinate,
                             distanceMeters:
-                                distance
+                                distance,
+                            placeKind:
+                                mapItem.pointOfInterestCategory == .hotel
+                                    ? "hotel"
+                                    : mapItem.pointOfInterestCategory == .stadium
+                                        ? "stadium"
+                                        : "fitness_center"
                         )
                 }
                 .sorted {
