@@ -3047,11 +3047,7 @@ struct PerformanceStatsView: View {
                                 healthRecords: resolvedHealthRecords
                             ),
                             compactPremium: true,
-                            provenance: kind.healthKind.flatMap { healthKind in
-                                resolvedHealthRecords.first { $0.kind == healthKind }
-                            } != nil
-                                ? text("GPS", "GPS")
-                                : text("Calculated", "Beregnet")
+                            provenance: runningSummarySource(for: kind)
                         )
                     }
                 }
@@ -3093,6 +3089,19 @@ struct PerformanceStatsView: View {
             radius: 14,
             y: 6
         )
+    }
+
+    private func runningSummarySource(
+        for kind: ProfileFeaturedRecordKind
+    ) -> String {
+        guard let healthKind = kind.healthKind,
+              resolvedHealthRecords.contains(where: { $0.kind == healthKind })
+        else {
+            return text("Calculated", "Beregnet")
+        }
+        return healthKind.targetDistanceMeters != nil
+            ? "GPS"
+            : "Apple Health"
     }
 
     // Running PRs and the profile picker share a single record catalog.
