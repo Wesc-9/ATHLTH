@@ -483,21 +483,35 @@ struct HomeActivityRunDetailView: View {
                     .fill(ATHLTHPlanDesign.warmDivider)
                     .frame(height: 0.7)
 
-                LazyVGrid(columns: [
-                    GridItem(.flexible(), spacing: 9),
-                    GridItem(.flexible(), spacing: 9)
-                ], spacing: 10) {
-                    resultValue(tr("Time", "Tid"), durationText, icon: "timer")
-                    resultValue(tr("Average pace", "Snittempo"), paceText, icon: "speedometer")
-                    resultValue(tr("Average HR", "Snittpuls"), averageHeartRateText, icon: "heart")
-                    resultValue(
-                        isTreadmillWorkout
-                            ? tr("Max HR", "Makspuls")
-                            : tr("Elevation gain", "Høydemeter"),
-                        isTreadmillWorkout ? maxHeartRateText : (ascentText ?? "—"),
-                        icon: isTreadmillWorkout ? "heart.fill" : "mountain.2"
-                    )
-                }
+                ATHLTHWorkoutMetricGrid(
+                    metrics: [
+                        ATHLTHWorkoutDisplayMetric(
+                            icon: "timer",
+                            label: tr("Time", "Tid"),
+                            value: durationText
+                        ),
+                        ATHLTHWorkoutDisplayMetric(
+                            icon: "speedometer",
+                            label: tr("Average pace", "Snittempo"),
+                            value: paceText
+                        ),
+                        ATHLTHWorkoutDisplayMetric(
+                            icon: "heart",
+                            label: tr("Average HR", "Snittpuls"),
+                            value: averageHeartRateText
+                        ),
+                        ATHLTHWorkoutDisplayMetric(
+                            icon: isTreadmillWorkout
+                                ? "heart.fill" : "mountain.2",
+                            label: isTreadmillWorkout
+                                ? tr("Max HR", "Makspuls")
+                                : tr("Elevation gain", "Høydemeter"),
+                            value: isTreadmillWorkout
+                                ? maxHeartRateText : (ascentText ?? "—")
+                        )
+                    ],
+                    columnCount: 2
+                )
 
                 if isTreadmillWorkout {
                     HStack(spacing: 10) {
@@ -519,33 +533,6 @@ struct HomeActivityRunDetailView: View {
                 }
             }
         }
-    }
-
-    private func resultValue(_ title: String, _ value: String, icon: String) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                .frame(width: 28, height: 28)
-                .background(ATHLTHPlanDesign.selectedSurface,
-                            in: RoundedRectangle(cornerRadius: 9))
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.caption2)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                Text(value)
-                    .font(.subheadline.weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, minHeight: 62, alignment: .leading)
-        .background(ATHLTHPlanDesign.warmSurface.opacity(0.47),
-                    in: RoundedRectangle(cornerRadius: 13))
     }
 
     @ViewBuilder
