@@ -337,9 +337,8 @@ struct WorkoutHistoryDetailView: View {
                 ATHLTHWorkoutLocationSection(
                     workout: workout,
                     hasRecordedGPS: healthDetailLoaded &&
-                        (
-                            healthDetail.route.count >= 1 ||
-                            healthDetail.workoutLocation != nil
+                        ATHLTHWorkoutExperienceEngine.hasValidGPSLocation(
+                            in: healthDetail
                         ),
                     isLoadingGPS: !healthDetailLoaded
                 ) {
@@ -822,15 +821,22 @@ struct WorkoutLocationMapCard: View {
     let activity: WorkoutActivity
 
     private var routeCoordinates: [CLLocationCoordinate2D] {
-        detail.route.map(\.coordinate)
+        detail.route.map(\.coordinate).filter {
+            ATHLTHWorkoutExperienceEngine.isValidCoordinate($0)
+        }
     }
 
     private var singleLocation: CLLocation? {
-        if let workoutLocation = detail.workoutLocation {
+        if let workoutLocation = detail.workoutLocation,
+           ATHLTHWorkoutExperienceEngine.isValidCoordinate(
+               workoutLocation.coordinate
+           ) {
             return workoutLocation
         }
 
-        return detail.route.count == 1 ? detail.route.first : nil
+        return detail.route.first {
+            ATHLTHWorkoutExperienceEngine.isValidCoordinate($0.coordinate)
+        }
     }
 
     private var isRoute: Bool {
