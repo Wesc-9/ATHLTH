@@ -998,6 +998,26 @@ enum ATHLTHRunningStepEngine {
             return 0
         }
     }
+
+    static func overallProgress(
+        steps: [WatchRunningWorkoutStep],
+        index: Int,
+        currentStepProgress: Double
+    ) -> Double {
+        guard !steps.isEmpty else { return 0 }
+        let weights = steps.map { step -> Double in
+            let expectedSeconds = step.durationSeconds ??
+                step.distanceMeters.map {
+                    ($0 / 1_000) * (step.targetPaceMinSecondsPerKilometer ?? 360)
+                } ?? 60
+            return expectedSeconds.isFinite ? max(expectedSeconds, 15) : 60
+        }
+        let total = weights.reduce(0, +)
+        guard total > 0 else { return 0 }
+        let complete = weights.prefix(max(0, min(index, weights.count))).reduce(0, +)
+        let active = weights.indices.contains(index) ? weights[index] : 0
+        return min(max((complete + active * min(max(currentStepProgress, 0), 1)) / total, 0), 1)
+    }
 }
 
 struct WatchRunningWorkoutTransfer: Codable, Hashable {
@@ -1476,6 +1496,8 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var runningStepIndex: Int? = nil
     var runningStepCount: Int? = nil
     var runningStepProgress: Double? = nil
+    var runningOverallProgress: Double? = nil
+    var runningStepTargetTreadmillInclinePercent: Double? = nil
     var runningNextStepTitle: String? = nil
     var runningStepRemainingSeconds: TimeInterval? = nil
     var runningStepRemainingMeters: Double? = nil
