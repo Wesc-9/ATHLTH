@@ -4148,7 +4148,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
               (!force && sliceSeconds >= 60) else { return }
 
         let previouslySampledDistance = samples.reduce(0.0) {
-            $0 + $1.watchDistanceMeters
+            $0 + $1.recordedDistanceMeters
         }
         let newDistance = max(0,
             currentStructuredStepDistanceMeters - previouslySampledDistance)
@@ -4156,7 +4156,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             stepIndex: stepIndex,
             stepElapsedAtEndSeconds: currentEnd,
             activeSeconds: sliceSeconds,
-            watchDistanceMeters: newDistance,
+            recordedDistanceMeters: newDistance,
             watchHeartRateBPM: hasFreshHeartRate ? heartRate : nil,
             targetPaceSecondsPerKilometer:
                 step.targetPaceMinSecondsPerKilometer,
