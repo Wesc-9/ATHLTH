@@ -1904,10 +1904,14 @@ struct ActiveStrengthWorkoutView: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                focusedExerciseHero(
-                    workout: workout,
-                    exercise: exercise
-                )
+                if exercise.isEmbeddedRunningInterval == true &&
+                    !strength.currentExerciseAllSetsCompleted {
+                    embeddedIntervalCard(exercise: exercise)
+                } else {
+                    focusedExerciseHero(
+                        workout: workout,
+                        exercise: exercise
+                    )
 
                 if let suggestion =
                         strength
@@ -1964,11 +1968,163 @@ struct ActiveStrengthWorkoutView: View {
                         exercise: exercise
                     )
                 }
+                }
             }
 
             if let upcoming = strength.nextPendingExercise,
                !workoutComplete {
                 focusedNextExercisePreview(upcoming)
+            }
+        }
+    }
+
+    /// Running-only live presentation within the active strength recording.
+    /// Timed 4×4/recovery phases have their own pace, HR and countdown, while
+    /// Apple Watch HealthKit continues reporting ONE strength workout.
+    @ViewBuilder
+    private func embeddedIntervalCard(exercise: StrengthExerciseLog) -> some View {
+        if let set = strength.currentSet {
+            ATHLTHPlanSurface {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(spacing: 9) {
+                        Image(systemName: "figure.run")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            .frame(width: 42, height: 42)
+                            .background(
+                                ATHLTHTheme.champagneSoft,
+                                in: RoundedRectangle(cornerRadius: 14)
+                            )
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "RUNNING INSIDE STRENGTH",
+                                norwegian: "LØPING I STYRKEØKTEN"
+                            ))
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(1.1)
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            Text(exercise.appendedWorkoutTitle ??
+                                 ATHLTHLocalization.choose(
+                                     english: "Treadmill intervals",
+                                     norwegian: "Mølleintervaller"
+                                 ))
+                                .font(.headline)
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                        }
+                        Spacer()
+                        Text("\(set.setNumber)/\(exercise.sets.count)")
+                            .font(.caption.weight(.bold))
+                            .monospacedDigit()
+                    }
+
+                    Text(set.hybridPhaseTitle ?? ATHLTHLocalization.choose(
+                        english: "Running", norwegian: "Løping"
+                    ))
+                    .font(.system(size: 27, weight: .semibold, design: .rounded))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        let seconds = strength.currentTimedSetCountdown?
+                            .secondsRemaining(at: context.date)
+                            ?? set.plannedDurationSeconds ?? 0
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(TimeInterval(seconds).clockDuration)
+                                .font(.system(size: 48, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                                .contentTransition(.numericText())
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Spacer(minLength: 2)
+                            Text(ATHLTHLocalization.choose(
+                                english: "remaining", norwegian: "igjen"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                    }
+
+                    HStack(spacing: 8) {
+                        if let zone = set.hybridTargetHeartRateZone {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Target zone \(zone)",
+                                norwegian: "Målsone \(zone)"
+                            ), systemImage: "heart")
+                        }
+                        if let pace = set.hybridTargetPaceSecondsPerKilometer {
+                            Label(
+                                TimeInterval(pace).clockDuration + " min/km",
+                                systemImage: "speedometer"
+                            )
+                        }
+                    }
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+
+                    HStack(spacing: 10) {
+                        focusedNumberField(
+                            title: ATHLTHLocalization.choose(
+                                english: "Manual speed", norwegian: "Manuell fart"
+                            ),
+                            value: treadmillSpeedBinding,
+                            suffix: "km/t"
+                        )
+                        focusedNumberField(
+                            title: ATHLTHLocalization.choose(
+                                english: "Incline", norwegian: "Stigning"
+                            ),
+                            value: treadmillInclineBinding,
+                            suffix: "%"
+                        )
+                    }
+
+                    HStack(spacing: 10) {
+                        Button {
+                            if strength.currentTimedSetCountdown?.isRunning == true {
+                                strength.pauseTimedSet()
+                            } else {
+                                strength.startOrResumeTimedSet()
+                            }
+                        } label: {
+                            Label(
+                                strength.currentTimedSetCountdown?.isRunning == true
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Pause phase", norwegian: "Sett på pause"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Resume phase", norwegian: "Start / fortsett"
+                                    ),
+                                systemImage:
+                                    strength.currentTimedSetCountdown?.isRunning == true
+                                        ? "pause.fill" : "play.fill"
+                            )
+                            .frame(maxWidth: .infinity, minHeight: 46)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHPlanDesign.accentInk)
+
+                        Button {
+                            strength.completeCurrentDraftSet()
+                            if strength.currentExercise?.isEmbeddedRunningInterval == true,
+                               strength.currentSet?.isCompleted == false {
+                                strength.startOrResumeTimedSet()
+                            }
+                        } label: {
+                            Image(systemName: "forward.end.fill")
+                                .frame(width: 43, height: 46)
+                        }
+                        .buttonStyle(.bordered)
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Finish current phase now",
+                            norwegian: "Fullfør fasen nå"
+                        ))
+                    }
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Watch pulse and any measured distance remain attached to this workout. Manually entered speed only estimates pace and distance.",
+                        norwegian: "Puls og eventuell målt distanse fra klokken beholdes i samme økt. Manuell fart gir bare estimert tempo og distanse."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
             }
         }
     }
