@@ -719,48 +719,49 @@ struct WorkoutHistoryDetailView: View {
     }
 
     private var metricGrid: some View {
-        HStack(spacing: 10) {
-            metric("Time", durationText(workout.duration), "clock.fill")
-
-            if let distance = workout.distanceMeters, distance > 0 {
-                metric(
-                    "Distance",
-                    String(format: "%.2f km", distance / 1_000),
-                    "point.topleft.down.to.point.bottomright.curvepath"
-                )
-            }
-
-            if let calories = workout.activeEnergyKilocalories,
-               calories > 0 {
-                metric(
-                    "Energy",
-                    String(format: "%.0f kcal", calories),
-                    "flame.fill"
-                )
-            }
-        }
+        ATHLTHWorkoutMetricGrid(
+            metrics: historicalMetrics,
+            columnCount: historicalMetrics.count == 1 ? 2 : 3
+        )
     }
 
-    private func metric(
-        _ title: String,
-        _ value: String,
-        _ icon: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Image(systemName: icon)
-                .foregroundStyle(ATHLTHTheme.accent)
-            Text(value)
-                .font(.headline.monospacedDigit())
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+    private var historicalMetrics: [ATHLTHWorkoutDisplayMetric] {
+        var metrics = [
+            ATHLTHWorkoutDisplayMetric(
+                icon: "timer",
+                label: ATHLTHLocalization.choose(
+                    english: "Time", norwegian: "Tid"
+                ),
+                value: durationText(workout.duration)
+            )
+        ]
+
+        if let distance = workout.distanceMeters,
+           distance.isFinite, distance > 0 {
+            metrics.append(
+                ATHLTHWorkoutDisplayMetric(
+                    icon: "point.topleft.down.to.point.bottomright.curvepath",
+                    label: ATHLTHLocalization.choose(
+                        english: "Distance", norwegian: "Distanse"
+                    ),
+                    value: String(format: "%.2f km", distance / 1_000)
+                )
+            )
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            ATHLTHUnifiedDesign.surface,
-            in: RoundedRectangle(cornerRadius: 17)
-        )
+
+        if let calories = workout.activeEnergyKilocalories,
+           calories.isFinite, calories > 0 {
+            metrics.append(
+                ATHLTHWorkoutDisplayMetric(
+                    icon: "flame.fill",
+                    label: ATHLTHLocalization.choose(
+                        english: "Energy", norwegian: "Energi"
+                    ),
+                    value: String(format: "%.0f kcal", calories)
+                )
+            )
+        }
+        return metrics
     }
 
     private func reviewRow(_ title: String, _ value: String) -> some View {
