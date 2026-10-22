@@ -191,6 +191,9 @@ private final class ATHLTHAudioCoachPreviewSpeaker:
 struct ATHLTHAudioCoachSettingsView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @State private var showAdvancedSettings = false
+    @State private var showingCustomTimeInterval = false
+    @State private var customTimeMinutes = 5
+    @State private var customTimeSeconds = 0
 
     var body: some View {
         ZStack {
@@ -240,6 +243,112 @@ struct ATHLTHAudioCoachSettingsView: View {
         }
         .navigationTitle("Audio Coach")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showingCustomTimeInterval) {
+            customTimeIntervalSheet
+        }
+    }
+
+    /// Keep both the new second-accurate value and the older minute setting
+    /// in sync, so older versions can still interpret a reasonable fallback.
+    private func setTimeInterval(seconds: Int) {
+        let value = min(max(seconds, 15), 7_200)
+        settings.audioCoachTimeIntervalSeconds = value
+        settings.audioCoachTimeIntervalMinutes = max(1, Int((Double(value) / 60).rounded()))
+    }
+
+    private var customTimeTotalSeconds: Int {
+        customTimeMinutes * 60 + customTimeSeconds
+    }
+
+    private var customTimeIsValid: Bool {
+        (15...7_200).contains(customTimeTotalSeconds)
+    }
+
+    private func openCustomTimeInterval() {
+        let current = min(max(settings.audioCoachTimeIntervalSeconds, 15), 7_200)
+        customTimeMinutes = current / 60
+        customTimeSeconds = current % 60
+        showingCustomTimeInterval = true
+    }
+
+    private var timeIntervalTitle: String {
+        let seconds = min(max(settings.audioCoachTimeIntervalSeconds, 15), 7_200)
+        let minutes = seconds / 60
+        let remainder = seconds % 60
+        if minutes == 0 { return "\(remainder) sek" }
+        if remainder == 0 { return "\(minutes) min" }
+        return "\(minutes) min \(remainder) sek"
+    }
+
+    private var customTimeIntervalSheet: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Custom time interval", norwegian: "Egendefinert tidsintervall"
+                    ))
+                    .font(.title3.weight(.semibold))
+                    Text(ATHLTHLocalization.choose(
+                        english: "How often should Audio Coach speak?",
+                        norwegian: "Hvor ofte skal Audio Coach gi oppdateringer?"
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 4) {
+                Picker(ATHLTHLocalization.choose(
+                    english: "Minutes", norwegian: "Minutter"
+                ), selection: $customTimeMinutes) {
+                    ForEach(0...120, id: \.self) { minutes in
+                        Text("\(minutes) min").tag(minutes)
+                    }
+                }
+                .pickerStyle(.wheel)
+                .frame(maxWidth: .infinity)
+
+                Picker(ATHLTHLocalization.choose(
+                    english: "Seconds", norwegian: "Sekunder"
+                ), selection: $customTimeSeconds) {
+                    ForEach(0...59, id: \.self) { seconds in
+                        Text("\(seconds) sek").tag(seconds)
+                    }
+                }
+                .pickerStyle(.wheel)
+                .frame(maxWidth: .infinity)
+            }
+            .frame(height: 140)
+
+            Text(ATHLTHLocalization.choose(
+                english: "Choose between 15 seconds and 120 minutes.",
+                norwegian: "Velg mellom 15 sekunder og 120 minutter."
+            ))
+            .font(.caption)
+            .foregroundStyle(customTimeIsValid
+                ? ATHLTHTheme.mutedText : Color.red)
+
+            Button {
+                setTimeInterval(seconds: customTimeTotalSeconds)
+                showingCustomTimeInterval = false
+            } label: {
+                Text(ATHLTHLocalization.choose(
+                    english: "Use interval", norwegian: "Bruk intervallet"
+                ))
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 48)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(ATHLTHTheme.accentDeep)
+            .disabled(!customTimeIsValid)
+        }
+        .padding(22)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(ATHLTHTheme.canvasTop.ignoresSafeArea())
+        .presentationDetents([.height(360)])
+        .presentationDragIndicator(.visible)
     }
 
     private var premiumBackground: some View {
@@ -1012,20 +1121,29 @@ struct ATHLTHAudioCoachSettingsView: View {
                                 norwegian:
                                     "Tidsintervall"
                             ),
-                        value:
-                            "\(settings.audioCoachTimeIntervalMinutes) min"
+                        value: timeIntervalTitle
                     ) {
-                        ForEach(
-                            [5, 10, 15, 30],
-                            id: \.self
-                        ) { minutes in
-                            Button(
-                                "\(minutes) min"
-                            ) {
-                                settings
-                                    .audioCoachTimeIntervalMinutes =
-                                    minutes
+                        ForEach([5, 10, 15, 30], id: \.self) { minutes in
+                            Button {
+                                setTimeInterval(seconds: minutes * 60)
+                            } label: {
+                                if settings.audioCoachTimeIntervalSeconds == minutes * 60 {
+                                    Label("\(minutes) min", systemImage: "checkmark")
+                                } else {
+                                    Text("\(minutes) min")
+                                }
                             }
+                        }
+
+                        Button {
+                            openCustomTimeInterval()
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Custom…", norwegian: "Egendefinert…"
+                                ),
+                                systemImage: "slider.horizontal.3"
+                            )
                         }
                     }
                 }
