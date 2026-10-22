@@ -489,31 +489,63 @@ private struct ATHLTHArenaChallengeOverviewSection: View {
         NavigationLink {
             ChallengeDetailView(challengeID: challenge.id)
         } label: {
-            HStack(spacing: 12) {
-                Image(systemName: challenge.sport.systemImage)
-                    .font(.title3)
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .frame(width: 40, height: 40)
-                    .background(ATHLTHTheme.vitalitySoft.opacity(0.66), in: Circle())
-                VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 0) {
+                ATHLTHArenaEditorialPhoto(
+                    scene: challenge.sport == .strength ? .strength : .running
+                )
+                .frame(width: 112, height: 117)
+                .clipped()
+                .overlay(alignment: .topLeading) {
+                    Image(systemName: challenge.sport.systemImage)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(ATHLTHArenaLightStyle.ink)
+                        .padding(8)
+                        .background(.regularMaterial, in: Capsule())
+                        .padding(8)
+                }
+
+                VStack(alignment: .leading, spacing: 5) {
                     Text(challenge.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                        .lineLimit(1)
+                        .font(ATHLTHArenaLightStyle.editorialTitle(19))
+                        .foregroundStyle(ATHLTHArenaLightStyle.ink)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+
                     Text(invitation
-                        ? ATHLTHLocalization.choose(english: "Invitation to review", norwegian: "Invitasjon til vurdering")
+                        ? ATHLTHLocalization.choose(
+                            english: "Invitation to review",
+                            norwegian: "Invitasjon til vurdering"
+                        )
                         : challenge.sport.title
                     )
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHArenaLightStyle.secondary)
+
+                    Spacer(minLength: 4)
+
+                    HStack(spacing: 5) {
+                        Text(invitation
+                            ? ATHLTHLocalization.choose(
+                                english: "Review", norwegian: "Svar"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Open duel", norwegian: "Åpne duell"
+                            )
+                        )
+                        Image(systemName: "arrow.right")
+                    }
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(ATHLTHArenaLightStyle.ink)
+                    .padding(.horizontal, 11)
+                    .frame(minHeight: 33)
+                    .background(ATHLTHTheme.champagneSoft, in: Capsule())
                 }
-                Spacer(minLength: 4)
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(13)
-            .background(ATHLTHArenaLightStyle.card(17))
+            .frame(height: 117)
+            .background(ATHLTHArenaLightStyle.card(19))
+            .clipShape(RoundedRectangle(cornerRadius: 19, style: .continuous))
         }
         .buttonStyle(.plain)
     }
