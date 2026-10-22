@@ -115,9 +115,22 @@ final class ATHLTHAzureWorkoutSpeech:
                     }
                     self.audio = player
                     self.timeoutTask?.cancel()
-                    self.timeoutTask = nil
                     self.requestTask = nil
-                    // The voice lease stays active until playback completes.
+                    // Some Bluetooth routes omit AVAudioPlayer's finish
+                    // callback after an interruption. Always release the
+                    // music lease even if the delegate never fires.
+                    self.timeoutTask = Task { [weak self] in
+                        let seconds = min(max(player.duration + 4, 6), 70)
+                        try? await Task.sleep(for: .seconds(seconds))
+                        guard !Task.isCancelled,
+                              let self,
+                              self.identity == generation,
+                              self.audio === player
+                        else { return }
+                        let done = self.finishHandler
+                        self.cleanup()
+                        done?()
+                    }
                 } catch {
                     self.fallback(generation)
                 }
@@ -169,4 +182,15 @@ final class ATHLTHAzureWorkoutSpeech:
             callback?()
         }
     }
+    nonisolated func audioPlayerDecodeErrorDidOccur(
+        _ player: AVAudioPlayer, error: Error?
+    ) {
+        Task { @MainActor [weak self] in
+            guard let self, self.audio === player else { return }
+            let callback = self.finishHandler
+            self.cleanup()
+            callback?()
+        }
+    }
+
 }
