@@ -1329,28 +1329,43 @@ final class StrengthWorkoutStore: ObservableObject {
     /// HealthKit recording and Apple Watch ownership stay with the parent
     /// strength workout, preventing a second workout or duplicate calories.
     func advanceEmbeddedIntervalIfNeeded(at date: Date = Date()) {
-        guard currentExercise?.isEmbeddedRunningInterval == true,
+        var advanced = 0
+        // Date anchoring catches up after screen lock, foreground suspension
+        // or a temporary Bluetooth handoff. Never count a paused phase.
+        while advanced < 80,
+              currentExercise?.isEmbeddedRunningInterval == true,
               let timer = currentTimedSetCountdown,
               timer.isRunning,
               timer.remaining(at: date) <= 0,
-              currentSet?.isCompleted == false
-        else { return }
+              currentSet?.isCompleted == false {
+            let originalSetID = timer.setID
+            let overtime = max(
+                date.timeIntervalSince(timer.resumedAt ?? date)
+                    - timer.secondsAtPause,
+                0
+            )
 
-        let finishedSetID = timer.setID
-        completeCurrentSet(
-            reps: nil,
-            durationSeconds: timer.targetSeconds,
-            weightKilograms: nil,
-            rpe: nil,
-            rir: nil,
-            restSeconds: 0
-        )
+            completeCurrentSet(
+                reps: nil,
+                durationSeconds: timer.targetSeconds,
+                weightKilograms: nil,
+                rpe: nil,
+                rir: nil,
+                restSeconds: 0
+            )
 
-        if currentExercise?.isEmbeddedRunningInterval == true,
-           let next = currentSet,
-           next.id != finishedSetID,
-           !next.isCompleted {
+            guard currentExercise?.isEmbeddedRunningInterval == true,
+                  let next = currentSet,
+                  next.id != originalSetID,
+                  !next.isCompleted
+            else { return }
             startOrResumeTimedSet()
+
+            if overtime > 0, var continuation = currentTimedSetCountdown {
+                continuation.resumedAt = date.addingTimeInterval(-overtime)
+                timedSetCountdown = continuation
+            }
+            advanced += 1
         }
     }
 
