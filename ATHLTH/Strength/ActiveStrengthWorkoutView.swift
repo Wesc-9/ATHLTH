@@ -589,7 +589,9 @@ struct ActiveStrengthWorkoutView: View {
                 )
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        // Keep Spotify/coach controls visible directly beneath the live
+        // navigation bar instead of hiding them below long set-entry cards.
+        .safeAreaInset(edge: .top, spacing: 0) {
             if let workout = strength.activeWorkout {
                 ATHLTHWorkoutAudioDock(
                     coachVisible:
