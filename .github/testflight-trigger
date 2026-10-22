@@ -130,3 +130,5 @@ ATHLTH 1.8.7 build 94 — user-authorized TestFlight upload 2026-10-21 15:02 Eur
 ATHLTH 1.8.8 build 95 — user-authorized TestFlight upload 2026-10-21. Include latest combined strength and running data, iPhone–Watch exercise/set synchronization, light ATHLTH strength Live Activity, timed bodyweight holds, and Replay exercise list. Require passing same-commit Build ATHLTH and backend regressions, signed iPhone/Watch/Widget archive and App Store Connect validation before actual upload. Keep release/v1.8.8 active/unlocked.
 
 ATHLTH 1.8.8 build 95 — explicit user-authorized TestFlight upload 2026-10-22 (Europe/Oslo). Launch release/v1.8.8 through normal same-commit build/backend checks, iOS+Apple Watch+Widget signed archive and App Store Connect validation. Retain active development branch (no version lock).
+
+ATHLTH 1.8.9 build 96 — user-authorized TestFlight upload 2026-10-22; includes premium image-free performance records, 4x4 pace records, interval/watch improvements and running analysis. Gate on same-commit iOS build and backend regressions, signed iPhone/Watch/Widget archive and validated App Store Connect upload; keep release/v1.8.9 active/unlocked.
