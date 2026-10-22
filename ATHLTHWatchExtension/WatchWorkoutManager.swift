@@ -4192,6 +4192,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
            (step.phase == "warmup" &&
             structuredRunningWorkout?.autoStartMainAfterWarmup != true) { return }
         if step.measure == .time,
+           step.phase != "warmup",
            structuredRunningWorkout?.autoAdvanceTimedSteps == false {
             return
         }
@@ -6924,7 +6925,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
         let runningStepProgress =
             currentRunningStep.map {
-                ATHLTHRunningStepEngine.progress(
+                if awaitingMainStart { return 0.0 }
+                return ATHLTHRunningStepEngine.progress(
                     step: $0,
                     elapsedTime: elapsedTime,
                     distanceMeters: distanceMeters,
