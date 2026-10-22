@@ -10862,6 +10862,37 @@ private struct StrengthPlateCalculatorView: View {
 
 
 
+/// Small exercise artwork reuses the exercise database instead of shipping
+/// an extra image. A fallback makes offline sessions equally navigable.
+private struct StrengthQueueArtwork: View {
+    let exercise: StrengthExerciseLog
+
+    var body: some View {
+        ZStack {
+            ATHLTHPlanDesign.warmSurface
+
+            if let url = exercise.exercise.imageURL {
+                AsyncImage(url: url) { phase in
+                    if let image = phase.image {
+                        image.resizable().scaledToFill()
+                    } else {
+                        Image(systemName: "dumbbell.fill")
+                            .font(.title2)
+                            .foregroundStyle(ATHLTHTheme.premiumGold)
+                    }
+                }
+            } else {
+                Image(systemName: "dumbbell.fill")
+                    .font(.title2)
+                    .foregroundStyle(ATHLTHTheme.premiumGold)
+            }
+        }
+        .frame(width: 76, height: 76)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .accessibilityHidden(true)
+    }
+}
+
 private struct StrengthActiveExerciseQueueView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var strength: StrengthWorkoutStore
@@ -10875,6 +10906,7 @@ private struct StrengthActiveExerciseQueueView: View {
                             ForEach(workout.exercises) { exercise in
                                 VStack(alignment: .leading, spacing: 9) {
                                 HStack(spacing: 10) {
+                                    StrengthQueueArtwork(exercise: exercise)
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(exercise.exercise.displayName)
                                             .font(.subheadline.weight(.semibold))
@@ -10901,6 +10933,36 @@ private struct StrengthActiveExerciseQueueView: View {
                                         )
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
+
+                                        if let first = exercise.sets.first {
+                                            HStack(spacing: 6) {
+                                                if let seconds = first.plannedDurationSeconds,
+                                                   seconds > 0 {
+                                                    Label(
+                                                        TimeInterval(seconds).clockDuration,
+                                                        systemImage: "timer"
+                                                    )
+                                                } else if let reps = first.plannedReps {
+                                                    Text("(reps) reps")
+                                                }
+
+                                                if let weight = first.plannedWeightKilograms,
+                                                   weight > 0 {
+                                                    Text(String(format: "· %.1f kg", weight))
+                                                } else if let speed =
+                                                    first.completedTreadmillSpeedKilometersPerHour,
+                                                    speed > 0 {
+                                                    Text(String(format: "· %.1f km/t", speed))
+                                                } else if let tempo = first.plannedTempo,
+                                                          !tempo.isEmpty {
+                                                    Text("· (tempo)")
+                                                }
+                                            }
+                                            .font(.caption2.weight(.medium))
+                                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(0.78)
+                                        }
                                     }
 
                                     Spacer(minLength: 6)
@@ -10915,10 +10977,10 @@ private struct StrengthActiveExerciseQueueView: View {
                                             systemImage: "play.fill"
                                         )
                                         .font(.caption.weight(.bold))
-                                        .foregroundStyle(ATHLTHTheme.vitality)
+                                        .foregroundStyle(ATHLTHTheme.premiumGold)
                                     } else if exercise.isCompleted {
                                         Image(systemName: "checkmark.circle.fill")
-                                            .foregroundStyle(ATHLTHTheme.vitality)
+                                            .foregroundStyle(ATHLTHTheme.premiumGold)
                                     } else {
                                         Button(
                                             ATHLTHLocalization.choose(
@@ -10998,7 +11060,8 @@ private struct StrengthActiveExerciseQueueView: View {
                                 .font(.caption.weight(.semibold))
                                 .tint(ATHLTHPlanDesign.accentInk)
                                 }
-                                .padding(.vertical, 5)
+                                .padding(.vertical, 9)
+                                .listRowBackground(ATHLTHTheme.card)
                             }
                             .onMove { from, to in
                                 strength.reorderActiveExercises(
@@ -11031,6 +11094,8 @@ private struct StrengthActiveExerciseQueueView: View {
                     norwegian: "Øvelsesrekkefølge"
                 )
             )
+            .scrollContentBackground(.hidden)
+            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
