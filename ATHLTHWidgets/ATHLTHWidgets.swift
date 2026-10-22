@@ -488,6 +488,37 @@ private struct ATHLTHLockScreenWidgetView: View {
     }
 }
 
+/// iOS 27 can place two Live Activities side by side with reduced width.
+/// Keep the readable training metric whenever there is room, rather than
+/// constraining the entire Dynamic Island to the smallest presentation.
+@available(iOS 27.0, *)
+private struct ATHLTHAdaptiveCompactMetric: View {
+    @Environment(\.isDynamicIslandLimitedInWidth)
+    private var isLimitedInWidth
+
+    let regular: String
+    let condensed: String
+
+    var body: some View {
+        if isLimitedInWidth {
+            Text(condensed)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(width: 28, height: 28)
+                .accessibilityLabel(regular)
+        } else {
+            Text(regular)
+                .font(.caption2.weight(.bold))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .fixedSize(horizontal: true, vertical: false)
+        }
+    }
+}
+
 struct ATHLTHWorkoutLiveActivity: Widget {
     private typealias Context =
         ActivityViewContext<ATHLTHWorkoutActivityAttributes>
@@ -808,6 +839,11 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                              " \(min(max(set, 1), count))/\(count)")
                             .font(.caption.weight(.semibold))
                     }
+                    if let weight = context.state.strengthWeightKilograms,
+                       weight.isFinite, weight > 0 {
+                        Text(String(format: "%.1f kg", weight))
+                            .font(.caption.weight(.semibold))
+                    }
                 }
 
             case .runningInterval:
@@ -926,13 +962,25 @@ struct ATHLTHWorkoutLiveActivity: Widget {
         }
     }
 
-    private func compactIslandText(_ value: String) -> some View {
-        Text(value)
-            .font(.system(size: 12, weight: .bold, design: .rounded))
-            .monospacedDigit()
-            .lineLimit(1)
-            .minimumScaleFactor(0.75)
-            .frame(maxWidth: 42)
+    /// Use the full value in a normal compact Island. Only reduce it when
+    /// iOS reports that adjacent Live Activities make the Island narrower.
+    @ViewBuilder
+    private func compactIslandText(
+        _ regular: String,
+        condensed: String
+    ) -> some View {
+        if #available(iOS 27.0, *) {
+            ATHLTHAdaptiveCompactMetric(
+                regular: regular,
+                condensed: condensed
+            )
+        } else {
+            Text(regular)
+                .font(.caption2.weight(.bold))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+        }
     }
 
     @ViewBuilder
@@ -940,10 +988,14 @@ struct ATHLTHWorkoutLiveActivity: Widget {
         if workoutFocus(context) == .strengthRest,
            let ends = context.state.strengthRestEndsAt {
             TimelineView(.periodic(from: .now, by: 5)) { timeline in
+                let remaining = ceil(ends.timeIntervalSince(timeline.date))
                 compactIslandText(
-                    ends > timeline.date
+                    remaining > 0
+                        ? duration(remaining)
+                        : localized("READY", "KLAR"),
+                    condensed: remaining > 0
                         ? ATHLTHLiveActivityDisplayPolicy.compactDuration(
-                            ceil(ends.timeIntervalSince(timeline.date))
+                            remaining
                         )
                         : localized("READY", "KLAR")
                 )
@@ -958,6 +1010,10 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                 )
                 compactIslandText(
                     left.map { $0 > 0
+                        ? duration(ceil($0))
+                        : localized("READY", "KLAR")
+                    } ?? "—",
+                    condensed: left.map { $0 > 0
                         ? ATHLTHLiveActivityDisplayPolicy.compactDuration(
                             ceil($0)
                         )
@@ -967,14 +1023,14 @@ struct ATHLTHWorkoutLiveActivity: Widget {
             }
         } else {
             TimelineView(.periodic(from: .now, by: 15)) { tick in
-                compactIslandText(
-                    workoutFocus(context) == .paused ||
+                let isCurrent = workoutFocus(context) == .paused ||
                     ATHLTHLiveActivityDisplayPolicy.isRecent(
                         updatedAt: context.state.updatedAt,
                         now: tick.date
                     )
-                    ? compactIslandValue(context)
-                    : "—"
+                compactIslandText(
+                    isCurrent ? compactValue(context) : "—",
+                    condensed: isCurrent ? compactIslandValue(context) : "—"
                 )
             }
         }
