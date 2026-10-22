@@ -11813,6 +11813,8 @@ struct ATHLTHRecoveryView: View {
     @State private var showingSorenessLog = false
     @State private var hasAutoOpenedDailyCheckIn = false
     @State private var showingRecoveryInfo = false
+    @State private var showingRecoveryMethodDetails = false
+    @State private var openRecoveryDetailsAfterPopover = false
     @State private var showingRecoveryCoach = false
     @State private var selectedRecoveryTool: RecoveryTool?
     @State private var recoveryDerivedSnapshot =
@@ -12090,7 +12092,7 @@ struct ATHLTHRecoveryView: View {
                     store: sorenessStore
                 )
             }
-            .sheet(isPresented: $showingRecoveryInfo) {
+            .sheet(isPresented: $showingRecoveryMethodDetails) {
                 RecoveryMethodInfoView()
             }
             .sheet(item: $selectedRecoveryTool) { tool in
@@ -12164,6 +12166,31 @@ struct ATHLTHRecoveryView: View {
                 .accessibilityLabel(
                     insightText("How ATHLTH calculates recovery", "Hvordan ATHLTH beregner restitusjon")
                 )
+                .accessibilityHint(insightText(
+                    "Opens a quick explanation without leaving the readiness card",
+                    "Åpner en kort forklaring uten å forlate dagsformkortet"
+                ))
+                .popover(
+                    isPresented: $showingRecoveryInfo,
+                    attachmentAnchor: .rect(.bounds),
+                    arrowEdge: .top
+                ) {
+                    RecoveryMethodQuickInfoPopover {
+                        // Present the full explanation only on explicit request.
+                        openRecoveryDetailsAfterPopover = true
+                        showingRecoveryInfo = false
+                    }
+                    .presentationCompactAdaptation(.popover)
+                    .onDisappear {
+                        guard openRecoveryDetailsAfterPopover else { return }
+                        openRecoveryDetailsAfterPopover = false
+                        // Allow the popover to finish dismissing before the
+                        // optional in-depth sheet is presented on iPhone.
+                        DispatchQueue.main.async {
+                            showingRecoveryMethodDetails = true
+                        }
+                    }
+                }
             }
 
             if let score = health.recovery.score {
