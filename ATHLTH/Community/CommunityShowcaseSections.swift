@@ -598,6 +598,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
     let currentDisplayName: String
     let currentAvatarURL: URL?
     let friends: [SocialProfileCard]
+    var initialFriendID: UUID? = nil
 
     @State private var selectedFriendID: UUID?
     @State private var period:
@@ -682,8 +683,12 @@ struct CommunityFriendsVsFriendsDetailView: View {
         }
         .task {
             if selectedFriendID == nil {
-                selectedFriendID =
-                    friends.first?.userID
+                if let initialFriendID,
+                   friends.contains(where: { $0.userID == initialFriendID }) {
+                    selectedFriendID = initialFriendID
+                } else {
+                    selectedFriendID = friends.first?.userID
+                }
             }
 
             ownActivities =
