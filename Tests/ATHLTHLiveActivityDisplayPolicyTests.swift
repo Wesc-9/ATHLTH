@@ -130,4 +130,23 @@ final class ATHLTHLiveActivityDisplayPolicyTests: XCTestCase {
         )
     }
 
+
+    func testCompactIslandRepetitionsDoNotShowLongUnitText() {
+        XCTAssertEqual(ATHLTHLiveActivityDisplayPolicy.compactRepetitions(8), "8×")
+        XCTAssertEqual(ATHLTHLiveActivityDisplayPolicy.compactRepetitions(12), "12×")
+        XCTAssertEqual(ATHLTHLiveActivityDisplayPolicy.compactRepetitions(nil), "—")
+        XCTAssertEqual(ATHLTHLiveActivityDisplayPolicy.compactRepetitions(-1), "—")
+    }
+
+    func testCompactIslandDistanceFitsAlongsideMusic() {
+        XCTAssertEqual(ATHLTHLiveActivityDisplayPolicy.compactDistance(500), "500m")
+        XCTAssertEqual(ATHLTHLiveActivityDisplayPolicy.compactDistance(2400), "2.4k")
+        XCTAssertEqual(ATHLTHLiveActivityDisplayPolicy.compactDistance(.nan), "—")
+    }
+
+    func testCompactIslandLongSessionsUseShortDuration() {
+        XCTAssertEqual(ATHLTHLiveActivityDisplayPolicy.compactDuration(300), "5:00")
+        XCTAssertEqual(ATHLTHLiveActivityDisplayPolicy.compactDuration(3_905), "1h05")
+        XCTAssertEqual(ATHLTHLiveActivityDisplayPolicy.compactDuration(.infinity), "—")
+    }
 }
