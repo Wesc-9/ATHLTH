@@ -3414,7 +3414,8 @@ struct ActiveStrengthWorkoutView: View {
     /// A workout target is a separate, optional pre-workout preference.
     private func liveHeartRateAndZoneRow(_ workout: StrengthWorkoutLog) -> some View {
         let pulse = strengthWatchSnapshot?.heartRate
-        let maxBPM = appSession.onboardingProfile?.maximumHeartRateBPM.map(Double.init)
+        let maximum = appSession.onboardingProfile?.maximumHeartRateBPM
+        let maxBPM = maximum.map(Double.init)
         let observed = ATHLTHHeartRateZones.measuredZone(
             heartRateBPM: pulse, maximumBPM: maxBPM
         )
