@@ -356,13 +356,80 @@ struct MirroredWorkoutLiveView: View {
                     }
                 }
 
-                ToolbarItem(
-                    placement:
-                        .topBarTrailing
-                ) {
-                    ATHLTHAudioRouteControl(
-                        compact: true
-                    )
+                // Use the run's top-right + for real, supported in-session
+                // actions. The Watch owns this recording; do not offer an
+                // unimplemented second workout recorder from this screen.
+                if let snapshot = mirroring.snapshot,
+                   mirroring.hasActiveMirroredWorkout,
+                   snapshot.kind == .running || snapshot.kind == .walking {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            if let incline = snapshot.treadmillInclinePercent {
+                                Button {
+                                    treadmillInclineDraft = incline
+                                    showingTreadmillInclineEditor = true
+                                } label: {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english: "Adjust treadmill incline",
+                                            norwegian: "Juster stigning på mølle"
+                                        ),
+                                        systemImage: "figure.run"
+                                    )
+                                }
+                            }
+
+                            if snapshot.routeCanReturnToStart == true {
+                                Button {
+                                    _ = mirroring.requestRunBackToStart()
+                                } label: {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english: "Run back to start",
+                                            norwegian: "Løp tilbake til start"
+                                        ),
+                                        systemImage: "arrow.uturn.backward"
+                                    )
+                                }
+                            }
+
+                            Button {
+                                showingAIConversation = true
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Talk to AI Coach",
+                                        norwegian: "Snakk med AI Coach"
+                                    ),
+                                    systemImage: "waveform"
+                                )
+                            }
+
+                            if mirroring.canReplayMirroredCoachMessage {
+                                Button {
+                                    mirroring.replayMirroredCoachMessage()
+                                } label: {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english: "Replay last coach message",
+                                            norwegian: "Hør siste coachbeskjed"
+                                        ),
+                                        systemImage: "arrow.counterclockwise"
+                                    )
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "More live workout actions",
+                            norwegian: "Flere valg under økten"
+                        ))
+                    }
                 }
             }
         }
@@ -471,9 +538,7 @@ struct MirroredWorkoutLiveView: View {
                     }
                     Spacer(minLength: 4)
 
-                    if mirroring.isIPhoneCoachVoiceOwner {
-                        ATHLTHAudioRouteControl(compact: true)
-                    }
+
                 }
 
                 if mirroring.isIPhoneCoachVoiceOwner {
