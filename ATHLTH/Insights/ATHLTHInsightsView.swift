@@ -66,10 +66,13 @@ struct ATHLTHInsightsView: View {
                 await loadTrend()
             }
             .onReceive(health.$workouts) { workouts in
-                sessionBaselines = InsightsSessionBaselines.calculate(
+                let updated = InsightsSessionBaselines.calculate(
                     workouts: workouts,
                     at: Date()
                 )
+                if sessionBaselines != updated {
+                    sessionBaselines = updated
+                }
             }
         }
     }
