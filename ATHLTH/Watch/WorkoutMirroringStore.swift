@@ -354,6 +354,36 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         return true
     }
 
+    /// Advance only the currently shown running phase in the same Watch workout.
+    /// A reconnect or double tap cannot turn one request into two skipped phases.
+    @discardableResult
+    func advanceRunningStep(expectedIndex: Int, startedAt: Date?) -> Bool {
+        guard let mirroredSession,
+              let startedAt,
+              hasActiveMirroredWorkout,
+              snapshot?.state == .running,
+              snapshot?.runningStepIndex == expectedIndex,
+              snapshot?.runningManualAdvanceRequired == true
+        else { return false }
+
+        guard let data = try? JSONEncoder().encode(
+            WatchWorkoutMirrorCommand(
+                command: .advanceRunningStep,
+                workoutStartedAt: startedAt,
+                expectedRunningStepIndex: expectedIndex
+            )
+        ) else { return false }
+
+        Task {
+            do {
+                try await mirroredSession.sendToRemoteWorkoutSession(data: data)
+            } catch {
+                publish { self.errorMessage = error.localizedDescription }
+            }
+        }
+        return true
+    }
+
     @discardableResult
     func sendTreadmillInclinePercent(
         _ percent: Double
