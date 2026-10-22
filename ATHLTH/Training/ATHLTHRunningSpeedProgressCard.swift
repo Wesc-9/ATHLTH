@@ -116,6 +116,47 @@ struct ATHLTHRunningSpeedProgressCard: View {
                     }
                 }
 
+                if let samples = latest.minutes, !samples.isEmpty {
+                    DisclosureGroup(tr("Minute-by-minute run", "Løp minutt for minutt")) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(Array(samples.prefix(80).enumerated()),
+                                    id: \.offset) { _, minute in
+                                HStack(spacing: 8) {
+                                    Text(tr("Phase", "Del") + " \(minute.stepIndex + 1) · " +
+                                        "\(Int(ceil(minute.stepElapsedAtEndSeconds / 60))) min")
+                                        .font(.caption)
+                                    Spacer(minLength: 3)
+                                    if minute.activeSeconds > 0 {
+                                        Text(String(format: "%.1f km/t",
+                                            minute.watchDistanceMeters * 3.6 /
+                                            minute.activeSeconds))
+                                            .font(.caption.weight(.semibold))
+                                            .monospacedDigit()
+                                    }
+                                    if let bpm = minute.watchHeartRateBPM {
+                                        Text("\(Int(bpm.rounded())) bpm")
+                                            .font(.caption)
+                                    }
+                                }
+                                if let incline = minute.manuallyEnteredTreadmillInclinePercent {
+                                    Text(String(format: "Oppgitt stigning %.1f %%", incline))
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Text(tr(
+                                "Speed is derived from recorded distance and time. Targets and manually entered incline are not sensor measurements.",
+                                "Hastigheten er beregnet fra registrert distanse og tid. Målverdier og manuelt oppgitt stigning er ikke sensormålinger."
+                            ))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.top, 7)
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                }
+
                 if latest.userReported {
                     Label(tr(
                         "Treadmill speeds were entered manually.",
