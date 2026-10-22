@@ -1439,7 +1439,8 @@ final class IPhoneWorkoutStore:
                 recoveryEnd ?? Date(),
                 workout.start
             )
-        recordRunningMinuteIfDue(&workout, force: true, at: workout.end ?? Date())
+        let minuteSampleEnd = workout.end ?? Date()
+        recordRunningMinuteIfDue(&workout, force: true, at: minuteSampleEnd)
         // Keep the final in-progress phase in the durable result as a
         // partial step. A fully completed structured workout already records
         // its last phase at the transition.
