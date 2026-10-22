@@ -135,7 +135,31 @@ struct ActiveStrengthWorkoutView: View {
             )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItemGroup(placement: .topBarLeading) {
+                    if strength.activeWorkout != nil {
+                        Button {
+                            // Keep the recording, completed sets and active
+                            // timers alive; only close this live presentation.
+                            strength.checkpoint()
+                            dismiss()
+                        } label: {
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                .frame(width: 40, height: 40)
+                                .background(ATHLTHTheme.champagneSoft, in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Minimize workout",
+                            norwegian: "Legg ned økten"
+                        ))
+                        .accessibilityHint(ATHLTHLocalization.choose(
+                            english: "Keep tracking your workout and return to ATHLTH",
+                            norwegian: "Fortsett å registrere økten og gå tilbake til ATHLTH"
+                        ))
+                    }
+
                     if strength.activeWorkout?.exercises.isEmpty == false {
                         Button {
                             showingExerciseQueue = true
@@ -146,6 +170,7 @@ struct ActiveStrengthWorkoutView: View {
                                 .frame(width: 40, height: 40)
                                 .background(ATHLTHTheme.champagneSoft, in: Circle())
                         }
+                        .buttonStyle(.plain)
                         .accessibilityLabel(ATHLTHLocalization.choose(
                             english: "Exercises and order",
                             norwegian: "Øvelser og rekkefølge"
