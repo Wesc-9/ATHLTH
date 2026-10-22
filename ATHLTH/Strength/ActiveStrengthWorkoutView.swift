@@ -1930,6 +1930,95 @@ struct ActiveStrengthWorkoutView: View {
         }
     }
 
+    @ViewBuilder
+    private func focusedNextExercisePreview(_ upcoming: StrengthExerciseLog) -> some View {
+        let artwork = focusedExerciseMediaURLs(upcoming).first
+        let first = upcoming.sets.first
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Group {
+                    if let artwork {
+                        focusedExerciseArtwork(url: artwork, exercise: upcoming)
+                    } else {
+                        focusedExerciseArtworkFallback(upcoming)
+                    }
+                }
+                .frame(width: 94, height: 94)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "UP NEXT", norwegian: "NESTE ØVELSE"
+                    ))
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.6)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+
+                    Text(upcoming.exercise.displayName)
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "\(upcoming.sets.count) sets",
+                        norwegian: "\(upcoming.sets.count) sett"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+                    if let duration = first?.plannedDurationSeconds,
+                       duration > 0 {
+                        Label(TimeInterval(duration).clockDuration,
+                              systemImage: "timer")
+                            .font(.caption.weight(.semibold))
+                    } else if let reps = first?.plannedReps {
+                        Text("\(reps) reps")
+                            .font(.caption.weight(.semibold))
+                    }
+                    if let weight = first?.plannedWeightKilograms,
+                       weight > 0 {
+                        Text(String(format: "%.1f kg", weight))
+                            .font(.caption.weight(.semibold))
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+
+            Button {
+                // Existing engine keeps completed sets intact and never
+                // edits the original training plan.
+                _ = strength.selectExerciseForNow(upcoming.id)
+            } label: {
+                HStack {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Open next exercise",
+                        norwegian: "Åpne neste øvelse"
+                    ))
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .padding(.horizontal, 15)
+                .frame(minHeight: 44)
+                .background(ATHLTHTheme.champagne, in: Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(14)
+        .background(
+            ATHLTHTheme.card,
+            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(ATHLTHTheme.premiumGold.opacity(0.20), lineWidth: 0.8)
+        }
+        .accessibilityElement(children: .contain)
+    }
+
     /// Count the interval after the last completed exercise as rest, not as
     /// an extension of its training time. Date anchors survive app suspension.
     private func focusedBetweenExerciseRestCard(
