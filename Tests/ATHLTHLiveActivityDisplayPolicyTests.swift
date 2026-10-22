@@ -149,4 +149,75 @@ final class ATHLTHLiveActivityDisplayPolicyTests: XCTestCase {
         XCTAssertEqual(ATHLTHLiveActivityDisplayPolicy.compactDuration(3_905), "1h05")
         XCTAssertEqual(ATHLTHLiveActivityDisplayPolicy.compactDuration(.infinity), "—")
     }
+
+    func testDynamicIslandShowsBrandOnlyDuringTransitions() {
+        for phase in ["idle", "preparing", "ending", "completed", "failed"] {
+            XCTAssertTrue(ATHLTHLiveActivityDisplayPolicy.showsBrandMark(phase: phase))
+        }
+        for phase in ["running", "paused"] {
+            XCTAssertFalse(ATHLTHLiveActivityDisplayPolicy.showsBrandMark(phase: phase))
+        }
+    }
+
+    func testStrengthCompactIslandPrioritizesElapsedTime() {
+        XCTAssertEqual(
+            ATHLTHLiveActivityDisplayPolicy.compactMetric(focus: .strengthSet),
+            .elapsed
+        )
+        XCTAssertEqual(
+            ATHLTHLiveActivityDisplayPolicy.compactMetric(focus: .strengthRest),
+            .strengthRest
+        )
+        XCTAssertEqual(
+            ATHLTHLiveActivityDisplayPolicy.compactMetric(focus: .strengthTimedSet),
+            .strengthTimedSet
+        )
+        XCTAssertEqual(
+            ATHLTHLiveActivityDisplayPolicy.compactMetric(focus: .paused),
+            .paused
+        )
+    }
+
+    func testRunningCompactIslandPrioritizesAvailablePaceOrTime() {
+        XCTAssertEqual(
+            ATHLTHLiveActivityDisplayPolicy.compactMetric(
+                focus: .running, pace: 310
+            ), .pace
+        )
+        for pace in [nil, .nan, 0, 2000] as [Double?] {
+            XCTAssertEqual(
+                ATHLTHLiveActivityDisplayPolicy.compactMetric(
+                    focus: .running, pace: pace
+                ), .elapsed
+            )
+        }
+        XCTAssertEqual(
+            ATHLTHLiveActivityDisplayPolicy.compactMetric(
+                focus: .runningInterval
+            ), .runningInterval
+        )
+    }
+
+    func testWalkingAndCyclingOnlyUseValidRecordedDistance() {
+        for sport in [
+            ATHLTHLiveActivityDisplayFocus.walking,
+            ATHLTHLiveActivityDisplayFocus.cycling
+        ] {
+            XCTAssertEqual(
+                ATHLTHLiveActivityDisplayPolicy.compactMetric(
+                    focus: sport, distanceMeters: 4100
+                ), .distance
+            )
+            XCTAssertEqual(
+                ATHLTHLiveActivityDisplayPolicy.compactMetric(
+                    focus: sport, distanceMeters: 0
+                ), .elapsed
+            )
+            XCTAssertEqual(
+                ATHLTHLiveActivityDisplayPolicy.compactMetric(
+                    focus: sport, distanceMeters: .nan
+                ), .elapsed
+            )
+        }
+    }
 }
