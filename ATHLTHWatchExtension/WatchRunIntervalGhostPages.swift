@@ -22,7 +22,7 @@ struct WatchRunIntervalFocusPage: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 6) {
                         Image(systemName: "timer")
-                            .foregroundStyle(WatchTheme.liveLime)
+                            .foregroundStyle(WatchTheme.accentDeep)
                         Text(ATHLTHLocalization.choose(
                             english: "CURRENT INTERVAL",
                             norwegian: "AKTUELT INTERVALL"
@@ -180,7 +180,7 @@ struct WatchRunIntervalFocusPage: View {
                             .monospacedDigit()
                         }
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(WatchTheme.liveLime)
+                        .foregroundStyle(WatchTheme.accentDeep)
                         .padding(9)
                         .watchSurface(radius: 14)
                     }
