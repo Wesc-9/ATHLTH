@@ -1352,601 +1352,552 @@ struct CommunityFriendsVsFriendsDetailView: View {
         .pickerStyle(.segmented)
     }
 
+    // MARK: - Rivalry breakdown
+
     private var metricCard: some View {
         let mine = currentStats
         let theirs = friendStats
-        let directMetric =
-            activeDirectMetric
+        let duelMetric = activeDirectMetric
 
-        return VStack(spacing: 0) {
-                matchupHeader
+        return VStack(alignment: .leading, spacing: 11) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(ATHLTHLocalization.choose(
+                    english: "The details", norwegian: "Sammenligningen"
+                ))
+                .font(.title3.weight(.bold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                Spacer()
+                Text(period.title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+            .padding(.bottom, 2)
 
-                if directMetric ==
-                    .workoutCount {
-                    metricRow(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Workouts · duel",
-                            norwegian:
-                                "Treningsøkter · duell"
+            metricRow(
+                ATHLTHLocalization.choose(english: "Workouts", norwegian: "Økter"),
+                icon: "checkmark.circle.fill",
+                mine: duelMetric == .workoutCount
+                    ? primaryScoreValues.mine : mine.workouts,
+                theirs: duelMetric == .workoutCount
+                    ? primaryScoreValues.theirs : theirs.workouts,
+                format: countText,
+                emphasis: metricEmphasis(for: .workouts)
+            )
+            metricRow(
+                ATHLTHLocalization.choose(english: "Running distance", norwegian: "Løping"),
+                icon: "figure.run",
+                mine: duelMetric == .runningDistance
+                    ? primaryScoreValues.mine.map { $0 / 1_000 }
+                    : mine.runningKilometers,
+                theirs: duelMetric == .runningDistance
+                    ? primaryScoreValues.theirs.map { $0 / 1_000 }
+                    : theirs.runningKilometers,
+                format: distanceText,
+                emphasis: metricEmphasis(for: .running)
+            )
+            metricRow(
+                ATHLTHLocalization.choose(english: "Active time", norwegian: "Aktiv tid"),
+                icon: "clock",
+                mine: mine.activeMinutes,
+                theirs: theirs.activeMinutes,
+                format: minutesText,
+                emphasis: metricEmphasis(for: .activeTime)
+            )
+
+            if period != .allTime || duelMetric == .strengthVolume {
+                metricRow(
+                    duelMetric == .strengthVolume
+                        ? ATHLTHLocalization.choose(
+                            english: "Strength volume", norwegian: "Styrkevolum"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Strength workouts", norwegian: "Styrkeøkter"
                         ),
-                        icon:
-                            "checkmark.circle.fill",
-                        mine:
-                            primaryScoreValues
-                                .mine,
-                        theirs:
-                            primaryScoreValues
-                                .theirs,
-                        format: countText,
-                        emphasis:
-                            .highlighted
-                    )
-                } else {
-                    metricRow(
-                        ATHLTHLocalization.choose(
-                            english: "Workouts",
-                            norwegian: "Økter"
-                        ),
-                        icon:
-                            "figure.run.circle.fill",
-                        mine: mine.workouts,
-                        theirs:
-                            theirs.workouts,
-                        format: countText,
-                        emphasis:
-                            metricEmphasis(
-                                for: .workouts
-                            )
-                    )
-                }
+                    icon: "dumbbell.fill",
+                    mine: duelMetric == .strengthVolume
+                        ? primaryScoreValues.mine : mine.strengthWorkouts,
+                    theirs: duelMetric == .strengthVolume
+                        ? primaryScoreValues.theirs : theirs.strengthWorkouts,
+                    format: duelMetric == .strengthVolume
+                        ? strengthVolumeText : countText,
+                    emphasis: metricEmphasis(for: .strength)
+                )
+            }
 
-                Divider()
-                    .opacity(
-                        directMetric == nil
-                            ? 1
-                            : 0.36
-                    )
-
-                if directMetric ==
-                    .runningDistance {
-                    metricRow(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Running · duel",
-                            norwegian:
-                                "Løping · duell"
-                        ),
-                        icon: "figure.run",
-                        mine:
-                            primaryScoreValues
-                                .mine
-                                .map {
-                                    $0 / 1_000
-                                },
-                        theirs:
-                            primaryScoreValues
-                                .theirs
-                                .map {
-                                    $0 / 1_000
-                                },
-                        format: distanceText,
-                        emphasis:
-                            .highlighted
-                    )
-                } else {
-                    metricRow(
-                        ATHLTHLocalization.choose(
-                            english: "Running",
-                            norwegian: "Løping"
-                        ),
-                        icon: "figure.run",
-                        mine:
-                            mine.runningKilometers,
-                        theirs:
-                            theirs
-                                .runningKilometers,
-                        format: distanceText,
-                        emphasis:
-                            metricEmphasis(
-                                for: .running
-                            )
-                    )
-                }
-
-                Divider()
-                    .opacity(
-                        directMetric == nil
-                            ? 1
-                            : 0.36
-                    )
-
+            if period != .allTime {
                 metricRow(
                     ATHLTHLocalization.choose(
-                        english: "Active time",
-                        norwegian: "Aktiv tid"
+                        english: "Personal records", norwegian: "Personlige rekorder"
                     ),
-                    icon: "clock.fill",
-                    mine:
-                        mine.activeMinutes,
-                    theirs:
-                        theirs.activeMinutes,
-                    format: minutesText,
-                    emphasis:
-                        metricEmphasis(
-                            for: .activeTime
-                        )
+                    icon: "sparkles",
+                    mine: mine.personalRecords,
+                    theirs: theirs.personalRecords,
+                    format: countText,
+                    emphasis: metricEmphasis(for: .personalRecords)
                 )
-
-                if period != .allTime ||
-                    directMetric ==
-                        .strengthVolume {
-                    Divider()
-                        .opacity(
-                            directMetric == nil
-                                ? 1
-                                : 0.36
-                        )
-
-                    if directMetric ==
-                        .strengthVolume {
-                        metricRow(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Strength volume · duel",
-                                norwegian:
-                                    "Styrkevolum · duell"
-                            ),
-                            icon:
-                                "dumbbell.fill",
-                            mine:
-                                primaryScoreValues
-                                    .mine,
-                            theirs:
-                                primaryScoreValues
-                                    .theirs,
-                            format:
-                                strengthVolumeText,
-                            emphasis:
-                                .highlighted
-                        )
-                    } else {
-                        metricRow(
-                            ATHLTHLocalization.choose(
-                                english: "Strength",
-                                norwegian: "Styrke"
-                            ),
-                            icon:
-                                "dumbbell.fill",
-                            mine:
-                                mine.strengthWorkouts,
-                            theirs:
-                                theirs
-                                    .strengthWorkouts,
-                            format: countText,
-                            emphasis:
-                                metricEmphasis(
-                                    for: .strength
-                                )
-                        )
-                    }
-                }
-
-                if period != .allTime {
-                    Divider()
-                        .opacity(
-                            directMetric == nil
-                                ? 1
-                                : 0.36
-                        )
-
-                    metricRow(
-                        "PRs",
-                        icon: "bolt.fill",
-                        mine:
-                            mine.personalRecords,
-                        theirs:
-                            theirs
-                                .personalRecords,
-                        format: countText,
-                        emphasis:
-                            metricEmphasis(
-                                for:
-                                    .personalRecords
-                            )
-                    )
-
-                    Divider()
-                        .opacity(
-                            directMetric == nil
-                                ? 1
-                                : 0.36
-                        )
-
-                    metricRow(
-                        ATHLTHLocalization.choose(
-                            english: "Challenges",
-                            norwegian: "Challenges"
-                        ),
-                        icon: "trophy.fill",
-                        mine:
-                            mine.challenges,
-                        theirs:
-                            theirs.challenges,
-                        format: countText,
-                        emphasis:
-                            metricEmphasis(
-                                for: .challenges
-                            )
-                    )
-                }
-            }
-        .padding(18)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.white
-                        .opacity(0.96),
-                    ATHLTHTheme
-                        .vitalitySoft
-                        .opacity(0.36),
-                    ATHLTHTheme
-                        .surfaceStone
-                        .opacity(0.54)
-                ],
-                startPoint:
-                    .topLeading,
-                endPoint:
-                    .bottomTrailing
-            ),
-            in: RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-            .stroke(
-                Color.black.opacity(0.045),
-                lineWidth: 0.8
-            )
-        }
-        .shadow(
-            color: Color.black.opacity(0.03),
-            radius: 12,
-            y: 5
-        )
-    }
-
-    private var matchupHeader: some View {
-        HStack {
-            Text("YOU")
-                .font(.caption2.bold())
-                .tracking(1.2)
-                .foregroundStyle(
-                    ATHLTHTheme.accentDeep
-                )
-
-            Spacer()
-
-            Text(period.title.uppercased())
-                .font(.caption2.bold())
-                .tracking(1.0)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-
-            Spacer()
-
-            Text("FRIEND")
-                .font(.caption2.bold())
-                .tracking(1.2)
-                .foregroundStyle(
-                    ATHLTHTheme.accentDeep
-                )
-        }
-        .padding(.bottom, 12)
-    }
-
-    private var contextCard: some View {
-        VStack(
-            alignment: .leading,
-            spacing: 11
-        ) {
-                HStack {
-                    VStack(
-                        alignment: .leading,
-                        spacing: 3
-                    ) {
-                        Text("Keep it going")
-                            .font(
-                                .headline
-                            )
-
-                        Text(
-                            "Turn the comparison into a direct challenge."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(
-                            .secondary
-                        )
-                    }
-
-                    Spacer()
-
-                    if loadingFriend {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-                }
-
-                if period == .allTime &&
-                    friendProfile?
-                        .performance == nil {
-                    Label(
-                        "Some all-time metrics are hidden by this athlete’s privacy settings.",
-                        systemImage:
-                            "lock.fill"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
-                    )
-                }
-
-                Button {
-                    showingChallenge = true
-                } label: {
-                    Label(
-                        "Challenge " +
-                            firstName(
-                                selectedFriend?
-                                    .resolvedName ??
-                                    "friend"
-                            ),
-                        systemImage:
-                            "trophy.fill"
-                    )
-                    .font(
-                        .subheadline.weight(
-                            .bold
-                        )
-                    )
-                    .foregroundStyle(.white)
-                    .frame(
-                        maxWidth: .infinity
-                    )
-                    .frame(height: 46)
-                    .background(
-                        ATHLTHTheme.accentDeep,
-                        in: RoundedRectangle(
-                            cornerRadius: 15,
-                            style: .continuous
-                        )
-                    )
-                }
-                .buttonStyle(.plain)
-                .disabled(
-                    selectedFriend == nil
-                )
-            }
-        .padding(18)
-        .background(
-            Color.white.opacity(0.94),
-            in: RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-            .stroke(
-                Color.black.opacity(0.045),
-                lineWidth: 0.8
-            )
-        }
-        .shadow(
-            color: Color.black.opacity(0.03),
-            radius: 12,
-            y: 5
-        )
-    }
-
-    private var pointsExplainerCard:
-        some View {
-        ATHLTHCard {
-            VStack(
-                alignment: .leading,
-                spacing: 12
-            ) {
-                HStack {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "HOW ACTIVITY POINTS WORK",
-                            norwegian:
-                                "SLIK FÅR DU AKTIVITETSPOENG"
-                        ),
-                        systemImage:
-                            "bolt.fill"
-                    )
-                    .font(
-                        .caption.weight(
-                            .bold
-                        )
-                    )
-                    .tracking(0.8)
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .vitality
-                    )
-
-                    Spacer()
-                }
-
-                Text(
+                metricRow(
                     ATHLTHLocalization.choose(
-                        english:
-                            "Activity points are the default Head-to-head score, so running, strength, walking and other workouts can compete on the same scale.",
-                        norwegian:
-                            "Aktivitetspoeng er standardscoren i Head-to-head, slik at løping, styrke, gange og andre økter kan konkurrere på samme skala."
-                    )
-                )
-                .font(.subheadline)
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .primaryText
-                )
-                .fixedSize(
-                    horizontal: false,
-                    vertical: true
-                )
-
-                pointRuleRow(
-                    icon:
-                        "checkmark.circle.fill",
-                    value:
-                        "+20",
-                    detail:
-                        ATHLTHLocalization.choose(
-                            english:
-                                "points per completed workout",
-                            norwegian:
-                                "poeng per gjennomført økt"
-                        )
-                )
-
-                pointRuleRow(
-                    icon: "clock.fill",
-                    value: "+1",
-                    detail:
-                        ATHLTHLocalization.choose(
-                            english:
-                                "point for every 5 active minutes",
-                            norwegian:
-                                "poeng per 5 aktive minutter"
-                        )
-                )
-
-                Label(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "The time bonus is capped at 120 active minutes per workout.",
-                        norwegian:
-                            "Tidsbonusen stopper ved 120 aktive minutter per økt."
+                        english: "Challenges", norwegian: "Utfordringer"
                     ),
-                    systemImage:
-                        "hourglass.bottomhalf.filled"
+                    icon: "trophy.fill",
+                    mine: mine.challenges,
+                    theirs: theirs.challenges,
+                    format: countText,
+                    emphasis: metricEmphasis(for: .challenges)
                 )
-                .font(.caption)
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .mutedText
-                )
-
-                if activeDirectDuel != nil {
-                    Divider()
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "A confirmed direct duel replaces the headline score with the selected category. Activity points are still calculated in the background.",
-                            norwegian:
-                                "En godkjent direkte duell erstatter hovedscoren med valgt gren. Aktivitetspoengene beregnes fortsatt i bakgrunnen."
-                        )
-                    )
-                    .font(
-                        .caption.weight(
-                            .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .accentDeep
-                    )
-                }
             }
+
+            Label(ATHLTHLocalization.choose(
+                english: "Only workouts available to you are included. A dash means data is not shared.",
+                norwegian: "Kun tilgjengelige økter er med. En strek betyr at data ikke er delt."
+            ), systemImage: "lock.shield")
+            .font(.caption2)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, 5)
         }
+        .padding(16)
+        .background(ATHLTHTheme.card, in: RoundedRectangle(
+            cornerRadius: 25, style: .continuous
+        ))
         .overlay {
-            RoundedRectangle(
-                cornerRadius:
-                    ATHLTHTheme
-                        .cornerRadius,
-                style: .continuous
+            RoundedRectangle(cornerRadius: 25, style: .continuous)
+                .stroke(ATHLTHTheme.border, lineWidth: 1)
+        }
+    }
+
+    /// Interpretation is based only on the values currently available.
+    /// Avoid claiming a friend did not exercise when their sharing is empty.
+    private var matchupLeadText: String {
+        let mine = primaryScoreValues.mine
+        let theirs = primaryScoreValues.theirs
+        switch CommunityMatchupVisualPolicy.standing(mine: mine, theirs: theirs) {
+        case .unavailable:
+            return ATHLTHLocalization.choose(
+                english: "Not enough shared data yet",
+                norwegian: "Ikke nok delte data ennå"
             )
-            .stroke(
-                ATHLTHTheme
-                    .vitality
-                    .opacity(0.10),
-                lineWidth: 0.8
+        case .tied:
+            return ATHLTHLocalization.choose(
+                english: "It's level so far",
+                norwegian: "Foreløpig helt jevnt"
+            )
+        case .leading:
+            return ATHLTHLocalization.choose(
+                english: "You're ahead on available data",
+                norwegian: "Du leder med tilgjengelige data"
+            )
+        case .trailing:
+            return ATHLTHLocalization.choose(
+                english: "\(firstName(selectedFriend?.resolvedName ?? "Friend")) is ahead",
+                norwegian: "\(firstName(selectedFriend?.resolvedName ?? "Vennen")) leder"
             )
         }
     }
 
-    private func pointRuleRow(
-        icon: String,
-        value: String,
-        detail: String
-    ) -> some View {
-        HStack(spacing: 11) {
-            Image(
-                systemName: icon
+    private var matchupInsightText: String {
+        if loadingFriend {
+            return ATHLTHLocalization.choose(
+                english: "Updating the shared workout data…",
+                norwegian: "Oppdaterer tilgjengelige treningsdata …"
             )
-            .font(
-                .system(
-                    size: 14,
-                    weight: .bold
+        }
+        if period == .allTime && friendProfile?.performance == nil {
+            return ATHLTHLocalization.choose(
+                english: "All-time totals are not shared by this athlete. Private data never counts as zero.",
+                norwegian: "Denne utøveren deler ikke totalstatistikk. Private data regnes aldri som null."
+            )
+        }
+        if friendStats.workouts == 0, activeDirectDuel == nil {
+            return ATHLTHLocalization.choose(
+                english: "No shared workouts for this opponent in the selected period. They may have trained privately.",
+                norwegian: "Ingen delte økter fra motstanderen i valgt periode. Private økter vises ikke."
+            )
+        }
+        let own = currentStats
+        let friend = friendStats
+        if let w1 = own.workouts, let w2 = friend.workouts,
+           w1 != w2 {
+            return w1 > w2
+                ? ATHLTHLocalization.choose(
+                    english: "You've completed more workouts in this period.",
+                    norwegian: "Du har registrert flere økter i denne perioden."
                 )
-            )
-            .foregroundStyle(
-                ATHLTHTheme.vitality
-            )
-            .frame(
-                width: 34,
-                height: 34
-            )
-            .background(
-                ATHLTHTheme
-                    .vitalitySoft,
-                in:
-                    RoundedRectangle(
-                        cornerRadius: 11,
-                        style:
-                            .continuous
-                    )
-            )
+                : ATHLTHLocalization.choose(
+                    english: "Your opponent has more shared workouts in this period.",
+                    norwegian: "Motstanderen har flere delte økter i denne perioden."
+                )
+        }
+        if let t1 = own.activeMinutes, let t2 = friend.activeMinutes,
+           t1 != t2 {
+            return t1 > t2
+                ? ATHLTHLocalization.choose(
+                    english: "Your active time gives you an edge.",
+                    norwegian: "Du har fordelen på aktiv treningstid."
+                )
+                : ATHLTHLocalization.choose(
+                    english: "Your opponent has the edge in active time.",
+                    norwegian: "Motstanderen har fordelen på aktiv treningstid."
+                )
+        }
+        return ATHLTHLocalization.choose(
+            english: "Compare the details below or start a direct duel.",
+            norwegian: "Se detaljene nedenfor, eller start en direkte duell."
+        )
+    }
 
-            Text(value)
-                .font(
-                    .headline
-                        .monospacedDigit()
-                        .weight(.bold)
+    private var comparisonInsightCard: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "chart.line.uptrend.xyaxis")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.premiumGold)
+                .frame(width: 38, height: 38)
+                .background(
+                    ATHLTHTheme.premiumGoldSoft,
+                    in: RoundedRectangle(cornerRadius: 12)
                 )
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .primaryText
-                )
-                .frame(
-                    width: 42,
-                    alignment: .leading
-                )
-
-            Text(detail)
-                .font(.caption)
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .mutedText
-                )
-
+            VStack(alignment: .leading, spacing: 5) {
+                Text(ATHLTHLocalization.choose(
+                    english: "MATCHUP INSIGHT", norwegian: "DUELLINNSIKT"
+                ))
+                .font(.system(size: 10, weight: .bold))
+                .tracking(1.3)
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                Text(matchupInsightText)
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Spacer(minLength: 0)
+            if loadingFriend {
+                ProgressView().controlSize(.small)
+            }
         }
+        .padding(16)
+        .background(ATHLTHTheme.cardWarm.opacity(0.50),
+                    in: RoundedRectangle(cornerRadius: 21))
+        .overlay {
+            RoundedRectangle(cornerRadius: 21)
+                .stroke(ATHLTHTheme.premiumGold.opacity(0.18), lineWidth: 1)
+        }
+    }
+
+    // MARK: - Visible recent activity: no guessed or private training
+
+    private var recentDays: [Date] {
+        let today = Calendar.current.startOfDay(for: Date())
+        return (0..<7).compactMap {
+            Calendar.current.date(byAdding: .day, value: $0 - 6, to: today)
+        }
+    }
+
+    private func ownWorkoutCount(on day: Date) -> Int {
+        health.workouts.filter {
+            Calendar.current.isDate($0.startDate, inSameDayAs: day)
+        }.count
+    }
+
+    private func sharedWorkoutCount(on day: Date) -> Int {
+        friendActivities.filter {
+            $0.kind == "workout" &&
+            Calendar.current.isDate($0.createdAt, inSameDayAs: day)
+        }.count
+    }
+
+    private var trendCard: some View {
+        let days = recentDays
+        let high = max(1, days.map {
+            max(ownWorkoutCount(on: $0), sharedWorkoutCount(on: $0))
+        }.max() ?? 1)
+        let hasTraining = days.contains {
+            ownWorkoutCount(on: $0) > 0 || sharedWorkoutCount(on: $0) > 0
+        }
+
+        return VStack(alignment: .leading, spacing: 13) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Recent momentum", norwegian: "Aktivitet siste uke"
+                    ))
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Completed workouts · last 7 days",
+                        norwegian: "Registrerte økter · siste 7 dager"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                Spacer()
+                Image(systemName: "chart.bar.xaxis")
+                    .foregroundStyle(ATHLTHTheme.premiumGold)
+            }
+            if hasTraining {
+                HStack(alignment: .bottom, spacing: 8) {
+                    ForEach(days, id: \.self) { day in
+                        let own = ownWorkoutCount(on: day)
+                        let shared = sharedWorkoutCount(on: day)
+                        VStack(spacing: 7) {
+                            HStack(alignment: .bottom, spacing: 3) {
+                                Capsule()
+                                    .fill(ATHLTHTheme.premiumGold)
+                                    .frame(height: own == 0 ? 3 :
+                                        CGFloat(own) / CGFloat(high) * 58)
+                                Capsule()
+                                    .fill(ATHLTHTheme.accentDeep.opacity(0.48))
+                                    .frame(height: shared == 0 ? 3 :
+                                        CGFloat(shared) / CGFloat(high) * 58)
+                            }
+                            .frame(height: 61, alignment: .bottom)
+                            Text(day, format: .dateTime.weekday(.narrow))
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(
+                            "\(day.formatted(date: .abbreviated, time: .omitted)), \(own) / \(shared)"
+                        )
+                    }
+                }
+                HStack(spacing: 17) {
+                    legend(color: ATHLTHTheme.premiumGold,
+                           title: ATHLTHLocalization.choose(
+                            english: "You", norwegian: "Du"))
+                    legend(color: ATHLTHTheme.accentDeep.opacity(0.48),
+                           title: firstName(selectedFriend?.resolvedName ?? "Friend"))
+                }
+            } else {
+                Label(ATHLTHLocalization.choose(
+                    english: "No visible workouts in the last 7 days.",
+                    norwegian: "Ingen synlige økter siste 7 dager."
+                ), systemImage: "calendar")
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .padding(.vertical, 8)
+            }
+        }
+        .padding(17)
+        .background(ATHLTHTheme.card, in: RoundedRectangle(cornerRadius: 24))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(ATHLTHTheme.border, lineWidth: 1)
+        }
+    }
+
+    private func legend(color: Color, title: String) -> some View {
+        HStack(spacing: 6) {
+            Circle().fill(color).frame(width: 7, height: 7)
+            Text(title)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .lineLimit(1)
+        }
+    }
+
+    // MARK: - Real challenge actions
+
+    private var duelActionCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: "scope")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.premiumGold)
+                    .frame(width: 42, height: 42)
+                    .background(
+                        ATHLTHTheme.premiumGoldSoft,
+                        in: RoundedRectangle(cornerRadius: 13)
+                    )
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Take on a new challenge",
+                        norwegian: "Gjør sammenligningen til en duell"
+                    ))
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose a category. The opponent must accept.",
+                        norwegian: "Velg en gren. Motstanderen må godta."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                Spacer(minLength: 0)
+            }
+
+            Button {
+                showingDirectDuelPicker = true
+            } label: {
+                HStack {
+                    if creatingDirectDuel {
+                        ProgressView().tint(.white)
+                    } else {
+                        Image(systemName: "bolt.fill")
+                    }
+                    Text(directDuelButtonTitle)
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                }
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .frame(height: 50)
+                .background(
+                    ATHLTHTheme.accentDeep,
+                    in: RoundedRectangle(cornerRadius: 15)
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(
+                selectedFriend == nil || creatingDirectDuel ||
+                outgoingPendingDirectDuel != nil
+            )
+
+            Button {
+                showingChallenge = true
+            } label: {
+                HStack {
+                    Image(systemName: "trophy")
+                    Text(ATHLTHLocalization.choose(
+                        english: "Other challenge types",
+                        norwegian: "Andre utfordringer"
+                    ))
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .padding(.horizontal, 16)
+                .frame(height: 44)
+                .background(
+                    ATHLTHTheme.surfaceStone,
+                    in: RoundedRectangle(cornerRadius: 15)
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(selectedFriend == nil)
+
+            if outgoingPendingDirectDuel != nil {
+                Label(ATHLTHLocalization.choose(
+                    english: "Invitation sent. Waiting for a reply.",
+                    norwegian: "Invitasjonen er sendt. Venter på svar."
+                ), systemImage: "clock")
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            } else if incomingPendingDirectDuel != nil {
+                Label(ATHLTHLocalization.choose(
+                    english: "You have an invitation. Reply in Inbox.",
+                    norwegian: "Du har en invitasjon. Svar i innboksen."
+                ), systemImage: "tray.full")
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.premiumGold)
+            }
+        }
+        .padding(18)
+        .background(ATHLTHTheme.card, in: RoundedRectangle(cornerRadius: 24))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(ATHLTHTheme.premiumGold.opacity(0.23), lineWidth: 1)
+        }
+    }
+
+    private var pointsExplainerCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showingPointRules.toggle()
+                }
+            } label: {
+                HStack(spacing: 11) {
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(ATHLTHTheme.premiumGold)
+                    Text(ATHLTHLocalization.choose(
+                        english: "How the score is calculated",
+                        norwegian: "Slik beregnes aktivitetspoengene"
+                    ))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.caption.bold())
+                        .rotationEffect(.degrees(showingPointRules ? 180 : 0))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if showingPointRules {
+                Divider().padding(.vertical, 13)
+                Text(ATHLTHLocalization.choose(
+                    english: "20 points per registered workout + 1 point for each 5 active minutes, with a cap of 120 minutes per workout in the total calculation. Missing duration does not count as zero workouts.",
+                    norwegian: "20 poeng per registrerte økt + 1 poeng for hver 5. aktive minutt. Tidsbonusen er begrenset i beregningen til maksimalt 120 minutter per økt. Manglende varighet fjerner ikke øktpoengene."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .fixedSize(horizontal: false, vertical: true)
+
+                if let own = CommunityMatchupVisualPolicy.pointsBreakdown(
+                    workouts: currentStats.workouts,
+                    activeMinutes: currentStats.activeMinutes
+                ), let friend = CommunityMatchupVisualPolicy.pointsBreakdown(
+                    workouts: friendStats.workouts,
+                    activeMinutes: friendStats.activeMinutes
+                ) {
+                    VStack(spacing: 9) {
+                        scoreDetailRow(
+                            ATHLTHLocalization.choose(
+                                english: "Workout points", norwegian: "Øktpoeng"),
+                            mine: own.workoutPoints,
+                            theirs: friend.workoutPoints
+                        )
+                        scoreDetailRow(
+                            ATHLTHLocalization.choose(
+                                english: "Time bonus", norwegian: "Tidsbonus"),
+                            mine: own.timePoints,
+                            theirs: friend.timePoints
+                        )
+                    }
+                    .padding(.top, 12)
+                }
+                if activeDirectDuel != nil {
+                    Label(ATHLTHLocalization.choose(
+                        english: "The accepted duel uses its chosen category for the headline score.",
+                        norwegian: "En godtatt duell bruker valgt gren som hovedscore."
+                    ), systemImage: "checkmark.shield")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .padding(.top, 9)
+                }
+            }
+        }
+        .padding(16)
+        .background(ATHLTHTheme.surfaceStone.opacity(0.56),
+                    in: RoundedRectangle(cornerRadius: 20))
+    }
+
+    private func scoreDetailRow(
+        _ title: String, mine: Double, theirs: Double
+    ) -> some View {
+        HStack {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+            Spacer()
+            Text("\(Int(mine.rounded())) – \(Int(theirs.rounded())) p")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+        }
+    }
+
+    private var matchupShareText: String {
+        let friend = selectedFriend?.resolvedName ?? "Friend"
+        return "ATHLTH · Head-to-head\n" +
+            "\(currentDisplayName) vs \(friend)\n" +
+            "\(primaryScoreTitle): " +
+            "\(primaryScoreText(primaryScoreValues.mine)) – " +
+            "\(primaryScoreText(primaryScoreValues.theirs))\n" +
+            primaryScoreSubtitle
     }
 
     private var directDuelChallenges:
