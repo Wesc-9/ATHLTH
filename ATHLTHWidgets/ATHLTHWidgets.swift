@@ -514,7 +514,6 @@ private struct ATHLTHAdaptiveCompactMetric: View {
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
-                .fixedSize(horizontal: true, vertical: false)
         }
     }
 }
