@@ -334,6 +334,7 @@ final class IPhoneWorkoutStore:
     private let speechSynthesizer =
         AVSpeechSynthesizer()
     private let azureCoachSpeech = ATHLTHAzureWorkoutSpeech()
+    private let audioOwner = "phone-workout-\(UUID().uuidString)"
     private var guidancePriorityGate =
         ATHLTHGuidancePriorityGate()
     private var coachEventLedger = ATHLTHCoachEventLedger()
@@ -4216,7 +4217,8 @@ final class IPhoneWorkoutStore:
                       !self.coachSpeechPaused
                 else { return }
                 try? ATHLTHSpokenAudioSession.activate(
-                    duckOtherAudio: configuration.shouldDuckOtherAudio
+                    duckOtherAudio: configuration.shouldDuckOtherAudio,
+                    owner: self.audioOwner
                 )
                 self.speechSynthesizer.speak(utterance)
             },
@@ -4259,7 +4261,7 @@ final class IPhoneWorkoutStore:
         )
 
         ATHLTHSpokenAudioSession
-            .deactivate()
+            .deactivate(owner: audioOwner)
     }
 
     nonisolated func speechSynthesizer(
@@ -4279,7 +4281,7 @@ final class IPhoneWorkoutStore:
             self.guidancePriorityGate.voiceDidFinish()
 
             ATHLTHSpokenAudioSession
-                .deactivate()
+                .deactivate(owner: audioOwner)
             self.deliverNextQueuedCoachCue()
         }
     }
@@ -4301,7 +4303,7 @@ final class IPhoneWorkoutStore:
             self.guidancePriorityGate.voiceDidFinish()
 
             ATHLTHSpokenAudioSession
-                .deactivate()
+                .deactivate(owner: audioOwner)
             self.deliverNextQueuedCoachCue()
         }
     }
