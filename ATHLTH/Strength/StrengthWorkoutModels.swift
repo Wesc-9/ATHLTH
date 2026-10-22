@@ -536,6 +536,8 @@ struct StrengthExerciseLog: Identifiable, Codable, Hashable {
     // Preserves an explicit decision to omit planned sets in a live workout.
     // Saved training plan and completed set IDs remain unchanged.
     var skippedPlannedSetCount: Int? = nil
+    var targetSpeedKilometersPerHour: Double? = nil
+    var targetHeartRateZone: Int? = nil
 
     var isCompleted: Bool {
         completedAt != nil
