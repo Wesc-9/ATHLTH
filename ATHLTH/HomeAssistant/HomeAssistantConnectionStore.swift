@@ -2336,62 +2336,51 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 : .array([])
 
         if supportsAthleteSnapshot {
-            state["athlete_display_name"] =
-                shareAthleteProfile
-                    ? (
-                        Self.sanitizedText(athleteDisplayName).map {
-                        String($0.prefix(80))
-                    }
-                            .map(HomeAssistantJSONValue.string)
-                        ?? .null
-                    )
-                    : .null
-    
-            let approvedAvatar = athleteAvatarURL.flatMap { avatar in
+            let displayName = Self.sanitizedText(athleteDisplayName)
+                .map { String($0.prefix(80)) }
+            state["athlete_display_name"] = shareAthleteProfile
+                ? (displayName.map(HomeAssistantJSONValue.string) ?? .null)
+                : .null
+
+            let approvedAvatar = athleteAvatarURL.flatMap { avatar -> String? in
                 let host = avatar.host?.lowercased() ?? ""
-                return avatar.scheme?.lowercased() == "https"
-                    && host.hasSuffix(".supabase.co")
-                    && avatar.path.hasPrefix(
-                        "/storage/v1/object/public/profile-avatars/"
-                    )
-                    ? avatar.absoluteString : nil
+                let value = avatar.absoluteString
+                guard avatar.scheme?.lowercased() == "https",
+                      host.hasSuffix(".supabase.co"),
+                      avatar.path.hasPrefix(
+                          "/storage/v1/object/public/profile-avatars/"
+                      ),
+                      value.utf8.count <= 256
+                else {
+                    return nil
+                }
+                return value
             }
-            state["athlete_avatar_url"] =
-                shareAthleteProfile
-                    ? (approvedAvatar.map(HomeAssistantJSONValue.string) ?? .null)
-                    : .null
-    
+            state["athlete_avatar_url"] = shareAthleteProfile
+                ? (approvedAvatar.map(HomeAssistantJSONValue.string) ?? .null)
+                : .null
+
+            let records: [HomeAssistantJSONValue] =
+                performanceRecords.prefix(12).map { record in
+                    let recordID = Self.sanitizedText(record.id)
+                        .map { String($0.prefix(96)) } ?? "record"
+                    let title = Self.sanitizedText(record.title)
+                        .map { String($0.prefix(96)) } ?? "Prestasjon"
+                    let value = Self.sanitizedText(record.value)
+                        .map { String($0.prefix(64)) } ?? "—"
+                    let category = ["running", "strength", "other"].contains(
+                        record.category
+                    ) ? record.category : "other"
+                    return .object([
+                        "id": .string(recordID),
+                        "title": .string(title),
+                        "value": .string(value),
+                        "category": .string(category),
+                        "date": .string(Self.iso8601(record.date))
+                    ])
+                }
             state["performance_records"] =
-                shareMilestoneEvents
-                    ? .array(
-                        performanceRecords.prefix(12).map { record in
-                            .object([
-                                "id": .string(
-                                    Self.sanitizedText(record.id).map {
-                                    String($0.prefix(96))
-                                } ?? "record"
-                                ),
-                                "title": .string(
-                                    Self.sanitizedText(record.title).map {
-                                    String($0.prefix(96))
-                                } ?? "Prestasjon"
-                                ),
-                                "value": .string(
-                                    Self.sanitizedText(record.value).map {
-                                    String($0.prefix(64))
-                                } ?? "—"
-                                ),
-                                "category": .string(
-                                    ["running", "strength", "other"].contains(
-                                        record.category
-                                    ) ? record.category : "other"
-                                ),
-                                "date": .string(Self.iso8601(record.date))
-                            ])
-                        }
-                    )
-                    : .array([])
-    
+                shareMilestoneEvents ? .array(records) : .array([])
         }
 
         state["pending_delivery_count"] =
