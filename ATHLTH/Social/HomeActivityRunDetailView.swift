@@ -341,7 +341,11 @@ struct HomeActivityRunDetailView: View {
                         athleteMaximumBPM: session.onboardingProfile?.maximumHeartRateBPM.map(Double.init),
                         measuredHeartRate: measuredPulse,
                         workoutStartDate: workout.startDate,
-                        workoutEndDate: workout.endDate
+                        workoutEndDate: workout.endDate,
+                        previousPerformances: completedIntervalHistory +
+                            phoneWorkout.history.compactMap {
+                                ATHLTHCompletedRunningPerformance(phone: $0)
+                            }
                     )
                 }
 

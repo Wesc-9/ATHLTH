@@ -9,6 +9,7 @@ struct ATHLTHIntervalResultSummaryCard: View {
     var measuredHeartRate: [ATHLTHRunningHeartRatePoint] = []
     var workoutStartDate: Date? = nil
     var workoutEndDate: Date? = nil
+    var previousPerformances: [ATHLTHCompletedRunningPerformance] = []
     @State private var showPhaseTimeline = true
     @State private var showMinuteBreakdown = false
 
@@ -181,6 +182,34 @@ struct ATHLTHIntervalResultSummaryCard: View {
         return "\(Int(previousBPM.rounded())) → \(Int(lastBPM.rounded())) bpm"
     }
 
+    private var fourByFourMilestone: String? {
+        guard let record = ATHLTHFourByFourRecords.qualifyingResult(performance)
+        else { return nil }
+        let earlier = ATHLTHFourByFourRecords.records(
+            previousPerformances.filter {
+                $0.id != record.id &&
+                $0.completedAt < performance.completedAt &&
+                $0.userReported == record.reported
+            }
+        )
+        let source = record.reported
+            ? tr("entered treadmill values", "oppgitte mølleverdier")
+            : tr("recorded distance", "registrert distanse")
+        guard let best = earlier.first else {
+            return tr("Your first comparable 4 × 4 result", "Ditt første sammenlignbare 4 × 4-resultat") +
+                " · " + String(format: "%.1f km/t", record.averageSpeedKmh) +
+                " (" + source + ")"
+        }
+        if record.averageSpeedKmh > best.averageSpeedKmh + 0.05 {
+            return tr("New personal best for 4 × 4", "Ny personlig rekord på 4 × 4") +
+                " · " + String(format: "%.1f km/t", record.averageSpeedKmh) +
+                " (" + source + ")"
+        }
+        return tr("Comparable 4 × 4 result", "Sammenlignbart 4 × 4-resultat") +
+            " · " + String(format: "%.1f km/t", record.averageSpeedKmh) +
+            " (" + source + ")"
+    }
+
     private var evenness: String? {
         guard let fastest, let slowest, fastest > 0,
               work.count >= 2 else { return nil }
@@ -325,6 +354,16 @@ struct ATHLTHIntervalResultSummaryCard: View {
                     if let evenness {
                         smallStat(tr("Speed variation", "Fartsvariasjon"), evenness)
                     }
+                }
+
+                if let fourByFourMilestone {
+                    Label(fourByFourMilestone, systemImage: "trophy.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(ATHLTHPlanDesign.selectedSurface,
+                                    in: RoundedRectangle(cornerRadius: 12))
                 }
 
                 Rectangle().fill(ATHLTHPlanDesign.warmDivider).frame(height: 1)
