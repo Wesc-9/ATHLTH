@@ -3702,6 +3702,36 @@ struct ActiveStrengthWorkoutView: View {
                 }
             }
 
+            if exercise.targetSpeedKilometersPerHour != nil ||
+                exercise.targetHeartRateZone != nil {
+                HStack(spacing: 8) {
+                    if let speed = exercise.targetSpeedKilometersPerHour {
+                        Label(
+                            String(format: "Målfart %.1f km/t", speed),
+                            systemImage: "speedometer"
+                        )
+                    }
+                    if let zone = exercise.targetHeartRateZone {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Target zone \(zone)",
+                                norwegian: "Målsone \(zone)"
+                            ),
+                            systemImage: "heart.text.square"
+                        )
+                    }
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(
+                    ATHLTHTheme.premiumGoldSoft,
+                    in: RoundedRectangle(cornerRadius: 13)
+                )
+            }
+
             focusedExerciseInstructionDisclosure(
                 exercise
             )
