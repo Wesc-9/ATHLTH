@@ -793,7 +793,7 @@ final class MirroredWorkoutAudioCoach:
             try? ATHLTHSpokenAudioSession.activate(
                 duckOtherAudio: configuration.shouldDuckOtherAudio,
                 owner: audioOwner
-            
+            )
             synthesizer.speak(utterance)
         }
         if rememberForReplay,
