@@ -101,6 +101,8 @@ enum ATHLTHSpokenAudioSession {
     private static var owners: [String: Bool] = [:]
     private static var revision = 0
     private static var delayedRestoreTask: Task<Void, Never>?
+    private static var ownerExpiryTasks: [String: Task<Void, Never>] = [:]
+    private static var ownerGenerations: [String: UUID] = [:]
     private static var routeObserver: NSObjectProtocol?
     private static var interruptionObserver: NSObjectProtocol?
 
@@ -152,6 +154,18 @@ enum ATHLTHSpokenAudioSession {
         do {
             try configure(session)
             revision += 1
+            ownerExpiryTasks[owner]?.cancel()
+            let generation = UUID()
+            ownerGenerations[owner] = generation
+            // A system speech delegate can occasionally fail to return
+            // after a route change. A short cue cannot own ducking forever.
+            ownerExpiryTasks[owner] = Task { @MainActor in
+                try? await Task.sleep(for: .seconds(120))
+                guard !Task.isCancelled,
+                      ownerGenerations[owner] == generation
+                else { return }
+                deactivate(owner: owner)
+            }
         } catch {
             if let previous {
                 owners[owner] = previous
@@ -192,6 +206,8 @@ enum ATHLTHSpokenAudioSession {
 
     static func deactivate(owner: String = "legacy") {
         guard owners.removeValue(forKey: owner) != nil else { return }
+        ownerExpiryTasks.removeValue(forKey: owner)?.cancel()
+        ownerGenerations.removeValue(forKey: owner)
         revision += 1
 
         if !owners.isEmpty {
