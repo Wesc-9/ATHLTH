@@ -91,6 +91,7 @@ private struct WatchPersistedWorkoutState: Codable {
     var structuredStepIndex: Int
     var structuredStepStartElapsedTime: TimeInterval
     var structuredStepStartDistanceMeters: Double
+    var awaitingMainStart: Bool? = nil
     var ghostRace: WatchGhostRaceTransfer?
     var lapSummaries: [WatchWorkoutLapSummary]
     var lapCount: Int
@@ -175,6 +176,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     @Published private(set) var treadmillInclinePercent:
         Double?
     @Published private(set) var structuredStepIndex = 0
+    @Published private(set) var awaitingMainStart = false
     @Published private(set) var strengthSession:
         WatchStrengthSessionSnapshot?
     @Published private(set) var strengthActionPending = false
@@ -553,6 +555,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.treadmillInclinePercent =
                 workout.treadmillInclinePercent
             self.structuredStepIndex = 0
+            self.awaitingMainStart = false
 
             if let routeAlerts = workout.routeAlerts {
                 self.routeAlertConfiguration =
@@ -3282,6 +3285,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     structuredStepStartElapsedTime,
                 structuredStepStartDistanceMeters:
                     structuredStepStartDistanceMeters,
+                awaitingMainStart: awaitingMainStart,
                 ghostRace:
                     ghostRaceConfiguration,
                 lapSummaries:
@@ -3351,6 +3355,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         structuredStepStartDistanceMeters =
             snapshot
                 .structuredStepStartDistanceMeters
+        awaitingMainStart = snapshot.awaitingMainStart ?? false
         lastLapElapsedTime =
             snapshot.lastLapElapsedTime
         lastLapDistanceMeters =
@@ -4135,7 +4140,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     /// seconds when the user advances. Do not substitute target speed for
     /// measured Watch distance or mark manually set incline as measured.
     private func recordRunningMinuteIfDue(force: Bool = false) {
-        guard state == .running,
+        guard !awaitingMainStart, state == .running,
               let step = currentStructuredRunningStep,
               (kind == .running || kind == .walking) else { return }
 
@@ -4169,6 +4174,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     private func evaluateStructuredRunningWorkout() {
         guard state == .running,
+              !awaitingMainStart,
               (kind == .running || kind == .walking),
               !structuredWorkoutComplete,
               let step = currentStructuredRunningStep
@@ -4180,7 +4186,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         // Warm-up and cool-down are minimum suggested times, never auto-advance.
         // The runner explicitly chooses when the actual main set begins or ends.
-        if step.phase == "warmup" || step.phase == "cooldown" { return }
+        if step.phase == "cooldown" ||
+           (step.phase == "warmup" &&
+            structuredRunningWorkout?.autoStartMainAfterWarmup != true) { return }
         if step.measure == .time,
            structuredRunningWorkout?.autoAdvanceTimedSteps == false {
             return
@@ -4254,11 +4262,30 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
     }
 
+    /// One action for the runner, but two deliberate steps at the warm-up boundary.
     func advanceStructuredRunningWorkoutManually() {
         guard state == .running,
               currentStructuredRunningStep != nil,
               !structuredWorkoutComplete else { return }
-        advanceStructuredRunningWorkout(manually: true)
+        if awaitingMainStart {
+            startStructuredMainAfterWarmup()
+        } else {
+            advanceStructuredRunningWorkout(manually: true)
+        }
+    }
+
+    private func startStructuredMainAfterWarmup() {
+        guard state == .running, awaitingMainStart,
+              currentStructuredRunningStep != nil else { return }
+        // Discard distance/time while waiting; it never becomes a work interval.
+        structuredStepStartElapsedTime = elapsedTime
+        structuredStepStartDistanceMeters = distanceMeters
+        lastIntervalProgressCueKey = nil
+        lastIntervalWarningCueKey = nil
+        publish { self.awaitingMainStart = false }
+        persistWorkoutRecoveryState()
+        WKInterfaceDevice.current().play(.start)
+        announceCurrentStructuredStep(prefix: "Starting")
     }
 
     private func advanceStructuredRunningWorkout(manually: Bool = false) {
@@ -4324,14 +4351,28 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         lastTargetAlertAt = nil
         targetWasOutside = false
 
+        let mustStartMainManually = finishedStep?.phase == "warmup" &&
+            workout.autoStartMainAfterWarmup != true
         publish {
             self.structuredStepIndex = nextIndex
+            self.awaitingMainStart = mustStartMainManually
             self.liveTargetStatus = nil
         }
 
         persistWorkoutRecoveryState()
         WKInterfaceDevice.current().play(.notification)
-        announceCurrentStructuredStep(prefix: "Next")
+        if mustStartMainManually {
+            if audioCoachConfiguration.enabled {
+                speak(
+                    coachPhrase(
+                        english: "Warm-up finished. Start the main section when ready.",
+                        norwegian: "Oppvarming avsluttet. Start hoveddelen når du er klar."
+                    ), priority: .structuredStep
+                )
+            }
+        } else {
+            announceCurrentStructuredStep(prefix: "Next")
+        }
     }
 
     private func announceCurrentStructuredStep(
@@ -6970,13 +7011,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 currentRunningStep?.targetTreadmillInclinePercent,
             runningStepTargetPaceSecondsPerKilometer:
                 currentRunningStep?.targetPaceMinSecondsPerKilometer,
+            runningAwaitingMainStart: awaitingMainStart,
             runningManualAdvanceRequired:
                 currentRunningStep.map { step in
                     step.phase == "warmup" || step.phase == "cooldown" ||
                     structuredRunningWorkout?.autoAdvanceTimedSteps == false
                 },
             runningStepElapsedSeconds:
-                currentRunningStep == nil ? nil : currentStructuredStepElapsedTime,
+                currentRunningStep == nil ? nil :
+                    (awaitingMainStart ? 0 : currentStructuredStepElapsedTime),
             runningIntervalCoachCueEverySeconds:
                 structuredRunningWorkout?.intervalCoachCueEverySeconds,
             runningIntervalCoachCountdownSeconds:
@@ -7654,7 +7697,13 @@ extension WatchWorkoutManager:
                        let expected = command.expectedRunningStepIndex,
                        expected == self.structuredStepIndex,
                        self.currentStructuredRunningStep != nil {
-                        self.advanceStructuredRunningWorkoutManually()
+                        if command.startMainAfterWarmup == true {
+                            if self.awaitingMainStart {
+                                self.advanceStructuredRunningWorkoutManually()
+                            }
+                        } else if !self.awaitingMainStart {
+                            self.advanceStructuredRunningWorkoutManually()
+                        }
                     }
                 case .appendRunningWorkout:
                     if let part = command.runningWorkoutToAppend {
