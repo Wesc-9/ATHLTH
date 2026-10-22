@@ -81,6 +81,13 @@ struct ActiveHybridWorkoutPicker: View {
                             ))
                             .font(.caption)
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Starting another part saves elapsed time in any active timed set. Existing completed sets and the Watch recording stay intact.",
+                                norwegian: "Starter du en annen del, lagres faktisk tid i et pågående tidssett. Ferdige sett og klokkeopptaket beholdes."
+                            ))
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     .padding(.vertical, 7)
