@@ -1037,6 +1037,7 @@ private struct HomeFriendQuickActionsPopover: View {
 
 struct HomePersonalRecentActivitySection:
     View {
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var health:
         HealthKitManager
     @EnvironmentObject private var strength:
@@ -1168,6 +1169,26 @@ struct HomePersonalRecentActivitySection:
         .task(id: recentRevision) {
             rebuildRecentWorkouts()
         }
+        .task {
+            await refreshRecentWorkouts()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            Task { await refreshRecentWorkouts() }
+        }
+        .onReceive(health.$workouts) { _ in
+            // A HealthKit read may finish without changing the number of
+            // workouts; don't rely exclusively on the old revision key.
+            rebuildRecentWorkouts()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: .athlthTrainingDataDidChange
+            )
+        ) { _ in
+            rebuildRecentWorkouts()
+            Task { await refreshRecentWorkouts(force: true) }
+        }
         .onReceive(
             NotificationCenter.default.publisher(
                 for:
@@ -1178,6 +1199,15 @@ struct HomePersonalRecentActivitySection:
         ) { _ in
             rebuildRecentWorkouts()
         }
+    }
+
+    @MainActor
+    private func refreshRecentWorkouts(force: Bool = false) async {
+        guard scenePhase == .active else { return }
+        // A narrow workout-only Health query is much cheaper than
+        // refreshAll(), which also fetches sleep, readiness, HRV, etc.
+        _ = await health.refreshRecentWorkoutsForHome(force: force)
+        rebuildRecentWorkouts()
     }
 
     private func rebuildRecentWorkouts() {
