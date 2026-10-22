@@ -35,9 +35,13 @@ REQUIRED = {
     "ATHLTH/Social/SocialViews.swift": (
         r"Image\(\"CommunityHero\"\)\s*\.resizable\(\)\s*\.scaledToFill\(\)\s*\.athlthBoundedFill\(\)",
     ),
+    # The performance redesign deliberately removes GoalSprint and
+    # StrengthPostWorkoutHero from these surfaces. Require compact, bounded
+    # image-free record tiles rather than obsolete photo layouts.
     "ATHLTH/Profile/ProfilePerformanceViews.swift": (
-        r"Image\(\"GoalSprint\"\).*?\.scaleEffect\(1\.10\)\s*\.athlthBoundedFill\(\)",
-        r"Image\(\"StrengthPostWorkoutHero\"\).*?\.scaleEffect\(1\.08\)\s*\.athlthBoundedFill\(\)",
+        r"private struct ProfileRecordVisualTile: View.*?\.frame\(height: compactPremium \? 94 : 109\)",
+        r"private var editorialRunningPRCard:.*?LinearGradient\(",
+        r"private var editorialStrengthPRCard:.*?LinearGradient\(",
     ),
     "ATHLTH/Goals/GoalViews.swift": (
         r"private struct GoalPreviewCard.*?\.athlthBoundedFill\(\)",
@@ -55,6 +59,10 @@ def main() -> int:
         for pattern in patterns:
             if not re.search(pattern, source, re.DOTALL):
                 errors.append(f"{relative}: lost responsive artwork guard: {pattern}")
+
+    performance = (ROOT / "ATHLTH/Profile/ProfilePerformanceViews.swift").read_text(encoding="utf-8")
+    if re.search(r'Image\("(?:GoalSprint|StrengthPostWorkoutHero)"\)', performance):
+        errors.append("Performance screen reintroduced background photos into compact record cards")
 
     # Informational project-wide scan. An image can be safely bounded by
     # an enclosing GeometryReader, so simplistic grep matches aren't build
