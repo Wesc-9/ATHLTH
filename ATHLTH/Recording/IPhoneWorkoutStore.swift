@@ -2102,6 +2102,7 @@ final class IPhoneWorkoutStore:
               structuredTickTask == nil else { return }
         structuredTickTask = Task { @MainActor [weak self] in
             var lastMinuteCheckpoint = -1
+            var lastCoachTickSecond = -1
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(200))
                 guard !Task.isCancelled, let self,
@@ -2113,6 +2114,11 @@ final class IPhoneWorkoutStore:
                 // Write a sample at each active minute even without GPS movement.
                 let elapsed = current.elapsed(at: Date())
                 let minute = Int(elapsed / 60)
+                let coachSecond = Int(elapsed)
+                if coachSecond != lastCoachTickSecond {
+                    lastCoachTickSecond = coachSecond
+                    self.announceStructuredIntervalCues(current, elapsed: elapsed)
+                }
                 if minute > 0 && minute != lastMinuteCheckpoint {
                     lastMinuteCheckpoint = minute
                     self.checkpoint(force: true)
