@@ -638,6 +638,10 @@ struct PlannedExercise: Identifiable, Codable, Hashable {
     // machine settings such as a RowErg damper/resistance level.
     var loadKind: StrengthExerciseLoadKind? = nil
     var targetResistanceLevel: Int? = nil
+    // Optional per-exercise cardio guidance; backward-compatible with saved
+    // plans and distinct from measured Watch speed/heart rate.
+    var targetSpeedKilometersPerHour: Double? = nil
+    var targetHeartRateZone: Int? = nil
 
     // Optional keeps older plans fully compatible. When present, each set can
     // carry its own prescription instead of inheriting one exercise-wide
