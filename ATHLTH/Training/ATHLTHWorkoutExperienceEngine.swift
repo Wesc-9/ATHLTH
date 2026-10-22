@@ -69,6 +69,7 @@ enum ATHLTHWorkoutExperienceEngine {
 struct ATHLTHWorkoutLocationSection<RecordedMap: View>: View {
     let workout: SocialPublishableWorkout
     let hasRecordedGPS: Bool
+    var isLoadingGPS = false
     @ViewBuilder let recordedMap: () -> RecordedMap
 
     private var locationMode: ATHLTHWorkoutLocationMode {
@@ -86,7 +87,8 @@ struct ATHLTHWorkoutLocationSection<RecordedMap: View>: View {
             case .recordedGPSMap:
                 recordedMap()
             case .missingGPS:
-                ATHLTHPlanSurface {
+                if !isLoadingGPS {
+                    ATHLTHPlanSurface {
                     HStack(spacing: 13) {
                         Image(systemName: "map")
                             .font(.title3)
@@ -113,6 +115,7 @@ struct ATHLTHWorkoutLocationSection<RecordedMap: View>: View {
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         }
                         Spacer(minLength: 0)
+                    }
                     }
                 }
             case .noLocation:
