@@ -3489,7 +3489,6 @@ struct AppRootView: View {
             await homeAssistant.syncWorkoutHistory(health.workouts)
         }
         await homeAssistant.syncStrengthProgress(strengthWorkout.workoutHistory)
-        }
     }
 
     private func homeAssistantPlannedOccurrences()
