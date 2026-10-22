@@ -340,7 +340,8 @@ struct WorkoutHistoryDetailView: View {
                         (
                             healthDetail.route.count >= 1 ||
                             healthDetail.workoutLocation != nil
-                        )
+                        ),
+                    isLoadingGPS: !healthDetailLoaded
                 ) {
                     if healthDetailLoaded {
                         WorkoutLocationMapCard(
