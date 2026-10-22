@@ -921,12 +921,22 @@ private struct IPhoneStructuredStepCard: View {
                                         }
                                     }
 
-                                    ProgressView(
-                                        value: progress
-                                    )
-                                    .tint(
-                                        ATHLTHTheme.accent
-                                    )
+                                    Text("DENNE DELEN")
+                                        .font(.caption2.weight(.semibold))
+                                    ProgressView(value: progress)
+                                        .tint(ATHLTHTheme.accent)
+                                    if let plan = workout.structuredRunningWorkout {
+                                        Text("HELE ØKTEN")
+                                            .font(.caption2.weight(.semibold))
+                                        ProgressView(value:
+                                            ATHLTHRunningStepEngine.overallProgress(
+                                                steps: plan.steps,
+                                                index: workout.structuredStepIndex ?? 0,
+                                                currentStepProgress: progress
+                                            )
+                                        )
+                                        .tint(ATHLTHTheme.accentDeep)
+                                    }
 
                                     Text(
                                         structuredRemainingText(
