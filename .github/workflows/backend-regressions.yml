@@ -43,7 +43,25 @@ jobs:
       - name: Typecheck changed Edge Functions
         run: deno check supabase/functions/generate-strength-session/index.ts supabase/functions/create-audio-coach-session/index.ts supabase/functions/delete-account/index.ts supabase/functions/verify-app-store-transaction/index.ts supabase/functions/app-store-notifications/index.ts supabase/functions/recovery-sense/index.ts supabase/functions/recovery-sense-v2/index.ts supabase/functions/workout-insight/index.ts supabase/functions/generate-training-program/index.ts supabase/functions/generate-plan-adaptation/index.ts supabase/functions/post-trial-offer/index.ts scripts/harden_workout_media_cache.ts
       - name: Start disposable Supabase database
-        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
+        shell: bash
+        run: |
+          set -euo pipefail
+          # GHCR can briefly throttle public container pulls on shared
+          # runners. Retry only this disposable test-service startup;
+          # all actual database/privacy assertions below remain required.
+          for attempt in 1 2 3; do
+            if supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor; then
+              echo "Supabase test database started."
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Disposable Supabase startup failed after three attempts."
+              exit 1
+            fi
+            echo "::warning::Transient container registry/start failure; retrying database startup ($attempt/3)."
+            supabase stop --no-backup || true
+            sleep $((attempt * 25))
+          done
       - name: Replay migrations and verify privacy rules
         run: |
           supabase db reset --local --no-seed
