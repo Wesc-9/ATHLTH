@@ -43,8 +43,8 @@ private enum ATHLTHArenaEditorialAtlas {
         let end = Int(((crop.y + crop.height) * scale).rounded(.down))
         guard end > y,
               let part = image.cropping(to: CGRect(
-                x: 0, y: y, width: image.width,
-                height: min(end - y, image.height - y)
+                x: 0, y: CGFloat(y), width: CGFloat(image.width),
+                height: CGFloat(min(end - y, image.height - y))
               )) else { return nil }
         return UIImage(cgImage: part)
     }
