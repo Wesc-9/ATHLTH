@@ -518,12 +518,22 @@ struct ActiveStrengthWorkoutView: View {
                     workoutMirroring
                         .snapshot?
                         .state
-            ) { _, newState in
-                guard newState == .completed else {
-                    return
+            ) { previousState, newState in
+                if let workout = strength.activeWorkout,
+                   workout.captureDevice == .appleWatch,
+                   strength.currentExercise?.isEmbeddedRunningInterval == true,
+                   workoutMirroring.snapshot?.kind == .strength ||
+                   workoutMirroring.snapshot?.kind == .functional {
+                    if newState == .paused {
+                        strength.pauseTimedSet()
+                    } else if previousState == .paused &&
+                              newState == .running {
+                        strength.startOrResumeTimedSet()
+                    }
                 }
-
-                finalizeWatchStrengthFromMirrorIfNeeded()
+                if newState == .completed {
+                    finalizeWatchStrengthFromMirrorIfNeeded()
+                }
             }
             .onChange(of: strength.currentSetIndex) {
                 loadDefaultsFromCurrentSet()
