@@ -6956,6 +6956,18 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     .steps.count,
             runningStepProgress:
                 runningStepProgress,
+            runningOverallProgress:
+                runningStepProgress.flatMap { progress in
+                    structuredRunningWorkout.map {
+                        ATHLTHRunningStepEngine.overallProgress(
+                            steps: $0.steps,
+                            index: structuredStepIndex,
+                            currentStepProgress: progress
+                        )
+                    }
+                },
+            runningStepTargetTreadmillInclinePercent:
+                currentRunningStep?.targetTreadmillInclinePercent,
             runningNextStepTitle:
                 nextStructuredRunningStep?.title,
             runningStepRemainingSeconds:
