@@ -1308,6 +1308,35 @@ final class StrengthWorkoutStore: ObservableObject {
         persistCheckpointNow()
     }
 
+    /// Date-anchored embedded running intervals. Only the phase advances:
+    /// HealthKit recording and Apple Watch ownership stay with the parent
+    /// strength workout, preventing a second workout or duplicate calories.
+    func advanceEmbeddedIntervalIfNeeded(at date: Date = Date()) {
+        guard currentExercise?.isEmbeddedRunningInterval == true,
+              let timer = currentTimedSetCountdown,
+              timer.isRunning,
+              timer.remaining(at: date) <= 0,
+              currentSet?.isCompleted == false
+        else { return }
+
+        let finishedSetID = timer.setID
+        completeCurrentSet(
+            reps: nil,
+            durationSeconds: timer.targetSeconds,
+            weightKilograms: nil,
+            rpe: nil,
+            rir: nil,
+            restSeconds: 0
+        )
+
+        if currentExercise?.isEmbeddedRunningInterval == true,
+           let next = currentSet,
+           next.id != finishedSetID,
+           !next.isCompleted {
+            startOrResumeTimedSet()
+        }
+    }
+
     func pauseTimedSet() {
         guard var countdown = currentTimedSetCountdown,
               countdown.isRunning else { return }
