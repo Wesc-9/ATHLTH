@@ -433,6 +433,14 @@ final class IPhoneWorkoutStore:
             history.sort { $0.start > $1.start }
             persistHistory()
         }
+        if let userID,
+           !UserDefaults.standard.bool(
+             forKey: AccountLocalStorage.key("deleted", userID: userID)
+           ) {
+            ATHLTHRunningPerformanceHistory.backfillPhoneHistory(
+                history, userID: userID
+            )
+        }
         treadmillInclineOverrides =
             userID.flatMap {
                 AccountLocalStorage.read(
