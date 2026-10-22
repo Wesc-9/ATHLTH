@@ -217,6 +217,10 @@ final class HealthKitManager: ObservableObject {
     private var backgroundRefreshTask: Task<Void, Never>?
     private var backgroundRefreshNeedsFull = false
     private var allWorkoutsCache: (workouts: [HKWorkout], generatedAt: Date)?
+    // Home's light recent-workout refresh must not launch simultaneous
+    // HealthKit queries or repeat a full health assessment on every render.
+    private var lastHomeWorkoutRefreshAt: Date?
+    private var homeWorkoutRefreshInProgress = false
     private var workoutRouteCache:
         [UUID: (route: [CLLocation], generatedAt: Date)] = [:]
     private var workoutRouteCacheOrder: [UUID] = []
@@ -1467,6 +1471,64 @@ final class HealthKitManager: ObservableObject {
         } catch {
             authorizationError =
                 "Could not save the ATHLTH strength workout to Apple Health: \(error.localizedDescription)"
+            return nil
+        }
+    }
+
+    /// Keep Home's recent workouts current without fetching sleep, HRV,
+    /// training, recovery, and routes. The full Health refresh is intentionally
+    /// much heavier and may be deferred after a previous launch crash.
+    @discardableResult
+    func refreshRecentWorkoutsForHome(
+        force: Bool = false
+    ) async -> [WorkoutSummary]? {
+        guard integrationEnabled,
+              healthDataAvailable,
+              hasRequestedAuthorization,
+              !shouldDeferAutomaticHealthWork else {
+            return nil
+        }
+
+        if !force, let lastHomeWorkoutRefreshAt,
+           Date().timeIntervalSince(lastHomeWorkoutRefreshAt) < 45 {
+            return workouts
+        }
+
+        guard !homeWorkoutRefreshInProgress, !isRefreshing else {
+            return workouts
+        }
+
+        homeWorkoutRefreshInProgress = true
+        defer { homeWorkoutRefreshInProgress = false }
+
+        let now = Date()
+        let start = Calendar.current.date(
+            byAdding: .month, value: -3, to: now
+        ) ?? now.addingTimeInterval(-7_776_000)
+
+        do {
+            let fetched = try await fetchWorkouts(
+                startDate: start, endDate: now, limit: 100
+            )
+            let fresh = fetched.map(WorkoutSummary.init)
+                .sorted { $0.startDate > $1.startDate }
+
+            let oldIDs = Set(workouts.map(\.id))
+            let newIDs = Set(fresh.map(\.id))
+            if oldIDs != newIDs {
+                // History's separate all-workouts cache must never return
+                // yesterday's state after Home observed a new Health workout.
+                allWorkoutsCache = nil
+                invalidateWorkoutDerivedCaches()
+            }
+
+            if workouts != fresh { workouts = fresh }
+            cacheWorkoutObjects(fetched)
+            lastHomeWorkoutRefreshAt = Date()
+            return fresh
+        } catch {
+            // Never replace existing Home results with empty history when
+            // Apple Health is temporarily unavailable.
             return nil
         }
     }
