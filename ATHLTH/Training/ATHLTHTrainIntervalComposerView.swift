@@ -27,6 +27,8 @@ struct ATHLTHTrainIntervalComposerView: View {
     @State private var paceSeconds = 300
     @State private var speedInputEnabled = false
     @State private var speedKilometersPerHour = 12.0
+    @State private var inclineEnabled = false
+    @State private var inclinePercent = 0.0
     @State private var notes = ""
     @State private var heartRateTargetEnabled = false
     @State private var heartRateZone = 4
@@ -47,6 +49,10 @@ struct ATHLTHTrainIntervalComposerView: View {
     @State private var pauseAfterWarmupEnabled: Bool
     @State private var pauseAfterWarmupSeconds: Int
     @State private var autoAdvanceTimedSteps: Bool
+    @State private var coachIntervalEnabled: Bool
+    @State private var coachIntervalSeconds: Int
+    @State private var coachCountdownEnabled: Bool
+    @State private var coachCountdownSeconds: Int
 
     private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
     private let muted = Color(red: 0.46, green: 0.44, blue: 0.43)
@@ -73,6 +79,10 @@ struct ATHLTHTrainIntervalComposerView: View {
             max(15, Int(warmupPause?.work.durationSeconds ?? 90)))
         _autoAdvanceTimedSteps = State(initialValue:
             initial?.autoAdvanceTimedSteps ?? true)
+        _coachIntervalEnabled = State(initialValue: initial?.intervalCoachCueEverySeconds != nil)
+        _coachIntervalSeconds = State(initialValue: Int(initial?.intervalCoachCueEverySeconds ?? 60))
+        _coachCountdownEnabled = State(initialValue: initial?.intervalCoachCountdownSeconds != nil)
+        _coachCountdownSeconds = State(initialValue: Int(initial?.intervalCoachCountdownSeconds ?? 15))
         _activityName = State(initialValue: "")
         _ghostEnabled = State(initialValue: initial?.intervalGhostPaceSecondsPerKilometer != nil)
         _ghostPaceSeconds = State(initialValue: Int(initial?.intervalGhostPaceSecondsPerKilometer ?? 300))
@@ -522,6 +532,14 @@ struct ATHLTHTrainIntervalComposerView: View {
                 }
             }
 
+            Toggle(tr("Treadmill incline target", "Målstigning på tredemølle"),
+                   isOn: $inclineEnabled)
+                .tint(ATHLTHPlanDesign.accentInk)
+            if inclineEnabled {
+                Stepper(String(format: "%.1f %%", inclinePercent),
+                        value: $inclinePercent, in: 0...15, step: 0.5)
+            }
+
             Toggle(tr("Heart-rate zone", "Pulssone"), isOn: $heartRateTargetEnabled)
                 .tint(ATHLTHPlanDesign.accentInk)
             if heartRateTargetEnabled {
@@ -542,8 +560,8 @@ struct ATHLTHTrainIntervalComposerView: View {
                    isOn: $autoAdvanceTimedSteps)
                 .tint(ATHLTHPlanDesign.accentInk)
             Text(tr(
-                "A timed interval ends at its scheduled second and the next recovery starts automatically. Turn off to use Done / Next manually.",
-                "Et tidsstyrt drag avsluttes på riktig sekund og neste pause starter automatisk. Slå av for å bruke Ferdig / Neste."
+                "Work intervals and recoveries can advance automatically. Warm-up and cool-down always wait for Next. Turn this off to advance every phase manually.",
+                "Hoveddel og pauser kan gå automatisk. Oppvarming og nedjogging avsluttes alltid med Neste. Slå av for manuell styring av alle deler."
             ))
             .font(.caption)
             .foregroundStyle(muted)
@@ -595,6 +613,20 @@ struct ATHLTHTrainIntervalComposerView: View {
             Toggle(tr("Also save as reusable template", "Lagre også som gjenbrukbar mal"),
                    isOn: $saveAsReusableTemplate)
                 .tint(bronze)
+            Toggle(tr("Interval voice updates", "Løpende intervalloppdateringer"),
+                   isOn: $coachIntervalEnabled)
+                .tint(bronze)
+            if coachIntervalEnabled {
+                Stepper(tr("Every", "Hvert") + " \(coachIntervalSeconds) s",
+                        value: $coachIntervalSeconds, in: 15...300, step: 15)
+            }
+            Toggle(tr("Warn before interval ends", "Varsle før draget er ferdig"),
+                   isOn: $coachCountdownEnabled)
+                .tint(bronze)
+            if coachCountdownEnabled {
+                Stepper(tr("Before finish", "Før slutt") + " · \(coachCountdownSeconds) s",
+                        value: $coachCountdownSeconds, in: 5...60, step: 5)
+            }
             Text(tr("Tell Audio Coach what matters", "Fortell Audio Coach hva som er viktig"))
                 .font(.subheadline.weight(.semibold))
             TextField(tr("e.g. Motivate me and focus on pace", "F.eks. Motiver meg og følg med på tempo"),
@@ -656,6 +688,8 @@ struct ATHLTHTrainIntervalComposerView: View {
         paceEnabled = block.work.intensity.paceMinSecondsPerKilometer != nil
         paceSeconds = Int(block.work.intensity.paceMinSecondsPerKilometer ?? 300)
         speedInputEnabled = false
+        inclineEnabled = block.work.treadmillInclinePercent != nil
+        inclinePercent = block.work.treadmillInclinePercent ?? 0
         speedKilometersPerHour = 3_600 / Double(max(paceSeconds, 1))
         heartRateTargetEnabled = block.work.intensity.heartRateZone != nil
         heartRateZone = block.work.intensity.heartRateZone ?? 4
@@ -674,9 +708,10 @@ struct ATHLTHTrainIntervalComposerView: View {
             heartRateZone: heartRateTargetEnabled ? heartRateZone : nil,
             rpe: nil
         )
-        let work = measure == .distance
+        var work = measure == .distance
             ? RunningStepTarget.distance(Double(distanceMeters), intensity: intensity)
             : RunningStepTarget.time(Double(minutes * 60), intensity: intensity)
+        work.treadmillInclinePercent = inclineEnabled ? inclinePercent : nil
         let recovery: RunningStepTarget? = kind == .work
             && repetitions > 1 && pauseEnabled
             ? .time(Double(pauseSeconds), intensity: .easy)
@@ -731,6 +766,9 @@ struct ATHLTHTrainIntervalComposerView: View {
         if let pace = step.intensity.paceMinSecondsPerKilometer, pace > 0 {
             parts.append(String(format: "%.1f km/t", 3_600 / pace))
         }
+        if let incline = step.treadmillInclinePercent {
+            parts.append(String(format: "%.1f %%", incline))
+        }
         if let zone = step.intensity.heartRateZone {
             parts.append(tr("HR zone", "Pulssone") + " \(zone)")
         }
@@ -780,6 +818,10 @@ struct ATHLTHTrainIntervalComposerView: View {
             updatedAt: now
         )
         result.autoAdvanceTimedSteps = autoAdvanceTimedSteps
+        result.intervalCoachCueEverySeconds = coachIntervalEnabled
+            ? TimeInterval(coachIntervalSeconds) : nil
+        result.intervalCoachCountdownSeconds = coachCountdownEnabled
+            ? TimeInterval(coachCountdownSeconds) : nil
         result.intervalGhostPaceSecondsPerKilometer =
             ghostEnabled ? Double(ghostPaceSeconds) : nil
         result.intervalGhostFollowRecovery = ghostEnabled && ghostFollowRecovery
