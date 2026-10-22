@@ -86,6 +86,7 @@ struct PlannedWorkoutWatchBuilder {
                     workout.autoPauseEnabled,
                 autoAdvanceTimedSteps:
                     structured.allSatisfy { $0.autoAdvanceTimedSteps != false },
+                autoStartMainAfterWarmup: structured.first?.autoStartMainAfterWarmup,
                 intervalCoachCueEverySeconds: structured.first?.intervalCoachCueEverySeconds,
                 intervalCoachCountdownSeconds: structured.first?.intervalCoachCountdownSeconds
             )
@@ -165,6 +166,7 @@ struct PlannedWorkoutWatchBuilder {
             routeAlerts: routeAlerts,
             autoPauseEnabled: autoPauseEnabled,
             autoAdvanceTimedSteps: workout.autoAdvanceTimedSteps,
+            autoStartMainAfterWarmup: workout.autoStartMainAfterWarmup,
             intervalCoachCueEverySeconds: workout.intervalCoachCueEverySeconds,
             intervalCoachCountdownSeconds: workout.intervalCoachCountdownSeconds
         )
