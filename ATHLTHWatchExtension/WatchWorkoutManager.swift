@@ -6769,7 +6769,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         let latestRoutePoint =
             routePoints.last
         let currentRunningStep =
-            currentStructuredRunningStep
+            structuredWorkoutComplete ? nil : currentStructuredRunningStep
         let runningStepReadout = currentRunningStep.map {
             ATHLTHRunIntervalReadout.resolve(
                 step: $0,
