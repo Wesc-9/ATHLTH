@@ -5,7 +5,8 @@ import Charts
 /// warm-up and cool-down never inflate the interval averages.
 struct ATHLTHIntervalResultSummaryCard: View {
     let performance: ATHLTHCompletedRunningPerformance
-    @State private var showSupportingPhases = false
+    var athleteMaximumBPM: Double? = nil
+    @State private var showPhaseTimeline = true
     @State private var showMinuteBreakdown = false
 
     private func tr(_ en: String, _ no: String) -> String {
@@ -22,10 +23,8 @@ struct ATHLTHIntervalResultSummaryCard: View {
         }
     }
 
-    private var supporting: [ATHLTHRecordedRunningStep] {
-        performance.steps.filter {
-            ["warmup", "cooldown"].contains(($0.phase ?? "").lowercased())
-        }
+    private var phases: [ATHLTHRecordedRunningStep] {
+        performance.steps.sorted { $0.index < $1.index }
     }
 
     private var workSeconds: Double {
@@ -102,10 +101,66 @@ struct ATHLTHIntervalResultSummaryCard: View {
     }
 
     private var detailedSamples: [ATHLTHRecordedRunningMinute] {
-        let phaseIndices = Set((work + recovery).map(\.index))
-        return (performance.minutes ?? []).filter {
-            phaseIndices.contains($0.stepIndex) && $0.activeSeconds > 0
+        (performance.minutes ?? []).filter { $0.activeSeconds > 0 }
+    }
+
+    private func phaseSamples(_ index: Int) -> [ATHLTHRecordedRunningMinute] {
+        (performance.minutes ?? [])
+            .filter { $0.stepIndex == index }
+            .sorted { $0.stepElapsedAtEndSeconds < $1.stepElapsedAtEndSeconds }
+    }
+
+    private func observedPulsePeak(_ index: Int) -> Double? {
+        phaseSamples(index).compactMap(\.watchHeartRateBPM)
+            .filter { $0.isFinite && (30...240).contains($0) }.max()
+    }
+
+    private func observedZone(_ index: Int) -> Int? {
+        guard let pulse = sampledPulseBPM(for: index) else { return nil }
+        return ATHLTHHeartRateZones.measuredZone(
+            heartRateBPM: pulse, maximumBPM: athleteMaximumBPM
+        )
+    }
+
+    private var averageRecoverySpeed: Double? {
+        let elapsed = recovery.reduce(0.0) { $0 + $1.activeSeconds }
+        let meters = recovery.reduce(0.0) { $0 + $1.distanceMeters }
+        guard elapsed > 0, meters > 0 else { return nil }
+        return meters * 3.6 / elapsed
+    }
+
+    private var targetComparison: (onTarget: Int, compared: Int)? {
+        let pairs = work.compactMap { step -> (Double, Double)? in
+            guard let pace = step.targetPaceSecondsPerKilometer,
+                  pace.isFinite, pace > 0,
+                  let actual = step.actualSpeedKilometersPerHour else { return nil }
+            return (actual, 3_600 / pace)
         }
+        guard !pairs.isEmpty else { return nil }
+        return (pairs.filter { abs($0.0 - $0.1) / $0.1 <= 0.05 }.count,
+                pairs.count)
+    }
+
+    private func phaseName(_ phase: ATHLTHRecordedRunningStep,
+                           effortNumber: Int) -> String {
+        switch (phase.phase ?? "main").lowercased() {
+        case "warmup": return tr("Warm-up", "Oppvarming")
+        case "cooldown": return tr("Cool-down", "Nedjogging")
+        case "recovery", "rest": return tr("Recovery", "Pause")
+        default: return tr("Effort", "Drag") + " \(effortNumber)"
+        }
+    }
+
+    private func pulseRecovery(_ recoveryPhase: ATHLTHRecordedRunningStep) -> String? {
+        guard let before = phases.last(where: { $0.index < recoveryPhase.index &&
+            !["warmup", "cooldown", "recovery", "rest"].contains(($0.phase ?? "").lowercased())
+        }), let previousBPM = phaseSamples(before.index).compactMap(\.watchHeartRateBPM)
+            .filter({ $0.isFinite && (30...240).contains($0) }).last,
+            let lastBPM = phaseSamples(recoveryPhase.index).compactMap(\.watchHeartRateBPM)
+                .filter({ $0.isFinite && (30...240).contains($0) }).last else {
+            return nil
+        }
+        return "\(Int(previousBPM.rounded())) → \(Int(lastBPM.rounded())) bpm"
     }
 
     private var evenness: String? {
@@ -129,9 +184,18 @@ struct ATHLTHIntervalResultSummaryCard: View {
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 }
-                Text(tr("How did your intervals go?", "Slik gikk intervallene"))
-                    .font(.title2.weight(.semibold))
+                Text(performance.title)
+                    .font(.system(size: 24, weight: .semibold, design: .serif))
                     .foregroundStyle(ATHLTHPlanDesign.ink)
+                HStack(spacing: 8) {
+                    Label("\(work.count) " + tr("completed efforts", "fullførte drag"),
+                          systemImage: "checkmark.seal.fill")
+                    Text("·")
+                    Text(performance.source)
+                    Spacer(minLength: 0)
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
 
                 HStack(alignment: .top, spacing: 12) {
                     headline(tr("AVERAGE SPEED", "SNITTHASTIGHET"),
@@ -146,6 +210,17 @@ struct ATHLTHIntervalResultSummaryCard: View {
                     Spacer(minLength: 0)
                     headline(tr("RECOVERY TIME", "PAUSETID"),
                              value: duration(recoverySeconds))
+                }
+
+                HStack(spacing: 10) {
+                    if let pace = performance.averageWorkSpeed, pace > 0 {
+                        smallStat(tr("Work pace", "Tempo i drag"),
+                                  self.pace(3_600 / pace))
+                    }
+                    if let recoverySpeed = averageRecoverySpeed {
+                        smallStat(tr("Recovery speed", "Fart i pausene"),
+                                  speed(recoverySpeed))
+                    }
                 }
 
                 if let pulse = sampledWorkPulse {
@@ -167,13 +242,27 @@ struct ATHLTHIntervalResultSummaryCard: View {
                                 .foregroundStyle(ATHLTHPlanDesign.accentInk)
                                 .cornerRadius(4)
                             }
+                            if let target = effort.targetPaceSecondsPerKilometer,
+                               target > 0 {
+                                PointMark(
+                                    x: .value("Drag", offset + 1),
+                                    y: .value(tr("Target speed", "Målfart"), 3_600 / target)
+                                )
+                                .symbolSize(80)
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                            }
                         }
                     }
                     .frame(height: 150)
                     .chartXAxisLabel(tr("Interval", "Drag"))
                     .accessibilityLabel(tr(
-                        "Speed by work interval", "Hastighet per intervall"
+                        "Recorded speed bars and planned target speed points for each effort.",
+                        "Stolper viser registrert fart og punkter viser planlagt målfart."
                     ))
+                    Text(tr("Bars: recorded speed · Dots: planned speed",
+                            "Stolper: registrert fart · Punkter: planlagt fart"))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 }
 
                 if phasePulseAvailable {
@@ -222,63 +311,42 @@ struct ATHLTHIntervalResultSummaryCard: View {
 
                 Rectangle().fill(ATHLTHPlanDesign.warmDivider).frame(height: 1)
 
-                Text(tr("EVERY INTERVAL", "HVERT ENKELT DRAG"))
-                    .font(.caption2.weight(.bold))
-                    .tracking(1)
+                DisclosureGroup(
+                    tr("Full session timeline", "Hele øktforløpet"),
+                    isExpanded: $showPhaseTimeline
+                ) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(phases, id: \.index) { phase in
+                            phaseRow(phase)
+                            if phase.index != phases.last?.index {
+                                Rectangle().fill(ATHLTHPlanDesign.warmDivider)
+                                    .frame(height: 0.6)
+                            }
+                        }
+                    }
+                    .padding(.top, 9)
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                if let targetComparison {
+                    Label(
+                        tr("Within 5% of target speed on",
+                           "Innen 5 % av målfart på") +
+                        " \(targetComparison.onTarget)/\(targetComparison.compared) " +
+                        tr("efforts with both values recorded.",
+                           "drag med både mål og faktisk fart."),
+                        systemImage: "scope"
+                    )
+                    .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
-
-                ForEach(Array(work.enumerated()), id: \.offset) { number, effort in
-                    VStack(alignment: .leading, spacing: 5) {
-                        HStack(alignment: .firstTextBaseline) {
-                            Text(tr("Interval", "Drag") + " \(number + 1)")
-                                .font(.subheadline.weight(.semibold))
-                            Spacer()
-                            Text(speed(effort.actualSpeedKilometersPerHour))
-                                .font(.headline.weight(.semibold))
-                                .monospacedDigit()
-                        }
-                        HStack(spacing: 7) {
-                            Text(duration(effort.activeSeconds))
-                            Text("·")
-                            Text(String(format: "%.0f m", effort.distanceMeters))
-                            let observedPace = effort.distanceMeters > 0
-                                ? effort.activeSeconds * 1_000 / effort.distanceMeters : nil
-                            Text("·")
-                            Text(pace(observedPace))
-                        }
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-
-                        HStack(spacing: 7) {
-                            if let target = effort.targetPaceSecondsPerKilometer,
-                               target.isFinite, target > 0 {
-                                Text(tr("Target", "Mål") + " " +
-                                     String(format: "%.1f km/t", 3_600 / target))
-                            }
-                            if let pulse = samplePulse(for: effort.index) {
-                                Label(pulse, systemImage: "heart.fill")
-                            }
-                        }
-                        .font(.caption2)
-                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                        if let rest = recovery.first(where: { $0.index == effort.index + 1 }) {
-                            HStack(spacing: 8) {
-                                Text(tr("Recovery", "Pause") + ": " +
-                                     duration(rest.activeSeconds) + " · " +
-                                     String(format: "%.0f m", rest.distanceMeters))
-                                if let pulse = samplePulse(for: rest.index) {
-                                    Spacer(minLength: 2)
-                                    Label(pulse, systemImage: "heart.fill")
-                                }
-                            }
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        }
-                    }
-                    .padding(.vertical, 8)
-                    if number < work.count - 1 {
-                        Rectangle().fill(ATHLTHPlanDesign.warmDivider).frame(height: 0.5)
-                    }
+                } else {
+                    Text(tr(
+                        "No reliable target-versus-actual speed comparison is available. The app does not substitute planned speed for a recorded result.",
+                        "Ingen sikker sammenligning av målfart og faktisk fart er tilgjengelig. Planlagt fart brukes aldri som registrert resultat."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 }
 
                 if !detailedSamples.isEmpty {
@@ -310,8 +378,12 @@ struct ATHLTHIntervalResultSummaryCard: View {
                                                 speed(3_600 / target))
                                         }
                                         if let incline = sample.manuallyEnteredTreadmillInclinePercent {
-                                            Text(tr("Entered incline", "Oppgitt stigning") +
-                                                 String(format: " %.1f %%", incline))
+                                            let from = max(0, sample.stepElapsedAtEndSeconds -
+                                                           sample.activeSeconds)
+                                            Text(tr("Incline", "Stigning") + " " +
+                                                 duration(from) + "–" +
+                                                 duration(sample.stepElapsedAtEndSeconds) +
+                                                 String(format: " · %.1f %% (manuelt)", incline))
                                         }
                                     }
                                     .font(.caption2)
@@ -320,29 +392,6 @@ struct ATHLTHIntervalResultSummaryCard: View {
                             }
                         }
                         .padding(.top, 7)
-                    }
-                    .font(.subheadline.weight(.medium))
-                }
-
-                if !supporting.isEmpty {
-                    DisclosureGroup(
-                        tr("Warm-up & cool-down", "Oppvarming og nedjogging"),
-                        isExpanded: $showSupportingPhases
-                    ) {
-                        VStack(alignment: .leading, spacing: 7) {
-                            ForEach(supporting, id: \.index) { item in
-                                HStack {
-                                    Text((item.phase ?? "").lowercased() == "warmup"
-                                        ? tr("Warm-up", "Oppvarming")
-                                        : tr("Cool-down", "Nedjogging"))
-                                    Spacer()
-                                    Text(duration(item.activeSeconds) + " · " +
-                                        String(format: "%.0f m", item.distanceMeters))
-                                }
-                                .font(.caption)
-                            }
-                        }
-                        .padding(.top, 8)
                     }
                     .font(.subheadline.weight(.medium))
                 }
@@ -356,6 +405,135 @@ struct ATHLTHIntervalResultSummaryCard: View {
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
         }
+    }
+
+    @ViewBuilder
+    private func phaseRow(_ phase: ATHLTHRecordedRunningStep) -> some View {
+        let kind = (phase.phase ?? "main").lowercased()
+        let isWork = !["warmup", "cooldown", "recovery", "rest"].contains(kind)
+        let index = work.firstIndex(where: { $0.index == phase.index })
+        let label = phaseName(phase, effortNumber: (index ?? 0) + 1)
+        let pulse = sampledPulseBPM(for: phase.index)
+        let samples = phaseSamples(phase.index)
+        let incline = samples.filter {
+            guard let value = $0.manuallyEnteredTreadmillInclinePercent else { return false }
+            return value.isFinite && (0...30).contains(value)
+        }
+
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: isWork ? "figure.run.circle.fill" :
+                    (kind == "recovery" || kind == "rest" ? "pause.circle" : "clock"))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Text(label)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                Spacer(minLength: 0)
+                Text(duration(phase.activeSeconds))
+                    .font(.subheadline.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+            }
+
+            HStack(spacing: 10) {
+                Text(String(format: "%.0f m", phase.distanceMeters))
+                Text(speed(phase.actualSpeedKilometersPerHour))
+                if phase.actualSpeedKilometersPerHour != nil {
+                    Text(pace(phase.activeSeconds * 1_000 /
+                              max(phase.distanceMeters, 1)))
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+            if let planned = phase.targetDurationSeconds, planned > 0 {
+                Text(tr("Planned", "Plan") + " " + duration(planned) + " · " +
+                     tr("Actual", "Faktisk") + " " + duration(phase.activeSeconds))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+            if let plannedPace = phase.targetPaceSecondsPerKilometer,
+               plannedPace > 0 {
+                Label(tr("Target speed", "Målfart") + " " +
+                      speed(3_600 / plannedPace), systemImage: "scope")
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            }
+            if let pulse {
+                HStack(spacing: 8) {
+                    Label("\(Int(pulse.rounded())) bpm " +
+                          tr("(sample average)", "(snitt målepunkter)"),
+                          systemImage: "heart.fill")
+                    if let peak = observedPulsePeak(phase.index) {
+                        Text(tr("Highest sample", "Høyeste målepunkt") +
+                             " \(Int(peak.rounded()))")
+                    }
+                }
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                HStack(spacing: 8) {
+                    if let zone = observedZone(phase.index) {
+                        Text(tr("Observed zone", "Registrert sone") + " \(zone)")
+                    }
+                    if let targetZone = phase.targetHeartRateZone {
+                        Text(tr("Target zone", "Målsone") + " \(targetZone)")
+                    }
+                }
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            } else if let zone = phase.targetHeartRateZone {
+                Text(tr("Target HR zone", "Målpulssone") + " \(zone) · " +
+                     tr("Pulse not recorded", "Puls ikke registrert"))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+            if ["rest", "recovery"].contains(kind),
+               let drop = pulseRecovery(phase) {
+                Label(tr("Pulse checkpoints", "Puls ved kontrollpunkter") +
+                      " " + drop, systemImage: "heart.text.square")
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            }
+
+            if let plannedIncline = phase.targetTreadmillInclinePercent,
+               plannedIncline.isFinite {
+                Text(tr("Planned incline for this phase", "Planlagt stigning i denne fasen") +
+                     String(format: " · %.1f %%", plannedIncline))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+            if !incline.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(tr("Entered incline by time", "Oppgitt stigning per tidspunkt"))
+                        .font(.caption2.weight(.semibold))
+                    ForEach(Array(incline.enumerated()), id: \.offset) { _, sample in
+                        let from = max(0, sample.stepElapsedAtEndSeconds -
+                                        sample.activeSeconds)
+                        HStack(spacing: 6) {
+                            Text(duration(from) + "–" +
+                                 duration(sample.stepElapsedAtEndSeconds))
+                            Spacer(minLength: 4)
+                            Text(String(format: "%.1f %%", 
+                                sample.manuallyEnteredTreadmillInclinePercent ?? 0))
+                        }
+                        .font(.caption2)
+                        .monospacedDigit()
+                    }
+                }
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .padding(9)
+                .background(ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 10))
+            }
+            if phase.isUserReported {
+                Text(tr("Treadmill speed/distance are user-reported or estimated.",
+                        "Møllefart/-distanse er oppgitt eller estimert."))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 11)
     }
 
     private func headline(_ label: String, value: String) -> some View {
