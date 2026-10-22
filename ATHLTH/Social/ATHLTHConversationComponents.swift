@@ -2,6 +2,9 @@ import SwiftUI
 
 /// Native artwork asset. Only the photographic stadium background is bundled;
 /// all identity, messaging, buttons and text remain native SwiftUI.
+/// Asset provenance: stadium photograph by Heber Vazquez (Pexels),
+/// https://www.pexels.com/photo/stands-by-running-track-at-stadium-19753619/
+/// Attribution stays with the source instead of appearing as a chat action.
 enum ATHLTHConversationArtwork {
     static let directMessageHeader = "ConversationStadiumHero"
 }
