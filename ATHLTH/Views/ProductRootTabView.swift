@@ -12160,7 +12160,8 @@ struct ATHLTHRecoveryView: View {
                         .foregroundStyle(
                             ATHLTHTheme.accentDeep
                         )
-                        .frame(width: 30, height: 30)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(
