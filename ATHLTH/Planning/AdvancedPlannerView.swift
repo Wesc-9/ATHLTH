@@ -10386,6 +10386,9 @@ struct PlannedExerciseEditorView: View {
     @State private var minimumReps: Int
     @State private var maximumReps: Int
     @State private var notes: String
+    @State private var usesSpeedTarget: Bool
+    @State private var targetSpeedKPH: Double
+    @State private var targetHeartRateZone: Int?
 
     init(
         exercise: PlannedExercise,
@@ -10519,6 +10522,15 @@ struct PlannedExerciseEditorView: View {
         _maximumReps = State(
             initialValue:
                 exercise.progression?.maximumReps ?? 12
+        )
+        _usesSpeedTarget = State(
+            initialValue: exercise.targetSpeedKilometersPerHour != nil
+        )
+        _targetSpeedKPH = State(
+            initialValue: exercise.targetSpeedKilometersPerHour ?? 8.0
+        )
+        _targetHeartRateZone = State(
+            initialValue: exercise.targetHeartRateZone
         )
         _notes = State(
             initialValue:
@@ -10772,6 +10784,70 @@ struct PlannedExerciseEditorView: View {
                 .listRowBackground(
                     ATHLTHTheme.card
                 )
+
+                // Cardio/machine exercises can target speed and pulse zone
+                // independently of repetitions, weight or time. These are
+                // planned goals, not claimed Watch measurements.
+                if targetKind == .time {
+                    Section(ATHLTHLocalization.choose(
+                        english: "Pace & pulse targets",
+                        norwegian: "Tempo og pulsmål"
+                    )) {
+                        Toggle(
+                            ATHLTHLocalization.choose(
+                                english: "Target speed (km/h)",
+                                norwegian: "Målhastighet (km/t)"
+                            ),
+                            isOn: $usesSpeedTarget
+                        )
+                        .tint(ATHLTHTheme.premiumGold)
+
+                        if usesSpeedTarget {
+                            HStack(spacing: 12) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Speed",
+                                    norwegian: "Fart"
+                                ))
+                                Spacer()
+                                Text(String(format: "%.1f km/t", targetSpeedKPH))
+                                    .font(.subheadline.weight(.semibold))
+                                    .monospacedDigit()
+                                Stepper(
+                                    ATHLTHLocalization.choose(
+                                        english: "Speed", norwegian: "Fart"
+                                    ),
+                                    value: $targetSpeedKPH,
+                                    in: 0.5...25,
+                                    step: 0.5
+                                )
+                                .labelsHidden()
+                            }
+                            Text(ATHLTHLocalization.choose(
+                                english: "Manual target, not measured speed.",
+                                norwegian: "Manuelt mål, ikke målt hastighet."
+                            ))
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+
+                        Picker(
+                            ATHLTHLocalization.choose(
+                                english: "Target heart-rate zone",
+                                norwegian: "Målpulssone"
+                            ),
+                            selection: $targetHeartRateZone
+                        ) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "No target", norwegian: "Ingen mål"
+                            )).tag(nil as Int?)
+                            ForEach(1...5, id: \.self) { zone in
+                                Text("Sone \(zone)").tag(Optional(zone))
+                            }
+                        }
+                        .tint(ATHLTHPlanDesign.accentInk)
+                    }
+                    .listRowBackground(ATHLTHTheme.card)
+                }
 
                 if advancedMode &&
                     targetKind == .reps &&
@@ -13042,6 +13118,12 @@ struct PlannedExerciseEditorView: View {
             updated.restSeconds =
                 restSeconds
         }
+
+        updated.targetSpeedKilometersPerHour =
+            targetKind == .time && usesSpeedTarget
+                ? targetSpeedKPH : nil
+        updated.targetHeartRateZone =
+            targetKind == .time ? targetHeartRateZone : nil
 
         updated.notes =
             notes
