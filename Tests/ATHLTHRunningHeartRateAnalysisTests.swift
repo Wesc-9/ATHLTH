@@ -69,4 +69,28 @@ final class ATHLTHRunningHeartRateAnalysisTests: XCTestCase {
         XCTAssertEqual(reduced.first?.date, verified.first?.date)
         XCTAssertEqual(reduced.last?.date, verified.last?.date)
     }
+
+    func testVerifiedFourByFourMapsPulseOnlyToItsOwnEffort() {
+        let steps = [
+            ATHLTHRecordedRunningStep(index: 0, title: "Oppvarming",
+                phase: "warmup", activeSeconds: 600, distanceMeters: 800),
+            ATHLTHRecordedRunningStep(index: 1, title: "Drag 1",
+                phase: "work", activeSeconds: 240, distanceMeters: 700),
+            ATHLTHRecordedRunningStep(index: 2, title: "Pause",
+                phase: "recovery", activeSeconds: 120, distanceMeters: 150)
+        ]
+        let pulse = [sample(30, bpm: 105), sample(610, bpm: 145),
+                     sample(720, bpm: 172), sample(860, bpm: 110)]
+        let work = ATHLTHRunningHeartRateAnalysis.phasePoints(
+            pulse, phaseIndex: 1, steps: steps, startedAt: started,
+            endedAt: started.addingTimeInterval(960)
+        )
+        XCTAssertEqual(work.map(\.bpm), [145, 172])
+
+        let pausedSession = ATHLTHRunningHeartRateAnalysis.phasePoints(
+            pulse, phaseIndex: 1, steps: steps, startedAt: started,
+            endedAt: started.addingTimeInterval(1_200)
+        )
+        XCTAssertTrue(pausedSession.isEmpty)
+    }
 }
