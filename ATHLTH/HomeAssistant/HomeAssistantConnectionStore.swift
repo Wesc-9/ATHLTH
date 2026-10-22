@@ -296,6 +296,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     @Published private(set) var supportsAthleteSnapshot = false
     @Published private(set) var supportsWorkoutHistory = false
     @Published private(set) var supportsStrengthProgress = false
+    private var strengthProgressFingerprint: String?
+    private var isStrengthProgressSyncing = false
     private var lastWorkoutHistoryDigest: String?
     private var isWorkoutHistorySyncing = false
 
@@ -314,6 +316,13 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 shareCompletedWorkouts,
                 forKey: Self.shareCompletedWorkoutsKey
             )
+        }
+    }
+
+    @Published var shareStrengthProgress: Bool {
+        didSet {
+            UserDefaults.standard.set(shareStrengthProgress, forKey: Self.shareStrengthProgressKey)
+            strengthProgressFingerprint = nil
         }
     }
 
@@ -458,6 +467,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         "athlth.homeAssistant.shareWorkoutState"
     private static let shareCompletedWorkoutsKey =
         "athlth.homeAssistant.shareCompletedWorkouts"
+    private static let shareStrengthProgressKey = "athlth.homeAssistant.shareStrengthProgress"
     private static let shareWorkoutHistoryKey =
         "athlth.homeAssistant.shareWorkoutHistory"
     private static let shareRecoveryKey =
@@ -590,6 +600,9 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             defaults,
             key: Self.shareCompletedWorkoutsKey,
             defaultValue: true
+        )
+        shareStrengthProgress = Self.storedBool(
+            defaults, key: Self.shareStrengthProgressKey, defaultValue: false
         )
         shareWorkoutHistory = Self.storedBool(
             defaults,
@@ -877,6 +890,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         supportsAthleteSnapshot = false
         supportsWorkoutHistory = false
         lastWorkoutHistoryDigest = nil
+        supportsStrengthProgress = false
+        strengthProgressFingerprint = nil
     }
 
     func send(
@@ -1008,6 +1023,12 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 )
         else {
             return
+        }
+
+        let progressSupported = response.features?.contains("strength_progress_v1") == true
+        if supportsStrengthProgress != progressSupported {
+            supportsStrengthProgress = progressSupported
+            strengthProgressFingerprint = nil
         }
 
         let historySupport = response.features?.contains(
