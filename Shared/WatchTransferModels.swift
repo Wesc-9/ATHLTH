@@ -1258,6 +1258,11 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
     var manualTreadmillInclinePercent: Double? = nil
     var targetKindRaw: String? = nil
     var loadKindRaw: String? = nil
+    // A treadmill interval inside a strength session retains its single
+    // workout engine, but Watch can present running-specific phase labels.
+    var isEmbeddedRunningInterval: Bool? = nil
+    var embeddedRunningPhaseTitle: String? = nil
+    var embeddedRunningPhaseKind: String? = nil
     var isResting: Bool
     var restEndsAt: Date?
     var currentExerciseComplete: Bool
