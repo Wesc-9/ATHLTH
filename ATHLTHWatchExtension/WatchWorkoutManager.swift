@@ -595,28 +595,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         commandID: UUID?,
         requestedWorkoutStart: Date?
     ) {
-        guard kind == .running || kind == .walking,
+        guard (kind == .running || kind == .walking),
               isActive,
               let startedAt,
               let requestedWorkoutStart,
-              abs(requestedWorkoutStart.timeIntervalSince(startedAt)) < 5,
-              !addition.steps.isEmpty,
-              addition.steps.count <= 150 else { return }
-
-        guard addition.steps.allSatisfy({ step in
-            switch step.measure {
-            case .time:
-                return step.durationSeconds.map {
-                    $0.isFinite && (15...7_200).contains($0)
-                } == true
-            case .distance:
-                return step.distanceMeters.map {
-                    $0.isFinite && (10...100_000).contains($0)
-                } == true
-            case .open:
-                return true
-            }
-        }) else { return }
+              abs(requestedWorkoutStart.timeIntervalSince(startedAt)) < 5 else {
+            return
+        }
 
         if let commandID, appliedRunningAppendCommands.contains(commandID) {
             return
@@ -624,8 +609,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         let hasActivePart =
             structuredRunningWorkout != nil && !structuredWorkoutComplete
-        if startNow && hasActivePart { return }
-        if !startNow && !hasActivePart { return }
+        guard ATHLTHRunningWorkoutAppendPolicy.canAppend(
+            hasInProgressStructuredSteps: hasActivePart,
+            startNow: startNow,
+            steps: addition.steps
+        ) else { return }
 
         let firstNewIndex = structuredRunningWorkout?.steps.count ?? 0
         if var existing = structuredRunningWorkout {
