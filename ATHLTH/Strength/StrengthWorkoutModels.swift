@@ -382,6 +382,12 @@ struct StrengthSetLog: Identifiable, Codable, Hashable {
     var watchActiveDurationSeconds: TimeInterval? = nil
     var watchAverageHeartRateBPM: Double? = nil
     var watchMaximumHeartRateBPM: Double? = nil
+    /// Running interval phase stored within the same strength workout.
+    /// Nil for every existing strength set and older saved workouts.
+    var hybridPhaseTitle: String? = nil
+    var hybridPhaseKind: String? = nil
+    var hybridTargetHeartRateZone: Int? = nil
+    var hybridTargetPaceSecondsPerKilometer: Double? = nil
 
     // A completed set can contain multiple effort segments. Example:
     // 8 reps @ 10 kg + 2 reps @ 8 kg in the same planned 10-rep set.
@@ -538,6 +544,10 @@ struct StrengthExerciseLog: Identifiable, Codable, Hashable {
     var skippedPlannedSetCount: Int? = nil
     var targetSpeedKilometersPerHour: Double? = nil
     var targetHeartRateZone: Int? = nil
+    /// Display provenance only; completed sets remain in the parent workout.
+    var appendedWorkoutTitle: String? = nil
+    var appendedWorkoutID: UUID? = nil
+    var isEmbeddedRunningInterval: Bool? = nil
 
     var isCompleted: Bool {
         completedAt != nil
