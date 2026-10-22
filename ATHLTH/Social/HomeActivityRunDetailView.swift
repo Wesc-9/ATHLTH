@@ -11,6 +11,7 @@ struct HomeActivityRunDetailView: View {
     let workout: SocialPublishableWorkout
 
     @State private var detail: WorkoutDetail?
+    @State private var completedIntervalHistory: [ATHLTHCompletedRunningPerformance] = []
     @State private var aiInsight: WorkoutAIInsight?
     @State private var isLoadingDetail = false
     @State private var hasResolvedDetail = false
@@ -43,6 +44,15 @@ struct HomeActivityRunDetailView: View {
     }
 
     // Indoor running has no outdoor GPS track; preserve route features for outdoor workouts.
+    private var structuredIntervalResult: ATHLTHCompletedRunningPerformance? {
+        let phone = phoneWorkout.history.compactMap {
+            ATHLTHCompletedRunningPerformance(phone: $0)
+        }
+        return (phone + completedIntervalHistory).first {
+            $0.id == workout.id || $0.healthWorkoutUUID == workout.id
+        }
+    }
+
     private var isTreadmillWorkout: Bool {
         workout.activity == .running && workout.isIndoor == true
     }
@@ -316,6 +326,10 @@ struct HomeActivityRunDetailView: View {
             VStack(spacing: 16) {
                 summaryCard
 
+                if let intervals = structuredIntervalResult {
+                    ATHLTHIntervalResultSummaryCard(performance: intervals)
+                }
+
                 ATHLTHWorkoutLocationSection(
                     workout: workout,
                     hasRecordedGPS: routeCoordinates.count >= 2,
@@ -389,7 +403,17 @@ struct HomeActivityRunDetailView: View {
             }
         }
         .task(id: workout.id) {
+            completedIntervalHistory = ATHLTHRunningPerformanceHistory.load(
+                userID: session.profile.userID
+            )
             await loadDetailAndCoach()
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: .athlthTrainingDataDidChange
+        )) { _ in
+            completedIntervalHistory = ATHLTHRunningPerformanceHistory.load(
+                userID: session.profile.userID
+            )
         }
         .sheet(isPresented: $showingResultShare) {
             ATHLTHRunningResultShareSheet(
