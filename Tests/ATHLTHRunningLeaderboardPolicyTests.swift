@@ -72,6 +72,28 @@ final class ATHLTHRunningLeaderboardPolicyTests: XCTestCase {
         ).eligible)
     }
 
+    func testEditedRestRecipeDisqualifiesEvenWhenAthleteFollowsEdit() {
+        let original = canonical
+        var edited = original
+        edited.steps[2].durationSeconds = 150
+        var followed = complete
+        followed[2].activeSeconds = 150
+
+        XCTAssertFalse(ATHLTHRunningLeaderboardPolicy.evaluate(
+            canonical: original, executed: edited, recorded: followed
+        ).eligible)
+    }
+
+    func testIndividualPaceTargetMayDifferWithoutChangingOfficialStructure() {
+        let original = canonical
+        var personalized = original
+        personalized.steps[1].targetPaceMinSecondsPerKilometer = 230
+        personalized.steps[3].targetPaceMinSecondsPerKilometer = 210
+        XCTAssertTrue(ATHLTHRunningLeaderboardPolicy.evaluate(
+            canonical: original, executed: personalized, recorded: complete
+        ).eligible)
+    }
+
     func testMissingOrUnfinishedPhasesNeverQualify() {
         XCTAssertFalse(ATHLTHRunningLeaderboardPolicy.evaluate(
             planned: canonical, recorded: Array(complete.dropLast())
