@@ -2135,17 +2135,14 @@ struct PerformanceStatsView: View {
     private var editorialHero: some View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
-                Image("GoalRunning")
-                    .resizable()
-                    .interpolation(.high)
-                    .antialiased(true)
-                    .scaledToFill()
-                    .frame(
-                        width: proxy.size.width,
-                        height: proxy.size.height
-                    )
-                    .clipped()
-                    .accessibilityHidden(true)
+                LinearGradient(
+                    colors: [
+                        ATHLTHTheme.accentDeep,
+                        Color(red: 0.36, green: 0.39, blue: 0.48)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
 
                 LinearGradient(
                     stops: [
@@ -2766,20 +2763,14 @@ struct PerformanceStatsView: View {
             ZStack(
                 alignment: .bottomLeading
             ) {
-                Image("GoalSprint")
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFill()
-                    .scaleEffect(1.10)
-                    .athlthBoundedFill()
-                    .frame(
-                        maxWidth: .infinity
-                    )
-                    .frame(height: 138)
-                    .clipped()
-                    .accessibilityHidden(
-                        true
-                    )
+                LinearGradient(
+                    colors: [
+                        ATHLTHTheme.accentDeep,
+                        ATHLTHTheme.accentDeep.opacity(0.82)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
 
                 LinearGradient(
                     colors: [
@@ -3060,20 +3051,14 @@ struct PerformanceStatsView: View {
             ZStack(
                 alignment: .bottomLeading
             ) {
-                Image("StrengthPostWorkoutHero")
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFill()
-                    .scaleEffect(1.08)
-                    .athlthBoundedFill()
-                    .frame(
-                        maxWidth: .infinity
-                    )
-                    .frame(height: 138)
-                    .clipped()
-                    .accessibilityHidden(
-                        true
-                    )
+                LinearGradient(
+                    colors: [
+                        ATHLTHTheme.accentDeep,
+                        Color(red: 0.36, green: 0.35, blue: 0.41)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
 
                 LinearGradient(
                     colors: [
@@ -7192,18 +7177,11 @@ private struct PerformanceRecordCollectionView:
                 alignment:
                     .bottomLeading
             ) {
-                Image(imageName)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(
-                        width:
-                            proxy.size
-                                .width,
-                        height:
-                            proxy.size
-                                .height
-                    )
-                    .clipped()
+                LinearGradient(
+                    colors: [ATHLTHTheme.accentDeep,
+                             ATHLTHTheme.accentDeep.opacity(0.75)],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                )
 
                 LinearGradient(
                     colors: [
