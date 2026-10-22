@@ -20,6 +20,7 @@ struct HomeActivityStrengthDetailView: View {
 
     @State private var aiInsight: WorkoutAIInsight?
     @State private var isLoadingAIInsight = false
+    @State private var showingRestFlowDetails = false
     @State private var editingSetResult:
         StrengthSetResultEditTarget?
 
@@ -91,7 +92,7 @@ struct HomeActivityStrengthDetailView: View {
                 }
 
                 if hasRestFlowData {
-                    restFlowCard
+                    restFlowDisclosure
                 }
 
                 exerciseBreakdownSection
@@ -1108,56 +1109,102 @@ struct HomeActivityStrengthDetailView: View {
         return result
     }
 
-    private var restFlowCard:
-        some View {
-        VStack(
-            alignment: .leading,
-            spacing: 14
-        ) {
-            HStack {
-                VStack(
-                    alignment: .leading,
-                    spacing: 3
-                ) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Rest & flow",
-                            norwegian:
-                                "Pause & flyt"
-                        )
-                    )
-                    .font(
-                        .headline.weight(
-                            .semibold
-                        )
-                    )
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Actual rest recorded during this workout.",
-                            norwegian:
-                                "Faktisk pause registrert under denne økta."
-                        )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
+    /// Detailed rest analysis is deliberately opt-in. The glanceable total
+    /// rest duration remains in "Workout at a glance", alongside the other
+    /// session measurements; this section does not consume a full card until
+    /// the user requests it.
+    private var restFlowDisclosure: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.23)) {
+                    showingRestFlowDetails.toggle()
                 }
+            } label: {
+                HStack(spacing: 11) {
+                    Image(systemName: "stopwatch")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 37, height: 37)
+                        .background(
+                            ATHLTHTheme.accentSoft.opacity(0.7),
+                            in: RoundedRectangle(cornerRadius: 12)
+                        )
 
-                Spacer()
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Rest & flow",
+                            norwegian: "Pause og flyt"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
 
-                Image(
-                    systemName:
-                        "stopwatch.fill"
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.accentDeep
-                )
+                        Text(ATHLTHLocalization.choose(
+                            english: "Average, longest rest and exercise changes",
+                            norwegian: "Snittpause, lengste pause og øvelsesbytter"
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .lineLimit(2)
+                    }
+
+                    Spacer(minLength: 5)
+
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .rotationEffect(
+                            .degrees(showingRestFlowDetails ? 180 : 0)
+                        )
+                }
+                .frame(maxWidth: .infinity, minHeight: 45)
+                .padding(.horizontal, 15)
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Rest and flow details",
+                norwegian: "Detaljer om pause og flyt"
+            ))
+            .accessibilityValue(showingRestFlowDetails
+                ? ATHLTHLocalization.choose(
+                    english: "Expanded", norwegian: "Utvidet"
+                )
+                : ATHLTHLocalization.choose(
+                    english: "Collapsed", norwegian: "Minimert"
+                )
+            )
+            .accessibilityHint(ATHLTHLocalization.choose(
+                english: "Double-tap to show or hide rest analysis",
+                norwegian: "Dobbelttrykk for å vise eller skjule pauseanalysen"
+            ))
 
+            if showingRestFlowDetails {
+                Divider()
+                    .opacity(0.55)
+                    .padding(.horizontal, 15)
+
+                restFlowCard
+                    .padding(.horizontal, 15)
+                    .padding(.top, 13)
+                    .padding(.bottom, 16)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .background(
+            ATHLTHTheme.card,
+            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(ATHLTHTheme.border, lineWidth: 1)
+        }
+    }
+
+    /// Preserve the existing metrics and per-set timeline, but avoid a second
+    /// heading and nested card when shown inside the collapsible disclosure.
+    private var restFlowCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
             LazyVGrid(
                 columns: [
                     GridItem(
@@ -1349,25 +1396,6 @@ struct HomeActivityStrengthDetailView: View {
                     )
                 }
             }
-        }
-        .padding(16)
-        .background(
-            ATHLTHTheme.card,
-            in:
-                RoundedRectangle(
-                    cornerRadius: 22,
-                    style: .continuous
-                )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-            .stroke(
-                ATHLTHTheme.border,
-                lineWidth: 1
-            )
         }
     }
 
