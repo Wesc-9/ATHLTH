@@ -94,6 +94,11 @@ struct HomeAssistantSettingsView: View {
         ) { _, _ in
             clearDisabledValues()
         }
+        .onChange(
+            of: homeAssistant.shareAthleteProfile
+        ) { _, _ in
+            clearDisabledValues()
+        }
         .confirmationDialog(
             ATHLTHLocalization.choose(
                 english: "Disconnect Home Assistant?",
@@ -344,6 +349,21 @@ struct HomeAssistantSettingsView: View {
             )
 
             sharingToggle(
+                title: ATHLTHLocalization.choose(
+                    english: "Athlete profile",
+                    norwegian: "Utøverprofil"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english:
+                        "Optionally shares your display name and public ATHLTH avatar with your paired Home Assistant. Off by default.",
+                    norwegian:
+                        "Deler valgfritt visningsnavn og offentlig ATHLTH-profilbilde med din tilkoblede Home Assistant. Av som standard."
+                ),
+                icon: "person.crop.circle",
+                isOn: $homeAssistant.shareAthleteProfile
+            )
+
+            sharingToggle(
                 title: "Recovery",
                 detail: ATHLTHLocalization.choose(
                     english:
@@ -530,9 +550,9 @@ struct HomeAssistantSettingsView: View {
                 ),
                 detail: ATHLTHLocalization.choose(
                     english:
-                        "Lets Home Assistant react to personal records, achievements, completed goals and challenges. Off by default.",
+                        "Shares up to 12 current running/strength personal records with Home Assistant and enables milestone events. Off by default.",
                     norwegian:
-                        "Lar Home Assistant reagere på personlige rekorder, achievements, fullførte mål og challenges. Av som standard."
+                        "Deler opptil 12 eksisterende løpe- og styrkerekorder med Home Assistant, samt hendelser for milepæler. Av som standard."
                 ),
                 icon: "trophy.fill",
                 isOn:
