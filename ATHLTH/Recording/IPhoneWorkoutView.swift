@@ -2219,10 +2219,11 @@ struct IPhoneWorkoutView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                Button {
-                    showingAddRunningWorkout = true
-                } label: {
-                    Image(systemName: "plus")
+                if !workout.walking {
+                    Button {
+                        showingAddRunningWorkout = true
+                    } label: {
+                        Image(systemName: "plus")
                         .font(.system(size: 19, weight: .semibold))
                         .foregroundStyle(ATHLTHTheme.accentDeep)
                         .frame(width: 43, height: 43)
@@ -2234,10 +2235,11 @@ struct IPhoneWorkoutView: View {
                         }
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "Add interval workout",
-                    norwegian: "Legg til intervalløkt"
-                ))
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Add interval workout",
+                        norwegian: "Legg til intervalløkt"
+                    ))
+                }
             }
 
             if workout.runEnvironment == .treadmill {
