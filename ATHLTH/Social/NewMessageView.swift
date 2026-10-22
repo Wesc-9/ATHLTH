@@ -47,8 +47,8 @@ struct NewMessageView: View {
                 ATHLTHPremiumCanvas(
                     accent:
                         ATHLTHTheme
-                            .vitality
-                            .opacity(0.16)
+                            .premiumGold
+                            .opacity(0.10)
                 )
 
                 ScrollView {
@@ -147,7 +147,9 @@ struct NewMessageView: View {
                 if social.mutualFollows.isEmpty {
                     await social.refresh()
                 }
-                searchFocused = true
+                // Allow choosing a mutual friend without opening a keyboard
+                // over half of the sheet. Focus search only on empty state.
+                searchFocused = social.mutualFollows.isEmpty
             }
             .task(id: cleanQuery) {
                 let term = cleanQuery
@@ -167,32 +169,15 @@ struct NewMessageView: View {
     }
 
     private var newMessageHeader: some View {
-        ATHLTHPremiumScreenHeader(
-            eyebrow:
-                ATHLTHLocalization.choose(
-                    english: "Messages",
-                    norwegian: "Meldinger"
-                ),
-            title:
-                ATHLTHLocalization.choose(
-                    english: "New message",
-                    norwegian: "Ny melding"
-                ),
-            subtitle:
-                ATHLTHLocalization.choose(
-                    english:
-                        "Find an athlete and start a conversation or send one message request.",
-                    norwegian:
-                        "Finn en utøver og start en samtale eller send én meldingsforespørsel."
-                ),
-            icon:
-                "square.and.pencil",
-            tint:
-                ATHLTHTheme
-                    .vitality
-        ) {
-            EmptyView()
-        }
+        ATHLTHMessagingCompactHeader(
+            eyebrow: ATHLTHLocalization.choose(
+                english: "Messages", norwegian: "Meldinger"
+            ),
+            title: ATHLTHLocalization.choose(
+                english: "New message", norwegian: "Ny melding"
+            ),
+            symbol: "square.and.pencil"
+        )
     }
 
     private var premiumSearchField: some View {
@@ -209,7 +194,7 @@ struct NewMessageView: View {
             )
             .foregroundStyle(
                 ATHLTHTheme
-                    .vitality
+                    .premiumGold
             )
 
             TextField(
@@ -276,10 +261,10 @@ struct NewMessageView: View {
             HStack(spacing: 13) {
                 Image(systemName: "message.badge.filled.fill")
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.vitality)
+                    .foregroundStyle(ATHLTHTheme.premiumGold)
                     .frame(width: 46, height: 46)
                     .background(
-                        ATHLTHTheme.vitalitySoft,
+                        ATHLTHTheme.premiumGoldSoft,
                         in: RoundedRectangle(
                             cornerRadius: 14,
                             style: .continuous
@@ -307,14 +292,23 @@ struct NewMessageView: View {
         if social.mutualFollows.isEmpty {
             VStack(spacing: 14) {
                 ContentUnavailableView(
-                    "Find someone to message",
+                    ATHLTHLocalization.choose(
+                        english: "Find someone to message",
+                        norwegian: "Finn noen å sende melding til"
+                    ),
                     systemImage: "person.2.wave.2",
                     description: Text(
-                        "Search by name or @username. If you do not follow each other, your first message is sent as a request for the other athlete to approve or decline."
+                        ATHLTHLocalization.choose(
+                            english: "Search by name or @username. New contacts receive a request they can accept or decline.",
+                            norwegian: "Søk etter navn eller @brukernavn. Nye kontakter får en forespørsel de kan godta eller avslå."
+                        )
                     )
                 )
 
-                Text("Start typing in the search field above.")
+                Text(ATHLTHLocalization.choose(
+                    english: "Start typing in the search field above.",
+                    norwegian: "Søk i feltet over."
+                ))
                     .font(.caption)
                     .foregroundStyle(ATHLTHTheme.mutedText)
             }
@@ -322,8 +316,10 @@ struct NewMessageView: View {
             .padding(.vertical, 44)
         } else {
             peopleSection(
-                title: "MUTUAL FOLLOWS",
-                people: Array(social.mutualFollows.prefix(20))
+                title: ATHLTHLocalization.choose(
+                    english: "MUTUAL FOLLOWS", norwegian: "FØLGER HVERANDRE"
+                ),
+                people: Array(filteredFriends.prefix(20))
             )
         }
     }
@@ -422,16 +418,24 @@ private struct NewMessagePersonRow: View {
 
     private var actionTitle: String {
         if isDeclinedRequester {
-            return "Declined"
+            return ATHLTHLocalization.choose(
+                english: "Declined", norwegian: "Avslått"
+            )
         }
 
         if hasConversation {
-            return "Open"
+            return ATHLTHLocalization.choose(
+                english: "Open", norwegian: "Åpne"
+            )
         }
 
         return social.isMutualFollow(profile.userID)
-            ? "Message"
-            : "Request"
+            ? ATHLTHLocalization.choose(
+                english: "Message", norwegian: "Melding"
+            )
+            : ATHLTHLocalization.choose(
+                english: "Request", norwegian: "Forespør"
+            )
     }
 
     private var actionIcon: String {
@@ -460,11 +464,17 @@ private struct NewMessagePersonRow: View {
                     }
 
                     if social.isMutualFollow(profile.userID) {
-                        Text("• Mutual follow")
+                        Text(ATHLTHLocalization.choose(
+                            english: "• Mutual follow", norwegian: "• Følger hverandre"
+                        ))
                     } else if isDeclinedRequester {
-                        Text("• Request declined")
+                        Text(ATHLTHLocalization.choose(
+                            english: "• Request declined", norwegian: "• Forespørsel avslått"
+                        ))
                     } else if !hasConversation {
-                        Text("• Message request")
+                        Text(ATHLTHLocalization.choose(
+                            english: "• Message request", norwegian: "• Meldingsforespørsel"
+                        ))
                     }
                 }
                 .font(.caption)
@@ -476,11 +486,11 @@ private struct NewMessagePersonRow: View {
 
             Label(actionTitle, systemImage: actionIcon)
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.vitality)
+                .foregroundStyle(ATHLTHTheme.premiumGold)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 6)
                 .background(
-                    ATHLTHTheme.vitalitySoft.opacity(0.72),
+                    ATHLTHTheme.premiumGoldSoft.opacity(0.72),
                     in: Capsule()
                 )
         }
