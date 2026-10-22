@@ -1131,6 +1131,9 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
     let immersiveTransition: Bool
     let scrollFadeTransition: Bool
     let pullDownFadeBridge: Bool
+    /// Skip full-height shadow and offscreen clip/mask compositing on
+    /// scrolling-heavy dashboards such as Insights.
+    let lightweightScrolling: Bool
     let sheetOverlapOverride: CGFloat?
     let transitionFadeHeightOverride: CGFloat?
     private let hero: Hero
@@ -1179,6 +1182,7 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
         immersiveTransition: Bool = false,
         scrollFadeTransition: Bool = false,
         pullDownFadeBridge: Bool = false,
+        lightweightScrolling: Bool = false,
         sheetOverlapOverride: CGFloat? = nil,
         transitionFadeHeightOverride: CGFloat? = nil,
         @ViewBuilder hero: () -> Hero,
@@ -1189,6 +1193,7 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
         self.immersiveTransition = immersiveTransition
         self.scrollFadeTransition = scrollFadeTransition
         self.pullDownFadeBridge = pullDownFadeBridge
+        self.lightweightScrolling = lightweightScrolling
         self.sheetOverlapOverride =
             sheetOverlapOverride
         self.transitionFadeHeightOverride =
@@ -1285,8 +1290,9 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                             )
                         )
                     }
-                    .clipShape(
-                        ATHLTHTopRoundedSheetShape(
+                    .modifier(
+                        ATHLTHOptionalFullSheetClip(
+                            enabled: !lightweightScrolling,
                             radius: sheetCornerRadius
                         )
                     )
@@ -1334,7 +1340,7 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                     }
                     .shadow(
                         color: ATHLTHTheme.accentDeep.opacity(
-                            scrollFadeTransition
+                            lightweightScrolling ? 0 : scrollFadeTransition
                                 ? 0
                                 : (
                                     immersiveTransition
@@ -1343,7 +1349,7 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                                 )
                         ),
                         radius:
-                            scrollFadeTransition
+                            lightweightScrolling ? 0 : scrollFadeTransition
                                 ? 0
                                 : (immersiveTransition ? 28 : 20),
                         x: 0,
@@ -1370,45 +1376,14 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                 .scrollIndicators(.hidden)
                 .scrollDismissesKeyboard(.interactively)
                 .background(Color.clear)
-                .mask {
-                    if scrollFadeTransition {
-                        VStack(spacing: 0) {
-                            LinearGradient(
-                                stops: [
-                                    .init(
-                                        color: Color.clear,
-                                        location: 0
-                                    ),
-                                    .init(
-                                        color: Color.clear,
-                                        location: 0.10
-                                    ),
-                                    .init(
-                                        color: Color.black.opacity(
-                                            0.42 + (0.05 * scrollFadeProgress)
-                                        ),
-                                        location: 0.30
-                                    ),
-                                    .init(
-                                        color: Color.black.opacity(0.84),
-                                        location: 0.62
-                                    ),
-                                    .init(
-                                        color: Color.black,
-                                        location: 1
-                                    )
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                            .frame(height: scrollFadeHeight)
-
-                            Color.black
-                        }
-                    } else {
-                        Color.black
-                    }
-                }
+                .modifier(
+                    ATHLTHOptionalScrollFadeMask(
+                        enabled: !lightweightScrolling,
+                        scrollFadeTransition: scrollFadeTransition,
+                        scrollFadeProgress: scrollFadeProgress,
+                        scrollFadeHeight: scrollFadeHeight
+                    )
+                )
                 .onScrollGeometryChange(for: CGFloat.self) { @Sendable geometry in
                     max(0, geometry.contentOffset.y)
                 } action: { _, newOffset in
@@ -1426,6 +1401,61 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
     }
 }
 
+
+private struct ATHLTHOptionalFullSheetClip: ViewModifier {
+    let enabled: Bool
+    let radius: CGFloat
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if enabled {
+            content.clipShape(ATHLTHTopRoundedSheetShape(radius: radius))
+        } else {
+            content
+        }
+    }
+}
+
+private struct ATHLTHOptionalScrollFadeMask: ViewModifier {
+    let enabled: Bool
+    let scrollFadeTransition: Bool
+    let scrollFadeProgress: CGFloat
+    let scrollFadeHeight: CGFloat
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if !enabled {
+            content
+        } else {
+            content.mask {
+                if scrollFadeTransition {
+                    VStack(spacing: 0) {
+                        LinearGradient(
+                            stops: [
+                                .init(color: .clear, location: 0),
+                                .init(color: .clear, location: 0.10),
+                                .init(
+                                    color: .black.opacity(
+                                        0.42 + 0.05 * scrollFadeProgress
+                                    ),
+                                    location: 0.30
+                                ),
+                                .init(color: .black.opacity(0.84), location: 0.62),
+                                .init(color: .black, location: 1)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: scrollFadeHeight)
+                        Color.black
+                    }
+                } else {
+                    Color.black
+                }
+            }
+        }
+    }
+}
 
 struct ATHLTHPullDownFadeBridge:
     View {
