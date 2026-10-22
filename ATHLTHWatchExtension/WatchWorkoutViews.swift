@@ -1022,7 +1022,12 @@ struct WatchActiveWorkoutView: View {
                                             "Synkroniserer…"
                                     )
                                 : (
-                                    snapshot.setCount > 0 &&
+                                    snapshot.isEmbeddedRunningInterval == true
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Finish running phase",
+                                            norwegian: "Avslutt løpedel"
+                                          )
+                                        : snapshot.setCount > 0 &&
                                     snapshot.setIndex + 1 >=
                                         snapshot.setCount
                                         ? ATHLTHLocalization
@@ -2019,7 +2024,12 @@ struct WatchActiveWorkoutView: View {
                                 norwegian: "Synkroniserer…"
                             )
                             : (
-                                snapshot.setCount > 0 &&
+                                snapshot.isEmbeddedRunningInterval == true
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Finish running phase",
+                                        norwegian: "Avslutt løpedel"
+                                      )
+                                    : snapshot.setCount > 0 &&
                                 snapshot.setIndex + 1 >= snapshot.setCount
                                     ? ATHLTHLocalization.choose(
                                         english: "Complete Exercise",
