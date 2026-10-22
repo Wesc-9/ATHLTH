@@ -128,7 +128,7 @@ struct ATHLTHRunningSpeedProgressCard: View {
                                     Spacer(minLength: 3)
                                     if minute.activeSeconds > 0 {
                                         Text(String(format: "%.1f km/t",
-                                            minute.watchDistanceMeters * 3.6 /
+                                            minute.recordedDistanceMeters * 3.6 /
                                             minute.activeSeconds))
                                             .font(.caption.weight(.semibold))
                                             .monospacedDigit()
