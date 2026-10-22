@@ -29,6 +29,38 @@ struct ActiveHybridWorkoutPicker: View {
         .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
+    private var treadmillTemplates: [RunningWorkoutTemplate] {
+        runningLibrary.allTemplates.filter { template in
+            let runSteps = ATHLTHUnifiedWorkout
+                .editorBlocks(from: makeRunningSession(template))
+                .filter { $0.kind == .run || $0.kind == .rest }
+            return runSteps.contains(where: { $0.kind == .run }) &&
+                runSteps.allSatisfy {
+                    $0.durationSeconds.map {
+                        $0.isFinite && (15...7_200).contains($0)
+                    } == true
+                }
+        }
+    }
+
+    private func makeRunningSession(
+        _ template: RunningWorkoutTemplate
+    ) -> PlannedSession {
+        PlannedSession(
+            id: UUID(),
+            title: template.title,
+            kind: .running,
+            scheduledStart: nil,
+            durationMinutes: nil,
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            routeID: nil,
+            exercises: [],
+            notes: template.summary,
+            runningWorkout: template
+        )
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -57,31 +89,17 @@ struct ActiveHybridWorkoutPicker: View {
                 Section(ATHLTHLocalization.choose(
                     english: "Treadmill intervals", norwegian: "Intervaller på mølle"
                 )) {
-                    ForEach(runningLibrary.allTemplates.filter {
-                        // Only timed phases currently support automatic
-                        // countdown inside the strength Watch session.
-                        !$0.blocks.isEmpty
-                    }) { template in
+                    ForEach(treadmillTemplates) { template in
                         workoutRow(
                             title: template.title,
                             subtitle: template.summary,
                             symbol: "figure.run",
                             duration: nil
                         ) { startNow in
-                            let planned = PlannedSession(
-                                id: UUID(),
-                                title: template.title,
-                                kind: .running,
-                                scheduledStart: nil,
-                                durationMinutes: nil,
-                                targetDistanceKilometers: nil,
-                                targetPaceSecondsPerKilometer: nil,
-                                routeID: nil,
-                                exercises: [],
-                                notes: template.summary,
-                                runningWorkout: template
+                            append(
+                                makeRunningSession(template),
+                                startNow: startNow
                             )
-                            append(planned, startNow: startNow)
                         }
                     }
                 }
