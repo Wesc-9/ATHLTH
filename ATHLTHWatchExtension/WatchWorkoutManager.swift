@@ -595,7 +595,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         commandID: UUID?,
         requestedWorkoutStart: Date?
     ) {
-        guard (kind == .running || kind == .walking),
+        guard kind == .running,
               isActive,
               let startedAt,
               let requestedWorkoutStart,
