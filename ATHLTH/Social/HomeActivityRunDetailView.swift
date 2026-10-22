@@ -11,6 +11,7 @@ struct HomeActivityRunDetailView: View {
     let workout: SocialPublishableWorkout
 
     @State private var detail: WorkoutDetail?
+    @State private var measuredPulse: [ATHLTHRunningHeartRatePoint] = []
     @State private var completedIntervalHistory: [ATHLTHCompletedRunningPerformance] = []
     @State private var aiInsight: WorkoutAIInsight?
     @State private var isLoadingDetail = false
@@ -330,6 +331,25 @@ struct HomeActivityRunDetailView: View {
                     ATHLTHIntervalResultSummaryCard(performance: intervals)
                 }
 
+                if !isIndoorActivity {
+                    ATHLTHRunningResultAnalysisCard(
+                        splits: verifiedSplits,
+                        elevation: elevationProfile,
+                        activeEnergyKilocalories: workout.activeEnergyKilocalories,
+                        maxHeartRateBPM: detail?.maxHeartRate,
+                        pulseSamples: measuredPulse
+                    )
+                }
+
+                ATHLTHRunningPulseResultCard(
+                    points: measuredPulse,
+                    averageBPM: detail?.averageHeartRate,
+                    maximumBPM: detail?.maxHeartRate,
+                    athleteMaximumBPM: session.onboardingProfile?.maximumHeartRateBPM
+                        .map(Double.init),
+                    isStructured: structuredIntervalResult != nil
+                )
+
                 ATHLTHWorkoutLocationSection(
                     workout: workout,
                     hasRecordedGPS: routeCoordinates.count >= 2,
@@ -343,12 +363,6 @@ struct HomeActivityRunDetailView: View {
                 }
 
                 if !isIndoorActivity {
-                    ATHLTHRunningResultAnalysisCard(
-                        splits: verifiedSplits,
-                        elevation: elevationProfile,
-                        activeEnergyKilocalories: workout.activeEnergyKilocalories,
-                        maxHeartRateBPM: detail?.maxHeartRate
-                    )
                     if linkedRoute != nil { routeResultCard }
                     routeFactsCard
                 }
@@ -1360,6 +1374,10 @@ struct HomeActivityRunDetailView: View {
             isLoadingDetail = false
         }
         hasResolvedDetail = true
+
+        measuredPulse = await health.runningHeartRateTimeline(
+            for: workout.id
+        )
 
         if !isIndoorActivity {
             await loadRouteResultIfNeeded()
