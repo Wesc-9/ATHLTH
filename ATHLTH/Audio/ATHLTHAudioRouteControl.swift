@@ -101,11 +101,47 @@ enum ATHLTHSpokenAudioSession {
     private static var owners: [String: Bool] = [:]
     private static var revision = 0
     private static var delayedRestoreTask: Task<Void, Never>?
+    private static var routeObserver: NSObjectProtocol?
+    private static var interruptionObserver: NSObjectProtocol?
+
+    /// iOS may decline deactivation while AirPods / Spotify change routes.
+    /// Keep a retry trigger registered for as long as a voice is ever used.
+    private static func installRestorationObserversIfNeeded() {
+        if routeObserver == nil {
+            routeObserver = NotificationCenter.default.addObserver(
+                forName: AVAudioSession.routeChangeNotification,
+                object: AVAudioSession.sharedInstance(),
+                queue: .main
+            ) { _ in
+                Task { @MainActor in
+                    guard owners.isEmpty else { return }
+                    restoreIfIdle(generation: revision)
+                }
+            }
+        }
+        if interruptionObserver == nil {
+            interruptionObserver = NotificationCenter.default.addObserver(
+                forName: AVAudioSession.interruptionNotification,
+                object: AVAudioSession.sharedInstance(),
+                queue: .main
+            ) { event in
+                // Do not race Apple's interruption start. Retry after it ends.
+                guard let raw = event.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                      AVAudioSession.InterruptionType(rawValue: raw) == .ended
+                else { return }
+                Task { @MainActor in
+                    guard owners.isEmpty else { return }
+                    restoreIfIdle(generation: revision)
+                }
+            }
+        }
+    }
 
     static func activate(
         duckOtherAudio: Bool,
         owner: String = "legacy"
     ) throws {
+        installRestorationObserversIfNeeded()
         let session = AVAudioSession.sharedInstance()
         delayedRestoreTask?.cancel()
         delayedRestoreTask = nil
@@ -170,27 +206,37 @@ enum ATHLTHSpokenAudioSession {
 
     private static func restoreIfIdle(generation: Int) {
         guard owners.isEmpty, generation == revision else { return }
+        delayedRestoreTask?.cancel()
+        delayedRestoreTask = nil
+
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setActive(
-                false, options: .notifyOthersOnDeactivation
-            )
-            delayedRestoreTask?.cancel()
-            delayedRestoreTask = nil
+            try session.setActive(false, options: .notifyOthersOnDeactivation)
         } catch {
-            // iOS can transiently reject deactivation during an AirPods
-            // route handoff or interruption. Retry only while still idle;
-            // a newly started voice invalidates the pending restoration.
-            delayedRestoreTask?.cancel()
+            // Never leave music ducked forever because of one rejected call.
+            // Retry over route handoffs and Bluetooth reconnects. A new coach
+            // lease invalidates the task before it can silence active speech.
             delayedRestoreTask = Task { @MainActor in
-                for _ in 0..<4 {
-                    try? await Task.sleep(for: .milliseconds(250))
+                let delays: [Duration] = [
+                    .milliseconds(150),
+                    .milliseconds(300),
+                    .milliseconds(500),
+                    .seconds(1), .seconds(2), .seconds(3),
+                    .seconds(5), .seconds(5), .seconds(5),
+                    .seconds(8)
+                ]
+                for delay in delays {
+                    do {
+                        try await Task.sleep(for: delay)
+                    } catch { return }
                     guard !Task.isCancelled,
-                          owners.isEmpty, revision == generation
-                    else { return }
+                          owners.isEmpty,
+                          revision == generation else { return }
+
                     do {
                         try session.setActive(
-                            false, options: .notifyOthersOnDeactivation
+                            false,
+                            options: .notifyOthersOnDeactivation
                         )
                         delayedRestoreTask = nil
                         return
@@ -198,6 +244,8 @@ enum ATHLTHSpokenAudioSession {
                         continue
                     }
                 }
+                // Still blocked by iOS. Route/interruption notifications will
+                // trigger an additional restore attempt when conditions change.
                 delayedRestoreTask = nil
             }
         }
