@@ -10,6 +10,8 @@ struct ATHLTHCompletedRunningPerformance: Identifiable, Codable, Hashable {
     let source: String
     let steps: [ATHLTHRecordedRunningStep]
     var minutes: [ATHLTHRecordedRunningMinute]? = nil
+    /// Link to the HealthKit activity shown in the actual post-run detail.
+    var healthWorkoutUUID: UUID? = nil
 
     var workSteps: [ATHLTHRecordedRunningStep] {
         steps.filter { !["warmup", "cooldown", "recovery", "rest"]
@@ -60,6 +62,7 @@ struct ATHLTHCompletedRunningPerformance: Identifiable, Codable, Hashable {
         source = "iPhone"
         steps = recorded
         minutes = phone.recordedRunningMinutes
+        healthWorkoutUUID = phone.healthID
     }
 
     init?(watch: WatchWorkoutResult) {
@@ -74,6 +77,7 @@ struct ATHLTHCompletedRunningPerformance: Identifiable, Codable, Hashable {
         source = "Apple Watch"
         steps = recorded
         minutes = watch.recordedRunningMinutes
+        healthWorkoutUUID = watch.healthKitWorkoutUUID
     }
 }
 
