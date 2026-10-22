@@ -6,7 +6,7 @@ import XCTest
 final class ATHLTHHybridStrengthSessionTests: XCTestCase {
     private func session(
         title: String,
-        kind: PlannedWorkoutKind,
+        kind: WorkoutKind,
         runningWorkout: RunningWorkoutTemplate? = nil
     ) -> PlannedSession {
         PlannedSession(
