@@ -9,6 +9,7 @@ struct ATHLTHCompletedRunningPerformance: Identifiable, Codable, Hashable {
     let completedAt: Date
     let source: String
     let steps: [ATHLTHRecordedRunningStep]
+    var minutes: [ATHLTHRecordedRunningMinute]? = nil
 
     var workSteps: [ATHLTHRecordedRunningStep] {
         steps.filter { !["warmup", "cooldown", "recovery", "rest"]
@@ -58,6 +59,7 @@ struct ATHLTHCompletedRunningPerformance: Identifiable, Codable, Hashable {
         completedAt = finished
         source = "iPhone"
         steps = recorded
+        minutes = phone.recordedRunningMinutes
     }
 
     init?(watch: WatchWorkoutResult) {
@@ -71,6 +73,7 @@ struct ATHLTHCompletedRunningPerformance: Identifiable, Codable, Hashable {
         completedAt = watch.endedAt
         source = "Apple Watch"
         steps = recorded
+        minutes = watch.recordedRunningMinutes
     }
 }
 
