@@ -97,6 +97,30 @@ enum ATHLTHRunningPerformanceHistory {
     /// performance view as Watch runs, without requiring a HealthKit export.
     /// Idempotent by the original workout id; a later HealthKit save may add
     /// its UUID and should replace the older local snapshot.
+    /// Recover earlier phone sessions when the record feature is upgraded.
+    /// Runs once per account activation and only writes when new records
+    /// actually exist. Never recalculate an unfinished session as a PR.
+    static func backfillPhoneHistory(
+        _ completed: [PhoneWorkout], userID: UUID
+    ) {
+        var stored = load(userID: userID)
+        var byID = Dictionary(uniqueKeysWithValues: stored.map { ($0.id, $0) })
+        var changed = false
+        for workout in completed {
+            guard let record = ATHLTHCompletedRunningPerformance(phone: workout)
+            else { continue }
+            if byID[record.id] != record {
+                byID[record.id] = record
+                changed = true
+            }
+        }
+        guard changed else { return }
+        stored = byID.values.sorted { $0.completedAt > $1.completedAt }
+        if stored.count > 300 { stored = Array(stored.prefix(300)) }
+        AccountLocalStorage.write(stored, name: name, userID: userID)
+        ATHLTHTrainingDataChangeSignal.post(userID: userID)
+    }
+
     static func savePhone(_ completed: PhoneWorkout, userID: UUID) {
         guard let record = ATHLTHCompletedRunningPerformance(phone: completed) else {
             return
