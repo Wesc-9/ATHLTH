@@ -938,6 +938,14 @@ private struct IPhoneStructuredStepCard: View {
                                         .tint(ATHLTHTheme.accentDeep)
                                     }
 
+                                    if workout.awaitingMainStart == true {
+                                        Label(ATHLTHLocalization.choose(
+                                            english: "Ready for main section",
+                                            norwegian: "Klar for hoveddel"
+                                        ), systemImage: "figure.run.circle.fill")
+                                            .font(.title3.weight(.bold))
+                                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                    } else {
                                     Text(
                                         structuredRemainingText(
                                             step: step,
@@ -947,6 +955,7 @@ private struct IPhoneStructuredStepCard: View {
                                     )
                                     .font(.system(size: 28, weight: .bold, design: .rounded))
                                     .monospacedDigit()
+                                    }
 
                                     if let pace = step.targetPaceMinSecondsPerKilometer,
                                        pace.isFinite, pace > 0 {
@@ -1018,7 +1027,10 @@ private struct IPhoneStructuredStepCard: View {
                                         .font(.subheadline.weight(.semibold))
                                     }
 
-                                    if step.phase == "warmup" || step.phase == "cooldown" ||
+                                    if workout.awaitingMainStart == true ||
+                                       (step.phase == "warmup" &&
+                                        workout.structuredRunningWorkout?.autoStartMainAfterWarmup != true) ||
+                                       step.phase == "cooldown" ||
                                        workout.structuredRunningWorkout?.autoAdvanceTimedSteps == false {
                                         HStack(spacing: 12) {
                                             if let next = recorder.nextStructuredStep {
@@ -1036,8 +1048,14 @@ private struct IPhoneStructuredStepCard: View {
                                                 recorder.advanceStructuredStepManually()
                                             } label: {
                                                 Text(ATHLTHLocalization.choose(
-                                                    english: "Done / Next",
-                                                    norwegian: "Ferdig / Neste"
+                                                    english: workout.awaitingMainStart == true
+                                                        ? "Start main section" : step.phase == "warmup"
+                                                        ? "End warm-up" : step.phase == "cooldown"
+                                                        ? "End cool-down" : "Next phase",
+                                                    norwegian: workout.awaitingMainStart == true
+                                                        ? "Start hoveddel" : step.phase == "warmup"
+                                                        ? "Avslutt oppvarming" : step.phase == "cooldown"
+                                                        ? "Avslutt nedjogging" : "Neste del"
                                                 ))
                                                 .font(.caption.weight(.bold))
                                                 .padding(.horizontal, 11)
