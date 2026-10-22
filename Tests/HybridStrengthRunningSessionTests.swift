@@ -13,6 +13,7 @@ final class HybridStrengthRunningSessionTests: XCTestCase {
         )
     }
 
+    @MainActor
     private func intervalPlan() -> PlannedSession {
         let template = RunningWorkoutLibraryStore.builtInTemplates.first {
             $0.title == "4 × 4 intervaller"
