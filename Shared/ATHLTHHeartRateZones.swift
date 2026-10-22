@@ -14,4 +14,20 @@ enum ATHLTHHeartRateZones {
         let upperBPM = Int((maximumBPM * upper).rounded())
         return lowerBPM...upperBPM
     }
+
+    /// Observed zone uses an actually measured heart rate and a valid
+    /// athlete maximum. A planned target is never reused as a measurement.
+    static func measuredZone(
+        heartRateBPM: Double?,
+        maximumBPM: Double?
+    ) -> Int? {
+        guard let heartRateBPM, heartRateBPM.isFinite,
+              heartRateBPM > 0,
+              let maximumBPM, maximumBPM.isFinite,
+              (100...240).contains(maximumBPM)
+        else { return nil }
+        let fraction = heartRateBPM / maximumBPM
+        guard fraction >= 0.50 else { return nil }
+        return min(5, max(1, Int((fraction - 0.50) / 0.10) + 1))
+    }
 }
