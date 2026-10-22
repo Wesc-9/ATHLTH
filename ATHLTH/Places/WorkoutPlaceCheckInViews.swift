@@ -157,7 +157,7 @@ struct WorkoutPlaceCheckInSection: View {
 
                     Text(
                         record == nil
-                            ? placeTR("Add the fitness center for this workout.", "Legg til treningssted for denne økten.")
+                            ? placeTR("Add the training place for this workout.", "Legg til treningssted for denne økten.")
                             : placeTR("Saved privately to this workout.", "Lagret privat på denne økten.")
                     )
                     .font(.caption)
@@ -428,7 +428,7 @@ private struct WorkoutPlacePickerView:
                                 )
 
                             Text(
-                                placeTR("Finding fitness centers within 150 m…", "Søker etter treningssteder innen 150 m…")
+                                placeTR("Finding nearby training venues within 150 m…", "Søker etter treningssteder innen 150 m…")
                             )
                             .font(.caption)
                             .foregroundStyle(
@@ -467,7 +467,7 @@ private struct WorkoutPlacePickerView:
                        !location.isUpdating,
                        nearby.isEmpty {
                         ContentUnavailableView(
-                            placeTR("No fitness center within 150 m", "Ingen treningssteder innen 150 m"),
+                            placeTR("No training venue within 150 m", "Ingen treningssteder innen 150 m"),
                             systemImage:
                                 "figure.strengthtraining.traditional",
                             description:
