@@ -43,7 +43,7 @@ struct ATHLTHDirectShareSheet: View {
                     HStack(spacing: 14) {
                         Image(systemName: draft.kind.systemImage)
                             .font(.title2)
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .foregroundStyle(ATHLTHTheme.premiumGold)
                             .frame(width: 54, height: 54)
                             .background(ATHLTHPlanDesign.selectedSurface,
                                         in: RoundedRectangle(cornerRadius: 17))
@@ -64,7 +64,7 @@ struct ATHLTHDirectShareSheet: View {
                         Label(tr("Sent to the recipient's inbox", "Sendt til mottakerens innboks"),
                               systemImage: "checkmark.circle.fill")
                             .font(.headline)
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .foregroundStyle(ATHLTHTheme.premiumGold)
                             .padding(18)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(.white, in: RoundedRectangle(cornerRadius: 18))
@@ -110,7 +110,7 @@ struct ATHLTHDirectShareSheet: View {
                                             Spacer()
                                             Image(systemName: recipient?.userID == person.userID
                                                 ? "checkmark.circle.fill" : "circle")
-                                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                                .foregroundStyle(ATHLTHTheme.premiumGold)
                                         }
                                         .padding(12)
                                         .contentShape(Rectangle())
@@ -183,7 +183,7 @@ struct ATHLTHDirectShareSheet: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accentDeep)
+                .tint(ATHLTHTheme.premiumGold)
                 .disabled(!sent && (recipient == nil || sending))
                 .padding(.horizontal, 18)
                 .padding(.vertical, 10)
