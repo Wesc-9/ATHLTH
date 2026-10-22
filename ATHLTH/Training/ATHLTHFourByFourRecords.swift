@@ -57,7 +57,7 @@ enum ATHLTHFourByFourRecords {
                   step.distanceMeters >= 0 else { return nil }
 
             if index.isMultiple(of: 2) {
-                guard !["recovery", "rest"].contains(phase),
+                guard ["work", "main", "effort", "interval"].contains(phase),
                       abs(step.activeSeconds - 240) <= 2,
                       let speed = step.actualSpeedKilometersPerHour,
                       speed > 0 else { return nil }
