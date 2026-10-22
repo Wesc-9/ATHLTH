@@ -41,9 +41,14 @@ private enum ATHLTHArenaEditorialAtlas {
         let scale = CGFloat(image.height) / 590
         let y = Int((crop.y * scale).rounded(.down))
         let end = Int(((crop.y + crop.height) * scale).rounded(.down))
-        guard end > y,
+        // The chosen concept's top-right corner contains a mockup bell.
+        // Keep only the runner photograph, never the baked-in UI chrome.
+        let visibleWidth = scene == .athlete
+            ? Int(CGFloat(image.width) * 0.85)
+            : image.width
+        guard end > y, visibleWidth > 0,
               let part = image.cropping(to: CGRect(
-                x: 0, y: CGFloat(y), width: CGFloat(image.width),
+                x: 0, y: CGFloat(y), width: CGFloat(visibleWidth),
                 height: CGFloat(min(end - y, image.height - y))
               )) else { return nil }
         return UIImage(cgImage: part)
