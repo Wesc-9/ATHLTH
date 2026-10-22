@@ -856,7 +856,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     var currentStructuredStepElapsedTime: TimeInterval {
-        max(
+        if awaitingMainStart { return 0 }
+        return max(
             elapsedTime -
             structuredStepStartElapsedTime,
             0
@@ -864,7 +865,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     var currentStructuredStepDistanceMeters: Double {
-        max(
+        if awaitingMainStart { return 0 }
+        return max(
             distanceMeters -
             structuredStepStartDistanceMeters,
             0
@@ -7014,7 +7016,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             runningAwaitingMainStart: awaitingMainStart,
             runningManualAdvanceRequired:
                 currentRunningStep.map { step in
-                    step.phase == "warmup" || step.phase == "cooldown" ||
+                    awaitingMainStart ||
+                    (step.phase == "warmup" &&
+                     structuredRunningWorkout?.autoStartMainAfterWarmup != true) ||
+                    step.phase == "cooldown" ||
                     structuredRunningWorkout?.autoAdvanceTimedSteps == false
                 },
             runningStepElapsedSeconds:
