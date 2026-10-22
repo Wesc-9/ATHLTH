@@ -2,7 +2,6 @@ import Foundation
 import XCTest
 @testable import ATHLTH
 
-@MainActor
 final class ATHLTHHybridStrengthSessionTests: XCTestCase {
     private func session(
         title: String,
@@ -24,6 +23,7 @@ final class ATHLTHHybridStrengthSessionTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testAppendingIntervalsKeepsParentWorkoutAndWatchIdentifiers() {
         let strength = StrengthWorkoutStore()
         let watchID = UUID()
@@ -51,6 +51,7 @@ final class ATHLTHHybridStrengthSessionTests: XCTestCase {
         XCTAssertTrue(strength.currentSet?.resolvedTargetKind == .time)
     }
 
+    @MainActor
     func testUnsupportedWorkoutNeverChangesParentRecording() {
         let strength = StrengthWorkoutStore()
         strength.start(
@@ -68,6 +69,7 @@ final class ATHLTHHybridStrengthSessionTests: XCTestCase {
         XCTAssertEqual(strength.activeWorkout?.exercises.count, 0)
     }
 
+    @MainActor
     func testQueuedIntervalKeepsCurrentExerciseUnchanged() {
         let strength = StrengthWorkoutStore()
         strength.start(
