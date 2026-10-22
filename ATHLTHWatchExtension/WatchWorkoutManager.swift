@@ -6975,6 +6975,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     step.phase == "warmup" || step.phase == "cooldown" ||
                     structuredRunningWorkout?.autoAdvanceTimedSteps == false
                 },
+            runningStepElapsedSeconds:
+                currentRunningStep == nil ? nil : currentStructuredStepElapsedTime,
+            runningIntervalCoachCueEverySeconds:
+                structuredRunningWorkout?.intervalCoachCueEverySeconds,
+            runningIntervalCoachCountdownSeconds:
+                structuredRunningWorkout?.intervalCoachCountdownSeconds,
             runningNextStepTitle:
                 nextStructuredRunningStep?.title,
             runningStepRemainingSeconds:
