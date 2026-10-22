@@ -18,6 +18,44 @@ final class AudioCoachContentLevelTests: XCTestCase {
         return configuration
     }
 
+    @MainActor
+    func testCustomTimeIntervalPersistsAndReachesWatch() throws {
+        let suite = "athlth.audioCoach.cadence.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let settings = AppSettingsStore(defaults: defaults)
+        settings.audioCoachTimeTriggerEnabled = true
+        settings.audioCoachTimeIntervalSeconds = 95
+        settings.audioCoachTimeIntervalMinutes = 2
+
+        let launchConfiguration = settings.audioCoachConfiguration(enabled: true)
+        XCTAssertEqual(launchConfiguration.timeIntervalSeconds, 95)
+
+        let transfer = try JSONEncoder().encode(launchConfiguration)
+        let decoded = try JSONDecoder().decode(
+            WatchAudioCoachConfiguration.self, from: transfer
+        )
+        XCTAssertEqual(decoded.timeIntervalSeconds, 95)
+
+        let restored = AppSettingsStore(defaults: defaults)
+        XCTAssertEqual(restored.audioCoachTimeIntervalSeconds, 95)
+        XCTAssertEqual(restored.audioCoachConfiguration(enabled: true).timeIntervalSeconds, 95)
+    }
+
+    @MainActor
+    func testPreviousWholeMinuteSettingMigratesToSecondPrecision() throws {
+        let suite = "athlth.audioCoach.legacy.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(15, forKey: "settings.audioCoach.timeIntervalMinutes")
+        defaults.set(true, forKey: "settings.audioCoach.timeTriggerEnabled")
+
+        let settings = AppSettingsStore(defaults: defaults)
+        XCTAssertEqual(settings.audioCoachTimeIntervalSeconds, 900)
+        XCTAssertEqual(settings.audioCoachConfiguration(enabled: true).timeIntervalSeconds, 900)
+    }
+
     func testPresetsNeverChangeCadenceOrVoiceOwner() {
         let base = sampleConfiguration()
 
