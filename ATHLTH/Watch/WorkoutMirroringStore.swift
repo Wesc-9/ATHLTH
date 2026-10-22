@@ -416,18 +416,18 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     ) -> Bool {
         guard hasActiveMirroredWorkout,
               let snapshot,
-              snapshot.kind == .running || snapshot.kind == .walking,
+              (snapshot.kind == .running || snapshot.kind == .walking),
+              (snapshot.state == .running || snapshot.state == .paused),
               let startedAt = snapshot.startedAt,
               let mirroredSession else { return false }
 
         let transfer = watchRunningWorkoutTransfer(from: template)
-        guard !transfer.steps.isEmpty else { return false }
-
-        // A selected "Start now" must never silently discard a live interval.
-        if startNow,
-           snapshot.runningStepTitle != nil {
-            return false
-        }
+        // An active structured step must be queued, never replaced.
+        guard ATHLTHRunningWorkoutAppendPolicy.canAppend(
+            hasInProgressStructuredSteps: snapshot.runningStepTitle != nil,
+            startNow: startNow,
+            steps: transfer.steps
+        ) else { return false }
 
         let command = WatchWorkoutMirrorCommand(
             command: .appendRunningWorkout,
