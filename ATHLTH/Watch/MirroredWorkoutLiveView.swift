@@ -1145,7 +1145,14 @@ struct MirroredWorkoutLiveView: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
 
-                        if let remaining = snapshot.runningStepRemainingSeconds,
+                        if snapshot.runningAwaitingMainStart == true {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Ready for main section",
+                                norwegian: "Klar for hoveddel"
+                            ), systemImage: "figure.run.circle.fill")
+                                .font(.headline.weight(.bold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                        } else if let remaining = snapshot.runningStepRemainingSeconds,
                            remaining.isFinite {
                             HStack(alignment: .firstTextBaseline, spacing: 6) {
                                 Text(durationText(remaining))
@@ -1423,13 +1430,22 @@ struct MirroredWorkoutLiveView: View {
                let stepIndex = snapshot.runningStepIndex {
                 Button {
                     mirroring.advanceRunningStep(
-                        expectedIndex: stepIndex, startedAt: snapshot.startedAt
+                        expectedIndex: stepIndex, startedAt: snapshot.startedAt,
+                        startMain: snapshot.runningAwaitingMainStart == true
                     )
                 } label: {
                     Label(
-                        snapshot.runningNextStepTitle == nil
+                        snapshot.runningAwaitingMainStart == true
                             ? ATHLTHLocalization.choose(
-                                english: "Finish phase", norwegian: "Avslutt del"
+                                english: "Start main section", norwegian: "Start hoveddel"
+                              )
+                            : snapshot.runningStepPhase == "warmup"
+                            ? ATHLTHLocalization.choose(
+                                english: "End warm-up", norwegian: "Avslutt oppvarming"
+                              )
+                            : snapshot.runningStepPhase == "cooldown"
+                            ? ATHLTHLocalization.choose(
+                                english: "End cool-down", norwegian: "Avslutt nedjogging"
                               )
                             : ATHLTHLocalization.choose(
                                 english: "Next phase", norwegian: "Neste del"
