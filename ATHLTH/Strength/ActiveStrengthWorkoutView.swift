@@ -718,7 +718,10 @@ struct ActiveStrengthWorkoutView: View {
               !strengthCoach.speechPaused
         else { return }
 
-        let totalSets = workout.exercises.flatMap(\.sets).count
+        let totalSets = workout.exercises
+            .flatMap(\.sets)
+            .filter { $0.hybridPhaseKind == nil }
+            .count
         let exerciseName =
             strength.currentExercise?.exercise.displayName ??
             workout.title
@@ -1460,6 +1463,7 @@ struct ActiveStrengthWorkoutView: View {
                     let totalSets =
                         active.exercises
                             .flatMap(\.sets)
+                            .filter { $0.hybridPhaseKind == nil }
                             .count
                     let exercisePosition =
                         min(
@@ -3462,7 +3466,9 @@ struct ActiveStrengthWorkoutView: View {
             let timer = strength.currentTimedSetCountdown
             let totalSets = max(
                 workout.exercises.reduce(0) {
-                    $0 + $1.sets.count + ($1.skippedPlannedSetCount ?? 0)
+                    $0 + $1.sets.filter {
+                        $0.hybridPhaseKind == nil
+                    }.count + ($1.skippedPlannedSetCount ?? 0)
                 }, 1
             )
             let completed = min(max(workout.totalCompletedSets, 0), totalSets)
