@@ -16,6 +16,10 @@ struct ATHLTHIntervalRepetitionEditorView: View {
     @State private var paceSeconds: Int
     @State private var paceAsSpeed: Bool
     @State private var targetSpeedKmh: Double
+    @State private var inclineEnabled: Bool
+    @State private var inclinePercent: Double
+    @State private var recoveryInclineEnabled: Bool
+    @State private var recoveryInclinePercent: Double
     @State private var recoverySpeedEnabled: Bool
     @State private var recoverySpeedKmh: Double
     @State private var recoveryPaceSeconds: Int
@@ -50,6 +54,10 @@ struct ATHLTHIntervalRepetitionEditorView: View {
         _paceAsSpeed = State(initialValue: environment == .treadmill)
         _targetSpeedKmh = State(initialValue:
             (3_600 / max(work.intensity.paceMinSecondsPerKilometer ?? 300, 1) * 10).rounded() / 10)
+        _inclineEnabled = State(initialValue: work.treadmillInclinePercent != nil)
+        _inclinePercent = State(initialValue: work.treadmillInclinePercent ?? 0)
+        _recoveryInclineEnabled = State(initialValue: recovery?.treadmillInclinePercent != nil)
+        _recoveryInclinePercent = State(initialValue: recovery?.treadmillInclinePercent ?? 0)
         let recoveryPace = recovery?.intensity.paceMinSecondsPerKilometer
         _recoverySpeedEnabled = State(initialValue: recoveryPace != nil)
         _recoverySpeedKmh = State(initialValue:
@@ -102,6 +110,12 @@ struct ATHLTHIntervalRepetitionEditorView: View {
                         }
                     }
 
+                    Toggle(tr("Treadmill incline target", "Målstigning på mølle"), isOn: $inclineEnabled)
+                    if inclineEnabled {
+                        Stepper(String(format: "%.1f %%", inclinePercent),
+                                value: $inclinePercent, in: 0...15, step: 0.5)
+                    }
+
                     Toggle(tr("Target HR zone", "Målsone for puls"), isOn: $heartRateEnabled)
                     if heartRateEnabled {
                         Stepper(tr("Zone", "Sone") + " \(heartRateZone)",
@@ -148,6 +162,12 @@ struct ATHLTHIntervalRepetitionEditorView: View {
                                             in: 180...1200, step: 5)
                                 }
                             }
+                            Toggle(tr("Recovery incline", "Stigning i pausen"),
+                                   isOn: $recoveryInclineEnabled)
+                            if recoveryInclineEnabled {
+                                Stepper(String(format: "%.1f %%", recoveryInclinePercent),
+                                        value: $recoveryInclinePercent, in: 0...15, step: 0.5)
+                            }
                             Toggle(tr("Target recovery zone", "Målsone i pausen"),
                                    isOn: $recoveryZoneEnabled)
                             if recoveryZoneEnabled {
@@ -189,9 +209,10 @@ struct ATHLTHIntervalRepetitionEditorView: View {
                             heartRateZone: heartRateEnabled ? heartRateZone : nil,
                             rpe: nil
                         )
-                        let work = measure == .time
+                        var work = measure == .time
                             ? RunningStepTarget.time(Double(workSeconds), intensity: intensity)
                             : RunningStepTarget.distance(Double(workMeters), intensity: intensity)
+                        work.treadmillInclinePercent = inclineEnabled ? inclinePercent : nil
                         let recoveryPace: Double? = recoverySpeedEnabled
                             ? (environment == .treadmill
                                 ? 3_600 / max(recoverySpeedKmh, 0.1)
@@ -204,12 +225,16 @@ struct ATHLTHIntervalRepetitionEditorView: View {
                             heartRateZone: recoveryZoneEnabled ? recoveryZone : nil,
                             rpe: nil
                         )
-                        let recovery: RunningStepTarget? = recoveryEnabled &&
+                        var recovery: RunningStepTarget? = recoveryEnabled &&
                             repetition < totalRepetitions
                             ? (recoveryMeasure == .time
                                 ? .time(Double(recoverySeconds), intensity: recoveryIntensity)
                                 : .distance(Double(recoveryMeters), intensity: recoveryIntensity))
                             : nil
+                        if recovery != nil {
+                            recovery?.treadmillInclinePercent = recoveryInclineEnabled
+                                ? recoveryInclinePercent : nil
+                        }
                         onSave(RunningRepetitionOverride(
                             repetition: repetition,
                             work: work,
