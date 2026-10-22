@@ -294,6 +294,9 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     @Published private(set) var lastErrorMessage: String?
     @Published private(set) var pendingDeliveryCount: Int = 0
     @Published private(set) var supportsAthleteSnapshot = false
+    @Published private(set) var supportsWorkoutHistory = false
+    private var lastWorkoutHistoryDigest: String?
+    private var isWorkoutHistorySyncing = false
 
     @Published var shareWorkoutState: Bool {
         didSet {
@@ -310,6 +313,16 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 shareCompletedWorkouts,
                 forKey: Self.shareCompletedWorkoutsKey
             )
+        }
+    }
+
+    @Published var shareWorkoutHistory: Bool {
+        didSet {
+            UserDefaults.standard.set(
+                shareWorkoutHistory,
+                forKey: Self.shareWorkoutHistoryKey
+            )
+            lastWorkoutHistoryDigest = nil
         }
     }
 
@@ -444,6 +457,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         "athlth.homeAssistant.shareWorkoutState"
     private static let shareCompletedWorkoutsKey =
         "athlth.homeAssistant.shareCompletedWorkouts"
+    private static let shareWorkoutHistoryKey =
+        "athlth.homeAssistant.shareWorkoutHistory"
     private static let shareRecoveryKey =
         "athlth.homeAssistant.shareRecovery"
     private static let shareTrainingLoadKey =
@@ -574,6 +589,11 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             defaults,
             key: Self.shareCompletedWorkoutsKey,
             defaultValue: true
+        )
+        shareWorkoutHistory = Self.storedBool(
+            defaults,
+            key: Self.shareWorkoutHistoryKey,
+            defaultValue: false
         )
         shareRecovery = Self.storedBool(
             defaults,
@@ -854,6 +874,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         lastErrorMessage = nil
         connectionState = .disconnected
         supportsAthleteSnapshot = false
+        supportsWorkoutHistory = false
+        lastWorkoutHistoryDigest = nil
     }
 
     func send(
@@ -985,6 +1007,14 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 )
         else {
             return
+        }
+
+        let historySupport = response.features?.contains(
+            "workout_history_v1"
+        ) == true
+        if supportsWorkoutHistory != historySupport {
+            supportsWorkoutHistory = historySupport
+            lastWorkoutHistoryDigest = nil
         }
 
         let supports = response.features?.contains(
@@ -1959,6 +1989,88 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                     ])
                 ]
             )
+        }
+    }
+
+    /// Distinct opt-in export. No GPS coordinates or raw Health samples.
+    /// Uploaded only when content changes; retry after failed delivery.
+    func syncWorkoutHistory(_ workouts: [WorkoutSummary]) async {
+        guard isConnected, supportsWorkoutHistory,
+              !isWorkoutHistorySyncing
+        else {
+            return
+        }
+
+        isWorkoutHistorySyncing = true
+        defer { isWorkoutHistorySyncing = false }
+
+        let allowed = shareCompletedWorkouts && shareWorkoutHistory
+        var records: [HomeAssistantJSONValue] = []
+        if allowed {
+            let now = Date()
+            let cutoff = now.addingTimeInterval(-89 * 24 * 60 * 60)
+            let selected = workouts.filter {
+                $0.endDate >= cutoff &&
+                $0.endDate <= now &&
+                $0.startDate <= $0.endDate &&
+                $0.duration.isFinite &&
+                $0.duration >= 0 &&
+                $0.duration <= 604_800
+            }
+            .sorted { $0.endDate > $1.endDate }
+            .prefix(90)
+
+            records = selected.map { session in
+                var data: [String: HomeAssistantJSONValue] = [
+                    "id": .string(session.id.uuidString),
+                    "type": .string(session.activity.rawValue),
+                    "started_at": .string(Self.iso8601(session.startDate)),
+                    "ended_at": .string(Self.iso8601(session.endDate)),
+                    "duration_seconds": .double(session.duration),
+                    "environment": .string(
+                        session.isIndoor == true ? "indoor" :
+                            session.isIndoor == false ? "outdoor" : "unknown"
+                    ),
+                    "source": .string("apple_health"),
+                    // Even an HK value might come from manual entry or
+                    // an estimated treadmill recording.
+                    "distance_provenance": .string("healthkit_unverified")
+                ]
+                if let distance = session.distanceMeters,
+                   distance.isFinite, distance >= 0,
+                   distance <= 5_000_000 {
+                    data["distance_meters"] = .double(distance)
+                }
+                if let energy = session.activeEnergyKilocalories,
+                   energy.isFinite, energy >= 0,
+                   energy <= 100_000 {
+                    data["active_energy_kcal"] = .double(energy)
+                }
+                return .object(data)
+            }
+        }
+
+        let payload: [String: HomeAssistantJSONValue] = allowed
+            ? ["workouts": .array(records)]
+            : ["clear": .bool(true)]
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        guard let encoded = try? encoder.encode(
+            HomeAssistantJSONValue.object(payload)
+        ) else {
+            return
+        }
+        let digest = SHA256.hash(data: encoded)
+            .map { String(format: "%02x", $0) }
+            .joined()
+        guard lastWorkoutHistoryDigest != digest else { return }
+
+        do {
+            try await send(event: "workout_history_synced", payload: payload)
+            lastWorkoutHistoryDigest = digest
+        } catch {
+            // Keep digest unset so the next legitimate refresh can retry.
+            lastErrorMessage = error.localizedDescription
         }
     }
 
