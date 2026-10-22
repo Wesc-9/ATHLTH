@@ -948,6 +948,19 @@ private struct IPhoneStructuredStepCard: View {
                                     .font(.system(size: 28, weight: .bold, design: .rounded))
                                     .monospacedDigit()
 
+                                    if let pace = step.targetPaceMinSecondsPerKilometer,
+                                       pace.isFinite, pace > 0 {
+                                        Label(String(format: "%.1f km/t · %d:%02d /km",
+                                            3_600 / pace, Int(pace) / 60, Int(pace) % 60),
+                                            systemImage: "speedometer")
+                                            .font(.subheadline.weight(.semibold))
+                                    }
+                                    if let incline = step.targetTreadmillInclinePercent,
+                                       incline.isFinite {
+                                        Label(String(format: "%.1f %% mål stigning", incline),
+                                              systemImage: "mountain.2")
+                                            .font(.subheadline.weight(.medium))
+                                    }
                                     HStack(spacing: 12) {
                                         VStack(alignment: .leading, spacing: 3) {
                                             Text(ATHLTHLocalization.choose(
