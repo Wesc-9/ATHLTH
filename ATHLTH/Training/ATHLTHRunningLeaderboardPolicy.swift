@@ -16,6 +16,46 @@ enum ATHLTHRunningLeaderboardPolicy {
         }
     }
 
+    /// Compare the executed recipe to the immutable published challenge,
+    /// not to an athlete-edited copy. Target pace may vary, but changing
+    /// effort/rest structure or treadmill incline changes the competition.
+    static func evaluate(
+        canonical: WatchRunningWorkoutTransfer,
+        executed: WatchRunningWorkoutTransfer,
+        recorded: [ATHLTHRecordedRunningStep],
+        modifiedDuringWorkout: Bool = false
+    ) -> Verdict {
+        guard matchesCanonicalStructure(canonical, executed) else {
+            return Verdict(
+                eligible: false,
+                reason: "The workout differs from the published challenge.",
+                mainDistanceMeters: 0, mainActiveSeconds: 0
+            )
+        }
+        return evaluate(
+            planned: canonical, recorded: recorded,
+            modifiedDuringWorkout: modifiedDuringWorkout
+        )
+    }
+
+    private static func matchesCanonicalStructure(
+        _ canonical: WatchRunningWorkoutTransfer,
+        _ executed: WatchRunningWorkoutTransfer
+    ) -> Bool {
+        guard !canonical.steps.isEmpty,
+              canonical.steps.count == executed.steps.count else { return false }
+        if let officialID = canonical.sourceWorkoutID,
+           officialID != executed.sourceWorkoutID { return false }
+        return zip(canonical.steps, executed.steps).allSatisfy { original, actual in
+            original.phase?.lowercased() == actual.phase?.lowercased() &&
+            original.measure == actual.measure &&
+            original.durationSeconds == actual.durationSeconds &&
+            original.distanceMeters == actual.distanceMeters &&
+            original.targetTreadmillInclinePercent ==
+                actual.targetTreadmillInclinePercent
+        }
+    }
+
     static func evaluate(
         planned: WatchRunningWorkoutTransfer,
         recorded: [ATHLTHRecordedRunningStep],
