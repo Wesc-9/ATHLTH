@@ -88,8 +88,9 @@ struct HomeActivityStrengthDetailView: View {
                 // Indoor strength shows a private venue check-in, not a map.
                 ATHLTHWorkoutLocationSection(
                     workout: workout,
-                    hasRecordedGPS: recordedGPSDetail?.route.isEmpty == false ||
-                        recordedGPSDetail?.workoutLocation != nil
+                    hasRecordedGPS: recordedGPSDetail.map {
+                        ATHLTHWorkoutExperienceEngine.hasValidGPSLocation(in: $0)
+                    } ?? false
                 ) {
                     if let recordedGPSDetail {
                         WorkoutLocationMapCard(
