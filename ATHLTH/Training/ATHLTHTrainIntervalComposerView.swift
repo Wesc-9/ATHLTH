@@ -578,7 +578,7 @@ struct ATHLTHTrainIntervalComposerView: View {
             .font(.caption)
             .foregroundStyle(muted)
 
-            if blocks.contains(where: { $0.kind == .warmup }) {
+            if blocks.contains(where: { $0.kind == .warmup }) && autoStartMainAfterWarmup {
                 Toggle(tr("Pause between warm-up and main set",
                           "Pause mellom oppvarming og hoveddel"),
                        isOn: $pauseAfterWarmupEnabled)
@@ -809,7 +809,7 @@ struct ATHLTHTrainIntervalComposerView: View {
     private func save() {
         let now = Date()
         var savedBlocks = blocks
-        if pauseAfterWarmupEnabled,
+        if autoStartMainAfterWarmup, pauseAfterWarmupEnabled,
            let warmupIndex = savedBlocks.firstIndex(where: { $0.kind == .warmup }) {
             savedBlocks.insert(RunningWorkoutBlock(
                 kind: .recovery,
