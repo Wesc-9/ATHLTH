@@ -2243,6 +2243,10 @@ final class IPhoneWorkoutStore:
             announceStructuredStepIfNeeded(prefix: "Starting")
             return
         }
+        guard let phase = currentStructuredStep?.phase,
+              phase == "warmup" || phase == "cooldown" ||
+              workout.structuredRunningWorkout?.autoAdvanceTimedSteps == false
+        else { return }
         evaluateStructuredWorkout(&workout, forceManualAdvance: true)
         active = workout
         persistActiveCheckpoint(force: true)
