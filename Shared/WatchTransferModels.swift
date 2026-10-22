@@ -1498,6 +1498,8 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var runningStepProgress: Double? = nil
     var runningOverallProgress: Double? = nil
     var runningStepTargetTreadmillInclinePercent: Double? = nil
+    var runningStepTargetPaceSecondsPerKilometer: Double? = nil
+    var runningManualAdvanceRequired: Bool? = nil
     var runningNextStepTitle: String? = nil
     var runningStepRemainingSeconds: TimeInterval? = nil
     var runningStepRemainingMeters: Double? = nil
@@ -1741,6 +1743,8 @@ struct WatchWorkoutMirrorCommand: Codable, Hashable {
     // Older Watch builds ignore the unknown command, never start a duplicate.
     var runningWorkoutToAppend: WatchRunningWorkoutTransfer? = nil
     var runningWorkoutStartImmediately: Bool? = nil
+    /// Expected phase when advancing manually: repeated/stale taps cannot skip a second step.
+    var expectedRunningStepIndex: Int? = nil
     var commandID: UUID? = nil
 }
 
@@ -1751,6 +1755,7 @@ enum WatchWorkoutCommand: String, Codable, Hashable {
     case setTreadmillIncline
     case returnToStart
     case appendRunningWorkout
+    case advanceRunningStep
 }
 
 enum WatchSpotifyCommandKind: String, Codable, Hashable {
