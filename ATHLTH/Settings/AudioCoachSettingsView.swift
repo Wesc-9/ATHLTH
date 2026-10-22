@@ -275,9 +275,14 @@ struct ATHLTHAudioCoachSettingsView: View {
         let seconds = min(max(settings.audioCoachTimeIntervalSeconds, 15), 7_200)
         let minutes = seconds / 60
         let remainder = seconds % 60
-        if minutes == 0 { return "\(remainder) sek" }
+        if minutes == 0 {
+            return "\(remainder) " + ATHLTHLocalization.choose(
+                english: "sec", norwegian: "sek"
+            )
+        }
         if remainder == 0 { return "\(minutes) min" }
-        return "\(minutes) min \(remainder) sek"
+        return "\(minutes) min \(remainder) " +
+            ATHLTHLocalization.choose(english: "sec", norwegian: "sek")
     }
 
     private var customTimeIntervalSheet: some View {
@@ -313,7 +318,9 @@ struct ATHLTHAudioCoachSettingsView: View {
                     english: "Seconds", norwegian: "Sekunder"
                 ), selection: $customTimeSeconds) {
                     ForEach(0...59, id: \.self) { seconds in
-                        Text("\(seconds) sek").tag(seconds)
+                        Text("\(seconds) " + ATHLTHLocalization.choose(
+                            english: "sec", norwegian: "sek"
+                        )).tag(seconds)
                     }
                 }
                 .pickerStyle(.wheel)
