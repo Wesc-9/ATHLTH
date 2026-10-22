@@ -303,7 +303,8 @@ final class MirroredWorkoutAudioCoach:
     private func announceIntervalProgressIfDue(
         _ snapshot: WatchWorkoutLiveSnapshot
     ) {
-        guard let step = snapshot.runningStepTitle,
+        guard snapshot.runningAwaitingMainStart != true,
+              let step = snapshot.runningStepTitle,
               !step.isEmpty,
               let index = snapshot.runningStepIndex,
               let elapsed = snapshot.runningStepElapsedSeconds,
@@ -359,8 +360,8 @@ final class MirroredWorkoutAudioCoach:
         _ snapshot:
             WatchWorkoutLiveSnapshot
     ) {
-        guard configuration
-                .announceCurrentWorkoutStep,
+        guard snapshot.runningAwaitingMainStart != true,
+              configuration.announceCurrentWorkoutStep,
               let index =
                 snapshot.runningStepIndex,
               index != lastStepIndex,
