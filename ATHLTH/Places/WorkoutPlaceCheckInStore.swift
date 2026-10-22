@@ -579,7 +579,8 @@ final class WorkoutPlaceCheckInStore:
                 id: place.id,
                 name: place.name,
                 coordinate: place.coordinate,
-                distanceMeters: distance
+                distanceMeters: distance,
+                placeKind: place.placeKind
             )
         }
         .sorted {
@@ -636,7 +637,9 @@ final class WorkoutPlaceCheckInStore:
                         coordinate:
                             existing.coordinate,
                         distanceMeters:
-                            distance
+                            distance,
+                        placeKind:
+                            existing.placeKind
                     )
             }
 
@@ -717,7 +720,13 @@ final class WorkoutPlaceCheckInStore:
                         mapItem
                             .placemark
                             .coordinate,
-                    distanceMeters: nil
+                    distanceMeters: nil,
+                    placeKind:
+                        mapItem.pointOfInterestCategory == .hotel
+                            ? "hotel"
+                            : mapItem.pointOfInterestCategory == .stadium
+                                ? "stadium"
+                                : "fitness_center"
                 )
         } catch {
             return nil
