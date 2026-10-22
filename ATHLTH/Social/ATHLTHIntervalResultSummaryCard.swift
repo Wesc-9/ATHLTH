@@ -64,6 +64,22 @@ struct ATHLTHIntervalResultSummaryCard: View {
         return String(format: "%.1f km/t", value)
     }
 
+    /// Watch pulse at the end of each recorded minute: useful interval
+    /// evidence, not a continuous average without the underlying samples.
+    private func sampledPulseBPM(for index: Int) -> Double? {
+        let values = (performance.minutes ?? []).filter {
+            $0.stepIndex == index
+        }.compactMap { $0.watchHeartRateBPM }.filter {
+            $0.isFinite && (30...240).contains($0)
+        }
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +) / Double(values.count)
+    }
+
+    private var phasePulseAvailable: Bool {
+        (work + recovery).contains { sampledPulseBPM(for: $0.index) != nil }
+    }
+
     private func samplePulse(for index: Int) -> String? {
         let values = (performance.minutes ?? []).filter {
             $0.stepIndex == index
@@ -160,6 +176,41 @@ struct ATHLTHIntervalResultSummaryCard: View {
                     ))
                 }
 
+                if phasePulseAvailable {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(tr("Pulse by effort and recovery", "Puls per drag og pause"))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                        Chart {
+                            ForEach(performance.steps, id: \.index) { phase in
+                                if !["warmup", "cooldown"].contains(
+                                    (phase.phase ?? "").lowercased()
+                                ), let bpm = sampledPulseBPM(for: phase.index) {
+                                    BarMark(
+                                        x: .value(tr("Phase", "Del"), phase.index + 1),
+                                        y: .value("bpm", bpm)
+                                    )
+                                    .foregroundStyle(
+                                        ["recovery", "rest"].contains(
+                                            (phase.phase ?? "").lowercased()
+                                        )
+                                        ? ATHLTHPlanDesign.accentInk.opacity(0.25)
+                                        : ATHLTHPlanDesign.accentInk
+                                    )
+                                    .cornerRadius(3)
+                                }
+                            }
+                        }
+                        .frame(height: 115)
+                        Text(tr(
+                            "Dark bars are efforts; light bars are recoveries. Pulse is based on available Watch checkpoints.",
+                            "Mørke stolper er drag, lyse er pauser. Puls bygger på tilgjengelige målepunkter fra klokken."
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                }
+
                 HStack(spacing: 10) {
                     if let fastest {
                         smallStat(tr("Fastest interval", "Raskeste drag"), speed(fastest))
@@ -211,11 +262,17 @@ struct ATHLTHIntervalResultSummaryCard: View {
                         .font(.caption2)
                         .foregroundStyle(ATHLTHPlanDesign.accentInk)
                         if let rest = recovery.first(where: { $0.index == effort.index + 1 }) {
-                            Text(tr("Recovery", "Pause") + ": " +
-                                 duration(rest.activeSeconds) + " · " +
-                                 String(format: "%.0f m", rest.distanceMeters))
-                                .font(.caption)
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            HStack(spacing: 8) {
+                                Text(tr("Recovery", "Pause") + ": " +
+                                     duration(rest.activeSeconds) + " · " +
+                                     String(format: "%.0f m", rest.distanceMeters))
+                                if let pulse = samplePulse(for: rest.index) {
+                                    Spacer(minLength: 2)
+                                    Label(pulse, systemImage: "heart.fill")
+                                }
+                            }
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         }
                     }
                     .padding(.vertical, 8)
