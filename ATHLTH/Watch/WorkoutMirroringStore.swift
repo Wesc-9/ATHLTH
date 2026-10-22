@@ -406,6 +406,50 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         return true
     }
 
+    /// Append interval steps without creating another HealthKit session.
+    /// The Watch validates the startedAt token and performs the append.
+    /// This returns only whether the command could be sent, not an ACK.
+    @discardableResult
+    func appendRunningWorkout(
+        _ template: RunningWorkoutTemplate,
+        startNow: Bool
+    ) -> Bool {
+        guard hasActiveMirroredWorkout,
+              let snapshot,
+              snapshot.kind == .running || snapshot.kind == .walking,
+              let startedAt = snapshot.startedAt,
+              let mirroredSession else { return false }
+
+        let transfer = watchRunningWorkoutTransfer(from: template)
+        guard !transfer.steps.isEmpty else { return false }
+
+        // A selected "Start now" must never silently discard a live interval.
+        if startNow,
+           snapshot.runningStepTitle != nil {
+            return false
+        }
+
+        let command = WatchWorkoutMirrorCommand(
+            command: .appendRunningWorkout,
+            workoutStartedAt: startedAt,
+            runningWorkoutToAppend: transfer,
+            runningWorkoutStartImmediately: startNow,
+            commandID: UUID()
+        )
+        guard let data = try? JSONEncoder().encode(command) else {
+            return false
+        }
+
+        Task { @MainActor in
+            do {
+                try await mirroredSession.sendToRemoteWorkoutSession(data: data)
+            } catch {
+                publish { self.errorMessage = error.localizedDescription }
+            }
+        }
+        return true
+    }
+
     func liveViewDidAppear() {
         liveViewIsVisible = true
     }
