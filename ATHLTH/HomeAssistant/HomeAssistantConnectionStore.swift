@@ -295,6 +295,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     @Published private(set) var pendingDeliveryCount: Int = 0
     @Published private(set) var supportsAthleteSnapshot = false
     @Published private(set) var supportsWorkoutHistory = false
+    @Published private(set) var supportsStrengthProgress = false
     private var lastWorkoutHistoryDigest: String?
     private var isWorkoutHistorySyncing = false
 
