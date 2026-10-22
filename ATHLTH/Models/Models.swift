@@ -770,24 +770,13 @@ enum WorkoutActivity: String, Codable, CaseIterable, Hashable {
     func allowsTrainingPlaceCheckIn(
         isIndoor: Bool?
     ) -> Bool {
-        switch self {
-        case .strength,
-             .hiit,
-             .rowing,
-             .elliptical,
-             .stairClimbing,
-             .yoga,
-             .coreTraining:
-            return true
-
-        case .running,
-             .walking,
-             .cycling,
-             .swimming,
-             .hiking,
-             .other:
-            return isIndoor == true
-        }
+        // All views now share the same environment rules; never show a venue
+        // check-in for an explicitly outdoor workout.
+        ATHLTHWorkoutExperienceEngine.locationMode(
+            activity: self,
+            isIndoor: isIndoor,
+            hasRecordedGPS: false
+        ) == .indoorCheckIn
     }
 
     var icon: String {
