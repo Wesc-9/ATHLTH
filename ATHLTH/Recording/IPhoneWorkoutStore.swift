@@ -2151,6 +2151,50 @@ final class IPhoneWorkoutStore:
         syncLiveActivity()
     }
 
+    /// Add a timed/distance interval program to the SAME active phone
+    /// recording. Never starts a second HealthKit workout or resets totals.
+    /// Completed and in-flight steps remain intact when another part is
+    /// queued. Start-now is allowed only when no other part is in progress.
+    @discardableResult
+    func appendRunningIntervalsDuringWorkout(
+        _ template: RunningWorkoutTemplate,
+        startNow: Bool
+    ) -> Bool {
+        guard var workout = active,
+              !saving,
+              workout.resumedAt != nil else { return false }
+
+        let addition = watchRunningWorkoutTransfer(from: template)
+        guard !addition.steps.isEmpty else { return false }
+
+        let existing = workout.structuredRunningWorkout
+        let existingComplete = workout.structuredWorkoutComplete == true
+        if startNow && existing != nil && !existingComplete {
+            return false
+        }
+
+        let priorCount = existing?.steps.count ?? 0
+        if var current = existing {
+            current.steps.append(contentsOf: addition.steps)
+            current.sourceWorkoutID = nil
+            workout.structuredRunningWorkout = current
+        } else {
+            workout.structuredRunningWorkout = addition
+        }
+
+        if existing == nil || existingComplete {
+            workout.structuredStepIndex = priorCount
+            workout.structuredStepStartElapsedTime = workout.elapsed(at: Date())
+            workout.structuredStepStartDistanceMeters = workout.distanceMeters
+        }
+        workout.structuredWorkoutComplete = false
+        active = workout
+        persistActiveCheckpoint(force: true)
+        startStructuredTicksIfNeeded()
+        syncLiveActivity()
+        return true
+    }
+
     func advanceStructuredStepManually() {
         guard var workout = active,
               workout.resumedAt != nil,
