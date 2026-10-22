@@ -4015,6 +4015,71 @@ final class IPhoneWorkoutStore:
         )
     }
 
+    /// Workout-relative voice cues for the current scheduled interval. The
+    /// one-second structured tick drives this; there is no independent clock.
+    private func announceStructuredIntervalCues(
+        _ workout: PhoneWorkout,
+        elapsed: TimeInterval
+    ) {
+        guard let audio = workout.audioCoachConfiguration,
+              audio.enabled,
+              workout.structuredWorkoutComplete != true,
+              let plan = workout.structuredRunningWorkout,
+              let index = workout.structuredStepIndex,
+              plan.steps.indices.contains(index) else { return }
+
+        let step = plan.steps[index]
+        guard step.measure == .time,
+              let length = step.durationSeconds,
+              length > 0 else { return }
+        let passed = max(0, elapsed -
+            (workout.structuredStepStartElapsedTime ?? 0))
+        let remaining = max(0, length - passed)
+        let norwegian = localizedCoachPhrase(
+            english: "en", norwegian: "no", configuration: audio
+        ) == "no"
+
+        if let warning = plan.intervalCoachCountdownSeconds,
+           warning >= 5, warning < length,
+           remaining > 0, remaining <= warning,
+           remaining > warning - 1.5 {
+            speak(
+                norwegian
+                    ? "\(Int(ceil(remaining))) sekunder igjen av \(step.title)"
+                    : "\(Int(ceil(remaining))) seconds left in \(step.title)",
+                configuration: audio,
+                priority: .structuredStep,
+                event: ATHLTHCoachEvent(
+                    kind: .runningStep,
+                    key: "phone-interval-warning:\(workout.id):\(index)",
+                    priority: .structuredStep,
+                    validFor: 8
+                )
+            )
+            return
+        }
+
+        guard let cadence = plan.intervalCoachCueEverySeconds,
+              cadence.isFinite, cadence >= 15,
+              passed >= cadence, remaining > 2 else { return }
+        let slot = Int(floor(passed / cadence))
+        guard slot > 0,
+              passed - Double(slot) * cadence < 1.5 else { return }
+        speak(
+            norwegian
+                ? "\(Int(ceil(remaining))) sekunder igjen av \(step.title)"
+                : "\(Int(ceil(remaining))) seconds left in \(step.title)",
+            configuration: audio,
+            priority: .routineCoach,
+            event: ATHLTHCoachEvent(
+                kind: .routineMilestone,
+                key: "phone-interval-progress:\(workout.id):\(index):\(slot)",
+                priority: .routineCoach,
+                validFor: 8
+            )
+        )
+    }
+
     private func evaluateCoachAnnouncements(
         _ workout: PhoneWorkout
     ) {
