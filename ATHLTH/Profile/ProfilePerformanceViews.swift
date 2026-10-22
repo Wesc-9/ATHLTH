@@ -1683,99 +1683,76 @@ private struct ProfileRecordVisualTile: View {
     var isSelected: Bool = false
     var showsManagement: Bool = false
     var compactPremium: Bool = false
+    var provenance: String? = nil
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            if !compactPremium {
-            GeometryReader { proxy in
-                Image(kind.recordArtwork)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: proxy.size.width, height: proxy.size.height)
-                    .clipped()
-                    .opacity(0.26)
-            }
-
-            LinearGradient(
-                colors: [
-                    compactPremium ? Color.white : kind.tint.opacity(0.16),
-                    compactPremium ? Color(red: 0.965, green: 0.973, blue: 0.982) : Color.white.opacity(0.84)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            }
-
-            VStack(alignment: .leading, spacing: compactPremium ? 3 : 5) {
-                HStack {
-                    Image(systemName: kind.icon)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(compactPremium ? ATHLTHTheme.accentDeep : kind.tint)
-                        .frame(width: compactPremium ? 26 : 30, height: compactPremium ? 26 : 30)
-                        .background(Color.white.opacity(0.85), in: Circle())
-
-                    Spacer(minLength: 4)
-
-                    if showsSelection {
-                        Image(
-                            systemName: isSelected
-                                ? "checkmark.circle.fill"
-                                : "circle"
-                        )
-                        .font(.system(size: 21, weight: .semibold))
+        VStack(alignment: .leading, spacing: compactPremium ? 3 : 5) {
+            HStack(spacing: 5) {
+                Image(systemName: kind.icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 25, height: 25)
+                    .background(
+                        ATHLTHTheme.premiumGold.opacity(0.12),
+                        in: RoundedRectangle(cornerRadius: 8)
+                    )
+                Spacer(minLength: 2)
+                if showsSelection {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 19, weight: .semibold))
                         .foregroundStyle(
-                            isSelected
-                                ? ATHLTHTheme.accentDeep
-                                : ATHLTHTheme.mutedText.opacity(0.68)
+                            isSelected ? ATHLTHTheme.accentDeep :
+                                ATHLTHTheme.mutedText.opacity(0.65)
                         )
-                        .accessibilityHidden(true)
-                    } else if showsManagement {
-                        Image(systemName: "ellipsis.circle.fill")
-                            .font(.system(size: 21, weight: .medium))
-                            .foregroundStyle(ATHLTHTheme.primaryText.opacity(0.78))
-                            .accessibilityHidden(true)
-                    }
+                } else if showsManagement {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                } else if let provenance {
+                    Text(provenance)
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
-
-                Spacer(minLength: 1)
-
-                Text(kind.title)
-                    .font(.system(size: compactPremium ? 11 : 11, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.85)
-
-                Text(value)
-                    .font(.system(size: compactPremium ? 18 : 17, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.68)
-
-                Text(detail)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                    .lineLimit(1)
             }
-            .padding(compactPremium ? 10 : 12)
+            Spacer(minLength: 0)
+            Text(kind.title)
+                .font(.system(size: compactPremium ? 10 : 11, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+            Text(value)
+                .font(.system(size: compactPremium ? 17 : 19,
+                              weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
+            Text(detail)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .lineLimit(1)
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: compactPremium ? 98 : 130)
-        .clipShape(RoundedRectangle(cornerRadius: compactPremium ? 17 : 20, style: .continuous))
+        .padding(compactPremium ? 10 : 11)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: compactPremium ? 94 : 109)
+        .background(
+            Color.white.opacity(0.95),
+            in: RoundedRectangle(cornerRadius: 17, style: .continuous)
+        )
         .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
                 .stroke(
                     isSelected && showsSelection
-                        ? ATHLTHTheme.accentDeep.opacity(0.50)
-                        : ATHLTHTheme.primaryText.opacity(0.09),
-                    lineWidth: isSelected && showsSelection ? 1.4 : 0.8
+                        ? ATHLTHTheme.accentDeep.opacity(0.45)
+                        : ATHLTHTheme.border.opacity(0.65),
+                    lineWidth: isSelected && showsSelection ? 1.3 : 0.7
                 )
         }
         .accessibilityElement(children: .combine)
     }
 }
-
 
 struct ProfilePerformanceSection: View {
     let stats: ProfilePerformanceStats?
