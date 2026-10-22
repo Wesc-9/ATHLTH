@@ -2527,7 +2527,17 @@ final class StrengthWorkoutStore: ObservableObject {
                 ?? added.first
             : added.first
         guard let selected = first else { return true }
-        return selectExerciseForNow(selected.id)
+        if currentExercise?.id != selected.id,
+           currentTimedSetCountdown?.isRunning == true {
+            // Explicitly choosing "Start now" closes the previous partial
+            // timed set with its actual elapsed time before switching motors.
+            completeCurrentDraftSet()
+        }
+        guard selectExerciseForNow(selected.id) else { return false }
+        if selected.isEmbeddedRunningInterval == true {
+            startOrResumeTimedSet()
+        }
+        return true
     }
 
     func start(
