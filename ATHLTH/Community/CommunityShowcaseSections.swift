@@ -17,76 +17,76 @@ struct CommunityFriendsVsFriendsCard: View {
         let isCurrentUser: Bool
     }
 
+    /// The preview and detail now use the same all-sport activity score.
+    /// Shared feed rows may omit duration; the completed workout still counts.
     private var entries: [Entry] {
         let threshold = Calendar.current.date(
-            byAdding: .day,
-            value: -7,
-            to: Date()
+            byAdding: .day, value: -7, to: Date()
         ) ?? .distantPast
-
+        let own = ownWorkouts.filter { $0.startDate >= threshold }
+        let ownDuration = own.reduce(0) { $0 + max($1.duration, 0) } / 60
+        let ownScore = CommunityMatchupVisualPolicy.pointsBreakdown(
+            workouts: Double(own.count),
+            activeMinutes: ownDuration
+        )
         var result: [Entry] = [
             Entry(
                 id: currentUserID,
-                name:
-                    currentDisplayName.isEmpty
-                        ? "You"
-                        : currentDisplayName,
+                name: currentDisplayName.isEmpty ? "You" : currentDisplayName,
                 avatarURL: currentAvatarURL,
-                score:
-                    ownWorkouts
-                    .filter {
-                        $0.startDate >= threshold &&
-                        $0.activity == .running
-                    }
-                    .compactMap(\.distanceMeters)
-                    .reduce(0, +) / 1_000,
+                score: (ownScore?.workoutPoints ?? 0) +
+                    (ownScore?.timePoints ?? 0),
                 isCurrentUser: true
             )
         ]
-
         for friend in friends {
             let activities = feed.filter {
                 $0.actor.userID == friend.userID &&
                 $0.activity.createdAt >= threshold &&
                 $0.activity.kind == "workout"
             }
-
-            result.append(
-                Entry(
-                    id: friend.userID,
-                    name: friend.resolvedName,
-                    avatarURL:
-                        friend.avatarURL.flatMap(URL.init(string:)),
-                    score: activities.reduce(0) {
-                        $0 + runningKilometers($1.activity)
-                    },
-                    isCurrentUser: false
-                )
-            )
-        }
-
-        return result
-            .sorted {
-                if $0.score == $1.score {
-                    return $0.name
-                        .localizedCaseInsensitiveCompare(
-                            $1.name
-                        ) == .orderedAscending
-                }
-                return $0.score > $1.score
+            let totalMinutes = activities.reduce(0.0) { total, item in
+                let seconds = Double(
+                    item.activity.metadata?["duration_seconds"] ?? ""
+                ) ?? 0
+                return total + max(seconds, 0) / 60
             }
-            .prefix(4)
-            .map { $0 }
+            let parts = CommunityMatchupVisualPolicy.pointsBreakdown(
+                workouts: Double(activities.count),
+                activeMinutes: totalMinutes
+            )
+            result.append(Entry(
+                id: friend.userID,
+                name: friend.resolvedName,
+                avatarURL: friend.avatarURL.flatMap(URL.init(string:)),
+                score: (parts?.workoutPoints ?? 0) +
+                    (parts?.timePoints ?? 0),
+                isCurrentUser: false
+            ))
+        }
+        return Array(result.sorted {
+            if $0.score == $1.score {
+                return $0.name.localizedCaseInsensitiveCompare($1.name)
+                    == .orderedAscending
+            }
+            return $0.score > $1.score
+        }.prefix(4))
     }
 
     var body: some View {
         ATHLTHCard {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Friends vs Friends")
+                    Text(ATHLTHLocalization.choose(
+                        english: "Head-to-head",
+                        norwegian: "Head-to-head"
+                    ))
                         .font(.title3.weight(.bold))
 
-                    Text("Your training circle · last 7 days")
+                    Text(ATHLTHLocalization.choose(
+                        english: "Activity points · last 7 days",
+                        norwegian: "Aktivitetspoeng · siste 7 dager"
+                    ))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -102,7 +102,9 @@ struct CommunityFriendsVsFriendsCard: View {
                             friends: friends
                         )
                     } label: {
-                        Text("Matchups")
+                        Text(ATHLTHLocalization.choose(
+                                english: "View", norwegian: "Se"
+                            ))
                             .font(.caption.weight(.semibold))
                     }
                 }
@@ -197,7 +199,7 @@ struct CommunityFriendsVsFriendsCard: View {
                                     .frame(width: 19, height: 19)
                                     .background(
                                         offset == 0
-                                            ? Color.orange
+                                            ? ATHLTHTheme.premiumGold
                                             : Color(.systemGray5),
                                         in: Circle()
                                     )
@@ -215,7 +217,7 @@ struct CommunityFriendsVsFriendsCard: View {
 
                             Text(
                                 String(
-                                    format: "%.1f km",
+                                    format: "%.0f p",
                                     entry.score
                                 )
                             )
@@ -231,7 +233,7 @@ struct CommunityFriendsVsFriendsCard: View {
                             )
                             .tint(
                                 offset == 0
-                                    ? .orange
+                                    ? ATHLTHTheme.premiumGold
                                     : ATHLTHTheme.accentDeep
                             )
                         }
@@ -250,7 +252,10 @@ struct CommunityFriendsVsFriendsCard: View {
                 } label: {
                     HStack {
                         Label(
-                            "Open head-to-head",
+                            ATHLTHLocalization.choose(
+                                english: "Open comparison",
+                                norwegian: "Åpne sammenligning"
+                            ),
                             systemImage:
                                 "person.2.gobackward"
                         )
