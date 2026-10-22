@@ -6,6 +6,9 @@ import Charts
 struct ATHLTHIntervalResultSummaryCard: View {
     let performance: ATHLTHCompletedRunningPerformance
     var athleteMaximumBPM: Double? = nil
+    var measuredHeartRate: [ATHLTHRunningHeartRatePoint] = []
+    var workoutStartDate: Date? = nil
+    var workoutEndDate: Date? = nil
     @State private var showPhaseTimeline = true
     @State private var showMinuteBreakdown = false
 
@@ -63,12 +66,22 @@ struct ATHLTHIntervalResultSummaryCard: View {
         return String(format: "%.1f km/t", value)
     }
 
-    /// Watch pulse at the end of each recorded minute: useful interval
-    /// evidence, not a continuous average without the underlying samples.
+    private func measuredPhasePulse(_ index: Int) -> [ATHLTHRunningHeartRatePoint] {
+        guard let workoutStartDate, let workoutEndDate else { return [] }
+        return ATHLTHRunningHeartRateAnalysis.phasePoints(
+            measuredHeartRate, phaseIndex: index, steps: phases,
+            startedAt: workoutStartDate, endedAt: workoutEndDate
+        )
+    }
+
+    /// Use exact HealthKit timestamps where an uninterrupted timeline aligns.
+    /// Otherwise fall back to Watch checkpoints attached to the step ID.
     private func sampledPulseBPM(for index: Int) -> Double? {
-        let values = (performance.minutes ?? []).filter {
-            $0.stepIndex == index
-        }.compactMap { $0.watchHeartRateBPM }.filter {
+        let health = measuredPhasePulse(index)
+        if !health.isEmpty {
+            return health.reduce(0.0) { $0 + $1.bpm } / Double(health.count)
+        }
+        let values = phaseSamples(index).compactMap(\.watchHeartRateBPM).filter {
             $0.isFinite && (30...240).contains($0)
         }
         guard !values.isEmpty else { return nil }
@@ -80,22 +93,21 @@ struct ATHLTHIntervalResultSummaryCard: View {
     }
 
     private func samplePulse(for index: Int) -> String? {
-        let values = (performance.minutes ?? []).filter {
-            $0.stepIndex == index
-        }.compactMap { $0.watchHeartRateBPM }.filter {
-            $0.isFinite && $0 > 0
-        }
-        guard !values.isEmpty else { return nil }
-        let mean = values.reduce(0, +) / Double(values.count)
-        return "\(Int(mean.rounded())) bpm"
+        guard let pulse = sampledPulseBPM(for: index) else { return nil }
+        return "\(Int(pulse.rounded())) bpm"
     }
 
     private var sampledWorkPulse: String? {
-        let workIndices = Set(work.map(\.index))
+        let health = work.flatMap { measuredPhasePulse($0.index) }
+        if !health.isEmpty {
+            let mean = health.reduce(0.0) { $0 + $1.bpm } / Double(health.count)
+            return "\(Int(mean.rounded())) bpm"
+        }
+        let indices = Set(work.map(\.index))
         let pulse = (performance.minutes ?? [])
-            .filter { workIndices.contains($0.stepIndex) }
-            .compactMap { $0.watchHeartRateBPM }
-            .filter { $0.isFinite && $0 > 0 }
+            .filter { indices.contains($0.stepIndex) }
+            .compactMap(\.watchHeartRateBPM)
+            .filter { $0.isFinite && (30...240).contains($0) }
         guard !pulse.isEmpty else { return nil }
         return "\(Int((pulse.reduce(0, +) / Double(pulse.count)).rounded())) bpm"
     }
@@ -111,8 +123,16 @@ struct ATHLTHIntervalResultSummaryCard: View {
     }
 
     private func observedPulsePeak(_ index: Int) -> Double? {
-        phaseSamples(index).compactMap(\.watchHeartRateBPM)
+        let health = measuredPhasePulse(index)
+        if !health.isEmpty { return health.map(\.bpm).max() }
+        return phaseSamples(index).compactMap(\.watchHeartRateBPM)
             .filter { $0.isFinite && (30...240).contains($0) }.max()
+    }
+
+    private func lastPulse(_ index: Int) -> Double? {
+        if let last = measuredPhasePulse(index).last { return last.bpm }
+        return phaseSamples(index).compactMap(\.watchHeartRateBPM)
+            .filter { $0.isFinite && (30...240).contains($0) }.last
     }
 
     private func observedZone(_ index: Int) -> Int? {
@@ -154,10 +174,8 @@ struct ATHLTHIntervalResultSummaryCard: View {
     private func pulseRecovery(_ recoveryPhase: ATHLTHRecordedRunningStep) -> String? {
         guard let before = phases.last(where: { $0.index < recoveryPhase.index &&
             !["warmup", "cooldown", "recovery", "rest"].contains(($0.phase ?? "").lowercased())
-        }), let previousBPM = phaseSamples(before.index).compactMap(\.watchHeartRateBPM)
-            .filter({ $0.isFinite && (30...240).contains($0) }).last,
-            let lastBPM = phaseSamples(recoveryPhase.index).compactMap(\.watchHeartRateBPM)
-                .filter({ $0.isFinite && (30...240).contains($0) }).last else {
+        }), let previousBPM = lastPulse(before.index),
+            let lastBPM = lastPulse(recoveryPhase.index) else {
             return nil
         }
         return "\(Int(previousBPM.rounded())) → \(Int(lastBPM.rounded())) bpm"
@@ -224,8 +242,8 @@ struct ATHLTHIntervalResultSummaryCard: View {
                 }
 
                 if let pulse = sampledWorkPulse {
-                    Label(tr("Observed heart rate in the main section",
-                             "Registrert puls i hoveddelen") + " · " + pulse,
+                    Label(tr("Available heart-rate measurements during efforts",
+                             "Tilgjengelige pulsmålinger i dragene") + " · " + pulse,
                           systemImage: "heart.fill")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
