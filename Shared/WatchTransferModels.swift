@@ -1696,6 +1696,11 @@ struct WatchWorkoutMirrorCommand: Codable, Hashable {
     // Only return-route commands need a workout identity; default nil
     // preserves pause/resume/end compatibility with existing Watch versions.
     var workoutStartedAt: Date? = nil
+    // Only used to append interval parts to the existing Watch recording.
+    // Older Watch builds ignore the unknown command, never start a duplicate.
+    var runningWorkoutToAppend: WatchRunningWorkoutTransfer? = nil
+    var runningWorkoutStartImmediately: Bool? = nil
+    var commandID: UUID? = nil
 }
 
 enum WatchWorkoutCommand: String, Codable, Hashable {
@@ -1704,6 +1709,7 @@ enum WatchWorkoutCommand: String, Codable, Hashable {
     case resume
     case setTreadmillIncline
     case returnToStart
+    case appendRunningWorkout
 }
 
 enum WatchSpotifyCommandKind: String, Codable, Hashable {
