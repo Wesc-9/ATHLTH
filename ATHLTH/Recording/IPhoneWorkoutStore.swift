@@ -166,6 +166,8 @@ struct PhoneWorkout: Codable, Identifiable {
     var structuredStepStartElapsedTime: TimeInterval? = nil
     var structuredStepStartDistanceMeters: Double? = nil
     var structuredWorkoutComplete: Bool? = nil
+    /// Paused between finishing the warm-up and deliberately starting main.
+    var awaitingMainStart: Bool? = nil
     // Recorded active-time and distance at each completed structured step.
     // Partial runs retain this diagnostic data but never enter progression.
     var recordedRunningSteps: [ATHLTHRecordedRunningStep]? = nil
@@ -2111,6 +2113,7 @@ final class IPhoneWorkoutStore:
                       current.structuredRunningWorkout != nil else { return }
                 guard current.resumedAt != nil,
                       current.structuredWorkoutComplete != true,
+                      current.awaitingMainStart != true,
                       let step = self.currentStructuredStep else { continue }
                 // Write a sample at each active minute even without GPS movement.
                 let elapsed = current.elapsed(at: Date())
@@ -2127,7 +2130,11 @@ final class IPhoneWorkoutStore:
                     lastMinuteCheckpointKey = minuteKey
                     self.checkpoint(force: true)
                 }
-                if step.phase == "warmup" || step.phase == "cooldown" { continue }
+                if step.phase == "cooldown" ||
+                   (step.phase == "warmup" &&
+                    current.structuredRunningWorkout?.autoStartMainAfterWarmup != true) {
+                    continue
+                }
                 // Use authoritative active time, not a second timer.
                 if step.measure == .time,
                    (current.structuredRunningWorkout?.autoAdvanceTimedSteps ?? true),
@@ -2223,6 +2230,17 @@ final class IPhoneWorkoutStore:
               workout.resumedAt != nil,
               workout.structuredWorkoutComplete != true,
               currentStructuredStep != nil else { return }
+        if workout.awaitingMainStart == true {
+            // Waiting time/distance is not credited to the first interval.
+            workout.structuredStepStartElapsedTime = workout.elapsed(at: Date())
+            workout.structuredStepStartDistanceMeters = workout.distanceMeters
+            workout.awaitingMainStart = false
+            active = workout
+            persistActiveCheckpoint(force: true)
+            syncLiveActivity()
+            announceStructuredStepIfNeeded(prefix: "Starting")
+            return
+        }
         evaluateStructuredWorkout(&workout, forceManualAdvance: true)
         active = workout
         persistActiveCheckpoint(force: true)
@@ -3743,6 +3761,7 @@ final class IPhoneWorkoutStore:
         at now: Date = Date()
     ) {
         guard workout.structuredWorkoutComplete != true,
+              workout.awaitingMainStart != true,
               let plan = workout.structuredRunningWorkout,
               let index = workout.structuredStepIndex,
               plan.steps.indices.contains(index) else { return }
@@ -3788,6 +3807,7 @@ final class IPhoneWorkoutStore:
         at now: Date = Date()
     ) {
         guard workout.structuredWorkoutComplete != true,
+              workout.awaitingMainStart != true,
               let plan =
                 workout.structuredRunningWorkout,
               plan.steps.indices.contains(
@@ -3803,8 +3823,10 @@ final class IPhoneWorkoutStore:
             ]
 
         if !forceManualAdvance,
-           (step.phase == "warmup" || step.phase == "cooldown" ||
-            (step.measure == .time && plan.autoAdvanceTimedSteps == false)) {
+           (step.phase == "cooldown" ||
+            (step.phase == "warmup" && plan.autoStartMainAfterWarmup != true) ||
+            (step.measure == .time && plan.autoAdvanceTimedSteps == false &&
+             step.phase != "warmup")) {
             return
         }
         guard forceManualAdvance || ATHLTHRunningStepEngine
@@ -3890,6 +3912,8 @@ final class IPhoneWorkoutStore:
 
         workout.structuredStepIndex =
             nextIndex
+        workout.awaitingMainStart = step.phase == "warmup" &&
+            plan.autoStartMainAfterWarmup != true
         workout.structuredStepStartElapsedTime = endElapsed
         workout.structuredStepStartDistanceMeters =
             workout.distanceMeters
@@ -3897,6 +3921,20 @@ final class IPhoneWorkoutStore:
         UINotificationFeedbackGenerator()
             .notificationOccurred(.success)
 
+        if workout.awaitingMainStart == true {
+            if workout.audioCoachConfiguration?.enabled == true {
+                speak(
+                    localizedCoachPhrase(
+                        english: "Warm-up complete. Start the main section when ready.",
+                        norwegian: "Oppvarming avsluttet. Start hoveddelen når du er klar.",
+                        configuration: workout.audioCoachConfiguration ?? .disabled
+                    ),
+                    configuration: workout.audioCoachConfiguration,
+                    priority: .structuredStep
+                )
+            }
+            return
+        }
         if workout
             .audioCoachConfiguration?
             .announceCurrentWorkoutStep == true {
@@ -4027,6 +4065,7 @@ final class IPhoneWorkoutStore:
     ) {
         guard let audio = workout.audioCoachConfiguration,
               audio.enabled,
+              workout.awaitingMainStart != true,
               workout.structuredWorkoutComplete != true,
               let plan = workout.structuredRunningWorkout,
               let index = workout.structuredStepIndex,
@@ -5071,9 +5110,13 @@ final class IPhoneWorkoutStore:
                     currentStep?.targetPaceMinSecondsPerKilometer,
                 runningManualAdvanceRequired:
                     currentStep.map { step in
-                        step.phase == "warmup" || step.phase == "cooldown" ||
+                        workout.awaitingMainStart == true ||
+                        (step.phase == "warmup" &&
+                         workout.structuredRunningWorkout?.autoStartMainAfterWarmup != true) ||
+                        step.phase == "cooldown" ||
                         workout.structuredRunningWorkout?.autoAdvanceTimedSteps == false
                     },
+                runningAwaitingMainStart: workout.awaitingMainStart == true,
                 runningNextStepTitle:
                     nextStepTitle,
                 runningStepRemainingSeconds:
