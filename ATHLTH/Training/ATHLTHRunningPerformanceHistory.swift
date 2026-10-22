@@ -93,6 +93,27 @@ enum ATHLTHRunningPerformanceHistory {
         ) ?? []
     }
 
+    /// Phone-only structured runs must feed the same account-scoped personal
+    /// performance view as Watch runs, without requiring a HealthKit export.
+    /// Idempotent by the original workout id; a later HealthKit save may add
+    /// its UUID and should replace the older local snapshot.
+    static func savePhone(_ completed: PhoneWorkout, userID: UUID) {
+        guard let record = ATHLTHCompletedRunningPerformance(phone: completed) else {
+            return
+        }
+        var history = load(userID: userID)
+        if let index = history.firstIndex(where: { $0.id == record.id }) {
+            if history[index] == record { return }
+            history[index] = record
+        } else {
+            history.insert(record, at: 0)
+        }
+        history.sort { $0.completedAt > $1.completedAt }
+        if history.count > 300 { history = Array(history.prefix(300)) }
+        AccountLocalStorage.write(history, name: name, userID: userID)
+        ATHLTHTrainingDataChangeSignal.post(userID: userID)
+    }
+
     static func saveWatch(
         _ result: WatchWorkoutResult,
         userID: UUID,
