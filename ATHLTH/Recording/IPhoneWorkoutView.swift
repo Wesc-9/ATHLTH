@@ -1819,7 +1819,7 @@ struct IPhoneWorkoutView: View {
                     .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $showingAddRunningWorkout) {
-                ActiveHybridWorkoutPicker { session, startNow in
+                ActiveHybridWorkoutPicker(runningOnly: true) { session, startNow in
                     guard let template = session.runningWorkout else {
                         return false
                     }
