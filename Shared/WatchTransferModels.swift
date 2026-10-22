@@ -1500,6 +1500,9 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var runningStepTargetTreadmillInclinePercent: Double? = nil
     var runningStepTargetPaceSecondsPerKilometer: Double? = nil
     var runningManualAdvanceRequired: Bool? = nil
+    var runningStepElapsedSeconds: TimeInterval? = nil
+    var runningIntervalCoachCueEverySeconds: TimeInterval? = nil
+    var runningIntervalCoachCountdownSeconds: TimeInterval? = nil
     var runningNextStepTitle: String? = nil
     var runningStepRemainingSeconds: TimeInterval? = nil
     var runningStepRemainingMeters: Double? = nil
