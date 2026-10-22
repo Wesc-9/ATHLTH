@@ -10590,12 +10590,12 @@ struct PlannedExerciseEditorView: View {
                     ) {
                         HStack(spacing: 12) {
                             if let entry = catalogEntry {
-                                ExerciseArtwork(entry: entry, size: 66)
+                                ExerciseArtwork(entry: entry, size: 92)
                             } else {
                                 Image(systemName: "dumbbell.fill")
                                     .font(.system(size: 20, weight: .medium))
                                     .foregroundStyle(ATHLTHPlanDesign.accent)
-                                    .frame(width: 66, height: 66)
+                                    .frame(width: 92, height: 92)
                                     .background(
                                         ATHLTHPlanDesign.selectedSurface,
                                         in: RoundedRectangle(cornerRadius: 14)
@@ -10611,13 +10611,8 @@ struct PlannedExerciseEditorView: View {
                                         exerciseLibrary.localizedExerciseName($0)
                                     } ?? original.embeddedExercise.displayName
                                 )
-                                .font(
-                                    .headline
-                                )
-                                .foregroundStyle(
-                                    ATHLTHTheme
-                                        .primaryText
-                                )
+                                 .font(.system(size: 22, weight: .semibold, design: .serif))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
 
                                 Text(
                                     ATHLTHLocalization.choose(
@@ -11380,9 +11375,7 @@ struct PlannedExerciseEditorView: View {
             .scrollContentBackground(.hidden)
             .background(
                 ATHLTHPremiumCanvas(
-                    accent:
-                        ATHLTHTheme.accent
-                            .opacity(0.18)
+                    accent: ATHLTHTheme.premiumGold.opacity(0.13)
                 )
             )
             .navigationTitle(
