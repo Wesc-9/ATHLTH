@@ -6968,6 +6968,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 },
             runningStepTargetTreadmillInclinePercent:
                 currentRunningStep?.targetTreadmillInclinePercent,
+            runningStepTargetPaceSecondsPerKilometer:
+                currentRunningStep?.targetPaceMinSecondsPerKilometer,
+            runningManualAdvanceRequired:
+                currentRunningStep.map { step in
+                    step.phase == "warmup" || step.phase == "cooldown" ||
+                    structuredRunningWorkout?.autoAdvanceTimedSteps == false
+                },
             runningNextStepTitle:
                 nextStructuredRunningStep?.title,
             runningStepRemainingSeconds:
@@ -7633,6 +7640,15 @@ extension WatchWorkoutManager:
                         self.setTreadmillInclinePercent(
                             value
                         )
+                    }
+                case .advanceRunningStep:
+                    if let requestedStart = command.workoutStartedAt,
+                       let activeStart = self.startedAt,
+                       abs(requestedStart.timeIntervalSince(activeStart)) < 5,
+                       let expected = command.expectedRunningStepIndex,
+                       expected == self.structuredStepIndex,
+                       self.currentStructuredRunningStep != nil {
+                        self.advanceStructuredRunningWorkoutManually()
                     }
                 case .appendRunningWorkout:
                     if let part = command.runningWorkoutToAppend {
