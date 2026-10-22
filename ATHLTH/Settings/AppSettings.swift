@@ -521,6 +521,8 @@ final class AppSettingsStore: ObservableObject {
     @Published var audioCoachTimeTriggerEnabled: Bool { didSet { persist() } }
     @Published var audioCoachDistanceIntervalKilometers: Double { didSet { persist() } }
     @Published var audioCoachTimeIntervalMinutes: Int { didSet { persist() } }
+    /// Precise custom cadence (seconds). Old installs migrate from minutes.
+    @Published var audioCoachTimeIntervalSeconds: Int { didSet { persist() } }
     @Published var audioCoachAnnounceDistance: Bool { didSet { persist() } }
     @Published var audioCoachAnnounceElapsedTime: Bool { didSet { persist() } }
     @Published var audioCoachAnnounceAveragePace: Bool { didSet { persist() } }
@@ -842,6 +844,11 @@ final class AppSettingsStore: ObservableObject {
             defaults.object(
                 forKey: "settings.audioCoach.timeIntervalMinutes"
             ) as? Int ?? 10
+        audioCoachTimeIntervalSeconds = min(max(
+            defaults.object(forKey: "settings.audioCoach.timeIntervalSeconds") as? Int ??
+            audioCoachTimeIntervalMinutes * 60,
+            15
+        ), 7_200)
         audioCoachAnnounceDistance =
             defaults.object(
                 forKey: "settings.audioCoach.announceDistance"
@@ -1152,6 +1159,10 @@ final class AppSettingsStore: ObservableObject {
             forKey: "settings.audioCoach.timeIntervalMinutes"
         )
         defaults.set(
+            audioCoachTimeIntervalSeconds,
+            forKey: "settings.audioCoach.timeIntervalSeconds"
+        )
+        defaults.set(
             audioCoachAnnounceDistance,
             forKey: "settings.audioCoach.announceDistance"
         )
@@ -1417,7 +1428,7 @@ final class AppSettingsStore: ObservableObject {
                     : nil,
             timeIntervalSeconds:
                 audioCoachTimeTriggerEnabled
-                    ? Double(audioCoachTimeIntervalMinutes * 60)
+                    ? Double(min(max(audioCoachTimeIntervalSeconds, 15), 7_200))
                     : nil,
             announceDistance: audioCoachAnnounceDistance,
             announceElapsedTime: audioCoachAnnounceElapsedTime,
