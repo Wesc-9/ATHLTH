@@ -147,8 +147,15 @@ enum ATHLTHRunningPerformanceHistory {
               let workoutID = record.workoutID,
               knownWorkoutIDs.contains(workoutID) else { return }
         var history = load(userID: userID)
-        guard !history.contains(where: { $0.id == record.id }) else { return }
-        history.insert(record, at: 0)
+        // A late HealthKit export may supply its workout UUID after the
+        // first Watch result. Update the existing session without duplicates.
+        if let index = history.firstIndex(where: { $0.id == record.id }) {
+            if history[index] == record { return }
+            history[index] = record
+        } else {
+            history.insert(record, at: 0)
+        }
+        history.sort { $0.completedAt > $1.completedAt }
         if history.count > 300 { history = Array(history.prefix(300)) }
         AccountLocalStorage.write(history, name: name, userID: userID)
         ATHLTHTrainingDataChangeSignal.post(userID: userID)

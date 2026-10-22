@@ -1372,6 +1372,10 @@ struct ATHLTHRecordedRunningStep: Codable, Hashable {
     // A treadmill with manually entered belt speed is user-reported evidence.
     var isUserReported: Bool = false
     var targetPaceSecondsPerKilometer: Double? = nil
+    /// Optional planned values, not measured results. Nil for older histories.
+    var targetDurationSeconds: TimeInterval? = nil
+    var targetHeartRateZone: Int? = nil
+    var targetTreadmillInclinePercent: Double? = nil
 
     var actualSpeedKilometersPerHour: Double? {
 

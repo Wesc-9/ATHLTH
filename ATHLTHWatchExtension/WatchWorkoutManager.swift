@@ -4329,7 +4329,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 distanceMeters: meters,
                 isUserReported: false,
                 targetPaceSecondsPerKilometer:
-                    finishedStep.targetPaceMinSecondsPerKilometer
+                    finishedStep.targetPaceMinSecondsPerKilometer,
+                targetDurationSeconds: finishedStep.durationSeconds,
+                targetHeartRateZone: finishedStep.targetHeartRateZone,
+                targetTreadmillInclinePercent:
+                    finishedStep.targetTreadmillInclinePercent
             ))
         }
 

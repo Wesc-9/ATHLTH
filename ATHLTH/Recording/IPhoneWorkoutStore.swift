@@ -1472,7 +1472,11 @@ final class IPhoneWorkoutStore:
                         activeSeconds: seconds, distanceMeters: meters,
                         isUserReported: workout.runEnvironment == .treadmill,
                         targetPaceSecondsPerKilometer:
-                            step.targetPaceMinSecondsPerKilometer
+                            step.targetPaceMinSecondsPerKilometer,
+                        targetDurationSeconds: step.durationSeconds,
+                        targetHeartRateZone: step.targetHeartRateZone,
+                        targetTreadmillInclinePercent:
+                            step.targetTreadmillInclinePercent
                     )
                 ]
             }
@@ -3889,7 +3893,11 @@ final class IPhoneWorkoutStore:
                     distanceMeters: segmentMeters,
                     isUserReported: workout.runEnvironment == .treadmill,
                     targetPaceSecondsPerKilometer:
-                        step.targetPaceMinSecondsPerKilometer
+                        step.targetPaceMinSecondsPerKilometer,
+                    targetDurationSeconds: step.durationSeconds,
+                    targetHeartRateZone: step.targetHeartRateZone,
+                    targetTreadmillInclinePercent:
+                        step.targetTreadmillInclinePercent
                 ))
                 workout.recordedRunningSteps = recorded
             }
