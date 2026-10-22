@@ -1832,7 +1832,7 @@ struct WatchRunWorkoutExperienceView: View {
 
                     Circle()
                         .fill(workoutManager.state == .paused
-                            ? WatchTheme.warning : WatchTheme.liveLime)
+                            ? WatchTheme.warning : WatchTheme.accentDeep)
                         .frame(width: 6, height: 6)
                     Text(workoutManager.state == .paused ||
                          workoutManager.automaticPauseActive
@@ -2053,7 +2053,7 @@ struct WatchRunWorkoutExperienceView: View {
 
                     Text(unit)
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(tint)
+                        .foregroundStyle(WatchTheme.accentDeep)
                 }
             }
             Spacer(minLength: 0)
