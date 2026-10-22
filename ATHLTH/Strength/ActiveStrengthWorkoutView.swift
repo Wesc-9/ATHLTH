@@ -1855,18 +1855,10 @@ struct ActiveStrengthWorkoutView: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                if strength.currentExerciseAllSetsCompleted,
-                   let upcoming = strength.nextPendingExercise {
-                    focusedUpcomingExerciseHero(
-                        upcoming,
-                        completed: exercise
-                    )
-                } else {
-                    focusedExerciseHero(
-                        workout: workout,
-                        exercise: exercise
-                    )
-                }
+                focusedExerciseHero(
+                    workout: workout,
+                    exercise: exercise
+                )
 
                 if let suggestion =
                         strength
@@ -1982,6 +1974,15 @@ struct ActiveStrengthWorkoutView: View {
                     if let weight = first?.plannedWeightKilograms,
                        weight > 0 {
                         Text(String(format: "%.1f kg", weight))
+                            .font(.caption.weight(.semibold))
+                    }
+                    if let speed = upcoming.targetSpeedKilometersPerHour,
+                       speed > 0 {
+                        Text(String(format: "Målfart %.1f km/t", speed))
+                            .font(.caption.weight(.semibold))
+                    }
+                    if let zone = upcoming.targetHeartRateZone {
+                        Text("Målpuls: sone \(zone)")
                             .font(.caption.weight(.semibold))
                     }
                 }
@@ -3417,7 +3418,8 @@ struct ActiveStrengthWorkoutView: View {
         let observed = ATHLTHHeartRateZones.measuredZone(
             heartRateBPM: pulse, maximumBPM: maxBPM
         )
-        let target = workout.liveHeartRateTargetZone
+        let target = strength.currentExercise?.targetHeartRateZone ??
+            workout.liveHeartRateTargetZone
 
         return HStack(spacing: 9) {
             Label(
@@ -10943,7 +10945,7 @@ private struct StrengthActiveExerciseQueueView: View {
                                                         systemImage: "timer"
                                                     )
                                                 } else if let reps = first.plannedReps {
-                                                    Text("(reps) reps")
+                                                    Text("\(reps) reps")
                                                 }
 
                                                 if let weight = first.plannedWeightKilograms,
@@ -10955,7 +10957,14 @@ private struct StrengthActiveExerciseQueueView: View {
                                                     Text(String(format: "· %.1f km/t", speed))
                                                 } else if let tempo = first.plannedTempo,
                                                           !tempo.isEmpty {
-                                                    Text("· (tempo)")
+                                                    Text("· \(tempo)")
+                                                }
+                                                if let speed = exercise.targetSpeedKilometersPerHour,
+                                                   speed > 0 {
+                                                    Text(String(format: "· %.1f km/t", speed))
+                                                }
+                                                if let zone = exercise.targetHeartRateZone {
+                                                    Text("· Sone \(zone)")
                                                 }
                                             }
                                             .font(.caption2.weight(.medium))
