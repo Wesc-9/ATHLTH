@@ -1431,6 +1431,9 @@ struct AppRootView: View {
         .onChange(of: homeAssistant.shareCompletedWorkouts) { _, _ in
             Task { await syncHomeAssistantSnapshot() }
         }
+        .onChange(of: homeAssistant.shareWorkoutHistory) { _, _ in
+            Task { await syncHomeAssistantSnapshot() }
+        }
         .onChange(of: homeAssistant.shareRecovery) { _, _ in
             Task { await syncHomeAssistantSnapshot() }
         }
@@ -1465,6 +1468,10 @@ struct AppRootView: View {
             Task { await syncHomeAssistantSnapshot() }
         }
         .onChange(of: homeAssistant.supportsAthleteSnapshot) { _, supported in
+            guard supported else { return }
+            Task { await syncHomeAssistantSnapshot() }
+        }
+        .onChange(of: homeAssistant.supportsWorkoutHistory) { _, supported in
             guard supported else { return }
             Task { await syncHomeAssistantSnapshot() }
         }
@@ -3465,6 +3472,7 @@ struct AppRootView: View {
             strengthWorkout.activeWorkout,
             force: true
         )
+        await homeAssistant.syncWorkoutHistory(health.workouts)
     }
 
     private func homeAssistantPlannedOccurrences()
