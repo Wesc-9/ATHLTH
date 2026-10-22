@@ -1144,8 +1144,25 @@ final class StrengthWorkoutStore: ObservableObject {
 
     @discardableResult
     func selectExerciseForNow(_ exerciseID: UUID) -> Bool {
-        // Capture the selection ID first, then refresh the workout after
-        // finalizing rest so its recorded actual-rest duration is not lost.
+        guard let existing = activeWorkout,
+              let targetIndex = existing.exercises.firstIndex(where: {
+                  $0.id == exerciseID && !$0.isCompleted
+              }) else { return false }
+
+        // Motor change: finish a started timed phase using *actual* elapsed
+        // seconds, not its planned duration. A set that was not started stays
+        // uncompleted. This applies equally to treadmill intervals and
+        // time-based strength sets, with one Watch/HealthKit session throughout.
+        if targetIndex != currentExerciseIndex,
+           let clock = currentTimedSetCountdown {
+            if clock.elapsedSeconds() > 0,
+               currentSet?.isCompleted == false {
+                completeCurrentDraftSet()
+            } else {
+                timedSetCountdown = nil
+            }
+        }
+
         finalizeActualRestIfNeeded()
         guard var workout = activeWorkout,
               let target = workout.exercises.firstIndex(where: {
@@ -2471,6 +2488,28 @@ final class StrengthWorkoutStore: ObservableObject {
         }
         persistCheckpointNow()
         return true
+    }
+
+    /// Atomically append a full planned workout and optionally switch focus
+    /// to its first relevant motor. The parent workout/Watch IDs do not change.
+    @discardableResult
+    func appendWorkoutDuringSession(
+        _ session: PlannedSession,
+        startNow: Bool
+    ) -> Bool {
+        let before = Set(activeWorkout?.exercises.map(\.id) ?? [])
+        guard appendWorkoutDuringSession(session) else { return false }
+        guard startNow else { return true }
+
+        let added = activeWorkout?.exercises.filter {
+            !before.contains($0.id)
+        } ?? []
+        let first = session.kind == .running
+            ? added.first(where: { $0.isEmbeddedRunningInterval == true })
+                ?? added.first
+            : added.first
+        guard let selected = first else { return true }
+        return selectExerciseForNow(selected.id)
     }
 
     func start(
