@@ -14,6 +14,16 @@ enum ATHLTHLiveActivityDisplayFocus: Equatable {
     case elapsed
 }
 
+enum ATHLTHCompactIslandMetric: Equatable {
+    case paused
+    case strengthRest
+    case strengthTimedSet
+    case runningInterval
+    case pace
+    case distance
+    case elapsed
+}
+
 enum ATHLTHLiveActivityDisplayPolicy {
     static func resolve(
         kindRaw: String?,
@@ -47,6 +57,39 @@ enum ATHLTHLiveActivityDisplayPolicy {
             }
             return .elapsed
         default: return .elapsed
+        }
+    }
+
+    /// The Live Activity represents the ATHLTH brand while starting or
+    /// finishing. While training or paused, its icon identifies the sport.
+    /// iOS itself controls the Island when no Live Activity is running.
+    static func showsBrandMark(phase: String) -> Bool {
+        phase != "running" && phase != "paused"
+    }
+
+    /// Choose one glanceable metric; details belong in the expanded Island.
+    /// Strength defaults to elapsed workout time, never reps in the pill.
+    static func compactMetric(
+        focus: ATHLTHLiveActivityDisplayFocus,
+        pace: TimeInterval? = nil,
+        distanceMeters: Double? = nil
+    ) -> ATHLTHCompactIslandMetric {
+        switch focus {
+        case .paused: return .paused
+        case .strengthRest: return .strengthRest
+        case .strengthTimedSet: return .strengthTimedSet
+        case .strengthSet, .elapsed: return .elapsed
+        case .runningInterval: return .runningInterval
+        case .running:
+            if let pace, pace.isFinite, pace >= 120, pace <= 1_800 {
+                return .pace
+            }
+            return .elapsed
+        case .walking, .cycling:
+            if let meters = distanceMeters, meters.isFinite, meters > 0 {
+                return .distance
+            }
+            return .elapsed
         }
     }
 
