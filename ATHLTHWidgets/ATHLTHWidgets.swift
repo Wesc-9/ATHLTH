@@ -29,6 +29,11 @@ private enum ATHLTHWidgetPalette {
         green: 0.47,
         blue: 0.38
     )
+    static let brandGold = Color(
+        red: 0.71,
+        green: 0.55,
+        blue: 0.31
+    )
 }
 
 private struct ATHLTHSurfaceEntry: TimelineEntry {
@@ -518,6 +523,29 @@ private struct ATHLTHAdaptiveCompactMetric: View {
     }
 }
 
+/// Native timer keeps workout time moving smoothly between Watch snapshots.
+/// iOS decides whether another Live Activity reduces the available width.
+@available(iOS 27.0, *)
+private struct ATHLTHAdaptiveCompactClock: View {
+    @Environment(\.isDynamicIslandLimitedInWidth)
+    private var isLimitedInWidth
+
+    let elapsedAnchor: Date
+
+    var body: some View {
+        Text(elapsedAnchor, style: .timer)
+            .font(.system(
+                size: isLimitedInWidth ? 11 : 13,
+                weight: .bold,
+                design: .rounded
+            ))
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(isLimitedInWidth ? 0.70 : 0.85)
+            .accessibilityLabel(Text(elapsedAnchor, style: .timer))
+    }
+}
+
 struct ATHLTHWorkoutLiveActivity: Widget {
     private typealias Context =
         ActivityViewContext<ATHLTHWorkoutActivityAttributes>
@@ -579,14 +607,11 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                     }
                 }
             } compactLeading: {
-                Image(systemName: primarySymbol(context))
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(focusTint(context))
+                compactActivityIdentity(context)
             } compactTrailing: {
                 compactTrainingValue(context)
             } minimal: {
-                Image(systemName: primarySymbol(context))
-                    .foregroundStyle(focusTint(context))
+                compactActivityIdentity(context)
             }
         }
     }
@@ -745,6 +770,47 @@ struct ATHLTHWorkoutLiveActivity: Widget {
             hasRunningStep: context.state.runningStepTitle != nil,
             recordedDistanceMeters: context.state.distanceMeters
         )
+    }
+
+    /// Active or paused workouts use their sport icon. During transition
+    /// phases the original ATHLTH mark appears instead of a generic spinner.
+    @ViewBuilder
+    private func compactActivityIdentity(_ context: Context) -> some View {
+        if ATHLTHLiveActivityDisplayPolicy.showsBrandMark(
+            phase: context.state.phase
+        ) {
+            ATHLTHMarkShape()
+                .fill(ATHLTHWidgetPalette.brandGold)
+                .frame(width: 23, height: 18)
+                .accessibilityLabel("ATHLTH")
+        } else {
+            Image(systemName: compactSportSymbol(context))
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(
+                    isOffRoute(context) || context.state.phase == "paused"
+                        ? Color.orange
+                        : focusTint(context)
+                )
+                .accessibilityLabel(
+                    context.state.workoutDisplayTitle ??
+                    context.attributes.workoutTitle
+                )
+        }
+    }
+
+    private func compactSportSymbol(_ context: Context) -> String {
+        // A route warning takes priority, without changing the workout.
+        if isOffRoute(context) { return "exclamationmark.triangle.fill" }
+        if context.state.workoutKindRaw == "strength" ||
+           context.state.strengthExerciseName != nil {
+            return "dumbbell.fill"
+        }
+        switch context.state.workoutKindRaw {
+        case "running": return "figure.run"
+        case "walking": return "figure.walk"
+        case "cycling": return "figure.outdoor.cycle"
+        default: return context.attributes.systemImage
+        }
     }
 
     private func primarySymbol(_ context: Context) -> String {
@@ -982,10 +1048,68 @@ struct ATHLTHWorkoutLiveActivity: Widget {
         }
     }
 
+    /// Text(status) is used only while the Live Activity is preparing,
+    /// ending or finished. No ongoing activity is created just for branding.
+    private func compactTransitionLabel(_ phase: String) -> String {
+        switch phase {
+        case "preparing": return localized("STARTING", "STARTER")
+        case "ending": return localized("FINISHING", "AVSLUTTER")
+        case "completed": return localized("DONE", "FERDIG")
+        case "failed": return localized("ERROR", "FEIL")
+        default: return "ATHLTH"
+        }
+    }
+
+    @ViewBuilder
+    private func compactElapsedClock(_ context: Context) -> some View {
+        TimelineView(.periodic(from: .now, by: 15)) { tick in
+            if ATHLTHLiveActivityDisplayPolicy.isRecent(
+                updatedAt: context.state.updatedAt,
+                now: tick.date
+            ), context.state.elapsedTime.isFinite,
+               context.state.elapsedTime >= 0 {
+                // Anchored to the latest captured workout elapsed time, not
+                // wall-clock workout start (which can include paused time).
+                let anchor = context.state.updatedAt.addingTimeInterval(
+                    -context.state.elapsedTime
+                )
+                if #available(iOS 27.0, *) {
+                    ATHLTHAdaptiveCompactClock(elapsedAnchor: anchor)
+                } else {
+                    Text(anchor, style: .timer)
+                        .font(.caption2.weight(.bold))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                }
+            } else {
+                compactIslandText("—", condensed: "—")
+            }
+        }
+    }
+
     @ViewBuilder
     private func compactTrainingValue(_ context: Context) -> some View {
-        if workoutFocus(context) == .strengthRest,
-           let ends = context.state.strengthRestEndsAt {
+        let metric = ATHLTHLiveActivityDisplayPolicy.compactMetric(
+            focus: workoutFocus(context),
+            pace: context.state.currentPaceSecondsPerKilometer,
+            distanceMeters: context.state.distanceMeters
+        )
+
+        if ATHLTHLiveActivityDisplayPolicy.showsBrandMark(
+            phase: context.state.phase
+        ) {
+            compactIslandText(
+                compactTransitionLabel(context.state.phase),
+                condensed: compactTransitionLabel(context.state.phase)
+            )
+        } else if metric == .paused {
+            compactIslandText(
+                localized("PAUSED", "PAUSE"),
+                condensed: "PAUSE"
+            )
+        } else if metric == .strengthRest,
+                  let ends = context.state.strengthRestEndsAt {
             TimelineView(.periodic(from: .now, by: 5)) { timeline in
                 let remaining = ceil(ends.timeIntervalSince(timeline.date))
                 compactIslandText(
@@ -999,7 +1123,7 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                         : localized("READY", "KLAR")
                 )
             }
-        } else if workoutFocus(context) == .strengthTimedSet {
+        } else if metric == .strengthTimedSet {
             TimelineView(.periodic(from: .now, by: 5)) { timeline in
                 let left = ATHLTHLiveActivityDisplayPolicy.remainingTimedSet(
                     secondsAtSnapshot:
@@ -1020,13 +1144,14 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                     } ?? "—"
                 )
             }
+        } else if metric == .elapsed || metric == .strengthRest {
+            compactElapsedClock(context)
         } else {
             TimelineView(.periodic(from: .now, by: 15)) { tick in
-                let isCurrent = workoutFocus(context) == .paused ||
-                    ATHLTHLiveActivityDisplayPolicy.isRecent(
-                        updatedAt: context.state.updatedAt,
-                        now: tick.date
-                    )
+                let isCurrent = ATHLTHLiveActivityDisplayPolicy.isRecent(
+                    updatedAt: context.state.updatedAt,
+                    now: tick.date
+                )
                 compactIslandText(
                     isCurrent ? compactValue(context) : "—",
                     condensed: isCurrent ? compactIslandValue(context) : "—"
