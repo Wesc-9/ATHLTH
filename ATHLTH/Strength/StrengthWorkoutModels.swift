@@ -520,7 +520,7 @@ struct StrengthSetLog: Identifiable, Codable, Hashable {
     }
 
     var countsTowardTrainingLoad: Bool {
-        isCompleted && isWarmUp != true && plannedSetType != .warmUp
+        isCompleted && hybridPhaseKind == nil && isWarmUp != true && plannedSetType != .warmUp
     }
 }
 
@@ -695,7 +695,7 @@ struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
     var totalCompletedSets: Int {
         exercises
             .flatMap(\.sets)
-            .filter(\.isCompleted)
+            .filter { $0.isCompleted && $0.hybridPhaseKind == nil }
             .count
     }
 
