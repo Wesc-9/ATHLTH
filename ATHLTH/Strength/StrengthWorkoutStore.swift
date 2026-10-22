@@ -2286,7 +2286,11 @@ final class StrengthWorkoutStore: ObservableObject {
                                     : nil
                         )
                     },
-                completedAt: nil
+                completedAt: nil,
+                targetSpeedKilometersPerHour:
+                    planned.targetSpeedKilometersPerHour,
+                targetHeartRateZone:
+                    planned.targetHeartRateZone
             )
         }
 
