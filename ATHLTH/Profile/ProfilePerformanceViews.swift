@@ -2909,8 +2909,8 @@ struct PerformanceStatsView: View {
                     sourceBadge(
                         title:
                             text(
-                                "HEALTH + ATHLTH",
-                                "HEALTH + ATHLTH"
+                                "DATA + TRAINING",
+                                "DATA + TRENING"
                             ),
                         icon:
                             "checkmark.seal.fill"
@@ -2987,6 +2987,38 @@ struct PerformanceStatsView: View {
                     }
                 }
 
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(text("INTERVAL BENCHMARKS", "INTERVALLREKORDER"))
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(0.9)
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                    HStack(alignment: .top, spacing: 8) {
+                        lightPRMetric(
+                            fourByFourItem(bestFourByFour, reported: false),
+                            source: text("RECORDED", "REGISTRERT")
+                        )
+                        if let reportedFourByFour {
+                            lightPRMetric(
+                                fourByFourItem(reportedFourByFour, reported: true),
+                                source: text("REPORTED", "OPPGITT")
+                            )
+                        } else if let bestEffort = fourByFourFastestEffortItem() {
+                            lightPRMetric(
+                                bestEffort,
+                                source: text("RECORDED", "REGISTRERT")
+                            )
+                        }
+                    }
+                    Text(text(
+                        "4 × 4: only the four complete 4-minute efforts count. Three 2-minute recoveries required. Reported treadmill values are shown separately, never as verified results.",
+                        "4 × 4: kun de fire fullførte fireminuttersdragene teller. Tre pauser på to minutter kreves. Oppgitt møllefart vises separat, aldri som verifisert resultat."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+
                 LazyVGrid(
                     columns: [
                         GridItem(
@@ -3013,7 +3045,13 @@ struct PerformanceStatsView: View {
                             ),
                             detail: kind.supportingDetail(
                                 healthRecords: resolvedHealthRecords
-                            )
+                            ),
+                            compactPremium: true,
+                            provenance: kind.healthKind.flatMap { healthKind in
+                                resolvedHealthRecords.first { $0.kind == healthKind }
+                            } != nil
+                                ? text("GPS", "GPS")
+                                : text("Calculated", "Beregnet")
                         )
                     }
                 }
@@ -3073,17 +3111,36 @@ struct PerformanceStatsView: View {
         ProfileFeaturedRecordKind.allCases.filter { $0.group == .running }
     }
 
+    private var runningExtraItems: [PerformanceMetricItem] {
+        var values = [fourByFourItem(bestFourByFour, reported: false)]
+        if let reportedFourByFour {
+            values.append(fourByFourItem(reportedFourByFour, reported: true))
+        }
+        if let fastest = fourByFourFastestEffortItem() {
+            values.append(fastest)
+        }
+        return values
+    }
+
     private var runningDisplayItems: [PerformanceMetricItem] {
-        runningDisplayKinds.map(profileRecordMetric)
+        runningDisplayKinds.map(profileRecordMetric) + runningExtraItems
     }
 
     private func runningMetricSource(_ index: Int) -> String {
         guard runningDisplayKinds.indices.contains(index) else {
-            return "ATHLTH"
+            let offset = index - runningDisplayKinds.count
+            if offset == 1, reportedFourByFour != nil {
+                return text("Reported", "Oppgitt")
+            }
+            return text("Recorded", "Registrert")
         }
-        return runningDisplayKinds[index].healthKind != nil
-            ? ATHLTHLocalization.choose(english: "Apple Health", norwegian: "Apple Health")
-            : "ATHLTH"
+        let kind = runningDisplayKinds[index]
+        guard let healthKind = kind.healthKind else {
+            return text("Calculated", "Beregnet")
+        }
+        return resolvedHealthRecords.contains(where: { $0.kind == healthKind })
+            ? "Apple Health · GPS"
+            : text("Calculated", "Beregnet")
     }
 
     private func profileRecordMetric(
@@ -3299,7 +3356,9 @@ struct PerformanceStatsView: View {
                             ),
                             detail: kind.supportingDetail(
                                 healthRecords: resolvedHealthRecords
-                            )
+                            ),
+                            compactPremium: true,
+                            provenance: text("ATHLTH log", "ATHLTH-logg")
                         )
                     }
                 }
