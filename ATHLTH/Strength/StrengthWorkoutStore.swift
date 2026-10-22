@@ -2395,8 +2395,9 @@ final class StrengthWorkoutStore: ObservableObject {
                     restSeconds: 0,
                     isWarmUp: block.phase == .warmup,
                     targetKind: timed ? .time : .reps,
-                    plannedDurationSeconds: block.durationSeconds.map {
-                        min(max(Int($0.rounded()), 15), 7_200)
+                    plannedDurationSeconds: block.durationSeconds.flatMap {
+                        guard $0.isFinite && $0 > 0 else { return nil }
+                        return Int(min(max($0.rounded(), 15), 7_200))
                     }
                 )
 
@@ -2438,7 +2439,9 @@ final class StrengthWorkoutStore: ObservableObject {
             // A distance-only workout cannot be executed using the
             // duration countdown; refuse it instead of silently skipping.
             guard runBlocks.allSatisfy({
-                $0.durationSeconds.map { $0.isFinite && $0 >= 15 } == true
+                $0.durationSeconds.map {
+                    $0.isFinite && (15...7_200).contains($0)
+                } == true
             }) else { return false }
 
             let snapshots = ExerciseSnapshot(
