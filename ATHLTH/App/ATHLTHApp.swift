@@ -3472,7 +3472,15 @@ struct AppRootView: View {
             strengthWorkout.activeWorkout,
             force: true
         )
-        await homeAssistant.syncWorkoutHistory(health.workouts)
+        // An empty HealthKit cache during app startup is not a genuine
+        // zero-workout history. Never erase previously synced data until
+        // HealthKit has finished a successful refresh, unless user revokes
+        // workout/history sharing.
+        if !homeAssistant.shareCompletedWorkouts ||
+            !homeAssistant.shareWorkoutHistory ||
+            (health.lastSuccessfulRefreshAt != nil && !health.isRefreshing) {
+            await homeAssistant.syncWorkoutHistory(health.workouts)
+        }
     }
 
     private func homeAssistantPlannedOccurrences()
