@@ -39,7 +39,8 @@ final class ATHLTHAzureWorkoutSpeech:
         let audioBase64: String
     }
 
-    private var audio: AVAudioPlayer?    private let audioOwner = "azure-\(UUID().uuidString)"
+    private var audio: AVAudioPlayer?
+    private let audioOwner = "azure-\(UUID().uuidString)"
 
     private var requestTask: Task<Void, Never>?
     private var timeoutTask: Task<Void, Never>?
