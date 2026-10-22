@@ -2034,6 +2034,8 @@ struct PerformanceStatsView: View {
 
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
+    @EnvironmentObject private var session: AppSessionStore
+    @State private var runningPerformances: [ATHLTHCompletedRunningPerformance] = []
     @State private var fetchedHealthRecords: [HealthPersonalRecord] = []
     @State private var performanceWorkoutHistory:
         [WorkoutSummary] = []
@@ -2097,6 +2099,7 @@ struct PerformanceStatsView: View {
             }
         }
         .task {
+            refreshStructuredRunningRecords()
             guard health.hasRequestedAuthorization
             else {
                 return
@@ -2122,7 +2125,66 @@ struct PerformanceStatsView: View {
                     ) ?? []
             }
         }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)
+        ) { _ in
+            refreshStructuredRunningRecords()
+        }
+        .onChange(of: session.profile.userID) { _, _ in
+            refreshStructuredRunningRecords()
+        }
     }
+
+    private func refreshStructuredRunningRecords() {
+        runningPerformances = ATHLTHRunningPerformanceHistory.load(
+            userID: session.profile.userID
+        )
+    }
+
+    private var bestFourByFour: ATHLTHFourByFourRecords.Result? {
+        ATHLTHFourByFourRecords.bestMeasured(runningPerformances)
+    }
+
+    private var reportedFourByFour: ATHLTHFourByFourRecords.Result? {
+        ATHLTHFourByFourRecords.bestReported(runningPerformances)
+    }
+
+    private func fourByFourItem(
+        _ result: ATHLTHFourByFourRecords.Result?,
+        reported: Bool
+    ) -> PerformanceMetricItem {
+        let name = reported
+            ? text("4 × 4 · reported pace", "4 × 4 · oppgitt fart")
+            : text("Fastest 4 × 4", "Raskeste 4 × 4")
+        guard let result else {
+            return PerformanceMetricItem(
+                icon: "figure.run.circle.fill",
+                title: name,
+                value: "—",
+                detail: text("No completed 4 × 4 yet", "Ingen fullført 4 × 4 ennå"),
+                tint: ATHLTHTheme.accentDeep
+            )
+        }
+        return PerformanceMetricItem(
+            icon: "figure.run.circle.fill",
+            title: name,
+            value: formatPace(result.averagePaceSecondsPerKilometer),
+            detail: "4 × 4 min · " + formatDate(result.date),
+            tint: ATHLTHTheme.accentDeep
+        )
+    }
+
+    private func fourByFourFastestEffortItem() -> PerformanceMetricItem? {
+        guard let result = bestFourByFour else { return nil }
+        return PerformanceMetricItem(
+            icon: "speedometer",
+            title: text("Best 4-minute effort", "Beste 4-minuttersdrag"),
+            value: formatPace(result.fastestEffortPaceSecondsPerKilometer),
+            detail: formatDate(result.date),
+            tint: ATHLTHTheme.accentDeep
+        )
+    }
+
 
     private var resolvedPerformanceWorkouts:
         [WorkoutSummary] {
