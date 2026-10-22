@@ -216,26 +216,10 @@ struct ActiveStrengthWorkoutView: View {
             }
             .sheet(isPresented: $showingAppendWorkout) {
                 ActiveHybridWorkoutPicker { session, startNow in
-                    let existingIDs = Set(
-                        strength.activeWorkout?.exercises.map(\.id) ?? []
+                    strength.appendWorkoutDuringSession(
+                        session,
+                        startNow: startNow
                     )
-                    guard strength.appendWorkoutDuringSession(session)
-                    else { return false }
-                    if startNow,
-                       let added = strength.activeWorkout?.exercises.first(where: {
-                           !existingIDs.contains($0.id)
-                       }) {
-                        // Explicit "start this part" closes a previous partial
-                        // timer with its actual elapsed time; nothing is lost.
-                        if strength.currentTimedSetCountdown?.isRunning == true {
-                            strength.completeCurrentDraftSet()
-                        }
-                        _ = strength.selectExerciseForNow(added.id)
-                        if added.isEmbeddedRunningInterval == true {
-                            strength.startOrResumeTimedSet()
-                        }
-                    }
-                    return true
                 }
                 .environmentObject(appSession)
                 .environmentObject(runningWorkoutLibrary)
@@ -1761,6 +1745,44 @@ struct ActiveStrengthWorkoutView: View {
         VStack(spacing: 14) {
             focusedWorkoutStatus(
                 workout
+            )
+
+            HStack(spacing: 9) {
+                Image(systemName: exercise.isEmbeddedRunningInterval == true
+                      ? "figure.run" : "dumbbell.fill")
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Text(exercise.isEmbeddedRunningInterval == true
+                     ? ATHLTHLocalization.choose(
+                        english: "Treadmill mode",
+                        norwegian: "Møllemodus"
+                     )
+                     : ATHLTHLocalization.choose(
+                        english: "Strength mode",
+                        norwegian: "Styrkemodus"
+                     ))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                Spacer(minLength: 2)
+                Button {
+                    showingAppendWorkout = true
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Add / switch workout",
+                            norwegian: "Legg til / bytt økt"
+                        ),
+                        systemImage: "arrow.left.arrow.right"
+                    )
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(minHeight: 44)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 12)
+            .background(
+                ATHLTHTheme.champagneSoft.opacity(0.55),
+                in: RoundedRectangle(cornerRadius: 16)
             )
 
             if workoutComplete {
