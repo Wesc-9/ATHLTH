@@ -11,6 +11,7 @@ struct WatchStrengthTimedSetPage: View {
     }
 
     private func isRunningSegment(_ snapshot: WatchStrengthSessionSnapshot) -> Bool {
+        if snapshot.isEmbeddedRunningInterval == true { return true }
         if snapshot.manualTreadmillSpeedKilometersPerHour != nil ||
            snapshot.manualTreadmillInclinePercent != nil {
             return true
@@ -22,6 +23,16 @@ struct WatchStrengthTimedSetPage: View {
         return ["running", "treadmill", "jogging", "run interval",
                 "loping", "lop", "molle", "walking", "power walk"]
             .contains(where: name.contains)
+    }
+
+    private func runningPhaseLabel(_ phase: String?) -> String {
+        switch phase?.lowercased() {
+        case "warmup": return tr("WARM-UP", "OPPVARMING")
+        case "work", "effort", "interval": return tr("WORK INTERVAL", "HOVEDDRAG")
+        case "recovery", "rest": return tr("RECOVERY", "PAUSE")
+        case "cooldown": return tr("COOL-DOWN", "NEDJOGGING")
+        default: return tr("RUNNING", "LØPING")
+        }
     }
 
     var body: some View {
@@ -48,7 +59,7 @@ struct WatchStrengthTimedSetPage: View {
                                 ? "figure.run" : "timer")
                                 .foregroundStyle(WatchTheme.premiumGold)
                             Text(isRunning
-                                 ? tr("RUNNING", "LØPING")
+                                 ? runningPhaseLabel(session.embeddedRunningPhaseKind)
                                  : session.isWarmUp == true
                                    ? tr("WARM-UP", "OPPVARMING")
                                    : tr("TIMED EXERCISE", "TIDSØVELSE"))
@@ -62,7 +73,8 @@ struct WatchStrengthTimedSetPage: View {
                                 .foregroundStyle(WatchTheme.textSecondary)
                         }
 
-                        Text(session.exerciseName ?? session.title)
+                        Text(session.embeddedRunningPhaseTitle ??
+                             session.exerciseName ?? session.title)
                             .font(.system(size: compact ? 11 : 12, weight: .semibold))
                             .foregroundStyle(WatchTheme.textPrimary)
                             .lineLimit(1)
