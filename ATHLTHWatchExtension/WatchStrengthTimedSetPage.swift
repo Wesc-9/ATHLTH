@@ -101,7 +101,9 @@ struct WatchStrengthTimedSetPage: View {
                                     .font(.system(size: 12, weight: .bold))
                                     .monospacedDigit()
                                     .foregroundStyle(WatchTheme.liveHeart)
-                                Text("bpm")
+                                Text(session.embeddedRunningTargetHeartRateZone.map {
+                                    tr("TARGET Z", "MÅL S") + "\($0)"
+                                } ?? "bpm")
                                     .font(.system(size: 8, weight: .medium))
                                     .foregroundStyle(WatchTheme.textSecondary)
                             }
