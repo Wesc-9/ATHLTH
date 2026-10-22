@@ -7,6 +7,7 @@ struct ActiveHybridWorkoutPicker: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
 
+    var runningOnly = false
     let onAppend: (PlannedSession, Bool) -> Bool
 
     @State private var unsupportedMessage: String?
@@ -20,6 +21,7 @@ struct ActiveHybridWorkoutPicker: View {
         var seen = Set<UUID>()
         return all.filter {
             seen.insert($0.id).inserted &&
+            (!runningOnly || $0.runningWorkout != nil) &&
             !$0.isExplicitRestDay &&
             (!$0.exercises.isEmpty ||
              !$0.resolvedWorkoutBlocks.isEmpty ||
@@ -71,19 +73,31 @@ struct ActiveHybridWorkoutPicker: View {
                             .foregroundStyle(ATHLTHTheme.premiumGold)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(ATHLTHLocalization.choose(
-                                english: "One recording, multiple workout parts",
-                                norwegian: "Én registrering, flere treningsdeler"
+                                english: runningOnly
+                                    ? "Add intervals, keep your recording"
+                                    : "One recording, multiple workout parts",
+                                norwegian: runningOnly
+                                    ? "Legg til intervaller i samme økt"
+                                    : "Én registrering, flere treningsdeler"
                             ))
                             .font(.subheadline.weight(.semibold))
                             Text(ATHLTHLocalization.choose(
-                                english: "Add a saved session or a treadmill interval. Existing sets and Apple Watch measurements are preserved.",
-                                norwegian: "Legg til en lagret økt eller mølleintervaller. Settene og Apple Watch-målingene beholdes."
+                                english: runningOnly
+                                    ? "Append a running interval program without stopping your current Apple Watch or iPhone recording."
+                                    : "Add a saved session or a treadmill interval. Existing sets and Apple Watch measurements are preserved.",
+                                norwegian: runningOnly
+                                    ? "Legg til en intervalløkt uten å stoppe det pågående opptaket fra Apple Watch eller iPhone."
+                                    : "Legg til en lagret økt eller mølleintervaller. Settene og Apple Watch-målingene beholdes."
                             ))
                             .font(.caption)
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                             Text(ATHLTHLocalization.choose(
-                                english: "Starting another part saves elapsed time in any active timed set. Existing completed sets and the Watch recording stay intact.",
-                                norwegian: "Starter du en annen del, lagres faktisk tid i et pågående tidssett. Ferdige sett og klokkeopptaket beholdes."
+                                english: runningOnly
+                                    ? "If intervals are in progress, queue the next program rather than restarting the current one."
+                                    : "Starting another part saves elapsed time in any active timed set. Existing completed sets and the Watch recording stay intact.",
+                                norwegian: runningOnly
+                                    ? "Hvis intervaller allerede pågår, legger du neste program i kø i stedet for å avbryte det aktive."
+                                    : "Starter du en annen del, lagres faktisk tid i et pågående tidssett. Ferdige sett og klokkeopptaket beholdes."
                             ))
                             .font(.caption2)
                             .foregroundStyle(ATHLTHPlanDesign.accentInk)
@@ -165,8 +179,12 @@ struct ActiveHybridWorkoutPicker: View {
             dismiss()
         } else {
             unsupportedMessage = ATHLTHLocalization.choose(
-                english: "This workout has no supported exercises or time-based running phases. Distance-only GPS workouts need a separate outdoor recording.",
-                norwegian: "Økten har ingen støttede øvelser eller tidsstyrte løpefaser. Distansebasert GPS-løping må fortsatt registreres separat."
+                english: runningOnly
+                    ? "This interval could not be added right now. If another interval is running, choose Queue. If no interval is running, choose Start this part. Strength additions require the hybrid strength session."
+                    : "This workout has no supported exercises or time-based running phases. Distance-only GPS workouts need a separate outdoor recording.",
+                norwegian: runningOnly
+                    ? "Intervalløkten kunne ikke legges til nå. Hvis et intervall pågår, velg Legg til senere. Ellers velger du Start denne delen. Styrkedeler må legges til fra hybrid styrkeøkt."
+                    : "Økten har ingen støttede øvelser eller tidsstyrte løpefaser. Distansebasert GPS-løping må fortsatt registreres separat."
             )
         }
     }
