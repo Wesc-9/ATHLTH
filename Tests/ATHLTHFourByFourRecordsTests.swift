@@ -68,6 +68,14 @@ final class ATHLTHFourByFourRecordsTests: XCTestCase {
         XCTAssertNil(result(phases))
     }
 
+    func testARecoveryOrUnknownPhaseCannotCountAsAnInterval() {
+        var phases = standard()
+        phases[3].phase = "steady"
+        XCTAssertNil(result(phases))
+        phases[3].phase = "recovery"
+        XCTAssertNil(result(phases))
+    }
+
     func testManualTreadmillPaceRemainsExplicitlyReported() throws {
         var phases = standard()
         phases[1].isUserReported = true
