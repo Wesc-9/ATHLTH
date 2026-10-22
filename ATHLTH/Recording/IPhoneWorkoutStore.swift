@@ -1560,12 +1560,9 @@ final class IPhoneWorkoutStore:
         // Emit completion only after the Health save attempt has settled so
         // downstream Goals, Challenges and the review all see the final
         // HealthKit workout identity when one is available.
-        lastCompletedWorkout =
-            history.first(
-                where: {
-                    $0.id == workout.id
-                }
-            ) ?? workout
+        let finalWorkout = history.first(where: { $0.id == workout.id }) ?? workout
+        ATHLTHRunningPerformanceHistory.savePhone(finalWorkout, userID: userID)
+        lastCompletedWorkout = finalWorkout
     }
 
     func retryHealthSave(_ workout: PhoneWorkout) async {
