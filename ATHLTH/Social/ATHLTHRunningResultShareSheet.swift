@@ -13,6 +13,7 @@ struct ATHLTHRunningResultShareSheet: View {
     let elevationGainMeters: Double?
     let rawRoute: [CLLocation]
     let highlights: [ATHLTHRunningResultInsights.KilometerSplit]
+    var intervalPerformance: ATHLTHCompletedRunningPerformance? = nil
 
     @State private var includeRoute = false
     @State private var hideStartAndEnd = true
@@ -189,10 +190,22 @@ struct ATHLTHRunningResultShareSheet: View {
                     .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
-            Text(tr("RUNNING RESULT", "LØPERESULTAT"))
+            Text(intervalPerformance == nil
+                ? tr("RUNNING RESULT", "LØPERESULTAT")
+                : tr("INTERVAL RESULT", "INTERVALLRESULTAT"))
                 .font(.caption2.weight(.bold))
                 .tracking(2)
                 .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            if let intervalPerformance {
+                Text(intervalPerformance.title)
+                    .font(.system(size: 25, weight: .semibold, design: .serif))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                Label("\(intervalPerformance.workSteps.count) " +
+                      tr("completed efforts", "fullførte drag"),
+                      systemImage: "checkmark.seal.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            }
             Text(distance)
                 .font(.system(size: 43, weight: .semibold, design: .serif))
                 .foregroundStyle(ATHLTHPlanDesign.ink)
@@ -203,6 +216,39 @@ struct ATHLTHRunningResultShareSheet: View {
                 shareValue(tr("Time", "Tid"), duration)
                 shareValue(tr("Pace", "Tempo"), pace)
                 if let heartRate { shareValue(tr("Avg HR", "Snittpuls"), heartRate) }
+            }
+            if let intervalPerformance {
+                let efforts = intervalPerformance.workSteps.sorted {
+                    $0.index < $1.index
+                }
+                if let kmh = intervalPerformance.averageWorkSpeed {
+                    shareValue(tr("Average effort speed", "Snittfart i drag"),
+                               String(format: "%.1f km/t", kmh))
+                }
+                HStack(spacing: 7) {
+                    ForEach(Array(efforts.enumerated()), id: \.offset) { number, effort in
+                        VStack(spacing: 3) {
+                            Text(tr("Effort", "Drag") + " \(number + 1)")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            Text(effort.actualSpeedKilometersPerHour.map {
+                                String(format: "%.1f", $0)
+                            } ?? "—")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                                .monospacedDigit()
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(ATHLTHPlanDesign.selectedSurface,
+                                    in: RoundedRectangle(cornerRadius: 9))
+                    }
+                }
+                Text(intervalPerformance.userReported
+                     ? tr("Treadmill speeds may be manually entered or estimated.",
+                          "Møllefart kan være manuelt oppgitt eller estimert.")
+                     : tr("Recorded effort speeds", "Registrert fart per drag"))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
             if let gain = elevationGainMeters, gain.isFinite, gain >= 5 {
                 Label("\(Int(gain.rounded())) " + tr("m elevation gain", "høydemeter"),
