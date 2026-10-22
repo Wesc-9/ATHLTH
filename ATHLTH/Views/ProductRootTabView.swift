@@ -98,6 +98,7 @@ struct ProductRootTabView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
+    @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var notifications:
         ATHLTHNotificationStore
     @EnvironmentObject private var messaging:
@@ -472,10 +473,31 @@ struct ProductRootTabView: View {
                     )
                 }
 
+                if let workout = strengthWorkout.activeWorkout {
+                    ATHLTHMinimizedWorkoutReturnPill(
+                        title: ATHLTHLocalization.choose(
+                            english: "Return to strength workout",
+                            norwegian: "Tilbake til styrkeøkten"
+                        ),
+                        systemImage: "dumbbell.fill",
+                        detail: workout.title
+                    ) {
+                        // Reuse the existing Train presenter instead of
+                        // creating a new recording or competing full-screen
+                        // presentation over Home/Community.
+                        trainNavigationRequest = .quick(.strength)
+                        selectedTab = 1
+                    }
+                    .transition(
+                        .move(edge: .top).combined(with: .opacity)
+                    )
+                }
+
                 if workoutMirroring
                         .hasActiveMirroredWorkout,
                    workoutMirroring
-                        .isUserMinimized {
+                        .isUserMinimized,
+                   strengthWorkout.activeWorkout == nil {
                     ATHLTHMinimizedWorkoutReturnPill(
                         title: ATHLTHLocalization.choose(
                             english: "Return to Apple Watch workout",
