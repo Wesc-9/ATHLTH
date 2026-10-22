@@ -1005,18 +1005,19 @@ private struct IPhoneStructuredStepCard: View {
                                         .font(.subheadline.weight(.semibold))
                                     }
 
-                                    if let next =
-                                        recorder
-                                            .nextStructuredStep {
+                                    if step.phase == "warmup" || step.phase == "cooldown" ||
+                                       workout.structuredRunningWorkout?.autoAdvanceTimedSteps == false {
                                         HStack(spacing: 12) {
-                                            Label(
-                                                ATHLTHLocalization.choose(
-                                                    english: "Next", norwegian: "Neste"
-                                                ) + ": \(next.title)",
-                                                systemImage: "arrow.right.circle.fill"
-                                            )
-                                            .font(.caption.weight(.semibold))
-                                            .lineLimit(2)
+                                            if let next = recorder.nextStructuredStep {
+                                                Label(
+                                                    ATHLTHLocalization.choose(
+                                                        english: "Next", norwegian: "Neste"
+                                                    ) + ": \(next.title)",
+                                                    systemImage: "arrow.right.circle.fill"
+                                                )
+                                                .font(.caption.weight(.semibold))
+                                                .lineLimit(2)
+                                            }
                                             Spacer(minLength: 6)
                                             Button {
                                                 recorder.advanceStructuredStepManually()
