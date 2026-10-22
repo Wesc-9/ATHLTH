@@ -29,7 +29,7 @@ struct WatchRunWorkoutExperienceView: View {
     }
 
     private var secondaryLiveText: Color {
-        Color.white.opacity(strongContrast ? 0.96 : 0.77)
+        WatchTheme.textSecondary
     }
 
     @State private var coachOutputName: String?
@@ -1815,7 +1815,7 @@ struct WatchRunWorkoutExperienceView: View {
                 HStack(spacing: 5) {
                     Image(systemName: "figure.run")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(WatchTheme.liveLime)
+                        .foregroundStyle(WatchTheme.premiumGold)
 
                     Text(workoutManager.kind == .walking
                         ? ATHLTHLocalization.choose(
@@ -1826,7 +1826,7 @@ struct WatchRunWorkoutExperienceView: View {
                         ))
                         .font(.system(size: 10, weight: .heavy))
                         .tracking(1)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(WatchTheme.textPrimary)
 
                     Spacer(minLength: 2)
 
@@ -1838,9 +1838,7 @@ struct WatchRunWorkoutExperienceView: View {
                          workoutManager.automaticPauseActive
                          ? "PAUSE" : "LIVE")
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(
-                            Color.white.opacity(0.82)
-                        )
+                        .foregroundStyle(WatchTheme.textSecondary)
                 }
 
                 if workoutManager.currentStructuredRunningStep != nil {
@@ -1858,7 +1856,7 @@ struct WatchRunWorkoutExperienceView: View {
                     Text(liveWorkoutStepTitle)
                         .font(.system(size: compact ? 10 : 11,
                                       weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.72))
+                        .foregroundStyle(WatchTheme.textSecondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                 }
@@ -1871,7 +1869,7 @@ struct WatchRunWorkoutExperienceView: View {
                         ),
                         value: distanceKilometersText,
                         unit: "km",
-                        tint: WatchTheme.liveCyan,
+                        tint: WatchTheme.accentDeep,
                         fontSize: compact ? 35 : 42
                     )
 
@@ -1881,7 +1879,7 @@ struct WatchRunWorkoutExperienceView: View {
                             : ATHLTHLocalization.choose(english: "PACE", norwegian: "TEMPO"),
                         value: paceText(liveDisplayedPace),
                         unit: "/km",
-                        tint: WatchTheme.liveLime,
+                        tint: WatchTheme.premiumGold,
                         fontSize: compact ? 31 : 37
                     )
                 } else {
@@ -1892,7 +1890,7 @@ struct WatchRunWorkoutExperienceView: View {
                             : ATHLTHLocalization.choose(english: "PACE", norwegian: "TEMPO"),
                         value: paceText(liveDisplayedPace),
                         unit: "/km",
-                        tint: WatchTheme.liveLime,
+                        tint: WatchTheme.premiumGold,
                         fontSize: compact ? 35 : 42
                     )
 
@@ -1902,28 +1900,44 @@ struct WatchRunWorkoutExperienceView: View {
                         ),
                         value: distanceKilometersText,
                         unit: "km",
-                        tint: WatchTheme.liveCyan,
+                        tint: WatchTheme.accentDeep,
                         fontSize: compact ? 31 : 37
                     )
                 }
 
                 Spacer(minLength: 0)
 
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
                     Label(
                         durationText(workoutManager.elapsedTime),
                         systemImage: "clock"
                     )
-                    .foregroundStyle(Color.white.opacity(strongContrast ? 1 : 0.88))
-                    Spacer(minLength: 4)
-                    Label(heartRateText, systemImage: "heart.fill")
-                        .foregroundStyle(WatchTheme.liveHeart)
+                    .font(.system(size: compact ? 11 : 12, weight: .semibold))
+                    .foregroundStyle(WatchTheme.textSecondary)
+
+                    Spacer(minLength: 2)
+
+                    Label(
+                        workoutManager.hasFreshHeartRate
+                          ? heartRateText : "—",
+                        systemImage: "heart.fill"
+                    )
+                    .font(.system(size: compact ? 12 : 13, weight: .bold))
+                    .foregroundStyle(WatchTheme.liveHeart)
+
+                    if let zone = workoutManager.currentStructuredRunningStep?
+                        .targetHeartRateZone ??
+                        workoutManager.targetAlertConfiguration?.heartRateZone {
+                        Text(ATHLTHLocalization.choose(
+                            english: "TARGET Z", norwegian: "MÅL S"
+                        ) + "\(zone)")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(WatchTheme.accentDeep)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 4)
+                        .background(WatchTheme.planSelected, in: Capsule())
+                    }
                 }
-                .font(.system(
-                    size: compact ? 12 : 13,
-                    weight: .semibold,
-                    design: .rounded
-                ))
                 .monospacedDigit()
                 .lineLimit(1)
             }
@@ -1934,9 +1948,9 @@ struct WatchRunWorkoutExperienceView: View {
                 height: viewport.size.height,
                 alignment: .topLeading
             )
-            .background(WatchTheme.liveCanvas)
+            .background(WatchTheme.canvas)
         }
-        .background(WatchTheme.liveCanvas.ignoresSafeArea())
+        .background(WatchTheme.canvas.ignoresSafeArea())
     }
 
     /// One scan-friendly line replaces the workout subtitle during a duel.
@@ -1982,7 +1996,7 @@ struct WatchRunWorkoutExperienceView: View {
             }
             .font(.system(size: 10, weight: .bold))
             .foregroundStyle(signal == .live
-                ? WatchTheme.liveLime : Color.orange)
+                ? WatchTheme.accentDeep : WatchTheme.warning)
             .lineLimit(1)
             .minimumScaleFactor(0.74)
         }
@@ -2023,7 +2037,7 @@ struct WatchRunWorkoutExperienceView: View {
                 Text(title)
                     .font(.system(size: 8, weight: .bold))
                     .tracking(0.8)
-                    .foregroundStyle(tint)
+                    .foregroundStyle(WatchTheme.accentDeep)
 
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(value)
@@ -2033,7 +2047,7 @@ struct WatchRunWorkoutExperienceView: View {
                             design: .rounded
                         ))
                         .monospacedDigit()
-                        .foregroundStyle(.white)
+                        .foregroundStyle(WatchTheme.textPrimary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.65)
 
@@ -2048,12 +2062,12 @@ struct WatchRunWorkoutExperienceView: View {
         .padding(.vertical, 3)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            tint.opacity(0.11),
+            WatchTheme.planSelected,
             in: RoundedRectangle(cornerRadius: 13, style: .continuous)
         )
         .overlay {
             RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .stroke(tint.opacity(0.35), lineWidth: 0.8)
+                .stroke(WatchTheme.planBorder, lineWidth: 0.8)
         }
     }
 
