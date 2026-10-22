@@ -231,6 +231,9 @@ struct ActiveStrengthWorkoutView: View {
                             strength.completeCurrentDraftSet()
                         }
                         _ = strength.selectExerciseForNow(added.id)
+                        if added.isEmbeddedRunningInterval == true {
+                            strength.startOrResumeTimedSet()
+                        }
                     }
                     return true
                 }
