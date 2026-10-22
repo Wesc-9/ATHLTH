@@ -346,6 +346,7 @@ struct RunningWorkoutDetailView: View {
 
     @State private var showingDelete = false
     @State private var showingIntervalEditor = false
+    @State private var editingBeforeStart = false
 
     var body: some View {
         ScrollView {
@@ -364,6 +365,22 @@ struct RunningWorkoutDetailView: View {
 
                 if let onStart {
                     Button {
+                        editingBeforeStart = true
+                        showingIntervalEditor = true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Adjust workout before starting",
+                                norwegian: "Tilpass økten før start"
+                            ),
+                            systemImage: "slider.horizontal.3"
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(ATHLTHTheme.accentDeep)
+
+                    Button {
                         onStart(workout)
                         dismiss()
                     } label: {
@@ -376,6 +393,7 @@ struct RunningWorkoutDetailView: View {
                 }
 
                 Button {
+                        editingBeforeStart = false
                         showingIntervalEditor = true
                     } label: {
                         Label(
@@ -439,10 +457,14 @@ struct RunningWorkoutDetailView: View {
         }
         .sheet(isPresented: $showingIntervalEditor) {
             ATHLTHTrainIntervalComposerView(initial: workout) { edited in
-                library.save(edited)
-                onSelect?(edited)
-                // The detail held a snapshot of the old workout. Return to
-                // the refreshed library after saving to avoid showing stale data.
+                if editingBeforeStart, let onStart {
+                    // Run the athlete's edited copy without overwriting the
+                    // official library recipe or its leaderboard identity.
+                    onStart(edited)
+                } else {
+                    library.save(edited)
+                    onSelect?(edited)
+                }
                 dismiss()
             }
         }
