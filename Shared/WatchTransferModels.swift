@@ -898,6 +898,8 @@ struct WatchRunningWorkoutStep: Identifiable, Codable, Hashable {
     /// Work, recovery, warmup, or cooldown. Optional for older transfers.
     var phase: String? = nil
     var targetHeartRateZone: Int? = nil
+    /// Planned belt incline; not a measured workout metric.
+    var targetTreadmillInclinePercent: Double? = nil
     var ghostPaceSecondsPerKilometer: Double? = nil
     /// Optional on old Watch transfers. In recovery the pacer follows actual
     /// reduced speed without imposing a work-pace target.
@@ -1014,6 +1016,8 @@ struct WatchRunningWorkoutTransfer: Codable, Hashable {
     var autoPauseEnabled: Bool? = nil
     /// Automatic timed-step progression is the existing default for old plans.
     var autoAdvanceTimedSteps: Bool? = nil
+    var intervalCoachCueEverySeconds: TimeInterval? = nil
+    var intervalCoachCountdownSeconds: TimeInterval? = nil
 }
 
 
