@@ -70,8 +70,27 @@ struct WatchRunIntervalFocusPage: View {
                         }
 
                         if let progress = readout.progress {
+                            Text(ATHLTHLocalization.choose(
+                                english: "THIS PHASE", norwegian: "DENNE DELEN"
+                            ))
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(WatchTheme.textSecondary)
                             ProgressView(value: progress)
                                 .tint(WatchTheme.liveAction)
+                            if let structured = workout.structuredRunningWorkout {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "TOTAL WORKOUT", norwegian: "HELE ØKTEN"
+                                ))
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(WatchTheme.textSecondary)
+                                .padding(.top, 3)
+                                ProgressView(value: overallProgress(
+                                    steps: structured.steps,
+                                    index: workout.structuredStepIndex,
+                                    current: progress
+                                ))
+                                .tint(WatchTheme.accentDeep)
+                            }
                         }
                     }
                     .padding(10)
@@ -101,17 +120,10 @@ struct WatchRunIntervalFocusPage: View {
                         .watchSurface(radius: 15)
                     }
 
-                    // The interval page prioritizes the three metrics a
-                    // runner needs at a glance: remaining, pulse and pace.
+                    // A single, high-contrast pulse surface: current pulse
+                    // is measured; coloured segments indicate target zone only.
                     HStack(spacing: 8) {
-                        metric(
-                            title: ATHLTHLocalization.choose(
-                                english: "HEART RATE", norwegian: "PULS"
-                            ),
-                            value: workout.heartRate > 0
-                                ? "\(Int(workout.heartRate.rounded())) bpm"
-                                : "—"
-                        )
+                        heartRateCard(targetZone: step.targetHeartRateZone)
                         metric(
                             title: ATHLTHLocalization.choose(
                                 english: "CURRENT PACE", norwegian: "TEMPO NÅ"
@@ -122,16 +134,20 @@ struct WatchRunIntervalFocusPage: View {
                         )
                     }
 
-                    if let zone = step.targetHeartRateZone {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Target heart-rate zone",
-                                norwegian: "Målsone for puls"
-                            ) + " \(zone)",
-                            systemImage: "heart.fill"
-                        )
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(WatchTheme.textSecondary)
+                    if let incline = step.targetTreadmillInclinePercent,
+                       incline.isFinite, (0...15).contains(incline) {
+                        HStack {
+                            Label(ATHLTHLocalization.choose(
+                                english: "PLANNED INCLINE", norwegian: "PLANLAGT STIGNING"
+                            ), systemImage: "mountain.2")
+                                .font(.system(size: 9, weight: .semibold))
+                            Spacer()
+                            Text(String(format: "%.1f %%", incline))
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                        }
+                        .padding(10)
+                        .watchSurface(radius: 15)
                     }
 
                     if let lead = ATHLTHIntervalGhostPacer.leadMeters(
@@ -197,14 +213,17 @@ struct WatchRunIntervalFocusPage: View {
                     }
 
                     if let workoutPlan = workout.structuredRunningWorkout,
-                       workoutPlan.autoAdvanceTimedSteps == false,
-                       workout.state == .running,
-                       workout.nextStructuredRunningStep != nil {
+                       (step.phase == "warmup" || step.phase == "cooldown" ||
+                        workoutPlan.autoAdvanceTimedSteps == false),
+                       workout.state == .running {
                         Button {
                             workout.advanceStructuredRunningWorkoutManually()
                         } label: {
                             Label(ATHLTHLocalization.choose(
-                                english: "Done / Next", norwegian: "Ferdig / Neste"
+                                english: workout.nextStructuredRunningStep == nil
+                                    ? "Finish phase" : "Next phase",
+                                norwegian: workout.nextStructuredRunningStep == nil
+                                    ? "Avslutt del" : "Neste del"
                             ), systemImage: "arrow.right.circle.fill")
                                 .font(.system(size: 13, weight: .bold))
                                 .frame(maxWidth: .infinity, minHeight: 42)
@@ -231,6 +250,63 @@ struct WatchRunIntervalFocusPage: View {
         }
         .scrollIndicators(.hidden)
         .background(WatchTheme.canvas.ignoresSafeArea())
+    }
+
+    private func overallProgress(
+        steps: [WatchRunningWorkoutStep],
+        index: Int,
+        current: Double
+    ) -> Double {
+        guard !steps.isEmpty else { return 0 }
+        let weights = steps.map { step -> Double in
+            let estimate = step.durationSeconds ??
+                step.distanceMeters.map {
+                    ($0 / 1_000) *
+                    (step.targetPaceMinSecondsPerKilometer ?? 360)
+                } ?? 60
+            return estimate.isFinite ? max(estimate, 15) : 60
+        }
+        let total = weights.reduce(0, +)
+        guard total > 0 else { return 0 }
+        let done = weights.prefix(max(0, min(index, weights.count))).reduce(0, +)
+        let this = weights.indices.contains(index) ? weights[index] : 0
+        return min(max((done + this * min(max(current, 0), 1)) / total, 0), 1)
+    }
+
+    private func heartRateCard(targetZone: Int?) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Label(ATHLTHLocalization.choose(
+                english: "PULSE", norwegian: "PULS"
+            ), systemImage: "heart.fill")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(WatchTheme.liveHeart)
+            Text(workout.hasFreshHeartRate && workout.heartRate > 0
+                 ? "\(Int(workout.heartRate.rounded()))" : "—")
+                .font(.system(size: 26, weight: .bold, design: .rounded))
+                .monospacedDigit()
+            if let zone = targetZone, (1...5).contains(zone) {
+                Text(ATHLTHLocalization.choose(
+                    english: "TARGET ZONE", norwegian: "MÅLSONE"
+                ) + " \(zone)")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(WatchTheme.textSecondary)
+                HStack(spacing: 3) {
+                    ForEach(1...5, id: \.self) { number in
+                        Capsule()
+                            .fill(number == zone
+                                  ? WatchTheme.liveHeart : WatchTheme.border)
+                            .frame(height: 5)
+                    }
+                }
+            } else {
+                Text("bpm")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(WatchTheme.textSecondary)
+            }
+        }
+        .padding(9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .watchSurface(radius: 14)
     }
 
     private func accessibleRemaining(
