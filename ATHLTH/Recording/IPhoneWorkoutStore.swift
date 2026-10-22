@@ -2165,13 +2165,13 @@ final class IPhoneWorkoutStore:
               workout.resumedAt != nil else { return false }
 
         let addition = watchRunningWorkoutTransfer(from: template)
-        guard !addition.steps.isEmpty else { return false }
-
         let existing = workout.structuredRunningWorkout
         let existingComplete = workout.structuredWorkoutComplete == true
-        if startNow && existing != nil && !existingComplete {
-            return false
-        }
+        guard ATHLTHRunningWorkoutAppendPolicy.canAppend(
+            hasInProgressStructuredSteps: existing != nil && !existingComplete,
+            startNow: startNow,
+            steps: addition.steps
+        ) else { return false }
 
         let priorCount = existing?.steps.count ?? 0
         if var current = existing {
