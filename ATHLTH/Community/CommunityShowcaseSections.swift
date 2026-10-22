@@ -3015,7 +3015,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
     }
 }
 
-private struct CommunityShowcaseAvatar: View {
+struct CommunityShowcaseAvatar: View {
     let url: URL?
     let fallback: String
     let size: CGFloat
