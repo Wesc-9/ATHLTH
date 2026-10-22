@@ -132,6 +132,24 @@ struct ActiveStrengthWorkoutView: View {
             )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if strength.activeWorkout?.exercises.isEmpty == false {
+                        Button {
+                            showingExerciseQueue = true
+                        } label: {
+                            Image(systemName: "list.number")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                .frame(width: 40, height: 40)
+                                .background(ATHLTHTheme.champagneSoft, in: Circle())
+                        }
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Exercises and order",
+                            norwegian: "Øvelser og rekkefølge"
+                        ))
+                    }
+                }
+
                 ToolbarItemGroup(
                     placement:
                         .topBarTrailing
@@ -1691,187 +1709,6 @@ struct ActiveStrengthWorkoutView: View {
                 workout
             )
 
-            Button {
-                showingExerciseQueue = true
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "list.bullet")
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Exercises & order",
-                            norwegian: "Øvelser og rekkefølge"
-                        )
-                    )
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
-                }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.accentDeep)
-                .padding(.horizontal, 14)
-                .frame(minHeight: 42)
-                .background(
-                    .ultraThinMaterial,
-                    in: RoundedRectangle(cornerRadius: 15)
-                )
-            }
-            .buttonStyle(.plain)
-
-            if !strength.currentExerciseAllSetsCompleted,
-               let upcoming = strength.nextPendingExercise {
-                DisclosureGroup(
-                    isExpanded: $showingNextExerciseDetails
-                ) {
-                    VStack(alignment: .leading, spacing: 9) {
-                        Text(upcoming.exercise.displayName)
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(ATHLTHPlanDesign.ink)
-                        Text(ATHLTHLocalization.choose(
-                            english: "\(upcoming.sets.count) planned sets · \(upcoming.sets.first?.plannedDurationSeconds.map { "\($0 / 60) min" } ?? "\(upcoming.sets.first?.plannedReps ?? 0) reps")",
-                            norwegian: "\(upcoming.sets.count) planlagte sett · \(upcoming.sets.first?.plannedDurationSeconds.map { "\($0 / 60) min" } ?? "\(upcoming.sets.first?.plannedReps ?? 0) reps")"
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        if !upcoming.exercise.primaryMuscles.isEmpty {
-                            Label(
-                                upcoming.exercise.primaryMuscles.joined(separator: " · "),
-                                systemImage: "figure.strengthtraining.traditional"
-                            )
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        }
-                        VStack(spacing: 0) {
-                            ForEach(Array(upcoming.sets.prefix(6))) { plannedSet in
-                                HStack(spacing: 8) {
-                                    Text(ATHLTHLocalization.choose(
-                                        english: "Set \(plannedSet.setNumber)",
-                                        norwegian: "Sett \(plannedSet.setNumber)"
-                                    ))
-                                    .fontWeight(.semibold)
-                                    Spacer(minLength: 4)
-                                    Text(
-                                        plannedSet.resolvedTargetKind == .time
-                                            ? TimeInterval(plannedSet.plannedDurationSeconds ?? 0).clockDuration
-                                            : "\(plannedSet.plannedReps ?? 0) reps"
-                                    )
-                                    .monospacedDigit()
-                                    if let weight = plannedSet.plannedWeightKilograms {
-                                        Text(String(format: "· %.1f kg", weight))
-                                    } else if let level = plannedSet.plannedResistanceLevel {
-                                        Text("· L\(level)")
-                                    }
-                                }
-                                .font(.caption)
-                                .foregroundStyle(ATHLTHPlanDesign.ink)
-                                .padding(.vertical, 8)
-                                .padding(.horizontal, 10)
-                                if plannedSet.id != upcoming.sets.prefix(6).last?.id {
-                                    Divider().padding(.horizontal, 10)
-                                }
-                            }
-                        }
-                        .background(
-                            ATHLTHPlanDesign.surface,
-                            in: RoundedRectangle(cornerRadius: 12)
-                        )
-                        if upcoming.sets.count > 6 {
-                            Text(ATHLTHLocalization.choose(
-                                english: "+\(upcoming.sets.count - 6) additional sets available when you open the exercise",
-                                norwegian: "+\(upcoming.sets.count - 6) flere sett vises når du åpner øvelsen"
-                            ))
-                            .font(.caption2)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        }
-                        if let rest = upcoming.sets.first?.restSeconds {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Planned rest: \(rest)s",
-                                    norwegian: "Planlagt pause: \(rest)s"
-                                ),
-                                systemImage: "timer"
-                            )
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        }
-                        if let note = upcoming.exercise.instructions.first, !note.isEmpty {
-                            Text(note)
-                                .font(.caption2)
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                .lineLimit(3)
-                        }
-                        Text(ATHLTHLocalization.choose(
-                            english: "You can open the next exercise without marking this one complete.",
-                            norwegian: "Du kan åpne neste øvelse uten å fullføre denne."
-                        ))
-                        .font(.caption2)
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        Button {
-                            if strength.selectExerciseForNow(upcoming.id) {
-                                showingNextExerciseDetails = false
-                            }
-                        } label: {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Open exercise",
-                                    norwegian: "Åpne øvelsen"
-                                ),
-                                systemImage: "arrow.right"
-                            )
-                            .frame(maxWidth: .infinity, minHeight: 42)
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(ATHLTHPlanDesign.accentInk)
-                    }
-                    .padding(.top, 10)
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Next exercise",
-                            norwegian: "Neste øvelse"
-                        ) + ": " + upcoming.exercise.displayName,
-                        systemImage: "arrow.turn.down.right"
-                    )
-                    .lineLimit(1)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                }
-                .padding(14)
-                .background(ATHLTHPlanDesign.warmSurface,
-                            in: RoundedRectangle(cornerRadius: 17))
-            }
-
-            if workoutComplete || workout.plannedTrainingPlace != nil {
-                Button {
-                    showingTrainingPlacePicker = true
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "mappin.and.ellipse")
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Training place",
-                                norwegian: "Treningssted"
-                            ))
-                            .font(.caption.weight(.semibold))
-                            Text(workout.plannedTrainingPlace?.name ??
-                                ATHLTHLocalization.choose(
-                                    english: "Choose a training place",
-                                    norwegian: "Velg treningssted"
-                                ))
-                            .font(.subheadline.weight(.semibold))
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                    }
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                    .padding(14)
-                    .background(
-                        ATHLTHPlanDesign.warmSurface,
-                        in: RoundedRectangle(cornerRadius: 17)
-                    )
-                }
-                .buttonStyle(.plain)
-            }
             if workoutComplete {
                 focusedBetweenExerciseRestCard(workout)
             }
@@ -1908,7 +1745,6 @@ struct ActiveStrengthWorkoutView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(ATHLTHPlanDesign.accentInk)
                 }
-                WorkoutPlaceCheckInSection(workoutID: workout.id)
             } else if workoutComplete &&
                 showingWorkoutReview {
                 focusedWorkoutCompletionHero(
@@ -1931,9 +1767,6 @@ struct ActiveStrengthWorkoutView: View {
                     workout
                 )
 
-                WorkoutPlaceCheckInSection(
-                    workoutID: workout.id
-                )
 
                 Button {
                     _ = strength.continueFreeTrainingBetweenExercises()
@@ -2088,6 +1921,11 @@ struct ActiveStrengthWorkoutView: View {
                         exercise: exercise
                     )
                 }
+            }
+
+            if let upcoming = strength.nextPendingExercise,
+               !workoutComplete {
+                focusedNextExercisePreview(upcoming)
             }
         }
     }
