@@ -4230,7 +4230,8 @@ final class IPhoneWorkoutStore:
         )
         if !routedToAzure {
             try? ATHLTHSpokenAudioSession.activate(
-                duckOtherAudio: configuration.shouldDuckOtherAudio
+                duckOtherAudio: configuration.shouldDuckOtherAudio,
+                owner: audioOwner
             )
             speechSynthesizer.speak(utterance)
         }
