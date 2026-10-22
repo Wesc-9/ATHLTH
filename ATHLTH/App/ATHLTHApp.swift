@@ -1461,6 +1461,20 @@ struct AppRootView: View {
         .onChange(of: homeAssistant.shareGoals) { _, _ in
             Task { await syncHomeAssistantSnapshot() }
         }
+        .onChange(of: homeAssistant.shareAthleteProfile) { _, _ in
+            Task { await syncHomeAssistantSnapshot() }
+        }
+        .onChange(of: homeAssistant.shareMilestoneEvents) { _, _ in
+            Task { await syncHomeAssistantSnapshot() }
+        }
+        .onChange(of: appSession.profile.displayName) { _, _ in
+            guard homeAssistant.shareAthleteProfile else { return }
+            Task { await syncHomeAssistantSnapshot() }
+        }
+        .onChange(of: appSession.profile.avatarURL) { _, _ in
+            guard homeAssistant.shareAthleteProfile else { return }
+            Task { await syncHomeAssistantSnapshot() }
+        }
         .onChange(of: appSession.onboardingCompleted) { _, completed in
             guard completed else { return }
             scheduleNotificationPermissionPrimerIfNeeded()
@@ -3344,6 +3358,36 @@ struct AppRootView: View {
                 primaryGoal
             )
 
+        // Records already available to the signed-in athlete are shared
+        // only when PR/milestone sharing is explicitly enabled.
+        var sharedPerformance: [HomeAssistantPerformanceRecordPayload] = []
+        if homeAssistant.shareMilestoneEvents {
+            let runRecords = (try? await health.personalRecords()) ?? []
+            let strengthRecords = strengthWorkout.repPersonalRecords
+
+            sharedPerformance += runRecords.map { record in
+                HomeAssistantPerformanceRecordPayload(
+                    id: "run-" + record.id,
+                    title: record.kind.title,
+                    value: record.formattedValue,
+                    category: "running",
+                    date: record.date
+                )
+            }
+            sharedPerformance += strengthRecords.map { record in
+                HomeAssistantPerformanceRecordPayload(
+                    id: "strength-" + record.id,
+                    title: record.title,
+                    value: record.value,
+                    category: "strength",
+                    date: record.date
+                )
+            }
+            sharedPerformance = Array(
+                sharedPerformance.sorted { $0.date > $1.date }.prefix(12)
+            )
+        }
+
         await homeAssistant.syncSnapshot(
             workoutActive:
                 presence.state == .training,
@@ -3400,7 +3444,13 @@ struct AppRootView: View {
             goalDaysRemaining:
                 goalDaysRemaining,
             calendarEvents:
-                homeAssistantCalendarEvents()
+                homeAssistantCalendarEvents(),
+            athleteDisplayName:
+                appSession.profile.displayName,
+            athleteAvatarURL:
+                appSession.profile.avatarURL,
+            performanceRecords:
+                sharedPerformance
         )
 
         await syncHomeAssistantPhoneWorkoutLiveState(
