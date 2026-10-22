@@ -4685,7 +4685,7 @@ struct DirectMessageThreadView: View {
                         Text(selectedShare.title)
                             .font(.caption.weight(.semibold))
                             .lineLimit(1)
-                        Text(selectedShare.kind.title)
+                        Text(selectedShare.kind.localizedTitle)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -7283,7 +7283,7 @@ struct MessageSharePicker: View {
                                             kind
                                     } label: {
                                         Label(
-                                            shareCategoryTitle(kind),
+                                            kind.localizedTitle,
                                             systemImage:
                                                 kind.systemImage
                                         )
@@ -7395,23 +7395,6 @@ struct MessageSharePicker: View {
                     shareError ?? ""
                 )
             }
-        }
-    }
-
-    private func shareCategoryTitle(_ kind: MessageShareKind) -> String {
-        switch kind {
-        case .workout:
-            return ATHLTHLocalization.choose(english: "Workout", norwegian: "Økt")
-        case .trainingPlan:
-            return ATHLTHLocalization.choose(english: "Training Plan", norwegian: "Treningsplan")
-        case .exercise:
-            return ATHLTHLocalization.choose(english: "Exercise", norwegian: "Øvelse")
-        case .runningWorkout:
-            return ATHLTHLocalization.choose(english: "Running Workout", norwegian: "Løpeøkt")
-        case .route:
-            return ATHLTHLocalization.choose(english: "Route", norwegian: "Rute")
-        case .challenge:
-            return ATHLTHLocalization.choose(english: "Challenge", norwegian: "Utfordring")
         }
     }
 
