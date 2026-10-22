@@ -151,43 +151,46 @@ struct WatchStrengthTimedSetPage: View {
                         Spacer(minLength: 1)
 
                         if editable {
-                            if !finished {
-                                Button {
-                                    if running {
-                                        workout.pauseTimedStrengthSet()
-                                    } else {
-                                        workout.startOrResumeTimedStrengthSet()
+                            HStack(spacing: 7) {
+                                if !finished {
+                                    Button {
+                                        if running {
+                                            workout.pauseTimedStrengthSet()
+                                        } else {
+                                            workout.startOrResumeTimedStrengthSet()
+                                        }
+                                    } label: {
+                                        Image(systemName: running ? "pause.fill" : "play.fill")
+                                            .font(.system(size: 12, weight: .bold))
+                                            .frame(width: 38, height: compact ? 32 : 36)
                                     }
-                                } label: {
-                                    Label(running
-                                          ? tr("Pause phase", "Pause del")
-                                          : started
-                                            ? tr("Resume", "Fortsett")
-                                            : tr("Start", "Start"),
-                                          systemImage: running ? "pause.fill" : "play.fill")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .frame(maxWidth: .infinity)
-                                        .frame(height: compact ? 30 : 34)
+                                    .buttonStyle(.bordered)
+                                    .tint(WatchTheme.accentDeep)
+                                    .accessibilityLabel(running
+                                        ? tr("Pause phase", "Pause del")
+                                        : started
+                                          ? tr("Resume phase", "Fortsett del")
+                                          : tr("Start phase", "Start del"))
                                 }
-                                .buttonStyle(.bordered)
+
+                                Button {
+                                    workout.completeStrengthSet()
+                                } label: {
+                                    Label(
+                                        isRunning
+                                          ? tr("Finish running phase", "Avslutt løpedel")
+                                          : tr("Complete set", "Fullfør sett"),
+                                        systemImage: "checkmark.circle.fill"
+                                    )
+                                    .font(.system(size: 10, weight: .bold))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: compact ? 32 : 36)
+                                }
+                                .buttonStyle(.borderedProminent)
                                 .tint(WatchTheme.accentDeep)
                             }
-
-                            Button {
-                                workout.completeStrengthSet()
-                            } label: {
-                                Label(
-                                    isRunning
-                                      ? tr("Finish running phase", "Avslutt løpedel")
-                                      : tr("Complete set", "Fullfør sett"),
-                                    systemImage: "checkmark.circle.fill"
-                                )
-                                .font(.system(size: 11, weight: .bold))
-                                .frame(maxWidth: .infinity)
-                                .frame(height: compact ? 30 : 34)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(WatchTheme.accentDeep)
                         } else if session.inputMode == .iPhone {
                             Text(tr("Controlled on iPhone", "Styres på iPhone"))
                                 .font(.system(size: 9, weight: .semibold))
