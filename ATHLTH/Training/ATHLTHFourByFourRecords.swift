@@ -32,7 +32,17 @@ enum ATHLTHFourByFourRecords {
     static func qualifyingResult(
         _ record: ATHLTHCompletedRunningPerformance
     ) -> Result? {
-        let ordered = record.steps.sorted { $0.index < $1.index }
+        qualifyingResult(
+            steps: record.steps, id: record.id, date: record.completedAt
+        )
+    }
+
+    static func qualifyingResult(
+        steps: [ATHLTHRecordedRunningStep],
+        id: UUID,
+        date: Date
+    ) -> Result? {
+        let ordered = steps.sorted { $0.index < $1.index }
         let relevant = ordered.filter {
             !["warmup", "cooldown"].contains(($0.phase ?? "").lowercased())
         }
@@ -62,7 +72,7 @@ enum ATHLTHFourByFourRecords {
 
         guard effortSpeeds.count == 4, mainDistance > 0 else { return nil }
         return Result(
-            id: record.id, date: record.completedAt,
+            id: id, date: date,
             mainDistanceMeters: mainDistance, mainSeconds: 960,
             fastestEffortSpeedKmh: effortSpeeds.max() ?? 0,
             reported: reported, exerciseCount: 4
