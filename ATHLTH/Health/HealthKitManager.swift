@@ -58,6 +58,7 @@ final class HealthKitManager: ObservableObject {
     static let shared = HealthKitManager()
 
     @Published private(set) var workouts: [WorkoutSummary] = []
+    @Published private(set) var lastWorkoutsFetchedAt: Date?
     @Published private(set) var pendingWorkoutImports: [PendingWorkoutImport] = []
     @Published private(set) var sleep: SleepSummary = .empty
     @Published private(set) var heart: HeartSummary = .empty
@@ -950,6 +951,7 @@ final class HealthKitManager: ObservableObject {
 
         do {
             let fetched = try await workoutsTask
+            lastWorkoutsFetchedAt = Date()
             let summaries = fetched.map(WorkoutSummary.init)
             workouts = summaries
             workoutObjects = fetched.reduce(into: [:]) { result, workout in
