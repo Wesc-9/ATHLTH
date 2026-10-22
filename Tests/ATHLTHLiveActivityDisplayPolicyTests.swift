@@ -184,7 +184,8 @@ final class ATHLTHLiveActivityDisplayPolicyTests: XCTestCase {
                 focus: .running, pace: 310
             ), .pace
         )
-        for pace in [nil, .nan, 0, 2000] as [Double?] {
+        let invalidPaces: [TimeInterval?] = [nil, .nan, 0, 2_000]
+        for pace in invalidPaces {
             XCTAssertEqual(
                 ATHLTHLiveActivityDisplayPolicy.compactMetric(
                     focus: .running, pace: pace
