@@ -57,6 +57,8 @@ struct WorkoutStartOptionsView: View {
     @State private var showingRestCueSettings = false
 
     @State private var showingDisplayControls = false
+    @State private var targetHeartRateZone: Int?
+
 
     init(
         session: PlannedSession,
@@ -88,6 +90,9 @@ struct WorkoutStartOptionsView: View {
         )
         _configuredExercises = State(
             initialValue: session.exercises
+        )
+        _targetHeartRateZone = State(
+            initialValue: session.targetAlertConfiguration?.heartRateZone
         )
         _selectedTrainingPlace = State(initialValue: session.plannedTrainingPlace)
         _selectedSpotifyPlaylist = State(
@@ -173,6 +178,52 @@ struct WorkoutStartOptionsView: View {
                             .frame(minHeight: 44)
                         }
                         .buttonStyle(.plain)
+                    }
+
+                    ATHLTHPlanSurface(density: .compact) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "heart.text.square")
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Heart-rate zone target",
+                                    norwegian: "Målpulssone"
+                                ))
+                                .font(.subheadline.weight(.semibold))
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Optional · set before starting",
+                                    norwegian: "Valgfritt · velges før økten"
+                                ))
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+
+                            Spacer()
+
+                            Menu {
+                                Button(ATHLTHLocalization.choose(
+                                    english: "No target", norwegian: "Ingen mål"
+                                )) { targetHeartRateZone = nil }
+                                ForEach(1...5, id: \.self) { zone in
+                                    Button("Sone \(zone)") {
+                                        targetHeartRateZone = zone
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Text(targetHeartRateZone.map { "Sone \($0)" } ??
+                                        ATHLTHLocalization.choose(
+                                            english: "No target", norwegian: "Ingen mål"
+                                        ))
+                                    Image(systemName: "chevron.down")
+                                        .font(.caption2)
+                                }
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                .frame(minHeight: 44)
+                            }
+                        }
                     }
 
                     // Same immediate avatar row as Quick Run and Quick Walk.
@@ -691,6 +742,26 @@ struct WorkoutStartOptionsView: View {
         var configured = session
         configured.exercises = configuredExercises
         configured.plannedTrainingPlace = selectedTrainingPlace
+        // A target selected before the workout is preserved for the Watch and
+        // the strength log. Measured zones are computed only from actual HR.
+        if targetHeartRateZone != session.targetAlertConfiguration?.heartRateZone {
+            var alerts = configured.targetAlertConfiguration ??
+                WatchWorkoutTargetAlertConfiguration(
+                    heartRateEnabled: false,
+                    heartRateZone: nil,
+                    heartRateMinimumBPM: nil,
+                    heartRateMaximumBPM: nil,
+                    paceAlertsEnabled: false,
+                    paceToleranceSecondsPerKilometer: 15,
+                    graceSeconds: 15,
+                    repeatSeconds: 120,
+                    delivery: .haptic,
+                    announceBackInTarget: false
+                )
+            alerts.heartRateZone = targetHeartRateZone
+            alerts.heartRateEnabled = targetHeartRateZone != nil
+            configured.targetAlertConfiguration = alerts
+        }
         return configured
     }
 
