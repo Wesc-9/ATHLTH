@@ -7263,7 +7263,7 @@ struct MessageSharePicker: View {
                 ATHLTHPremiumCanvas(
                     accent:
                         ATHLTHTheme
-                            .vitality
+                            .premiumGold
                             .opacity(0.16)
                 )
 
@@ -7272,32 +7272,16 @@ struct MessageSharePicker: View {
                         alignment: .leading,
                         spacing: 16
                     ) {
-                        ATHLTHPremiumScreenHeader(
-                            eyebrow:
-                                ATHLTHLocalization.choose(
-                                    english: "Share",
-                                    norwegian: "Del"
-                                ),
-                            title:
-                                ATHLTHLocalization.choose(
-                                    english: "Share with athlete",
-                                    norwegian: "Del med utøver"
-                                ),
-                            subtitle:
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "Send a workout, plan, route or challenge directly in the conversation.",
-                                    norwegian:
-                                        "Send en økt, plan, rute eller challenge direkte i samtalen."
-                                ),
-                            icon:
-                                "square.and.arrow.up.fill",
-                            tint:
-                                ATHLTHTheme
-                                    .vitality
-                        ) {
-                            EmptyView()
-                        }
+                        ATHLTHMessagingCompactHeader(
+                            eyebrow: ATHLTHLocalization.choose(
+                                english: "Share", norwegian: "Del"
+                            ),
+                            title: ATHLTHLocalization.choose(
+                                english: "Share with athlete",
+                                norwegian: "Del med utøver"
+                            ),
+                            symbol: "square.and.arrow.up"
+                        )
 
                         ScrollView(
                             .horizontal,
@@ -7313,7 +7297,7 @@ struct MessageSharePicker: View {
                                             kind
                                     } label: {
                                         Label(
-                                            kind.title,
+                                            shareCategoryTitle(kind),
                                             systemImage:
                                                 kind.systemImage
                                         )
@@ -7332,17 +7316,13 @@ struct MessageSharePicker: View {
                                             9
                                         )
                                         .foregroundStyle(
-                                            selectedKind ==
-                                                kind
-                                                ? Color.white
-                                                : ATHLTHTheme
-                                                    .primaryText
+                                            ATHLTHTheme.primaryText
                                         )
                                         .background(
                                             selectedKind ==
                                                 kind
                                                 ? ATHLTHTheme
-                                                    .vitality
+                                                    .premiumGold
                                                 : Color.white
                                                     .opacity(
                                                         0.68
@@ -7432,6 +7412,23 @@ struct MessageSharePicker: View {
         }
     }
 
+    private func shareCategoryTitle(_ kind: MessageShareKind) -> String {
+        switch kind {
+        case .workout:
+            return ATHLTHLocalization.choose(english: "Workout", norwegian: "Økt")
+        case .trainingPlan:
+            return ATHLTHLocalization.choose(english: "Training Plan", norwegian: "Treningsplan")
+        case .exercise:
+            return ATHLTHLocalization.choose(english: "Exercise", norwegian: "Øvelse")
+        case .runningWorkout:
+            return ATHLTHLocalization.choose(english: "Running Workout", norwegian: "Løpeøkt")
+        case .route:
+            return ATHLTHLocalization.choose(english: "Route", norwegian: "Rute")
+        case .challenge:
+            return ATHLTHLocalization.choose(english: "Challenge", norwegian: "Utfordring")
+        }
+    }
+
     @ViewBuilder
     private var shareContent: some View {
         switch selectedKind {
@@ -7439,9 +7436,9 @@ struct MessageSharePicker: View {
             let workouts = shareableWorkouts
             if workouts.isEmpty {
                 ContentUnavailableView(
-                    "No saved workouts",
+                    ATHLTHLocalization.choose(english: "No saved workouts", norwegian: "Ingen lagrede økter"),
                     systemImage: "dumbbell",
-                    description: Text("Create a workout or add one to a training plan first.")
+                    description: Text(ATHLTHLocalization.choose(english: "Create a workout or add one to a training plan first.", norwegian: "Opprett en økt eller legg en til i treningsplanen først."))
                 )
             } else {
                 ForEach(workouts) { workout in
@@ -7495,9 +7492,9 @@ struct MessageSharePicker: View {
             let plans = shareablePlans
             if plans.isEmpty {
                 ContentUnavailableView(
-                    "No training plans",
+                    ATHLTHLocalization.choose(english: "No training plans", norwegian: "Ingen treningsplaner"),
                     systemImage: "calendar",
-                    description: Text("Create or save a training plan first.")
+                    description: Text(ATHLTHLocalization.choose(english: "Create or save a training plan first.", norwegian: "Opprett eller lagre en treningsplan først."))
                 )
             } else {
                 ForEach(plans) { plan in
@@ -7522,9 +7519,9 @@ struct MessageSharePicker: View {
         case .runningWorkout:
             if runningLibrary.customTemplates.isEmpty {
                 ContentUnavailableView(
-                    "No custom running workouts",
+                    ATHLTHLocalization.choose(english: "No custom running workouts", norwegian: "Ingen lagrede løpeøkter"),
                     systemImage: "figure.run",
-                    description: Text("Create a running workout first.")
+                    description: Text(ATHLTHLocalization.choose(english: "Create a running workout first.", norwegian: "Opprett en løpeøkt først."))
                 )
             } else {
                 ForEach(runningLibrary.customTemplates) { workout in
@@ -7548,9 +7545,9 @@ struct MessageSharePicker: View {
         case .route:
             if session.savedRoutes.isEmpty {
                 ContentUnavailableView(
-                    "No saved routes",
+                    ATHLTHLocalization.choose(english: "No saved routes", norwegian: "Ingen lagrede ruter"),
                     systemImage: "map",
-                    description: Text("Save or import a route first.")
+                    description: Text(ATHLTHLocalization.choose(english: "Save or import a route first.", norwegian: "Lagre eller importer en rute først."))
                 )
             } else {
                 ForEach(session.savedRoutes) { route in
@@ -7575,9 +7572,9 @@ struct MessageSharePicker: View {
         case .challenge:
             if shareableChallenges.isEmpty {
                 ContentUnavailableView(
-                    "No challenges",
+                    ATHLTHLocalization.choose(english: "No challenges", norwegian: "Ingen utfordringer"),
                     systemImage: "bolt",
-                    description: Text("Create or join a challenge first.")
+                    description: Text(ATHLTHLocalization.choose(english: "Create or join a challenge first.", norwegian: "Opprett eller bli med i en utfordring først."))
                 )
             } else {
                 ForEach(shareableChallenges) { challenge in
@@ -7752,7 +7749,7 @@ struct MessageSharePicker: View {
                 )
                 .foregroundStyle(
                     ATHLTHTheme
-                        .vitality
+                        .premiumGold
                 )
                 .frame(
                     width: 42,
@@ -7760,7 +7757,7 @@ struct MessageSharePicker: View {
                 )
                 .background(
                     ATHLTHTheme
-                        .vitalitySoft,
+                        .premiumGoldSoft,
                     in: RoundedRectangle(
                         cornerRadius: 13,
                         style: .continuous
@@ -7799,7 +7796,7 @@ struct MessageSharePicker: View {
                 )
                 .foregroundStyle(
                     ATHLTHTheme
-                        .vitality
+                        .premiumGold
                 )
             }
             .padding(13)
