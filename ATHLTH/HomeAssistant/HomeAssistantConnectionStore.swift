@@ -2442,11 +2442,11 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         if !shareCompletedWorkouts {
             state["last_workout"] = .null
         }
-        if !shareAthleteProfile {
+        if supportsAthleteSnapshot && !shareAthleteProfile {
             state["athlete_display_name"] = .null
             state["athlete_avatar_url"] = .null
         }
-        if !shareMilestoneEvents {
+        if supportsAthleteSnapshot && !shareMilestoneEvents {
             state["performance_records"] = .array([])
         }
         if !shareRecovery {
