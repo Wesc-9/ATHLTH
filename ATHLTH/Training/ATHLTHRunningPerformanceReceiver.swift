@@ -5,12 +5,14 @@ import SwiftUI
 struct ATHLTHRunningPerformanceReceiver: ViewModifier {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var watch: AppleWatchConnectionStore
+    @EnvironmentObject private var health: HealthKitManager
 
     func body(content: Content) -> some View {
         content
             .onAppear(perform: receive)
             .onChange(of: watch.pendingWorkoutResults) { _, _ in receive() }
             .onChange(of: session.profile.userID) { _, _ in receive() }
+            .onChange(of: health.workouts.map(\.id)) { _, _ in receive() }
     }
 
     private func receive() {
@@ -28,7 +30,8 @@ struct ATHLTHRunningPerformanceReceiver: ViewModifier {
             ATHLTHRunningPerformanceHistory.saveWatch(
                 result,
                 userID: session.profile.userID,
-                knownWorkoutIDs: knownIDs
+                knownWorkoutIDs: knownIDs,
+                knownHealthWorkoutIDs: Set(health.workouts.map(\.id))
             )
         }
     }

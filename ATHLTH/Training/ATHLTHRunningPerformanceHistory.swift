@@ -87,6 +87,29 @@ struct ATHLTHCompletedRunningPerformance: Identifiable, Codable, Hashable {
 enum ATHLTHRunningPerformanceHistory {
     private static let name = "completedRunningPerformance"
 
+    /// Match HealthKit activity identity first. A unique close completion
+    /// match recovers legitimate older exports with a different local UUID,
+    /// but never guesses when two sessions fall in the same time window.
+    static func match(
+        workoutID: UUID,
+        endDate: Date,
+        duration: TimeInterval,
+        candidates: [ATHLTHCompletedRunningPerformance]
+    ) -> ATHLTHCompletedRunningPerformance? {
+        var seen = Set<UUID>()
+        let unique = candidates.filter { seen.insert($0.id).inserted }
+        if let exact = unique.first(where: {
+            $0.id == workoutID || $0.healthWorkoutUUID == workoutID
+        }) { return exact }
+        guard duration.isFinite, duration > 0 else { return nil }
+        let matches = unique.filter {
+            abs($0.completedAt.timeIntervalSince(endDate)) <= 75 &&
+            abs($0.steps.reduce(0) { $0 + $1.activeSeconds } - duration) <=
+                max(20, duration * 0.07)
+        }
+        return matches.count == 1 ? matches[0] : nil
+    }
+
     static func load(userID: UUID) -> [ATHLTHCompletedRunningPerformance] {
         AccountLocalStorage.read(
             [ATHLTHCompletedRunningPerformance].self, name: name, userID: userID
@@ -141,11 +164,16 @@ enum ATHLTHRunningPerformanceHistory {
     static func saveWatch(
         _ result: WatchWorkoutResult,
         userID: UUID,
-        knownWorkoutIDs: Set<UUID>
+        knownWorkoutIDs: Set<UUID>,
+        knownHealthWorkoutIDs: Set<UUID> = []
     ) {
-        guard let record = ATHLTHCompletedRunningPerformance(watch: result),
-              let workoutID = record.workoutID,
-              knownWorkoutIDs.contains(workoutID) else { return }
+        guard let record = ATHLTHCompletedRunningPerformance(watch: result)
+        else { return }
+        let recognizedPlan = record.workoutID.map { knownWorkoutIDs.contains($0) } ?? false
+        let recognizedHealth = record.healthWorkoutUUID.map {
+            knownHealthWorkoutIDs.contains($0)
+        } ?? false
+        guard recognizedPlan || recognizedHealth else { return }
         var history = load(userID: userID)
         // A late HealthKit export may supply its workout UUID after the
         // first Watch result. Update the existing session without duplicates.

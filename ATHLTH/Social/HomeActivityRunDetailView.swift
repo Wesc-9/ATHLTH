@@ -7,6 +7,7 @@ struct HomeActivityRunDetailView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
+    @EnvironmentObject private var watch: AppleWatchConnectionStore
 
     let workout: SocialPublishableWorkout
 
@@ -21,8 +22,6 @@ struct HomeActivityRunDetailView: View {
     @State private var linkedRouteAttempt: RouteAttemptRecord?
     @State private var linkedRouteAttempts: [RouteAttemptRecord] = []
     @State private var isLoadingRouteResult = false
-    @State private var showingTreadmillInclineEditor = false
-    @State private var treadmillInclineDraft = 0.0
     @State private var showingResultShare = false
     @State private var showingFullscreenMap = false
     @State private var showingSaveRouteConfirmation = false
@@ -49,9 +48,18 @@ struct HomeActivityRunDetailView: View {
         let phone = phoneWorkout.history.compactMap {
             ATHLTHCompletedRunningPerformance(phone: $0)
         }
-        return (phone + completedIntervalHistory).first {
-            $0.id == workout.id || $0.healthWorkoutUUID == workout.id
-        }
+        let stored = ATHLTHRunningPerformanceHistory.match(
+            workoutID: workout.id,
+            endDate: workout.endDate,
+            duration: workout.duration,
+            candidates: phone + completedIntervalHistory
+        )
+        if let stored { return stored }
+        // A freshly finished Watch result may not yet have been persisted.
+        // Only its identical HealthKit UUID can authorize a direct match.
+        return watch.pendingWorkoutResults.compactMap {
+            ATHLTHCompletedRunningPerformance(watch: $0)
+        }.first { $0.healthWorkoutUUID == workout.id }
     }
 
     private var isTreadmillWorkout: Bool {
@@ -328,7 +336,10 @@ struct HomeActivityRunDetailView: View {
                 summaryCard
 
                 if let intervals = structuredIntervalResult {
-                    ATHLTHIntervalResultSummaryCard(performance: intervals)
+                    ATHLTHIntervalResultSummaryCard(
+                        performance: intervals,
+                        athleteMaximumBPM: session.onboardingProfile?.maximumHeartRateBPM.map(Double.init)
+                    )
                 }
 
                 if !isIndoorActivity {
@@ -436,7 +447,8 @@ struct HomeActivityRunDetailView: View {
                 elevationGainMeters: isIndoorActivity ? nil :
                     (ascentText == nil ? nil : elevationGainMeters),
                 rawRoute: isIndoorActivity ? [] : route,
-                highlights: verifiedSplits
+                highlights: verifiedSplits,
+                intervalPerformance: structuredIntervalResult
             )
         }
         .sheet(item: $routeToOpen) { route in
@@ -479,16 +491,6 @@ struct HomeActivityRunDetailView: View {
                     }
             }
         }
-        .sheet(isPresented: $showingTreadmillInclineEditor) {
-            TreadmillInclineEditorView(
-                initialValue: treadmillInclineDraft
-            ) { value in
-                phoneWorkout.setCompletedTreadmillInclinePercent(
-                    value, workoutID: workout.id
-                )
-                treadmillInclineDraft = value
-            }
-        }
     }
 
     // Result-first hierarchy shared with Training Plan: the detailed map
@@ -498,7 +500,9 @@ struct HomeActivityRunDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(alignment: .top, spacing: 10) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("ATHLTH  /  " + tr("RUNNING", "LØPING"))
+                        Text("ATHLTH  /  " + (structuredIntervalResult == nil
+                            ? tr("RUNNING", "LØPING")
+                            : tr("INTERVAL RUN", "INTERVALLØKT")))
                             .font(.caption2.weight(.bold))
                             .tracking(1.5)
                             .foregroundStyle(ATHLTHPlanDesign.accentInk)
@@ -515,6 +519,21 @@ struct HomeActivityRunDetailView: View {
                         .padding(.horizontal, 9)
                         .padding(.vertical, 7)
                         .background(ATHLTHPlanDesign.selectedSurface, in: Capsule())
+                }
+
+                if let interval = structuredIntervalResult {
+                    Text(interval.title)
+                        .font(.system(size: 28, weight: .semibold, design: .serif))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 7) {
+                        Label("\(interval.workSteps.count) " + tr("efforts", "drag"),
+                              systemImage: "figure.run")
+                        Text("·")
+                        Text(interval.source)
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
                 }
 
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -560,24 +579,6 @@ struct HomeActivityRunDetailView: View {
                     columnCount: 2
                 )
 
-                if isTreadmillWorkout {
-                    HStack(spacing: 10) {
-                        Label(tr("Incline", "Stigning"), systemImage: "arrow.up.right")
-                        Spacer()
-                        Text(String(format: "%.1f%%",
-                            phoneWorkout.treadmillInclinePercent(for: workout.id) ?? 0))
-                            .monospacedDigit()
-                        Button(tr("Adjust", "Juster")) {
-                            treadmillInclineDraft = phoneWorkout
-                                .treadmillInclinePercent(for: workout.id) ?? 0
-                            showingTreadmillInclineEditor = true
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                }
             }
         }
     }
