@@ -236,6 +236,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var structuredStepStartDistanceMeters: Double = 0
     private var structuredWorkoutComplete = false
     private var recordedStructuredRunSteps: [ATHLTHRecordedRunningStep] = []
+    private var lastIntervalProgressCueKey: String?
+    private var lastIntervalWarningCueKey: String?
     private var plannedRouteLocations: [CLLocation] = []
     private var plannedRouteCumulativeMeters: [Double] = []
     private var plannedRouteGeometryMeters: Double = 0
@@ -572,6 +574,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         structuredStepStartDistanceMeters = distanceMeters
         structuredWorkoutComplete = false
         recordedStructuredRunSteps = []
+        lastIntervalProgressCueKey = nil
+        lastIntervalWarningCueKey = nil
         offRouteStartedAt = nil
         lastOffRouteAlertAt = nil
         routeWasOff = false
@@ -4133,7 +4137,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
-        // The athlete may opt to advance timed intervals manually.
+        announceIntervalProgressIfDue(for: step)
+
+        // Warm-up and cool-down are minimum suggested times, never auto-advance.
+        // The runner explicitly chooses when the actual main set begins or ends.
+        if step.phase == "warmup" || step.phase == "cooldown" { return }
         if step.measure == .time,
            structuredRunningWorkout?.autoAdvanceTimedSteps == false {
             return
@@ -4153,6 +4161,58 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         advanceStructuredRunningWorkout()
+    }
+
+    private func announceIntervalProgressIfDue(for step: WatchRunningWorkoutStep) {
+        guard audioCoachConfiguration.enabled,
+              !coachSpeechPaused,
+              let configuration = structuredRunningWorkout,
+              step.measure == .time,
+              let total = step.durationSeconds,
+              total > 0 else { return }
+
+        let elapsed = currentStructuredStepElapsedTime
+        let remaining = max(total - elapsed, 0)
+        let norwegian = coachPhrase(english: "en", norwegian: "no") == "no"
+
+        if let lead = configuration.intervalCoachCountdownSeconds,
+           lead >= 5, lead < total,
+           remaining > 0, remaining <= lead,
+           remaining > lead - 2.5 {
+            let key = "\(structuredStepIndex):\(Int(lead))"
+            if lastIntervalWarningCueKey != key {
+                lastIntervalWarningCueKey = key
+                speak(
+                    norwegian ? "\(Int(remaining.rounded())) sekunder igjen av \(step.title)"
+                              : "\(Int(remaining.rounded())) seconds left in \(step.title)",
+                    priority: .structuredStep,
+                    event: ATHLTHCoachEvent(
+                        kind: .runningStep, key: "warning:\(key)",
+                        priority: .structuredStep, validFor: 8
+                    )
+                )
+            }
+            return
+        }
+
+        guard let interval = configuration.intervalCoachCueEverySeconds,
+              interval >= 15, interval.isFinite,
+              elapsed >= interval else { return }
+        let slot = Int(floor(elapsed / interval))
+        let dueTime = Double(slot) * interval
+        guard slot > 0, elapsed - dueTime < 2.5, remaining > 2 else { return }
+        let key = "\(structuredStepIndex):\(slot)"
+        guard lastIntervalProgressCueKey != key else { return }
+        lastIntervalProgressCueKey = key
+        speak(
+            norwegian ? "\(Int(remaining.rounded())) sekunder igjen av \(step.title)"
+                      : "\(Int(remaining.rounded())) seconds remaining in \(step.title)",
+            priority: .routineCoach,
+            event: ATHLTHCoachEvent(
+                kind: .routineMilestone, key: "interval:\(key)",
+                priority: .routineCoach, validFor: 8
+            )
+        )
     }
 
     func advanceStructuredRunningWorkoutManually() {
