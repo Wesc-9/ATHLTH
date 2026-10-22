@@ -4272,9 +4272,16 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
               !structuredWorkoutComplete else { return }
         if awaitingMainStart {
             startStructuredMainAfterWarmup()
-        } else {
-            advanceStructuredRunningWorkout(manually: true)
+            return
         }
+        guard let current = currentStructuredRunningStep,
+              current.phase == "warmup" ||
+              current.phase == "cooldown" ||
+              structuredRunningWorkout?.autoAdvanceTimedSteps == false else {
+            // Prevent a double tap on Start main from skipping effort one.
+            return
+        }
+        advanceStructuredRunningWorkout(manually: true)
     }
 
     private func startStructuredMainAfterWarmup() {
