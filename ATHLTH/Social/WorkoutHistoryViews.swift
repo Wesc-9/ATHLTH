@@ -332,34 +332,21 @@ struct WorkoutHistoryDetailView: View {
             VStack(spacing: 18) {
                 hero
 
-                if healthDetailLoaded {
-                    if healthDetail.route.count >= 2 ||
-                        healthDetail.workoutLocation != nil ||
-                        healthDetail.route.count == 1 {
+                // A single location rule across History, Run and Strength:
+                // venue check-in for indoor; a real saved map for outdoor GPS.
+                ATHLTHWorkoutLocationSection(
+                    workout: workout,
+                    hasRecordedGPS: healthDetailLoaded &&
+                        (
+                            healthDetail.route.count >= 1 ||
+                            healthDetail.workoutLocation != nil
+                        )
+                ) {
+                    if healthDetailLoaded {
                         WorkoutLocationMapCard(
                             detail: healthDetail,
                             activity: workout.activity
                         )
-                    } else if workout.activity == .strength {
-                        ATHLTHUnifiedCard {
-                            HStack(spacing: 12) {
-                                Image(systemName: "location.slash.fill")
-                                    .font(.title3)
-                                    .foregroundStyle(.secondary)
-
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text("Workout location unavailable")
-                                        .font(.subheadline.weight(.semibold))
-                                    Text(
-                                        "This strength workout did not contain a saved location in Apple Health."
-                                    )
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                }
-
-                                Spacer()
-                            }
-                        }
                     }
                 }
 
@@ -828,7 +815,7 @@ struct WorkoutHistoryDetailView: View {
     }
 }
 
-private struct WorkoutLocationMapCard: View {
+struct WorkoutLocationMapCard: View {
     let detail: WorkoutDetail
     let activity: WorkoutActivity
 
