@@ -1172,6 +1172,11 @@ struct HomePersonalRecentActivitySection:
         .task {
             await refreshRecentWorkouts()
         }
+        .onAppear {
+            // Returning from Activity Log may not create a new Home view;
+            // refresh the existing section as it becomes visible again.
+            Task { await refreshRecentWorkouts() }
+        }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active else { return }
             Task { await refreshRecentWorkouts() }
