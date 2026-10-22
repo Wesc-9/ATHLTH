@@ -1263,6 +1263,7 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
     var isEmbeddedRunningInterval: Bool? = nil
     var embeddedRunningPhaseTitle: String? = nil
     var embeddedRunningPhaseKind: String? = nil
+    var embeddedRunningTargetHeartRateZone: Int? = nil
     var isResting: Bool
     var restEndsAt: Date?
     var currentExerciseComplete: Bool
