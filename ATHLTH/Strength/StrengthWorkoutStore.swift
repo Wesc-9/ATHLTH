@@ -2503,7 +2503,7 @@ final class StrengthWorkoutStore: ObservableObject {
         guard !additions.isEmpty else { return false }
         finalizeActualRestIfNeeded()
         let shouldFocus = workout.exercises.isEmpty ||
-            workout.exercises.allSatisfy(.isCompleted)
+            workout.exercises.allSatisfy(\.isCompleted)
         let firstNew = workout.exercises.count
         workout.exercises.append(contentsOf: additions)
         activeWorkout = workout
