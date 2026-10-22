@@ -175,7 +175,7 @@ struct PlannedWorkoutWatchBuilder {
     private static func runningSteps(
         from template: RunningWorkoutTemplate
     ) -> [WatchRunningWorkoutStep] {
-        template.blocks.flatMap { block in
+        template.blocks.flatMap { (block: RunningWorkoutBlock) -> [WatchRunningWorkoutStep] in
             // A manual Start main section replaces an old post-warm-up
             // preparation pause; the athlete chooses the exact wait time.
             if template.autoStartMainAfterWarmup != true,
