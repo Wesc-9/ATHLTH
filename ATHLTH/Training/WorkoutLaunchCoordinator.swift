@@ -176,6 +176,12 @@ struct PlannedWorkoutWatchBuilder {
         from template: RunningWorkoutTemplate
     ) -> [WatchRunningWorkoutStep] {
         template.blocks.flatMap { block in
+            // A manual Start main section replaces an old post-warm-up
+            // preparation pause; the athlete chooses the exact wait time.
+            if template.autoStartMainAfterWarmup != true,
+               block.kind == .recovery,
+               (block.title == "Pause før hoveddel" ||
+                block.title == "Recovery after warm-up") { return [] }
             let count = max(block.repetitions, 1)
             var steps: [WatchRunningWorkoutStep] = []
 
