@@ -357,9 +357,18 @@ private enum CommunityMatchupPeriod:
 
     var title: String {
         switch self {
-        case .week: return "7 days"
-        case .month: return "30 days"
-        case .allTime: return "All-time"
+        case .week:
+            return ATHLTHLocalization.choose(
+                english: "7 days", norwegian: "7 dager"
+            )
+        case .month:
+            return ATHLTHLocalization.choose(
+                english: "30 days", norwegian: "30 dager"
+            )
+        case .allTime:
+            return ATHLTHLocalization.choose(
+                english: "All-time", norwegian: "Totalt"
+            )
         }
     }
 
@@ -849,7 +858,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
                 Circle()
                     .fill(
                         ATHLTHTheme
-                            .vitality
+                            .premiumGold
                             .opacity(0.11)
                     )
                     .frame(
@@ -877,7 +886,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
                         .font(.title2)
                         .foregroundStyle(
                             ATHLTHTheme
-                                .vitality
+                                .premiumGold
                         )
                         .frame(
                             width: 46,
@@ -885,7 +894,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
                         )
                         .background(
                             ATHLTHTheme
-                                .vitalitySoft,
+                                .premiumGoldSoft,
                             in: Circle()
                         )
 
@@ -1038,7 +1047,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
                 )
                 .foregroundStyle(
                     ATHLTHTheme
-                        .vitality
+                        .premiumGold
                 )
                 .frame(
                     width: 42,
@@ -1046,7 +1055,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
                 )
                 .background(
                     ATHLTHTheme
-                        .vitalitySoft,
+                        .premiumGoldSoft,
                     in:
                         RoundedRectangle(
                             cornerRadius: 13,
@@ -1089,7 +1098,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
                 .font(.caption.bold())
                 .foregroundStyle(
                     ATHLTHTheme
-                        .vitality
+                        .premiumGold
                 )
             }
             .padding(
@@ -1103,7 +1112,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
                         Color.white
                             .opacity(0.95),
                         ATHLTHTheme
-                            .vitalitySoft
+                            .premiumGoldSoft
                             .opacity(0.62)
                     ],
                     startPoint:
@@ -1124,7 +1133,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
                 )
                 .stroke(
                     ATHLTHTheme
-                        .vitality
+                        .premiumGold
                         .opacity(0.12),
                     lineWidth: 0.8
                 )
@@ -1288,19 +1297,22 @@ struct CommunityFriendsVsFriendsDetailView: View {
                 .contentTransition(.numericText())
 
                 GeometryReader { geometry in
-                    let share = CommunityMatchupVisualPolicy.share(
-                        mine: mine,
-                        theirs: theirs
-                    )
-                    HStack(spacing: 0) {
-                        ATHLTHTheme.premiumGold
-                            .frame(width: geometry.size.width * share)
-                        ATHLTHTheme.accentDeep.opacity(0.34)
+                    if let mine, let theirs,
+                       mine.isFinite, theirs.isFinite {
+                        let share = CommunityMatchupVisualPolicy.share(
+                            mine: mine, theirs: theirs
+                        )
+                        HStack(spacing: 0) {
+                            ATHLTHTheme.premiumGold
+                                .frame(width: geometry.size.width * share)
+                            ATHLTHTheme.accentDeep.opacity(0.34)
+                        }
+                        .clipShape(Capsule())
+                    } else {
+                        Capsule().fill(ATHLTHTheme.surfaceStone)
                     }
-                    .clipShape(Capsule())
                 }
                 .frame(height: 6)
-                .background(ATHLTHTheme.surfaceStone, in: Capsule())
 
                 Text(matchupLeadText)
                     .font(.subheadline.weight(.bold))
@@ -1337,19 +1349,43 @@ struct CommunityFriendsVsFriendsDetailView: View {
     }
 
     private var periodPicker: some View {
-        Picker(
-            "Period",
-            selection: $period
-        ) {
-            ForEach(
-                CommunityMatchupPeriod
-                    .allCases
-            ) { value in
-                Text(value.title)
-                    .tag(value)
+        HStack(spacing: 5) {
+            ForEach(CommunityMatchupPeriod.allCases) { value in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        period = value
+                    }
+                } label: {
+                    Text(value.title)
+                        .font(.subheadline.weight(period == value ? .bold : .medium))
+                        .foregroundStyle(period == value
+                            ? ATHLTHTheme.primaryText
+                            : ATHLTHTheme.mutedText)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 38)
+                        .background(
+                            period == value ? ATHLTHTheme.card : .clear,
+                            in: RoundedRectangle(cornerRadius: 13)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 13)
+                                .stroke(
+                                    period == value
+                                        ? ATHLTHTheme.premiumGold.opacity(0.30)
+                                        : .clear,
+                                    lineWidth: 1
+                                )
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(value.title)
             }
         }
-        .pickerStyle(.segmented)
+        .padding(5)
+        .background(
+            ATHLTHTheme.surfaceStone.opacity(0.83),
+            in: RoundedRectangle(cornerRadius: 18)
+        )
     }
 
     // MARK: - Rivalry breakdown
@@ -2025,10 +2061,8 @@ struct CommunityFriendsVsFriendsDetailView: View {
                 activeDirectDuel
         else {
             return (
-                currentStats
-                    .calculatedActivityPoints,
-                friendStats
-                    .calculatedActivityPoints
+                currentStats.calculatedActivityPoints,
+                loadingFriend ? nil : friendStats.calculatedActivityPoints
             )
         }
 
@@ -2935,6 +2969,8 @@ struct CommunityFriendsVsFriendsDetailView: View {
         }
 
         loadingFriend = true
+        friendProfile = nil
+        friendActivities = []
         defer {
             loadingFriend = false
         }
