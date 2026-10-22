@@ -13,6 +13,7 @@ final class StrengthAudioCoachSpeaker:
     private let azureSpeech = ATHLTHAzureWorkoutSpeech()
     private let audioOwner = "strength-\(UUID().uuidString)"
     private var cueQueue = ATHLTHCoachCueQueue()
+    private var localSpeechWatchdog: Task<Void, Never>?
     private var eventLedger = ATHLTHCoachEventLedger()
     private var latestConfiguration: StrengthAudioCoachConfiguration?
     private var replayMemory = ATHLTHCoachReplayMemory()
@@ -37,6 +38,8 @@ final class StrengthAudioCoachSpeaker:
         speechPaused = paused
         cueQueue.reset()
         if paused {
+            localSpeechWatchdog?.cancel()
+            localSpeechWatchdog = nil
             azureSpeech.stop()
             synthesizer.stopSpeaking(at: .immediate)
             deactivateAudioSession()
@@ -176,6 +179,7 @@ final class StrengthAudioCoachSpeaker:
                 else { return }
                 self.activateLocalAudio(duck: configuration.duckOtherAudio)
                 self.synthesizer.speak(utterance)
+                self.watchLocalSpeech(utterance)
             },
             onFinished: { [weak self] in
                 self?.deliverNextQueuedCue()
@@ -184,6 +188,7 @@ final class StrengthAudioCoachSpeaker:
         if !routedToAzure {
             activateLocalAudio(duck: configuration.duckOtherAudio)
             synthesizer.speak(utterance)
+            watchLocalSpeech(utterance)
         }
         if rememberForReplay {
             replayMemory.remember(spokenText, priority: .structuredStep)
@@ -209,6 +214,8 @@ final class StrengthAudioCoachSpeaker:
     }
 
     func stop() {
+        localSpeechWatchdog?.cancel()
+        localSpeechWatchdog = nil
         cueQueue.reset()
         eventLedger.reset()
         replayMemory.reset()
@@ -230,6 +237,8 @@ final class StrengthAudioCoachSpeaker:
             guard let self,
                   !self.synthesizer.isSpeaking
             else { return }
+            self.localSpeechWatchdog?.cancel()
+            self.localSpeechWatchdog = nil
             self.deactivateAudioSession()
             self.deliverNextQueuedCue()
         }
@@ -243,6 +252,34 @@ final class StrengthAudioCoachSpeaker:
             guard let self,
                   !self.synthesizer.isSpeaking
             else { return }
+            self.localSpeechWatchdog?.cancel()
+            self.localSpeechWatchdog = nil
+            self.deactivateAudioSession()
+            self.deliverNextQueuedCue()
+        }
+    }
+
+    /// Reclaim the music ducking lease when iOS omits the TTS delegate
+    /// callback after a route change or interruption.
+    private func watchLocalSpeech(_ utterance: AVSpeechUtterance) {
+        localSpeechWatchdog?.cancel()
+        let seconds = max(60, min(150, Double(utterance.speechString.count) / 3 + 20))
+        localSpeechWatchdog = Task { @MainActor [weak self] in
+            for _ in 0..<Int(ceil(seconds / 2)) {
+                do { try await Task.sleep(for: .seconds(2)) }
+                catch { return }
+                guard !Task.isCancelled, let self else { return }
+                if !self.synthesizer.isSpeaking && !self.azureSpeech.isBusy {
+                    self.localSpeechWatchdog = nil
+                    self.deactivateAudioSession()
+                    self.deliverNextQueuedCue()
+                    return
+                }
+            }
+            guard !Task.isCancelled, let self,
+                  !self.azureSpeech.isBusy else { return }
+            self.synthesizer.stopSpeaking(at: .immediate)
+            self.localSpeechWatchdog = nil
             self.deactivateAudioSession()
             self.deliverNextQueuedCue()
         }
