@@ -6935,7 +6935,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 )
             }
 
-        let snapshot = WatchWorkoutLiveSnapshot(
+        var snapshot = WatchWorkoutLiveSnapshot(
             kind: kind,
             state: stateOverride ?? mirrorState(for: state),
             startedAt: startedAt,
@@ -6999,36 +6999,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     .steps.count,
             runningStepProgress:
                 runningStepProgress,
-            runningOverallProgress:
-                runningStepProgress.flatMap { progress in
-                    structuredRunningWorkout.map {
-                        ATHLTHRunningStepEngine.overallProgress(
-                            steps: $0.steps,
-                            index: structuredStepIndex,
-                            currentStepProgress: progress
-                        )
-                    }
-                },
-            runningStepTargetTreadmillInclinePercent:
-                currentRunningStep?.targetTreadmillInclinePercent,
-            runningStepTargetPaceSecondsPerKilometer:
-                currentRunningStep?.targetPaceMinSecondsPerKilometer,
-            runningAwaitingMainStart: awaitingMainStart,
-            runningManualAdvanceRequired:
-                currentRunningStep.map { step in
-                    awaitingMainStart ||
-                    (step.phase == "warmup" &&
-                     structuredRunningWorkout?.autoStartMainAfterWarmup != true) ||
-                    step.phase == "cooldown" ||
-                    structuredRunningWorkout?.autoAdvanceTimedSteps == false
-                },
-            runningStepElapsedSeconds:
-                currentRunningStep == nil ? nil :
-                    (awaitingMainStart ? 0 : currentStructuredStepElapsedTime),
-            runningIntervalCoachCueEverySeconds:
-                structuredRunningWorkout?.intervalCoachCueEverySeconds,
-            runningIntervalCoachCountdownSeconds:
-                structuredRunningWorkout?.intervalCoachCountdownSeconds,
             runningNextStepTitle:
                 nextStructuredRunningStep?.title,
             runningStepRemainingSeconds:
@@ -7093,6 +7063,32 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             coachHeartRateSampleAt: coachHeartRateSampleAt,
             coachPaceSampleAt: coachPaceSampleAt
         )
+
+        if let progress = runningStepProgress, let structure = structuredRunningWorkout {
+            snapshot.runningOverallProgress = ATHLTHRunningStepEngine.overallProgress(
+                steps: structure.steps, index: structuredStepIndex,
+                currentStepProgress: awaitingMainStart ? 0 : progress
+            )
+        }
+        snapshot.runningStepTargetTreadmillInclinePercent =
+            currentRunningStep?.targetTreadmillInclinePercent
+        snapshot.runningStepTargetPaceSecondsPerKilometer =
+            currentRunningStep?.targetPaceMinSecondsPerKilometer
+        snapshot.runningAwaitingMainStart = awaitingMainStart
+        if let step = currentRunningStep {
+            snapshot.runningManualAdvanceRequired =
+                awaitingMainStart ||
+                (step.phase == "warmup" &&
+                 structuredRunningWorkout?.autoStartMainAfterWarmup != true) ||
+                step.phase == "cooldown" ||
+                structuredRunningWorkout?.autoAdvanceTimedSteps == false
+            snapshot.runningStepElapsedSeconds =
+                awaitingMainStart ? 0 : currentStructuredStepElapsedTime
+        }
+        snapshot.runningIntervalCoachCueEverySeconds =
+            structuredRunningWorkout?.intervalCoachCueEverySeconds
+        snapshot.runningIntervalCoachCountdownSeconds =
+            structuredRunningWorkout?.intervalCoachCountdownSeconds
 
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
 
