@@ -7,6 +7,8 @@ enum ATHLTHRunningResultInsights {
     struct KilometerSplit: Identifiable, Equatable {
         let kilometer: Int
         let durationSeconds: Double
+        var startedAt: Date? = nil
+        var endedAt: Date? = nil
         var id: Int { kilometer }
         var paceSecondsPerKilometer: Double { durationSeconds }
     }
@@ -26,6 +28,7 @@ enum ATHLTHRunningResultInsights {
         var splitSeconds = 0.0
         var completed: [KilometerSplit] = []
         var previous = route[0]
+        var splitStart = previous.timestamp
 
         for point in route.dropFirst() {
             let seconds = point.timestamp.timeIntervalSince(previous.timestamp)
@@ -53,10 +56,14 @@ enum ATHLTHRunningResultInsights {
                 remainingSeconds -= takenSeconds
                 if accumulatedMeters >= 999.999 {
                     guard splitSeconds >= 50, splitSeconds <= 2_400 else { return [] }
+                    let splitEnd = point.timestamp.addingTimeInterval(-remainingSeconds)
                     completed.append(KilometerSplit(
                         kilometer: completed.count + 1,
-                        durationSeconds: splitSeconds
+                        durationSeconds: splitSeconds,
+                        startedAt: splitStart,
+                        endedAt: splitEnd
                     ))
+                    splitStart = splitEnd
                     accumulatedMeters = 0
                     splitSeconds = 0
                 }
