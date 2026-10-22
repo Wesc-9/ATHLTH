@@ -6,6 +6,57 @@ enum ATHLTHConversationArtwork {
     static let directMessageHeader = "ConversationStadiumHero"
 }
 
+/// Compact gold-branded title shared by message and attachment pickers.
+/// Visual photography, when selected, remains a separate asset decision.
+struct ATHLTHMessagingCompactHeader: View {
+    let eyebrow: String
+    let title: String
+    let symbol: String
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(eyebrow.uppercased())
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .tracking(2.0)
+                    .foregroundStyle(ATHLTHTheme.premiumGold)
+
+                Text(title)
+                    .font(.system(size: 31, weight: .semibold, design: .serif))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .minimumScaleFactor(0.78)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 8)
+
+            Image(systemName: symbol)
+                .font(.system(size: 21, weight: .medium))
+                .foregroundStyle(ATHLTHTheme.premiumGold)
+                .frame(width: 55, height: 55)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            ATHLTHTheme.champagneSoft,
+                            ATHLTHTheme.premiumGoldSoft
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    in: RoundedRectangle(cornerRadius: 19, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 19, style: .continuous)
+                        .stroke(ATHLTHTheme.premiumGold.opacity(0.24), lineWidth: 1)
+                }
+                .accessibilityHidden(true)
+        }
+        .padding(.horizontal, 2)
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 struct ATHLTHConversationHero<
     Avatar: View,
     Trailing: View
