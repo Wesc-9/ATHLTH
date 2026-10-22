@@ -11112,8 +11112,8 @@ private struct StrengthActiveExerciseQueueView: View {
                         } footer: {
                             Text(
                                 ATHLTHLocalization.choose(
-                                    english: "Choose a free station now, or use Edit to drag the exercise order. Completed sets stay saved and your original training plan is unchanged.",
-                                    norwegian: "Velg et ledig apparat med «Tren nå», eller trykk Rediger for å flytte øvelser. Registrerte sett beholdes, og den opprinnelige planen endres ikke."
+                                    english: "Tap Train now or use Edit to reorder. Completed sets stay saved.",
+                                    norwegian: "Trykk «Tren nå», eller bruk Rediger for å flytte øvelser. Fullførte sett beholdes."
                                 )
                             )
                         }
@@ -11153,7 +11153,20 @@ private struct StrengthActiveExerciseQueueView: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        // A single exercise should not open a half-screen sheet with
+        // hundreds of points of unused empty space.
+        .presentationDetents([
+            .height(
+                min(
+                    CGFloat((strength.activeWorkout?.exercises.count ?? 1) * 150 + 205),
+                    660
+                )
+            ),
+            .large
+        ])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(28)
+        .presentationBackground(ATHLTHPlanDesign.canvas)
     }
 }
 
