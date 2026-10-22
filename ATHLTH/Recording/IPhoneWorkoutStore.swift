@@ -3747,7 +3747,7 @@ final class IPhoneWorkoutStore:
             return
         }
         let sampledDistance = existing.reduce(0.0) {
-            $0 + $1.watchDistanceMeters
+            $0 + $1.recordedDistanceMeters
         }
         let delta = max(0,
             workout.distanceMeters -
@@ -3759,7 +3759,7 @@ final class IPhoneWorkoutStore:
             stepIndex: index,
             stepElapsedAtEndSeconds: elapsedInStep,
             activeSeconds: seconds,
-            watchDistanceMeters: delta,
+            recordedDistanceMeters: delta,
             watchHeartRateBPM: nil,
             targetPaceSecondsPerKilometer:
                 step.targetPaceMinSecondsPerKilometer,
