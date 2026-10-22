@@ -9,6 +9,7 @@ final class MirroredWorkoutAudioCoach:
     private let synthesizer =
         AVSpeechSynthesizer()
     private let azureCoachSpeech = ATHLTHAzureWorkoutSpeech()
+    private let audioOwner = "mirror-\(UUID().uuidString)"
 
     private var configuration:
         WatchAudioCoachConfiguration =
@@ -261,7 +262,7 @@ final class MirroredWorkoutAudioCoach:
     func suspendForWatchFallback() {
         azureCoachSpeech.stop()
         synthesizer.stopSpeaking(at: .immediate)
-        ATHLTHSpokenAudioSession.deactivate()
+        ATHLTHSpokenAudioSession.deactivate(owner: audioOwner)
         guidanceGate.reset()
         cueQueue.reset()
     }
@@ -272,7 +273,7 @@ final class MirroredWorkoutAudioCoach:
             at: .immediate
         )
         ATHLTHSpokenAudioSession
-            .deactivate()
+            .deactivate(owner: audioOwner)
         guidanceGate.reset()
         eventLedger.reset()
         cueQueue.reset()
@@ -777,7 +778,8 @@ final class MirroredWorkoutAudioCoach:
                 guard let self, self.configuration.enabled, !self.finished
                 else { return }
                 try? ATHLTHSpokenAudioSession.activate(
-                    duckOtherAudio: self.configuration.shouldDuckOtherAudio
+                    duckOtherAudio: self.configuration.shouldDuckOtherAudio,
+                    owner: self.audioOwner
                 )
                 self.synthesizer.speak(utterance)
             },
@@ -789,8 +791,9 @@ final class MirroredWorkoutAudioCoach:
         )
         if !routedToAzure {
             try? ATHLTHSpokenAudioSession.activate(
-                duckOtherAudio: configuration.shouldDuckOtherAudio
-            )
+                duckOtherAudio: configuration.shouldDuckOtherAudio,
+                owner: audioOwner
+            
             synthesizer.speak(utterance)
         }
         if rememberForReplay,
@@ -837,7 +840,7 @@ final class MirroredWorkoutAudioCoach:
             // A cancelled system utterance can finish its delegate callback
             // after an Azure replacement has already started. Never release
             // the ducking audio session while a second coach voice is active.
-            ATHLTHSpokenAudioSession.deactivate()
+            ATHLTHSpokenAudioSession.deactivate(owner: audioOwner)
             self.deliverNextQueuedCue()
         }
     }
@@ -863,7 +866,7 @@ final class MirroredWorkoutAudioCoach:
             // A cancelled system utterance can finish its delegate callback
             // after an Azure replacement has already started. Never release
             // the ducking audio session while a second coach voice is active.
-            ATHLTHSpokenAudioSession.deactivate()
+            ATHLTHSpokenAudioSession.deactivate(owner: audioOwner)
             self.deliverNextQueuedCue()
         }
     }
