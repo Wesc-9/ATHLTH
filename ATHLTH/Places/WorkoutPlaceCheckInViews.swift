@@ -640,6 +640,19 @@ private struct WorkoutPlacePickerView:
         _ place:
             WorkoutPlacePresentation
     ) -> some View {
+        let venueSymbol =
+            place.placeKind == "hotel"
+                ? "building.2.fill"
+                : place.placeKind == "stadium"
+                    ? "sportscourt.fill"
+                    : "dumbbell.fill"
+        let venueType =
+            place.placeKind == "hotel"
+                ? placeTR("Hotel", "Hotell")
+                : place.placeKind == "stadium"
+                    ? placeTR("Stadium", "Idrettsanlegg")
+                    : placeTR("Gym", "Treningssenter")
+
         let distance =
             place.distanceMeters
         let canCheckIn =
@@ -680,10 +693,7 @@ private struct WorkoutPlacePickerView:
             }
         } label: {
             HStack(spacing: 12) {
-                Image(
-                    systemName:
-                        "figure.strengthtraining.traditional"
-                )
+                Image(systemName: venueSymbol)
                 .font(
                     .system(
                         size: 15,
@@ -731,12 +741,10 @@ private struct WorkoutPlacePickerView:
                         .lineLimit(1)
 
                     HStack(spacing: 6) {
+                        Text(venueType)
                         if let distance {
-                            Text(
-                                distanceText(
-                                    distance
-                                )
-                            )
+                            Text("·")
+                            Text(distanceText(distance))
                         }
 
                         let count =
