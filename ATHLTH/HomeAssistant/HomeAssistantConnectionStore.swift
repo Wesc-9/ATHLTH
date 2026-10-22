@@ -2096,6 +2096,45 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         }
     }
 
+    /// Independent, revocable, signed export of completed strength efforts.
+    func syncStrengthProgress(_ sessions: [StrengthWorkoutLog]) async {
+        guard isConnected, supportsStrengthProgress, !isStrengthProgressSyncing else { return }
+        isStrengthProgressSyncing = true
+        defer { isStrengthProgressSyncing = false }
+
+        let allowed = shareCompletedWorkouts && shareStrengthProgress
+        let records: [HomeAssistantJSONValue] = allowed
+            ? HomeAssistantStrengthProgressExtractor.confirmedBestSets(
+                from: sessions
+            ).map { item in
+                .object([
+                    "id": .string(item.id),
+                    "exercise": .string(item.exercise),
+                    "reps": .int(item.reps),
+                    "weight_kg": .double(item.weightKilograms),
+                    "ended_at": .string(Self.iso8601(item.endedAt)),
+                    "source": .string("completed_strength_set")
+                ])
+            }
+            : []
+        let payload: [String: HomeAssistantJSONValue] = allowed
+            ? ["records": .array(records)] : ["clear": .bool(true)]
+        let coder = JSONEncoder()
+        coder.outputFormatting = [.sortedKeys]
+        guard let bytes = try? coder.encode(HomeAssistantJSONValue.object(payload)) else {
+            return
+        }
+        let fingerprint = SHA256.hash(data: bytes)
+            .map { String(format: "%02x", $0) }.joined()
+        guard fingerprint != strengthProgressFingerprint else { return }
+        do {
+            try await send(event: "strength_progress_synced", payload: payload)
+            strengthProgressFingerprint = fingerprint
+        } catch {
+            lastErrorMessage = error.localizedDescription
+        }
+    }
+
     func sendRecovery(score: Int?) async {
         guard isConnected,
               shareRecovery,
