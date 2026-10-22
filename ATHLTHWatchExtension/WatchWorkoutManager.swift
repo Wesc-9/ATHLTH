@@ -201,6 +201,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var mirroringRetryPending = false
     private var iPhoneVoiceLease = ATHLTHAudioCoachVoiceLease()
     private var lastMirrorSnapshotSentAt: Date?
+    private var appliedRunningAppendCommands = Set<UUID>()
     private let speechSynthesizer = AVSpeechSynthesizer()
     private var coachAudioSessionIsActive = false
     private var audioCoachActivationTask:
@@ -582,6 +583,81 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         if isActive,
            !workout.steps.isEmpty {
             announceCurrentStructuredStep(prefix: "Starting")
+        }
+    }
+
+    /// Use the same HKWorkoutSession for a running interval added from the
+    /// iPhone. Existing route, pulse, distance, completed steps and elapsed
+    /// time are preserved. No second workout is started on Apple Watch.
+    private func appendRunningPart(
+        _ addition: WatchRunningWorkoutTransfer,
+        startNow: Bool,
+        commandID: UUID?,
+        requestedWorkoutStart: Date?
+    ) {
+        guard kind == .running || kind == .walking,
+              isActive,
+              let startedAt,
+              let requestedWorkoutStart,
+              abs(requestedWorkoutStart.timeIntervalSince(startedAt)) < 5,
+              !addition.steps.isEmpty,
+              addition.steps.count <= 150 else { return }
+
+        guard addition.steps.allSatisfy({ step in
+            switch step.measure {
+            case .time:
+                return step.durationSeconds.map {
+                    $0.isFinite && (15...7_200).contains($0)
+                } == true
+            case .distance:
+                return step.distanceMeters.map {
+                    $0.isFinite && (10...100_000).contains($0)
+                } == true
+            case .open:
+                return true
+            }
+        }) else { return }
+
+        if let commandID, appliedRunningAppendCommands.contains(commandID) {
+            return
+        }
+
+        let hasActivePart =
+            structuredRunningWorkout != nil && !structuredWorkoutComplete
+        if startNow && hasActivePart { return }
+        if !startNow && !hasActivePart { return }
+
+        let firstNewIndex = structuredRunningWorkout?.steps.count ?? 0
+        if var existing = structuredRunningWorkout {
+            existing.steps.append(contentsOf: addition.steps)
+            existing.sourceWorkoutID = nil
+            publish { self.structuredRunningWorkout = existing }
+        } else {
+            publish { self.structuredRunningWorkout = addition }
+        }
+
+        if !hasActivePart {
+            structuredStepStartElapsedTime = elapsedTime
+            structuredStepStartDistanceMeters = distanceMeters
+            publish { self.structuredStepIndex = firstNewIndex }
+        }
+        structuredWorkoutComplete = false
+        targetViolationStartedAt = nil
+        lastTargetAlertAt = nil
+        targetWasOutside = false
+
+        if let commandID {
+            if appliedRunningAppendCommands.count > 100 {
+                appliedRunningAppendCommands.removeAll()
+            }
+            appliedRunningAppendCommands.insert(commandID)
+        }
+        persistWorkoutRecoveryState()
+        if !hasActivePart {
+            announceCurrentStructuredStep(prefix: "Starting")
+        }
+        Task { @MainActor [weak self] in
+            await self?.sendLiveSnapshot(force: true)
         }
     }
 
@@ -7454,6 +7530,15 @@ extension WatchWorkoutManager:
                                 .treadmillInclinePercent {
                         self.setTreadmillInclinePercent(
                             value
+                        )
+                    }
+                case .appendRunningWorkout:
+                    if let part = command.runningWorkoutToAppend {
+                        self.appendRunningPart(
+                            part,
+                            startNow: command.runningWorkoutStartImmediately ?? false,
+                            commandID: command.commandID,
+                            requestedWorkoutStart: command.workoutStartedAt
                         )
                     }
                 }
