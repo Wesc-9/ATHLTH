@@ -54,6 +54,20 @@ final class HybridStrengthRunningSessionTests: XCTestCase {
         )
         XCTAssertTrue(phases.sets.allSatisfy { $0.hybridPhaseKind != nil })
         XCTAssertEqual(workout.totalCompletedSets, 0)
+
+        // Watch must know this is a running phase even though HealthKit
+        // retains one combined strength workout.
+        let watch = try XCTUnwrap(store.watchSnapshot)
+        XCTAssertEqual(watch.isEmbeddedRunningInterval, true)
+        XCTAssertEqual(watch.exerciseName, "Treadmill Running")
+        XCTAssertNotNil(watch.embeddedRunningPhaseTitle)
+        XCTAssertNotNil(watch.embeddedRunningPhaseKind)
+        let wire = try JSONEncoder().encode(watch)
+        let restored = try JSONDecoder().decode(
+            WatchStrengthSessionSnapshot.self, from: wire
+        )
+        XCTAssertEqual(restored.isEmbeddedRunningInterval, true)
+        XCTAssertEqual(restored.embeddedRunningPhaseTitle, watch.embeddedRunningPhaseTitle)
     }
 
     @MainActor
